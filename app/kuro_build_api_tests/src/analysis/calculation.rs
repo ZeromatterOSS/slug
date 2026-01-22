@@ -129,7 +129,7 @@ async fn test_analysis_calculation() -> kuro_error::Result<()> {
                 module.dupe(),
             )]),
         },
-        PackageListing::testing_new(&[], "BUCK"),
+        PackageListing::testing_new(&[], "BUILD.bazel"),
     )?;
 
     let fs = ProjectRootTemp::new()?;

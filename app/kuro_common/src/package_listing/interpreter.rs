@@ -213,7 +213,7 @@ impl std::fmt::Display for GatherPackageListingError {
             path `fbsource//foo/target/x` is a file, not a directory
 
          package `fbsource//foo/target/x/y/lmnop:` does not exist
-             missing `TARGETS` file (also missing alternatives `TARGETS.v2`, `BUCK`, `BUCK.v2`)
+             missing `BUILD.bazel` file (also missing alternative `BUILD`)
 
          error loading package `fbsource//foo/target/x/y/lmnop:`
               ... # just display the kuro_error for now

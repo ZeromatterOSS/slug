@@ -205,7 +205,7 @@ mod tests {
             true,
             ignores
                 .check(UncheckedCellRelativePath::unchecked_new(
-                    "trailing_slash/BUCK"
+                    "trailing_slash/BUILD.bazel"
                 ))
                 .is_ignored()
         );

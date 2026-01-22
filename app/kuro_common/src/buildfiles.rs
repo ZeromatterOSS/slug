@@ -23,36 +23,23 @@ use crate::legacy_configs::dice::HasLegacyConfigs;
 use crate::legacy_configs::key::BuckconfigKeyRef;
 use crate::legacy_configs::view::LegacyBuckConfigView;
 
-const DEFAULT_BUILDFILES: &[&str] = &["BUCK.v2", "BUCK"];
+const DEFAULT_BUILDFILES: &[&str] = &["BUILD.bazel", "BUILD"];
 
-/// Deal with the `buildfile.name` key (and `name_v2`)
+/// Deal with the `buildfile.name` key
+///
+/// Bazel-compatible defaults: BUILD.bazel takes precedence over BUILD.
+/// Custom buildfile names can be configured via [buildfile] name.
 pub fn parse_buildfile_name(
     mut config: impl LegacyBuckConfigView,
 ) -> kuro_error::Result<Vec<FileNameBuf>> {
-    // For kuro, we support a slightly different mechanism for setting the buildfile to
-    // assist with easier migration from v1 to v2.
-    // First, we check the key `buildfile.name_v2`, if this is provided, we use it.
-    // Second, if that wasn't provided, we will use `buildfile.name` like buck1 does,
-    // but for every entry `FOO` we will insert a preceding `FOO.v2`.
-    // If neither of those is provided, we will use the default of `["BUCK.v2", "BUCK"]`.
-    // This scheme provides a natural progression to buckv2, with the ability to use separate
-    // buildfiles for the two where necessary.
+    // Check [buildfile] name for custom buildfile names
+    // If not provided, use Bazel-compatible defaults: BUILD.bazel, BUILD
     let mut base = if let Some(buildfiles_value) =
         config.parse_list::<String>(BuckconfigKeyRef {
             section: "buildfile",
-            property: "name_v2",
+            property: "name",
         })? {
         buildfiles_value.into_try_map(FileNameBuf::try_from)?
-    } else if let Some(buildfiles_value) = config.parse_list::<String>(BuckconfigKeyRef {
-        section: "buildfile",
-        property: "name",
-    })? {
-        let mut buildfiles = Vec::new();
-        for buildfile in buildfiles_value {
-            buildfiles.push(FileNameBuf::try_from(format!("{buildfile}.v2"))?);
-            buildfiles.push(FileNameBuf::try_from(buildfile)?);
-        }
-        buildfiles
     } else {
         DEFAULT_BUILDFILES.map(|&n| FileNameBuf::try_from(n.to_owned()).unwrap())
     };
@@ -156,8 +143,7 @@ mod tests {
                             [cells]
                                 third_party = .
                             [buildfile]
-                                name_v2 = OKAY
-                                name = OKAY_v1
+                                name = BUILD.bazel,BUILD
                         "#
                 ),
             ),
@@ -165,27 +151,30 @@ mod tests {
 
         let cells = BuckConfigBasedCells::testing_parse_with_file_ops(&mut file_ops, &[]).await?;
 
+        // Default buildfiles are BUILD.bazel, BUILD (Bazel-compatible)
         let config = cells
             .parse_single_cell_with_file_ops(CellName::testing_new("root"), &mut file_ops)
             .await?;
         assert_eq!(
-            vec!["BUCK.v2", "BUCK"],
+            vec!["BUILD.bazel", "BUILD"],
             parse_buildfile_name(&config)?.map(|f| f.as_str()),
         );
 
+        // Custom buildfile names are used directly (no .v2 suffix added)
         let config = cells
             .parse_single_cell_with_file_ops(CellName::testing_new("other"), &mut file_ops)
             .await?;
         assert_eq!(
-            vec!["TARGETS.v2", "TARGETS", "TARGETS.test"],
+            vec!["TARGETS", "TARGETS.test"],
             parse_buildfile_name(&config)?.map(|f| f.as_str()),
         );
 
+        // Explicit list in config
         let config = cells
             .parse_single_cell_with_file_ops(CellName::testing_new("third_party"), &mut file_ops)
             .await?;
         assert_eq!(
-            vec!["OKAY"],
+            vec!["BUILD.bazel", "BUILD"],
             parse_buildfile_name(&config)?.map(|f| f.as_str()),
         );
 

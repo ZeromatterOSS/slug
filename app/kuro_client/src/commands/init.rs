@@ -174,9 +174,9 @@ fn initialize_buckconfig(repo_root: &AbsPath, prelude: bool, git: bool) -> kuro_
     Ok(())
 }
 
-fn initialize_toolchains_buck(repo_root: &AbsPath) -> kuro_error::Result<()> {
+fn initialize_toolchains_build(repo_root: &AbsPath) -> kuro_error::Result<()> {
     std::fs::write(
-        repo_root.join("BUCK"),
+        repo_root.join("BUILD.bazel"),
         r#"
 load("@prelude//toolchains:demo.bzl", "system_demo_toolchains")
 
@@ -189,20 +189,20 @@ system_demo_toolchains()
     Ok(())
 }
 
-fn initialize_root_buck(repo_root: &AbsPath, prelude: bool) -> kuro_error::Result<()> {
-    let mut buck = std::fs::File::create(repo_root.join("BUCK"))?;
+fn initialize_root_build(repo_root: &AbsPath, prelude: bool) -> kuro_error::Result<()> {
+    let mut build = std::fs::File::create(repo_root.join("BUILD.bazel"))?;
 
     if prelude {
         writeln!(
-            buck,
+            build,
             "# A list of available rules and their signatures can be found here: https://kuro.build/docs/prelude/globals/"
         )?;
-        writeln!(buck)?;
-        writeln!(buck, "genrule(")?;
-        writeln!(buck, "    name = \"hello_world\",")?;
-        writeln!(buck, "    out = \"out.txt\",")?;
-        writeln!(buck, "    cmd = \"echo BUILT BY BUCK2> $OUT\",")?;
-        writeln!(buck, ")")?;
+        writeln!(build)?;
+        writeln!(build, "genrule(")?;
+        writeln!(build, "    name = \"hello_world\",")?;
+        writeln!(build, "    out = \"out.txt\",")?;
+        writeln!(build, "    cmd = \"echo BUILT BY KURO> $OUT\",")?;
+        writeln!(build, ")")?;
     }
     // TODO: Add a doc pointers for rules
     Ok(())
@@ -253,11 +253,12 @@ fn set_up_project(repo_root: &AbsPath, git: bool, prelude: bool) -> kuro_error::
         let toolchains = repo_root.join("toolchains");
         if !toolchains.exists() {
             fs_util::create_dir(&toolchains)?;
-            initialize_toolchains_buck(&toolchains)?;
+            initialize_toolchains_build(&toolchains)?;
         }
     }
-    if !repo_root.join("BUCK").exists() {
-        initialize_root_buck(repo_root, prelude)?;
+    // Create BUILD.bazel if neither BUILD.bazel nor BUILD exists
+    if !repo_root.join("BUILD.bazel").exists() && !repo_root.join("BUILD").exists() {
+        initialize_root_build(repo_root, prelude)?;
     }
     Ok(())
 }
@@ -268,7 +269,7 @@ mod tests {
     use kuro_fs::paths::abs_path::AbsPath;
 
     use crate::commands::init::initialize_buckconfig;
-    use crate::commands::init::initialize_root_buck;
+    use crate::commands::init::initialize_root_build;
     use crate::commands::init::set_up_gitignore;
     use crate::commands::init::set_up_project;
 
@@ -283,8 +284,8 @@ mod tests {
         set_up_project(tempdir_path, false, true)?;
         assert!(tempdir_path.join(".buckconfig").exists());
         assert!(tempdir_path.join("toolchains").exists());
-        assert!(tempdir_path.join("toolchains/BUCK").exists());
-        assert!(tempdir_path.join("BUCK").exists());
+        assert!(tempdir_path.join("toolchains/BUILD.bazel").exists());
+        assert!(tempdir_path.join("BUILD.bazel").exists());
         Ok(())
     }
 
@@ -383,24 +384,24 @@ mod tests {
     }
 
     #[test]
-    fn test_buckfile_generation_with_prelude() -> kuro_error::Result<()> {
+    fn test_buildfile_generation_with_prelude() -> kuro_error::Result<()> {
         let tempdir = tempfile::tempdir()?;
         let tempdir_path = tempdir.path();
         let tempdir_path = AbsPath::new(tempdir_path)?;
         fs_util::create_dir_all(tempdir_path)?;
 
-        let buck_path = tempdir_path.join("BUCK");
-        initialize_root_buck(tempdir_path, true)?;
-        let actual_buck = fs_util::read_to_string(buck_path)?;
-        let expected_buck = "# A list of available rules and their signatures can be found here: https://kuro.build/docs/prelude/globals/
+        let build_path = tempdir_path.join("BUILD.bazel");
+        initialize_root_build(tempdir_path, true)?;
+        let actual_build = fs_util::read_to_string(build_path)?;
+        let expected_build = "# A list of available rules and their signatures can be found here: https://kuro.build/docs/prelude/globals/
 
 genrule(
     name = \"hello_world\",
     out = \"out.txt\",
-    cmd = \"echo BUILT BY BUCK2> $OUT\",
+    cmd = \"echo BUILT BY KURO> $OUT\",
 )
 ";
-        assert_eq!(actual_buck, expected_buck);
+        assert_eq!(actual_build, expected_build);
         Ok(())
     }
 }

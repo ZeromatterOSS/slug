@@ -435,15 +435,15 @@ mod tests {
             let tester = TestPatternResolver::new(
                 &[("root", ""), ("child", "child/cell")],
                 &[
-                    ("BUCK"),
-                    ("other/BUCK"),
-                    ("other/a/bit/deeper/BUCK"),
-                    ("other/a/bit/deeper/and/deeper/BUCK"),
-                    ("some/thing/dir/a/BUCK"),
-                    ("some/thing/dir/a/b/BUCK"),
-                    ("some/thing/extra/BUCK"),
-                    ("child/cell/BUCK"),
-                    ("child/cell/foo/BUCK"),
+                    ("BUILD.bazel"),
+                    ("other/BUILD.bazel"),
+                    ("other/a/bit/deeper/BUILD.bazel"),
+                    ("other/a/bit/deeper/and/deeper/BUILD.bazel"),
+                    ("some/thing/dir/a/BUILD.bazel"),
+                    ("some/thing/dir/a/b/BUILD.bazel"),
+                    ("some/thing/extra/BUILD.bazel"),
+                    ("child/cell/BUILD.bazel"),
+                    ("child/cell/foo/BUILD.bazel"),
                 ],
             )
             .unwrap();
@@ -620,15 +620,15 @@ mod tests {
             let tester = TestPatternResolver::new(
                 &[("root", ""), ("child", "child/cell")],
                 &[
-                    ("BUCK"),
-                    ("other/BUCK"),
-                    ("other/a/bit/deeper/BUCK"),
-                    ("other/a/bit/deeper/and/deeper/BUCK"),
-                    ("some/thing/dir/a/BUCK"),
-                    ("some/thing/dir/a/b/BUCK"),
-                    ("some/thing/extra/BUCK"),
-                    ("child/cell/BUCK"),
-                    ("child/cell/foo/BUCK"),
+                    ("BUILD.bazel"),
+                    ("other/BUILD.bazel"),
+                    ("other/a/bit/deeper/BUILD.bazel"),
+                    ("other/a/bit/deeper/and/deeper/BUILD.bazel"),
+                    ("some/thing/dir/a/BUILD.bazel"),
+                    ("some/thing/dir/a/b/BUILD.bazel"),
+                    ("some/thing/extra/BUILD.bazel"),
+                    ("child/cell/BUILD.bazel"),
+                    ("child/cell/foo/BUILD.bazel"),
                 ],
             )
             .unwrap();

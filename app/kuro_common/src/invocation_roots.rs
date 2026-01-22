@@ -28,7 +28,7 @@ use crate::invocation_paths_result::InvocationPathsResult;
 #[derive(Debug, kuro_error::Error)]
 enum BuckCliError {
     #[error(
-        "Couldn't find a buck project root for directory `{}`. Expected to find a .buckconfig file.", _0.path().display()
+        "Couldn't find a project root for directory `{}`. Expected to find a MODULE.bazel or .buckconfig file.", _0.path().display()
     )]
     #[kuro(tag = NoBuckRoot)]
     NoBuckRoot(AbsWorkingDir),
@@ -60,8 +60,11 @@ impl InvocationRoots {
 
 /// Finds the project root.
 ///
+/// For Bazel compatibility, this looks for MODULE.bazel first (Bazel 9.0+ style),
+/// then falls back to .buckconfig for backwards compatibility.
+///
 /// This uses a rather liberal definition of "roots". It traverses the directory and its parents
-/// looking for all .buckconfig files and the furthest one (with the shortest path) will be detected
+/// looking for root marker files and the furthest one (with the shortest path) will be detected
 /// as the "project root".
 ///
 /// We also look for .buckroot files, and if we find one of them, we don't traverse further upwards.
@@ -71,7 +74,14 @@ fn get_roots(from: &AbsWorkingDir) -> kuro_error::Result<Option<InvocationRoots>
 
     let home_dir = dirs::home_dir();
     for curr in from.path().ancestors() {
-        if fs_util::try_exists(curr.join(FileName::unchecked_new(".buckconfig")))? {
+        // Check for MODULE.bazel first (Bazel 9.0+ workspace marker)
+        let has_module_bazel =
+            fs_util::try_exists(curr.join(FileName::unchecked_new("MODULE.bazel")))?;
+        // Fall back to .buckconfig for backwards compatibility
+        let has_buckconfig =
+            fs_util::try_exists(curr.join(FileName::unchecked_new(".buckconfig")))?;
+
+        if has_module_bazel || has_buckconfig {
             // Do not allow /home/{unixname}, /home or / to be a cell,
             // and /home/{unixname}/.buckconfig is used for config override
             if let Some(home_dir_path) = &home_dir {

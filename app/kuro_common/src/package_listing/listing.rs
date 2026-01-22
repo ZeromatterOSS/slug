@@ -122,7 +122,7 @@ pub mod testing {
         }
 
         fn testing_files(files: &[&str]) -> Self {
-            Self::testing_new(files, "BUCK")
+            Self::testing_new(files, "BUILD.bazel")
         }
 
         fn testing_new(files: &[&str], buildfile: &str) -> Self {

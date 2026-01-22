@@ -696,7 +696,7 @@ pub mod testing {
 
             let buildfile_path = Arc::new(BuildFilePath::new(
                 label.pkg().dupe(),
-                FileNameBuf::unchecked_new("BUCK"),
+                FileNameBuf::unchecked_new("BUILD.bazel"),
             ));
             TargetNode::new(
                 Arc::new(Rule {
