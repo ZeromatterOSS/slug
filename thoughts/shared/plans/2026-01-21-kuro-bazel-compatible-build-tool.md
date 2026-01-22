@@ -20,8 +20,8 @@ Named after the [Costasiella kuroshimae](https://en.wikipedia.org/wiki/Costasiel
 | Feature | Kuro | Bazel 9.0 | Work Required |
 |---------|-------|-----------|---------------|
 | Build files | BUCK | BUILD.bazel | File detection change |
-| Starlark dialect | `attrs.*`, type annotations | `attr.*`, optional types | API additions (keep types) |
-| Rule definition | `impl` param | `implementation` param | Support both, prefer Bazel |
+| Starlark dialect | `attrs.*`, type annotations | `attr.*`, optional types | Bazel only (`attr.*`), keep type annotations |
+| Rule definition | `impl` param | `implementation` param | Bazel only (`implementation`) |
 | Dep management | Cells, no modules | bzlmod mandatory | Full bzlmod implementation |
 | Registry | None | BCR | Registry client |
 | Local isolation | None (RE-first) | Sandboxing | Implement sandboxing |
@@ -171,47 +171,37 @@ Modify starlark-rust to support Bazel's Starlark APIs while preserving type anno
 - Type annotations should be **optional** (code without them must work)
 - Type errors should be **warnings**, not failures
 
-#### 2. Add Bazel Attribute Module
-**File**: Create Bazel-compatible attribute API
+#### 2. Replace Attribute Module with Bazel API
+**File**: Replace Kuro attribute API with Bazel-compatible API
 
-Add `attr` module alongside existing `attrs`:
+Replace `attrs` module with `attr` (Kuro's `attrs.*` will not be supported):
 
 ```python
-# Both should work:
-# Kuro style (existing):
-attrs.string(), attrs.dep(), attrs.list(attrs.dep())
-
-# Bazel style (add):
+# Bazel style (only supported):
 attr.string(), attr.label(), attr.label_list()
 ```
 
-Full mapping:
-| Bazel `attr.*` | Implementation |
-|----------------|----------------|
-| `attr.string()` | Maps to `attrs.string()` |
-| `attr.int()` | Maps to `attrs.int()` |
-| `attr.bool()` | Maps to `attrs.bool()` |
-| `attr.label()` | Maps to `attrs.dep()` |
-| `attr.label_list()` | Maps to `attrs.list(attrs.dep())` |
-| `attr.string_list()` | Maps to `attrs.list(attrs.string())` |
-| `attr.string_dict()` | Maps to `attrs.dict(...)` |
-| `attr.output()` | Maps to `attrs.output()` |
-| `attr.output_list()` | Maps to `attrs.list(attrs.output())` |
+Required `attr.*` functions:
+| Bazel `attr.*` | Description |
+|----------------|-------------|
+| `attr.string()` | String attribute |
+| `attr.int()` | Integer attribute |
+| `attr.bool()` | Boolean attribute |
+| `attr.label()` | Dependency label |
+| `attr.label_list()` | List of dependency labels |
+| `attr.string_list()` | List of strings |
+| `attr.string_dict()` | Dictionary of strings |
+| `attr.output()` | Output file |
+| `attr.output_list()` | List of output files |
 
-#### 3. Rule Definition API Compatibility
+#### 3. Rule Definition API
 **File**: Rule definition handling
 
-Support both parameter names:
+Only Bazel-style `implementation` parameter (Kuro's `impl` will not be supported):
 ```python
-# Bazel style (prefer):
+# Bazel style (only supported):
 my_rule = rule(
     implementation = _impl,
-    attrs = {...}
-)
-
-# Kuro style (also works):
-my_rule = rule(
-    impl = _impl,
     attrs = {...}
 )
 ```
@@ -262,8 +252,8 @@ Support Bazel patterns:
 
 #### Manual Verification:
 - [x] Sample .bzl file with Bazel syntax loads without errors
-- [x] Sample .bzl file with Kuro syntax still loads (backwards compat during transition)
 - [x] Type-annotated .bzl file works with annotations as optional
+- [x] Kuro-style syntax (`attrs.*`, `impl`) is rejected with clear error message
 
 ---
 
