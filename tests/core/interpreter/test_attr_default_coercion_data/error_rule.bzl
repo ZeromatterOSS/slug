@@ -6,20 +6,14 @@
 # of this source tree. You may select, at your option, one of the
 # above-listed licenses.
 
-def _transition_impl(**_kwargs):
+def _impl(ctx):
     pass
 
-_transition = transition(
-    impl = _transition_impl,
-    refs = {},
-)
-
-def _impl():
-    pass
-
+# Test that invalid default values for label attributes are properly rejected.
+# Using Bazel-compatible attr.label() API.
 error_rule = rule(
-    impl = _impl,
+    implementation = _impl,
     attrs = {
-        "someattr": attrs.transition_dep(default = "notaproperlabel", cfg = _transition),
+        "someattr": attr.label(default = "notaproperlabel"),
     },
 )

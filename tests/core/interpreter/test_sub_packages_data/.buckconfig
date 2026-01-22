@@ -3,4 +3,4 @@
   prelude = .
 
 [buildfile]
-  name = TARGETS.fixture
+  name = BUILD.bazel

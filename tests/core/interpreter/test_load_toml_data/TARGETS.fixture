@@ -1,4 +1,0 @@
-load(":example.toml", toml = "value")
-
-# buildifier: disable=print
-print(toml)

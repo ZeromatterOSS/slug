@@ -1,7 +1,7 @@
 [repositories]
     root = .
 [buildfile]
-    name = TARGETS.fixture
+    name = BUILD.bazel
 [kuro]
     directories_to_allow_relative_paths = \
         //foo

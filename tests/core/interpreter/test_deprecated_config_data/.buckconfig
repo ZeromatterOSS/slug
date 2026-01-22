@@ -5,7 +5,7 @@
 [repository_aliases]
     prelude = root
 [buildfile]
-    name = TARGETS.fixture
+    name = BUILD.bazel
 [unlike]
     harsh = regular
 [some]

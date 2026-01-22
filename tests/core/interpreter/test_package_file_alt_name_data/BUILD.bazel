@@ -1,0 +1,4 @@
+# Primary build file (BUILD.bazel) - takes precedence over BUILD
+
+# buildifier: disable=print
+print("AAA from BUILD.bazel")

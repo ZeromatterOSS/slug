@@ -3,6 +3,6 @@
     prelude = .
     other = other
 [buildfile]
-    name = TARGETS.fixture
+    name = BUILD.bazel
 [unlike]
     harsh = regular

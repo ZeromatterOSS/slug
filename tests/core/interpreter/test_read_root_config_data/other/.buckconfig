@@ -1,4 +1,4 @@
 [buildfile]
-    name = TARGETS.fixture
+    name = BUILD.bazel
 [unlike]
     harsh = guerrilla
