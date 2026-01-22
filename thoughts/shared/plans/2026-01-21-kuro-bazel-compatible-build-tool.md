@@ -160,6 +160,23 @@ Verify the renamed binary runs:
 ### Overview
 Modify starlark-rust to support Bazel's Starlark APIs while preserving type annotation support.
 
+### Bazel Source References
+
+Consult these Bazel source files to understand the exact API contracts:
+
+| Feature | Bazel Source File |
+|---------|-------------------|
+| `attr.*` module | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkAttrModuleApi.java` |
+| Attribute types | `src/main/java/com/google/devtools/build/lib/packages/Attribute.java` |
+| `rule()` function | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkRuleFunctionsApi.java` |
+| `native.*` module | `src/main/java/com/google/devtools/build/lib/packages/StarlarkNativeModule.java` |
+| Visibility labels | `src/main/java/com/google/devtools/build/lib/packages/RuleVisibility.java` |
+| Target patterns | `src/main/java/com/google/devtools/build/lib/cmdline/TargetPattern.java` |
+
+**Key tests to study:**
+- `src/test/java/com/google/devtools/build/lib/starlark/StarlarkRuleClassFunctionsTest.java`
+- `src/test/java/com/google/devtools/build/lib/packages/AttributeTest.java`
+
 ### Changes Required:
 
 #### 1. Keep Type Annotation Support
@@ -262,6 +279,19 @@ Support Bazel patterns:
 ### Overview
 Change kuro to recognize BUILD.bazel and BUILD files instead of BUCK files.
 
+### Bazel Source References
+
+Consult these Bazel source files for build file detection and package boundary logic:
+
+| Feature | Bazel Source File |
+|---------|-------------------|
+| Build file names | `src/main/java/com/google/devtools/build/lib/skyframe/PackageLookupFunction.java` |
+| Package boundaries | `src/main/java/com/google/devtools/build/lib/packages/Package.java` |
+| Workspace detection | `src/main/java/com/google/devtools/build/lib/bazel/BazelWorkspaceStatusModule.java` |
+| Label parsing | `src/main/java/com/google/devtools/build/lib/cmdline/Label.java` |
+
+**Key constant:** Look for `BUILD_FILE_NAME` constants in `PackageLookupFunction.java` to see the exact precedence rules (BUILD.bazel vs BUILD).
+
 ### Changes Required:
 
 #### 1. Build File Detection
@@ -301,15 +331,17 @@ fn find_workspace_root(start: &Path) -> Option<PathBuf> {
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `kuro build //...` finds BUILD.bazel files
-- [ ] `kuro build //...` ignores BUCK files
-- [ ] Workspace root detected by MODULE.bazel presence
-- [ ] Package boundaries correctly identified
-- [ ] BUILD.bazel takes precedence over BUILD
+- [x] `kuro build //...` finds BUILD.bazel files
+- [x] `kuro build //...` ignores BUCK files
+- [x] Workspace root detected by MODULE.bazel presence
+- [x] Package boundaries correctly identified
+- [x] BUILD.bazel takes precedence over BUILD
 
 #### Manual Verification:
-- [ ] Create test directory with BUILD.bazel, verify it's found
-- [ ] Create test directory with both BUILD and BUILD.bazel, verify BUILD.bazel used
+- [x] Create test directory with BUILD.bazel, verify it's found
+- [x] Create test directory with both BUILD and BUILD.bazel, verify BUILD.bazel used
+
+**Implementation Note**: Phase 3 complete. MODULE.bazel is detected as workspace marker alongside .buckconfig. Full MODULE.bazel support for cell configuration comes in Phase 4a.
 
 ---
 
@@ -317,6 +349,21 @@ fn find_workspace_root(start: &Path) -> Option<PathBuf> {
 
 ### Overview
 Parse MODULE.bazel as workspace root marker and implement basic parsing.
+
+### Bazel Source References
+
+The bzlmod implementation is well-organized in Bazel. Start here:
+
+| Feature | Bazel Source File |
+|---------|-------------------|
+| MODULE.bazel parser | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java` |
+| Module data structure | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/Module.java` |
+| `module()` directive | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java` |
+| `bazel_dep()` directive | Same file as above - search for `bazelDep` method |
+| Version parsing | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/Version.java` |
+
+**Key tests:**
+- `src/test/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunctionTest.java`
 
 ### Changes Required:
 
@@ -380,6 +427,14 @@ Integrate with Phase 3's workspace detection - MODULE.bazel is the marker.
 ### Overview
 Implement local module loading via `local_path_override()`.
 
+### Bazel Source References
+
+| Feature | Bazel Source File |
+|---------|-------------------|
+| Override directives | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java` (search for `localPathOverride`) |
+| Override resolution | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelDepGraphFunction.java` |
+| Local repo rule | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/LocalPathOverride.java` |
+
 ### Changes Required:
 
 #### 1. Override Directives
@@ -437,6 +492,19 @@ Load and parse MODULE.bazel from all local overrides, building initial dependenc
 
 ### Overview
 Implement Bazel Central Registry client for fetching remote modules.
+
+### Bazel Source References
+
+| Feature | Bazel Source File |
+|---------|-------------------|
+| Registry interface | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/Registry.java` |
+| Index registry (BCR) | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/IndexRegistry.java` |
+| Registry factory | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RegistryFactory.java` |
+| Source fetching | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/RepoSpecFunction.java` |
+| Archive handling | `src/main/java/com/google/devtools/build/lib/bazel/repository/downloader/HttpDownloader.java` |
+| Integrity check | `src/main/java/com/google/devtools/build/lib/bazel/repository/downloader/Checksum.java` |
+
+**BCR protocol reference:** Also see the BCR repository itself at https://github.com/bazelbuild/bazel-central-registry for the expected JSON schema of `metadata.json` and `source.json` files.
 
 ### Changes Required:
 
@@ -558,6 +626,25 @@ Cache fetched modules:
 
 ### Overview
 Implement Minimal Version Selection (MVS) algorithm and lockfile generation.
+
+> **CRITICAL**: This phase implements the core dependency resolution algorithm. For in-depth documentation including algorithm pseudocode, edge cases, version comparison rules, and all override types, see:
+>
+> **[`2026-01-21-bzlmod-resolution-algorithm.md`](./2026-01-21-bzlmod-resolution-algorithm.md)**
+
+### Bazel Source References
+
+| Feature | Bazel Source File |
+|---------|-------------------|
+| MVS algorithm | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/Selection.java` |
+| Dependency graph | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelDepGraphFunction.java` |
+| Compatibility checking | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/Module.java` (see `getCompatibilityLevel`) |
+| Lockfile format | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileValue.java` |
+| Lockfile I/O | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileFunction.java` |
+| Lockfile JSON schema | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/GsonTypeAdapterUtil.java` |
+
+**Key tests:**
+- `src/test/java/com/google/devtools/build/lib/bazel/bzlmod/SelectionTest.java` - MVS algorithm edge cases
+- `src/test/java/com/google/devtools/build/lib/bazel/bzlmod/BazelLockFileFunctionTest.java`
 
 ### Changes Required:
 
@@ -681,6 +768,25 @@ pub fn resolve_with_lockfile(
 ### Overview
 Implement module extensions which allow custom dependency resolution logic.
 
+### Bazel Source References
+
+Module extensions are one of the more complex bzlmod features. Study these carefully:
+
+| Feature | Bazel Source File |
+|---------|-------------------|
+| Extension definition | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtension.java` |
+| `module_extension()` API | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionApi.java` |
+| `use_extension()` handling | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java` |
+| Tag classes | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/TagClass.java` |
+| Extension evaluation | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/SingleExtensionEvalFunction.java` |
+| `module_ctx` object | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionContext.java` |
+| Extension lockfile | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/LockFileModuleExtension.java` |
+
+**Key tests:**
+- `src/test/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionResolutionTest.java`
+
+**Real-world examples:** Study how rules_python implements `pip.parse()` in the rules_python repository.
+
 ### Changes Required:
 
 #### 1. Extension Definition Parsing
@@ -767,6 +873,35 @@ Record extension results in MODULE.bazel.lock for caching.
 
 ### Overview
 Ensure kuro's rule execution API matches Bazel's ctx, actions, and provider interfaces.
+
+### Bazel Source References
+
+This is a critical phase - the rule API must match Bazel exactly. Study these thoroughly:
+
+| Feature | Bazel Source File |
+|---------|-------------------|
+| **ctx object** | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkRuleContextApi.java` |
+| ctx implementation | `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleContext.java` |
+| **actions API** | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkActionFactoryApi.java` |
+| actions implementation | `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkActionFactory.java` |
+| **Args builder** | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/CommandLineArgsApi.java` |
+| Args implementation | `src/main/java/com/google/devtools/build/lib/analysis/starlark/Args.java` |
+| **DefaultInfo** | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/DefaultInfoApi.java` |
+| **RunInfo** | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/RunEnvironmentInfoApi.java` |
+| **OutputGroupInfo** | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/OutputGroupInfoApi.java` |
+| **depset** | `src/main/java/com/google/devtools/build/lib/collect/nestedset/Depset.java` |
+| depset ordering | `src/main/java/com/google/devtools/build/lib/collect/nestedset/Order.java` |
+| **Runfiles** | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/RunfilesApi.java` |
+| Runfiles implementation | `src/main/java/com/google/devtools/build/lib/analysis/Runfiles.java` |
+| **Provider definition** | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/ProviderApi.java` |
+
+**Starlark builtins (important!):**
+- `src/main/starlark/builtins_bzl/common/` - Built-in rule implementations in Starlark
+- These show how Bazel's own rules use the ctx/actions API
+
+**Key tests:**
+- `src/test/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleContextTest.java`
+- `src/test/java/com/google/devtools/build/lib/analysis/RunfilesTest.java`
 
 ### Changes Required:
 
@@ -1163,6 +1298,28 @@ If any features truly require nightly with no reasonable workaround:
 ### Overview
 Implement local build sandboxing to ensure hermetic builds and catch undeclared dependencies.
 
+### Bazel Source References
+
+Bazel's sandboxing is well-documented in source. The linux-sandbox is particularly instructive:
+
+| Feature | Bazel Source File |
+|---------|-------------------|
+| Sandbox abstraction | `src/main/java/com/google/devtools/build/lib/sandbox/SandboxedSpawn.java` |
+| Sandbox strategy base | `src/main/java/com/google/devtools/build/lib/sandbox/AbstractSandboxSpawnRunner.java` |
+| **Linux sandbox** | `src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxedSpawnRunner.java` |
+| Linux sandbox C helper | `src/main/tools/linux-sandbox/` (C code for namespace setup) |
+| **macOS sandbox** | `src/main/java/com/google/devtools/build/lib/sandbox/DarwinSandboxedSpawnRunner.java` |
+| macOS sandbox profile | Look for `.sb` sandbox profile files |
+| **Windows sandbox** | `src/main/java/com/google/devtools/build/lib/sandbox/WindowsSandboxedSpawnRunner.java` |
+| Symlink sandbox (fallback) | `src/main/java/com/google/devtools/build/lib/sandbox/SymlinkedSandboxedSpawn.java` |
+| Sandbox options | `src/main/java/com/google/devtools/build/lib/sandbox/SandboxOptions.java` |
+
+**Critical implementation detail:** Study `src/main/tools/linux-sandbox/linux-sandbox.cc` - this is the actual C program that sets up Linux namespaces. You may want to write a similar helper in Rust.
+
+**Key tests:**
+- `src/test/java/com/google/devtools/build/lib/sandbox/` - Full sandbox test suite
+- `src/test/shell/integration/sandboxing_test.sh` - Integration tests
+
 ### Changes Required:
 
 #### 1. Sandbox Infrastructure
@@ -1315,6 +1472,29 @@ Ensure kuro works on Linux, Windows, and macOS.
 ### Overview
 Implement Bazel-compatible query commands for build graph introspection.
 
+### Bazel Source References
+
+Bazel has three query engines. Study the query language carefully:
+
+| Feature | Bazel Source File |
+|---------|-------------------|
+| **Query language parser** | `src/main/java/com/google/devtools/build/lib/query2/engine/QueryParser.java` |
+| Query language grammar | `src/main/java/com/google/devtools/build/lib/query2/engine/Lexer.java` |
+| **Query functions** | `src/main/java/com/google/devtools/build/lib/query2/engine/QueryFunctions.java` |
+| `deps()` function | `src/main/java/com/google/devtools/build/lib/query2/engine/DepsFunction.java` |
+| `rdeps()` function | `src/main/java/com/google/devtools/build/lib/query2/engine/RdepsFunction.java` |
+| `kind()` function | `src/main/java/com/google/devtools/build/lib/query2/engine/KindFunction.java` |
+| Set operations | `src/main/java/com/google/devtools/build/lib/query2/engine/BinaryOperatorExpression.java` |
+| **cquery (configured)** | `src/main/java/com/google/devtools/build/lib/query2/cquery/ConfiguredTargetQueryEnvironment.java` |
+| **aquery (action)** | `src/main/java/com/google/devtools/build/lib/query2/aquery/ActionGraphQueryEnvironment.java` |
+| Output formatters | `src/main/java/com/google/devtools/build/lib/query2/query/output/` |
+
+**Query language specification:** https://bazel.build/query/language (official docs have the full grammar)
+
+**Key tests:**
+- `src/test/java/com/google/devtools/build/lib/query2/` - Comprehensive query tests
+- `src/test/shell/integration/query_test.sh` - Integration tests
+
 ### Changes Required:
 
 #### 1. Query Command (`kuro query`)
@@ -1416,3 +1596,27 @@ Support Bazel query syntax:
 - Starlark specification: https://github.com/bazelbuild/starlark
 - bzlmod documentation: https://bazel.build/external/module
 - Costasiella kuroshimae (mascot): https://en.wikipedia.org/wiki/Costasiella_kuroshimae
+
+### Bazel Source Code References
+
+When implementing Bazel-compatible features, consult the Bazel source at https://github.com/bazelbuild/bazel for authoritative behavior and architectural patterns.
+
+**Key directories:**
+
+| Area | Bazel Source Path |
+|------|-------------------|
+| **Starlark API definitions** | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/` |
+| **Starlark builtins** | `src/main/starlark/builtins_bzl/` |
+| **bzlmod implementation** | `src/main/java/com/google/devtools/build/lib/bazel/bzlmod/` |
+| **Sandboxing** | `src/main/java/com/google/devtools/build/lib/sandbox/` |
+| **Query engine** | `src/main/java/com/google/devtools/build/lib/query2/` |
+| **Actions** | `src/main/java/com/google/devtools/build/lib/actions/` |
+| **Rules (ctx, providers)** | `src/main/java/com/google/devtools/build/lib/analysis/` |
+| **Package loading** | `src/main/java/com/google/devtools/build/lib/packages/` |
+| **Skyframe (incremental)** | `src/main/java/com/google/devtools/build/skyframe/` |
+
+**How to use these references:**
+1. Clone Bazel source: `git clone https://github.com/bazelbuild/bazel`
+2. Navigate to the relevant directory for the feature you're implementing
+3. Study the interfaces, data structures, and algorithms
+4. Pay attention to edge cases handled in tests: `src/test/java/...`
