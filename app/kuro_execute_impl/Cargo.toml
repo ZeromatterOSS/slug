@@ -1,0 +1,65 @@
+[package]
+description = "Implementations of executors and materializers"
+edition = "2024"
+license = { workspace = true }
+name = "kuro_execute_impl"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-condvar-fair = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+dashmap = { workspace = true }
+derivative = { workspace = true }
+derive_more = { workspace = true }
+dupe = { workspace = true }
+futures = { workspace = true }
+gazebo = { workspace = true }
+host_sharing = { workspace = true }
+indexmap = { workspace = true }
+itertools = { workspace = true }
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
+pin-project = { workspace = true }
+prost = { workspace = true }
+regex = { workspace = true }
+remote_execution = { workspace = true }
+rusqlite = { workspace = true }
+starlark_map = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tonic = { workspace = true }
+tracing = { workspace = true }
+zstd = { workspace = true }
+
+allocative = { workspace = true }
+
+kuro_action_metadata_proto = { workspace = true }
+kuro_build_signals = { workspace = true }
+kuro_cli_proto = { workspace = true }
+kuro_common = { workspace = true }
+kuro_core = { workspace = true }
+kuro_data = { workspace = true }
+kuro_directory = { workspace = true }
+kuro_error = { workspace = true }
+kuro_events = { workspace = true }
+kuro_execute = { workspace = true }
+kuro_execute_local = { workspace = true }
+kuro_fs = { workspace = true }
+kuro_http = { workspace = true }
+kuro_resource_control = { workspace = true }
+kuro_util = { workspace = true }
+kuro_worker_proto = { workspace = true }
+kuro_wrapper_common = { workspace = true }
+dice_futures = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+kuro_forkserver = { workspace = true }
+kuro_forkserver_proto = { workspace = true }
+
+[dev-dependencies]
+assert_matches = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fbcode_build)"] }

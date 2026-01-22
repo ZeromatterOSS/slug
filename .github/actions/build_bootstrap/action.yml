@@ -1,0 +1,7 @@
+name: build_bootstrap
+runs:
+  using: composite
+  steps:
+  - name: Build `kuro` with `kuro`
+    run: "$RUNNER_TEMP/artifacts/kuro build :kuro -v 2"
+    shell: bash

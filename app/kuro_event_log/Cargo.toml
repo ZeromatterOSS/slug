@@ -1,0 +1,44 @@
+[package]
+description = "Code supporting kuro event log handling"
+edition = "2024"
+license = { workspace = true }
+name = "kuro_event_log"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+allocative = { workspace = true }
+async-compression = { workspace = true }
+chrono = { workspace = true }
+dupe = { workspace = true }
+futures = { workspace = true }
+gazebo = { workspace = true }
+itertools = { workspace = true }
+pin-project = { workspace = true }
+prost = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+shlex = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+
+kuro_cli_proto = { workspace = true }
+kuro_common = { workspace = true }
+kuro_core = { workspace = true }
+kuro_data = { workspace = true }
+kuro_error = { workspace = true }
+kuro_event_observer = { workspace = true }
+kuro_events = { workspace = true }
+kuro_fs = { workspace = true }
+kuro_util = { workspace = true }
+kuro_wrapper_common = { workspace = true }
+
+[dev-dependencies]
+maplit = { workspace = true }
+tempfile = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(tokio_unstable)"] }

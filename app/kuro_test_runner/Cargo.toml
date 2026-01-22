@@ -1,0 +1,18 @@
+[package]
+edition = "2024"
+license = { workspace = true }
+name = "kuro_test_runner"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-trait = { workspace = true }
+clap = { workspace = true }
+futures = { workspace = true }
+parking_lot = { workspace = true }
+tokio = { workspace = true }
+
+kuro_error = { workspace = true }
+kuro_grpc = { workspace = true }
+kuro_test_api = { workspace = true }
+host_sharing = { workspace = true }

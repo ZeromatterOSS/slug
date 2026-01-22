@@ -1,0 +1,503 @@
+[workspace]
+members = [
+    "allocative/allocative",
+    "allocative/allocative_derive",
+    "app/kuro",
+    "app/kuro_action_impl",
+    "app/kuro_action_impl_tests",
+    "app/kuro_action_metadata_proto",
+    "app/kuro_analysis",
+    "app/kuro_anon_target",
+    "app/kuro_cmd_audit_client",
+    "app/kuro_cmd_audit_server",
+    "app/kuro_bxl",
+    "app/kuro_build_info",
+    "app/kuro_certs",
+    "app/kuro_cfg_constructor",
+    "app/kuro_client",
+    "app/kuro_client_ctx",
+    "app/kuro_cmd_completion_client",
+    "app/kuro_cmd_debug_client",
+    "app/kuro_cmd_docs_client",
+    "app/kuro_cmd_docs_server",
+    "app/kuro_cmd_log_client",
+    "app/kuro_cmd_query_server",
+    "app/kuro_cmd_rage_client",
+    "app/kuro_common",
+    "app/kuro_env",
+    "app/kuro_configured",
+    "app/kuro_core",
+    "app/kuro_cli_proto",
+    "app/kuro_cmd_targets_server",
+    "app/kuro_daemon",
+    "app/kuro_directory",
+    "app/kuro_downward_api",
+    "app/kuro_downward_api_proto",
+    "app/kuro_error",
+    "app/kuro_error_derive",
+    "app/kuro_error_tests",
+    "app/kuro_errorformat",
+    "app/kuro_event_observer",
+    "app/kuro_events",
+    "app/kuro_event_log",
+    "app/kuro_execute",
+    "app/kuro_execute_impl",
+    "app/kuro_execute_local",
+    "app/kuro_external_cells",
+    "app/kuro_external_cells_bundled",
+    "app/kuro_grpc",
+    "app/kuro_health_check",
+    "app/kuro_health_check_proto",
+    "app/kuro_http",
+    "app/kuro_install_proto",
+    "app/kuro_interpreter",
+    "app/kuro_interpreter_for_build",
+    "app/kuro_interpreter_for_build_tests",
+    "app/kuro_miniperf",
+    "app/kuro_miniperf_proto",
+    "app/kuro_node",
+    "app/kuro_node_tests",
+    "app/kuro_offline_archive",
+    "app/kuro_artifact",
+    "app/kuro_cmd_starlark_client",
+    "app/kuro_cmd_starlark_server",
+    "app/kuro_test",
+    "app/kuro_test_api",
+    "app/kuro_test_proto",
+    "app/kuro_test_runner",
+    "app/kuro_forkserver",
+    "app/kuro_forkserver_proto",
+    "app/kuro_fs",
+    "app/kuro_profile",
+    "app/kuro_protoc_dev",
+    "app/kuro_query",
+    "app/kuro_query_impls",
+    "app/kuro_query_parser",
+    "app/kuro_query_derive",
+    "app/kuro_re_configuration",
+    "app/kuro_resource_control",
+    "app/kuro_server",
+    "app/kuro_server_commands",
+    "app/kuro_server_ctx",
+    "app/kuro_server_starlark_debug",
+    "app/kuro_transition",
+    "app/kuro_util",
+    "app/kuro_data",
+    "app/kuro_worker_proto",
+    "app/kuro_wrapper_common",
+    "app/kuro_build_api",
+    "app/kuro_build_api_derive",
+    "app/kuro_build_api_tests",
+    "app/kuro_subscription_proto",
+    "app/kuro_critical_path",
+    "app/kuro_build_signals",
+    "app/kuro_build_signals_impl",
+    "app/kuro_eden",
+    "app/kuro_validation",
+    "app/kuro_host_sharing_proto",
+    "dice/dice",
+    "dice/dice_error",
+    "dice/dice_examples",
+    "dice/dice_futures",
+    "dice/dice_tests",
+    # @oss-disable: "dice/fuzzy_dice",
+    "dice/read_dump",
+    # @oss-disable: "host_sharing",
+    "gazebo/display_container",
+    "gazebo/cmp_any",
+    "gazebo/gazebo",
+    "gazebo/gazebo_derive",
+    "gazebo/strong_hash",
+    "gazebo/strong_hash_derive",
+    "gazebo/strong_hash_tests",
+    "integrations/resources/rust",
+    "integrations/rust-project",
+    "pagable",
+    "pagable_derive",
+    "remote_execution/oss/re_grpc",
+    "remote_execution/oss/re_grpc_proto",
+    "starlark-rust/starlark",
+    "starlark-rust/starlark_bin",
+    "starlark-rust/starlark_derive",
+    "starlark-rust/starlark_lsp",
+    "starlark-rust/starlark_map",
+    "starlark-rust/starlark_syntax",
+    "shed/setsketch",
+    "shed/static_interner",
+    "shed/lock_free_hashtable",
+    "shed/lock_free_vec",
+    "shed/provider",
+    "shed/three_billion_instructions",
+    "superconsole",
+]
+resolver = "2"
+
+[workspace.package]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/facebook/kuro"
+
+[workspace.dependencies]
+anyhow = "1.0.65"
+anymap3 = "1.0.1"
+arc-swap = "1.6.0"
+argfile = "0.2"
+assert_matches = "1.5"
+async-compression = { version = "=0.4.9", features = ["tokio", "brotli", "deflate", "gzip", "zstd"] }
+async-condvar-fair = { version = "1.0", features = ["parking_lot_0_11", "tokio"] }
+async-recursion = "1.0"
+async-scoped = { version = "0.9", features = ["use-tokio"] }
+async-trait = "0.1.24"
+atomic = "0.5.1"
+backtrace = "0.3.51"
+base64 = "0.21.7"
+bincode = "1.3.3"
+blake3 = { version = "1.3.1", features = ["default", "rayon", "std", "traits-preview"] }
+bumpalo = "3.11.1"
+bytemuck = { version = "1.24", features = ["const_zeroed", "derive", "min_const_generics", "must_cast", "nightly_portable_simd", "nightly_stdsimd"] }
+byteorder = "1.4.3"
+bytes = "1.0"
+bytesize = "2.0"
+chrono = "0.4.38"
+clap = { version = "4.5.6", features = ["derive", "env", "string"] }
+clap_complete = "4.5.5"
+common-path = "1.0.0"
+compact_str = { version = "0.8", features = ["serde"] }
+console = "0.15.7"
+const-oid = { version = "0.9.6", features = ["db"] }
+const_format = "0.2.32"
+constant_time_eq = "0.2.4"
+convert_case = "0.4.0"
+criterion = { version = "0.3.1", features = [] }
+crossbeam = "0.8"
+crossbeam-channel = "0.5.8"
+crossbeam-epoch = "0.9.7"
+crossterm = "0.27"
+csv = "1.1"
+ctor = "0.1.16"
+dashmap = "5.5.3"
+debugserver-types = "0.5.0"
+derivative = "2.2"
+derive_more = { version = "1.0.0", features = ["full"] }
+digest = { version = "0.10", features = ["oid"] }
+dirs = "3.0.1"
+dunce = "1.0.2"
+either = "1.8"
+enum-iterator = "1.4.1"
+enum-map = "2.7.3"
+env_logger = "0.9.0"
+equivalent = "1.0.0"
+erased-serde = "0.3.20"
+faccess = "0.2.3"
+fancy-regex = "0.16.0"
+flate2 = "1.0.22"
+fnv = "1.0"
+fs4 = { version = "0.9.1", features = ["sync"] }
+futures = { version = "0.3.28", features = ["async-await", "compat"] }
+futures-intrusive = "0.4"
+fxhash = "0.2.1"
+glob = "0.3.0"
+globset = "0.4.10"
+h2 = { version = "^0.4.13" } # force version bump for https://github.com/facebook/kuro/issues/1123
+hashbrown = { version = "0.14.3", features = ["raw"] }
+hex = "0.4.3"
+hostname = "0.3.1"
+http = "1.3.1"
+http-body-util = "0.1.0"
+httparse = "1.7.1"
+httptest = "0.16"
+humantime = "2.0.1"
+hyper = { version = "1.5.1", features = ["client", "http1", "http2"] }
+hyper-http-proxy = "1.0"
+hyper-rustls = { version = "0.27.0", features = ["http2"] }
+hyper-timeout = "0.5"
+hyper-util = "0.1.10"
+hyperlocal = { version = "0.9", features = ["client"] }
+indent_write = "2.2.0"
+indenter = "0.3.3"
+index_vec = "0.1.4"
+indexmap = { version = "2.12.1", features = ["serde"] }
+indoc = "2.0.2"
+inferno = { version = "0.11.19", default-features = false }
+internment = { version = "0.8", features = ["arc"] }
+inventory = "0.3.8"
+ipnetwork = "0.20.0"
+is_proc_translated = "0.1.1"
+itertools = "0.13.0"
+lalrpop = { version = "0.19.7", artifact = "bin" }
+lalrpop-util = "0.19.7"
+libc = "0.2.158"
+linked-hash-map = { version = "0.5", features = ["serde_impl"] }
+linkme = { version = "0.3.17", features = ["used_linker"] }
+log = "0.4"
+logos = "0.12"
+lru = "0.12.3"
+lsp-server = "0.7.2"
+lsp-types = "0.94.1"
+maplit = "1.0.2"
+mappable-rc = { version = "0.1.1", features = ["std"] }
+memchr = "2.4.1"
+memmap2 = "0.5.0"
+memoffset = "0.6.4"
+mimalloc = "0.1.46"
+multimap = "0.8.2"
+native-tls = "0.2"
+nix = { version = "0.30.1", features = ["dir", "event", "hostname", "inotify", "ioctl", "mman", "mount", "net", "poll", "ptrace", "reboot", "resource", "sched", "signal", "term", "time", "user", "zerocopy"] }
+nom = "8"
+nom-language = "0.1"
+notify = "=5.0.0"
+num-bigint = "0.4.3"
+num-traits = "0.2"
+num_cpus = "1.11"
+num_enum = "0.7"
+object = "0.36.7"
+once_cell = "1.8"
+os_str_bytes = { version = "6.6.0", features = ["conversions"] }
+parking_lot = { version = "0.11.2", features = ["send_guard"] }
+paste = "1.0"
+pathdiff = "0.2"
+perf-event = "0.4"
+perf-event-open-sys = "5.0"
+pin-project = "0.4.29"
+plist = "1.4.3"
+postcard = { version = "1.0.8", features = ["use-crc", "use-std"] }
+pretty_assertions = "1.2.1"
+probminhash = { git = "https://github.com/krallin/probminhash", rev = "3d6b7a5315305c2893a7a04e0de9e23b305992c5", default-features = false } # WAITING_FOR_PR https://github.com/jean-pierreBoth/probminhash/pull/4
+proc-macro2 = "1.0"
+prost = "0.13.4"
+prost-build = "0.13.4"
+prost-derive = "0.13.4"
+prost-types = "0.13.4"
+protoc-bin-vendored = "3.0.0"
+psutil = "3.2"
+quote = "1.0.3"
+rand = { version = "0.9", features = ["small_rng"] }
+rand_08 = { package = "rand", version = "0.8.4", features = ["small_rng"] }
+rand_chacha = "0.3"
+rand_distr = "0.5"
+rand_distr_04 = { package = "rand_distr", version = "0.4" }
+rand_xoshiro = "0.7"
+ref-cast = "1.0.0"
+regex = "1.12.2"
+relative-path = { version = "1.7.0", features = ["serde"] }
+rusqlite = { version = "0.37.0", features = ["bundled"] }
+rustc-hash = { version = "2.1" }
+rustls = { package = "rustls", version = "0.23.29", features = ["aws-lc-rs"], default-features = false }
+rustls-native-certs = { version = "0.8.1" }
+rustls-pemfile = { package = "rustls-pemfile", version = "1.0.0" }
+rustls-pki-types = { version = "1.0", features = ["alloc", "std"] }
+rustyline = "14.0"
+scopeguard = "1.0.0"
+sequence_trie = "0.3.6"
+serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = { version = "1.0.48", features = ["raw_value"] }
+serde_path_to_error = "0.1"
+sha1 = "0.10"
+sha2 = "0.10"
+shlex = "1.3"
+siphasher = "0.3.3"
+slab = "0.4.7"
+slog = "2.7.0"
+smallvec = { version = "1.10", features = ["const_generics", "const_new", "serde", "specialization", "union", "write"] }
+static_assertions = "1.1.0"
+strsim = "0.10.0"
+structopt = "0.3.23"
+strum = { version = "0.26.2", features = ["derive", "strum_macros"] }
+syn = { version = "2", features = ["extra-traits", "full", "visit"] }
+sync_wrapper = "0.1.0"
+sys-info = "0.9.1"
+sysinfo = "0.35.1"
+take_mut = "0.2.2"
+tar = "0.4.38"
+tempfile = "3.1.0"
+termimad = "0.30"
+termios = "0.3"
+termwiz = "0.23"
+test-case = "3.1.0"
+textwrap = { version = "0.11", features = ["term_size"] }
+thiserror = "1.0.36"
+threadpool = "1.8.1"
+tikv-jemallocator = { version = "0.6.0", features = ["profiling"] }
+tokio = { version = "1.25.0", features = ["full", "test-util", "tracing"] }
+tokio-rustls = { version = "0.26" }
+tokio-stream = { version = "0.1.14", features = ["fs", "io-util", "net", "sync", "time", "signal"] }
+tokio-util = { version = "0.6", features = ["full"] }
+toml = "0.5"
+tonic = { version = "0.12.3", features = ["tls", "tls-webpki-roots"] }
+tonic-build = { version = "0.12.3", features = ["prost", "cleanup-markdown"] }
+tower = "0.4"
+tower-layer = "0.3.1"
+tower-service = "0.3.3"
+tracing = "0.1.22"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+triomphe = "0.1.11"
+trybuild = "1.0.56"
+twox-hash = "1.6.1"
+typed-arena = "2.0"
+unicode-segmentation = "1.7"
+uuid = { version = "=1.19.0", features = ["v4"] }
+walkdir = "2.3.2"
+which = "4.3.0"
+winapi = { version = "0.3", features = ["everything", "std"] }
+x509-parser = "0.14.0"
+xattr = "0.2.2"
+zip = "0.5"
+zstd = "0.13.0"
+
+# @oss-disable: fbinit.path = "../common/rust/shed/fbinit"
+fbinit.version = "0.2"
+# @oss-disable: sorted_vector_map.path = "../common/rust/shed/sorted_vector_map"
+sorted_vector_map.git = "https://github.com/facebookexperimental/rust-shed" # @oss-enable
+sorted_vector_map.version = "0.2"
+
+allocative.features = ["anyhow", "bumpalo", "dashmap", "either", "futures", "hashbrown", "indexmap", "num-bigint", "once_cell", "parking_lot", "prost-types", "relative-path", "serde_json", "slab", "smallvec", "compact_str", "sorted_vector_map", "tokio", "triomphe"]
+allocative.path = "allocative/allocative"
+allocative.version = "0.3.1"
+cmp_any = { path = "gazebo/cmp_any" }
+dice = { path = "dice/dice" }
+dice_error = { path = "dice/dice_error" }
+dice_futures = { path = "dice/dice_futures" }
+display_container = { path = "gazebo/display_container" }
+dupe.path = "gazebo/dupe"
+dupe.version = "0.9.0"
+gazebo.features = ["str_pattern_extensions"]
+gazebo.path = "gazebo/gazebo"
+gazebo.version = "0.8.1"
+host_sharing = { path = "host_sharing" }
+lock_free_hashtable = { version = "0.1.0", path = "shed/lock_free_hashtable" }
+lock_free_vec = { path = "shed/lock_free_vec" }
+pagable = { path = "pagable" }
+pagable_derive = { path = "pagable_derive" }
+provider = { path = "shed/provider" }
+remote_execution = { path = "remote_execution/oss/re_grpc" }
+setsketch = { path = "shed/setsketch" }
+starlark = { version = "0.13.0", path = "starlark-rust/starlark" }
+starlark_lsp = { version = "0.13.0", path = "starlark-rust/starlark_lsp" }
+starlark_map = { version = "0.13.0", path = "starlark-rust/starlark_map" }
+starlark_syntax = { version = "0.13.0", path = "starlark-rust/starlark_syntax" }
+static_interner = { path = "shed/static_interner" }
+strong_hash.features = ["num-bigint", "triomphe"]
+strong_hash.path = "gazebo/strong_hash"
+strong_hash_derive = { path = "gazebo/strong_hash_derive" }
+three_billion_instructions = { path = "shed/three_billion_instructions" }
+
+kuro_action_impl = { path = "app/kuro_action_impl" }
+kuro_action_metadata_proto = { path = "app/kuro_action_metadata_proto" }
+kuro_analysis = { path = "app/kuro_analysis" }
+kuro_anon_target = { path = "app/kuro_anon_target" }
+kuro_artifact = { path = "app/kuro_artifact" }
+kuro_build_api = { path = "app/kuro_build_api" }
+kuro_build_api_derive = { path = "app/kuro_build_api_derive" }
+kuro_build_info = { path = "app/kuro_build_info" }
+kuro_build_signals = { path = "app/kuro_build_signals" }
+kuro_build_signals_impl = { path = "app/kuro_build_signals_impl" }
+kuro_bxl = { path = "app/kuro_bxl" }
+kuro_certs = { path = "app/kuro_certs" }
+kuro_cfg_constructor = { path = "app/kuro_cfg_constructor" }
+kuro_cli_proto = { path = "app/kuro_cli_proto" }
+kuro_client = { path = "app/kuro_client" }
+kuro_client_ctx = { path = "app/kuro_client_ctx" }
+kuro_cmd_audit_client = { path = "app/kuro_cmd_audit_client" }
+kuro_cmd_audit_server = { path = "app/kuro_cmd_audit_server" }
+kuro_cmd_completion_client = { path = "app/kuro_cmd_completion_client" }
+kuro_cmd_debug_client = { path = "app/kuro_cmd_debug_client" }
+kuro_cmd_docs_client = { path = "app/kuro_cmd_docs_client" }
+kuro_cmd_docs_server = { path = "app/kuro_cmd_docs_server" }
+kuro_cmd_log_client = { path = "app/kuro_cmd_log_client" }
+kuro_cmd_query_server = { path = "app/kuro_cmd_query_server" }
+kuro_cmd_rage_client = { path = "app/kuro_cmd_rage_client" }
+kuro_cmd_starlark_client = { path = "app/kuro_cmd_starlark_client" }
+kuro_cmd_starlark_server = { path = "app/kuro_cmd_starlark_server" }
+kuro_cmd_targets_server = { path = "app/kuro_cmd_targets_server" }
+kuro_common = { path = "app/kuro_common" }
+kuro_configured = { path = "app/kuro_configured" }
+kuro_core = { path = "app/kuro_core" }
+kuro_critical_path = { path = "app/kuro_critical_path" }
+kuro_daemon = { path = "app/kuro_daemon" }
+kuro_data = { path = "app/kuro_data" }
+kuro_directory = { path = "app/kuro_directory" }
+kuro_downward_api = { path = "app/kuro_downward_api" }
+kuro_downward_api_proto = { path = "app/kuro_downward_api_proto" }
+kuro_eden = { path = "app/kuro_eden" }
+kuro_env = { path = "app/kuro_env" }
+kuro_error = { path = "app/kuro_error" }
+kuro_error_derive = { path = "app/kuro_error_derive" }
+kuro_errorformat = { path = "app/kuro_errorformat" }
+kuro_event_log = { path = "app/kuro_event_log" }
+kuro_event_observer = { path = "app/kuro_event_observer" }
+kuro_events = { path = "app/kuro_events" }
+kuro_execute = { path = "app/kuro_execute" }
+kuro_execute_impl = { path = "app/kuro_execute_impl" }
+kuro_execute_local = { path = "app/kuro_execute_local" }
+kuro_external_cells = { path = "app/kuro_external_cells" }
+kuro_external_cells_bundled = { path = "app/kuro_external_cells_bundled" }
+kuro_file_watcher = { path = "app/kuro_file_watcher" }
+kuro_forkserver = { path = "app/kuro_forkserver" }
+kuro_forkserver_proto = { path = "app/kuro_forkserver_proto" }
+kuro_fs = { path = "app/kuro_fs" }
+kuro_grpc = { path = "app/kuro_grpc" }
+kuro_health_check = { path = "app/kuro_health_check" }
+kuro_health_check_proto = { path = "app/kuro_health_check_proto" }
+kuro_host_sharing_proto = { path = "app/kuro_host_sharing_proto" }
+kuro_http = { path = "app/kuro_http" }
+kuro_install_proto = { path = "app/kuro_install_proto" }
+kuro_interpreter = { path = "app/kuro_interpreter" }
+kuro_interpreter_for_build = { path = "app/kuro_interpreter_for_build" }
+kuro_interpreter_for_build_tests = { path = "app/kuro_interpreter_for_build_tests" }
+kuro_miniperf = { path = "app/kuro_miniperf" }
+kuro_miniperf_proto = { path = "app/kuro_miniperf_proto" }
+kuro_node = { path = "app/kuro_node" }
+kuro_offline_archive = { path = "app/kuro_offline_archive" }
+kuro_profile = { path = "app/kuro_profile" }
+kuro_protoc_dev = { path = "app/kuro_protoc_dev" }
+kuro_query = { path = "app/kuro_query" }
+kuro_query_derive = { path = "app/kuro_query_derive" }
+kuro_query_impls = { path = "app/kuro_query_impls" }
+kuro_query_parser = { path = "app/kuro_query_parser" }
+kuro_re_configuration = { path = "app/kuro_re_configuration" }
+kuro_resource_control = { path = "app/kuro_resource_control" }
+kuro_server = { path = "app/kuro_server" }
+kuro_server_commands = { path = "app/kuro_server_commands" }
+kuro_server_ctx = { path = "app/kuro_server_ctx" }
+kuro_server_starlark_debug = { path = "app/kuro_server_starlark_debug" }
+kuro_subscription_proto = { path = "app/kuro_subscription_proto" }
+kuro_test = { path = "app/kuro_test" }
+kuro_test_api = { path = "app/kuro_test_api" }
+kuro_test_proto = { path = "app/kuro_test_proto" }
+kuro_test_runner = { path = "app/kuro_test_runner" }
+kuro_transition = { path = "app/kuro_transition" }
+kuro_util = { path = "app/kuro_util" }
+kuro_validation = { path = "app/kuro_validation" }
+kuro_worker_proto = { path = "app/kuro_worker_proto" }
+kuro_wrapper_common = { path = "app/kuro_wrapper_common" }
+
+[profile.release]
+incremental = true
+panic = "abort"
+# The line below increases build times from 50s to 84s, with no observed impact on runtime speed.
+# But maybe for some benchmarks it will show more noticeable variation.
+# lto = "thin"
+
+# Use with: --profile=release-symbols -Z unstable-options
+[profile.release-symbols]
+debug = true
+incremental = true
+inherits = "release"
+
+[profile.dev]
+debug = true
+incremental = true
+lto = "off"
+opt-level = 1
+panic = "abort"
+
+[profile.test]
+incremental = true
+
+[profile.bench]
+incremental = true
+
+[patch.crates-io]
+# For https://github.com/jimblandy/perf-event/pull/29
+# Base on the comment in https://github.com/jimblandy/perf-event/pull/53, we will no long need this patch in future.
+perf-event = { git = "https://github.com/Nero5023/perf-event.git", rev = "6dae86b6d4807acec081e6dc0a53167f57f8c0f4", version = "0.4" }
+perf-event-open-sys = { git = "https://github.com/Nero5023/perf-event.git", rev = "6dae86b6d4807acec081e6dc0a53167f57f8c0f4", version = "5.0" }

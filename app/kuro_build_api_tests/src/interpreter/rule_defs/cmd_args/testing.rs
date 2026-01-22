@@ -1,0 +1,73 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use kuro_build_api::interpreter::rule_defs::cmd_args::DefaultCommandLineContext;
+use kuro_build_api::interpreter::rule_defs::cmd_args::value_as::ValueAsCommandLineLike;
+use kuro_core::execution_types::executor_config::PathSeparatorKind;
+use kuro_core::fs::artifact_path_resolver::ArtifactFs;
+use kuro_core::fs::buck_out_path::BuckOutPathResolver;
+use kuro_core::fs::project::ProjectRoot;
+use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
+use kuro_execute::artifact::fs::ExecutorFs;
+use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
+use kuro_interpreter_for_build::interpreter::testing::cells;
+use fxhash::FxHashMap;
+use starlark::environment::GlobalsBuilder;
+use starlark::starlark_module;
+use starlark::values::UnpackValue;
+use starlark::values::Value;
+
+fn artifact_fs() -> ArtifactFs {
+    let cell_info = cells(None).unwrap();
+    ArtifactFs::new(
+        cell_info.1,
+        BuckOutPathResolver::new(ProjectRelativePathBuf::unchecked_new(
+            "buck-out/v2".to_owned(),
+        )),
+        ProjectRoot::new(AbsNormPathBuf::try_from(std::env::current_dir().unwrap()).unwrap())
+            .unwrap(),
+    )
+}
+
+fn get_command_line(value: Value) -> kuro_error::Result<Vec<String>> {
+    let fs = artifact_fs();
+    let executor_fs = ExecutorFs::new(&fs, PathSeparatorKind::Unix);
+    let mut cli = Vec::<String>::new();
+    let mut ctx = DefaultCommandLineContext::new(&executor_fs);
+
+    match ValueAsCommandLineLike::unpack_value(value)? {
+        Some(v) => {
+            v.0.add_to_command_line(&mut cli, &mut ctx, &FxHashMap::default())
+        }
+        None => ValueAsCommandLineLike::unpack_value_err(value)?
+            .0
+            .add_to_command_line(&mut cli, &mut ctx, &FxHashMap::default()),
+    }?;
+    Ok(cli)
+}
+
+#[starlark_module]
+pub(crate) fn command_line_stringifier(builder: &mut GlobalsBuilder) {
+    fn get_args<'v>(value: Value<'v>) -> starlark::Result<Vec<String>> {
+        Ok(get_command_line(value)?)
+    }
+
+    fn stringify_cli_arg<'v>(value: Value<'v>) -> starlark::Result<String> {
+        let fs = artifact_fs();
+        let executor_fs = ExecutorFs::new(&fs, PathSeparatorKind::Unix);
+        let mut cli = Vec::<String>::new();
+        let mut ctx = DefaultCommandLineContext::new(&executor_fs);
+        ValueAsCommandLineLike::unpack_value_err(value)?
+            .0
+            .add_to_command_line(&mut cli, &mut ctx, &FxHashMap::default())?;
+        assert_eq!(1, cli.len());
+        Ok(cli.first().unwrap().clone())
+    }
+}

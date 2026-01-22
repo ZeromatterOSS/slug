@@ -1,0 +1,19 @@
+[package]
+edition = "2024"
+license = { workspace = true }
+name = "kuro_grpc"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+kuro_error = { workspace = true }
+futures = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+pin-project = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true }
+tower = { workspace = true }
+
+[dev-dependencies]
+assert_matches = { workspace = true }

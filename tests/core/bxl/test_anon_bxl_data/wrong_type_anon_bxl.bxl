@@ -1,0 +1,24 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+#
+# This source code is dual-licensed under either the MIT license found in the
+# LICENSE-MIT file in the root directory of this source tree or the Apache
+# License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+# of this source tree. You may select, at your option, one of the
+# above-listed licenses.
+
+def _my_anon_impl(_ctx: AnalysisContext, _attrs: struct) -> list[Provider]:
+    return [DefaultInfo()]
+
+anon = bxl.anon_rule(
+    impl = _my_anon_impl,
+    attrs = {
+    },
+)
+
+def _wrong_type_impl(_ctx: bxl.Context):
+    return
+
+wrong_type = bxl_main(
+    impl = _wrong_type_impl,
+    cli_args = {},
+)

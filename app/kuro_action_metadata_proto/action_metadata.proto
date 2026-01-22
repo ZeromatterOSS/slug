@@ -1,0 +1,33 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+syntax = "proto3";
+
+package action_metadata;
+
+message DepFileInputs {
+  string dep_file_path = 1;
+  // A digest of
+  //  1. all untagged inputs for the action
+  //  2. tagged inputs for this dep file that was acutally used (in the dep
+  //  file)
+  bytes filtered_fingerprint = 2;
+}
+
+// Contains everything we should check before declaring it as a dep file hit
+message RemoteDepFile {
+  // A digest of the command line
+  bytes commandline_cli_digest = 1;
+  // A digest of all output paths
+  bytes output_paths_digest = 2;
+  // Inputs to this action that are not tracked by any dep files
+  bytes untagged_inputs_digest = 3;
+  repeated DepFileInputs dep_file_inputs = 4;
+}

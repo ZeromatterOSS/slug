@@ -1,0 +1,39 @@
+[package]
+edition = "2024"
+license = { workspace = true }
+name = "kuro_events"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+console = { workspace = true }
+crossbeam-channel = { workspace = true }
+derive_more = { workspace = true }
+futures = { workspace = true }
+hostname = { workspace = true }
+is_proc_translated = { workspace = true }
+pin-project = { workspace = true }
+serde = { workspace = true }
+smallvec = { workspace = true }
+sys-info = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }
+
+allocative = { workspace = true }
+dupe = { workspace = true }
+fbinit = { workspace = true }
+gazebo = { workspace = true }
+
+kuro_build_info = { workspace = true }
+kuro_cli_proto = { workspace = true }
+kuro_core = { workspace = true }
+kuro_data = { workspace = true }
+kuro_error = { workspace = true }
+kuro_util = { workspace = true }
+kuro_wrapper_common = { workspace = true }
+
+[target."cfg(windows)".dependencies]
+winver = "1"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fbcode_build)"] }

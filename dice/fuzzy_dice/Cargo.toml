@@ -1,0 +1,38 @@
+[package]
+edition = "2024"
+license = { workspace = true }
+name = "fuzzy_dice"
+repository = { workspace = true }
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.65"
+async-trait = "0.1.24"
+clap = { version = "3.2.24", features = ["derive"] }
+crossbeam = "0.8"
+derivative = "2.1.1"
+derive_more = { version = "1.0.0", features = ["full"] }
+futures = "0.3"
+itertools = "0.13.0"
+parking_lot = { version = "0.11.2", features = ["send_guard"] }
+quickcheck = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.48"
+thiserror = "1.0.36"
+tokio = { version = "1.5", features = ["full"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.2", features = ["v4"] }
+
+allocative = { workspace = true }
+dice_futures = { path = "../dice_futures" }
+dupe = { workspace = true }
+
+dice = { path = "../dice" }
+
+[dev-dependencies]
+# Newer cast pull in semver 1.0, which fails with
+# https://github.com/dtolnay/semver/issues/251
+anyhow = "1.0.65"
+futures = "0.3"

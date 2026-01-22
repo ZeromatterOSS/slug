@@ -1,0 +1,10 @@
+[buildfile]
+    name = TARGETS.fixture
+
+[repositories]
+    root = .
+    prelude = .
+
+[kuro_resource_control]
+    status = required
+    enable_action_cgroup_pool_v2 = true

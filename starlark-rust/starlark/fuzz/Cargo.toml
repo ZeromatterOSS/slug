@@ -1,0 +1,25 @@
+[package]
+edition = "2024"
+name = "starlark-fuzz"
+publish = false
+version = "0.0.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+starlark.path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+doc = false
+name = "starlark"
+path = "fuzz_targets/starlark.rs"
+test = false

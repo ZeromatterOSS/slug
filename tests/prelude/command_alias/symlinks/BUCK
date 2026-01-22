@@ -1,0 +1,68 @@
+load("@fbcode//buck2/tests/prelude:py_assertion.bzl", "py_assertion")
+load(":make_script_link.bzl", "make_script_link")
+
+oncall("build_infra")
+
+make_script_link(
+    name = "link_to_parent",
+    base = "fbcode//buck2/tests/prelude/command_alias/symlinks/subdir:script",
+    via_parent = True,
+)
+
+py_assertion(
+    name = "check_link_to_parent",
+    script = """
+import subprocess
+import sys
+import platform
+
+if platform.system() != "Windows":
+    # Symlinks resolve properly on Unix
+    try:
+        result = subprocess.run([sys.argv[1]], check=True, capture_output=True, text=True)
+        # Verify it actually ran and produced expected output
+        assert "foobar" in result.stdout, f"Expected 'foobar' in output"
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        sys.exit(1)
+else:
+    try:
+        subprocess.run([sys.argv[1]])
+        sys.exit(1)
+    except FileNotFoundError:
+        pass  # Expected behavior
+""",
+    script_args = ["$(exe_target :link_to_parent)"],
+)
+
+make_script_link(
+    name = "link_to_script",
+    base = "fbcode//buck2/tests/prelude/command_alias/symlinks/subdir:script",
+    via_parent = False,
+)
+
+py_assertion(
+    name = "check_link",
+    script = """
+import subprocess
+import sys
+import platform
+
+if platform.system() != "Windows":
+    # Symlinks resolve properly on Unix
+    try:
+        result = subprocess.run([sys.argv[1]], check=True, capture_output=True, text=True)
+        # Verify it actually ran and produced expected output
+        assert "foobar" in result.stdout, f"Expected 'foobar' in output"
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        sys.exit(1)
+else:
+    try:
+        subprocess.run([sys.argv[1]])
+        sys.exit(1)
+    except FileNotFoundError:
+        pass  # Expected behavior
+""",
+    script_args = ["$(exe_target :link_to_script)"],
+)

@@ -1,0 +1,18 @@
+load(":defs.bzl", "simple_rule")
+
+simple_rule(
+    name = "dummy",
+    has_content_based_path = read_config("test", "has_content_based_path", "False") in ["True", "true"],
+)
+
+constraint_setting(name = "os")
+
+constraint_value(
+    name = "linux",
+    constraint_setting = ":os",
+)
+
+platform(
+    name = "linux_platform",
+    constraint_values = [":linux"],
+)

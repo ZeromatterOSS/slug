@@ -1,0 +1,16 @@
+load("@fbsource//tools/build_defs:rust_library.bzl", "rust_library")
+
+oncall("buck2")
+
+rust_library(
+    name = "buck2_error_derive",
+    srcs = glob(
+        ["src/**/*.rs"],
+    ),
+    proc_macro = True,
+    deps = [
+        "fbsource//third-party/rust:proc-macro2",
+        "fbsource//third-party/rust:quote",
+        "fbsource//third-party/rust:syn",
+    ],
+)

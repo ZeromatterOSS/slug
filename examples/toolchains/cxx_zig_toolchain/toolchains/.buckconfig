@@ -1,0 +1,3 @@
+[cells]
+toolchains = .
+prelude = ../prelude

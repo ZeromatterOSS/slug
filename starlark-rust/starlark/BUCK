@@ -1,0 +1,73 @@
+load("@fbcode_macros//build_defs:native_rules.bzl", "alias", "buck_filegroup")
+load("@fbsource//tools/build_defs:rust_library.bzl", "rust_library")
+
+oncall("build_infra")
+
+alias(
+    name = "starlark-bin",
+    actual = "//buck2/starlark-rust/starlark_bin:starlark_bin",
+)
+
+buck_filegroup(
+    name = "testcases",
+    srcs = glob([
+        "src/**/golden/**",
+        "src/**/*.golden",
+        "testcases/**",
+    ]),
+    copy = False,
+)
+
+rust_library(
+    name = "starlark",
+    srcs = glob(["src/**/*.rs"]),
+    rustc_flags = [
+        "--cfg=rust_nightly",
+    ],
+    test_deps = [
+        "fbsource//third-party/rust:rand",
+        # This is a hack to build `:testcases` when invoking a test.
+        # Otherwise `OUT_DIR` is set, but it points to non-existing directory.
+        # This is likely a bug in `rust_test` rule.
+        ":testcases",
+    ],
+    test_env = {
+        # Some of our tests include testcase files relative to CARGO_MANIFEST_DIR.
+        # This is a hack that allows both `cargo test` and `buck test` to work.
+        "CARGO_MANIFEST_DIR": "$(location :testcases)",
+    },
+    deps = [
+        "fbsource//third-party/rust:anyhow",
+        "fbsource//third-party/rust:bumpalo",
+        "fbsource//third-party/rust:debugserver-types",
+        "fbsource//third-party/rust:derivative",
+        "fbsource//third-party/rust:derive_more",
+        "fbsource//third-party/rust:either",
+        "fbsource//third-party/rust:erased-serde",
+        "fbsource//third-party/rust:hashbrown",
+        "fbsource//third-party/rust:inventory",
+        "fbsource//third-party/rust:itertools",
+        "fbsource//third-party/rust:maplit",
+        "fbsource//third-party/rust:memoffset",
+        "fbsource//third-party/rust:num-bigint",
+        "fbsource//third-party/rust:num-traits",
+        "fbsource//third-party/rust:once_cell",
+        "fbsource//third-party/rust:paste",
+        "fbsource//third-party/rust:ref-cast",
+        "fbsource//third-party/rust:regex",
+        "fbsource//third-party/rust:rustyline",
+        "fbsource//third-party/rust:serde",
+        "fbsource//third-party/rust:serde_json",
+        "fbsource//third-party/rust:static_assertions",
+        "fbsource//third-party/rust:strsim",
+        "fbsource//third-party/rust:textwrap",
+        "fbsource//third-party/rust:thiserror",
+        "//buck2/allocative/allocative:allocative",
+        "//buck2/gazebo/cmp_any:cmp_any",
+        "//buck2/gazebo/display_container:display_container",
+        "//buck2/gazebo/dupe:dupe",
+        "//buck2/starlark-rust/starlark_derive:starlark_derive",
+        "//buck2/starlark-rust/starlark_map:starlark_map",
+        "//buck2/starlark-rust/starlark_syntax:starlark_syntax",
+    ],
+)

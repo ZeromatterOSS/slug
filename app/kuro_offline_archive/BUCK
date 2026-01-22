@@ -1,0 +1,29 @@
+load("@fbsource//tools/build_defs:rust_library.bzl", "rust_library")
+
+oncall("build_infra")
+
+rust_library(
+    name = "buck2_offline_archive",
+    srcs = glob(["src/**/*.rs"]),
+    test_os_deps = [
+        (
+            "linux",
+            [
+                "fbsource//third-party/rust:tempfile",
+            ],
+        ),
+        (
+            "macos",
+            [
+                "fbsource//third-party/rust:tempfile",
+            ],
+        ),
+    ],
+    deps = [
+        "fbsource//third-party/rust:serde",
+        "//buck2/app/buck2_core:buck2_core",
+        "//buck2/app/buck2_error:buck2_error",
+        "//buck2/app/buck2_fs:buck2_fs",
+        "//buck2/app/buck2_util:buck2_util",
+    ],
+)

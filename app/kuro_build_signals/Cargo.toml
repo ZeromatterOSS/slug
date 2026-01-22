@@ -1,0 +1,23 @@
+[package]
+authors = ["Meta"]
+description = "Interface for build signals"
+edition = "2024"
+license = { workspace = true }
+name = "kuro_build_signals"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+allocative = { workspace = true }
+async-trait = { workspace = true }
+kuro_core = { workspace = true }
+kuro_data = { workspace = true }
+kuro_error = { workspace = true }
+kuro_events = { workspace = true }
+kuro_fs = { workspace = true }
+kuro_util = { workspace = true }
+cmp_any = { workspace = true }
+derive_more = { workspace = true }
+dice = { workspace = true }
+dupe = { workspace = true }
+gazebo = { workspace = true }

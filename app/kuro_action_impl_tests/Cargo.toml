@@ -1,0 +1,25 @@
+[package]
+description = "Tests for kuro_action_impl"
+edition = "2024"
+license = { workspace = true }
+name = "kuro_action_impl_tests"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dev-dependencies]
+ctor = { workspace = true }
+indoc = { workspace = true }
+maplit = { workspace = true }
+
+kuro_error = { workspace = true }
+dupe = { workspace = true }
+starlark = { workspace = true }
+
+kuro_action_impl = { workspace = true }
+kuro_anon_target = { workspace = true }
+kuro_build_api = { workspace = true }
+kuro_core = { workspace = true }
+kuro_execute = { workspace = true }
+kuro_interpreter = { workspace = true }
+kuro_interpreter_for_build = { workspace = true }
+kuro_node = { workspace = true }

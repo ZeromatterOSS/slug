@@ -1,0 +1,42 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use starlark::values::FreezeError;
+
+// Adding conversion under 'kuro_interpreter' instead of 'kuro_error' to avoid
+// starlark dependency in 'kuro_error' crate. Any crate that requires a freeze error
+// conversion currently depends on 'kuro_interpreter' (And will likely be the case in the future too)
+#[cold]
+pub fn from_freeze_error(e: FreezeError) -> kuro_error::Error {
+    let mut base = kuro_error::kuro_error!(kuro_error::ErrorTag::StarlarkError, "{}", e.err_msg);
+    for err in e.contexts {
+        base = base.context(err);
+    }
+
+    base
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_freeze_error() {
+        let freeze_error = FreezeError::new("base error".to_owned());
+        let freeze_error = freeze_error.context("context 1");
+        let freeze_error = freeze_error.context("context 2");
+
+        let kuro_error = from_freeze_error(freeze_error);
+        let actual = kuro_error.get_stack_for_debug();
+
+        let expected = "CONTEXT: context 2\nCONTEXT: context 1\nCONTEXT: [StarlarkError]\nROOT:\n\"base error\"\n";
+        assert_eq!(expected, actual);
+    }
+}

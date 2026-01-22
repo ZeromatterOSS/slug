@@ -1,0 +1,29 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use std::hash::Hash;
+
+use allocative::Allocative;
+use allocative::Key;
+use allocative::Visitor;
+use sequence_trie::SequenceTrie;
+
+#[allow(unused)] // Allocative impls are considered unused
+pub(crate) fn visit_sequence_trie<K: Allocative + Eq + Hash, V: Allocative>(
+    t: &SequenceTrie<K, V>,
+    visitor: &mut Visitor<'_>,
+) {
+    let mut visitor = visitor.enter_self_sized::<SequenceTrie<K, V>>();
+    if let Some(root) = t.get([]) {
+        visitor.visit_field(Key::new("root"), root);
+    }
+    visitor.visit_generic_map_fields(t.iter().filter_map(|(mut k, v)| Some((k.pop()?, v))));
+    visitor.exit();
+}

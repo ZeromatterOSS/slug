@@ -1,0 +1,42 @@
+load("@fbsource//tools/build_defs:rust_library.bzl", "rust_library")
+
+oncall("build_infra")
+
+rust_library(
+    name = "buck2_wrapper_common",
+    srcs = glob(["src/**/*.rs"]),
+    os_deps = [
+        (
+            "linux",
+            [
+                "fbsource//third-party/rust:nix",
+            ],
+        ),
+        (
+            "macos",
+            [
+                "fbsource//third-party/rust:nix",
+            ],
+        ),
+        (
+            "windows",
+            [
+                "fbsource//third-party/rust:winapi",
+            ],
+        ),
+    ],
+    test_deps = [
+        "fbsource//third-party/rust:serde_json",
+        "//buck2/app/buck2_util:buck2_util",
+    ],
+    deps = [
+        "fbsource//third-party/rust:derive_more",
+        "fbsource//third-party/rust:serde",
+        "fbsource//third-party/rust:shlex",
+        "fbsource//third-party/rust:sysinfo",
+        "fbsource//third-party/rust:uuid",
+        "//buck2/allocative/allocative:allocative",
+        "//buck2/app/buck2_error:buck2_error",
+        "//buck2/gazebo/dupe:dupe",
+    ],
+)

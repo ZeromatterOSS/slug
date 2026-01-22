@@ -1,0 +1,8 @@
+[buildfile]
+name=TARGETS.fixture
+
+[repositories]
+prelude = .
+
+[kuro]
+check_starlark_peak_memory = true

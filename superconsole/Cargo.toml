@@ -1,0 +1,24 @@
+[package]
+authors = ["Meta"]
+categories = ["command-line-interface"]
+description = "A simple but powerful Text-based User Interface (TUI) framework"
+documentation = "https://docs.rs/superconsole"
+edition = "2024"
+keywords = ["TUI"]
+license = "MIT OR Apache-2.0"
+name = "superconsole"
+repository = "https://github.com/facebookincubator/superconsole"
+version = "0.2.0"
+
+[dependencies]
+crossbeam-channel = "0.5"
+crossterm = "0.27"
+itertools = "0.13.0"
+termwiz = "0.23"
+thiserror = "1.0.36"
+unicode-segmentation = "1.7"
+
+[dev-dependencies]
+anyhow = "1.0.65"
+derive_more = { version = "1.0.0", features = ["full"] }
+tokio = { version = "1.5", features = ["macros", "rt-multi-thread", "time"] }

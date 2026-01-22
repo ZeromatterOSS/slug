@@ -1,0 +1,17 @@
+[package]
+description = """
+Fork of thiserror used by kuro_error
+"""
+edition = "2024"
+license = { workspace = true }
+name = "kuro_error_derive"
+repository = { workspace = true }
+version = "0.1.0"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }

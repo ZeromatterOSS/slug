@@ -1,0 +1,11 @@
+[cells]
+  root = .
+
+[buildfile]
+  name = TARGETS.fixture
+
+[kuro]
+  file_watcher = edenfs
+
+[project]
+  watchman_merge_base = main

@@ -1,0 +1,28 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+#
+# This source code is dual-licensed under either the MIT license found in the
+# LICENSE-MIT file in the root directory of this source tree or the Apache
+# License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+# of this source tree. You may select, at your option, one of the
+# above-listed licenses.
+
+def _tests_of_impl(ctx: bxl.Context):
+    res = ctx.lazy.uquery().testsof("//:foo_lib").catch().resolve()
+    asserts.true(res.is_ok())
+    nodes = res.unwrap()
+    expected = ctx.unconfigured_targets(["//:foo_test0", "//:foo_test1"])
+    asserts.equals(expected, nodes)
+
+tests_of = bxl_main(
+    impl = _tests_of_impl,
+    cli_args = {},
+)
+
+def _tests_of_fail_impl(ctx: bxl.Context):
+    res = ctx.lazy.uquery().testsof("//:bar_lib").catch().resolve()
+    asserts.false(res.is_ok())
+
+tests_of_fail = bxl_main(
+    impl = _tests_of_fail_impl,
+    cli_args = {},
+)

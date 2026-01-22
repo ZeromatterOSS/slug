@@ -1,0 +1,18 @@
+[package]
+description = "Supporting code and utilities for manipulating offline build archives"
+edition = "2024"
+license = { workspace = true }
+name = "kuro_offline_archive"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+serde = { workspace = true }
+
+kuro_core = { workspace = true }
+kuro_error = { workspace = true }
+kuro_fs = { workspace = true }
+kuro_util = { workspace = true }
+
+[target.'cfg(unix)'.dev-dependencies]
+tempfile = { workspace = true }

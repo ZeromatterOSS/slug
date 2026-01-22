@@ -1,0 +1,11 @@
+[package]
+authors = ["Meta"]
+description = "Run 3B instructions"
+edition = "2024"
+license = { workspace = true }
+name = "three_billion_instructions"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+thiserror = { workspace = true }

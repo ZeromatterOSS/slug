@@ -1,0 +1,89 @@
+[package]
+description = ""
+edition = "2024"
+license = { workspace = true }
+name = "kuro"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+backtrace = { workspace = true }
+blake3 = { workspace = true }
+clap = { workspace = true }
+fbinit = { workspace = true }
+hex = { workspace = true }
+rustls = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+dupe = { workspace = true }
+gazebo = { workspace = true }
+host_sharing = { workspace = true }
+
+kuro_action_impl = { workspace = true }
+kuro_analysis = { workspace = true }
+kuro_anon_target = { workspace = true }
+kuro_build_api = { workspace = true }
+kuro_build_info = { workspace = true }
+kuro_build_signals = { workspace = true }
+kuro_build_signals_impl = { workspace = true }
+kuro_bxl = { workspace = true }
+kuro_certs = { workspace = true }
+kuro_cfg_constructor = { workspace = true }
+kuro_client = { workspace = true }
+kuro_client_ctx = { workspace = true }
+kuro_cmd_audit_client = { workspace = true }
+kuro_cmd_audit_server = { workspace = true }
+kuro_cmd_completion_client = { workspace = true }
+kuro_cmd_debug_client = { workspace = true }
+kuro_cmd_docs_client = { workspace = true }
+kuro_cmd_docs_server = { workspace = true }
+kuro_cmd_log_client = { workspace = true }
+kuro_cmd_query_server = { workspace = true }
+kuro_cmd_rage_client = { workspace = true }
+kuro_cmd_starlark_client = { workspace = true }
+kuro_cmd_starlark_server = { workspace = true }
+kuro_cmd_targets_server = { workspace = true }
+kuro_common = { workspace = true }
+kuro_configured = { workspace = true }
+kuro_core = { workspace = true }
+kuro_daemon = { workspace = true }
+kuro_data = { workspace = true }
+kuro_error = { workspace = true }
+kuro_event_log = { workspace = true }
+kuro_event_observer = { workspace = true }
+kuro_events = { workspace = true }
+kuro_external_cells = { workspace = true }
+kuro_fs = { workspace = true }
+kuro_interpreter_for_build = { workspace = true }
+kuro_query_impls = { workspace = true }
+kuro_server = { workspace = true }
+kuro_server_commands = { workspace = true }
+kuro_test = { workspace = true }
+kuro_test_runner = { workspace = true }
+kuro_transition = { workspace = true }
+kuro_util = { workspace = true }
+kuro_validation = { workspace = true }
+kuro_wrapper_common = { workspace = true }
+
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+tikv-jemallocator = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+dirs = { workspace = true }
+libc = { workspace = true }
+nix = { workspace = true }
+
+kuro_forkserver = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+libc = { workspace = true }
+mimalloc = { workspace = true }
+winapi = { workspace = true }
+
+[[bin]]
+name = "kuro"
+path = "bin/kuro.rs"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(buck_build)", "cfg(client_only)", "cfg(fbcode_build)"] }

@@ -1,0 +1,20 @@
+load(":defs.bzl", "symlink_files", "symlink_transitive_files", "write_file", "write_transitive_file")
+
+write_file(name = "dep", out = "dep.txt", contents = "dep contents")
+
+symlink_files(
+    name = "out",
+    srcs = [
+        "dir1/dir1_1/file1.txt",
+        ":dep",
+    ],
+)
+
+write_transitive_file(name = "target_with_tdep")
+
+symlink_transitive_files(
+    name = "symlinked_transitive_files_target",
+    srcs = [
+        ":target_with_tdep",
+    ],
+)

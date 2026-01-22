@@ -1,0 +1,23 @@
+load("@fbsource//tools/build_defs:rust_binary.bzl", "rust_binary")
+load("@fbsource//tools/build_defs:rust_library.bzl", "rust_library")
+
+oncall("build_infra")
+
+rust_library(
+    name = "three_billion_instructions",
+    srcs = glob(
+        ["src/**/*.rs"],
+    ),
+    deps = [
+        "fbsource//third-party/rust:thiserror",
+    ],
+)
+
+rust_binary(
+    name = "three_billion_instructions-bin",
+    srcs = ["bin/three_billion_instructions.rs"],
+    crate_root = "bin/three_billion_instructions.rs",
+    deps = [
+        ":three_billion_instructions",
+    ],
+)

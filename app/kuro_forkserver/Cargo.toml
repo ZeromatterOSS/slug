@@ -1,0 +1,36 @@
+[package]
+edition = "2024"
+license = { workspace = true }
+name = "kuro_forkserver"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+arc-swap = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+libc = { workspace = true }
+nix = { workspace = true }
+rand = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tonic = { workspace = true }
+
+allocative = { workspace = true }
+dupe = { workspace = true }
+
+kuro_common = { workspace = true }
+kuro_core = { workspace = true }
+kuro_error = { workspace = true }
+kuro_execute_local = { workspace = true }
+kuro_forkserver_proto = { workspace = true }
+kuro_fs = { workspace = true }
+kuro_grpc = { workspace = true }
+kuro_resource_control = { workspace = true }
+kuro_util = { workspace = true }
+
+[dev-dependencies]
+assert_matches = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fbcode_build)"] }

@@ -1,0 +1,28 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use kuro_common::cas_digest::CasDigest;
+use kuro_common::cas_digest::CasDigestConfig;
+use kuro_common::cas_digest::CasDigestKind;
+use kuro_common::cas_digest::TrackedCasDigest;
+
+pub struct ActionDigestKind {
+    _private: (),
+}
+
+impl CasDigestKind for ActionDigestKind {
+    fn empty_digest(_config: CasDigestConfig) -> Option<TrackedCasDigest<Self>> {
+        // No reason to optimize "empty" actions.
+        None
+    }
+}
+
+pub type ActionDigest = CasDigest<ActionDigestKind>;
+pub type TrackedActionDigest = TrackedCasDigest<ActionDigestKind>;

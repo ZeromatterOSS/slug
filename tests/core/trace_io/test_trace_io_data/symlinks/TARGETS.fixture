@@ -1,0 +1,28 @@
+load("//:defs.bzl", "my_binary")
+
+oncall("buck2")
+
+my_binary(
+    name = "relative_link",
+    srcs = ["main.cpp", "other.cpp"],
+)
+
+my_binary(
+    name = "external_link",
+    srcs = ["other.cpp", "PassRegistry.h", "include/clang/Basic/Visibility.h"],
+)
+
+my_binary(
+    name = "zz_last",
+    srcs = ["zz_last.cpp", "other.cpp"],
+)
+
+my_binary(
+    name = "aa_first",
+    srcs = ["aa_first.cpp", "other.cpp"],
+)
+
+my_binary(
+    name = "mm_middle",
+    srcs = ["mm_middle.cpp", "other.cpp"],
+)

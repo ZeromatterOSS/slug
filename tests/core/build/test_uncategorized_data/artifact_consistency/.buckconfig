@@ -1,0 +1,8 @@
+[repositories]
+root = .
+prelude = prelude
+[kuro]
+allow_eden_io = false
+dice = modern
+[buildfile]
+name = TARGETS.fixture

@@ -1,0 +1,73 @@
+load("@fbsource//tools/build_defs:rust_binary.bzl", "rust_binary")
+load("@fbsource//tools/build_defs:rust_library.bzl", "rust_library")
+
+oncall("build_infra")
+
+rust_library(
+    name = "superconsole",
+    srcs = glob(
+        ["src/**/*.rs"],
+    ),
+    crate_root = "src/lib.rs",
+    test_deps = [
+        "fbsource//third-party/rust:anyhow",
+        "fbsource//third-party/rust:derive_more",
+    ],
+    deps = [
+        "fbsource//third-party/rust:crossbeam-channel",
+        "fbsource//third-party/rust:crossterm",
+        "fbsource//third-party/rust:itertools",
+        "fbsource//third-party/rust:termwiz",
+        "fbsource//third-party/rust:thiserror",
+        "fbsource//third-party/rust:unicode-segmentation",
+    ],
+)
+
+rust_binary(
+    name = "cargo",
+    srcs = ["examples/cargo.rs"] + glob([
+        "examples/cargo/**",
+    ]),
+    crate_root = "examples/cargo.rs",
+    deps = [
+        ":superconsole",
+    ],
+)
+
+rust_binary(
+    name = "finalization",
+    srcs = ["examples/finalization.rs"],
+    deps = [
+        "fbsource//third-party/rust:derive_more",
+        "fbsource//third-party/rust:tokio",
+        ":superconsole",
+    ],
+)
+
+rust_binary(
+    name = "hello_world",
+    srcs = ["examples/hello_world.rs"],
+    deps = [
+        "fbsource//third-party/rust:tokio",
+        ":superconsole",
+    ],
+)
+
+rust_binary(
+    name = "readme",
+    srcs = ["examples/readme.rs"],
+    deps = [
+        "fbsource//third-party/rust:anyhow",
+        ":superconsole",
+    ],
+)
+
+rust_binary(
+    name = "stylized",
+    srcs = ["examples/stylized.rs"],
+    deps = [
+        "fbsource//third-party/rust:derive_more",
+        "fbsource//third-party/rust:tokio",
+        ":superconsole",
+    ],
+)

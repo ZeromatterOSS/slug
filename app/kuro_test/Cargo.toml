@@ -1,0 +1,64 @@
+[package]
+description = "Buck V2 test runner"
+edition = "2024"
+license = { workspace = true }
+name = "kuro_test"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-trait = { workspace = true }
+chrono = { workspace = true }
+dashmap = { workspace = true }
+derive_more = { workspace = true }
+display_container = { workspace = true }
+futures = { workspace = true }
+fxhash = { workspace = true }
+indexmap = { workspace = true }
+itertools = { workspace = true }
+once_cell = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+allocative = { workspace = true }
+dice = { workspace = true }
+dupe = { workspace = true }
+host_sharing = { workspace = true }
+remote_execution = { workspace = true }
+sorted_vector_map = { workspace = true }
+starlark = { workspace = true }
+
+kuro_build_api = { workspace = true }
+kuro_build_signals = { workspace = true }
+kuro_cli_proto = { workspace = true }
+kuro_common = { workspace = true }
+kuro_core = { workspace = true }
+kuro_data = { workspace = true }
+kuro_downward_api = { workspace = true }
+kuro_error = { workspace = true }
+kuro_error_derive = { workspace = true }
+kuro_events = { workspace = true }
+kuro_execute = { workspace = true }
+kuro_execute_impl = { workspace = true }
+kuro_fs = { workspace = true }
+kuro_grpc = { workspace = true }
+kuro_interpreter = { workspace = true }
+kuro_interpreter_for_build = { workspace = true }
+kuro_node = { workspace = true }
+kuro_resource_control = { workspace = true }
+kuro_server_ctx = { workspace = true }
+kuro_test_api = { workspace = true }
+kuro_util = { workspace = true }
+dice_futures = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
+[dev-dependencies]
+maplit = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fbcode_build)"] }

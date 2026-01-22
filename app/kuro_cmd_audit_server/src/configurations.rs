@@ -1,0 +1,71 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+use std::io::Write;
+
+use async_trait::async_trait;
+use kuro_cli_proto::ClientContext;
+use kuro_cmd_audit_client::configurations::AuditConfigurationsCommand;
+use kuro_core::configuration::bound_id::BoundConfigurationId;
+use kuro_core::configuration::data::ConfigurationData;
+use kuro_server_ctx::ctx::ServerCommandContextTrait;
+use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
+use itertools::Itertools;
+
+use crate::ServerAuditSubcommand;
+
+#[async_trait]
+impl ServerAuditSubcommand for AuditConfigurationsCommand {
+    async fn server_execute(
+        &self,
+        _server_ctx: &dyn ServerCommandContextTrait,
+        mut stdout: PartialResultDispatcher<kuro_cli_proto::StdoutBytes>,
+        _client_ctx: ClientContext,
+    ) -> kuro_error::Result<()> {
+        let mut stdout = stdout.as_writer();
+
+        if self.configs.is_empty() {
+            for cfg in ConfigurationData::iter_existing()
+                .filter(|c| c.is_bound())
+                .sorted_by_cached_key(|c| c.full_name().to_owned())
+            {
+                print_cfg(&mut stdout, &cfg)?;
+            }
+        } else {
+            for cfg in &self.configs {
+                let cfg = BoundConfigurationId::parse(cfg)?;
+                let cfg = ConfigurationData::lookup_bound(cfg)?;
+                print_cfg(&mut stdout, &cfg)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+fn print_cfg(stdout: &mut impl Write, cfg: &ConfigurationData) -> kuro_error::Result<()> {
+    writeln!(stdout, "{}:", cfg.full_name())?;
+    let data = cfg.data()?;
+    for (constraint_key, constraint_value) in data
+        .constraints
+        .iter()
+        .sorted_by(|(k1, v1), (k2, v2)| (v1, k1).cmp(&(v2, k2)))
+    {
+        // to_string() on the value is required to get the format string behavior.
+        writeln!(
+            stdout,
+            "  {:<59} ({})",
+            constraint_value.to_string(),
+            constraint_key
+        )?;
+    }
+
+    Ok(())
+}

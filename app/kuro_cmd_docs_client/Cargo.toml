@@ -1,0 +1,19 @@
+[package]
+description = "`kuro docs` command client implementation"
+edition = "2024"
+license = { workspace = true }
+name = "kuro_cmd_docs_client"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-trait = { workspace = true }
+clap = { workspace = true }
+dupe = { workspace = true }
+termimad = { workspace = true }
+
+kuro_cli_proto = { workspace = true }
+kuro_client_ctx = { workspace = true }
+kuro_error = { workspace = true }
+kuro_query = { workspace = true }
+regex = { workspace = true }

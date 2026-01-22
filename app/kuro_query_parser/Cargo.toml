@@ -1,0 +1,19 @@
+[package]
+description = "Kuro query language parser"
+edition = "2024"
+license = { workspace = true }
+name = "kuro_query_parser"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+derive_more = { workspace = true }
+enum-map = { workspace = true }
+nom = { workspace = true }
+nom-language = { workspace = true }
+
+dupe = { workspace = true }
+gazebo = { workspace = true }
+
+kuro_error = { workspace = true }
+kuro_util = { workspace = true }

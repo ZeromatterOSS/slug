@@ -1,0 +1,69 @@
+{
+    "exclude-github-release-provider": true,
+    "outputs": {
+      "kuro": {
+        "platforms": {
+          "macos-aarch64": {
+            "regex": "^kuro-aarch64-apple-darwin.zst$",
+            "path": "kuro-aarch64-apple-darwin"
+          },
+          "windows-aarch64": {
+            "regex": "^kuro-aarch64-pc-windows-msvc.exe.zst$",
+            "path": "kuro-aarch64-pc-windows-msvc.exe"
+          },
+          "linux-aarch64": {
+            "regex": "^kuro-aarch64-unknown-linux-musl.zst$",
+            "path": "kuro-aarch64-unknown-linux-musl"
+          },
+          "linux-riscv64": {
+            "regex": "^kuro-riscv64gc-unknown-linux-gnu.zst$",
+            "path": "kuro-riscv64gc-unknown-linux-gnu"
+          },
+          "macos-x86_64": {
+            "regex": "^kuro-x86_64-apple-darwin.zst$",
+            "path": "kuro-x86_64-apple-darwin"
+          },
+          "windows-x86_64": {
+            "regex": "^kuro-x86_64-pc-windows-msvc.exe.zst$",
+            "path": "kuro-x86_64-pc-windows-msvc.exe"
+          },
+          "linux-x86_64": {
+            "regex": "^kuro-x86_64-unknown-linux-musl.zst$",
+            "path": "kuro-x86_64-unknown-linux-musl"
+          }
+        }
+      },
+      "rust-project": {
+        "platforms": {
+          "macos-aarch64": {
+            "regex": "^rust-project-aarch64-apple-darwin.zst$",
+            "path": "rust-project-aarch64-apple-darwin"
+          },
+          "windows-aarch64": {
+            "regex": "^rust-project-aarch64-pc-windows-msvc.exe.zst$",
+            "path": "rust-project-aarch64-pc-windows-msvc.exe"
+          },
+          "linux-aarch64": {
+            "regex": "^rust-project-aarch64-unknown-linux-musl.zst$",
+            "path": "rust-project-aarch64-unknown-linux-musl"
+          },
+          "linux-riscv64": {
+            "regex": "^rust-project-riscv64gc-unknown-linux-gnu.zst$",
+            "path": "rust-project-riscv64gc-unknown-linux-gnu"
+          },
+          "macos-x86_64": {
+            "regex": "^rust-project-x86_64-apple-darwin.zst$",
+            "path": "rust-project-x86_64-apple-darwin"
+          },
+          "windows-x86_64": {
+            "regex": "^rust-project-x86_64-pc-windows-msvc.exe.zst$",
+            "path": "rust-project-x86_64-pc-windows-msvc.exe"
+          },
+          "linux-x86_64": {
+            "regex": "^rust-project-x86_64-unknown-linux-musl.zst$",
+            "path": "rust-project-x86_64-unknown-linux-musl"
+          }
+        }
+      }
+    }
+}

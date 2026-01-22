@@ -1,0 +1,8 @@
+[cells]
+  root = .
+
+[buildfile]
+  name = TARGETS.fixture
+
+[kuro_resource_control]
+  status = required

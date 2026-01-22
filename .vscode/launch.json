@@ -1,0 +1,47 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug kuro",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=kuro",
+                    "--package=cli"
+                ],
+                "env": {
+                    // Doesn't work, but has been requested upstream
+                    // https://github.com/vadimcn/vscode-lldb/issues/388
+                    "CARGO_PROFILE_DEV_DEBUG": "true"
+                },
+                "filter": {
+                    "name": "kuro",
+                    "kind": "bin"
+                }
+            },
+            "args": [
+                "build",
+                "fbcode//kuro:kuro"
+            ],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "attach",
+            "name": "Debug kurod",
+            "cwd": "${workspaceFolder}",
+            "pid": "${command:pickMyProcess}",
+        },
+        {
+            "type": "starlark",
+            "request": "launch",
+            "name": "Starlark",
+            "program": "${file}"
+        }
+    ]
+}

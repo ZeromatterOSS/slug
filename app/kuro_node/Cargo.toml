@@ -1,0 +1,48 @@
+[package]
+description = "Target graph node"
+edition = "2024"
+license = { workspace = true }
+name = "kuro_node"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+async-trait = { workspace = true }
+derive_more = { workspace = true }
+either = { workspace = true }
+futures = { workspace = true }
+itertools = { workspace = true }
+memchr = { workspace = true }
+once_cell = { workspace = true }
+ref-cast = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+smallvec = { workspace = true }
+static_assertions = { workspace = true }
+static_interner = { workspace = true }
+strsim = { workspace = true }
+triomphe = { workspace = true }
+
+allocative = { workspace = true }
+cmp_any = { workspace = true }
+dice = { workspace = true }
+display_container = { workspace = true }
+dupe = { workspace = true }
+gazebo = { workspace = true }
+pagable = { workspace = true }
+starlark_map = { workspace = true }
+strong_hash = { workspace = true }
+
+kuro_common = { workspace = true }
+kuro_core = { workspace = true }
+kuro_data = { workspace = true }
+kuro_error = { workspace = true }
+kuro_events = { workspace = true }
+kuro_fs = { workspace = true }
+kuro_query = { workspace = true }
+kuro_query_parser = { workspace = true }
+kuro_util = { workspace = true }
+dice_futures = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

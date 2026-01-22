@@ -1,0 +1,43 @@
+[package]
+edition = "2024"
+license = { workspace = true }
+name = "kuro_http"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+bytes = { workspace = true }
+futures = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+hyper = { workspace = true }
+hyper-http-proxy = { workspace = true }
+hyper-rustls = { workspace = true }
+hyper-timeout = { workspace = true }
+hyper-util = { workspace = true }
+ipnetwork = { workspace = true }
+pin-project = { workspace = true }
+rustls = { workspace = true }
+tokio = { workspace = true }
+tokio-rustls = { workspace = true }
+tokio-util = { workspace = true }
+tower-service = { workspace = true }
+tracing = { workspace = true }
+
+allocative = { workspace = true }
+dupe = { workspace = true }
+
+kuro_certs = { workspace = true }
+kuro_error = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+hyperlocal = { workspace = true }
+
+[dev-dependencies]
+httptest = { workspace = true }
+
+[target.'cfg(unix)'.dev-dependencies]
+tempfile = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fbcode_build)"] }

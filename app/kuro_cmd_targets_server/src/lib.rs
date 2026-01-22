@@ -1,0 +1,66 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+#![feature(box_patterns)]
+#![feature(error_generic_member_access)]
+#![feature(iter_order_by)]
+#![feature(never_type)]
+#![feature(try_blocks)]
+#![feature(used_with_arg)]
+
+use async_trait::async_trait;
+use kuro_server_ctx::ctx::ServerCommandContextTrait;
+use kuro_server_ctx::late_bindings::TARGETS_SERVER_COMMANDS;
+use kuro_server_ctx::late_bindings::TargetsServerCommands;
+use kuro_server_ctx::partial_result_dispatcher::NoPartialResult;
+use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
+
+pub mod ctargets;
+pub(crate) mod json;
+pub mod target_hash;
+pub mod targets;
+pub mod targets_show_outputs;
+
+struct TargetsServerCommandsInstance;
+
+#[async_trait]
+impl TargetsServerCommands for TargetsServerCommandsInstance {
+    async fn targets(
+        &self,
+        ctx: &dyn ServerCommandContextTrait,
+        partial_result_dispatcher: PartialResultDispatcher<kuro_cli_proto::StdoutBytes>,
+        req: kuro_cli_proto::TargetsRequest,
+    ) -> kuro_error::Result<kuro_cli_proto::TargetsResponse> {
+        targets::targets_command(ctx, partial_result_dispatcher, req).await
+    }
+
+    async fn targets_show_outputs(
+        &self,
+        ctx: &dyn ServerCommandContextTrait,
+        partial_result_dispatcher: PartialResultDispatcher<NoPartialResult>,
+        req: kuro_cli_proto::TargetsRequest,
+    ) -> kuro_error::Result<kuro_cli_proto::TargetsShowOutputsResponse> {
+        targets_show_outputs::targets_show_outputs_command(ctx, partial_result_dispatcher, req)
+            .await
+    }
+
+    async fn ctargets(
+        &self,
+        ctx: &dyn ServerCommandContextTrait,
+        partial_result_dispatcher: PartialResultDispatcher<NoPartialResult>,
+        req: kuro_cli_proto::ConfiguredTargetsRequest,
+    ) -> kuro_error::Result<kuro_cli_proto::ConfiguredTargetsResponse> {
+        ctargets::configured_targets_command(ctx, partial_result_dispatcher, req).await
+    }
+}
+
+pub fn init_late_bindings() {
+    TARGETS_SERVER_COMMANDS.init(&TargetsServerCommandsInstance);
+}

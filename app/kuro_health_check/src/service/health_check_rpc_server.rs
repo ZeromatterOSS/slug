@@ -1,0 +1,85 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+#![allow(dead_code)]
+
+use std::sync::Arc;
+
+use kuro_grpc::ServerHandle;
+use kuro_grpc::spawn_oneshot;
+use kuro_grpc::to_tonic;
+use kuro_health_check_proto::Empty;
+use kuro_health_check_proto::HealthCheckContextEvent;
+use kuro_health_check_proto::HealthCheckResult;
+use kuro_health_check_proto::HealthCheckSnapshotData;
+use kuro_health_check_proto::health_check_server;
+use tokio::io::AsyncRead;
+use tokio::io::AsyncWrite;
+use tokio::sync::Mutex;
+
+use crate::service::health_check_executor::HealthCheckExecutor;
+
+pub struct HealthCheckRpcServer {
+    executor: Arc<Mutex<HealthCheckExecutor>>,
+}
+
+impl HealthCheckRpcServer {
+    pub fn new() -> Self {
+        Self {
+            executor: Arc::new(Mutex::new(HealthCheckExecutor::new())),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl health_check_server::HealthCheck for HealthCheckRpcServer {
+    async fn update_context(
+        &self,
+        request: tonic::Request<HealthCheckContextEvent>,
+    ) -> Result<tonic::Response<Empty>, tonic::Status> {
+        to_tonic(async move {
+            let event = request.into_inner().try_into()?;
+            let mut executor = self.executor.lock().await;
+            executor.update_context(event).await?;
+            Ok(Empty {})
+        })
+        .await
+    }
+
+    async fn run_checks(
+        &self,
+        request: tonic::Request<HealthCheckSnapshotData>,
+    ) -> Result<tonic::Response<HealthCheckResult>, tonic::Status> {
+        to_tonic(async move {
+            let snapshot = request.into_inner().try_into()?;
+            let reports = self.executor.lock().await.run_checks(snapshot).await?;
+            Ok(HealthCheckResult {
+                reports: reports
+                    .into_iter()
+                    .map(|report| report.try_into())
+                    .collect::<Result<Vec<_>, _>>()?,
+            })
+        })
+        .await
+    }
+}
+
+pub fn spawn_health_check_server<I>(io: I) -> ServerHandle
+where
+    I: AsyncRead + AsyncWrite + Send + Unpin + 'static + tonic::transport::server::Connected,
+{
+    let router = tonic::transport::Server::builder().add_service(
+        health_check_server::HealthCheckServer::new(HealthCheckRpcServer::new())
+            .max_encoding_message_size(usize::MAX)
+            .max_decoding_message_size(usize::MAX),
+    );
+
+    spawn_oneshot(io, router)
+}
