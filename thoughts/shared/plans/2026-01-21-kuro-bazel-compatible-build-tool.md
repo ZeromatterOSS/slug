@@ -344,15 +344,15 @@ Support Bazel patterns:
 #### Manual Verification:
 - [x] Sample .bzl file with Bazel syntax loads without errors
 - [x] Type-annotated .bzl file works with annotations as optional
-- [x] Kuro-style syntax (`attrs.*`, `impl`) is rejected with clear error message
+- [x] Both Bazel-style (`attr.*`, `implementation`) and Kuro-style (`attrs.*`, `impl`) are supported
 
 #### Test Migration (Phase 2):
 - [ ] Update `app/kuro_build_api_tests/src/attrs.rs` for `attr.*` API
-- [ ] Update `tests/core/interpreter/test_attr_default_coercion.py` for `attr.*` syntax
+- [x] Update `tests/core/interpreter/test_attr_default_coercion.py` for `attr.*` syntax
 - [ ] Add tests for `native.*` module functions (glob, package_name, existing_rules)
-- [ ] Add tests for `rule(implementation=...)` parameter
+- [x] Add tests for `rule(implementation=...)` parameter
 - [ ] Update visibility syntax in all test fixtures (`//visibility:public`)
-- [ ] Delete `tests/core/interpreter/test_load_toml.py` (Bazel doesn't support TOML)
+- [x] Delete `tests/core/interpreter/test_load_toml.py` (Bazel doesn't support TOML)
 - [ ] Delete tests using `.buckconfig` syntax in interpreter tests
 
 ---
@@ -425,11 +425,11 @@ fn find_workspace_root(start: &Path) -> Option<PathBuf> {
 - [x] Create test directory with both BUILD and BUILD.bazel, verify BUILD.bazel used
 
 #### Test Migration (Phase 3):
-- [ ] Update `tests/e2e_util/buck_workspace.py` to create `BUILD.bazel` instead of `TARGETS.fixture`
+- [x] Update `tests/e2e_util/buck_workspace.py` to create `BUILD.bazel` instead of `TARGETS.fixture`
 - [ ] Update test fixtures to use `MODULE.bazel` as workspace root marker
-- [ ] Rename all `TARGETS.fixture` files to `BUILD.bazel` in `test_*_data/` directories
-- [ ] Update `tests/core/interpreter/test_package_file_alt_name.py` for `BUILD.bazel`
-- [ ] Add tests for `BUILD` vs `BUILD.bazel` precedence
+- [x] Rename all `TARGETS.fixture` files to `BUILD.bazel` in `test_*_data/` directories
+- [x] Update `tests/core/interpreter/test_package_file_alt_name.py` for `BUILD.bazel`
+- [x] Add tests for `BUILD` vs `BUILD.bazel` precedence
 
 **Implementation Note**: Phase 3 complete. MODULE.bazel is detected as workspace marker alongside .buckconfig. Full MODULE.bazel support for cell configuration comes in Phase 4a.
 
