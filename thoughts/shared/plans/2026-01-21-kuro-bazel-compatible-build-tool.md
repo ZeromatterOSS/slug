@@ -88,6 +88,80 @@ We will fork Kuro and progressively modify it to speak Bazel's dialect. The appr
 
 ---
 
+## Test Migration Strategy
+
+> **Reference Document**: [`2026-01-22-test-infrastructure-mapping.md`](../research/2026-01-22-test-infrastructure-mapping.md)
+
+### Overview
+
+The Kuro codebase inherits Buck2's extensive pytest-based test infrastructure. As we adopt Bazel semantics, tests must be migrated accordingly:
+
+1. **KEEP+UPDATE** (~34 tests): Buck2 tests covering shared concepts - update syntax/semantics to Bazel
+2. **DELETE** (~32 tests): Buck2-specific tests (cells, BUCK files, `attrs.*`) - no Bazel equivalent
+3. **ADD** (~123 tests): Bazel concepts not in Buck2 (bzlmod, `attr.*`, providers, sandboxing)
+4. **PRESERVE** (~69 tests): Tests covering identical concepts in both systems
+
+### Test Framework Preservation
+
+We preserve the existing pytest infrastructure because:
+- Python async tests enable parallel execution
+- Golden file infrastructure handles non-determinism
+- Sanitization functions are mature and extensible
+- Easier to read/write than Bazel's shell-based tests
+
+### Framework Modifications Required
+
+1. **Workspace Setup** (`tests/e2e_util/buck_workspace.py`):
+   - Support `MODULE.bazel` as workspace root marker
+   - Support `BUILD.bazel` instead of `TARGETS.fixture`
+   - Update default config generation
+
+2. **Test Fixtures** (`test_*_data/` directories):
+   - Replace `.buckconfig` with `MODULE.bazel`
+   - Replace `TARGETS.fixture` with `BUILD.bazel`
+   - Update attribute syntax (`attr.*` not `attrs.*`)
+   - Update visibility syntax (`//visibility:public`)
+
+3. **Golden Files** (`*.golden`):
+   - Update expected output formats for Bazel
+   - Add sanitizers for Bazel-specific paths/hashes
+
+### Per-Phase Test Tasks
+
+| Phase | Test Actions |
+|-------|--------------|
+| Phase 2 | Update `attr.*` tests, add `native.*` tests, update rule syntax tests |
+| Phase 3 | Update build file detection tests for `BUILD.bazel` |
+| Phase 4a-d | ADD bzlmod tests, DELETE cell tests |
+| Phase 5 | ADD module extension tests |
+| Phase 6 | ADD ctx/actions/provider/depset/runfiles tests |
+| Phase 7-10 | ADD rules_* integration tests |
+| Phase 12 | ADD sandbox isolation tests |
+| Phase 14 | ADD query function tests (deps, rdeps, kind, filter) |
+
+### Test Categories to Delete (Buck2-Specific)
+
+- `tests/core/cells/` - Replace with bzlmod workspace tests
+- `tests/core/external_cells/` - Replace with bzlmod registry tests
+- Tests using `.buckconfig` - Replace with `MODULE.bazel`
+- Tests using `attrs.*` API - Replace with `attr.*`
+- Tests using `impl` parameter - Replace with `implementation`
+- BXL tests - PRESERVE for tooling, but not priority
+
+### Test Categories to Add (Bazel-Specific)
+
+**Critical for Bazel Compatibility:**
+- bzlmod parsing and resolution tests
+- `attr.*` function tests
+- `native.*` module tests
+- `ctx.actions.*` API tests
+- Provider tests (DefaultInfo, CcInfo, PyInfo, etc.)
+- Depset operation tests
+- Sandbox isolation tests
+- Query function tests
+
+---
+
 ## Phase 1: Fork and Foundation
 
 ### Overview
@@ -272,6 +346,15 @@ Support Bazel patterns:
 - [x] Type-annotated .bzl file works with annotations as optional
 - [x] Kuro-style syntax (`attrs.*`, `impl`) is rejected with clear error message
 
+#### Test Migration (Phase 2):
+- [ ] Update `app/kuro_build_api_tests/src/attrs.rs` for `attr.*` API
+- [ ] Update `tests/core/interpreter/test_attr_default_coercion.py` for `attr.*` syntax
+- [ ] Add tests for `native.*` module functions (glob, package_name, existing_rules)
+- [ ] Add tests for `rule(implementation=...)` parameter
+- [ ] Update visibility syntax in all test fixtures (`//visibility:public`)
+- [ ] Delete `tests/core/interpreter/test_load_toml.py` (Bazel doesn't support TOML)
+- [ ] Delete tests using `.buckconfig` syntax in interpreter tests
+
 ---
 
 ## Phase 3: Build File Recognition
@@ -340,6 +423,13 @@ fn find_workspace_root(start: &Path) -> Option<PathBuf> {
 #### Manual Verification:
 - [x] Create test directory with BUILD.bazel, verify it's found
 - [x] Create test directory with both BUILD and BUILD.bazel, verify BUILD.bazel used
+
+#### Test Migration (Phase 3):
+- [ ] Update `tests/e2e_util/buck_workspace.py` to create `BUILD.bazel` instead of `TARGETS.fixture`
+- [ ] Update test fixtures to use `MODULE.bazel` as workspace root marker
+- [ ] Rename all `TARGETS.fixture` files to `BUILD.bazel` in `test_*_data/` directories
+- [ ] Update `tests/core/interpreter/test_package_file_alt_name.py` for `BUILD.bazel`
+- [ ] Add tests for `BUILD` vs `BUILD.bazel` precedence
 
 **Implementation Note**: Phase 3 complete. MODULE.bazel is detected as workspace marker alongside .buckconfig. Full MODULE.bazel support for cell configuration comes in Phase 4a.
 
@@ -420,6 +510,15 @@ Integrate with Phase 3's workspace detection - MODULE.bazel is the marker.
 - [ ] Create project with MODULE.bazel, verify kuro recognizes it
 - [ ] Invalid MODULE.bazel syntax gives helpful error message
 
+#### Test Migration (Phase 4a):
+- [ ] DELETE `tests/core/cells/` directory (cells → bzlmod)
+- [ ] DELETE `tests/core/external_cells/test_bundled.py` (bundled cells → bzlmod)
+- [ ] DELETE `tests/core/external_cells/test_git.py` (git cells → git_override)
+- [ ] ADD `tests/core/bzlmod/test_module_parsing.py` for MODULE.bazel parsing
+- [ ] ADD `tests/core/bzlmod/test_module_directive.py` for module() directive
+- [ ] ADD `tests/core/bzlmod/test_bazel_dep.py` for bazel_dep() directive
+- [ ] Update test fixtures to use MODULE.bazel instead of .buckconfig for workspace root
+
 ---
 
 ## Phase 4b: bzlmod - Local Dependencies
@@ -485,6 +584,11 @@ Load and parse MODULE.bazel from all local overrides, building initial dependenc
 - [ ] Create two-module project with local override
 - [ ] Build target that depends on local module
 - [ ] Modify local module, verify rebuild happens
+
+#### Test Migration (Phase 4b):
+- [ ] ADD `tests/core/bzlmod/test_local_path_override.py` for local module loading
+- [ ] ADD `tests/core/bzlmod/test_multi_module_project.py` for multi-module builds
+- [ ] ADD test fixture with two-module layout using local_path_override
 
 ---
 
@@ -619,6 +723,13 @@ Cache fetched modules:
 - [ ] Add `bazel_dep(name = "bazel_skylib", version = "1.5.0")`, verify fetched
 - [ ] Offline build works after initial fetch
 - [ ] Network failure gives clear error message
+
+#### Test Migration (Phase 4c):
+- [ ] ADD `tests/core/bzlmod/test_bcr_client.py` for registry client
+- [ ] ADD `tests/core/bzlmod/test_source_fetching.py` for archive/git fetching
+- [ ] ADD `tests/core/bzlmod/test_integrity_verification.py` for SRI hash checks
+- [ ] ADD `tests/core/bzlmod/test_module_cache.py` for caching behavior
+- [ ] DELETE `tests/core/external_cells/test_prelude.py` (replace with bzlmod prelude tests)
 
 ---
 
@@ -761,6 +872,14 @@ pub fn resolve_with_lockfile(
 - [ ] Offline build works with valid lockfile
 - [ ] Commit lockfile, verify teammate gets same versions
 
+#### Test Migration (Phase 4d):
+- [ ] ADD `tests/core/bzlmod/test_mvs_resolution.py` for MVS algorithm
+- [ ] ADD `tests/core/bzlmod/test_diamond_deps.py` for diamond dependency resolution
+- [ ] ADD `tests/core/bzlmod/test_compatibility_level.py` for compatibility checks
+- [ ] ADD `tests/core/bzlmod/test_lockfile_generation.py` for lockfile creation
+- [ ] ADD `tests/core/bzlmod/test_lockfile_usage.py` for lockfile fast path
+- [ ] Port tests from Bazel's `SelectionTest.java` (MVS edge cases)
+
 ---
 
 ## Phase 5: Module Extensions
@@ -866,6 +985,13 @@ Record extension results in MODULE.bazel.lock for caching.
 #### Manual Verification:
 - [ ] Simple extension creating a filegroup works
 - [ ] rules_python's `pip.parse()` extension works (stretch goal)
+
+#### Test Migration (Phase 5):
+- [ ] ADD `tests/core/bzlmod/test_use_extension.py` for extension usage
+- [ ] ADD `tests/core/bzlmod/test_module_extension_def.py` for extension definition
+- [ ] ADD `tests/core/bzlmod/test_tag_classes.py` for tag class handling
+- [ ] ADD `tests/core/bzlmod/test_module_ctx.py` for module_ctx object
+- [ ] ADD `tests/core/bzlmod/test_extension_lockfile.py` for extension caching
 
 ---
 
@@ -997,6 +1123,19 @@ ctx.runfiles(
 #### Manual Verification:
 - [ ] Simple rule that compiles a C file works
 - [ ] Rule with transitive dependencies collects all inputs
+
+#### Test Migration (Phase 6):
+- [ ] UPDATE `tests/core/analysis/test_cmd_args.py` for `ctx.actions.args()` API
+- [ ] UPDATE `tests/core/transitive_sets/test_transitive_sets.py` → rename to `test_depset.py`
+- [ ] ADD `tests/core/analysis/test_ctx_attr.py` for ctx.attr access
+- [ ] ADD `tests/core/analysis/test_ctx_file.py` for ctx.file/ctx.files
+- [ ] ADD `tests/core/analysis/test_ctx_actions_run.py` for ctx.actions.run()
+- [ ] ADD `tests/core/analysis/test_ctx_actions_write.py` for ctx.actions.write()
+- [ ] ADD `tests/core/analysis/test_ctx_actions_declare.py` for declare_file/directory
+- [ ] ADD `tests/core/analysis/test_default_info.py` for DefaultInfo provider
+- [ ] ADD `tests/core/analysis/test_runfiles.py` for runfiles collection
+- [ ] ADD `tests/core/analysis/test_depset_ordering.py` for depset order parameter
+- [ ] ADD `tests/core/analysis/test_provider_definition.py` for custom providers
 
 ---
 
@@ -1433,6 +1572,14 @@ kuro build --sandbox_strategy=symlink //...
 - [ ] Same build succeeds with `--sandbox=false` (proving sandbox caught it)
 - [ ] Performance overhead is acceptable (< 10% slowdown)
 
+#### Test Migration (Phase 12):
+- [ ] ADD `tests/core/sandbox/test_input_isolation.py` for undeclared input detection
+- [ ] ADD `tests/core/sandbox/test_output_isolation.py` for undeclared output detection
+- [ ] ADD `tests/core/sandbox/test_sandbox_strategies.py` for strategy selection
+- [ ] ADD `tests/core/sandbox/test_sandbox_disabled.py` for `--sandbox=false`
+- [ ] Port tests from Bazel's `src/test/java/com/google/devtools/build/lib/sandbox/`
+- [ ] Port shell tests from `sandboxing_test.sh`
+
 **Implementation Note**: Start with symlink-based sandbox for all platforms, then optimize Linux with namespaces.
 
 ---
@@ -1537,17 +1684,51 @@ Support Bazel query syntax:
 #### Manual Verification:
 - [ ] IDE/tooling integration using query commands works
 
+#### Test Migration (Phase 14):
+- [ ] UPDATE `tests/core/query/test_buildfiles.py` for Bazel buildfiles() function
+- [ ] ADD `tests/core/query/test_deps.py` for deps() function
+- [ ] ADD `tests/core/query/test_rdeps.py` for rdeps() function
+- [ ] ADD `tests/core/query/test_kind.py` for kind() function
+- [ ] ADD `tests/core/query/test_attr.py` for attr() function
+- [ ] ADD `tests/core/query/test_filter.py` for filter() function
+- [ ] ADD `tests/core/query/test_allpaths.py` for allpaths() function
+- [ ] ADD `tests/core/query/test_somepath.py` for somepath() function
+- [ ] ADD `tests/core/query/test_set_operations.py` for +, -, ^ operators
+- [ ] ADD `tests/core/query/test_output_formats.py` for --output=label|build|xml|json
+- [ ] ADD `tests/core/query/test_cquery.py` for configured query
+- [ ] ADD `tests/core/query/test_aquery.py` for action query
+- [ ] Port comprehensive tests from Bazel's `bazel_query_test.sh` (50+ test cases)
+
 ---
 
 ## Testing Strategy
 
-### Unit Tests
-- Starlark parser tests for Bazel dialect
-- MVS resolution algorithm tests
-- Sandbox isolation tests
-- Provider and depset tests
+> **Detailed Mapping**: See [`2026-01-22-test-infrastructure-mapping.md`](../research/2026-01-22-test-infrastructure-mapping.md) for the complete test-by-test migration plan.
 
-### Integration Tests
+### Test Migration Summary
+
+| Action | Count | Description |
+|--------|-------|-------------|
+| KEEP+UPDATE | ~34 | Update Buck2 tests for Bazel syntax |
+| DELETE | ~32 | Remove Buck2-specific tests |
+| ADD | ~123 | Create new Bazel-concept tests |
+| PRESERVE | ~69 | Keep unchanged (shared concepts) |
+
+### Framework Preservation
+
+We preserve the pytest-based test framework:
+- **Location**: `tests/e2e_util/` (framework), `tests/core/` and `tests/e2e/` (tests)
+- **Pattern**: `@buck_test()` decorator with async/await
+- **Fixtures**: `test_*_data/` directories with `MODULE.bazel` and `BUILD.bazel`
+- **Golden files**: `*.golden` with sanitization for non-determinism
+
+### Unit Tests (Rust)
+- `app/kuro_build_api_tests/src/attrs.rs` - Update for `attr.*` API
+- `app/kuro_build_api_tests/src/actions.rs` - Update for `ctx.actions.*` API
+- `app/kuro_build_api_tests/src/nodes.rs` - Preserve DICE node tests
+- ADD new module: `app/kuro_bzlmod_tests/` for bzlmod resolution
+
+### Integration Tests (Python)
 - Full build tests with rules_cc, rules_rust, rules_python
 - bzlmod resolution with real BCR
 - Lockfile generation and caching
