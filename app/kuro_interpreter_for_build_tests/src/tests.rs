@@ -189,7 +189,7 @@ async fn test_eval_build_file() {
     fs.write_file("pkg/file1.java", "");
     fs.write_file("pkg/file2.java", "");
     fs.write_file(
-        "pkg/BUCK",
+        "pkg/BUILD.bazel",
         indoc!(
             r#"
                 load("//imports:one.bzl", "some_macro")
@@ -247,7 +247,7 @@ async fn test_bazel_style_rule_with_implementation() {
 
     fs.write_file("pkg/file1.txt", "");
     fs.write_file(
-        "pkg/BUCK",
+        "pkg/BUILD.bazel",
         indoc!(
             r#"
                 load("//rules.bzl", "my_rule")
@@ -302,7 +302,7 @@ async fn test_bazel_attr_module_in_rules() {
 
     fs.write_file("pkg/file1.txt", "");
     fs.write_file(
-        "pkg/BUCK",
+        "pkg/BUILD.bazel",
         indoc!(
             r#"
                 load("//rules.bzl", "bazel_style_rule")
@@ -359,7 +359,7 @@ async fn test_mixed_bazel_kuro_style() {
 
     fs.write_file("pkg/file1.txt", "");
     fs.write_file(
-        "pkg/BUCK",
+        "pkg/BUILD.bazel",
         indoc!(
             r#"
                 load("//rules.bzl", "mixed_rule")
@@ -413,7 +413,7 @@ async fn test_code_without_type_annotations() {
     );
 
     fs.write_file(
-        "pkg/BUCK",
+        "pkg/BUILD.bazel",
         indoc!(
             r#"
                 load("//rules.bzl", "simple_rule")
@@ -469,7 +469,7 @@ async fn test_type_annotations_parse() {
     );
 
     fs.write_file(
-        "pkg/BUCK",
+        "pkg/BUILD.bazel",
         indoc!(
             r#"
                 load("//typed_rules.bzl", "typed_rule")

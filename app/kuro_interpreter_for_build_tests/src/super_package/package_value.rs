@@ -47,7 +47,7 @@ async fn test_package_value_same_dir_package_file() {
         ),
     );
     fs.write_file(
-        "headphones/BUCK",
+        "headphones/BUILD.bazel",
         indoc!(
             r#"
                 load("//:rules.bzl", "rrr")
@@ -106,7 +106,7 @@ async fn test_package_value_parent_dir_package_file() {
         ),
     );
     fs.write_file(
-        "trackpad/BUCK",
+        "trackpad/BUILD.bazel",
         indoc!(
             r#"
                 load("//:rules.bzl", "rrr")
@@ -156,7 +156,7 @@ async fn test_overwrite_package_value_not_allowed_without_overwrite_flag() {
 
     fs.write_file("PACKAGE", "write_package_value('aaa.bbb', 'ccc')");
     fs.write_file("foo/PACKAGE", "write_package_value('aaa.bbb', 'ccc')");
-    fs.write_file("foo/BUCK", "");
+    fs.write_file("foo/BUILD.bazel", "");
 
     let package_label = PackageLabel::testing_parse("root//foo");
 
@@ -189,7 +189,7 @@ async fn test_overwrite_package_value_with_flag() {
         "write_package_value('aaa.bbb', 'ddd', overwrite = True)",
     );
     fs.write_file(
-        "foo/BUCK",
+        "foo/BUILD.bazel",
         indoc!(
             r#"
                 load("//:rules.bzl", "rrr")
@@ -233,7 +233,7 @@ async fn test_read_parent_package_value() {
         "write_package_value('xxx.yyy', read_parent_package_value('aaa.bbb'))",
     );
     fs.write_file(
-        "foo/BUCK",
+        "foo/BUILD.bazel",
         indoc!(
             r#"
                 load("//:rules.bzl", "rrr")
@@ -301,7 +301,7 @@ async fn test_read_parent_package_value_from_bzl() {
         ),
     );
     fs.write_file(
-        "foo/BUCK",
+        "foo/BUILD.bazel",
         indoc!(
             r#"
                 load("//:rules.bzl", "rrr")
@@ -350,7 +350,7 @@ async fn test_read_parent_package_value_is_suggested_in_package_file() {
 
     fs.write_file("PACKAGE", "write_package_value('aaa.bbb', 'ccc')");
     fs.write_file("foo/PACKAGE", "read_package_value('aaa.bbb')");
-    fs.write_file("foo/BUCK", "");
+    fs.write_file("foo/BUILD.bazel", "");
 
     let package_label = PackageLabel::testing_parse("root//foo");
 
@@ -395,7 +395,7 @@ async fn test_read_parent_package_value_is_suggested_in_bzl_file() {
             "#
         ),
     );
-    fs.write_file("foo/BUCK", "");
+    fs.write_file("foo/BUILD.bazel", "");
 
     let package_label = PackageLabel::testing_parse("root//foo");
 
@@ -434,7 +434,7 @@ async fn test_config_unification_rollout_function_override() {
         "test_config_unification_rollout(enabled=False)",
     );
     fs.write_file(
-        "foo/BUCK",
+        "foo/BUILD.bazel",
         indoc!(
             r#"
                 load("//:rules.bzl", "rrr")

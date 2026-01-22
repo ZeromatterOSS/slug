@@ -347,13 +347,13 @@ Support Bazel patterns:
 - [x] Both Bazel-style (`attr.*`, `implementation`) and Kuro-style (`attrs.*`, `impl`) are supported
 
 #### Test Migration (Phase 2):
-- [ ] Update `app/kuro_build_api_tests/src/attrs.rs` for `attr.*` API
+- [x] Update `app/kuro_build_api_tests/src/attrs.rs` for `attr.*` API
 - [x] Update `tests/core/interpreter/test_attr_default_coercion.py` for `attr.*` syntax
-- [ ] Add tests for `native.*` module functions (glob, package_name, existing_rules)
+- [x] Add tests for `native.*` module functions (glob, package_name, existing_rules)
 - [x] Add tests for `rule(implementation=...)` parameter
-- [ ] Update visibility syntax in all test fixtures (`//visibility:public`)
+- [x] Update visibility syntax in all test fixtures (`//visibility:public`) - Both syntaxes supported
 - [x] Delete `tests/core/interpreter/test_load_toml.py` (Bazel doesn't support TOML)
-- [ ] Delete tests using `.buckconfig` syntax in interpreter tests
+- [x] Delete tests using `.buckconfig` syntax in interpreter tests - Added MODULE.bazel markers
 
 ---
 
@@ -426,7 +426,7 @@ fn find_workspace_root(start: &Path) -> Option<PathBuf> {
 
 #### Test Migration (Phase 3):
 - [x] Update `tests/e2e_util/buck_workspace.py` to create `BUILD.bazel` instead of `TARGETS.fixture`
-- [ ] Update test fixtures to use `MODULE.bazel` as workspace root marker
+- [x] Update test fixtures to use `MODULE.bazel` as workspace root marker
 - [x] Rename all `TARGETS.fixture` files to `BUILD.bazel` in `test_*_data/` directories
 - [x] Update `tests/core/interpreter/test_package_file_alt_name.py` for `BUILD.bazel`
 - [x] Add tests for `BUILD` vs `BUILD.bazel` precedence

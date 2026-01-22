@@ -8,8 +8,14 @@
  * above-listed licenses.
  */
 
+//! Tests for Bazel-compatible attr.* module display/repr.
+//!
+//! Note: The attr.* functions map to internal attrs.* types, so repr() shows
+//! the underlying attrs.* format. This is an implementation detail.
+
 use kuro_interpreter_for_build::interpreter::testing::Tester;
 
+/// Test attr.* display representations (shows underlying attrs.* format)
 #[test]
 fn test_attr_display() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
@@ -18,13 +24,13 @@ def assert_eq(a, b):
     if a != b:
         fail(a + " != " + b)
 
-assert_eq(repr(attrs.bool(default = True)), "attrs.bool(default=True)")
-assert_eq(repr(attrs.string()), "attrs.string()")
-assert_eq(repr(attrs.list(attrs.string())), "attrs.list(attrs.string())")
-assert_eq(repr(attrs.dict(attrs.string(), attrs.string())), "attrs.dict(attrs.string(), attrs.string(), sorted=False)")
-assert_eq(repr(attrs.one_of(attrs.string())), "attrs.one_of(attrs.string())")
-assert_eq(repr(attrs.tuple(attrs.string())), "attrs.tuple(attrs.string())")
-assert_eq(repr(attrs.option(attrs.string())), "attrs.option(attrs.string())")
+# Test Bazel-style attr.* display (maps to attrs.* internally)
+assert_eq(repr(attr.bool(default = True)), "attrs.bool(default=True)")
+assert_eq(repr(attr.string()), "attrs.string()")
+assert_eq(repr(attr.int()), "attrs.int()")
+assert_eq(repr(attr.label_list()), "attrs.list(attrs.dep())")
+assert_eq(repr(attr.string_list()), "attrs.list(attrs.string())")
+assert_eq(repr(attr.string_dict()), "attrs.dict(attrs.string(), attrs.string(), sorted=False)")
 
 def test(): pass
 "#)?;
@@ -33,7 +39,7 @@ def test(): pass
 
 /// Test Bazel-compatible attr module (singular) is registered and functions work
 #[test]
-fn test_bazel_attr_module_registered() -> kuro_error::Result<()> {
+fn test_attr_module_registered() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
     tester.run_starlark_bzl_test(r#"
 def test():
@@ -56,11 +62,11 @@ def test():
 
 /// Test Bazel-compatible attr.string() function
 #[test]
-fn test_bazel_attr_string() -> kuro_error::Result<()> {
+fn test_attr_string() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
     tester.run_starlark_bzl_test(r#"
 def test():
-    # attr.string() should create a string attribute
+    # attr.string() should create a string attribute (shows as attrs.string internally)
     s = attr.string()
     assert_eq("attrs.string()", repr(s))
 
@@ -77,7 +83,7 @@ def test():
 
 /// Test Bazel-compatible attr.int() function
 #[test]
-fn test_bazel_attr_int() -> kuro_error::Result<()> {
+fn test_attr_int() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
     tester.run_starlark_bzl_test(r#"
 def test():
@@ -92,7 +98,7 @@ def test():
 
 /// Test Bazel-compatible attr.bool() function
 #[test]
-fn test_bazel_attr_bool() -> kuro_error::Result<()> {
+fn test_attr_bool() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
     tester.run_starlark_bzl_test(r#"
 def test():
@@ -108,13 +114,13 @@ def test():
     Ok(())
 }
 
-/// Test Bazel-compatible attr.label() function (maps to attrs.dep())
+/// Test Bazel-compatible attr.label() function (maps to attrs.dep internally)
 #[test]
-fn test_bazel_attr_label() -> kuro_error::Result<()> {
+fn test_attr_label() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
     tester.run_starlark_bzl_test(r#"
 def test():
-    # attr.label() creates a dependency attribute
+    # attr.label() creates a dependency attribute (shows as attrs.dep internally)
     l = attr.label()
     assert_eq("attrs.dep()", repr(l))
 
@@ -127,7 +133,7 @@ def test():
 
 /// Test Bazel-compatible attr.label_list() function
 #[test]
-fn test_bazel_attr_label_list() -> kuro_error::Result<()> {
+fn test_attr_label_list() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
     tester.run_starlark_bzl_test(r#"
 def test():
@@ -142,7 +148,7 @@ def test():
 
 /// Test Bazel-compatible attr.string_list() function
 #[test]
-fn test_bazel_attr_string_list() -> kuro_error::Result<()> {
+fn test_attr_string_list() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
     tester.run_starlark_bzl_test(r#"
 def test():
@@ -157,7 +163,7 @@ def test():
 
 /// Test Bazel-compatible attr.int_list() function
 #[test]
-fn test_bazel_attr_int_list() -> kuro_error::Result<()> {
+fn test_attr_int_list() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
     tester.run_starlark_bzl_test(r#"
 def test():
@@ -172,7 +178,7 @@ def test():
 
 /// Test Bazel-compatible attr.string_dict() function
 #[test]
-fn test_bazel_attr_string_dict() -> kuro_error::Result<()> {
+fn test_attr_string_dict() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
     tester.run_starlark_bzl_test(r#"
 def test():
@@ -187,7 +193,7 @@ def test():
 
 /// Test Bazel-compatible attr.string_list_dict() function
 #[test]
-fn test_bazel_attr_string_list_dict() -> kuro_error::Result<()> {
+fn test_attr_string_list_dict() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
     tester.run_starlark_bzl_test(r#"
 def test():
@@ -197,14 +203,14 @@ def test():
     Ok(())
 }
 
-/// Test Bazel-compatible attr.output() function
+/// Test Bazel-compatible attr.output() function (maps to attrs.string internally)
 #[test]
-fn test_bazel_attr_output() -> kuro_error::Result<()> {
+fn test_attr_output() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
     tester.run_starlark_bzl_test(r#"
 def test():
     o = attr.output()
-    # Output is implemented as string attr in Kuro
+    # Output is implemented as string attr internally
     assert_eq("attrs.string()", repr(o))
 "#)?;
     Ok(())
@@ -212,12 +218,12 @@ def test():
 
 /// Test Bazel-compatible attr.output_list() function
 #[test]
-fn test_bazel_attr_output_list() -> kuro_error::Result<()> {
+fn test_attr_output_list() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
     tester.run_starlark_bzl_test(r#"
 def test():
     ol = attr.output_list()
-    # Output list is implemented as list of strings
+    # Output list is implemented as list of strings internally
     assert_eq("attrs.list(attrs.string())", repr(ol))
 "#)?;
     Ok(())

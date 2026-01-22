@@ -38,7 +38,7 @@ package(
 "#,
     );
     fs.write_file(
-        "juxtaposition/BUCK",
+        "juxtaposition/BUILD.bazel",
         r#"
 load("//:rules.bzl", "simple")
 simple(name = "a")
@@ -81,7 +81,7 @@ package(
 "#,
     );
     fs.write_file(
-        "juxtaposition/BUCK",
+        "juxtaposition/BUILD.bazel",
         r#"
 load("//:rules.bzl", "simple")
 simple(name = "a")
@@ -123,7 +123,7 @@ package(
 "#,
     );
     fs.write_file(
-        "juxtaposition/BUCK",
+        "juxtaposition/BUILD.bazel",
         r#"
 load("//:rules.bzl", "simple")
 simple(name = "a")
