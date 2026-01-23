@@ -26,6 +26,7 @@ use dice::DiceComputations;
 
 mod bundled;
 mod git;
+mod local;
 
 struct ConcreteExternalCellsImpl;
 
@@ -50,6 +51,9 @@ impl kuro_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
             }
             ExternalCellOrigin::Git(setup) => {
                 Ok(git::get_file_ops_delegate(ctx, cell_name, setup).await? as _)
+            }
+            ExternalCellOrigin::LocalPath(setup) => {
+                Ok(local::get_file_ops_delegate(ctx, cell_name, setup).await? as _)
             }
         }
     }
@@ -91,6 +95,10 @@ impl kuro_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
         let materialized_path = match origin {
             ExternalCellOrigin::Bundled(cell) => bundled::materialize_all(ctx, cell).await?,
             ExternalCellOrigin::Git(setup) => git::materialize_all(ctx, cell, setup).await?,
+            ExternalCellOrigin::LocalPath(setup) => {
+                // Local path cells are already on the filesystem, no materialization needed
+                local::materialize_all(ctx, cell, setup).await?
+            }
         };
 
         Ok(io.project_root().copy(&materialized_path, &dest_path)?)

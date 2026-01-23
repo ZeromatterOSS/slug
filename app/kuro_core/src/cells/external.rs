@@ -23,6 +23,27 @@ use crate::cells::name::CellName;
 pub enum ExternalCellOrigin {
     Bundled(CellName),
     Git(GitCellSetup),
+    /// Local path module from bzlmod `local_path_override()`.
+    LocalPath(LocalPathCellSetup),
+}
+
+/// Setup for a local path external cell (from bzlmod local_path_override).
+#[derive(
+    Debug,
+    derive_more::Display,
+    Clone,
+    Dupe,
+    Allocative,
+    PartialEq,
+    Eq,
+    Hash
+)]
+#[display("local_path({}, {})", module_name, path)]
+pub struct LocalPathCellSetup {
+    /// The bzlmod module name this local path provides.
+    pub module_name: Arc<str>,
+    /// The local filesystem path (relative to workspace root).
+    pub path: Arc<str>,
 }
 
 #[derive(
@@ -48,6 +69,7 @@ impl fmt::Display for ExternalCellOrigin {
         match self {
             Self::Bundled(cell) => write!(f, "bundled({cell})"),
             Self::Git(git) => write!(f, "{git}"),
+            Self::LocalPath(local) => write!(f, "local_path({}, {})", local.module_name, local.path),
         }
     }
 }

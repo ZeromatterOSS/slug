@@ -1,0 +1,4 @@
+[cells]
+root = .
+lib_a = libs/lib_a
+lib_b = libs/lib_b

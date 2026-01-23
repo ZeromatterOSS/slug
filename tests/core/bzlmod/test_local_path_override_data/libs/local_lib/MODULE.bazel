@@ -1,0 +1,4 @@
+module(
+    name = "local_lib",
+    version = "2.0.0",
+)

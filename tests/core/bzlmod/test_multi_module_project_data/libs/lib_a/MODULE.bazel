@@ -1,0 +1,4 @@
+module(
+    name = "lib_a",
+    version = "1.0.0",
+)

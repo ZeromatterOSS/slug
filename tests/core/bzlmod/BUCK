@@ -1,0 +1,33 @@
+load("@fbcode//buck2/tests:buck_e2e.bzl", "buck2_e2e_test")
+
+oncall("build_infra")
+
+buck2_e2e_test(
+    name = "test_module_parsing",
+    srcs = ["test_module_parsing.py"],
+    data_dir = "test_module_parsing_data",
+)
+
+buck2_e2e_test(
+    name = "test_module_directive",
+    srcs = ["test_module_directive.py"],
+    data_dir = "test_module_directive_data",
+)
+
+buck2_e2e_test(
+    name = "test_bazel_dep",
+    srcs = ["test_bazel_dep.py"],
+    data_dir = "test_bazel_dep_data",
+)
+
+buck2_e2e_test(
+    name = "test_local_path_override",
+    srcs = ["test_local_path_override.py"],
+    data_dir = "test_local_path_override_data",
+)
+
+buck2_e2e_test(
+    name = "test_multi_module_project",
+    srcs = ["test_multi_module_project.py"],
+    data_dir = "test_multi_module_project_data",
+)

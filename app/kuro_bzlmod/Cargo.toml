@@ -1,0 +1,18 @@
+[package]
+description = "Bzlmod (Bazel module) implementation for Kuro"
+edition = "2024"
+license = { workspace = true }
+name = "kuro_bzlmod"
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+allocative = { workspace = true }
+anyhow = { workspace = true }
+dupe = { workspace = true }
+starlark = { workspace = true }
+
+kuro_error = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

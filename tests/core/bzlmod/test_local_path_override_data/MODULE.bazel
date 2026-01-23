@@ -1,0 +1,10 @@
+module(
+    name = "test_root",
+    version = "1.0.0",
+)
+
+# Reference a local module using local_path_override
+local_path_override(
+    module_name = "local_lib",
+    path = "libs/local_lib",
+)

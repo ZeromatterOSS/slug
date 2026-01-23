@@ -1,0 +1,15 @@
+module(
+    name = "multi_module_root",
+    version = "1.0.0",
+)
+
+# Multiple local modules
+local_path_override(
+    module_name = "lib_a",
+    path = "libs/lib_a",
+)
+
+local_path_override(
+    module_name = "lib_b",
+    path = "libs/lib_b",
+)

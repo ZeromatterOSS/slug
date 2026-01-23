@@ -1,0 +1,36 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is dual-licensed under either the MIT license found in the
+ * LICENSE-MIT file in the root directory of this source tree or the Apache
+ * License, Version 2.0 found in the LICENSE-APACHE file in the root directory
+ * of this source tree. You may select, at your option, one of the
+ * above-listed licenses.
+ */
+
+//! Bzlmod (Bazel module) implementation for Kuro.
+//!
+//! This crate provides parsing and resolution of MODULE.bazel files,
+//! implementing Bazel 9.0's module system for dependency management.
+//!
+//! # Components
+//!
+//! - [`types`]: Data structures for Module, BazelDep, and related types
+//! - [`version`]: Bazel-compatible version parsing and comparison
+//! - [`globals`]: Starlark globals for MODULE.bazel directives
+//! - [`parser`]: MODULE.bazel file parsing
+
+pub mod globals;
+pub mod parser;
+pub mod resolution;
+pub mod types;
+pub mod version;
+
+pub use parser::parse_module_bazel;
+pub use resolution::resolve_local_modules;
+pub use resolution::resolve_local_override;
+pub use resolution::ResolvedLocalModule;
+pub use resolution::ResolvedLocalModules;
+pub use types::BazelDep;
+pub use types::Module;
+pub use version::Version;
