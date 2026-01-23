@@ -1,0 +1,10 @@
+# Example hello_world project for Kuro
+# This demonstrates Bazel-compatible MODULE.bazel syntax
+
+module(
+    name = "hello_world",
+    version = "1.0.0",
+)
+
+# Dependencies would be declared here when rules_cc integration is complete
+# bazel_dep(name = "rules_cc", version = "0.0.9")
