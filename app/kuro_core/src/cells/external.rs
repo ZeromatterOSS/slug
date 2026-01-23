@@ -25,6 +25,8 @@ pub enum ExternalCellOrigin {
     Git(GitCellSetup),
     /// Local path module from bzlmod `local_path_override()`.
     LocalPath(LocalPathCellSetup),
+    /// Remote module from bzlmod `bazel_dep()` fetched from a registry (e.g., BCR).
+    Bzlmod(BzlmodCellSetup),
 }
 
 /// Setup for a local path external cell (from bzlmod local_path_override).
@@ -44,6 +46,29 @@ pub struct LocalPathCellSetup {
     pub module_name: Arc<str>,
     /// The local filesystem path (relative to workspace root).
     pub path: Arc<str>,
+}
+
+/// Setup for a remote bzlmod module fetched from a registry (e.g., BCR).
+#[derive(
+    Debug,
+    derive_more::Display,
+    Clone,
+    Dupe,
+    Allocative,
+    PartialEq,
+    Eq,
+    Hash
+)]
+#[display("bzlmod({}, {}, {})", module_name, version, registry_url)]
+pub struct BzlmodCellSetup {
+    /// The bzlmod module name.
+    pub module_name: Arc<str>,
+    /// The module version.
+    pub version: Arc<str>,
+    /// The registry URL this was fetched from (e.g., "https://bcr.bazel.build").
+    pub registry_url: Arc<str>,
+    /// The absolute path to the cached/extracted source.
+    pub source_path: Arc<str>,
 }
 
 #[derive(
@@ -70,6 +95,7 @@ impl fmt::Display for ExternalCellOrigin {
             Self::Bundled(cell) => write!(f, "bundled({cell})"),
             Self::Git(git) => write!(f, "{git}"),
             Self::LocalPath(local) => write!(f, "local_path({}, {})", local.module_name, local.path),
+            Self::Bzlmod(bzlmod) => write!(f, "{bzlmod}"),
         }
     }
 }

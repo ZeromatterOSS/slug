@@ -5,19 +5,13 @@ code in this repository.
 
 ## Repository Overview
 
-Kuro is a fast, hermetic, multi-language build system written in Rust. This is
-Meta's internal version of Kuro, located at `fbcode/kuro` within the fbsource
-monorepo.
+Kuro is a fast, hermetic, multi-language build system written in Rust.
+Kuro is designed to be a fully compatible drop-in replacement for bazel,
+built using the internals from Meta's Buck2 project.
+
+This migration is in progress, and work is ongoing.
 
 ## Building and Development
-
-### Validate changes
-
-**ALWAYS** run this after changing files in `app/` or `fbcode/kuro/app/`:
-
-```bash
-arc rust-check fbcode//kuro/app/...
-```
 
 **Using Kuro (self-bootstrap):**
 

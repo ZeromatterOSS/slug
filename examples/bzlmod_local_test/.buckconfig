@@ -1,0 +1,24 @@
+# Minimal configuration for bzlmod local path override testing
+# This project tests local_path_override() functionality
+
+[cells]
+root = .
+toolchains = toolchains
+none = none
+
+[cell_aliases]
+# Alias common Meta cell names to the empty 'none' cell to prevent errors
+# from external configs that may reference these
+# NOTE: Do NOT define 'prelude' alias - leaving it undefined disables the prelude
+fbcode = none
+fbsource = none
+buck = none
+config = none
+fbcode_macros = none
+gh_facebook_buck2_shims_meta = none
+ovr_config = none
+shim = none
+
+[parser]
+# Disable target platform detection since we're using minimal toolchains
+target_platform_detector_spec =

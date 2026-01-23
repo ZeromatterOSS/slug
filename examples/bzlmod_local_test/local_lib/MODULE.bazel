@@ -1,0 +1,9 @@
+# Local library module for testing bzlmod integration
+# This module is referenced via local_path_override() from the parent
+
+module(
+    name = "local_lib",
+    version = "1.0.0",
+)
+
+# No external dependencies - keeps the test simple

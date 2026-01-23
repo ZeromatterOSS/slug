@@ -1,0 +1,3 @@
+# Minimal toolchains cell for bzlmod testing
+# The core test is loading @local_lib which doesn't require toolchains
+# Toolchain configuration would be needed for actual builds with rules_cc etc.

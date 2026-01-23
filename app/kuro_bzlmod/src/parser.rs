@@ -53,7 +53,7 @@ fn module_bazel_dialect() -> Dialect {
         enable_keyword_only_arguments: true,
         enable_types: DialectTypes::Disable, // Types not used in MODULE.bazel
         enable_load_reexport: false,
-        enable_top_level_stmt: false,
+        enable_top_level_stmt: true, // Enable variable assignments like IS_RELEASE = True
         enable_f_strings: true,
         ..Dialect::Standard
     }
@@ -442,5 +442,106 @@ pip.parse(quiet = False)
 
         let quiet = tag.kwargs.iter().find(|(k, _)| k == "quiet").map(|(_, v)| v);
         assert!(matches!(quiet, Some(crate::types::TagValue::Bool(false))));
+    }
+
+    #[test]
+    fn test_parse_bazel_lib_style_no_arg_tags() {
+        // Test MODULE.bazel style from bazel_lib which uses no-argument tag calls
+        let content = r#"
+module(
+    name = "bazel_lib",
+    version = "3.1.1",
+)
+
+bazel_dep(name = "bazel_skylib", version = "1.8.1")
+bazel_dep(name = "platforms", version = "0.0.10")
+
+bazel_lib_toolchains = use_extension("@bazel_lib//lib:extensions.bzl", "toolchains")
+bazel_lib_toolchains.copy_directory()
+bazel_lib_toolchains.copy_to_directory()
+bazel_lib_toolchains.coreutils()
+use_repo(bazel_lib_toolchains, "copy_directory_toolchains", "copy_to_directory_toolchains")
+"#;
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+
+        // Should have one extension usage
+        assert_eq!(parsed.extension_usages.len(), 1);
+
+        let ext = &parsed.extension_usages[0];
+        assert_eq!(ext.extension_bzl_file, "@bazel_lib//lib:extensions.bzl");
+        assert_eq!(ext.extension_name, "toolchains");
+
+        // Should have three tags (no-argument calls)
+        assert_eq!(ext.tags.len(), 3);
+        assert_eq!(ext.tags[0].tag_name, "copy_directory");
+        assert_eq!(ext.tags[1].tag_name, "copy_to_directory");
+        assert_eq!(ext.tags[2].tag_name, "coreutils");
+
+        // Each tag should have no kwargs
+        for tag in &ext.tags {
+            assert!(tag.kwargs.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_parse_bazel_lib_actual_from_bcr() {
+        // Test actual bazel_lib MODULE.bazel content from BCR which uses variable assignments
+        let content = r#"
+module(
+    name = "bazel_lib",
+    bazel_compatibility = [">=6.0.0"],
+    compatibility_level = 1,
+    version = "3.1.1",
+)
+
+bazel_dep(name = "bazel_features", version = "1.9.0")
+bazel_dep(name = "bazel_skylib", version = "1.8.1")
+bazel_dep(name = "platforms", version = "0.0.10")
+bazel_dep(name = "rules_shell", version = "0.4.1")
+
+bazel_lib_toolchains = use_extension("@bazel_lib//lib:extensions.bzl", "toolchains")
+bazel_lib_toolchains.copy_directory()
+bazel_lib_toolchains.copy_to_directory()
+bazel_lib_toolchains.coreutils()
+bazel_lib_toolchains.zstd()
+bazel_lib_toolchains.expand_template()
+bazel_lib_toolchains.bats()
+use_repo(bazel_lib_toolchains, "bats_toolchains", "copy_directory_toolchains", "copy_to_directory_toolchains")
+
+register_toolchains(
+    "@copy_directory_toolchains//:all",
+    "@copy_to_directory_toolchains//:all",
+)
+
+# Variable assignment - this was causing the parse failure!
+IS_RELEASE = True
+
+bazel_dep(
+    name = "gazelle",
+    version = "0.40.0",
+    dev_dependency = IS_RELEASE,
+)
+bazel_dep(
+    name = "rules_go",
+    version = "0.59.0",
+    dev_dependency = IS_RELEASE,
+    repo_name = "io_bazel_rules_go",
+)
+"#;
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        assert_eq!(parsed.module.name, "bazel_lib");
+        assert_eq!(parsed.module.compatibility_level, 1);
+
+        // Should have multiple bazel_deps including dev dependencies
+        assert!(parsed.module.bazel_deps.len() >= 6);
+
+        // Should have the toolchains extension
+        assert!(!parsed.extension_usages.is_empty());
+        let toolchains_ext = parsed
+            .extension_usages
+            .iter()
+            .find(|e| e.extension_name == "toolchains")
+            .expect("Should have toolchains extension");
+        assert_eq!(toolchains_ext.tags.len(), 6);
     }
 }

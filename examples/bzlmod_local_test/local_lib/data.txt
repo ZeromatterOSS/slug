@@ -1,0 +1,2 @@
+This is test data from local_lib module.
+Used to verify @local_lib//:lib_files target resolution.

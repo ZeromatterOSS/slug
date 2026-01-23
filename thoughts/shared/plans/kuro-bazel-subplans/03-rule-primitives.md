@@ -1,0 +1,274 @@
+# Rule Primitives Phase (6)
+
+> **Parent Plan**: [Kuro Bazel-Compatible Build Tool](../2026-01-21-kuro-bazel-compatible-build-tool.md)
+
+This sub-plan covers ensuring kuro's rule execution API matches Bazel's ctx, actions, and provider interfaces.
+
+---
+
+## Phase 6: Rule Primitives and Provider Compatibility
+
+### Overview
+
+Ensure kuro's rule execution API matches Bazel's ctx, actions, and provider interfaces. Kuro already has substantial infrastructure that needs Bazel API alignment.
+
+### Kuro Existing Implementation
+
+Kuro already has most of this infrastructure. The work is primarily **API alignment**, not building from scratch:
+
+| Feature                        | Kuro Location                                                                       | Status                                   |
+| ------------------------------ | ----------------------------------------------------------------------------------- | ---------------------------------------- |
+| `AnalysisContext` (ctx)        | `app/kuro_build_api/src/interpreter/rule_defs/context.rs:176`                       | Exists, needs API tweaks                 |
+| `ctx.attr`                     | `app/kuro_build_api/src/interpreter/rule_defs/context.rs`                           | **Kuro uses `ctx.attrs`**, needs alias   |
+| `ctx.actions`                  | `app/kuro_build_api/src/interpreter/rule_defs/context.rs:60`                        | Exists via `AnalysisActions`             |
+| `ctx.actions.run()`            | `app/kuro_action_impl/src/context/run.rs:121`                                       | Exists, verify parameter names           |
+| `ctx.actions.write()`          | `app/kuro_action_impl/src/context/write.rs:110`                                     | **Kuro uses positional args**, Bazel uses named |
+| `ctx.actions.declare_output()` | `app/kuro_action_impl/src/context/unsorted.rs:50`                                   | **Needs alias to `declare_file()`**      |
+| `DefaultInfo`                  | `app/kuro_build_api/src/interpreter/rule_defs/provider/builtin/default_info.rs:136` | Exists                                   |
+| `RunInfo`                      | `app/kuro_build_api/src/interpreter/rule_defs/provider/builtin/run_info.rs`         | Exists                                   |
+| `TransitiveSet`                | `app/kuro_build_api/src/interpreter/rule_defs/transitive_set/transitive_set.rs:112` | Exists, needs `depset` alias             |
+| Action execution               | `app/kuro_build_api/src/actions/execute/action_executor.rs:312`                     | Exists                                   |
+
+**Critical API Discrepancies Found During Testing:**
+
+These discrepancies were discovered while testing `examples/bzlmod_local_test/`:
+
+1. **`ctx.attr` vs `ctx.attrs`**: Bazel uses `ctx.attr.foo`, Kuro uses `ctx.attrs.foo`. Need to add `attr` as an alias.
+2. **`declare_file()` vs `declare_output()`**: Bazel uses `ctx.actions.declare_file()`, Kuro uses `ctx.actions.declare_output()`. Need to add alias.
+3. **`write()` parameter style**: Bazel accepts `write(output=out, content=text)`, Kuro requires positional `write(out, text)`. Need to accept both styles.
+
+### Bazel Source References
+
+This is a critical phase - the rule API must match Bazel exactly. Study these thoroughly:
+
+| Feature                 | Bazel Source File                                                                            |
+| ----------------------- | -------------------------------------------------------------------------------------------- |
+| **ctx object**          | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkRuleContextApi.java`   |
+| ctx implementation      | `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleContext.java`     |
+| **actions API**         | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkActionFactoryApi.java` |
+| actions implementation  | `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkActionFactory.java`   |
+| **Args builder**        | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/CommandLineArgsApi.java`       |
+| Args implementation     | `src/main/java/com/google/devtools/build/lib/analysis/starlark/Args.java`                    |
+| **DefaultInfo**         | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/DefaultInfoApi.java`           |
+| **RunInfo**             | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/RunEnvironmentInfoApi.java`    |
+| **OutputGroupInfo**     | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/OutputGroupInfoApi.java`       |
+| **depset**              | `src/main/java/com/google/devtools/build/lib/collect/nestedset/Depset.java`                  |
+| depset ordering         | `src/main/java/com/google/devtools/build/lib/collect/nestedset/Order.java`                   |
+| **Runfiles**            | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/RunfilesApi.java`              |
+| Runfiles implementation | `src/main/java/com/google/devtools/build/lib/analysis/Runfiles.java`                         |
+| **Provider definition** | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/ProviderApi.java`              |
+
+**Starlark builtins (important!):**
+
+- `src/main/starlark/builtins_bzl/common/` - Built-in rule implementations in Starlark
+- These show how Bazel's own rules use the ctx/actions API
+
+**Key tests:**
+
+- `src/test/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleContextTest.java`
+- `src/test/java/com/google/devtools/build/lib/analysis/RunfilesTest.java`
+
+### Changes Required:
+
+#### 1. AnalysisContext (ctx) API Alignment
+
+**File**: `app/kuro_build_api/src/interpreter/rule_defs/context.rs`
+
+Current Kuro `AnalysisContext` (line 176) needs these additional/renamed attributes:
+
+```python
+# Bazel ctx attributes (ensure all available):
+ctx.label              # ✓ Already exists
+ctx.attr               # ✓ Already exists (line 295)
+ctx.file               # NEED: Single file attribute access
+ctx.files              # NEED: File list attribute access
+ctx.executable         # NEED: Executable attribute access
+ctx.outputs            # ✓ Exists as declare_output, needs direct access
+ctx.actions            # ✓ Already exists (line 178)
+ctx.build_file_path    # NEED: BUILD file path
+ctx.workspace_name     # NEED: Workspace name (from MODULE.bazel)
+ctx.bin_dir            # NEED: Output bin directory path
+ctx.genfiles_dir       # NEED: Generated files directory path
+ctx.var                # NEED: Make variable access
+ctx.configuration      # NEED: Build configuration access
+ctx.fragments          # NEED: Configuration fragments
+```
+
+Add to `analysis_context_methods()` (line 295):
+
+```rust
+#[starlark_module]
+fn analysis_context_methods(builder: &mut MethodsBuilder) {
+    // Existing methods...
+
+    #[starlark(attribute)]
+    fn file<'v>(this: &AnalysisContext<'v>) -> anyhow::Result<...> {
+        // Return struct with single-file attributes
+    }
+
+    #[starlark(attribute)]
+    fn files<'v>(this: &AnalysisContext<'v>) -> anyhow::Result<...> {
+        // Return struct with file-list attributes
+    }
+
+    #[starlark(attribute)]
+    fn executable<'v>(this: &AnalysisContext<'v>) -> anyhow::Result<...> {
+        // Return struct with executable attributes
+    }
+
+    #[starlark(attribute)]
+    fn build_file_path<'v>(this: &AnalysisContext<'v>) -> anyhow::Result<&str> {
+        // Return path to BUILD.bazel file
+    }
+
+    #[starlark(attribute)]
+    fn workspace_name<'v>(this: &AnalysisContext<'v>) -> anyhow::Result<&str> {
+        // Return module name from MODULE.bazel
+    }
+}
+```
+
+#### 2. Actions API Alignment
+
+**Files**: `app/kuro_action_impl/src/context/*.rs`
+
+| Bazel Method          | Kuro File        | Status                          |
+| --------------------- | ---------------- | ------------------------------- |
+| `run()`               | `run.rs:121`     | ✓ Verify parameters match Bazel |
+| `run_shell()`         | TBD              | NEED: Shell command action      |
+| `write()`             | `write.rs:110`   | ✓ Exists                        |
+| `declare_file()`      | `unsorted.rs:50` | ✓ Rename from `declare_output`  |
+| `declare_directory()` | TBD              | NEED: Directory output          |
+| `args()`              | TBD              | NEED: Args builder              |
+| `symlink()`           | `copy.rs`        | CHECK: May exist                |
+| `expand_template()`   | TBD              | NEED: Template expansion        |
+
+**Key addition - `ctx.actions.args()` builder:**
+
+```rust
+// New file: app/kuro_action_impl/src/context/args.rs
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct ArgsBuilder {
+    items: Vec<ArgItem>,
+    param_file: Option<ParamFileSpec>,
+}
+
+impl<'v> StarlarkValue<'v> for ArgsBuilder {
+    // Methods: add(), add_all(), add_joined(), use_param_file(), set_param_file_format()
+}
+```
+
+#### 3. depset() Global Function
+
+**File**: `app/kuro_build_api/src/interpreter/rule_defs/transitive_set/globals.rs`
+
+Kuro uses `transitive_set()` but Bazel uses `depset()`. Add alias:
+
+```rust
+#[starlark_module]
+pub fn register_depset(builder: &mut GlobalsBuilder) {
+    /// Bazel-compatible depset (alias for transitive_set)
+    fn depset<'v>(
+        direct: Option<&List<'v>>,
+        transitive: Option<&List<'v>>,
+        order: Option<&str>,  // "default", "postorder", "preorder", "topological"
+    ) -> anyhow::Result<TransitiveSet<'v>> {
+        // Map to transitive_set implementation
+    }
+}
+```
+
+**Order mapping:**
+| Bazel Order | Kuro Equivalent |
+|-------------|-----------------|
+| `"default"` | BFS traversal |
+| `"postorder"` | `PostorderTransitiveSetIterator` (line 110) |
+| `"preorder"` | `PreorderTransitiveSetIterator` (line 53) |
+| `"topological"` | `TopologicalTransitiveSetIterator` (line 189) |
+
+#### 4. Built-in Providers
+
+**Directory**: `app/kuro_build_api/src/interpreter/rule_defs/provider/builtin/`
+
+**DefaultInfo** (line 136 in `default_info.rs`):
+
+- ✓ Already exists with `files`, `runfiles`, `executable`
+- CHECK: Parameter names match Bazel exactly
+
+**NEED: OutputGroupInfo**
+
+```rust
+// New file: output_group_info.rs
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct OutputGroupInfo {
+    groups: HashMap<String, TransitiveSet>,
+}
+```
+
+**NEED: CcInfo, PyInfo** (for rules_cc, rules_python integration):
+
+```rust
+// New file: cc_info.rs - Critical for Phase 7
+pub struct CcInfo {
+    compilation_context: CompilationContext,
+    linking_context: LinkingContext,
+}
+
+pub struct CompilationContext {
+    headers: TransitiveSet,
+    includes: TransitiveSet,
+    defines: TransitiveSet,
+    // ...
+}
+```
+
+#### 5. Runfiles
+
+**File**: Likely in `app/kuro_build_api/src/interpreter/rule_defs/`
+
+```python
+ctx.runfiles(
+    files = [...],
+    transitive_files = depset(...),
+    symlinks = {...},
+    root_symlinks = {...},
+    collect_data = True,
+    collect_default = True,
+)
+```
+
+Check Kuro's existing runfiles implementation and align API.
+
+### Success Criteria:
+
+#### Automated Verification:
+
+- [ ] ctx.actions.run() executes actions correctly
+- [ ] ctx.actions.args() builds command lines
+- [ ] depset operations are efficient
+- [ ] DefaultInfo provider works
+- [ ] Runfiles are collected correctly
+- [ ] All documented ctx methods available
+
+#### Manual Verification:
+
+- [ ] Simple rule that compiles a C file works
+- [ ] Rule with transitive dependencies collects all inputs
+
+#### Test Migration (Phase 6):
+
+- [ ] UPDATE `tests/core/analysis/test_cmd_args.py` for `ctx.actions.args()` API
+- [ ] UPDATE `tests/core/transitive_sets/test_transitive_sets.py` → rename to `test_depset.py`
+- [ ] ADD `tests/core/analysis/test_ctx_attr.py` for ctx.attr access
+- [ ] ADD `tests/core/analysis/test_ctx_file.py` for ctx.file/ctx.files
+- [ ] ADD `tests/core/analysis/test_ctx_actions_run.py` for ctx.actions.run()
+- [ ] ADD `tests/core/analysis/test_ctx_actions_write.py` for ctx.actions.write()
+- [ ] ADD `tests/core/analysis/test_ctx_actions_declare.py` for declare_file/directory
+- [ ] ADD `tests/core/analysis/test_default_info.py` for DefaultInfo provider
+- [ ] ADD `tests/core/analysis/test_runfiles.py` for runfiles collection
+- [ ] ADD `tests/core/analysis/test_depset_ordering.py` for depset order parameter
+- [ ] ADD `tests/core/analysis/test_provider_definition.py` for custom providers
+
+---
+

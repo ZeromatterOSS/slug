@@ -1,0 +1,14 @@
+# Test BUILD file for bzlmod local module integration
+# This tests that local_path_override() correctly resolves @local_lib
+
+# Load a rule from the local module
+load("@local_lib//:defs.bzl", "simple_rule")
+
+# Use the rule from local_lib
+simple_rule(
+    name = "test_target",
+    message = "Hello from bzlmod local test!",
+)
+
+# NOTE: filegroup and other native rules require a prelude.
+# For testing bzlmod local path resolution, the simple_rule test above is sufficient.

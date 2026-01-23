@@ -1,0 +1,11 @@
+# BUILD file for local_lib module
+# Note: This is a minimal setup without prelude, so filegroup/exports_files
+# are not available. The main test is loading defs.bzl via bzlmod.
+
+# Load our own rule to demonstrate bzlmod working
+load(":defs.bzl", "simple_rule")
+
+simple_rule(
+    name = "lib_message",
+    message = "Hello from local_lib module!",
+)

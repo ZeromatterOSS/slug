@@ -25,6 +25,7 @@ use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
 use dice::DiceComputations;
 
 mod bundled;
+mod bzlmod;
 mod git;
 mod local;
 
@@ -54,6 +55,9 @@ impl kuro_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
             }
             ExternalCellOrigin::LocalPath(setup) => {
                 Ok(local::get_file_ops_delegate(ctx, cell_name, setup).await? as _)
+            }
+            ExternalCellOrigin::Bzlmod(setup) => {
+                Ok(bzlmod::get_file_ops_delegate(ctx, cell_name, setup).await? as _)
             }
         }
     }
@@ -92,16 +96,28 @@ impl kuro_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
         // without doing the actual materialization. However, that's not currently possible without
         // it resulting in the materializer tracking paths in the repo, so this will have to do for
         // now.
-        let materialized_path = match origin {
-            ExternalCellOrigin::Bundled(cell) => bundled::materialize_all(ctx, cell).await?,
-            ExternalCellOrigin::Git(setup) => git::materialize_all(ctx, cell, setup).await?,
+        match origin {
+            ExternalCellOrigin::Bundled(cell) => {
+                let materialized_path = bundled::materialize_all(ctx, cell).await?;
+                io.project_root().copy(&materialized_path, &dest_path)?;
+            }
+            ExternalCellOrigin::Git(setup) => {
+                let materialized_path = git::materialize_all(ctx, cell, setup).await?;
+                io.project_root().copy(&materialized_path, &dest_path)?;
+            }
             ExternalCellOrigin::LocalPath(setup) => {
                 // Local path cells are already on the filesystem, no materialization needed
-                local::materialize_all(ctx, cell, setup).await?
+                let materialized_path = local::materialize_all(ctx, cell, setup).await?;
+                io.project_root().copy(&materialized_path, &dest_path)?;
             }
-        };
+            ExternalCellOrigin::Bzlmod(setup) => {
+                // Bzlmod cells are at absolute cache paths, copy directly from there
+                let abs_dest = io.project_root().resolve(&dest_path);
+                bzlmod::copy_to_destination(&setup, abs_dest.as_path()).await?;
+            }
+        }
 
-        Ok(io.project_root().copy(&materialized_path, &dest_path)?)
+        Ok(())
     }
 }
 

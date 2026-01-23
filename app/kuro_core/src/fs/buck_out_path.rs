@@ -324,13 +324,22 @@ impl BuckOutPathResolver {
         path: &CellRelativePath,
         origin: ExternalCellOrigin,
     ) -> ProjectRelativePathBuf {
+        // Pre-compute bzlmod identifier if needed (to satisfy borrow checker)
+        let bzlmod_id = match &origin {
+            ExternalCellOrigin::Bzlmod(setup) => {
+                Some(format!("{}/{}", setup.module_name, setup.version))
+            }
+            _ => None,
+        };
+
         ProjectRelativePathBuf::from(ForwardRelativePathBuf::concat([
             self.buck_out_v2.as_forward_relative_path(),
             ForwardRelativePath::new("external_cells").unwrap(),
-            match origin {
+            match &origin {
                 ExternalCellOrigin::Bundled(_) => ForwardRelativePath::new("bundled").unwrap(),
                 ExternalCellOrigin::Git(_) => ForwardRelativePath::new("git").unwrap(),
                 ExternalCellOrigin::LocalPath(_) => ForwardRelativePath::new("local").unwrap(),
+                ExternalCellOrigin::Bzlmod(_) => ForwardRelativePath::new("bzlmod").unwrap(),
             },
             match &origin {
                 ExternalCellOrigin::Bundled(cell) => {
@@ -341,6 +350,9 @@ impl BuckOutPathResolver {
                 }
                 ExternalCellOrigin::LocalPath(setup) => {
                     ForwardRelativePath::new(setup.module_name.as_ref()).unwrap()
+                }
+                ExternalCellOrigin::Bzlmod(_) => {
+                    ForwardRelativePath::new(bzlmod_id.as_ref().unwrap()).unwrap()
                 }
             },
             path.as_ref(),

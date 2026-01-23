@@ -1,0 +1,16 @@
+# Test project for bzlmod local module integration
+# This tests local_path_override() and @module//:target resolution
+
+module(
+    name = "bzlmod_local_test",
+    version = "1.0.0",
+)
+
+# Declare dependency on local_lib module
+bazel_dep(name = "local_lib", version = "1.0.0")
+
+# Override to use local path instead of fetching from registry
+local_path_override(
+    module_name = "local_lib",
+    path = "local_lib",
+)

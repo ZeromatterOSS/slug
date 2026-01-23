@@ -24,6 +24,7 @@ use kuro_core::cells::CellResolver;
 use kuro_core::cells::alias::NonEmptyCellAlias;
 use kuro_core::cells::cell_root_path::CellRootPath;
 use kuro_core::cells::cell_root_path::CellRootPathBuf;
+use kuro_core::cells::external::BzlmodCellSetup;
 use kuro_core::cells::external::ExternalCellOrigin;
 use kuro_core::cells::external::GitCellSetup;
 use kuro_core::cells::external::GitObjectFormat;
@@ -382,13 +383,20 @@ impl BuckConfigBasedCells {
 
         // ===== Bzlmod Integration =====
         // Check for MODULE.bazel and resolve dependencies from BCR
+        // Collect bzlmod cells with their external origins for later marking
+        let mut bzlmod_external_cells: Vec<(CellName, BzlmodCellSetup)> = Vec::new();
         if let Some(project_fs) = project_fs {
             if let Some(bzlmod_cells) = Self::resolve_bzlmod_dependencies(project_fs).await? {
-                for (name, path) in bzlmod_cells {
+                for (name, path, maybe_setup) in bzlmod_cells {
                     // Don't override cells defined in .buckconfig
                     if !cell_definitions.iter().any(|(n, _)| *n == name) {
                         cell_definitions.push((name, path));
                         tracing::info!("Added bzlmod cell: {}", name);
+
+                        // If this is a remote BCR module, track it for marking as external
+                        if let Some(setup) = maybe_setup {
+                            bzlmod_external_cells.push((name, setup));
+                        }
                     }
                 }
             }
@@ -398,6 +406,11 @@ impl BuckConfigBasedCells {
         let root_aliases = Self::get_cell_aliases_from_config(&root_config)?.collect();
 
         let mut aggregator = CellsAggregator::new(cell_definitions, root_aliases)?;
+
+        // Mark remote bzlmod modules as external cells
+        for (name, setup) in bzlmod_external_cells {
+            aggregator.mark_external_cell(name, ExternalCellOrigin::Bzlmod(setup))?;
+        }
 
         if let Some(external_cells) = root_config.get_section("external_cells") {
             for (alias, origin) in external_cells.iter() {
@@ -442,10 +455,11 @@ impl BuckConfigBasedCells {
     /// 3. Resolves local_path_override() to local cells
     /// 4. Fetches remote dependencies from BCR and extracts them
     ///
-    /// Returns a list of (CellName, CellRootPathBuf) for each resolved module.
+    /// Returns a list of (CellName, CellRootPathBuf, Option<BzlmodCellSetup>) for each resolved module.
+    /// The setup is `Some` for remote BCR modules, `None` for local path overrides.
     async fn resolve_bzlmod_dependencies(
         project_root: &ProjectRoot,
-    ) -> kuro_error::Result<Option<Vec<(CellName, CellRootPathBuf)>>> {
+    ) -> kuro_error::Result<Option<Vec<(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)>>> {
         let module_bazel_rel = ProjectRelativePath::new("MODULE.bazel")?;
         let module_bazel_path = project_root.resolve(module_bazel_rel);
 
@@ -475,7 +489,9 @@ impl BuckConfigBasedCells {
             let cell_path = CellRootPathBuf::new(
                 ProjectRelativePath::new(&resolved.relative_path)?.to_owned(),
             );
-            cells.push((cell_name, cell_path));
+            // Local modules don't need BzlmodCellSetup - they use LocalPath external origin
+            // which is handled separately if needed
+            cells.push((cell_name, cell_path, None));
             tracing::info!(
                 "Resolved local module: {} -> {}",
                 name,
@@ -518,20 +534,37 @@ impl BuckConfigBasedCells {
                                 match resolver.resolve_dependency(dep).await {
                                     Ok(resolved) => {
                                         let cell_name = CellName::unchecked_new(&resolved.name)?;
-                                        // For remote modules, we use the cache path
-                                        // Convert absolute path to project-relative if possible,
-                                        // otherwise we need to handle this as an external cell
                                         let source_path_str =
                                             resolved.source_path.to_string_lossy().to_string();
+
+                                        // Create a project-relative path for this external module
+                                        // e.g., bazel-external/rules_cc/0.0.9/
+                                        let external_path = format!(
+                                            "bazel-external/{}/{}",
+                                            resolved.name,
+                                            resolved.version.as_str()
+                                        );
+                                        let cell_path = CellRootPathBuf::new(
+                                            ProjectRelativePath::new(&external_path)?.to_owned(),
+                                        );
+
                                         tracing::info!(
-                                            "Resolved remote module: {}@{} -> {}",
+                                            "Resolved remote module: {}@{} -> {} (external path: {})",
                                             resolved.name,
                                             resolved.version.as_str(),
-                                            source_path_str
+                                            source_path_str,
+                                            external_path
                                         );
-                                        // Note: For now, we skip remote cells as they require
-                                        // ExternalCellOrigin integration, which is a larger change.
-                                        // The source is fetched and cached for later use.
+
+                                        // Store the setup info for marking as external later
+                                        let setup = kuro_core::cells::external::BzlmodCellSetup {
+                                            module_name: Arc::from(resolved.name.as_str()),
+                                            version: Arc::from(resolved.version.as_str()),
+                                            registry_url: Arc::from(resolved.registry_url.as_str()),
+                                            source_path: Arc::from(source_path_str.as_str()),
+                                        };
+
+                                        cells.push((cell_name, cell_path, Some(setup)));
                                     }
                                     Err(e) => {
                                         tracing::warn!(
