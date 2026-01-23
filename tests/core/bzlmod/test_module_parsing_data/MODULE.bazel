@@ -1,0 +1,4 @@
+module(
+    name = "test_module_parsing",
+    version = "1.0.0",
+)
