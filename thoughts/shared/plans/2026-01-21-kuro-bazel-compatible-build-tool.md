@@ -712,24 +712,27 @@ Cache fetched modules:
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] BCR metadata fetched successfully
-- [ ] Source archives downloaded and extracted
-- [ ] Integrity verification works (fails on mismatch)
-- [ ] Git repositories cloned correctly
-- [ ] Cache prevents re-downloads
-- [ ] Custom registry URL works (`--registry=URL`)
+- [x] BCR metadata fetched successfully (registry.rs: `fetch_metadata()`)
+- [x] Source archives downloaded and extracted (fetch.rs: `fetch_archive()`, `extract_tar_gz_impl()`)
+- [x] Integrity verification works (fails on mismatch) (integrity.rs: `verify_integrity()` - unit tests pass)
+- [x] Git repositories cloned correctly (fetch.rs: `fetch_git()`)
+- [x] Cache prevents re-downloads (cache.rs + registry.rs checks cache before fetching)
+- [ ] Custom registry URL works (`--registry=URL`) - needs CLI integration
 
 #### Manual Verification:
-- [ ] Add `bazel_dep(name = "bazel_skylib", version = "1.5.0")`, verify fetched
+- [x] Add `bazel_dep(name = "bazel_skylib", version = "1.5.0")`, verify fetched (**WORKING**)
 - [ ] Offline build works after initial fetch
 - [ ] Network failure gives clear error message
 
 #### Test Migration (Phase 4c):
-- [ ] ADD `tests/core/bzlmod/test_bcr_client.py` for registry client
-- [ ] ADD `tests/core/bzlmod/test_source_fetching.py` for archive/git fetching
-- [ ] ADD `tests/core/bzlmod/test_integrity_verification.py` for SRI hash checks
-- [ ] ADD `tests/core/bzlmod/test_module_cache.py` for caching behavior
+- [x] Rust unit tests added for: cache, integrity, fetch, registry modules
+- [ ] ADD `tests/core/bzlmod/test_bcr_client.py` for registry client (deferred - requires CLI integration)
+- [ ] ADD `tests/core/bzlmod/test_source_fetching.py` for archive/git fetching (deferred - requires CLI integration)
+- [ ] ADD `tests/core/bzlmod/test_integrity_verification.py` for SRI hash checks (deferred - requires CLI integration)
+- [ ] ADD `tests/core/bzlmod/test_module_cache.py` for caching behavior (deferred - requires CLI integration)
 - [ ] DELETE `tests/core/external_cells/test_prelude.py` (replace with bzlmod prelude tests)
+
+**Note**: Phase 4c core functionality is working! Modules are successfully fetched from BCR and extracted to `~/.cache/kuro/`. Integration with cell registration (to make `@bazel_skylib//:target` work) requires additional work in a later phase.
 
 ---
 

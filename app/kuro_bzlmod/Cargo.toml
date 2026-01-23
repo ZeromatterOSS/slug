@@ -9,10 +9,23 @@ version = "0.1.0"
 [dependencies]
 allocative = { workspace = true }
 anyhow = { workspace = true }
+base64 = { workspace = true }
+bytes = { workspace = true }
+dirs = { workspace = true }
 dupe = { workspace = true }
+flate2 = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
 starlark = { workspace = true }
+tar = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
 
 kuro_error = { workspace = true }
+kuro_http = { workspace = true }
 
 [dev-dependencies]
+httptest = { workspace = true }
 tempfile = { workspace = true }

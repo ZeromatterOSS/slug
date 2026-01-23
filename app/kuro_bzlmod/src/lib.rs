@@ -19,18 +19,35 @@
 //! - [`version`]: Bazel-compatible version parsing and comparison
 //! - [`globals`]: Starlark globals for MODULE.bazel directives
 //! - [`parser`]: MODULE.bazel file parsing
+//! - [`cache`]: Module caching for fetched dependencies
+//! - [`registry`]: Bazel Central Registry (BCR) client
+//! - [`fetch`]: Source fetching and extraction
+//! - [`integrity`]: Subresource Integrity (SRI) hash verification
 
+pub mod cache;
+pub mod fetch;
 pub mod globals;
+pub mod integrity;
 pub mod parser;
+pub mod registry;
 pub mod resolution;
 pub mod types;
 pub mod version;
 
+pub use cache::ModuleCache;
+pub use fetch::SourceFetcher;
+pub use integrity::verify_integrity;
 pub use parser::parse_module_bazel;
+pub use registry::RegistryClient;
+pub use registry::DEFAULT_REGISTRY_URL;
+pub use resolution::resolve_all_dependencies;
 pub use resolution::resolve_local_modules;
 pub use resolution::resolve_local_override;
+pub use resolution::RemoteModuleResolver;
 pub use resolution::ResolvedLocalModule;
 pub use resolution::ResolvedLocalModules;
+pub use resolution::ResolvedRemoteModule;
+pub use resolution::ResolvedRemoteModules;
 pub use types::BazelDep;
 pub use types::Module;
 pub use version::Version;

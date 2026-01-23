@@ -21,13 +21,18 @@ use std::sync::Arc;
 use allocative::Allocative;
 use kuro_error::BuckErrorContext;
 
+use crate::cache::ModuleCache;
+use crate::fetch::SourceFetcher;
 use crate::parser::parse_module_bazel;
+use crate::parser::parse_module_bazel_content;
+use crate::registry::RegistryClient;
+use crate::types::BazelDep;
 use crate::types::LocalPathOverride;
 use crate::types::Module;
 use crate::types::Override;
 use crate::version::Version;
 
-/// Errors that can occur during local module resolution.
+/// Errors that can occur during module resolution.
 #[derive(Debug, kuro_error::Error)]
 #[kuro(tag = Input)]
 pub enum LocalResolutionError {
@@ -45,6 +50,24 @@ pub enum LocalResolutionError {
 
     #[error("Local path override references unknown module: {0}")]
     UnknownModule(String),
+}
+
+/// Errors that can occur during remote module resolution.
+#[derive(Debug, kuro_error::Error)]
+#[kuro(tag = Input)]
+pub enum RemoteResolutionError {
+    #[error("Failed to fetch module '{name}@{version}' from registry")]
+    FetchFailed { name: String, version: String },
+
+    #[error("Module '{name}@{version}' not found in registry")]
+    ModuleNotFound { name: String, version: String },
+
+    #[error("Failed to extract source for '{name}@{version}': {reason}")]
+    ExtractionFailed {
+        name: String,
+        version: String,
+        reason: String,
+    },
 }
 
 /// A resolved local module.
@@ -286,6 +309,260 @@ impl ResolvedLocalModules {
             })
             .collect()
     }
+}
+
+// ============================================================================
+// Remote Module Resolution (BCR)
+// ============================================================================
+
+/// A resolved remote module from a registry.
+#[derive(Debug, Clone, Allocative)]
+pub struct ResolvedRemoteModule {
+    /// The module name.
+    pub name: String,
+
+    /// The resolved version.
+    pub version: Version,
+
+    /// The registry URL this was fetched from.
+    pub registry_url: String,
+
+    /// The absolute path to the extracted source directory.
+    pub source_path: PathBuf,
+
+    /// The parsed module information.
+    pub module: Module,
+}
+
+/// Result of resolving remote dependencies.
+#[derive(Debug, Clone, Default, Allocative)]
+pub struct ResolvedRemoteModules {
+    /// Map from module name to resolved module information.
+    pub modules: HashMap<String, ResolvedRemoteModule>,
+
+    /// Order in which modules were resolved.
+    pub resolution_order: Vec<String>,
+}
+
+impl ResolvedRemoteModules {
+    /// Creates an empty resolution result.
+    pub fn empty() -> Self {
+        Self {
+            modules: HashMap::new(),
+            resolution_order: Vec::new(),
+        }
+    }
+
+    /// Returns true if there are no resolved remote modules.
+    pub fn is_empty(&self) -> bool {
+        self.modules.is_empty()
+    }
+
+    /// Gets a resolved module by name.
+    pub fn get(&self, name: &str) -> Option<&ResolvedRemoteModule> {
+        self.modules.get(name)
+    }
+
+    /// Returns an iterator over all resolved modules.
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &ResolvedRemoteModule)> {
+        self.modules.iter()
+    }
+
+    /// Convert resolved modules to cell registration information.
+    pub fn to_cell_infos(&self) -> Vec<LocalModuleCellInfo> {
+        self.modules
+            .values()
+            .map(|resolved| LocalModuleCellInfo {
+                cell_name: resolved.name.clone(),
+                module_name: Arc::from(resolved.name.as_str()),
+                path: Arc::from(resolved.source_path.to_string_lossy().as_ref()),
+            })
+            .collect()
+    }
+}
+
+/// Resolver for remote modules from registries.
+pub struct RemoteModuleResolver {
+    registry_client: RegistryClient,
+    source_fetcher: SourceFetcher,
+}
+
+impl RemoteModuleResolver {
+    /// Create a new remote module resolver.
+    pub async fn new(cache: ModuleCache) -> kuro_error::Result<Self> {
+        let registry_client = RegistryClient::bcr(cache.clone()).await?;
+        let source_fetcher = SourceFetcher::new(cache).await?;
+
+        Ok(Self {
+            registry_client,
+            source_fetcher,
+        })
+    }
+
+    /// Create a resolver with a custom registry URL.
+    pub async fn with_registry(
+        registry_url: &str,
+        cache: ModuleCache,
+    ) -> kuro_error::Result<Self> {
+        let registry_client = RegistryClient::new(registry_url, cache.clone()).await?;
+        let source_fetcher = SourceFetcher::new(cache).await?;
+
+        Ok(Self {
+            registry_client,
+            source_fetcher,
+        })
+    }
+
+    /// Resolve a single dependency from the registry.
+    pub async fn resolve_dependency(
+        &self,
+        dep: &BazelDep,
+    ) -> kuro_error::Result<ResolvedRemoteModule> {
+        let name = &dep.name;
+        let version = &dep.version;
+        let version_str = version.as_str();
+
+        tracing::info!("Resolving {}@{} from BCR", name, version_str);
+
+        // Fetch MODULE.bazel from registry
+        let module_bazel_content = self
+            .registry_client
+            .fetch_module_bazel(name, version_str)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to fetch MODULE.bazel for {}@{}: {}", name, version_str, e);
+                RemoteResolutionError::FetchFailed {
+                    name: name.clone(),
+                    version: version_str.to_string(),
+                }
+            })?;
+
+        // Parse the MODULE.bazel
+        let filename = format!("{}@{}/MODULE.bazel", name, version_str);
+        let parsed = parse_module_bazel_content(&module_bazel_content, &filename)
+            .map_err(|e| {
+                tracing::error!("Failed to parse MODULE.bazel for {}@{}: {}", name, version_str, e);
+                RemoteResolutionError::FetchFailed {
+                    name: name.clone(),
+                    version: version_str.to_string(),
+                }
+            })?;
+
+        // Fetch source.json
+        let source_info = self
+            .registry_client
+            .fetch_source_info(name, version_str)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to fetch source.json for {}@{}: {}", name, version_str, e);
+                RemoteResolutionError::FetchFailed {
+                    name: name.clone(),
+                    version: version_str.to_string(),
+                }
+            })?;
+
+        // Download and extract source
+        let source_path = self
+            .source_fetcher
+            .fetch_source(self.registry_client.base_url(), name, version_str, &source_info)
+            .await
+            .map_err(|e| RemoteResolutionError::ExtractionFailed {
+                name: name.clone(),
+                version: version_str.to_string(),
+                reason: e.to_string(),
+            })?;
+
+        Ok(ResolvedRemoteModule {
+            name: name.clone(),
+            version: version.clone(),
+            registry_url: self.registry_client.base_url().to_string(),
+            source_path,
+            module: parsed.module,
+        })
+    }
+
+    /// Resolve all bazel_dep declarations from a module.
+    ///
+    /// This fetches each dependency from the registry, downloads and extracts
+    /// the source, and returns the resolved modules.
+    pub async fn resolve_dependencies(
+        &self,
+        deps: &[BazelDep],
+        overrides: &[Override],
+    ) -> kuro_error::Result<ResolvedRemoteModules> {
+        let mut modules = HashMap::new();
+        let mut resolution_order = Vec::new();
+
+        // Build set of modules with local overrides (skip fetching these)
+        let local_override_names: std::collections::HashSet<_> = overrides
+            .iter()
+            .filter_map(|o| match o {
+                Override::LocalPath(local) => Some(local.module_name.clone()),
+                _ => None,
+            })
+            .collect();
+
+        for dep in deps {
+            // Skip if there's a local override for this module
+            if local_override_names.contains(&dep.name) {
+                tracing::debug!(
+                    "Skipping {}@{} - has local_path_override",
+                    dep.name,
+                    dep.version
+                );
+                continue;
+            }
+
+            // Skip if already resolved
+            if modules.contains_key(&dep.name) {
+                continue;
+            }
+
+            match self.resolve_dependency(dep).await {
+                Ok(resolved) => {
+                    let name = resolved.name.clone();
+                    resolution_order.push(name.clone());
+                    modules.insert(name, resolved);
+                }
+                Err(e) => {
+                    tracing::error!("Failed to resolve {}@{}: {}", dep.name, dep.version, e);
+                    return Err(e);
+                }
+            }
+        }
+
+        Ok(ResolvedRemoteModules {
+            modules,
+            resolution_order,
+        })
+    }
+
+    /// Get the registry client for direct access.
+    pub fn registry_client(&self) -> &RegistryClient {
+        &self.registry_client
+    }
+}
+
+/// Convenience function to resolve all dependencies (both local and remote).
+///
+/// This is the main entry point for dependency resolution.
+pub async fn resolve_all_dependencies(
+    root_module: &Module,
+    workspace_root: &Path,
+) -> kuro_error::Result<(ResolvedLocalModules, ResolvedRemoteModules)> {
+    // Resolve local overrides first
+    let local_modules = resolve_local_modules(&root_module.overrides, workspace_root)?;
+
+    // Create cache and resolver for remote modules
+    let cache = ModuleCache::new()?;
+    let resolver = RemoteModuleResolver::new(cache).await?;
+
+    // Resolve remote dependencies (skipping those with local overrides)
+    let remote_modules = resolver
+        .resolve_dependencies(&root_module.bazel_deps, &root_module.overrides)
+        .await?;
+
+    Ok((local_modules, remote_modules))
 }
 
 #[cfg(test)]

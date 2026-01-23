@@ -52,6 +52,7 @@ gazebo = { workspace = true }
 pagable = { workspace = true }
 starlark_map = { workspace = true }
 
+kuro_bzlmod = { workspace = true }
 kuro_cli_proto = { workspace = true }
 kuro_core = { workspace = true }
 kuro_data = { workspace = true }

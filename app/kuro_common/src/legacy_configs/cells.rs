@@ -13,7 +13,12 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use kuro_bzlmod::ModuleCache;
+use kuro_bzlmod::RemoteModuleResolver;
+use kuro_bzlmod::parse_module_bazel;
+use kuro_bzlmod::resolve_local_modules;
 use kuro_core::kuro_env;
+use kuro_fs::fs_util;
 use kuro_core::cells::CellAliasResolver;
 use kuro_core::cells::CellResolver;
 use kuro_core::cells::alias::NonEmptyCellAlias;
@@ -254,6 +259,7 @@ impl BuckConfigBasedCells {
             },
             config_args,
             false, /* follow includes */
+            Some(project_fs),
         )
         .await
     }
@@ -266,6 +272,7 @@ impl BuckConfigBasedCells {
             file_ops,
             config_args,
             true, /* follow includes */
+            None, /* project_fs for bzlmod */
         )
         .await
     }
@@ -274,8 +281,9 @@ impl BuckConfigBasedCells {
         file_ops: &mut dyn ConfigParserFileOps,
         config_args: &[kuro_cli_proto::ConfigOverride],
         follow_includes: bool,
+        project_fs: Option<&ProjectRoot>,
     ) -> kuro_error::Result<Self> {
-        Self::parse_with_file_ops_and_options_inner(file_ops, config_args, follow_includes)
+        Self::parse_with_file_ops_and_options_inner(file_ops, config_args, follow_includes, project_fs)
             .await
             .buck_error_context("Parsing cells")
     }
@@ -284,6 +292,7 @@ impl BuckConfigBasedCells {
         file_ops: &mut dyn ConfigParserFileOps,
         config_args: &[kuro_cli_proto::ConfigOverride],
         follow_includes: bool,
+        project_fs: Option<&ProjectRoot>,
     ) -> kuro_error::Result<Self> {
         // Tracing file ops to record config file accesses on command invocation.
         struct TracingFileOps<'a> {
@@ -371,6 +380,21 @@ impl BuckConfigBasedCells {
             }
         }
 
+        // ===== Bzlmod Integration =====
+        // Check for MODULE.bazel and resolve dependencies from BCR
+        if let Some(project_fs) = project_fs {
+            if let Some(bzlmod_cells) = Self::resolve_bzlmod_dependencies(project_fs).await? {
+                for (name, path) in bzlmod_cells {
+                    // Don't override cells defined in .buckconfig
+                    if !cell_definitions.iter().any(|(n, _)| *n == name) {
+                        cell_definitions.push((name, path));
+                        tracing::info!("Added bzlmod cell: {}", name);
+                    }
+                }
+            }
+        }
+        // ===== End Bzlmod Integration =====
+
         let root_aliases = Self::get_cell_aliases_from_config(&root_config)?.collect();
 
         let mut aggregator = CellsAggregator::new(cell_definitions, root_aliases)?;
@@ -408,6 +432,134 @@ impl BuckConfigBasedCells {
                 args: processed_config_args,
             },
         })
+    }
+
+    /// Resolve bzlmod dependencies from MODULE.bazel if it exists.
+    ///
+    /// This function:
+    /// 1. Checks if MODULE.bazel exists in the project root
+    /// 2. Parses it for module() and bazel_dep() directives
+    /// 3. Resolves local_path_override() to local cells
+    /// 4. Fetches remote dependencies from BCR and extracts them
+    ///
+    /// Returns a list of (CellName, CellRootPathBuf) for each resolved module.
+    async fn resolve_bzlmod_dependencies(
+        project_root: &ProjectRoot,
+    ) -> kuro_error::Result<Option<Vec<(CellName, CellRootPathBuf)>>> {
+        let module_bazel_rel = ProjectRelativePath::new("MODULE.bazel")?;
+        let module_bazel_path = project_root.resolve(module_bazel_rel);
+
+        // Check if MODULE.bazel exists
+        if !fs_util::try_exists(&module_bazel_path)? {
+            return Ok(None);
+        }
+
+        tracing::info!("Found MODULE.bazel, resolving bzlmod dependencies");
+
+        // Parse MODULE.bazel
+        let parsed = match parse_module_bazel(module_bazel_path.as_path()) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!("Failed to parse MODULE.bazel: {}", e);
+                return Ok(None);
+            }
+        };
+
+        let mut cells = Vec::new();
+        let workspace_root = project_root.root().as_path();
+
+        // Resolve local path overrides first
+        let local_modules = resolve_local_modules(&parsed.module.overrides, workspace_root)?;
+        for (name, resolved) in local_modules.iter() {
+            let cell_name = CellName::unchecked_new(name)?;
+            let cell_path = CellRootPathBuf::new(
+                ProjectRelativePath::new(&resolved.relative_path)?.to_owned(),
+            );
+            cells.push((cell_name, cell_path));
+            tracing::info!(
+                "Resolved local module: {} -> {}",
+                name,
+                resolved.relative_path
+            );
+        }
+
+        // Resolve remote dependencies from BCR
+        if !parsed.module.bazel_deps.is_empty() {
+            // Only fetch remote deps if there are any non-overridden deps
+            let local_override_names: std::collections::HashSet<_> = parsed
+                .module
+                .overrides
+                .iter()
+                .filter_map(|o| match o {
+                    kuro_bzlmod::types::Override::LocalPath(local) => {
+                        Some(local.module_name.clone())
+                    }
+                    _ => None,
+                })
+                .collect();
+
+            let remote_deps: Vec<_> = parsed
+                .module
+                .bazel_deps
+                .iter()
+                .filter(|dep| !local_override_names.contains(&dep.name))
+                .collect();
+
+            if !remote_deps.is_empty() {
+                tracing::info!(
+                    "Fetching {} remote dependencies from BCR",
+                    remote_deps.len()
+                );
+
+                match ModuleCache::new() {
+                    Ok(cache) => match RemoteModuleResolver::new(cache).await {
+                        Ok(resolver) => {
+                            for dep in remote_deps {
+                                match resolver.resolve_dependency(dep).await {
+                                    Ok(resolved) => {
+                                        let cell_name = CellName::unchecked_new(&resolved.name)?;
+                                        // For remote modules, we use the cache path
+                                        // Convert absolute path to project-relative if possible,
+                                        // otherwise we need to handle this as an external cell
+                                        let source_path_str =
+                                            resolved.source_path.to_string_lossy().to_string();
+                                        tracing::info!(
+                                            "Resolved remote module: {}@{} -> {}",
+                                            resolved.name,
+                                            resolved.version.as_str(),
+                                            source_path_str
+                                        );
+                                        // Note: For now, we skip remote cells as they require
+                                        // ExternalCellOrigin integration, which is a larger change.
+                                        // The source is fetched and cached for later use.
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            "Failed to resolve {}@{}: {}",
+                                            dep.name,
+                                            dep.version.as_str(),
+                                            e
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to create remote module resolver: {}", e);
+                        }
+                    },
+                    Err(e) => {
+                        tracing::warn!("Failed to create module cache: {}", e);
+                    }
+                }
+            }
+        }
+
+        if cells.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(cells))
+        }
     }
 
     pub(crate) fn get_cell_aliases_from_config(

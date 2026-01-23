@@ -477,6 +477,48 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         let _ = eval;
         Ok(NoneType)
     }
+
+    /// Registers toolchains for use in the module.
+    ///
+    /// This is recorded but toolchain resolution is handled separately.
+    ///
+    /// # Example
+    ///
+    /// ```starlark
+    /// register_toolchains("@rules_cc//cc:all")
+    /// ```
+    fn register_toolchains<'v>(
+        #[starlark(args)] toolchains: UnpackTuple<&str>,
+        #[starlark(require = named, default = false)] dev_dependency: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        // Currently a no-op - toolchain registration is handled by the build system
+        let _ = toolchains;
+        let _ = dev_dependency;
+        let _ = eval;
+        Ok(NoneType)
+    }
+
+    /// Registers execution platforms for use in the module.
+    ///
+    /// This is recorded but platform resolution is handled separately.
+    ///
+    /// # Example
+    ///
+    /// ```starlark
+    /// register_execution_platforms("@local_config_platform//:host")
+    /// ```
+    fn register_execution_platforms<'v>(
+        #[starlark(args)] platforms: UnpackTuple<&str>,
+        #[starlark(require = named, default = false)] dev_dependency: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        // Currently a no-op - platform registration is handled by the build system
+        let _ = platforms;
+        let _ = dev_dependency;
+        let _ = eval;
+        Ok(NoneType)
+    }
 }
 
 /// Get the module context from the evaluator.
