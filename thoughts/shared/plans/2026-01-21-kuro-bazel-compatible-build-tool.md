@@ -136,7 +136,7 @@ Quick reference to all phases and their locations:
 | 2     | Starlark Dialect - Bazel Compatibility | [x] Complete |
 | 3     | Build File Recognition                 | [x] Complete |
 
-### bzlmod (Phases 4a-5b) - [Sub-plan](./kuro-bazel-subplans/02-bzlmod.md)
+### bzlmod (Phases 4a-5c) - [Sub-plan](./kuro-bazel-subplans/02-bzlmod.md)
 
 | Phase | Title                            | Status                                        |
 | ----- | -------------------------------- | --------------------------------------------- |
@@ -146,6 +146,7 @@ Quick reference to all phases and their locations:
 | 4d    | bzlmod - Resolution and Lockfile | [x] Complete                                  |
 | 5     | Module Extensions                | [ ] Partial (parsing done, execution pending) |
 | 5b    | bzlmod Build Integration         | [ ] In Progress                               |
+| 5c    | Bundle @bazel_tools Repository   | [ ] Not Started                               |
 
 ### Rule Primitives (Phase 6) - [Sub-plan](./kuro-bazel-subplans/03-rule-primitives.md)
 

@@ -1101,10 +1101,7 @@ impl Key for BzlmodResolutionKey {
 
 #### Remaining Infrastructure (Blocking Manual Verification):
 
-- [ ] **`@bazel_tools` built-in repository** - Many BCR modules (including `bazel_lib`) load from `@bazel_tools//tools/build_defs/repo:http.bzl`. This is a fundamental Bazel built-in that needs to be bundled or implemented. Options:
-    - Bundle a minimal `bazel_tools` cell with commonly-used .bzl files
-    - Implement `http_archive`, `http_file`, `git_repository` repository rules
-    - Provide stubs that redirect to Kuro equivalents
+- [ ] **`@bazel_tools` built-in repository** - See **Phase 5c** for bundling implementation
 
 - [ ] **Version compatibility via `native.bazel_version`** - Critical for rules compatibility:
     - Kuro must expose `native.bazel_version` returning >= "9.0.0" (e.g., "9.0.0-kuro")
@@ -1130,5 +1127,144 @@ impl Key for BzlmodResolutionKey {
 - [ ] ADD `tests/core/bzlmod/test_repo_aliasing.py` for repo_name parameter
 - [ ] ADD `tests/core/bzlmod/test_extension_repo_registration.py` for extension repos
 - [ ] UPDATE existing cell tests to verify bzlmod cells coexist with .buckconfig cells
+
+---
+
+## Phase 5c: Bundle @bazel_tools Repository
+
+### Overview
+
+Bundle the `@bazel_tools` repository from Bazel's source and make it automatically available to all bzlmod projects. This is a fundamental Bazel built-in that many BCR modules depend on.
+
+**Why this phase is critical:** Many BCR modules load from `@bazel_tools`:
+- `rules_cc` loads `@bazel_tools//tools/cpp:toolchain_utils.bzl`
+- Module extensions use `@bazel_tools//tools/build_defs/repo:http.bzl` for `http_archive`
+- `bazel_features` uses `@bazel_tools` for version detection
+
+### Source
+
+Copy the `tools/` directory from Bazel repository HEAD:
+- **Repository**: https://github.com/bazelbuild/bazel
+- **Directory**: `tools/`
+- **Destination**: `bazel_tools/` in Kuro source tree
+
+### Key Directories to Include
+
+| Directory | Purpose | Priority |
+|-----------|---------|----------|
+| `tools/build_defs/repo/` | Repository rules (http_archive, git_repository) | Critical |
+| `tools/cpp/` | C++ toolchain utilities | Critical |
+| `tools/build_defs/build_info/` | Build info utilities | Medium |
+| `tools/osx/` | macOS toolchain | Medium |
+| `tools/sh/` | Shell utilities | Low |
+
+### Implementation Steps
+
+#### 1. Copy bazel_tools Source
+
+**Script**: Create `scripts/sync_bazel_tools.sh`
+
+```bash
+#!/bin/bash
+# Sync bazel_tools from upstream Bazel repository
+BAZEL_VERSION="9.0.0"  # Or HEAD
+git clone --depth 1 --filter=blob:none --sparse \
+    https://github.com/bazelbuild/bazel.git /tmp/bazel-src
+cd /tmp/bazel-src
+git sparse-checkout set tools
+cp -r tools ../kuro/bazel_tools/
+```
+
+#### 2. Add Bundled Cell Definition
+
+**File**: `app/kuro_external_cells_bundled/src/lib.rs`
+
+Add new bundled cell alongside prelude:
+
+```rust
+const BAZEL_TOOLS: BundledCell = BundledCell {
+    name: "bazel_tools",
+    files: include!(concat!(env!("OUT_DIR"), "/bazel_tools_files.rs")),
+};
+
+pub const fn get_bundled_data() -> &'static [BundledCell] {
+    &[TEST_CELL, PRELUDE, BAZEL_TOOLS]
+}
+```
+
+#### 3. Update Build Script
+
+**File**: `app/kuro_external_cells_bundled/build.rs`
+
+Add bazel_tools directory scanning alongside prelude:
+
+```rust
+fn main() {
+    // Existing prelude generation
+    generate_bundled_files("prelude", "../../prelude");
+
+    // New bazel_tools generation
+    generate_bundled_files("bazel_tools", "../../bazel_tools");
+}
+```
+
+#### 4. Auto-Register for bzlmod Projects
+
+**File**: `app/kuro_common/src/legacy_configs/cells.rs`
+
+In `resolve_bzlmod_dependencies()`, automatically add `bazel_tools` cell:
+
+```rust
+// After resolving bzlmod deps, always add bazel_tools
+cells.push((
+    CellName::unchecked_new("bazel_tools")?,
+    CellRootPathBuf::bundled("bazel_tools"),
+    Some(ExternalCellOrigin::Bundled(CellName::unchecked_new("bazel_tools")?)),
+));
+```
+
+### Directory Structure After Implementation
+
+```
+kuro/
+├── bazel_tools/              # Copied from Bazel
+│   ├── build_defs/
+│   │   └── repo/
+│   │       ├── http.bzl
+│   │       ├── git.bzl
+│   │       └── ...
+│   ├── cpp/
+│   │   ├── toolchain_utils.bzl
+│   │   ├── cc_toolchain_config.bzl
+│   │   └── ...
+│   └── ...
+├── prelude/                  # Existing
+└── app/
+    └── kuro_external_cells_bundled/
+        └── build.rs          # Updated to include bazel_tools
+```
+
+### Success Criteria
+
+#### Automated Verification:
+
+- [ ] `bazel_tools/` directory exists with tools from Bazel HEAD
+- [ ] `kuro_external_cells_bundled` builds successfully with bazel_tools
+- [ ] `@bazel_tools` cell automatically registered for bzlmod projects
+- [ ] `load("@bazel_tools//tools/cpp:toolchain_utils.bzl", ...)` succeeds
+- [ ] `load("@bazel_tools//tools/build_defs/repo:http.bzl", ...)` succeeds
+
+#### Manual Verification:
+
+- [ ] Create bzlmod project without explicit bazel_tools configuration
+- [ ] Verify `@bazel_tools` is available via `kuro audit cell`
+- [ ] Load a .bzl file from rules_cc that depends on @bazel_tools
+- [ ] Build binary size increase is reasonable (< 5MB for bazel_tools)
+
+#### Test Migration (Phase 5c):
+
+- [ ] ADD `tests/core/bzlmod/test_bazel_tools_bundled.py` for bundled cell availability
+- [ ] ADD `tests/core/bzlmod/test_bazel_tools_loads.py` for load statement verification
+- [ ] UPDATE rules_cc integration test to verify full load chain works
 
 ---
