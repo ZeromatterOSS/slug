@@ -1,2 +1,0 @@
-# buckconfig is empty, but kuro should still create a root cell,
-# and report missing prelude cell.

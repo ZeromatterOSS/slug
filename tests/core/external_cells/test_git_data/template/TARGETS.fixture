@@ -1,6 +1,0 @@
-load("@root//:defs.bzl", "copy_src")
-
-copy_src(
-    name = "t",
-    src = "src.txt",
-)
