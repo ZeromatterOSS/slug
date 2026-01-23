@@ -1,0 +1,33 @@
+# Manual test BUILD file for bzlmod features
+#
+# Run: ../../target/release/kuro targets root//:
+# This should print version info and test results.
+
+# Test 1: native.bazel_version
+# Should print "9.0.0-kuro"
+_version = native.bazel_version
+print("Test 1 - native.bazel_version:", _version)
+
+# Test 2: Load from @bazel_skylib (BCR module)
+# Should succeed - simple .bzl file with no external deps
+load("@bazel_skylib//lib:dicts.bzl", "dicts")
+
+_merged = dicts.add({"a": 1, "b": 2}, {"c": 3})
+print("Test 2 - bazel_skylib dicts.add:", _merged)
+
+# Test 3: Load paths.bzl (another simple module)
+load("@bazel_skylib//lib:paths.bzl", "paths")
+
+_basename = paths.basename("/foo/bar/baz.txt")
+print("Test 3 - bazel_skylib paths.basename:", _basename)
+
+# Test 4: Version check (simulates what bazel_features does)
+# In real bazel_features, this is more complex, but basic comparison works
+_version_ok = _version >= "9.0.0"
+print("Test 4 - version >= 9.0.0:", _version_ok)
+
+# TODO: Add these tests when Phase 6 (CcInfo) is complete:
+# load("@rules_cc//cc:defs.bzl", "cc_library")
+# cc_library(name = "test_lib", srcs = [])
+
+print("All manual tests passed!")

@@ -1,8 +1,66 @@
-# bzlmod Phases (4a-5b)
+# bzlmod Phases (4a-5c)
 
 > **Parent Plan**: [Kuro Bazel-Compatible Build Tool](../2026-01-21-kuro-bazel-compatible-build-tool.md)
 
 This sub-plan covers the bzlmod module system: workspace recognition, local dependencies, BCR integration, resolution algorithm, module extensions, and build integration.
+
+---
+
+## Manual Testing Protocol
+
+### Test Project Location
+
+A manual test project is maintained at `tests/manual_test/` for validating bzlmod features during development.
+
+### Running Tests
+
+```bash
+# From tests/manual_test/:
+../../target/release/kuro audit cell          # Check cell resolution
+../../target/release/kuro targets root//:     # Parse BUILD files, run tests
+
+# From kuro root:
+./target/release/kuro --chdir tests/manual_test audit cell
+```
+
+### Current Test Coverage
+
+The manual test project validates:
+
+| Test | Command | Expected Output |
+|------|---------|-----------------|
+| Cell resolution | `audit cell` | Shows root, prelude, bazel_skylib, bazel_tools |
+| native.bazel_version | `targets root//:` | Prints "9.0.0-kuro" |
+| @bazel_skylib loading | `targets root//:` | dicts.add returns merged dict |
+| Version comparison | `targets root//:` | version >= 9.0.0 is True |
+
+### Extending Tests
+
+When implementing new features:
+
+1. **Add bazel_dep** to `tests/manual_test/MODULE.bazel` for new BCR modules
+2. **Add load statements** to `tests/manual_test/BUILD.bazel` with print() for validation
+3. **Add shims** to `tests/manual_test/bazel-external/bazel_tools/` for @bazel_tools dependencies
+4. **Update README.md** with new test documentation
+
+### Implementation Learnings
+
+**What Works (Phase 5b verified):**
+- BCR modules fetched to `~/.cache/kuro/` and extracted to `bazel-external/`
+- Cell resolver includes bzlmod modules alongside .buckconfig cells
+- Cross-cell `load()` statements resolve correctly
+- `native.bazel_version` returns "9.0.0-kuro"
+- Simple @bazel_skylib .bzl files load and execute
+
+**Current Blockers:**
+- **rules_cc loading**: Needs `CcInfo` provider as native global (Phase 6)
+- **@bazel_tools auto-registration**: Requires manual .buckconfig entry (Phase 5c)
+- **Module extensions**: Parsing complete, execution not implemented (Phase 5)
+
+**Key Version Requirement:**
+- Use `rules_cc` version **0.2.16** for testing (Bazel 9.0 compatible)
+- `native.bazel_version` must return >= "9.0.0" for bazel_features compatibility
+- Version checks like `_bazel_version_ge("9.0.0-pre.1231")` must return True
 
 ---
 
