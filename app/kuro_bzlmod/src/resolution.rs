@@ -264,7 +264,8 @@ pub struct MvsResolver {
     registry_client: RegistryClient,
     /// Source fetcher for downloading module sources.
     source_fetcher: SourceFetcher,
-    /// Cache for module storage.
+    /// Cache for module storage (kept for potential future use).
+    #[allow(dead_code)]
     cache: ModuleCache,
     /// All discovered modules during resolution.
     discovered: HashMap<ModuleKey, DiscoveredModule>,

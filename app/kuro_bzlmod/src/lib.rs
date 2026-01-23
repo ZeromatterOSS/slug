@@ -27,6 +27,7 @@
 //! - [`lockfile`]: MODULE.bazel.lock file handling
 
 pub mod cache;
+pub mod extensions;
 pub mod fetch;
 pub mod globals;
 pub mod integrity;

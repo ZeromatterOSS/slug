@@ -22,23 +22,38 @@
 //! - `use_repo()` - imports repositories from an extension (Phase 5)
 
 use std::cell::RefCell;
+use std::fmt;
+use std::fmt::Display;
 
+use allocative::Allocative;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
+use starlark::starlark_simple_value;
+use starlark::values::dict::DictRef;
+use starlark::values::list::ListRef;
 use starlark::values::list::UnpackList;
 use starlark::values::none::NoneType;
+use starlark::values::starlark_value;
 use starlark::values::tuple::UnpackTuple;
+use starlark::values::Heap;
+use starlark::values::NoSerialize;
+use starlark::values::StarlarkValue;
 use starlark::values::Value;
+use starlark::values::ValueLike;
 
 use crate::types::ArchiveOverride;
 use crate::types::BazelDep;
+use crate::types::ExtensionTag;
+use crate::types::ExtensionUsage;
 use crate::types::GitOverride;
 use crate::types::LocalPathOverride;
 use crate::types::MultipleVersionOverride;
 use crate::types::Override;
 use crate::types::SingleVersionOverride;
+use crate::types::TagValue;
+use crate::types::UseRepo;
 use crate::version::Version;
 
 /// Context for MODULE.bazel evaluation.
@@ -55,8 +70,12 @@ pub struct ModuleFileContext {
     /// All override declarations.
     pub overrides: Vec<Override>,
 
-    /// All use_extension() declarations (for Phase 5).
+    /// All use_extension() declarations with their tags and imports.
     pub extensions: Vec<ExtensionUsage>,
+
+    /// Counter for extension IDs (used to link use_repo to use_extension).
+    #[allow(dead_code)]
+    extension_counter: usize,
 }
 
 /// The module() declaration.
@@ -67,12 +86,163 @@ pub struct ModuleDecl {
     pub compatibility_level: u32,
 }
 
-/// A use_extension() declaration (placeholder for Phase 5).
-#[derive(Debug, Clone)]
-pub struct ExtensionUsage {
-    pub extension_bzl_file: String,
-    pub extension_name: String,
-    pub dev_dependency: bool,
+// ============================================================================
+// ExtensionProxy - Starlark value for capturing extension tag calls
+// ============================================================================
+
+/// A proxy object returned by `use_extension()` that captures tag method calls.
+///
+/// When you call a method on this object (e.g., `pip.parse(...)`), it records
+/// the call as an ExtensionTag that will be processed by the extension.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct ExtensionProxy {
+    /// Index of the extension in ModuleFileContext.extensions.
+    extension_index: usize,
+    /// Extension bzl file for debugging.
+    extension_bzl_file: String,
+    /// Extension name for debugging.
+    extension_name: String,
+}
+
+impl Display for ExtensionProxy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "<extension_proxy {}%{}>",
+            self.extension_bzl_file, self.extension_name
+        )
+    }
+}
+
+starlark_simple_value!(ExtensionProxy);
+
+#[starlark_value(type = "extension_proxy")]
+impl<'v> StarlarkValue<'v> for ExtensionProxy {
+    fn has_attr(&self, _attribute: &str, _heap: Heap<'v>) -> bool {
+        // Extension proxies accept any attribute (tag class name)
+        true
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        // We don't know what tag classes exist, so return empty
+        Vec::new()
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        // Return a tag invoker for this attribute (tag class)
+        let invoker = ExtensionTagInvoker {
+            extension_index: self.extension_index,
+            tag_name: attribute.to_string(),
+        };
+        Some(heap.alloc(invoker))
+    }
+}
+
+impl ExtensionProxy {
+    /// Get the extension index.
+    pub fn index(&self) -> usize {
+        self.extension_index
+    }
+}
+
+/// A callable that records a tag invocation when called.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct ExtensionTagInvoker {
+    /// Index of the extension in ModuleFileContext.extensions.
+    extension_index: usize,
+    /// The tag name (method name being invoked).
+    tag_name: String,
+}
+
+impl Display for ExtensionTagInvoker {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<tag_invoker {}>", self.tag_name)
+    }
+}
+
+starlark_simple_value!(ExtensionTagInvoker);
+
+#[starlark_value(type = "extension_tag_invoker")]
+impl<'v> StarlarkValue<'v> for ExtensionTagInvoker {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &starlark::eval::Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let ctx = get_module_context(eval)?;
+        let mut ctx = ctx.borrow_mut();
+
+        // Create the tag with all keyword arguments
+        let mut tag = ExtensionTag::new(self.tag_name.clone());
+
+        // Convert kwargs to TagValue using names_map()
+        let kwargs = args.names_map()?;
+        for (name, value) in kwargs.iter() {
+            let tag_value = starlark_to_tag_value(*value)?;
+            tag.kwargs.push((name.as_str().to_string(), tag_value));
+        }
+
+        // Add tag to the appropriate extension
+        if let Some(ext) = ctx.extensions.get_mut(self.extension_index) {
+            ext.tags.push(tag);
+        }
+
+        Ok(Value::new_none())
+    }
+}
+
+/// Convert a Starlark value to a TagValue.
+fn starlark_to_tag_value(value: Value) -> starlark::Result<TagValue> {
+    if value.is_none() {
+        return Ok(TagValue::None);
+    }
+
+    if let Some(s) = value.unpack_str() {
+        // Check if it looks like a label
+        if s.starts_with("//") || s.starts_with("@") || s.starts_with(":") {
+            return Ok(TagValue::Label(s.to_string()));
+        }
+        return Ok(TagValue::String(s.to_string()));
+    }
+
+    if let Some(b) = value.unpack_bool() {
+        return Ok(TagValue::Bool(b));
+    }
+
+    if let Some(i) = value.unpack_i32() {
+        return Ok(TagValue::Int(i as i64));
+    }
+
+    if let Some(list) = ListRef::from_value(value) {
+        let items: Vec<TagValue> = list
+            .iter()
+            .map(starlark_to_tag_value)
+            .collect::<starlark::Result<Vec<_>>>()?;
+        return Ok(TagValue::List(items));
+    }
+
+    if let Some(dict) = DictRef::from_value(value) {
+        let items: Vec<(String, TagValue)> = dict
+            .iter()
+            .map(|(k, v)| {
+                let key = k
+                    .unpack_str()
+                    .ok_or_else(|| {
+                        starlark::Error::new_other(anyhow::anyhow!(
+                            "Dict keys must be strings in extension tags"
+                        ))
+                    })?
+                    .to_string();
+                let value = starlark_to_tag_value(v)?;
+                Ok((key, value))
+            })
+            .collect::<starlark::Result<Vec<_>>>()?;
+        return Ok(TagValue::Dict(items));
+    }
+
+    // For complex types, convert to string representation
+    Ok(TagValue::String(value.to_repr()))
 }
 
 /// Register all MODULE.bazel globals.
@@ -427,54 +597,93 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
 
     /// Uses a module extension.
     ///
-    /// This is a placeholder for Phase 5 - module extensions.
-    /// Currently just records the usage for later processing.
+    /// Returns an extension proxy object that captures tag method calls.
+    /// Tags are recorded and processed by the extension's implementation.
     ///
     /// # Example
     ///
     /// ```starlark
     /// pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
-    /// pip.parse(...)
-    /// use_repo(pip, "pip_deps")
+    /// pip.parse(
+    ///     hub_name = "pip",
+    ///     python_version = "3.11",
+    ///     requirements_lock = "//:requirements_lock.txt",
+    /// )
+    /// use_repo(pip, "pip")
     /// ```
     fn use_extension<'v>(
         #[starlark(require = pos)] extension_bzl_file: &str,
         #[starlark(require = pos)] extension_name: &str,
         #[starlark(require = named, default = false)] dev_dependency: bool,
+        #[starlark(require = named, default = false)] isolate: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
 
-        ctx.extensions.push(ExtensionUsage {
+        // Create the extension usage record
+        let mut ext = ExtensionUsage::new(
+            extension_bzl_file.to_owned(),
+            extension_name.to_owned(),
+        );
+        ext.dev_dependency = dev_dependency;
+        ext.isolate = isolate;
+
+        // Get the index for this extension
+        let extension_index = ctx.extensions.len();
+        ctx.extensions.push(ext);
+
+        // Create and return the proxy
+        let proxy = ExtensionProxy {
+            extension_index,
             extension_bzl_file: extension_bzl_file.to_owned(),
             extension_name: extension_name.to_owned(),
-            dev_dependency,
-        });
+        };
 
-        // For now, return None. In Phase 5, this would return an extension proxy object.
-        Ok(Value::new_none())
+        Ok(eval.heap().alloc(proxy))
     }
 
     /// Imports repositories from a module extension.
     ///
-    /// This is a placeholder for Phase 5 - module extensions.
-    /// Currently a no-op.
+    /// Positional string arguments are repo names to import directly.
+    /// Keyword arguments map apparent names to actual repo names.
     ///
     /// # Example
     ///
     /// ```starlark
-    /// use_repo(pip, "pip_deps")
+    /// use_repo(pip, "pip", "pip_internal")  # Import repos as-is
+    /// use_repo(maven, maven_deps = "maven")  # Import "maven" as "@maven_deps"
     /// ```
     fn use_repo<'v>(
         #[starlark(require = pos)] extension: Value<'v>,
         #[starlark(args)] repos: UnpackTuple<&str>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        // Placeholder for Phase 5
-        let _ = extension;
-        let _ = repos;
-        let _ = eval;
+        let ctx = get_module_context(eval)?;
+        let mut ctx = ctx.borrow_mut();
+
+        // Get the extension proxy
+        let proxy = extension
+            .downcast_ref::<ExtensionProxy>()
+            .ok_or_else(|| {
+                starlark::Error::new_other(anyhow::anyhow!(
+                    "use_repo() first argument must be an extension from use_extension()"
+                ))
+            })?;
+
+        // Create UseRepo record
+        let mut use_repo = UseRepo::new();
+
+        // Add positional repo names
+        for repo in repos.items {
+            use_repo.repos.push(repo.to_string());
+        }
+
+        // Add to the appropriate extension
+        if let Some(ext) = ctx.extensions.get_mut(proxy.index()) {
+            ext.imports.push(use_repo);
+        }
+
         Ok(NoneType)
     }
 

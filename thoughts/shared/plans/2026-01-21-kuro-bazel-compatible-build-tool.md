@@ -983,8 +983,8 @@ Record extension results in MODULE.bazel.lock for caching.
 ### Success Criteria:
 
 #### Automated Verification:
-- [ ] `use_extension()` parses correctly
-- [ ] Extension tags collected from all using modules
+- [x] `use_extension()` parses correctly
+- [x] Extension tags collected from all using modules
 - [ ] Extension implementation executes
 - [ ] Generated repositories are accessible
 - [ ] Extension results cached in lockfile

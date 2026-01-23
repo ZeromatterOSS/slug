@@ -291,4 +291,189 @@ pub struct ParsedModuleFile {
     /// Whether a `module()` directive was present.
     /// If false, the module has default/empty values.
     pub has_module_directive: bool,
+
+    /// Extension usages from `use_extension()` calls.
+    pub extension_usages: Vec<ExtensionUsage>,
+}
+
+// ============================================================================
+// Module Extension Types (Phase 5)
+// ============================================================================
+
+/// A `use_extension()` call in MODULE.bazel with its associated tags.
+///
+/// # Example
+///
+/// ```starlark
+/// pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+/// pip.parse(
+///     hub_name = "pip",
+///     python_version = "3.11",
+///     requirements_lock = "//:requirements_lock.txt",
+/// )
+/// use_repo(pip, "pip")
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct ExtensionUsage {
+    /// The .bzl file containing the extension (e.g., "@rules_python//python/extensions:pip.bzl").
+    pub extension_bzl_file: String,
+
+    /// The name of the extension in the .bzl file (e.g., "pip").
+    pub extension_name: String,
+
+    /// Whether this is a dev-only extension usage.
+    pub dev_dependency: bool,
+
+    /// Isolate this extension usage from other modules (Bazel 6.3+).
+    pub isolate: bool,
+
+    /// Tags applied to this extension (e.g., `pip.parse(...)`).
+    pub tags: Vec<ExtensionTag>,
+
+    /// Repositories imported via `use_repo()` for this extension.
+    pub imports: Vec<UseRepo>,
+}
+
+impl ExtensionUsage {
+    /// Create a new extension usage.
+    pub fn new(extension_bzl_file: String, extension_name: String) -> Self {
+        Self {
+            extension_bzl_file,
+            extension_name,
+            dev_dependency: false,
+            isolate: false,
+            tags: Vec::new(),
+            imports: Vec::new(),
+        }
+    }
+
+    /// Get a unique identifier for this extension.
+    pub fn extension_id(&self) -> String {
+        format!("{}%{}", self.extension_bzl_file, self.extension_name)
+    }
+}
+
+/// A tag call on an extension (e.g., `pip.parse(...)`).
+///
+/// Tags are method calls on the extension proxy returned by `use_extension()`.
+/// They provide configuration to the extension's implementation function.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct ExtensionTag {
+    /// The tag name (method name, e.g., "parse", "install", "override").
+    pub tag_name: String,
+
+    /// Keyword arguments passed to the tag.
+    /// Values are stored as JSON strings for flexibility.
+    pub kwargs: Vec<(String, TagValue)>,
+}
+
+impl ExtensionTag {
+    /// Create a new extension tag.
+    pub fn new(tag_name: String) -> Self {
+        Self {
+            tag_name,
+            kwargs: Vec::new(),
+        }
+    }
+
+    /// Add a keyword argument.
+    pub fn with_kwarg(mut self, key: String, value: TagValue) -> Self {
+        self.kwargs.push((key, value));
+        self
+    }
+}
+
+/// A value passed to an extension tag.
+///
+/// Tags can accept various types of values. We store them in a typed enum
+/// for proper handling during extension execution.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum TagValue {
+    /// A string value.
+    String(String),
+    /// An integer value.
+    Int(i64),
+    /// A boolean value.
+    Bool(bool),
+    /// A list of values.
+    List(Vec<TagValue>),
+    /// A dictionary of values.
+    Dict(Vec<(String, TagValue)>),
+    /// A label reference (e.g., "//:requirements.txt").
+    Label(String),
+    /// None/null value.
+    None,
+}
+
+impl TagValue {
+    /// Convert to a string representation.
+    pub fn to_string_value(&self) -> Option<&str> {
+        match self {
+            TagValue::String(s) => Some(s),
+            TagValue::Label(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// Convert to a boolean.
+    pub fn to_bool(&self) -> Option<bool> {
+        match self {
+            TagValue::Bool(b) => Some(*b),
+            _ => None,
+        }
+    }
+
+    /// Convert to an integer.
+    pub fn to_int(&self) -> Option<i64> {
+        match self {
+            TagValue::Int(i) => Some(*i),
+            _ => None,
+        }
+    }
+}
+
+/// A `use_repo()` call to import repositories from an extension.
+///
+/// # Example
+///
+/// ```starlark
+/// use_repo(pip, "pip", other_name = "pip_internal")
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct UseRepo {
+    /// Repository names to import (positional arguments after the extension).
+    /// Each string is a repo name that will be made available as `@repo_name`.
+    pub repos: Vec<String>,
+
+    /// Repository name remapping (keyword arguments).
+    /// Maps apparent name -> actual generated repo name.
+    pub repo_mapping: Vec<(String, String)>,
+}
+
+impl UseRepo {
+    /// Create a new use_repo with no mappings.
+    pub fn new() -> Self {
+        Self {
+            repos: Vec::new(),
+            repo_mapping: Vec::new(),
+        }
+    }
+
+    /// Add a repository to import.
+    pub fn add_repo(mut self, repo: String) -> Self {
+        self.repos.push(repo);
+        self
+    }
+
+    /// Add a repository with a name mapping.
+    pub fn add_mapping(mut self, apparent_name: String, actual_name: String) -> Self {
+        self.repo_mapping.push((apparent_name, actual_name));
+        self
+    }
+}
+
+impl Default for UseRepo {
+    fn default() -> Self {
+        Self::new()
+    }
 }
