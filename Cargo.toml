@@ -92,6 +92,7 @@ members = [
     "app/kuro_critical_path",
     "app/kuro_build_signals",
     "app/kuro_build_signals_impl",
+    "app/kuro_bzlmod",
     "app/kuro_eden",
     "app/kuro_validation",
     "app/kuro_host_sharing_proto",
@@ -391,6 +392,7 @@ kuro_build_info = { path = "app/kuro_build_info" }
 kuro_build_signals = { path = "app/kuro_build_signals" }
 kuro_build_signals_impl = { path = "app/kuro_build_signals_impl" }
 kuro_bxl = { path = "app/kuro_bxl" }
+kuro_bzlmod = { path = "app/kuro_bzlmod" }
 kuro_certs = { path = "app/kuro_certs" }
 kuro_cfg_constructor = { path = "app/kuro_cfg_constructor" }
 kuro_cli_proto = { path = "app/kuro_cli_proto" }
