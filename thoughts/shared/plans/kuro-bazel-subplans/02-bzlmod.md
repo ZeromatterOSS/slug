@@ -1106,11 +1106,21 @@ impl Key for BzlmodResolutionKey {
     - Implement `http_archive`, `http_file`, `git_repository` repository rules
     - Provide stubs that redirect to Kuro equivalents
 
+- [ ] **Version compatibility via `native.bazel_version`** - Critical for rules compatibility:
+    - Kuro must expose `native.bazel_version` returning >= "9.0.0" (e.g., "9.0.0-kuro")
+    - The `bazel_features` module checks like `_bazel_version_ge("9.0.0-pre.1231")` must return `True`
+    - If version < 9.0.0 is detected, Kuro should abort with clear error
+    - This is required for rules_cc >= 0.2.16 and other modern rules
+
 #### Manual Verification:
 
-- [ ] Create project with `bazel_dep(name = "aspect_bazel_lib", version = "...")`
-- [ ] Successfully load `@bazel_lib//:defs.bzl` or similar
-- [ ] Build target that depends on bazel_lib function
+**Note**: Use `rules_cc` version **0.2.16** (not older versions) for testing - this is the first version with full Bazel 9.0 compatibility.
+
+- [ ] Create project with `bazel_dep(name = "rules_cc", version = "0.2.16")`
+- [ ] Successfully load `@rules_cc//cc:defs.bzl`
+- [ ] Build a simple C++ target using `cc_library` and `cc_binary`
+- [ ] Verify `native.bazel_version` returns >= "9.0.0"
+- [ ] Verify `bazel_features` version checks work correctly
 - [ ] Verify cache hit on second build (no network activity)
 
 #### Test Migration (Phase 5b):

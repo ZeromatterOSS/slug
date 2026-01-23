@@ -214,9 +214,24 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
 
         Ok(eval.heap().alloc_str(&resolved))
     }
+
 }
+
+/// Kuro's reported Bazel version for compatibility with modern rules.
+///
+/// This version is reported via `native.bazel_version` to satisfy version checks
+/// in rulesets like rules_cc, bazel_features, etc. We report 9.0.0 to ensure
+/// compatibility with Bazel 9.0+ rules.
+///
+/// The "-kuro" suffix identifies this as Kuro rather than actual Bazel.
+pub const KURO_BAZEL_VERSION: &str = "9.0.0-kuro";
 
 /// Register the Bazel-compatible `native` namespace.
 pub(crate) fn register_bazel_native(globals: &mut GlobalsBuilder) {
-    globals.namespace("native", bazel_native_module);
+    globals.namespace("native", |registry| {
+        bazel_native_module(registry);
+        // Add bazel_version constant to the native module
+        // This is accessed as `native.bazel_version` in Starlark
+        registry.set("bazel_version", KURO_BAZEL_VERSION);
+    });
 }

@@ -48,6 +48,19 @@ After completing this plan, kuro will:
 10. **Support Linux, Windows, and macOS** platforms
 11. **Preserve BXL** for future developer tooling (compile_commands.json, IDE integration)
 
+### Version Compatibility Requirements
+
+**Critical**: Kuro must report itself as Bazel 9.0+ for compatibility with modern rules:
+
+1. **`native.bazel_version`** must return a version string >= "9.0.0" (e.g., "9.0.0" or "9.0.0-kuro")
+2. **Version checks from `bazel_features`** must work correctly:
+   - `_bazel_version_ge("9.0.0-pre.1231")` must return `True`
+   - Version comparison functions (`ge`, `gt`, `lt`) must work with semver strings
+3. **Abort on incompatible version**: If Kuro is somehow configured to report < 9.0.0, it should abort with a clear error
+4. **Test with rules_cc 0.2.16** - This is the minimum version that works properly with Bazel 9.0
+
+The `bazel_features` module (https://github.com/bazel-contrib/bazel_features) provides feature detection that many rules depend on. Kuro must satisfy these version checks to be compatible with the modern rules_* ecosystem.
+
 ### Verification Criteria
 
 - [ ] `cargo build --release` works with stable Rust
