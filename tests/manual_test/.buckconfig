@@ -1,8 +1,7 @@
 [cells]
 root = .
 prelude = prelude
-# Manual bazel_tools shim - remove when Phase 5c auto-registers it
-bazel_tools = bazel-external/bazel_tools
+# bazel_tools auto-registered for bzlmod projects (Phase 5c)
 
 [cell_aliases]
 config = root

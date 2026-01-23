@@ -30,12 +30,28 @@ mod prelude {
 
 #[cfg(not(buck_build))]
 mod prelude {
-    include!(concat!(env!("OUT_DIR"), "/include.rs"));
+    include!(concat!(env!("OUT_DIR"), "/prelude_include.rs"));
 }
 
 const PRELUDE: BundledCell = BundledCell {
     name: "prelude",
     files: prelude::DATA,
+    is_testing: false,
+};
+
+#[cfg(buck_build)]
+mod bazel_tools {
+    include!("bazel_tools/contents.rs");
+}
+
+#[cfg(not(buck_build))]
+mod bazel_tools {
+    include!(concat!(env!("OUT_DIR"), "/bazel_tools_include.rs"));
+}
+
+const BAZEL_TOOLS: BundledCell = BundledCell {
+    name: "bazel_tools",
+    files: bazel_tools::DATA,
     is_testing: false,
 };
 
@@ -82,7 +98,7 @@ const TEST_CELL: BundledCell = BundledCell {
 };
 
 pub const fn get_bundled_data() -> &'static [BundledCell] {
-    &[TEST_CELL, PRELUDE]
+    &[TEST_CELL, PRELUDE, BAZEL_TOOLS]
 }
 
 #[cfg(test)]
@@ -115,6 +131,35 @@ mod tests {
                 .filter(|file| file.contents.len() > 100)
                 .count()
                 > 50
+        );
+    }
+
+    #[test]
+    fn test_bundled_bazel_tools_data() {
+        let c = super::BAZEL_TOOLS;
+
+        // Make sure http.bzl exists (critical for module extensions)
+        // Path is tools/build_defs/repo/http.bzl (matching @bazel_tools//tools/build_defs/repo:http.bzl)
+        assert!(c.files.iter().any(|file| {
+            file.path == "tools/build_defs/repo/http.bzl"
+                && std::str::from_utf8(file.contents)
+                    .unwrap()
+                    .contains("http_archive")
+        }));
+
+        // Make sure toolchain_utils.bzl exists (critical for rules_cc)
+        // Path is tools/cpp/toolchain_utils.bzl (matching @bazel_tools//tools/cpp:toolchain_utils.bzl)
+        assert!(c.files.iter().any(|file| {
+            file.path == "tools/cpp/toolchain_utils.bzl"
+                && std::str::from_utf8(file.contents)
+                    .unwrap()
+                    .contains("find_cpp_toolchain")
+        }));
+
+        // Should have at least 50 .bzl files
+        assert!(
+            c.files.iter().filter(|file| file.path.ends_with(".bzl")).count() > 50,
+            "Expected at least 50 .bzl files in bazel_tools"
         );
     }
 }

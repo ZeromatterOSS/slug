@@ -1,6 +1,0 @@
-# Minimal bazel_tools shim for testing
-# This is a temporary shim until Phase 5c bundles the real bazel_tools
-module(
-    name = "bazel_tools",
-    version = "0.0.0",
-)

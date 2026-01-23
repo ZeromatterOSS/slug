@@ -385,6 +385,7 @@ impl BuckConfigBasedCells {
         // Check for MODULE.bazel and resolve dependencies from BCR
         // Collect bzlmod cells with their external origins for later marking
         let mut bzlmod_external_cells: Vec<(CellName, BzlmodCellSetup)> = Vec::new();
+        let mut bzlmod_bundled_cells: Vec<CellName> = Vec::new();
         if let Some(project_fs) = project_fs {
             if let Some(bzlmod_cells) = Self::resolve_bzlmod_dependencies(project_fs).await? {
                 for (name, path, maybe_setup) in bzlmod_cells {
@@ -399,6 +400,20 @@ impl BuckConfigBasedCells {
                         }
                     }
                 }
+
+                // Auto-register @bazel_tools as a bundled cell for bzlmod projects
+                // Many BCR modules (rules_cc, etc.) load from @bazel_tools
+                let bazel_tools_name = CellName::unchecked_new("bazel_tools")?;
+                if !cell_definitions.iter().any(|(n, _)| *n == bazel_tools_name) {
+                    // Use "bazel_tools" as the path - bundled cells are resolved via file ops delegate
+                    // which overrides the actual filesystem path. The path just needs to be non-empty.
+                    let bazel_tools_path = CellRootPathBuf::new(
+                        ProjectRelativePath::new("bazel_tools")?.to_owned(),
+                    );
+                    cell_definitions.push((bazel_tools_name, bazel_tools_path));
+                    bzlmod_bundled_cells.push(bazel_tools_name);
+                    tracing::info!("Auto-registered bundled cell: bazel_tools");
+                }
             }
         }
         // ===== End Bzlmod Integration =====
@@ -410,6 +425,11 @@ impl BuckConfigBasedCells {
         // Mark remote bzlmod modules as external cells
         for (name, setup) in bzlmod_external_cells {
             aggregator.mark_external_cell(name, ExternalCellOrigin::Bzlmod(setup))?;
+        }
+
+        // Mark bundled cells added for bzlmod projects
+        for name in bzlmod_bundled_cells {
+            aggregator.mark_external_cell(name, ExternalCellOrigin::Bundled(name))?;
         }
 
         if let Some(external_cells) = root_config.get_section("external_cells") {

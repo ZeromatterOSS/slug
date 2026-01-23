@@ -1,0 +1,3 @@
+# Bundled @bazel_tools repository
+# Synced from https://github.com/bazelbuild/bazel
+module(name = "bazel_tools")

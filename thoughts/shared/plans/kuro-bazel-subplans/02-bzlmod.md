@@ -29,10 +29,11 @@ The manual test project validates:
 
 | Test | Command | Expected Output |
 |------|---------|-----------------|
-| Cell resolution | `audit cell` | Shows root, prelude, bazel_skylib, bazel_tools |
+| Cell resolution | `audit cell` | Shows root, prelude, bazel_skylib, bazel_tools (bundled) |
 | native.bazel_version | `targets root//:` | Prints "9.0.0-kuro" |
 | @bazel_skylib loading | `targets root//:` | dicts.add returns merged dict |
 | Version comparison | `targets root//:` | version >= 9.0.0 is True |
+| @bazel_tools bundled | `audit cell` | bazel_tools registered without .buckconfig entry |
 
 ### Extending Tests
 
@@ -40,8 +41,8 @@ When implementing new features:
 
 1. **Add bazel_dep** to `tests/manual_test/MODULE.bazel` for new BCR modules
 2. **Add load statements** to `tests/manual_test/BUILD.bazel` with print() for validation
-3. **Add shims** to `tests/manual_test/bazel-external/bazel_tools/` for @bazel_tools dependencies
-4. **Update README.md** with new test documentation
+3. **Update README.md** with new test documentation
+4. **Note**: @bazel_tools is now bundled (Phase 5c) - no shims needed
 
 ### Implementation Learnings
 
@@ -54,7 +55,7 @@ When implementing new features:
 
 **Current Blockers:**
 - **rules_cc loading**: Needs `CcInfo` provider as native global (Phase 6)
-- **@bazel_tools auto-registration**: Requires manual .buckconfig entry (Phase 5c)
+- **@bazel_tools file evaluation**: Files found but need Bazel-specific APIs (`visibility()`, etc.)
 - **Module extensions**: Parsing complete, execution not implemented (Phase 5)
 
 **Key Version Requirement:**
@@ -1285,44 +1286,65 @@ cells.push((
 
 ```
 kuro/
-├── bazel_tools/              # Copied from Bazel
-│   ├── build_defs/
-│   │   └── repo/
-│   │       ├── http.bzl
-│   │       ├── git.bzl
-│   │       └── ...
-│   ├── cpp/
-│   │   ├── toolchain_utils.bzl
-│   │   ├── cc_toolchain_config.bzl
+├── bazel_tools/              # Copied from Bazel via scripts/sync_bazel_tools.sh
+│   ├── tools/                # Preserves @bazel_tools//tools/... path structure
+│   │   ├── build_defs/
+│   │   │   └── repo/
+│   │   │       ├── http.bzl
+│   │   │       ├── git.bzl
+│   │   │       └── ...
+│   │   ├── cpp/
+│   │   │   ├── toolchain_utils.bzl
+│   │   │   ├── cc_toolchain_config.bzl
+│   │   │   └── ...
 │   │   └── ...
-│   └── ...
+│   ├── MODULE.bazel
+│   └── .buckconfig
 ├── prelude/                  # Existing
+├── scripts/
+│   └── sync_bazel_tools.sh   # Script to sync from Bazel repository
 └── app/
     └── kuro_external_cells_bundled/
-        └── build.rs          # Updated to include bazel_tools
+        ├── build.rs          # Updated to include bazel_tools
+        └── src/lib.rs        # BAZEL_TOOLS constant added
 ```
 
 ### Success Criteria
 
 #### Automated Verification:
 
-- [ ] `bazel_tools/` directory exists with tools from Bazel HEAD
-- [ ] `kuro_external_cells_bundled` builds successfully with bazel_tools
-- [ ] `@bazel_tools` cell automatically registered for bzlmod projects
+- [x] `bazel_tools/` directory exists with tools from Bazel 9.0.0
+- [x] `kuro_external_cells_bundled` builds successfully with bazel_tools (3 tests passing)
+- [x] `@bazel_tools` cell automatically registered for bzlmod projects
 - [ ] `load("@bazel_tools//tools/cpp:toolchain_utils.bzl", ...)` succeeds
+  - **Blocker**: File found but loads `@rules_cc` which isn't available in bazel_tools context
 - [ ] `load("@bazel_tools//tools/build_defs/repo:http.bzl", ...)` succeeds
+  - **Blocker**: Requires `visibility()` Starlark function (Bazel-specific API)
 
 #### Manual Verification:
 
-- [ ] Create bzlmod project without explicit bazel_tools configuration
-- [ ] Verify `@bazel_tools` is available via `kuro audit cell`
+- [x] Create bzlmod project without explicit bazel_tools configuration
+- [x] Verify `@bazel_tools` is available via `kuro audit cell`
 - [ ] Load a .bzl file from rules_cc that depends on @bazel_tools
-- [ ] Build binary size increase is reasonable (< 5MB for bazel_tools)
+  - **Blocker**: Real bazel_tools files use Bazel-specific APIs not yet in Kuro
+- [x] Build binary size increase is reasonable (~2MB for bazel_tools)
 
 #### Test Migration (Phase 5c):
 
 - [ ] ADD `tests/core/bzlmod/test_bazel_tools_bundled.py` for bundled cell availability
 - [ ] ADD `tests/core/bzlmod/test_bazel_tools_loads.py` for load statement verification
 - [ ] UPDATE rules_cc integration test to verify full load chain works
+
+### Future Work: Bazel-Specific Starlark APIs
+
+The bundled `@bazel_tools` files use several Bazel-specific Starlark APIs that Kuro doesn't implement yet. These are needed for full compatibility:
+
+| API | Used In | Purpose |
+|-----|---------|---------|
+| `visibility("public")` | `cache.bzl`, `http.bzl`, etc. | Package visibility control |
+| `repository_ctx` methods | `http.bzl`, `git.bzl` | Repository rule context |
+| Module-level `config_setting` | Various BUILD files | Configuration transitions |
+
+These APIs should be implemented in a future phase to enable full use of bundled bazel_tools content.
 
 ---

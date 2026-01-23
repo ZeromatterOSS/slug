@@ -30,7 +30,7 @@ Or from the kuro root:
 1. **bzlmod cell resolution** - MODULE.bazel parsed, deps fetched from BCR
 2. **Cross-cell loading** - `@bazel_skylib//lib:dicts.bzl` loads from BCR module
 3. **native.bazel_version** - Returns "9.0.0-kuro" for compatibility
-4. **bazel_tools shim** - Manual shim for @bazel_tools (until Phase 5c is implemented)
+4. **bazel_tools bundling** - @bazel_tools auto-registered for bzlmod projects (Phase 5c)
 
 ## Current Status
 
@@ -39,7 +39,8 @@ Or from the kuro root:
 | `@bazel_skylib` loading | Working | Simple .bzl files load correctly |
 | `native.bazel_version` | Working | Returns "9.0.0-kuro" |
 | `@rules_cc` loading | Blocked | Needs CcInfo provider (Phase 6) |
-| `@bazel_tools` | Manual shim | Auto-bundling in Phase 5c |
+| `@bazel_tools` bundled | Working | Auto-registered for bzlmod projects |
+| `@bazel_tools` file loads | Blocked | Needs Bazel-specific APIs (visibility, etc.) |
 
 ## Directory Structure
 
@@ -47,19 +48,14 @@ Or from the kuro root:
 manual_test/
 ├── MODULE.bazel          # Root module with bazel_deps
 ├── BUILD.bazel           # Test loads and prints
-├── .buckconfig           # Cell configuration (required for now)
+├── .buckconfig           # Cell configuration (minimal)
 ├── .buckroot             # Workspace marker
 ├── prelude/              # Minimal prelude stub
 │   ├── BUILD.bazel
 │   └── prelude.bzl
-└── bazel-external/       # Manual external cell shims
-    └── bazel_tools/      # @bazel_tools shim (until Phase 5c)
-        ├── MODULE.bazel
-        ├── BUILD.bazel
-        └── tools/
-            └── cpp/
-                ├── BUILD.bazel
-                └── toolchain_utils.bzl
+└── bazel-external/       # Auto-populated external modules
+    ├── bazel_skylib/     # BCR module (auto-fetched)
+    └── bazel_tools/      # Legacy shim (no longer needed)
 ```
 
 ## Extending This Test
@@ -68,7 +64,7 @@ When implementing new features, extend this test project:
 
 1. **New bzlmod features**: Add `bazel_dep()` entries to MODULE.bazel
 2. **New loads**: Add `load()` statements to BUILD.bazel
-3. **New bazel_tools shims**: Add files under `bazel-external/bazel_tools/`
+3. **Verify loads**: Run `kuro targets root//:` and check print output
 
 ## Learnings from Testing
 
@@ -78,11 +74,15 @@ When implementing new features, extend this test project:
 - Cell resolver includes bzlmod modules alongside .buckconfig cells
 - Cross-cell `load()` statements resolve correctly
 - `native.bazel_version` is accessible as "9.0.0-kuro"
+- `@bazel_tools` is auto-registered as a bundled cell for bzlmod projects
 
 ### Current Blockers
 
 1. **rules_cc loading** - Fails with "Variable `CcInfo` not found" because native providers aren't exposed (Phase 6)
-2. **@bazel_tools** - Not auto-registered, requires manual shim in .buckconfig
+2. **@bazel_tools file evaluation** - Files are found but fail to evaluate due to Bazel-specific APIs:
+   - `visibility("public")` - Package visibility function
+   - `repository_ctx` methods - Repository rule context
+   - Cross-cell dependencies (e.g., `@rules_cc` from `toolchain_utils.bzl`)
 3. **Module extensions** - Parsing works, execution not implemented (Phase 5)
 
 ### Testing Protocol

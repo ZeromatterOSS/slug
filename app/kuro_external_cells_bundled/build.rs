@@ -8,7 +8,7 @@
  * above-listed licenses.
  */
 
-//! Generate source file containing kuro/prelude tree with contents.
+//! Generate source files containing bundled cell contents (prelude, bazel_tools).
 
 use std::io;
 use std::path::Path;
@@ -19,21 +19,37 @@ fn main() {
 
 fn imp() -> io::Result<()> {
     let out_path = std::env::var_os("OUT_DIR").unwrap();
-    let include_file = Path::new(&out_path).join("include.rs");
+    let out_dir = Path::new(&out_path);
     let manifest_path = std::env::var_os("CARGO_MANIFEST_DIR").unwrap();
-    let prelude_path = Path::new(&manifest_path)
+    let project_root = Path::new(&manifest_path)
         .parent()
         .unwrap()
         .parent()
-        .unwrap()
-        .join("prelude");
+        .unwrap();
 
-    // Self-check.
-    assert!(prelude_path.join("prelude.bzl").exists());
-
+    // Generate prelude bundled files
+    let prelude_path = project_root.join("prelude");
+    assert!(
+        prelude_path.join("prelude.bzl").exists(),
+        "prelude/prelude.bzl not found"
+    );
     println!("cargo:rerun-if-changed={}", prelude_path.display());
+    write_include_file(
+        &prelude_path,
+        std::fs::File::create(out_dir.join("prelude_include.rs"))?,
+    )?;
 
-    write_include_file(&prelude_path, std::fs::File::create(&include_file)?)?;
+    // Generate bazel_tools bundled files
+    let bazel_tools_path = project_root.join("bazel_tools");
+    assert!(
+        bazel_tools_path.join("tools/build_defs/repo/http.bzl").exists(),
+        "bazel_tools/tools/build_defs/repo/http.bzl not found"
+    );
+    println!("cargo:rerun-if-changed={}", bazel_tools_path.display());
+    write_include_file(
+        &bazel_tools_path,
+        std::fs::File::create(out_dir.join("bazel_tools_include.rs"))?,
+    )?;
 
     Ok(())
 }
