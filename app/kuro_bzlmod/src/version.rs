@@ -42,7 +42,7 @@ use allocative::Allocative;
 /// A version identifier segment.
 ///
 /// Can be either a number (compared numerically) or a string (compared lexicographically).
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub enum Identifier {
     /// Numeric identifier (e.g., "1", "42", "20210324").
     Numeric(u64),
@@ -91,7 +91,7 @@ impl fmt::Display for Identifier {
 ///
 /// Versions follow a relaxed SemVer format with flexible segment counts
 /// and optional prerelease suffixes.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Allocative)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Hash, Allocative)]
 pub struct Version {
     /// Release segments (e.g., [1, 0, 0] for "1.0.0").
     release: Vec<Identifier>,
