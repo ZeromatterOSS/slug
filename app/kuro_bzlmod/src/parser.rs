@@ -138,6 +138,7 @@ pub fn parse_module_bazel_content(
     Ok(ParsedModuleFile {
         module: module_info,
         has_module_directive,
+        extension_usages: ctx.extensions.clone(),
     })
 }
 
@@ -312,5 +313,134 @@ module(name = "second", version = "2.0.0")
 "#;
         let result = parse_module_bazel_content(content, "MODULE.bazel");
         assert!(result.is_err());
+    }
+
+    // ========================================================================
+    // Extension Parsing Tests (Phase 5)
+    // ========================================================================
+
+    #[test]
+    fn test_parse_use_extension_basic() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+"#;
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        assert_eq!(parsed.extension_usages.len(), 1);
+
+        let ext = &parsed.extension_usages[0];
+        assert_eq!(ext.extension_bzl_file, "@rules_python//python/extensions:pip.bzl");
+        assert_eq!(ext.extension_name, "pip");
+        assert!(!ext.dev_dependency);
+        assert!(!ext.isolate);
+    }
+
+    #[test]
+    fn test_parse_use_extension_with_dev_dependency() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip", dev_dependency = True)
+"#;
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        let ext = &parsed.extension_usages[0];
+        assert!(ext.dev_dependency);
+    }
+
+    #[test]
+    fn test_parse_use_extension_with_tags() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    hub_name = "pip",
+    python_version = "3.11",
+    requirements_lock = "//:requirements_lock.txt",
+)
+"#;
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        let ext = &parsed.extension_usages[0];
+        assert_eq!(ext.tags.len(), 1);
+
+        let tag = &ext.tags[0];
+        assert_eq!(tag.tag_name, "parse");
+        assert_eq!(tag.kwargs.len(), 3);
+
+        // Check kwargs
+        let kwargs_map: std::collections::HashMap<_, _> =
+            tag.kwargs.iter().map(|(k, v)| (k.as_str(), v)).collect();
+
+        assert!(matches!(
+            kwargs_map.get("hub_name"),
+            Some(crate::types::TagValue::String(s)) if s == "pip"
+        ));
+        assert!(matches!(
+            kwargs_map.get("requirements_lock"),
+            Some(crate::types::TagValue::Label(s)) if s == "//:requirements_lock.txt"
+        ));
+    }
+
+    #[test]
+    fn test_parse_use_extension_with_use_repo() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(hub_name = "pip")
+use_repo(pip, "pip", "pip_internal")
+"#;
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        let ext = &parsed.extension_usages[0];
+        assert_eq!(ext.imports.len(), 1);
+
+        let use_repo = &ext.imports[0];
+        assert_eq!(use_repo.repos.len(), 2);
+        assert_eq!(use_repo.repos[0], "pip");
+        assert_eq!(use_repo.repos[1], "pip_internal");
+    }
+
+    #[test]
+    fn test_parse_multiple_extensions() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(hub_name = "pip")
+use_repo(pip, "pip")
+
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+maven.install(artifacts = ["com.google.guava:guava:31.1-jre"])
+use_repo(maven, "maven")
+"#;
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        assert_eq!(parsed.extension_usages.len(), 2);
+
+        assert_eq!(parsed.extension_usages[0].extension_name, "pip");
+        assert_eq!(parsed.extension_usages[1].extension_name, "maven");
+    }
+
+    #[test]
+    fn test_parse_extension_tag_with_list() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+maven.install(artifacts = ["guava", "protobuf"])
+"#;
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        let tag = &parsed.extension_usages[0].tags[0];
+
+        let artifacts = tag.kwargs.iter().find(|(k, _)| k == "artifacts").map(|(_, v)| v);
+        assert!(matches!(artifacts, Some(crate::types::TagValue::List(items)) if items.len() == 2));
+    }
+
+    #[test]
+    fn test_parse_extension_tag_with_bool() {
+        let content = r#"
+module(name = "test", version = "1.0.0")
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(quiet = False)
+"#;
+        let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
+        let tag = &parsed.extension_usages[0].tags[0];
+
+        let quiet = tag.kwargs.iter().find(|(k, _)| k == "quiet").map(|(_, v)| v);
+        assert!(matches!(quiet, Some(crate::types::TagValue::Bool(false))));
     }
 }
