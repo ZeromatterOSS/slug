@@ -26,6 +26,40 @@ use crate::interpreter::build_context::BuildContext;
 use crate::interpreter::globspec::GlobSpec;
 use crate::interpreter::module_internals::ModuleInternals;
 
+/// Register Bazel-specific module-level globals.
+///
+/// These are functions that can be called at the top level of .bzl files.
+#[starlark_module]
+pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
+    /// Declares the visibility of the current .bzl file.
+    ///
+    /// This function is called at the module level in Bazel .bzl files to control
+    /// which packages can load the file. For example:
+    ///
+    /// ```python
+    /// visibility("public")  # Any package can load this file
+    /// visibility("private")  # Only the same package can load this file
+    /// visibility(["//some/package:__subpackages__"])  # Specific packages
+    /// ```
+    ///
+    /// In Kuro, this is currently a no-op stub that accepts the argument but
+    /// does not enforce visibility. This allows loading of bazel_tools and other
+    /// BCR modules that use this function.
+    ///
+    /// See: https://bazel.build/rules/lib/globals/bzl#visibility
+    fn visibility<'v>(
+        #[starlark(require = pos)] _value: Value<'v>,
+    ) -> starlark::Result<NoneType> {
+        // TODO(bzlmod): Implement .bzl file visibility enforcement.
+        // Currently a no-op - Kuro doesn't enforce .bzl file visibility yet.
+        // The value can be:
+        // - "public" - visible to all packages
+        // - "private" - visible only within the same package
+        // - A list of package specifications like ["//foo:__pkg__", "//bar:__subpackages__"]
+        Ok(NoneType)
+    }
+}
+
 #[starlark_module]
 pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
     /// Check if the target with `name` has already been defined,

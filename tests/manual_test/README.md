@@ -40,7 +40,8 @@ Or from the kuro root:
 | `native.bazel_version` | Working | Returns "9.0.0-kuro" |
 | `@rules_cc` loading | Blocked | Needs CcInfo provider (Phase 6) |
 | `@bazel_tools` bundled | Working | Auto-registered for bzlmod projects |
-| `@bazel_tools` file loads | Blocked | Needs Bazel-specific APIs (visibility, etc.) |
+| `@bazel_tools` cache.bzl | Working | visibility() function implemented |
+| `@bazel_tools` http.bzl | Blocked | Needs repository_rule (Phase 5) |
 
 ## Directory Structure
 
@@ -79,11 +80,15 @@ When implementing new features, extend this test project:
 ### Current Blockers
 
 1. **rules_cc loading** - Fails with "Variable `CcInfo` not found" because native providers aren't exposed (Phase 6)
-2. **@bazel_tools file evaluation** - Files are found but fail to evaluate due to Bazel-specific APIs:
-   - `visibility("public")` - Package visibility function
-   - `repository_ctx` methods - Repository rule context
-   - Cross-cell dependencies (e.g., `@rules_cc` from `toolchain_utils.bzl`)
-3. **Module extensions** - Parsing works, execution not implemented (Phase 5)
+2. **@bazel_tools http.bzl** - Requires `repository_rule` Starlark global (Phase 5 - repository rules)
+3. **@bazel_tools toolchain_utils.bzl** - Loads `@rules_cc` which needs CcInfo provider (Phase 6)
+4. **Module extensions** - Parsing works, execution not implemented (Phase 5)
+
+### What Now Works
+
+- `visibility()` function - no-op stub allows bazel_tools files with `visibility("public")` to load
+- `@bazel_tools//tools/build_defs/repo:cache.bzl` - loads successfully
+- `@bazel_tools//tools/build_defs/repo:utils.bzl` - loads successfully (used by cache.bzl)
 
 ### Testing Protocol
 

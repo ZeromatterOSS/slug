@@ -41,6 +41,7 @@ use crate::interpreter::functions::soft_error::register_soft_error;
 use crate::interpreter::functions::starlark::register_set_starlark_peak_allocated_byte_limit;
 use crate::interpreter::functions::warning::register_warning;
 use crate::interpreter::natives::register_bazel_native;
+use crate::interpreter::natives::register_bzl_module_globals;
 use crate::interpreter::natives::register_module_natives;
 use crate::interpreter::selector::register_select;
 use crate::interpreter::selector::register_select_internal;
@@ -89,6 +90,8 @@ pub fn register_load_natives(builder: &mut GlobalsBuilder) {
     register_set_starlark_peak_allocated_byte_limit(builder);
     // Register Bazel-compatible `native` namespace for .bzl files
     register_bazel_native(builder);
+    // Register Bazel-specific module-level globals (visibility, etc.)
+    register_bzl_module_globals(builder);
 }
 
 pub fn register_analysis_natives(builder: &mut GlobalsBuilder) {

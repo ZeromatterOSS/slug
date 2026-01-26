@@ -81,6 +81,17 @@ If any features truly require nightly with no reasonable workaround:
 - Consider if the feature can be made optional
 - Track upstream stabilization
 
+#### 6. Remove OSS Markers
+
+**TODO**: Remove all `@oss-enable` and `@oss-disable` markers from the codebase.
+
+- Code under `@oss-disable` should be **deleted** (Meta-internal code not needed for Kuro)
+- Code under `@oss-enable` should be **kept unconditionally** (always enabled)
+- Remove the `is_open_source()` function and all conditional checks that use it
+- Search patterns: `@oss-enable`, `@oss-disable`, `is_open_source`
+
+This cleanup removes the dual-mode OSS/internal distinction inherited from Buck2, since Kuro is purely open source.
+
 ### Success Criteria:
 
 #### Automated Verification:
@@ -89,6 +100,8 @@ If any features truly require nightly with no reasonable workaround:
 - [ ] `cargo +stable test` passes
 - [ ] No `#![feature(...)]` in the codebase (or documented exceptions)
 - [ ] CI runs on stable Rust
+- [ ] No `@oss-enable` or `@oss-disable` markers in the codebase
+- [ ] No `is_open_source()` function or conditional OSS checks
 
 #### Manual Verification:
 

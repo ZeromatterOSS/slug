@@ -3,41 +3,54 @@
 # Run: ../../target/release/kuro targets root//:
 # This should print version info and test results.
 
-# Test 1: native.bazel_version
-# Should print "9.0.0-kuro"
-_version = native.bazel_version
-print("Test 1 - native.bazel_version:", _version)
-
 # Test 2: Load from @bazel_skylib (BCR module)
 # Should succeed - simple .bzl file with no external deps
 load("@bazel_skylib//lib:dicts.bzl", "dicts")
 
-_merged = dicts.add({"a": 1, "b": 2}, {"c": 3})
-print("Test 2 - bazel_skylib dicts.add:", _merged)
-
 # Test 3: Load paths.bzl (another simple module)
 load("@bazel_skylib//lib:paths.bzl", "paths")
 
+# Test 5: Load from @bazel_tools (bundled cell)
+# This tests that visibility() function works, which was blocking bazel_tools file loading
+load("@bazel_tools//tools/build_defs/repo:cache.bzl", "CANONICAL_ID_DOC")
+
+# Test 4: Load bazel_features version comparison utility
+load("@bazel_features//private:util.bzl", _bazel_version_ge = "ge")
+
+# Test 1: native.bazel_version
+# Should print "9.0.0-kuro"
+_version = native.bazel_version
+
+print("Test 1 - native.bazel_version:", _version)
+
+_merged = dicts.add(
+    {
+        "a": 1,
+        "b": 2,
+    },
+    {"c": 3},
+)
+
+print("Test 2 - bazel_skylib dicts.add:", _merged)
+
 _basename = paths.basename("/foo/bar/baz.txt")
+
 print("Test 3 - bazel_skylib paths.basename:", _basename)
 
-# Test 4: Version check (simulates what bazel_features does)
-# In real bazel_features, this is more complex, but basic comparison works
-_version_ok = _version >= "9.0.0"
-print("Test 4 - version >= 9.0.0:", _version_ok)
+# Test 4: Version check using bazel_features utility
+# This is how real rulesets check Bazel version compatibility
+_version_ok = _bazel_version_ge("9.0.0-pre.20250911")
 
-# Test 5: Verify @bazel_tools bundled cell is accessible
-# Note: Real bazel_tools files use Bazel-specific APIs (visibility(), etc.) that Kuro
-# doesn't implement yet. This test verifies the bundled cell mechanism works by checking
-# that the cell is registered and files exist at expected paths.
-# Full compatibility with real bazel_tools content requires Phase 6+ work.
-#
-# The bundled cell is working when:
-# - `audit cell` shows bazel_tools
-# - Load statements find the files (even if evaluation fails due to missing APIs)
-#
-# For now, we just print that the bundled cell is registered via the audit cell output.
-print("Test 5 - @bazel_tools bundled cell: See 'kuro audit cell' output for verification")
+print("Test 4 - bazel_features version >= 9.0.0-pre.20250911:", _version_ok)
+
+# The file defines CANONICAL_ID_DOC constant - if we can access it, the load worked
+print(
+    "Test 5 - @bazel_tools cache.bzl loaded:",
+    len(CANONICAL_ID_DOC) > 0,
+)
+
+# Note: http.bzl requires repository_rule which is Phase 5 work (module extensions)
+# load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")  # Blocked: needs repository_rule
 
 # TODO: Add these tests when Phase 6 (CcInfo) is complete:
 # load("@rules_cc//cc:defs.bzl", "cc_library")

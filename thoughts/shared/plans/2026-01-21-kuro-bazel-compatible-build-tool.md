@@ -54,12 +54,12 @@ After completing this plan, kuro will:
 
 1. **`native.bazel_version`** must return a version string >= "9.0.0" (e.g., "9.0.0" or "9.0.0-kuro")
 2. **Version checks from `bazel_features`** must work correctly:
-   - `_bazel_version_ge("9.0.0-pre.1231")` must return `True`
-   - Version comparison functions (`ge`, `gt`, `lt`) must work with semver strings
+    - `_bazel_version_ge("9.0.0-pre.1231")` must return `True`
+    - Version comparison functions (`ge`, `gt`, `lt`) must work with semver strings
 3. **Abort on incompatible version**: If Kuro is somehow configured to report < 9.0.0, it should abort with a clear error
 4. **Test with rules_cc 0.2.16** - This is the minimum version that works properly with Bazel 9.0
 
-The `bazel_features` module (https://github.com/bazel-contrib/bazel_features) provides feature detection that many rules depend on. Kuro must satisfy these version checks to be compatible with the modern rules_* ecosystem.
+The `bazel_features` module (https://github.com/bazel-contrib/bazel_features) provides feature detection that many rules depend on. Kuro must satisfy these version checks to be compatible with the modern rules\_\* ecosystem.
 
 ### Verification Criteria
 
@@ -101,7 +101,10 @@ We will fork Buck2 and progressively modify it to speak Bazel's dialect. The app
 10. **Platform support** - Linux, Windows, macOS
 11. **Query commands** - Add bazel-compatible query interface
 
-**Process Note:** Commit changes with a brief message after completing every phase/step.
+**Process Notes:**
+
+- Commit changes with a brief message after completing every phase/step.
+- **IMPORTANT:** When adding stubbed functions during migration (functions that exist for API compatibility but don't yet implement full functionality), mark them with a `TODO` comment explaining what needs to be implemented. Use the format `// TODO(component): Description of what needs to be implemented.`
 
 ---
 
@@ -146,7 +149,7 @@ Quick reference to all phases and their locations:
 | 4d    | bzlmod - Resolution and Lockfile | [x] Complete                                  |
 | 5     | Module Extensions                | [ ] Partial (parsing done, execution pending) |
 | 5b    | bzlmod Build Integration         | [ ] In Progress                               |
-| 5c    | Bundle @bazel_tools Repository   | [ ] Not Started                               |
+| 5c    | Bundle @bazel_tools Repository   | [x] Bundled (file loading blocked by APIs)    |
 
 ### Rule Primitives (Phase 6) - [Sub-plan](./kuro-bazel-subplans/03-rule-primitives.md)
 

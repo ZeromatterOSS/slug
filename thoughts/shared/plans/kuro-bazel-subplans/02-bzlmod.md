@@ -27,13 +27,14 @@ A manual test project is maintained at `tests/manual_test/` for validating bzlmo
 
 The manual test project validates:
 
-| Test | Command | Expected Output |
-|------|---------|-----------------|
-| Cell resolution | `audit cell` | Shows root, prelude, bazel_skylib, bazel_tools (bundled) |
-| native.bazel_version | `targets root//:` | Prints "9.0.0-kuro" |
-| @bazel_skylib loading | `targets root//:` | dicts.add returns merged dict |
-| Version comparison | `targets root//:` | version >= 9.0.0 is True |
-| @bazel_tools bundled | `audit cell` | bazel_tools registered without .buckconfig entry |
+| Test                    | Command           | Expected Output                                          |
+| ----------------------- | ----------------- | -------------------------------------------------------- |
+| Cell resolution         | `audit cell`      | Shows root, prelude, bazel_skylib, bazel_tools (bundled) |
+| native.bazel_version    | `targets root//:` | Prints "9.0.0-kuro"                                      |
+| @bazel_skylib loading   | `targets root//:` | dicts.add returns merged dict                            |
+| Version comparison      | `targets root//:` | version >= 9.0.0 is True                                 |
+| @bazel_tools bundled    | `audit cell`      | bazel_tools registered without .buckconfig entry         |
+| @bazel_tools file loads | `targets root//:` | cache.bzl loaded: True (visibility() function works)     |
 
 ### Extending Tests
 
@@ -47,18 +48,23 @@ When implementing new features:
 ### Implementation Learnings
 
 **What Works (Phase 5b verified):**
+
 - BCR modules fetched to `~/.cache/kuro/` and extracted to `bazel-external/`
 - Cell resolver includes bzlmod modules alongside .buckconfig cells
 - Cross-cell `load()` statements resolve correctly
 - `native.bazel_version` returns "9.0.0-kuro"
 - Simple @bazel_skylib .bzl files load and execute
+- `visibility()` function implemented (no-op stub for now)
+- @bazel_tools files using `visibility("public")` can now be loaded (e.g., cache.bzl)
 
 **Current Blockers:**
-- **rules_cc loading**: Needs `CcInfo` provider as native global (Phase 6)
-- **@bazel_tools file evaluation**: Files found but need Bazel-specific APIs (`visibility()`, etc.)
+
+- **rules_cc loading**: Need to try loading the latest @rules_cc. Implementation should mimic bazel 9 behavior and not require native C++ specific native rules or structures
+- **@bazel_tools http.bzl/git.bzl**: Needs `repository_rule` and `repository_ctx` (Phase 5)
 - **Module extensions**: Parsing complete, execution not implemented (Phase 5)
 
 **Key Version Requirement:**
+
 - Use `rules_cc` version **0.2.16** for testing (Bazel 9.0 compatible)
 - `native.bazel_version` must return >= "9.0.0" for bazel_features compatibility
 - Version checks like `_bazel_version_ge("9.0.0-pre.1231")` must return True
@@ -648,7 +654,7 @@ pub struct TagClassDef {
 }
 ```
 
-#### 2. module_ctx Starlark Object (Critical)
+#### 2. module_ctx Starlark Object (Critical)thoughts/shared/plans/kuro-bazel-subplans/02-bzlmod.md
 
 **File**: New `kuro_bzlmod/src/module_ctx.rs`
 
@@ -941,6 +947,7 @@ Bridge the gap between bzlmod module resolution and Kuro's build system. This ph
 ### Future Work: Remove `.buckconfig` Requirement
 
 **Current state:** Pure bzlmod projects still require a `.buckconfig` file with:
+
 - Root cell definition
 - Cell aliases to prevent errors from external configs (e.g., `fbcode = none`)
 - `.buckroot` marker file
@@ -1196,6 +1203,7 @@ impl Key for BzlmodResolutionKey {
 Bundle the `@bazel_tools` repository from Bazel's source and make it automatically available to all bzlmod projects. This is a fundamental Bazel built-in that many BCR modules depend on.
 
 **Why this phase is critical:** Many BCR modules load from `@bazel_tools`:
+
 - `rules_cc` loads `@bazel_tools//tools/cpp:toolchain_utils.bzl`
 - Module extensions use `@bazel_tools//tools/build_defs/repo:http.bzl` for `http_archive`
 - `bazel_features` uses `@bazel_tools` for version detection
@@ -1203,19 +1211,20 @@ Bundle the `@bazel_tools` repository from Bazel's source and make it automatical
 ### Source
 
 Copy the `tools/` directory from Bazel repository HEAD:
+
 - **Repository**: https://github.com/bazelbuild/bazel
 - **Directory**: `tools/`
 - **Destination**: `bazel_tools/` in Kuro source tree
 
 ### Key Directories to Include
 
-| Directory | Purpose | Priority |
-|-----------|---------|----------|
-| `tools/build_defs/repo/` | Repository rules (http_archive, git_repository) | Critical |
-| `tools/cpp/` | C++ toolchain utilities | Critical |
-| `tools/build_defs/build_info/` | Build info utilities | Medium |
-| `tools/osx/` | macOS toolchain | Medium |
-| `tools/sh/` | Shell utilities | Low |
+| Directory                      | Purpose                                         | Priority |
+| ------------------------------ | ----------------------------------------------- | -------- |
+| `tools/build_defs/repo/`       | Repository rules (http_archive, git_repository) | Critical |
+| `tools/cpp/`                   | C++ toolchain utilities                         | Critical |
+| `tools/build_defs/build_info/` | Build info utilities                            | Medium   |
+| `tools/osx/`                   | macOS toolchain                                 | Medium   |
+| `tools/sh/`                    | Shell utilities                                 | Low      |
 
 ### Implementation Steps
 
@@ -1316,17 +1325,19 @@ kuro/
 - [x] `bazel_tools/` directory exists with tools from Bazel 9.0.0
 - [x] `kuro_external_cells_bundled` builds successfully with bazel_tools (3 tests passing)
 - [x] `@bazel_tools` cell automatically registered for bzlmod projects
+- [x] `load("@bazel_tools//tools/build_defs/repo:cache.bzl", ...)` succeeds
+    - **Status**: Working - visibility() function implemented
 - [ ] `load("@bazel_tools//tools/cpp:toolchain_utils.bzl", ...)` succeeds
-  - **Blocker**: File found but loads `@rules_cc` which isn't available in bazel_tools context
+    - **Blocker**: File found but loads `@rules_cc` which isn't available in bazel_tools context
 - [ ] `load("@bazel_tools//tools/build_defs/repo:http.bzl", ...)` succeeds
-  - **Blocker**: Requires `visibility()` Starlark function (Bazel-specific API)
+    - **Blocker**: Requires `repository_rule` Starlark global (Phase 5 - repository rules)
 
 #### Manual Verification:
 
 - [x] Create bzlmod project without explicit bazel_tools configuration
 - [x] Verify `@bazel_tools` is available via `kuro audit cell`
 - [ ] Load a .bzl file from rules_cc that depends on @bazel_tools
-  - **Blocker**: Real bazel_tools files use Bazel-specific APIs not yet in Kuro
+    - **Blocker**: Real bazel_tools files use Bazel-specific APIs not yet in Kuro
 - [x] Build binary size increase is reasonable (~2MB for bazel_tools)
 
 #### Test Migration (Phase 5c):
@@ -1337,14 +1348,40 @@ kuro/
 
 ### Future Work: Bazel-Specific Starlark APIs
 
-The bundled `@bazel_tools` files use several Bazel-specific Starlark APIs that Kuro doesn't implement yet. These are needed for full compatibility:
+The bundled `@bazel_tools` files use several Bazel-specific Starlark APIs. Progress:
 
-| API | Used In | Purpose |
-|-----|---------|---------|
-| `visibility("public")` | `cache.bzl`, `http.bzl`, etc. | Package visibility control |
-| `repository_ctx` methods | `http.bzl`, `git.bzl` | Repository rule context |
-| Module-level `config_setting` | Various BUILD files | Configuration transitions |
+| API                           | Used In                       | Purpose                    | Status      |
+| ----------------------------- | ----------------------------- | -------------------------- | ----------- |
+| `visibility("public")`        | `cache.bzl`, `http.bzl`, etc. | Package visibility control | Implemented |
+| `repository_rule`             | `http.bzl`, `git.bzl`         | Repository rule definition | Phase 5     |
+| `repository_ctx` methods      | `http.bzl`, `git.bzl`         | Repository rule context    | Phase 5     |
+| Module-level `config_setting` | Various BUILD files           | Configuration transitions  | Future      |
 
-These APIs should be implemented in a future phase to enable full use of bundled bazel_tools content.
+The `visibility()` function is now implemented as a no-op stub, enabling many bazel_tools files to load.
+Repository rule support (`repository_rule`, `repository_ctx`) is part of Phase 5 (Module Extensions).
+
+#### Future: Visibility Enforcement (Research Task)
+
+The current `visibility()` implementation is a no-op stub - it accepts all values but doesn't enforce any visibility rules. Before implementing enforcement, research is needed:
+
+**Research Questions:**
+
+1. How does Bazel's `visibility()` interact with `load()` statements?
+2. What happens when loading a `visibility("private")` file from another package?
+3. How do package specifications like `"//foo:__subpackages__"` work?
+4. Does visibility apply at file level or symbol level?
+
+**References to study:**
+
+- Bazel source: `src/main/java/com/google/devtools/build/lib/packages/BzlVisibility.java`
+- Bazel docs: https://bazel.build/rules/lib/globals/bzl#visibility
+- Test cases: `src/test/java/com/google/devtools/build/lib/packages/BzlVisibilityTest.java`
+
+**Testing to add:**
+
+- [ ] Test that `visibility("public")` allows any package to load the file
+- [ ] Test that `visibility("private")` blocks loads from other packages
+- [ ] Test that `visibility(["//foo:__subpackages__"])` allows only foo and subpackages
+- [ ] Test error messages when visibility is violated
 
 ---
