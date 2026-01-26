@@ -257,8 +257,11 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
 /// in rulesets like rules_cc, bazel_features, etc. We report 9.0.0 to ensure
 /// compatibility with Bazel 9.0+ rules.
 ///
-/// The "-kuro" suffix identifies this as Kuro rather than actual Bazel.
-pub const KURO_BAZEL_VERSION: &str = "9.0.0-kuro";
+/// Using "9.0.0" without a suffix so version comparisons work correctly.
+/// The bazel_features module compares versions as tuples where released versions
+/// (no prerelease suffix) compare greater than prereleases. This ensures checks
+/// like `version >= "9.0.0-pre.20250911"` return True.
+pub const KURO_BAZEL_VERSION: &str = "9.0.0";
 
 /// Register the Bazel-compatible `native` namespace.
 pub(crate) fn register_bazel_native(globals: &mut GlobalsBuilder) {

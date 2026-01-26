@@ -30,11 +30,12 @@ The manual test project validates:
 | Test                    | Command           | Expected Output                                          |
 | ----------------------- | ----------------- | -------------------------------------------------------- |
 | Cell resolution         | `audit cell`      | Shows root, prelude, bazel_skylib, bazel_tools (bundled) |
-| native.bazel_version    | `targets root//:` | Prints "9.0.0-kuro"                                      |
+| native.bazel_version    | `targets root//:` | Prints "9.0.0"                                           |
 | @bazel_skylib loading   | `targets root//:` | dicts.add returns merged dict                            |
-| Version comparison      | `targets root//:` | version >= 9.0.0 is True                                 |
+| Version comparison      | `targets root//:` | version >= 9.0.0-pre.20250911 is True                    |
 | @bazel_tools bundled    | `audit cell`      | bazel_tools registered without .buckconfig entry         |
 | @bazel_tools file loads | `targets root//:` | cache.bzl loaded: True (visibility() function works)     |
+| Synthetic extension repos | `targets root//:` | bazel_features_version, bazel_features_globals created |
 
 ### Extending Tests
 
@@ -52,22 +53,34 @@ When implementing new features:
 - BCR modules fetched to `~/.cache/kuro/` and extracted to `bazel-external/`
 - Cell resolver includes bzlmod modules alongside .buckconfig cells
 - Cross-cell `load()` statements resolve correctly
-- `native.bazel_version` returns "9.0.0-kuro"
+- `native.bazel_version` returns "9.0.0" (released version for proper comparison)
 - Simple @bazel_skylib .bzl files load and execute
 - `visibility()` function implemented (no-op stub for now)
 - @bazel_tools files using `visibility("public")` can now be loaded (e.g., cache.bzl)
+- **Synthetic extension repos** for `bazel_features` work:
+  - `@bazel_features_version//:version.bzl` provides version string
+  - `@bazel_features_globals//:globals.bzl` provides globals struct
+- **Version comparison works**: `bazel_features` version checks return True for 9.0.0
+- **Synthetic cc_compatibility_proxy repo** created for rules_cc
 
 **Current Blockers:**
 
-- **rules_cc loading**: Need to try loading the latest @rules_cc. Implementation should mimic bazel 9 behavior and not require native C++ specific native rules or structures
+- **rules_cc loading blocked on Phase 6**: The load chain works until `cc_internal.bzl` which requires native `cc_common` built-in:
+  ```
+  @rules_cc//cc:defs.bzl
+    -> @cc_compatibility_proxy//:symbols.bzl (synthetic - working)
+    -> @rules_cc//cc/private:cc_common.bzl
+    -> @rules_cc//cc/private:cc_internal.bzl
+    -> requires native `cc_common` built-in (NOT IMPLEMENTED)
+  ```
 - **@bazel_tools http.bzl/git.bzl**: Needs `repository_rule` and `repository_ctx` (Phase 5)
-- **Module extensions**: Parsing complete, execution not implemented (Phase 5)
+- **Module extensions**: Parsing complete, synthetic repo workaround implemented, full execution not implemented
 
 **Key Version Requirement:**
 
 - Use `rules_cc` version **0.2.16** for testing (Bazel 9.0 compatible)
-- `native.bazel_version` must return >= "9.0.0" for bazel_features compatibility
-- Version checks like `_bazel_version_ge("9.0.0-pre.1231")` must return True
+- `native.bazel_version` must return "9.0.0" (no suffix) for version comparison
+- Version checks like `_bazel_version_ge("9.0.0-pre.20250911")` must return True
 
 ---
 

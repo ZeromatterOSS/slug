@@ -52,8 +52,22 @@ print(
 # Note: http.bzl requires repository_rule which is Phase 5 work (module extensions)
 # load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")  # Blocked: needs repository_rule
 
-# TODO: Add these tests when Phase 6 (CcInfo) is complete:
+# Test 6: rules_cc loading status
+# BLOCKED: rules_cc 0.2.16 requires native cc_common support (Phase 6)
+# The load chain is:
+#   @rules_cc//cc:defs.bzl
+#   -> @cc_compatibility_proxy//:symbols.bzl (synthetic repo - working)
+#   -> @rules_cc//cc/private:cc_common.bzl
+#   -> @rules_cc//cc/private:cc_internal.bzl
+#   -> requires native cc_common built-in (NOT IMPLEMENTED)
+#
+# To enable rules_cc, Kuro needs to implement:
+# 1. Native cc_common module with internal_DO_NOT_USE()
+# 2. CcInfo provider
+# 3. Other C++ build primitives
+#
+# Uncomment when Phase 6 is complete:
 # load("@rules_cc//cc:defs.bzl", "cc_library")
-# cc_library(name = "test_lib", srcs = [])
+# print("Test 6 - rules_cc loaded successfully!")
 
 print("All manual tests passed!")

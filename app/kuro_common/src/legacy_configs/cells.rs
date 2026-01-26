@@ -17,6 +17,9 @@ use kuro_bzlmod::ModuleCache;
 use kuro_bzlmod::RemoteModuleResolver;
 use kuro_bzlmod::parse_module_bazel;
 use kuro_bzlmod::resolve_local_modules;
+use kuro_bzlmod::synthetic_repos::collect_synthetic_repos;
+use kuro_bzlmod::synthetic_repos::materialize_synthetic_repos;
+use kuro_bzlmod::types::ParsedModuleFile;
 use kuro_core::kuro_env;
 use kuro_fs::fs_util;
 use kuro_core::cells::CellAliasResolver;
@@ -608,10 +611,94 @@ impl BuckConfigBasedCells {
             }
         }
 
+        // Collect extension usages from all resolved modules and generate synthetic repos
+        let synthetic_cells =
+            Self::generate_synthetic_extension_repos(project_root, &parsed, &cells).await?;
+        cells.extend(synthetic_cells);
+
         if cells.is_empty() {
             Ok(None)
         } else {
             Ok(Some(cells))
+        }
+    }
+
+    /// Generate synthetic repos for known module extensions.
+    ///
+    /// This function:
+    /// 1. Collects MODULE.bazel from all resolved dependencies
+    /// 2. Extracts extension usages (use_extension + use_repo)
+    /// 3. Generates synthetic repos for known extensions (e.g., bazel_features)
+    /// 4. Materializes them to bazel-external/
+    async fn generate_synthetic_extension_repos(
+        project_root: &ProjectRoot,
+        root_parsed: &kuro_bzlmod::types::ParsedModuleFile,
+        resolved_cells: &[(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
+    ) -> kuro_error::Result<Vec<(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)>> {
+        let mut parsed_modules: Vec<(String, ParsedModuleFile)> = Vec::new();
+
+        // Add root module
+        parsed_modules.push((
+            root_parsed.module.name.clone(),
+            root_parsed.clone(),
+        ));
+
+        // Parse MODULE.bazel from each resolved dependency
+        for (cell_name, _cell_path, setup) in resolved_cells {
+            if let Some(bzlmod_setup) = setup {
+                // Read MODULE.bazel from the cached source
+                let module_bazel_path =
+                    std::path::PathBuf::from(bzlmod_setup.source_path.as_ref()).join("MODULE.bazel");
+                if module_bazel_path.exists() {
+                    match parse_module_bazel(&module_bazel_path) {
+                        Ok(dep_parsed) => {
+                            parsed_modules.push((cell_name.as_str().to_string(), dep_parsed));
+                        }
+                        Err(e) => {
+                            tracing::debug!(
+                                "Failed to parse MODULE.bazel for {}: {}",
+                                cell_name.as_str(),
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // Collect synthetic repos from all extension usages
+        let synthetic_repos = collect_synthetic_repos(&parsed_modules);
+        if synthetic_repos.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        tracing::info!(
+            "Generating {} synthetic extension repos",
+            synthetic_repos.len()
+        );
+
+        // Materialize synthetic repos to bazel-external/
+        let synthetic_base_dir = project_root.root().as_path().join("bazel-external");
+        match materialize_synthetic_repos(&synthetic_repos, &synthetic_base_dir) {
+            Ok(paths) => {
+                let mut cells = Vec::new();
+                for (repo, path) in synthetic_repos.iter().zip(paths.iter()) {
+                    let cell_name = CellName::unchecked_new(&repo.name)?;
+                    let external_path = format!("bazel-external/{}", repo.name);
+                    let cell_path =
+                        CellRootPathBuf::new(ProjectRelativePath::new(&external_path)?.to_owned());
+
+                    tracing::info!("Registered synthetic repo: {} -> {}", repo.name, external_path);
+
+                    // Synthetic repos don't need BzlmodCellSetup - they're local
+                    cells.push((cell_name, cell_path, None));
+                }
+                Ok(cells)
+            }
+            Err(e) => {
+                tracing::warn!("Failed to materialize synthetic repos: {}", e);
+                Ok(Vec::new())
+            }
         }
     }
 

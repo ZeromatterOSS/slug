@@ -35,6 +35,7 @@ pub mod lockfile;
 pub mod parser;
 pub mod registry;
 pub mod resolution;
+pub mod synthetic_repos;
 pub mod types;
 pub mod version;
 
