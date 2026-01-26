@@ -124,6 +124,7 @@ The detailed implementation is split into focused sub-plans:
 
 - [bzlmod Resolution Algorithm](../research/2026-01-21-bzlmod-resolution-algorithm.md) - In-depth MVS algorithm documentation
 - [Test Infrastructure Mapping](../research/2026-01-22-test-infrastructure-mapping.md) - Test migration strategy
+- [BXL vs AXL Comparison](../research/bxl-vs-axl-comparison.md) - Compare Buck2's BXL with Aspect's AXL for build introspection
 
 ---
 
