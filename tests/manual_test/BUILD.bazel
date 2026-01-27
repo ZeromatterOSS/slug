@@ -52,22 +52,24 @@ print(
 # Note: http.bzl requires repository_rule which is Phase 5 work (module extensions)
 # load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")  # Blocked: needs repository_rule
 
-# Test 6: rules_cc loading status
-# BLOCKED: rules_cc 0.2.16 requires native cc_common support (Phase 6)
-# The load chain is:
-#   @rules_cc//cc:defs.bzl
-#   -> @cc_compatibility_proxy//:symbols.bzl (synthetic repo - working)
-#   -> @rules_cc//cc/private:cc_common.bzl
-#   -> @rules_cc//cc/private:cc_internal.bzl
-#   -> requires native cc_common built-in (NOT IMPLEMENTED)
-#
-# To enable rules_cc, Kuro needs to implement:
-# 1. Native cc_common module with internal_DO_NOT_USE()
-# 2. CcInfo provider
-# 3. Other C++ build primitives
-#
-# Uncomment when Phase 6 is complete:
+# Test 6: cc_common module (Phase 6)
+# Testing that cc_common has the internal_DO_NOT_USE attribute
+# Full rules_cc loading is blocked on transitive dependency resolution (bzlmod MVS)
+_has_internal = hasattr(cc_common, "internal_DO_NOT_USE")
+print("Test 6 - cc_common.internal_DO_NOT_USE exists:", _has_internal)
+
+# Test 7: cc_common methods exist
+_has_empty_vars = hasattr(cc_common, "empty_variables")
+_has_get_tool = hasattr(cc_common, "get_tool_for_action")
+print("Test 7 - cc_common methods exist:", _has_empty_vars and _has_get_tool)
+
+# Test 8: Get the internal API and verify it works
+_internal = cc_common.internal_DO_NOT_USE
+print("Test 8 - cc_common.internal_DO_NOT_USE returned:", type(_internal))
+
+# TODO: rules_cc full loading blocked on bzlmod transitive dependency resolution
+# rules_cc depends on: protobuf, platforms - which aren't being resolved transitively
 # load("@rules_cc//cc:defs.bzl", "cc_library")
-# print("Test 6 - rules_cc loaded successfully!")
+# print("Test 9 - rules_cc loaded successfully!")
 
 print("All manual tests passed!")
