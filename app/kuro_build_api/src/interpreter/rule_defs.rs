@@ -19,6 +19,7 @@ pub mod cmd_args;
 pub mod config;
 pub mod configuration_field;
 pub mod depset;
+pub mod fragments;
 pub mod command_executor_config;
 pub mod context;
 pub mod digest_config;

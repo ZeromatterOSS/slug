@@ -53,6 +53,7 @@ use starlark::values::type_repr::StarlarkTypeRepr;
 use crate::analysis::anon_promises_dyn::RunAnonPromisesAccessor;
 use crate::analysis::registry::AnalysisRegistry;
 use crate::deferred::calculation::GET_PROMISED_ARTIFACT;
+use crate::interpreter::rule_defs::fragments::ConfigurationFragments;
 use crate::interpreter::rule_defs::plugins::AnalysisPlugins;
 
 /// Functions to allow users to interact with the Actions registry.
@@ -336,6 +337,35 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             .0
             .plugins
             .buck_error_context("`plugins` is not available for `dynamic_output` or BXL")?)
+    }
+
+    /// Bazel-compatible alias for `attrs`.
+    ///
+    /// In Bazel, attributes are accessed via `ctx.attr.foo`. In Kuro (Buck2),
+    /// they are accessed via `ctx.attrs.foo`. This alias provides Bazel compatibility.
+    #[starlark(attribute)]
+    fn attr<'v>(
+        this: RefAnalysisContext<'v>,
+    ) -> starlark::Result<ValueOfUnchecked<'v, StructRef<'static>>> {
+        Ok(this
+            .0
+            .attrs
+            .buck_error_context("`attr` is not available for `dynamic_output` or BXL")?)
+    }
+
+    /// Configuration fragments for this target.
+    ///
+    /// Provides access to language-specific configuration like `ctx.fragments.cpp`,
+    /// `ctx.fragments.java`, etc.
+    #[starlark(attribute)]
+    fn fragments<'v>(
+        this: RefAnalysisContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        // Return default configuration fragments for now
+        // TODO(fragments): Pull actual configuration from target configuration
+        Ok(heap.alloc(ConfigurationFragments::default()))
     }
 }
 
