@@ -65,16 +65,17 @@ When implementing new features:
 
 **Current Blockers:**
 
-- **rules_cc loading blocked on Phase 6**: The load chain works until `cc_internal.bzl` which requires native `cc_common` built-in:
+- **rules_cc loading blocked on transitive dependency resolution**: The `cc_common` module is now implemented (Phase 6), but rules_cc depends on `protobuf` and `platforms` which aren't being resolved by MVS:
   ```
   @rules_cc//cc:defs.bzl
     -> @cc_compatibility_proxy//:symbols.bzl (synthetic - working)
-    -> @rules_cc//cc/private:cc_common.bzl
-    -> @rules_cc//cc/private:cc_internal.bzl
-    -> requires native `cc_common` built-in (NOT IMPLEMENTED)
+    -> cc_internal.bzl -> cc_common built-in (IMPLEMENTED)
+    -> @com_google_protobuf//bazel/common:proto_info.bzl (NOT RESOLVED)
   ```
+  The `bazel_dep(name = "protobuf", repo_name = "com_google_protobuf")` in rules_cc's MODULE.bazel should create the alias, but transitive deps aren't being pulled in.
 - **@bazel_tools http.bzl/git.bzl**: Needs `repository_rule` and `repository_ctx` (Phase 5)
 - **Module extensions**: Parsing complete, synthetic repo workaround implemented, full execution not implemented
+- **repo_name aliasing**: `bazel_dep(..., repo_name = "alias")` should create cell aliases for transitive deps
 
 **Key Version Requirement:**
 

@@ -125,6 +125,7 @@ The detailed implementation is split into focused sub-plans:
 - [bzlmod Resolution Algorithm](../research/2026-01-21-bzlmod-resolution-algorithm.md) - In-depth MVS algorithm documentation
 - [Test Infrastructure Mapping](../research/2026-01-22-test-infrastructure-mapping.md) - Test migration strategy
 - [BXL vs AXL Comparison](../research/bxl-vs-axl-comparison.md) - Compare Buck2's BXL with Aspect's AXL for build introspection
+- [rules_cc Native Requirements](../research/2026-01-26-rules-cc-native-requirements.md) - What Kuro must provide for rules_cc (Bazel 9.0+)
 
 ---
 

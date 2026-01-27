@@ -1,6 +1,8 @@
 # Rules Integration Phases (7-10)
 
 > **Parent Plan**: [Kuro Bazel-Compatible Build Tool](../2026-01-21-kuro-bazel-compatible-build-tool.md)
+>
+> **Key Research**: [rules_cc Native Requirements](../research/2026-01-26-rules-cc-native-requirements.md)
 
 This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rust, rules_python, and rules_oci.
 
@@ -8,14 +10,41 @@ This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rus
 
 ## Phase 7: rules_cc Integration
 
+### Current Status (2026-01-27)
+
+**Implemented:**
+- [x] Native `cc_common` module with `internal_DO_NOT_USE()` method
+- [x] `CcCommonInternal` struct with internal functions (stubs)
+- [x] `CcToolchainVariables` type
+- [x] `CcInfo` and `CcToolchainInfo` provider stubs
+- [x] Public API methods: `get_tool_for_action`, `get_execution_requirements`, `action_is_enabled`, `get_memory_inefficient_command_line`, `get_environment_variables`, `empty_variables`
+- [x] Internal methods: `create_cc_compile_action`, `get_artifact_name_for_category`, `combine_cc_toolchain_variables`, `actions2ctx_cheat`, `freeze`, etc.
+
+**Blocking:**
+- [ ] Transitive dependency resolution - rules_cc depends on `protobuf` (via `repo_name = "com_google_protobuf"`) and `platforms`, which aren't being resolved
+- [ ] `repo_name` aliasing in bzlmod - `bazel_dep(..., repo_name = "alias")` should create cell aliases
+
+**Files:**
+- `app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs` - cc_common implementation
+- `tests/manual_test/BUILD.bazel` - cc_common verification tests
+
 ### Overview
 
-Get rules*cc working to compile C and C++ code. We target Bazel 9.0.0+ where rules_cc uses Starlark providers. Further in depth research is required to determine if the cc rules are \_actually* pure starlark with fallbacks purely for older bazel versions.
-Due to the recency of the release of bazel 9, assumptions about version numbers should should be regularly be double checked by fetching web content, and plans and research should cite links, as well as filenames+line numbers heavily
+Get rules_cc working to compile C and C++ code. For Bazel 9.0+, rules_cc is **almost entirely pure Starlark**. The key insight from research is that Kuro does NOT need to implement native providers or rules—only the native `cc_common` module that the Starlark implementations call into.
 
 ### Architecture (Bazel 9.0.0+)
 
-TODO: Perform in-depth research &
+In rules_cc 0.2.16+ with Bazel 9.0+:
+
+- **Providers are pure Starlark**: `CcInfo`, `CcToolchainInfo`, `CcToolchainConfigInfo`, `DebugPackageInfo`
+- **Rules are pure Starlark**: `cc_library`, `cc_binary`, `cc_test` in `cc/private/rules_impl/*.bzl`
+- **Native builtin required**: The `cc_common` module for low-level action creation
+
+The version switch happens in `extensions.bzl:31`:
+```starlark
+if _bazel_version_ge("9.0.0-pre.20250911"):
+    # Use pure Starlark implementations
+```
 
 ### Changes Required:
 
@@ -26,9 +55,67 @@ module(name = "test_cc")
 bazel_dep(name = "rules_cc", version = "0.2.16")
 ```
 
-#### X. Unknown
+#### 2. Implement Native `cc_common` Module
 
-This must be filled in with further research
+Create a Starlark builtin module with public API functions:
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `get_tool_for_action` | `(*, feature_configuration, action_name) -> str` | Get tool path for action |
+| `get_execution_requirements` | `(*, feature_configuration, action_name) -> dict` | Get execution requirements |
+| `action_is_enabled` | `(*, feature_configuration, action_name) -> bool` | Check if action enabled |
+| `get_memory_inefficient_command_line` | `(*, feature_configuration, action_name, variables) -> list[str]` | Get command line |
+| `get_environment_variables` | `(*, feature_configuration, action_name, variables) -> dict` | Get env vars |
+| `empty_variables` | `() -> CcToolchainVariables` | Create empty variables |
+
+#### 3. Implement `cc_common.internal_DO_NOT_USE()`
+
+Return a struct with internal functions (accessed via `cc/private/cc_internal.bzl`):
+
+**Critical (needed for basic compilation):**
+
+| Function | Description |
+|----------|-------------|
+| `create_cc_compile_action` | Creates C++ compile actions |
+| `get_artifact_name_for_category` | Gets artifact name (`.o`, `.pic.o`, `.d`) |
+| `combine_cc_toolchain_variables` | Combines toolchain variables |
+| `actions2ctx_cheat` | Gets rule context from actions object |
+| `cc_toolchain_variables` | Creates CcToolchainVariables from dict |
+| `freeze` | Freezes list to immutable tuple |
+
+**High Priority (full functionality):**
+
+| Function | Description |
+|----------|-------------|
+| `create_cc_compile_action_template` | Tree artifact compile template |
+| `wrap_link_actions` | Wraps link actions for platform compat |
+| `get_link_args` | Gets link arguments from linking context |
+| `declare_compile_output_file` | Declares compile output file |
+| `declare_other_output_file` | Declares auxiliary outputs (dwo, etc.) |
+
+See [rules_cc Native Requirements](../research/2026-01-26-rules-cc-native-requirements.md) for complete function list.
+
+#### 4. Implement `ctx.fragments.cpp`
+
+C++ configuration fragment with required attributes:
+
+| Attribute/Method | Type | Description |
+|------------------|------|-------------|
+| `force_pic()` | `() -> bool` | Whether -fPIC is forced |
+| `compilation_mode()` | `() -> str` | "opt", "dbg", or "fastbuild" |
+| `use_llvm_coverage_map_format()` | `() -> bool` | Coverage format preference |
+| `apple_generate_dsym` | `bool` | Whether to generate dSYM files |
+| `fdo_instrument()` | `() -> str?` | FDO instrumentation path |
+
+#### 5. NOT Required (Pure Starlark in rules_cc)
+
+These are implemented in rules_cc's Starlark code—Kuro does NOT need native implementations:
+
+- `CcInfo` provider - `cc/private/cc_info.bzl`
+- `CcToolchainInfo` provider - `cc/private/rules_impl/cc_toolchain_info.bzl`
+- `cc_library` rule - `cc/private/rules_impl/cc_library.bzl`
+- `cc_binary` rule - `cc/private/rules_impl/cc_binary.bzl`
+- `cc_test` rule - `cc/private/rules_impl/cc_test.bzl`
 
 #### 6. Test with Real Project
 
