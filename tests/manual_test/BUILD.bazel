@@ -67,8 +67,8 @@ print("Test 7 - cc_common methods exist:", _has_empty_vars and _has_get_tool)
 _internal = cc_common.internal_DO_NOT_USE
 print("Test 8 - cc_common.internal_DO_NOT_USE returned:", type(_internal))
 
-# TODO: rules_cc full loading blocked on bzlmod transitive dependency resolution
-# rules_cc depends on: protobuf, platforms - which aren't being resolved transitively
+# Test 9: rules_cc loading (now with transitive deps resolved)
+# BLOCKED: protobuf requires ProtoInfo built-in provider which isn't implemented yet
 # load("@rules_cc//cc:defs.bzl", "cc_library")
 # print("Test 9 - rules_cc loaded successfully!")
 

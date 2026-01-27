@@ -65,17 +65,23 @@ When implementing new features:
 
 **Current Blockers:**
 
-- **rules_cc loading blocked on transitive dependency resolution**: The `cc_common` module is now implemented (Phase 6), but rules_cc depends on `protobuf` and `platforms` which aren't being resolved by MVS:
+- **rules_cc loading blocked on ProtoInfo provider**: Transitive dependencies now resolved correctly. rules_cc loads and its dependencies (protobuf, platforms) are registered as cells. However, `protobuf//bazel/private/native.bzl` requires the `ProtoInfo` built-in provider which isn't implemented:
   ```
   @rules_cc//cc:defs.bzl
-    -> @cc_compatibility_proxy//:symbols.bzl (synthetic - working)
-    -> cc_internal.bzl -> cc_common built-in (IMPLEMENTED)
-    -> @com_google_protobuf//bazel/common:proto_info.bzl (NOT RESOLVED)
+    -> @rules_cc//cc/objc_import.bzl
+    -> @cc_compatibility_proxy//proxy.bzl
+    -> @rules_cc//cc/private/rules_impl/cc_shared_library.bzl
+    -> @protobuf//bazel/common/proto_info.bzl
+    -> @protobuf//bazel/private/native.bzl <- needs ProtoInfo
   ```
-  The `bazel_dep(name = "protobuf", repo_name = "com_google_protobuf")` in rules_cc's MODULE.bazel should create the alias, but transitive deps aren't being pulled in.
 - **@bazel_tools http.bzl/git.bzl**: Needs `repository_rule` and `repository_ctx` (Phase 5)
 - **Module extensions**: Parsing complete, synthetic repo workaround implemented, full execution not implemented
-- **repo_name aliasing**: `bazel_dep(..., repo_name = "alias")` should create cell aliases for transitive deps
+
+**Completed:**
+
+- **Transitive dependency resolution (MVS)**: Full MVS algorithm now runs in `resolve_bzlmod_dependencies()`, resolving all transitive deps
+- **repo_name aliasing**: Both direct and transitive `bazel_dep(..., repo_name = "alias")` create cell aliases via `collect_transitive_repo_aliases()`
+- **Source fetching**: `MvsResolver::fetch_sources()` downloads and extracts all resolved modules to cache
 
 **Key Version Requirement:**
 
@@ -1160,13 +1166,15 @@ impl Key for BzlmodResolutionKey {
 
 #### Automated Verification:
 
-- [ ] `@bazel_lib//:defs.bzl` loads successfully after bzlmod resolution
-- [ ] `@rules_cc//cc:defs.bzl` loads after fetching from BCR
+- [x] `@bazel_skylib//:defs.bzl` loads successfully after bzlmod resolution (transitive deps working)
+- [ ] `@rules_cc//cc:defs.bzl` loads after fetching from BCR - BLOCKED on ProtoInfo provider
 - [ ] `@local_module//:target` works with local_path_override
-- [ ] Repo aliasing works: `bazel_dep(name="foo", repo_name="bar")` makes `@bar` available
+- [x] Repo aliasing works: `bazel_dep(name="foo", repo_name="bar")` makes `@bar` available
+- [x] Transitive repo_name aliases created via `collect_transitive_repo_aliases()`
 - [ ] Extension-generated repos accessible via `@repo_name//:target`
 - [ ] DICE caches bzlmod resolution (no re-resolution on second build)
 - [x] Cell resolver includes all bzlmod modules (remote BCR modules registered as external cells)
+- [x] MVS algorithm discovers and fetches ALL transitive dependencies
 
 #### Infrastructure Implementation (Complete):
 
@@ -1181,13 +1189,16 @@ impl Key for BzlmodResolutionKey {
 
 #### Remaining Infrastructure (Blocking Manual Verification):
 
-- [ ] **`@bazel_tools` built-in repository** - See **Phase 5c** for bundling implementation
+- [x] **`@bazel_tools` built-in repository** - See **Phase 5c** for bundling implementation (COMPLETE)
 
-- [ ] **Version compatibility via `native.bazel_version`** - Critical for rules compatibility:
-    - Kuro must expose `native.bazel_version` returning >= "9.0.0" (e.g., "9.0.0-kuro")
-    - The `bazel_features` module checks like `_bazel_version_ge("9.0.0-pre.1231")` must return `True`
-    - If version < 9.0.0 is detected, Kuro should abort with clear error
-    - This is required for rules_cc >= 0.2.16 and other modern rules
+- [x] **Version compatibility via `native.bazel_version`** - COMPLETE:
+    - Kuro exposes `native.bazel_version` returning "9.0.0"
+    - The `bazel_features` module checks like `_bazel_version_ge("9.0.0-pre.1231")` return `True`
+    - This is verified in manual tests
+
+- [ ] **ProtoInfo built-in provider** - Needed for rules_cc full loading:
+    - `protobuf//bazel/private/native.bzl` requires `ProtoInfo` built-in provider
+    - This blocks the final rules_cc load chain
 
 #### Manual Verification:
 
@@ -1397,5 +1408,66 @@ The current `visibility()` implementation is a no-op stub - it accepts all value
 - [ ] Test that `visibility("private")` blocks loads from other packages
 - [ ] Test that `visibility(["//foo:__subpackages__"])` allows only foo and subpackages
 - [ ] Test error messages when visibility is violated
+
+---
+
+## Phase 7: Proto Support (ProtoInfo Provider)
+
+### Overview
+
+Implement the `ProtoInfo` built-in provider required by protobuf rules. This is the current blocker for loading `@rules_cc//cc:defs.bzl`.
+
+### Why This Is Needed
+
+The load chain for rules_cc hits protobuf's native.bzl which expects ProtoInfo as a built-in:
+
+```
+@rules_cc//cc:defs.bzl
+  -> @rules_cc//cc/objc_import.bzl
+  -> @cc_compatibility_proxy//proxy.bzl
+  -> @rules_cc//cc/private/rules_impl/cc_shared_library.bzl
+  -> @protobuf//bazel/common/proto_info.bzl
+  -> @protobuf//bazel/private/native.bzl:3
+       NativeProtoInfo = ProtoInfo  <- ERROR: Variable `ProtoInfo` not found
+```
+
+### Research Needed
+
+Before implementation, research is needed to understand:
+
+1. **Is ProtoInfo a native Bazel provider in 9.0?** Or has it moved to the protobuf rules?
+2. **What fields does ProtoInfo have?** Check Bazel source and protobuf rules docs
+3. **How do rules_cc and protobuf v27+ interact?** The protobuf rules may have changed how they expose ProtoInfo
+4. **Can we stub ProtoInfo?** Or does it need full implementation?
+
+**References to study:**
+
+- Bazel source: `src/main/java/com/google/devtools/build/lib/rules/proto/ProtoInfo.java`
+- Protobuf rules: `https://github.com/protocolbuffers/protobuf/tree/main/bazel`
+- BCR protobuf 27.0: Check `bazel/private/native.bzl` and `bazel/common/proto_info.bzl`
+
+### Potential Implementation
+
+**File**: `app/kuro_interpreter/src/starlark/providers/proto_info.rs` (new)
+
+```rust
+/// ProtoInfo provider - information about proto files and their compilation
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct ProtoInfo {
+    // Core fields (research needed for exact API)
+    pub direct_sources: Vec<Artifact>,
+    pub transitive_sources: Depset<Artifact>,
+    pub direct_descriptor_set: Artifact,
+    pub transitive_descriptor_sets: Depset<Artifact>,
+    // ... additional fields
+}
+```
+
+### Success Criteria
+
+- [ ] `ProtoInfo` available as a built-in global in Starlark
+- [ ] `protobuf//bazel/private/native.bzl` loads successfully
+- [ ] `@rules_cc//cc:defs.bzl` loads completely
+- [ ] Can define a `cc_proto_library` target (stretch goal)
 
 ---
