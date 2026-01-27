@@ -590,13 +590,20 @@ pub fn register_provider(builder: &mut GlobalsBuilder) {
     ///
     /// For providers that accumulate upwards a transitive set is often a good choice.
     fn provider<'v>(
-        #[starlark(require=named, default = "")] doc: &str,
+        // Allow doc as positional or named argument for Bazel compatibility
+        // Bazel supports both: provider("doc", fields={...}) and provider(doc="doc", fields={...})
+        #[starlark(default = "")] doc: &str,
         #[starlark(require=named)] fields: Either<
             UnpackListOrTuple<String>,
             SmallMap<String, Value<'v>>,
         >,
+        // Bazel-compatible: init function for custom construction logic
+        // When specified, provider() returns (ProviderType, constructor_fn)
+        // TODO(bazel): Implement proper init function support with tuple return
+        #[starlark(require=named)] init: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<UserProviderCallable> {
+    ) -> starlark::Result<Value<'v>> {
+        let _unused_init = init;
         let docstring = DocString::from_docstring(DocStringKind::Starlark, doc);
         let path = starlark_path_from_build_context(eval)?.path();
 
@@ -629,6 +636,10 @@ pub fn register_provider(builder: &mut GlobalsBuilder) {
                 for (name, field) in fields {
                     if let Some(field) = field.downcast_ref::<UserProviderField>() {
                         new_fields.insert(name, field.dupe());
+                    } else if field.unpack_str().is_some() {
+                        // Bazel compatibility: field value can be a doc string
+                        // In this case, the field has no type constraint
+                        new_fields.insert(name, UserProviderField::default());
                     } else {
                         let ty = provider_field_parse_type(field, eval)
                             .with_buck_error_context(|| format!("Field `{name}` type `{field}` is not created with `provider_field`, and cannot be evaluated as a type"))?;
@@ -638,11 +649,17 @@ pub fn register_provider(builder: &mut GlobalsBuilder) {
                 new_fields
             }
         };
-        Ok(UserProviderCallable::new(
-            path.into_owned(),
-            docstring,
-            fields,
-        ))
+        let provider = UserProviderCallable::new(path.into_owned(), docstring, fields);
+
+        // If init is provided, return (provider, constructor) tuple
+        // The constructor is the same as the provider itself since it's callable
+        if init.is_some() {
+            let provider_val = eval.heap().alloc(provider);
+            // Return tuple of (provider, provider) - the provider is both type and constructor
+            Ok(eval.heap().alloc((provider_val, provider_val)))
+        } else {
+            Ok(eval.heap().alloc(provider))
+        }
     }
 
     /// Provider type, can be used in type expressions.

@@ -1,8 +1,7 @@
 # Bazel-compatible BUILD file for hello_world example
 # This demonstrates Bazel syntax (cc_binary, cc_library)
 
-# Note: This uses native cc_* rules. When rules_cc integration is complete,
-# you would use: load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
 cc_binary(
     name = "main",

@@ -21,7 +21,11 @@ use crate::interpreter::rule_defs::artifact::starlark_promise_artifact::register
 use crate::interpreter::rule_defs::artifact_tagging::artifact_tag::register_artifact_tag;
 use crate::interpreter::rule_defs::artifact_tagging::register_tagged_command_line;
 use crate::interpreter::rule_defs::artifact_tagging::register_tagged_value;
+use crate::interpreter::rule_defs::cc_common::register_cc_common;
 use crate::interpreter::rule_defs::cmd_args::register_cmd_args;
+use crate::interpreter::rule_defs::config::register_config;
+use crate::interpreter::rule_defs::configuration_field::register_configuration_field;
+use crate::interpreter::rule_defs::depset::register_depset;
 use crate::interpreter::rule_defs::cmd_args::register_command_line_inputs;
 use crate::interpreter::rule_defs::command_executor_config::register_command_executor_config;
 use crate::interpreter::rule_defs::context::register_analysis_context;
@@ -39,7 +43,11 @@ use crate::interpreter::rule_defs::validation_spec::register_validation_spec;
 
 fn register_build_api_globals(globals: &mut GlobalsBuilder) {
     register_builtin_providers(globals);
+    register_cc_common(globals);
     register_cmd_args(globals);
+    register_config(globals);
+    register_configuration_field(globals);
+    register_depset(globals);
     register_command_executor_config(globals);
     register_provider(globals);
     register_provider_collection(globals);

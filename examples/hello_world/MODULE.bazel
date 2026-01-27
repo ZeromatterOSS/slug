@@ -6,5 +6,14 @@ module(
     version = "1.0.0",
 )
 
-# Dependencies would be declared here when rules_cc integration is complete
-# bazel_dep(name = "rules_cc", version = "0.0.9")
+# Dependencies - rules_cc for C/C++ support
+bazel_dep(name = "rules_cc", version = "0.2.16")
+
+# TODO(bzlmod): Remove these when transitive dependency resolution is implemented.
+# These are transitive dependencies of rules_cc that need to be declared directly
+# until MVS resolution properly handles the full dependency graph.
+bazel_dep(name = "bazel_features", version = "1.28.0")
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "platforms", version = "0.0.10")
+
+bazel_dep(name = "protobuf", version = "27.0", repo_name = "com_google_protobuf")

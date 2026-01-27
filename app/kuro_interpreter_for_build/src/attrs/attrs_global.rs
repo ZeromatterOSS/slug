@@ -671,6 +671,11 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
     /// Bazel-compatible alias for attrs.dep().
     ///
     /// If `providers` is specified, the dependency must return those providers.
+    ///
+    /// `allow_single_file` can be:
+    /// - `True` (allow any single file)
+    /// - `False` (default, don't allow files)
+    /// - A list of extensions like `[".txt", ".json"]` (allow single file with those extensions)
     fn label<'v>(
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         providers: UnpackListOrTuple<Value<'v>>,
@@ -679,10 +684,28 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] mandatory: bool,
         #[starlark(require = named, default = false)] executable: bool,
         #[starlark(require = named, default = false)] allow_files: bool,
-        #[starlark(require = named, default = false)] allow_single_file: bool,
+        #[starlark(require = named)] allow_single_file: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = (mandatory, executable, allow_files, allow_single_file);
+        // Parse allow_single_file: can be bool or list of extension strings
+        let allow_single_file_bool = match allow_single_file {
+            None => false,
+            Some(v) => {
+                if let Some(b) = v.unpack_bool() {
+                    b
+                } else if v.iterate(eval.heap()).is_ok() {
+                    // It's a list/tuple of extensions - treat as allow_single_file=true
+                    // The extension filtering is not implemented yet, but we accept the param
+                    true
+                } else {
+                    return Err(ValueError::IncorrectParameterTypeNamed(
+                        "allow_single_file".to_owned(),
+                    )
+                    .into());
+                }
+            }
+        };
+        let _unused = (mandatory, executable, allow_files, allow_single_file_bool);
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         let coercer = AttrType::dep(required_providers, PluginKindSet::EMPTY);
         Ok(Attribute::attr(eval, default, doc, coercer)?)

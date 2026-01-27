@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -205,6 +206,15 @@ pub struct BuckConfigBasedCells {
     pub external_data: ExternalBuckconfigData,
 }
 
+/// Result of bzlmod dependency resolution.
+struct BzlmodResolutionResult {
+    /// Cells to register: (name, path, optional setup for remote modules)
+    cells: Vec<(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)>,
+    /// Cell aliases to register: (alias_name, target_cell_name)
+    /// These come from repo_name parameters in bazel_dep()
+    aliases: Vec<(NonEmptyCellAlias, CellName)>,
+}
+
 impl BuckConfigBasedCells {
     /// In the client and one place in the daemon, we need access to the alias resolver for the cwd
     /// in some places where we don't have normal dice access
@@ -389,9 +399,10 @@ impl BuckConfigBasedCells {
         // Collect bzlmod cells with their external origins for later marking
         let mut bzlmod_external_cells: Vec<(CellName, BzlmodCellSetup)> = Vec::new();
         let mut bzlmod_bundled_cells: Vec<CellName> = Vec::new();
+        let mut bzlmod_aliases: Vec<(NonEmptyCellAlias, CellName)> = Vec::new();
         if let Some(project_fs) = project_fs {
-            if let Some(bzlmod_cells) = Self::resolve_bzlmod_dependencies(project_fs).await? {
-                for (name, path, maybe_setup) in bzlmod_cells {
+            if let Some(bzlmod_result) = Self::resolve_bzlmod_dependencies(project_fs).await? {
+                for (name, path, maybe_setup) in bzlmod_result.cells {
                     // Don't override cells defined in .buckconfig
                     if !cell_definitions.iter().any(|(n, _)| *n == name) {
                         cell_definitions.push((name, path));
@@ -403,6 +414,9 @@ impl BuckConfigBasedCells {
                         }
                     }
                 }
+
+                // Collect repo_name aliases for later merging
+                bzlmod_aliases = bzlmod_result.aliases;
 
                 // Auto-register @bazel_tools as a bundled cell for bzlmod projects
                 // Many BCR modules (rules_cc, etc.) load from @bazel_tools
@@ -421,9 +435,19 @@ impl BuckConfigBasedCells {
         }
         // ===== End Bzlmod Integration =====
 
-        let root_aliases = Self::get_cell_aliases_from_config(&root_config)?.collect();
+        // Merge config aliases with bzlmod aliases (bzlmod aliases come from repo_name parameters)
+        let mut root_aliases: HashMap<NonEmptyCellAlias, NonEmptyCellAlias> =
+            Self::get_cell_aliases_from_config(&root_config)?.collect();
+        for (alias, target) in bzlmod_aliases {
+            // Convert CellName to NonEmptyCellAlias for the target
+            let target_alias = NonEmptyCellAlias::new(target.as_str().to_owned())?;
+            if !root_aliases.contains_key(&alias) {
+                tracing::info!("Adding bzlmod repo_name alias: {} -> {}", alias, target);
+                root_aliases.insert(alias, target_alias);
+            }
+        }
 
-        let mut aggregator = CellsAggregator::new(cell_definitions, root_aliases)?;
+        let mut aggregator = CellsAggregator::new(cell_definitions, root_aliases.clone())?;
 
         // Mark remote bzlmod modules as external cells
         for (name, setup) in bzlmod_external_cells {
@@ -477,12 +501,12 @@ impl BuckConfigBasedCells {
     /// 2. Parses it for module() and bazel_dep() directives
     /// 3. Resolves local_path_override() to local cells
     /// 4. Fetches remote dependencies from BCR and extracts them
+    /// Resolve bzlmod dependencies from MODULE.bazel.
     ///
-    /// Returns a list of (CellName, CellRootPathBuf, Option<BzlmodCellSetup>) for each resolved module.
-    /// The setup is `Some` for remote BCR modules, `None` for local path overrides.
+    /// Returns cells to register and aliases from repo_name parameters.
     async fn resolve_bzlmod_dependencies(
         project_root: &ProjectRoot,
-    ) -> kuro_error::Result<Option<Vec<(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)>>> {
+    ) -> kuro_error::Result<Option<BzlmodResolutionResult>> {
         let module_bazel_rel = ProjectRelativePath::new("MODULE.bazel")?;
         let module_bazel_path = project_root.resolve(module_bazel_rel);
 
@@ -503,6 +527,7 @@ impl BuckConfigBasedCells {
         };
 
         let mut cells = Vec::new();
+        let mut aliases = Vec::new();
         let workspace_root = project_root.root().as_path();
 
         // Resolve local path overrides first
@@ -588,6 +613,21 @@ impl BuckConfigBasedCells {
                                         };
 
                                         cells.push((cell_name, cell_path, Some(setup)));
+
+                                        // If repo_name is specified, create an alias so the module is accessible
+                                        // under both names. This is a global alias for now; proper implementation
+                                        // should create per-module aliases (only visible within the declaring module).
+                                        if let Some(repo_name) = &dep.repo_name {
+                                            if repo_name != &dep.name {
+                                                let alias_name = NonEmptyCellAlias::new(repo_name.clone())?;
+                                                tracing::info!(
+                                                    "Creating repo_name alias: {} -> {}",
+                                                    repo_name,
+                                                    resolved.name
+                                                );
+                                                aliases.push((alias_name, cell_name));
+                                            }
+                                        }
                                     }
                                     Err(e) => {
                                         tracing::warn!(
@@ -616,10 +656,10 @@ impl BuckConfigBasedCells {
             Self::generate_synthetic_extension_repos(project_root, &parsed, &cells).await?;
         cells.extend(synthetic_cells);
 
-        if cells.is_empty() {
+        if cells.is_empty() && aliases.is_empty() {
             Ok(None)
         } else {
-            Ok(Some(cells))
+            Ok(Some(BzlmodResolutionResult { cells, aliases }))
         }
     }
 

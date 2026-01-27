@@ -637,8 +637,13 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] is_toolchain_rule: bool,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         uses_plugins: UnpackListOrTuple<PluginKindArg>,
+        // Bazel-compatible: providers that this rule outputs (not yet implemented, just accepted)
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        provides: UnpackListOrTuple<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkRuleCallable<'v>> {
+        // TODO(bazel): Use the provides parameter to validate rule outputs
+        let _unused_provides = provides;
         // Support both `implementation` (Bazel) and `impl` (Kuro) parameter names
         let impl_fn = match (implementation, r#impl) {
             (Some(implementation), None) => implementation,

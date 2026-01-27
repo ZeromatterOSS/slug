@@ -21,6 +21,7 @@ sha2 = { workspace = true }
 starlark = { workspace = true }
 tar = { workspace = true }
 tokio = { workspace = true }
+zip = { workspace = true }
 tracing = { workspace = true }
 
 kuro_error = { workspace = true }

@@ -13,6 +13,7 @@
 //! This module handles downloading source archives and git repositories,
 //! verifying integrity, and extracting to the cache.
 
+use std::io::Cursor;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -24,6 +25,7 @@ use kuro_http::HttpClient;
 use kuro_http::HttpClientBuilder;
 use kuro_http::to_bytes;
 use tar::Archive;
+use zip::ZipArchive;
 
 use crate::cache::ModuleCache;
 use crate::integrity::verify_integrity;
@@ -251,17 +253,81 @@ impl SourceFetcher {
         .into())
     }
 
-    /// Extract a zip archive (not implemented, placeholder).
+    /// Extract a zip archive.
     fn extract_zip(
         &self,
-        _data: &[u8],
-        _dest_dir: &Path,
-        _strip_prefix: Option<&str>,
+        data: &[u8],
+        dest_dir: &Path,
+        strip_prefix: Option<&str>,
     ) -> kuro_error::Result<()> {
-        Err(FetchError::ExtractionFailed {
-            reason: "Zip format not yet supported".to_string(),
+        let cursor = Cursor::new(data);
+        let mut archive = ZipArchive::new(cursor).map_err(|e| FetchError::ExtractionFailed {
+            reason: format!("Failed to open zip archive: {}", e),
+        })?;
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i).map_err(|e| FetchError::ExtractionFailed {
+                reason: format!("Failed to read zip entry: {}", e),
+            })?;
+
+            let file_path = match file.enclosed_name() {
+                Some(path) => path.to_owned(),
+                None => continue, // Skip invalid paths
+            };
+
+            // Apply strip_prefix if specified
+            let dest_path = if let Some(prefix) = strip_prefix {
+                let stripped = file_path.strip_prefix(prefix).unwrap_or(&file_path);
+                dest_dir.join(stripped)
+            } else {
+                dest_dir.join(&file_path)
+            };
+
+            // Skip if path is empty after stripping
+            if dest_path == dest_dir {
+                continue;
+            }
+
+            if file.is_dir() {
+                std::fs::create_dir_all(&dest_path).map_err(|e| FetchError::ExtractionFailed {
+                    reason: format!("Failed to create directory {:?}: {}", dest_path, e),
+                })?;
+            } else {
+                // Create parent directories
+                if let Some(parent) = dest_path.parent() {
+                    std::fs::create_dir_all(parent).map_err(|e| FetchError::ExtractionFailed {
+                        reason: format!("Failed to create parent directory {:?}: {}", parent, e),
+                    })?;
+                }
+
+                // Extract file
+                let mut outfile = std::fs::File::create(&dest_path).map_err(|e| {
+                    FetchError::ExtractionFailed {
+                        reason: format!("Failed to create file {:?}: {}", dest_path, e),
+                    }
+                })?;
+
+                std::io::copy(&mut file, &mut outfile).map_err(|e| {
+                    FetchError::ExtractionFailed {
+                        reason: format!("Failed to write file {:?}: {}", dest_path, e),
+                    }
+                })?;
+
+                // Set permissions on Unix
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    if let Some(mode) = file.unix_mode() {
+                        let _ = std::fs::set_permissions(
+                            &dest_path,
+                            std::fs::Permissions::from_mode(mode),
+                        );
+                    }
+                }
+            }
         }
-        .into())
+
+        Ok(())
     }
 
     /// Fetch a git repository.
