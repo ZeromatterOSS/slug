@@ -1,6 +1,7 @@
 /target/
 Cargo.lock
 buck-out
+bazel-external
 /.direnv
 .buckconfig.local
 .envrc.local
