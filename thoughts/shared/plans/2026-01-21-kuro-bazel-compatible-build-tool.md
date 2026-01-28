@@ -118,6 +118,7 @@ The detailed implementation is split into focused sub-plans:
 | [02-bzlmod.md](./kuro-bazel-subplans/02-bzlmod.md)                       | 4a-5c  | bzlmod module system, BCR integration, resolution, extensions | **In Progress** |
 | [03-rule-primitives.md](./kuro-bazel-subplans/03-rule-primitives.md)     | 6a     | ctx/actions/providers API alignment                           | Not Started     |
 | [06-prelude-architecture.md](./kuro-bazel-subplans/06-prelude-architecture.md) | 6b | Prelude preservation, Bazel shim migration, cleanup          | Not Started     |
+| [08-aspects.md](./kuro-bazel-subplans/08-aspects.md)                     | 8a-8d  | Bazel aspects implementation (blocks rules_cc)                | **8a Complete** |
 | [04-rules-integration.md](./kuro-bazel-subplans/04-rules-integration.md) | 7-10   | rules_cc, rules_rust, rules_python, rules_oci                 | Not Started     |
 | [05-infrastructure.md](./kuro-bazel-subplans/05-infrastructure.md)       | 11-14  | Stable Rust, sandboxing, platform support, query              | Not Started     |
 
@@ -168,6 +169,15 @@ Quick reference to all phases and their locations:
 | 6b.2  | Migrate Bazel Shims from Native Rust to Starlark | [ ] Not Started |
 | 6b.3  | Remove Unused Buck2 Prelude Code               | [ ] Not Started |
 | 6b.4  | Simplify Native Module Registration            | [ ] Not Started |
+
+### Aspects (Phases 8a-8d) - [Sub-plan](./kuro-bazel-subplans/08-aspects.md)
+
+| Phase | Title                              | Status          |
+| ----- | ---------------------------------- | --------------- |
+| 8a    | Stub aspect() Function             | [x] Complete    |
+| 8b    | Aspect Context and Basic Execution | [ ] Not Started |
+| 8c    | Shadow Graph Propagation           | [ ] Not Started |
+| 8d    | Advanced Features                  | [ ] Not Started |
 
 ### Rules Integration (Phases 7-10) - [Sub-plan](./kuro-bazel-subplans/04-rules-integration.md)
 
