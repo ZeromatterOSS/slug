@@ -83,13 +83,26 @@ The following have been fixed:
 3. ~~**ProtoInfo should be None**~~ ✅ **RESOLVED**
     - Changed to `const ProtoInfo: NoneType = NoneType` in `proto_common.rs`
 
-**Architecture Note:**
+**Architecture Note - Native vs Starlark:**
 
-The None placeholders **must remain in native Rust code** rather than being moved to Starlark prelude because:
+The following **must remain in native Rust code**:
 
-- Code checks `if CcInfo == None` during early loading, before any Starlark is evaluated
-- Prelude injection happens after base globals are established
-- See [06-prelude-architecture.md](./06-prelude-architecture.md) for detailed architecture explanation
+1. **None placeholders** (`CcInfo`, `DebugPackageInfo`, `ProtoInfo` as `NoneType`)
+   - Code checks `if CcInfo == None` during early loading
+   - Prelude injection happens after base globals are established
+
+2. **Action primitives** (functions that create build actions)
+   - `cc_common.internal_DO_NOT_USE().create_cc_compile_action`
+   - `proto_common.compile()`
+   - These require integration with Kuro's action execution system
+
+3. **Artifact handling** (functions that create/manipulate artifacts)
+   - Artifact declaration
+   - Output file handling
+
+Everything else should preferably be implemented in Starlark in `prelude/bazel_compat/`.
+
+See [06-prelude-architecture.md](./06-prelude-architecture.md) for detailed architecture explanation
 
 **Verified in manual_test:**
 
@@ -126,6 +139,69 @@ Test 9 - ProtoInfo is None: True
 - Use `rules_cc` version **0.2.16** for testing (Bazel 9.0 compatible)
 - `native.bazel_version` must return "9.0.0" (no suffix) for version comparison
 - Version checks like `_bazel_version_ge("9.0.0-pre.20250911")` must return True
+
+---
+
+## Implementation Philosophy: Starlark-First
+
+Following Buck2's core philosophy, Bazel compatibility modules should be implemented in Starlark wherever possible, with only the minimum necessary primitives in native Rust.
+
+### Decision Framework
+
+When implementing a Bazel module, ask:
+
+1. **Does it require build system internals?** (action creation, artifact handling, DICE integration)
+   - YES → Native Rust required
+   - NO → Prefer Starlark
+
+2. **Is it checked before prelude loads?** (e.g., `if CcInfo == None`)
+   - YES → Native placeholder required
+   - NO → Can be Starlark
+
+3. **Is it language/platform specific?**
+   - YES → Strong preference for Starlark
+   - NO → Evaluate case-by-case
+
+### Native vs Starlark Mapping
+
+| Requirement | Implementation |
+|-------------|---------------|
+| Action primitives (compile, link) | Native |
+| Provider placeholders checked early | Native `NoneType` |
+| Type constants (platform names) | Starlark |
+| Simple provider wrappers | Starlark |
+| Configuration structs | Starlark |
+| Language-specific utilities | Starlark (in prelude) |
+
+### Location for Starlark Modules
+
+Starlark-based Bazel compatibility modules should go in:
+
+```
+prelude/
+├── bazel_compat/           # Bazel compatibility modules
+│   ├── apple_common.bzl    # apple_common module
+│   ├── config_common.bzl   # config_common module
+│   ├── coverage_common.bzl # coverage_common module
+│   ├── platform_common.bzl # platform_common module
+│   └── proto_common.bzl    # proto_common stub methods
+└── ...
+```
+
+These would be injected into globals via prelude loading, similar to how `native` symbols are exposed.
+
+### Current Native Stubs Analysis
+
+The following modules are currently implemented in native Rust:
+
+| Module | File | Lines | Native Necessity |
+|--------|------|-------|-----------------|
+| `cc_common` | `cc_common.rs` | 693 | Mixed - internal APIs need native, most stubs don't |
+| `apple_common` | `apple_common.rs` | 259 | Low - simple types and constants |
+| `proto_common` | `proto_common.rs` | 289 | Low - code notes "STUB: Can be Starlark" |
+| `config_common` | `config_common.rs` | 169 | Low - simple toolchain_type() struct |
+| `coverage_common` | `coverage_common.rs` | 113 | Low - simple provider stub |
+| `platform_common` | `platform_common.rs` | 230 | Low - provider types |
 
 ---
 
@@ -1446,6 +1522,229 @@ The current `visibility()` implementation is a no-op stub - it accepts all value
 - [ ] Test that `visibility("private")` blocks loads from other packages
 - [ ] Test that `visibility(["//foo:__subpackages__"])` allows only foo and subpackages
 - [ ] Test error messages when visibility is violated
+
+---
+
+## Phase 6: Migrate Stubs to Starlark
+
+### Overview
+
+Migrate language/platform-specific compatibility modules from native Rust to Starlark, following Buck2's philosophy of minimal native code.
+
+### Priority Order
+
+1. **Low-risk, high-value**: `config_common`, `platform_common`
+2. **Medium complexity**: `apple_common`, `coverage_common`
+3. **Partial migration**: `proto_common` stub methods (keep `compile()` native)
+4. **Complex, defer**: `cc_common` internals (many action integrations)
+
+### Phase 6a: config_common to Starlark
+
+**Current native implementation**: `rule_defs/config_common.rs` (169 lines)
+
+**Starlark replacement** (`prelude/bazel_compat/config_common.bzl`):
+
+```starlark
+# Toolchain type requirement struct
+ToolchainTypeRequirement = provider(
+    fields = {
+        "toolchain_type": "The toolchain type label",
+        "mandatory": "Whether this toolchain is required",
+    }
+)
+
+def _toolchain_type(toolchain_type, *, mandatory = True):
+    """Creates a toolchain type requirement."""
+    return ToolchainTypeRequirement(
+        toolchain_type = toolchain_type,
+        mandatory = mandatory,
+    )
+
+config_common = struct(
+    toolchain_type = _toolchain_type,
+)
+```
+
+**Native changes**:
+
+- Remove `config_common.rs`
+- Keep minimal registration that loads from prelude
+
+### Phase 6b: platform_common to Starlark
+
+**Current native implementation**: `rule_defs/platform_common.rs` (230 lines)
+
+**Starlark replacement**:
+
+```starlark
+TemplateVariableInfo = provider(
+    fields = {"variables": "Dict of template variables"}
+)
+
+ToolchainInfo = provider(
+    fields = {}  # Generic toolchain provider
+)
+
+platform_common = struct(
+    TemplateVariableInfo = TemplateVariableInfo,
+    ToolchainInfo = ToolchainInfo,
+)
+```
+
+### Phase 6c: apple_common to Starlark
+
+**Current native implementation**: `rule_defs/apple_common.rs` (259 lines)
+
+**Starlark replacement**:
+
+```starlark
+# Platform type constants
+platform_type = struct(
+    ios = "ios",
+    macos = "macos",
+    tvos = "tvos",
+    watchos = "watchos",
+    catalyst = "catalyst",
+    visionos = "visionos",
+)
+
+XcodeVersionConfig = provider(fields = {})
+AppleDynamicFramework = provider(fields = {})
+Objc = provider(fields = {})
+
+def _apple_toolchain():
+    return struct()
+
+apple_common = struct(
+    platform_type = platform_type,
+    XcodeVersionConfig = XcodeVersionConfig,
+    AppleDynamicFramework = AppleDynamicFramework,
+    Objc = Objc,
+    apple_toolchain = _apple_toolchain,
+)
+```
+
+### Phase 6d: coverage_common to Starlark
+
+**Current native implementation**: `rule_defs/coverage_common.rs` (113 lines)
+
+**Starlark replacement**:
+
+```starlark
+InstrumentedFilesInfo = provider(
+    fields = {
+        "source_attributes": "Source file attributes",
+        "dependency_attributes": "Dependency attributes",
+    }
+)
+
+def _instrumented_files_info(ctx, **kwargs):
+    return InstrumentedFilesInfo(**kwargs)
+
+coverage_common = struct(
+    instrumented_files_info = _instrumented_files_info,
+)
+```
+
+### Phase 6e: proto_common Partial Migration
+
+**Current native implementation**: `rule_defs/proto_common.rs` (289 lines)
+
+**Keep native**: `compile()` - requires action creation
+
+**Move to Starlark**: Stub methods (lines 182-240 are marked "STUB: Can be Starlark")
+
+```starlark
+def _proto_path_flag(proto_lang_toolchain_info):
+    return "--proto_path="
+
+def _descriptor_set_flag(proto_lang_toolchain_info):
+    return "--descriptor_set_out="
+
+# Partial module - native compile() injected separately
+proto_common_starlark = struct(
+    proto_path_flag = _proto_path_flag,
+    descriptor_set_flag = _descriptor_set_flag,
+    experimental_use_proto_source_order = lambda: False,
+    get_tool_path = lambda toolchain: "/usr/bin/protoc",
+    has_plugin = lambda toolchain: False,
+)
+```
+
+### Success Criteria
+
+- [ ] `config_common.toolchain_type()` works from Starlark
+- [ ] `platform_common.TemplateVariableInfo` works from Starlark
+- [ ] `apple_common.platform_type.ios` returns "ios" from Starlark
+- [ ] Native code reduced by ~1000 lines
+- [ ] All existing tests pass
+- [ ] No regression in rules_cc loading
+
+### cc_common: Deferred
+
+`cc_common` has deep integration with action creation and toolchain resolution. Migration would require:
+
+1. Implementing action creation in Starlark (complex)
+2. Exposing artifact APIs to Starlark (already exists in prelude)
+3. Significant refactoring
+
+Defer until rules_cc is fully working with native stubs.
+
+### Implementation Approach
+
+Replace native stubs directly with Starlark implementations, fixing issues as they arise.
+
+**Implementation Steps:**
+
+1. **Create prelude/bazel_compat/ directory** structure:
+
+   ```
+   prelude/bazel_compat/
+   ├── BUCK
+   ├── apple_common.bzl
+   ├── config_common.bzl
+   ├── coverage_common.bzl
+   ├── platform_common.bzl
+   └── proto_common.bzl
+   ```
+
+2. **Implement Starlark modules** in priority order:
+   - Phase 6a: `config_common` (simplest)
+   - Phase 6b: `platform_common`
+   - Phase 6c: `apple_common`
+   - Phase 6d: `coverage_common`
+   - Phase 6e: `proto_common` (partial - keep compile() native)
+
+3. **For each module**:
+   - Create the Starlark `.bzl` file in `prelude/bazel_compat/`
+   - Update `more.rs` to NOT register the native version
+   - Update prelude loading to inject the Starlark version into globals
+   - Delete the native `.rs` file once verified working
+   - Run tests to catch any issues immediately
+
+4. **Verification**: After each module migration:
+   - Run `cargo test` for Rust unit tests
+   - Run manual test project (`tests/manual_test/`)
+   - Verify rules_cc loading still works
+
+### Files to Modify
+
+**New Starlark Files:**
+
+- `prelude/bazel_compat/config_common.bzl`
+- `prelude/bazel_compat/platform_common.bzl`
+- `prelude/bazel_compat/apple_common.bzl`
+- `prelude/bazel_compat/coverage_common.bzl`
+- `prelude/bazel_compat/proto_common.bzl`
+
+**Native Files to Slim Down:**
+
+- `app/kuro_build_api/src/interpreter/rule_defs/config_common.rs` - Remove
+- `app/kuro_build_api/src/interpreter/rule_defs/platform_common.rs` - Remove
+- `app/kuro_build_api/src/interpreter/rule_defs/apple_common.rs` - Remove
+- `app/kuro_build_api/src/interpreter/rule_defs/coverage_common.rs` - Remove
+- `app/kuro_build_api/src/interpreter/rule_defs/proto_common.rs` - Keep compile(), remove stubs
+- `app/kuro_build_api/src/interpreter/more.rs` - Update registrations
 
 ---
 
