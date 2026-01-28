@@ -22,6 +22,7 @@ pub mod label;
 pub mod nodes;
 pub(crate) mod plugins;
 pub mod rule;
+pub mod subrule;
 pub mod super_package;
 
 pub fn init_late_bindings() {

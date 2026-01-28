@@ -99,11 +99,15 @@ load("@bazel_tools//tools/build_defs/proto:proto_common.bzl", "proto_common_help
 _proto_flag = proto_common_helpers.proto_path_flag(None)
 print("Test 12 - Starlark proto_common_helpers.proto_path_flag:", _proto_flag)
 
-# Test 13: rules_cc loading (now with transitive deps resolved)
+# Test 13: subrule() built-in exists
+_has_subrule = hasattr(native, "subrule") or "subrule" in dir()
+print("Test 13 - subrule built-in exists:", _has_subrule)
+
+# Test 14: rules_cc loading (now with subrule() implemented)
 # PROGRESS: Provider registrations fixed (CcInfo, DebugPackageInfo, etc. are now None)
 # PROGRESS: Starlark cc_common/proto_common helpers now available
-# Next blocker: subrule() built-in needed by fdo_context.bzl
-# load("@rules_cc//cc:defs.bzl", "cc_library")
-# print("Test 13 - rules_cc loaded successfully!")
+# PROGRESS: subrule() built-in implemented
+load("@rules_cc//cc:defs.bzl", "cc_library")
+print("Test 14 - rules_cc loaded successfully!")
 
 print("All manual tests passed!")

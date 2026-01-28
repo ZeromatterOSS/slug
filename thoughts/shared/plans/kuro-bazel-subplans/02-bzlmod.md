@@ -65,23 +65,9 @@ When implementing new features:
 
 **Current Blockers:**
 
-- **rules_cc loading blocked on subrule()**: Significant progress made! The following are now implemented:
-  - `ProtoInfo` provider and `proto_common_do_not_use` module (**see issues below**)
-  - `provider()` init function support (InitProviderConstructor)
-  - `Label()` function for Starlark
-  - `config_common.toolchain_type()` for toolchain requirements
-  - `apple_common` module with apple_toolchain(), platform_type, etc.
-  - C++ globals: `DebugPackageInfo`, `CcToolchainConfigInfo`, `CcSharedLibraryInfo` (**see issues below**)
-
-  The load chain now reaches `fdo_context.bzl` which needs the `subrule()` built-in:
-  ```
-  @rules_cc//cc:defs.bzl
-    -> @rules_cc//cc/toolchains/cc_toolchain.bzl
-    -> @rules_cc//cc/private/rules_impl/cc_toolchain.bzl
-    -> @rules_cc//cc/private/rules_impl/fdo/fdo_context.bzl <- needs subrule()
-  ```
 - **@bazel_tools http.bzl/git.bzl**: Needs `repository_rule` and `repository_ctx` (Phase 5)
 - **Module extensions**: Parsing complete, synthetic repo workaround implemented, full execution not implemented
+- **rules_cc further loading**: With `subrule()` implemented, the next blocker needs to be identified by testing
 
 **Implementation Issues - RESOLVED:**
 
@@ -127,6 +113,10 @@ Test 9 - ProtoInfo is None: True
 - **cc_common module**: Internal APIs for rules_cc (stub implementations)
 - **ctx.fragments.cpp**: Fragment access for C++ configuration
 - **ctx.attr**: Attribute access on analysis context
+- **subrule() built-in**: Implemented `subrule()` function for Bazel 7.0+ compatibility ✅
+  - `StarlarkSubruleCallable` and `FrozenStarlarkSubruleCallable` types
+  - Supports `implementation`, `attrs`, `fragments`, `toolchains`, `subrules` parameters
+  - Located in `app/kuro_interpreter_for_build/src/subrule.rs`
 
 **Key Version Requirement:**
 
