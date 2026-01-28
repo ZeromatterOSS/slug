@@ -18,6 +18,8 @@ pub mod artifact_tagging;
 pub mod cc_common;
 pub mod cmd_args;
 pub mod config_common;
+pub mod coverage_common;
+pub mod platform_common;
 pub mod proto_common;
 pub mod config;
 pub mod configuration_field;

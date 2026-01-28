@@ -83,15 +83,24 @@ impl AttributeExt for Attribute {
     ) -> kuro_error::Result<StarlarkAttribute> {
         let default = match default {
             None => None,
-            Some(x) => Some(Arc::new(
-                coercer
-                    .coerce(
-                        AttrIsConfigurable::Yes,
-                        &attr_coercion_context_for_bzl(eval)?,
-                        x,
-                    )
-                    .buck_error_context("Error coercing attribute default")?,
-            )),
+            Some(x) => {
+                // Skip coercion for configuration_field() values - these are placeholders
+                // indicating the value comes from configuration, not a static default.
+                // The actual value will be resolved at analysis time from the configuration.
+                if x.get_type() == "configuration_field" {
+                    None
+                } else {
+                    Some(Arc::new(
+                        coercer
+                            .coerce(
+                                AttrIsConfigurable::Yes,
+                                &attr_coercion_context_for_bzl(eval)?,
+                                x,
+                            )
+                            .buck_error_context("Error coercing attribute default")?,
+                    ))
+                }
+            }
         };
         Ok(StarlarkAttribute::new(Attribute::new(
             default, doc, coercer,
@@ -119,18 +128,75 @@ pub(crate) fn init_coerce_providers_label_for_bzl() {
 }
 
 /// Common code to handle `providers` argument of dep-like attrs.
+/// Handles the case where some providers are `None` (e.g., `CcInfo = None` for Bazel compat)
+/// by skipping them rather than failing.
+///
+/// Also handles Bazel's nested list syntax for "any-of" provider constraints:
+/// - `[ProviderA, ProviderB]` - flat list, all required
+/// - `[[ProviderA], [ProviderB]]` - nested list, any-of (currently flattened)
 fn dep_like_attr_handle_providers_arg(providers: Vec<Value>) -> kuro_error::Result<ProviderIdSet> {
-    Ok(ProviderIdSet::from(providers.try_map(|v| {
-        match v.as_provider_callable() {
-            Some(callable) => kuro_error::Ok(callable.id()?.dupe()),
-            None => Err(
-                starlark::Error::from(ValueError::IncorrectParameterTypeNamed(
-                    "providers".to_owned(),
-                ))
-                .into(),
-            ),
+    let mut result = Vec::new();
+    for v in providers {
+        // Skip None/NoneType values - this handles Bazel-compat providers like CcInfo that are
+        // set to None because they're defined in Starlark (rules_cc) rather than native.
+        // We check both is_none() (for the canonical None) and type name (for NoneType constants).
+        if v.is_none() || v.get_type() == "NoneType" {
+            continue;
         }
-    })?))
+
+        // Check if this element is a nested list (for any-of provider constraints)
+        // Bazel syntax: providers = [[ProviderA], [ProviderB]] means any-of
+        if let Some(list_ref) = starlark::values::list::ListRef::from_value(v) {
+            // This is a nested list - recursively process its contents
+            // For now, we flatten nested lists (treating any-of as collecting all providers)
+            // TODO(bazel): Properly implement any-of provider constraint semantics
+            let inner_providers: Vec<Value> = list_ref.iter().collect();
+            let inner_result = dep_like_attr_handle_providers_arg(inner_providers)?;
+            for id in &inner_result {
+                result.push(id.dupe());
+            }
+            continue;
+        }
+
+        match v.as_provider_callable() {
+            Some(callable) => result.push(callable.id()?.dupe()),
+            None => {
+                return Err(
+                    starlark::Error::from(ValueError::IncorrectParameterTypeNamed(
+                        "providers".to_owned(),
+                    ))
+                    .into(),
+                );
+            }
+        }
+    }
+    Ok(ProviderIdSet::from(result))
+}
+
+/// Helper to parse allow_files/allow_single_file parameters.
+/// These can be:
+/// - None/unset -> false
+/// - bool -> the bool value
+/// - list of strings -> true (with extensions, not yet filtered)
+fn parse_allow_files_param<'v>(
+    value: Option<Value<'v>>,
+    param_name: &str,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> starlark::Result<bool> {
+    match value {
+        None => Ok(false),
+        Some(v) => {
+            if let Some(b) = v.unpack_bool() {
+                Ok(b)
+            } else if v.iterate(eval.heap()).is_ok() {
+                // It's a list/tuple of extensions - treat as allow_files=true
+                // The extension filtering is not implemented yet, but we accept the param
+                Ok(true)
+            } else {
+                Err(ValueError::IncorrectParameterTypeNamed(param_name.to_owned()).into())
+            }
+        }
+    }
 }
 
 /// This type is available as a global `attrs` symbol, to allow the definition of attributes to the `rule` function.
@@ -683,29 +749,21 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
         #[starlark(require = named, default = false)] executable: bool,
-        #[starlark(require = named, default = false)] allow_files: bool,
+        // Bazel-compatible: allow_files can be bool or list of extension strings
+        // True = allow any file, False = don't allow, ["ext"] = allow files with extension
+        #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] allow_single_file: Option<Value<'v>>,
+        // Bazel's `flags` parameter for internal attribute metadata (e.g., DIRECT_COMPILE_TIME_INPUT).
+        // Currently accepted but ignored.
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        flags: UnpackListOrTuple<&str>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
+        // Parse allow_files: can be bool or list of extension strings
+        let allow_files_bool = parse_allow_files_param(allow_files, "allow_files", eval)?;
         // Parse allow_single_file: can be bool or list of extension strings
-        let allow_single_file_bool = match allow_single_file {
-            None => false,
-            Some(v) => {
-                if let Some(b) = v.unpack_bool() {
-                    b
-                } else if v.iterate(eval.heap()).is_ok() {
-                    // It's a list/tuple of extensions - treat as allow_single_file=true
-                    // The extension filtering is not implemented yet, but we accept the param
-                    true
-                } else {
-                    return Err(ValueError::IncorrectParameterTypeNamed(
-                        "allow_single_file".to_owned(),
-                    )
-                    .into());
-                }
-            }
-        };
-        let _unused = (mandatory, executable, allow_files, allow_single_file_bool);
+        let allow_single_file_bool = parse_allow_files_param(allow_single_file, "allow_single_file", eval)?;
+        let _unused = (mandatory, executable, allow_files_bool, allow_single_file_bool, flags);
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         let coercer = AttrType::dep(required_providers, PluginKindSet::EMPTY);
         Ok(Attribute::attr(eval, default, doc, coercer)?)
@@ -720,10 +778,16 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
-        #[starlark(require = named, default = false)] allow_files: bool,
+        // Bazel-compatible: allow_files can be bool or list of extension strings
+        #[starlark(require = named)] allow_files: Option<Value<'v>>,
+        // Bazel's `flags` parameter for internal attribute metadata (e.g., DIRECT_COMPILE_TIME_INPUT).
+        // Currently accepted but ignored.
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        flags: UnpackListOrTuple<&str>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = (mandatory, allow_files);
+        let allow_files_bool = parse_allow_files_param(allow_files, "allow_files", eval)?;
+        let _unused = (mandatory, allow_files_bool, flags);
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         let inner = AttrType::dep(required_providers, PluginKindSet::EMPTY);
         let coercer = AttrType::list(inner);

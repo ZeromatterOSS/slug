@@ -21,10 +21,34 @@ use crate::interpreter::rule_defs::artifact::starlark_promise_artifact::register
 use crate::interpreter::rule_defs::artifact_tagging::artifact_tag::register_artifact_tag;
 use crate::interpreter::rule_defs::artifact_tagging::register_tagged_command_line;
 use crate::interpreter::rule_defs::artifact_tagging::register_tagged_value;
+// NOTE: Bazel compatibility modules (apple_common, config_common, etc.) MUST be
+// registered here via REGISTER_BUCK2_BUILD_API_GLOBALS for architectural reasons:
+//
+// Symbol availability by context:
+// ┌─────────────────────────────┬──────────────┬─────────────┬──────────────┐
+// │ Context                     │ Base Globals │ Prelude     │ native.*     │
+// │                             │ (this file)  │ Symbols     │ Extraction   │
+// ├─────────────────────────────┼──────────────┼─────────────┼──────────────┤
+// │ Root cell BUILD file        │      ✓       │      ✓      │      ✓       │
+// │ Root cell .bzl file         │      ✓       │      ✓      │      ✗       │
+// │ External cell .bzl file     │      ✓       │      ✗      │      ✗       │
+// │ (e.g., rules_cc, bazel_*)   │              │             │              │
+// └─────────────────────────────┴──────────────┴─────────────┴──────────────┘
+//
+// External cells (rules_cc, bazel_skylib, etc.) access these at module level:
+//   _apple_toolchain = apple_common.apple_toolchain()  # in objc_common.bzl
+//   config_common.toolchain_type(...)                  # in find_cc_toolchain.bzl
+//
+// These external .bzl files don't have prelude injection - they only see base globals.
+// Therefore, these modules MUST be registered here to be available everywhere.
+//
+// See: thoughts/shared/plans/kuro-bazel-subplans/06-prelude-architecture.md
 use crate::interpreter::rule_defs::apple_common::register_apple_common;
 use crate::interpreter::rule_defs::cc_common::register_cc_common;
 use crate::interpreter::rule_defs::cmd_args::register_cmd_args;
 use crate::interpreter::rule_defs::config_common::register_config_common;
+use crate::interpreter::rule_defs::coverage_common::register_coverage_common;
+use crate::interpreter::rule_defs::platform_common::register_platform_common;
 use crate::interpreter::rule_defs::proto_common::register_proto_common;
 use crate::interpreter::rule_defs::config::register_config;
 use crate::interpreter::rule_defs::configuration_field::register_configuration_field;
@@ -49,6 +73,8 @@ fn register_build_api_globals(globals: &mut GlobalsBuilder) {
     register_apple_common(globals);
     register_cc_common(globals);
     register_config_common(globals);
+    register_coverage_common(globals);
+    register_platform_common(globals);
     register_proto_common(globals);
     register_cmd_args(globals);
     register_config(globals);

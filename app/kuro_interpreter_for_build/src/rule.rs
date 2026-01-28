@@ -640,10 +640,18 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         // Bazel-compatible: providers that this rule outputs (not yet implemented, just accepted)
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         provides: UnpackListOrTuple<Value<'v>>,
+        // Bazel-compatible: toolchains required by this rule (not yet implemented, just accepted)
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        toolchains: UnpackListOrTuple<Value<'v>>,
+        // Bazel-compatible: configuration fragments required by this rule (e.g., ["cpp", "java"])
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        fragments: UnpackListOrTuple<&str>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkRuleCallable<'v>> {
         // TODO(bazel): Use the provides parameter to validate rule outputs
-        let _unused_provides = provides;
+        // TODO(bazel): Use the toolchains parameter for toolchain resolution
+        // TODO(bazel): Use the fragments parameter for configuration fragment access
+        let _unused = (provides, toolchains, fragments);
         // Support both `implementation` (Bazel) and `impl` (Kuro) parameter names
         let impl_fn = match (implementation, r#impl) {
             (Some(implementation), None) => implementation,

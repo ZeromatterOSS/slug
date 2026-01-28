@@ -1673,12 +1673,66 @@ proto_common_starlark = struct(
 
 ### Success Criteria
 
-- [ ] `config_common.toolchain_type()` works from Starlark
-- [ ] `platform_common.TemplateVariableInfo` works from Starlark
-- [ ] `apple_common.platform_type.ios` returns "ios" from Starlark
-- [ ] Native code reduced by ~1000 lines
-- [ ] All existing tests pass
-- [ ] No regression in rules_cc loading
+- [x] `config_common.toolchain_type()` works (Test 15 verified)
+- [x] `platform_common.TemplateVariableInfo` works (Test 16 verified)
+- [x] `apple_common.platform_type.ios` returns "ios" (Test 17 verified)
+- [x] `coverage_common.instrumented_files_info` exists (Test 18 verified)
+- [N/A] Native code reduced - See architectural note below
+- [x] All existing tests pass
+- [x] No regression in rules_cc loading (blocked on aspect(), not these modules)
+
+### ARCHITECTURAL CONSTRAINT DISCOVERED
+
+**Date**: 2026-01-28
+
+**Finding**: The Bazel compatibility modules **cannot be migrated to pure Starlark** due to Kuro/Buck2's global injection architecture.
+
+#### Symbol Availability by Context
+
+| Context                     | Base Globals | Prelude Symbols | native.* Extraction |
+|-----------------------------|--------------|-----------------|---------------------|
+| Root cell BUILD file        | ✓            | ✓               | ✓                   |
+| Root cell .bzl file         | ✓            | ✓               | ✗                   |
+| External cell .bzl file     | ✓            | ✗               | ✗                   |
+
+#### Two Injection Mechanisms
+
+1. **`REGISTER_BUCK2_BUILD_API_GLOBALS` (Native Registration)**
+   - **When**: During interpreter initialization (before any Starlark evaluation)
+   - **Where**: Available in ALL Starlark contexts
+   - **How**: `GlobalsBuilder` adds symbols to `base_globals()`
+   - **Code**: `app/kuro_build_api/src/interpreter/more.rs`
+
+2. **Prelude Injection**
+   - **When**: During file evaluation (after base globals exist)
+   - **Where**: Only BUILD files and .bzl files within the prelude cell
+   - **How**: `import_public_symbols()` + `native` struct extraction
+   - **Code**: `interpreter_for_dir.rs:create_env()` lines 323-335
+
+#### Why External Cells Need Native Registration
+
+External cells (rules_cc, bazel_skylib, protobuf, etc.) access these modules at **module level** in their .bzl files:
+
+```python
+# rules_cc//cc/private/rules_impl/objc_common.bzl:22
+_apple_toolchain = apple_common.apple_toolchain()
+
+# rules_cc//cc/find_cc_toolchain.bzl:131
+return [config_common.toolchain_type(CC_TOOLCHAIN_TYPE, mandatory = mandatory)]
+```
+
+These external .bzl files:
+- Don't have the root cell's prelude configured
+- Don't receive prelude injection
+- Only see **base globals** from `REGISTER_BUCK2_BUILD_API_GLOBALS`
+
+**Implication**: These modules MUST remain as native Rust registrations to be available in external cells.
+
+The native implementations are in `app/kuro_build_api/src/interpreter/rule_defs/`:
+- `apple_common.rs`
+- `config_common.rs`
+- `coverage_common.rs`
+- `platform_common.rs`
 
 ### cc_common: Deferred
 
@@ -1690,9 +1744,10 @@ proto_common_starlark = struct(
 
 Defer until rules_cc is fully working with native stubs.
 
-### Implementation Approach
+### Implementation Approach (Revised)
 
-Replace native stubs directly with Starlark implementations, fixing issues as they arise.
+The original plan to replace native stubs with Starlark was blocked by architectural constraints.
+The native implementations remain, with Starlark reference implementations created for documentation.
 
 **Implementation Steps:**
 

@@ -45,6 +45,28 @@ Kuro inherits Buck2's prelude architecture which provides a powerful mechanism f
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### CRITICAL: Symbol Availability by Context (2026-01-28 Discovery)
+
+| Context                     | Base Globals | Prelude Symbols | native.* Extraction |
+|-----------------------------|--------------|-----------------|---------------------|
+| Root cell BUILD file        | ✓            | ✓               | ✓                   |
+| Root cell .bzl file         | ✓            | ✓               | ✗                   |
+| **External cell .bzl file** | **✓**        | **✗**           | **✗**               |
+
+**This is why Bazel modules (apple_common, config_common, etc.) MUST remain native:**
+
+External cells (rules_cc, bazel_skylib, protobuf, etc.) access these at module level:
+```python
+# rules_cc//cc/private/rules_impl/objc_common.bzl:22
+_apple_toolchain = apple_common.apple_toolchain()
+
+# rules_cc//cc/find_cc_toolchain.bzl:131
+return [config_common.toolchain_type(CC_TOOLCHAIN_TYPE, mandatory = mandatory)]
+```
+
+External .bzl files **do not receive prelude injection** - they only see base globals
+from `REGISTER_BUCK2_BUILD_API_GLOBALS`. See `interpreter_for_dir.rs:create_env()`.
+
 ### Key Files
 
 | File | Purpose |
@@ -118,7 +140,7 @@ pub fn base_globals() -> GlobalsBuilder {
 
 ---
 
-## Phase 6b.2: Migrate Bazel Shims to Starlark
+## Phase 6b.2: Bazel Shim Architecture (REVISED 2026-01-28)
 
 ### Current State
 
@@ -126,10 +148,24 @@ Native Rust modules in `app/kuro_build_api/src/interpreter/rule_defs/`:
 
 | Module | Status | Can Move to Starlark? |
 |--------|--------|----------------------|
-| `cc_common.rs` | Stub methods + action primitives | **Partially** - Stubs yes, action primitives no |
-| `proto_common.rs` | Stub methods + compile() | **Partially** - Stubs yes, compile() no |
-| `apple_common.rs` | Simple stubs | **Yes** - All stubs |
-| `config_common.rs` | Simple stubs | **Yes** - All stubs |
+| `cc_common.rs` | Stub methods + action primitives | **No** - External cells need native |
+| `proto_common.rs` | Stub methods + compile() | **No** - External cells need native |
+| `apple_common.rs` | Simple stubs | **No** - External cells need native |
+| `config_common.rs` | Simple stubs | **No** - External cells need native |
+| `coverage_common.rs` | Simple stubs | **No** - External cells need native |
+| `platform_common.rs` | Provider stubs | **No** - External cells need native |
+
+### Why Starlark Migration is Not Possible
+
+Per the architectural constraint discovered on 2026-01-28:
+
+1. External cell .bzl files only see **base globals** (from `REGISTER_BUCK2_BUILD_API_GLOBALS`)
+2. Prelude injection only affects BUILD files and root cell .bzl files
+3. rules_cc, bazel_skylib, protobuf, etc. access these modules at **module level** in their .bzl files
+4. There is no mechanism to inject Starlark-defined values into external cell .bzl file globals
+
+**Conclusion**: These modules must remain as native Rust registrations in
+`app/kuro_build_api/src/interpreter/rule_defs/`.
 
 ### Migration Strategy
 

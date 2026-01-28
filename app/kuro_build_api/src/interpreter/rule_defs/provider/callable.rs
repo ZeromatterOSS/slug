@@ -208,6 +208,25 @@ impl<'v> StarlarkValue<'v> for InitProviderConstructor<'v> {
     ) -> starlark::Result<Value<'v>> {
         invoke_init_provider_constructor(self.init_fn, self.provider, args, eval)
     }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+// InitProviderConstructor implements ProviderCallableLike by delegating to underlying provider
+impl<'v> ProviderCallableLike for InitProviderConstructor<'v> {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        self.provider
+            .request_value::<&dyn ProviderCallableLike>()
+            .ok_or_else(|| {
+                kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "InitProviderConstructor contains invalid provider"
+                )
+            })?
+            .id()
+    }
 }
 
 /// Frozen version of InitProviderConstructor
@@ -243,6 +262,26 @@ impl<'v> StarlarkValue<'v> for FrozenInitProviderConstructor {
             args,
             eval,
         )
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+// InitProviderConstructor implements ProviderCallableLike by delegating to underlying provider
+impl ProviderCallableLike for FrozenInitProviderConstructor {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        self.provider
+            .to_value()
+            .request_value::<&dyn ProviderCallableLike>()
+            .ok_or_else(|| {
+                kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "InitProviderConstructor contains invalid provider"
+                )
+            })?
+            .id()
     }
 }
 

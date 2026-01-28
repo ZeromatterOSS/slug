@@ -298,7 +298,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
     /// Creates a HeaderInfo struct.
     fn create_header_info<'v>(
         #[starlark(this)] _this: &CcCommonInternal,
-        #[starlark(require = named)] _headers: Value<'v>,
+        #[starlark(require = named, default = NoneType)] _headers: Value<'v>,
         #[starlark(require = named, default = NoneType)] _modular_headers: Value<'v>,
         #[starlark(require = named, default = NoneType)] _textual_headers: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -312,7 +312,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
     /// Creates a HeaderInfo struct with dependency tracking.
     fn create_header_info_with_deps<'v>(
         #[starlark(this)] _this: &CcCommonInternal,
-        #[starlark(require = named)] _headers: Value<'v>,
+        #[starlark(require = named, default = NoneType)] _headers: Value<'v>,
         #[starlark(require = named, default = NoneType)] _modular_headers: Value<'v>,
         #[starlark(require = named, default = NoneType)] _textual_headers: Value<'v>,
         #[starlark(require = named, default = NoneType)] _deps: Value<'v>,
@@ -614,6 +614,51 @@ starlark_simple_value!(CcSharedLibraryInfoProvider);
 impl<'v> StarlarkValue<'v> for CcSharedLibraryInfoProvider {}
 
 // ============================================================================
+// CcToolchainConfigInfo - Toolchain configuration provider
+// ============================================================================
+
+/// CcToolchainConfigInfo provider for C++ toolchain configuration.
+///
+/// This provider carries the full toolchain configuration including
+/// compiler paths, feature flags, and action configs. Created by
+/// cc_common.create_cc_toolchain_config_info().
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct CcToolchainConfigInfoProvider;
+
+// ============================================================================
+// OutputGroupInfo - Bazel output groups provider
+// ============================================================================
+
+/// OutputGroupInfo provider for grouping outputs.
+///
+/// This provider is used by rules to specify different groups of outputs
+/// for different purposes (e.g., IDE support, coverage, etc.).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct OutputGroupInfoProvider;
+
+impl Display for OutputGroupInfoProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<provider OutputGroupInfo>")
+    }
+}
+
+starlark_simple_value!(OutputGroupInfoProvider);
+
+#[starlark_value(type = "OutputGroupInfo")]
+impl<'v> StarlarkValue<'v> for OutputGroupInfoProvider {}
+
+impl Display for CcToolchainConfigInfoProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<provider CcToolchainConfigInfo>")
+    }
+}
+
+starlark_simple_value!(CcToolchainConfigInfoProvider);
+
+#[starlark_value(type = "CcToolchainConfigInfo")]
+impl<'v> StarlarkValue<'v> for CcToolchainConfigInfoProvider {}
+
+// ============================================================================
 // Registration
 // ============================================================================
 
@@ -632,9 +677,16 @@ pub fn register_cc_common(globals: &mut GlobalsBuilder) {
     /// CcToolchainInfo provider for C++ toolchain information.
     const CcToolchainInfo: CcToolchainInfoProvider = CcToolchainInfoProvider;
 
+    /// CcToolchainConfigInfo provider for toolchain configuration.
+    /// Used by cc_common.create_cc_toolchain_config_info().
+    const CcToolchainConfigInfo: CcToolchainConfigInfoProvider = CcToolchainConfigInfoProvider;
+
     /// DebugPackageInfo - None placeholder. Actual provider defined in rules_cc Starlark.
     const DebugPackageInfo: NoneType = NoneType;
 
     /// CcSharedLibraryInfo - None placeholder. Actual provider defined in rules_cc Starlark.
     const CcSharedLibraryInfo: NoneType = NoneType;
+
+    /// OutputGroupInfo provider for grouping rule outputs.
+    const OutputGroupInfo: OutputGroupInfoProvider = OutputGroupInfoProvider;
 }
