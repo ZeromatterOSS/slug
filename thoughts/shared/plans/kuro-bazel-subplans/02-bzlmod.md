@@ -27,15 +27,15 @@ A manual test project is maintained at `tests/manual_test/` for validating bzlmo
 
 The manual test project validates:
 
-| Test                    | Command           | Expected Output                                          |
-| ----------------------- | ----------------- | -------------------------------------------------------- |
-| Cell resolution         | `audit cell`      | Shows root, prelude, bazel_skylib, bazel_tools (bundled) |
-| native.bazel_version    | `targets root//:` | Prints "9.0.0"                                           |
-| @bazel_skylib loading   | `targets root//:` | dicts.add returns merged dict                            |
-| Version comparison      | `targets root//:` | version >= 9.0.0-pre.20250911 is True                    |
-| @bazel_tools bundled    | `audit cell`      | bazel_tools registered without .buckconfig entry         |
-| @bazel_tools file loads | `targets root//:` | cache.bzl loaded: True (visibility() function works)     |
-| Synthetic extension repos | `targets root//:` | bazel_features_version, bazel_features_globals created |
+| Test                      | Command           | Expected Output                                          |
+| ------------------------- | ----------------- | -------------------------------------------------------- |
+| Cell resolution           | `audit cell`      | Shows root, prelude, bazel_skylib, bazel_tools (bundled) |
+| native.bazel_version      | `targets root//:` | Prints "9.0.0"                                           |
+| @bazel_skylib loading     | `targets root//:` | dicts.add returns merged dict                            |
+| Version comparison        | `targets root//:` | version >= 9.0.0-pre.20250911 is True                    |
+| @bazel_tools bundled      | `audit cell`      | bazel_tools registered without .buckconfig entry         |
+| @bazel_tools file loads   | `targets root//:` | cache.bzl loaded: True (visibility() function works)     |
+| Synthetic extension repos | `targets root//:` | bazel_features_version, bazel_features_globals created   |
 
 ### Extending Tests
 
@@ -58,8 +58,8 @@ When implementing new features:
 - `visibility()` function implemented (no-op stub for now)
 - @bazel_tools files using `visibility("public")` can now be loaded (e.g., cache.bzl)
 - **Synthetic extension repos** for `bazel_features` work:
-  - `@bazel_features_version//:version.bzl` provides version string
-  - `@bazel_features_globals//:globals.bzl` provides globals struct
+    - `@bazel_features_version//:version.bzl` provides version string
+    - `@bazel_features_globals//:globals.bzl` provides globals struct
 - **Version comparison works**: `bazel_features` version checks return True for 9.0.0
 - **Synthetic cc_compatibility_proxy repo** created for rules_cc
 
@@ -74,23 +74,25 @@ When implementing new features:
 The following have been fixed:
 
 1. ~~**CcToolchainConfigInfoProvider should not exist**~~ ✅ **RESOLVED**
-   - Removed from cc_common.rs
+    - Removed from cc_common.rs
 
 2. ~~**DebugPackageInfo, CcSharedLibraryInfo, CcInfo should be None**~~ ✅ **RESOLVED**
-   - Changed to `const CcInfo: NoneType = NoneType` etc. in `cc_common.rs`
-   - These must stay native (not in Starlark prelude) because code checks `if CcInfo == None` before prelude loads
+    - Changed to `const CcInfo: NoneType = NoneType` etc. in `cc_common.rs`
+    - These must stay native (not in Starlark prelude) because code checks `if CcInfo == None` before prelude loads
 
 3. ~~**ProtoInfo should be None**~~ ✅ **RESOLVED**
-   - Changed to `const ProtoInfo: NoneType = NoneType` in `proto_common.rs`
+    - Changed to `const ProtoInfo: NoneType = NoneType` in `proto_common.rs`
 
 **Architecture Note:**
 
 The None placeholders **must remain in native Rust code** rather than being moved to Starlark prelude because:
+
 - Code checks `if CcInfo == None` during early loading, before any Starlark is evaluated
 - Prelude injection happens after base globals are established
 - See [06-prelude-architecture.md](./06-prelude-architecture.md) for detailed architecture explanation
 
 **Verified in manual_test:**
+
 ```
 Test 9 - CcInfo is None: True
 Test 9 - DebugPackageInfo is None: True
@@ -114,10 +116,10 @@ Test 9 - ProtoInfo is None: True
 - **ctx.fragments.cpp**: Fragment access for C++ configuration
 - **ctx.attr**: Attribute access on analysis context
 - **subrule() built-in (STUB)**: Implemented stub `subrule()` function for Bazel 7.0+ compatibility ✅
-  - `StarlarkSubruleCallable` and `FrozenStarlarkSubruleCallable` types
-  - Supports `implementation`, `attrs`, `fragments`, `toolchains`, `subrules` parameters
-  - Located in `app/kuro_interpreter_for_build/src/subrule.rs`
-  - **NOTE**: This is a STUB - see Phase 8 for full implementation requirements
+    - `StarlarkSubruleCallable` and `FrozenStarlarkSubruleCallable` types
+    - Supports `implementation`, `attrs`, `fragments`, `toolchains`, `subrules` parameters
+    - Located in `app/kuro_interpreter_for_build/src/subrule.rs`
+    - **NOTE**: This is a STUB - see Phase 8 for full implementation requirements
 
 **Key Version Requirement:**
 
@@ -1456,6 +1458,7 @@ The current `visibility()` implementation is a no-op stub - it accepts all value
 ### What Bazel Actually Does (Research Complete)
 
 Per [Bazel 8.0 release notes](https://blog.bazel.build/2024/12/09/bazel-8-release.html):
+
 - Native `*_proto_library` rules have been **moved to the protobuf repository**
 - `ProtoInfo` should come from `@protobuf//bazel/common:proto_info.bzl`, not as a native builtin
 - Bazel provides `--incompatible_autoload_externally` flag to automatically load rules from their repositories
@@ -1463,6 +1466,7 @@ Per [Bazel 8.0 release notes](https://blog.bazel.build/2024/12/09/bazel-8-releas
 ### Current Implementation (Incorrect)
 
 The current implementation in `app/kuro_build_api/src/interpreter/rule_defs/proto_common.rs` creates:
+
 - `ProtoInfo` as a native builtin provider type
 - `proto_common_do_not_use` module with stub methods
 
@@ -1471,6 +1475,7 @@ This mirrors the **deprecated** Bazel 7.x behavior, not Bazel 8+/9.0.
 ### Why rules_cc Still Needs It
 
 rules_cc 0.2.16 depends on protobuf 27.0, and the load chain hits:
+
 ```
 @rules_cc//cc:defs.bzl
   -> @protobuf//bazel/private/native.bzl:3
@@ -1482,15 +1487,18 @@ rules_cc 0.2.16 depends on protobuf 27.0, and the load chain hits:
 ### Recommended Approach
 
 **Option A: Bazel-compatible stub (Recommended for now)**
+
 - Set `ProtoInfo = None` (matches how Bazel sets `CcInfo`, `DebugPackageInfo`, etc. to `Starlark.NONE`)
 - Let protobuf rules fail gracefully or provide their own implementation
 - Test if this breaks rules_cc loading
 
 **Option B: Keep transitional stub**
+
 - Keep current stub but document it as transitional
 - Plan to remove once protobuf rules fully migrate
 
 **Option C: Remove entirely**
+
 - Remove `proto_common.rs` and let errors surface
 - May break rules_cc until protobuf rules can fully load
 
@@ -1520,12 +1528,28 @@ Complete the `subrule()` implementation to match Bazel's semantics per the desig
 ### Current Status: STUB ONLY
 
 The current implementation (`app/kuro_interpreter_for_build/src/subrule.rs`) is a minimal stub that:
-- ✅ Accepts `subrule()` calls and returns a `Subrule` object
-- ✅ Stores implementation function, attrs, fragments, toolchains, subrules
-- ❌ Does NOT implement SubruleContext
-- ❌ Does NOT lift attrs to parent rules
-- ❌ Does NOT inject implicit deps as keyword args
-- ❌ Does NOT add `subrules` parameter to `rule()` and `aspect()`
+
+**What's implemented:**
+- ✅ `subrule()` Starlark global function
+- ✅ `StarlarkSubruleCallable` - unfrozen callable with RefCell for name
+- ✅ `FrozenStarlarkSubruleCallable` - frozen version
+- ✅ Accepts parameters: `implementation`, `attrs`, `fragments`, `toolchains`, `subrules`, `doc`
+- ✅ Validates called only in `.bzl` files
+- ✅ Export_as() sets name when assigned to variable
+- ✅ Basic documentation generation
+- ✅ Accessors: `name()`, `attrs()`, `fragments()`, `toolchains()`, `implementation()`
+
+**What's NOT implemented:**
+- ❌ SubruleContext - currently just passes args through to implementation
+- ❌ `subrules` parameter on `rule()` function
+- ❌ `subrules` parameter on `aspect()` function
+- ❌ Attribute lifting (subrule attrs → parent rule attrs)
+- ❌ Attribute name mangling for collision avoidance
+- ❌ Implicit dep injection as keyword arguments
+- ❌ Runtime validation that subrule is declared in parent's subrules list
+- ❌ Toolchain resolution for subrules
+- ❌ Exec group support for subrules
+- ❌ Nested subrule composition
 
 ### Phase 8a: SubruleContext Implementation
 
@@ -1533,101 +1557,326 @@ The current implementation (`app/kuro_interpreter_for_build/src/subrule.rs`) is 
 
 **SubruleContext members (per design doc):**
 
-| Member | Description |
-|--------|-------------|
-| `ctx.actions` | For creating actions (implicit toolchain/exec_group from subrule) |
-| `ctx.toolchains` | Access to declared toolchains |
-| `ctx.label` | Target label for naming artifacts |
-| `ctx.fragments` | Configuration fragments (possibly - helps encapsulation) |
+| Member           | Description                                                       |
+| ---------------- | ----------------------------------------------------------------- |
+| `ctx.actions`    | For creating actions (implicit toolchain/exec_group from subrule) |
+| `ctx.toolchains` | Access to declared toolchains                                     |
+| `ctx.label`      | Target label for naming artifacts                                 |
+| `ctx.fragments`  | Configuration fragments (possibly - helps encapsulation)          |
 
 **Members NOT provided (encapsulation):**
 
-| Member | Reason |
-|--------|--------|
-| `ctx.attr`, `ctx.file`, `ctx.files`, `ctx.executable` | Use function parameters instead |
-| `ctx.bin_dir` | Use `file.root.path` on declared artifacts |
-| `ctx.exec_groups` | Only one exec group per subrule |
-| `ctx.rule`, `ctx.aspect_ids` | Breaks encapsulation |
-| `ctx.outputs` | Outputs must be public attributes, subrules can't have public attrs |
-| `ctx.split_attr` | No split transitions on implicit deps |
+| Member                                                | Reason                                                              |
+| ----------------------------------------------------- | ------------------------------------------------------------------- |
+| `ctx.attr`, `ctx.file`, `ctx.files`, `ctx.executable` | Use function parameters instead                                     |
+| `ctx.bin_dir`                                         | Use `file.root.path` on declared artifacts                          |
+| `ctx.exec_groups`                                     | Only one exec group per subrule                                     |
+| `ctx.rule`, `ctx.aspect_ids`                          | Breaks encapsulation                                                |
+| `ctx.outputs`                                         | Outputs must be public attributes, subrules can't have public attrs |
+| `ctx.split_attr`                                      | No split transitions on implicit deps                               |
+| `ctx.features`, `ctx.disabled_features`               | Combine rule public attrs - subrule doesn't have public attrs       |
+| `ctx.expand_location`                                 | Collects labels from public attrs - subrule has no public attrs     |
+| `ctx.var`                                             | Collects from hardcoded public attrs - breaks encapsulation         |
+
+**Implementation approach:**
+
+Create a new `SubruleContext` Starlark value that wraps the parent `AnalysisContext` but only exposes allowed members. The `ctx.actions` object should automatically apply the subrule's toolchain/exec_group to created actions.
+
+```rust
+#[derive(Debug, ProvidesStaticType, Trace, NoSerialize, Allocative)]
+pub struct SubruleContext<'v> {
+    /// Reference to the parent rule's context (for actions, label)
+    parent_ctx: Value<'v>,
+    /// The subrule's declared toolchains (for ctx.toolchains access)
+    toolchains: Vec<String>,
+    /// The subrule's exec_group (if any) - applied to actions
+    exec_group: Option<String>,
+    /// Configuration fragments this subrule can access
+    fragments: Vec<String>,
+}
+```
 
 **Files to Create/Modify:**
+
 - Create `app/kuro_build_api/src/interpreter/rule_defs/subrule_ctx.rs`
 - Modify `app/kuro_build_api/src/interpreter/rule_defs/mod.rs` to register
+- May need to modify `AnalysisActions` to support implicit exec_group
 
-### Phase 8b: Attribute Lifting
+### Phase 8b: Attribute Lifting and rule() Integration
 
 **Goal**: When a rule declares `subrules=[my_subrule]`, lift subrule's implicit deps.
 
 **Requirements:**
+
 - Subrule attrs MUST start with `_` (private/implicit)
 - Subrule attrs MUST be `attr.label` or `attr.label_list` only
 - No other attr types allowed (no strings, ints, etc.)
-- Lifted attrs are namespaced to avoid collisions:
-  ```
-  # In blaze query output:
-  @rules_java//java_common/compile.bzl%compile$java_toolchain
-  ```
+- Late-bound default labels ARE allowed
+- Computed defaults are NOT allowed (can't get param values before evaluation)
+
+**Attribute Name Mangling:**
+
+Lifted attrs are namespaced to avoid collisions between subrules:
+
+```
+# In blaze query --output=xml:
+@rules_java//java_common/compile.bzl%compile$java_toolchain
+
+# Format: {bzl_path}%{subrule_name}${attr_name}
+```
+
+This format:
+- Reveals which subrule owns the implicit dep
+- Prevents collision when multiple subrules use same attr names
+- Is surfaced in `native.existing_rules()`, query output, etc.
+
+**Validation to add in subrule.rs:**
+
+```rust
+fn validate_subrule_attrs(attrs: &[(String, Attribute)]) -> Result<()> {
+    for (name, attr) in attrs {
+        // All attrs must start with underscore (private)
+        if !name.starts_with('_') {
+            return Err(SubruleError::AttrMustBePrivate(name.clone()).into());
+        }
+        // Only label or label_list allowed
+        match attr.attr_type() {
+            AttrType::Label(_) | AttrType::LabelList(_) => {}
+            other => return Err(SubruleError::InvalidAttrType(name.clone(), other).into()),
+        }
+    }
+    Ok(())
+}
+```
+
+**Add subrules parameter to rule():**
+
+In `app/kuro_interpreter_for_build/src/rule.rs`, add to `rule()` function:
+
+```rust
+fn rule<'v>(
+    // ... existing params ...
+    #[starlark(require = named, default = UnpackListOrTuple::default())]
+    subrules: UnpackListOrTuple<&'v FrozenStarlarkSubruleCallable>,
+    // ...
+) -> starlark::Result<StarlarkRuleCallable<'v>>
+```
+
+**Store subrules in Rule struct:**
+
+In `app/kuro_node/src/rule.rs`, add:
+
+```rust
+pub struct Rule {
+    // ... existing fields ...
+    /// Subrules declared by this rule (for call validation and attr lifting)
+    pub subrules: Vec<SubruleRef>,
+}
+
+pub struct SubruleRef {
+    /// Full path: @repo//pkg:file.bzl%subrule_name
+    pub id: String,
+    /// Lifted attrs with mangled names
+    pub lifted_attrs: Vec<(String, Attribute)>,
+}
+```
 
 **Files to Modify:**
+
 - `app/kuro_interpreter_for_build/src/rule.rs` - Add `subrules` parameter to `rule()`
-- `app/kuro_interpreter_for_build/src/subrule.rs` - Validate attr restrictions
+- `app/kuro_interpreter_for_build/src/subrule.rs` - Add attr validation, generate mangled names
 - `app/kuro_node/src/rule.rs` - Store subrule references and lifted attrs
+- `app/kuro_node/src/attrs/spec.rs` - Support lifted attrs in AttributeSpec
 
 ### Phase 8c: Call Semantics
 
 **Goal**: Implement proper subrule invocation from rule implementations.
 
-**When subrule is called:**
-1. Verify the subrule is declared in parent's `subrules=[]` list
-2. Create SubruleContext (NOT RuleContext) from parent context
-3. Resolve implicit deps from lifted attrs
-4. Call implementation with:
-   - First positional arg: SubruleContext
-   - Keyword args for implicit deps (e.g., `_java_toolchain=<resolved_dep>`)
-   - User-provided args passed through
-5. Return implementation's return value (arbitrary type, not limited to providers)
+**Current behavior (stub):**
+
+```rust
+// In FrozenStarlarkSubruleCallable::invoke()
+fn invoke(&self, _me: Value<'v>, args: &Arguments<'v, '_>, eval: &mut Evaluator<'v, '_, '_>) -> starlark::Result<Value<'v>> {
+    // Just passes through to implementation - WRONG!
+    self.implementation.invoke(args, eval)
+}
+```
+
+**Required behavior:**
+
+1. **Get current analysis context** from evaluator's extra data
+2. **Verify subrule is declared** in parent rule's `subrules=[]` list
+3. **Create SubruleContext** wrapping parent context
+4. **Resolve implicit deps** from lifted attrs on the target
+5. **Call implementation** with:
+    - First positional arg: SubruleContext
+    - Keyword args for implicit deps (e.g., `_java_toolchain=<resolved_dep>`)
+    - User-provided args passed through
+6. **Return implementation's return value** (arbitrary type, not limited to providers)
+
+**Implementation sketch:**
+
+```rust
+fn invoke(&self, _me: Value<'v>, args: &Arguments<'v, '_>, eval: &mut Evaluator<'v, '_, '_>) -> starlark::Result<Value<'v>> {
+    // 1. Get parent analysis context from evaluator extra
+    let parent_ctx = get_analysis_context_from_eval(eval)?;
+
+    // 2. Verify subrule is declared in parent's subrules list
+    let parent_rule = parent_ctx.rule();
+    if !parent_rule.declares_subrule(&self.name) {
+        return Err(SubruleError::NotDeclared {
+            subrule: self.name.clone(),
+            rule: parent_rule.name().to_owned(),
+        }.into());
+    }
+
+    // 3. Create SubruleContext
+    let subrule_ctx = SubruleContext::new(
+        parent_ctx,
+        &self.toolchains,
+        self.exec_group.as_deref(),
+        &self.fragments,
+    );
+
+    // 4. Resolve implicit deps from lifted attrs
+    let mut kwargs = Vec::new();
+    for (attr_name, _) in &self.attrs {
+        let mangled_name = mangle_attr_name(&self.name, attr_name);
+        let resolved = parent_ctx.get_attr(&mangled_name)?;
+        kwargs.push((attr_name.clone(), resolved));
+    }
+
+    // 5. Build arguments: (subrule_ctx, **user_args, **implicit_deps)
+    let impl_args = build_impl_args(subrule_ctx, args, kwargs)?;
+
+    // 6. Call implementation
+    self.implementation.invoke(&impl_args, eval)
+}
+```
 
 **Error cases:**
-- Subrule called but not declared → runtime error
-- Subrule called outside of rule/aspect implementation → error
+
+| Error | Message |
+|-------|---------|
+| Subrule not declared | "Subrule `{name}` was called but not declared in rule's `subrules` parameter" |
+| Called outside rule impl | "Subrule can only be called during rule or aspect analysis" |
+| Attr resolution failure | "Could not resolve implicit dependency `{attr}` for subrule `{name}`" |
 
 **Files to Modify:**
-- `app/kuro_interpreter_for_build/src/subrule.rs` - Implement `FrozenStarlarkSubruleCallable::invoke()`
-- May need access to current analysis context to resolve deps
+
+- `app/kuro_interpreter_for_build/src/subrule.rs` - Rewrite `FrozenStarlarkSubruleCallable::invoke()`
+- `app/kuro_build_api/src/interpreter/rule_defs/` - Expose analysis context to subrule
+- May need new evaluator extra data or context threading
 
 ### Phase 8d: Toolchain and Exec Group Support
 
 **Goal**: Subrules can declare their own toolchains and execution requirements.
 
 **Parameters (per design doc):**
+
 - `toolchains` - List of toolchain types this subrule requires
 - `exec_compatible_with` - Execution platform constraints (NOT in MVP)
 - `exec_group` - Named execution group (NOT in MVP)
 
 **Behavior:**
+
 - When subrule declares toolchains, they're merged with parent rule's toolchains
 - Actions created by subrule implicitly use its toolchain/exec_group
 - Toolchain type collisions are merged (may pick different exec platform)
+
+**Exec group handling (per design doc):**
+
+| Scenario | Behavior |
+|----------|----------|
+| `exec_compatible_with` set | Subrule auto-creates separate exec_group for its actions |
+| `exec_group` set | Uses globally named exec_group (e.g., "cpp_link") |
+| Neither set | Uses parent rule's default exec_group |
+
+**Only one exec_group per subrule** - no dict of exec_groups allowed. Can be achieved by further splitting subrule.
+
+**Current status:**
+
+- `toolchains` parameter is accepted and stored (as strings)
+- NOT integrated with toolchain resolution
+- Actions don't automatically use subrule's toolchain/exec_group
+
+**MVP scope:**
+
+For rules_cc compatibility, implement basic toolchain passthrough:
+1. Merge subrule toolchains into parent rule's toolchain requirements
+2. Make `ctx.toolchains` on SubruleContext return subrule's declared toolchains
+3. Defer exec_compatible_with and exec_group to later phase
 
 ### Phase 8e: Aspect Support
 
 **Goal**: Aspects can also use subrules.
 
+**Current status**: No `aspect()` function found in kuro_interpreter_for_build. Bazel compatibility likely requires implementing aspects before this phase.
+
+**When aspects are implemented:**
+
+- Add `subrules` parameter to `aspect()` function (same as rule)
+- Aspects should be able to call declared subrules during analysis
+- SubruleContext works the same in aspect context
+
 **Files to Modify:**
-- `app/kuro_interpreter_for_build/src/aspect.rs` (if exists) - Add `subrules` parameter
+
+- `app/kuro_interpreter_for_build/src/aspect.rs` (create when implementing aspects) - Add `subrules` parameter
+
+### Phase 8f: Nested Subrule Support
+
+**Goal**: Subrules can declare other subrules they depend on.
+
+**Current status**: The `subrules` parameter on `subrule()` is accepted but not processed.
+
+**Behavior per design doc:**
+
+- Subrule can have its own `subrules=[]` parameter
+- Nested subrules' attrs are transitively lifted to the top-level rule
+- Name mangling handles nested paths:
+  ```
+  @repo//pkg:file.bzl%outer_subrule%inner_subrule$_some_attr
+  ```
+
+**Implementation:**
+
+1. When rule declares subrule A, and A declares subrule B:
+   - Lift A's attrs to rule
+   - Lift B's attrs to rule (via A)
+2. When subrule A calls subrule B:
+   - Same call validation (B must be in A's subrules list)
+   - B gets SubruleContext derived from A's SubruleContext
+
+**Files to Modify:**
+
+- `app/kuro_interpreter_for_build/src/subrule.rs` - Process nested subrules during freeze
+- `app/kuro_interpreter_for_build/src/rule.rs` - Recursively lift attrs from nested subrules
 
 ### Success Criteria
 
 #### Automated Verification:
+
 ```bash
 cargo test -p kuro_interpreter_for_build
 cargo test -p kuro_build_api
 ```
 
+**Unit tests to add:**
+
+- [ ] `subrule.rs`: Validate attrs must start with `_`
+- [ ] `subrule.rs`: Validate attrs must be `label` or `label_list`
+- [ ] `subrule.rs`: Attr name mangling produces correct format
+- [ ] `rule.rs`: `subrules` parameter accepted
+- [ ] `rule.rs`: Lifted attrs added to rule's AttributeSpec
+- [ ] `subrule_ctx.rs`: Only allowed members are accessible
+- [ ] `subrule_ctx.rs`: Disallowed members raise appropriate errors
+- [ ] Integration: Subrule not declared → clear error message
+- [ ] Integration: Subrule called outside analysis → clear error message
+
 #### Manual Verification:
 
 **Test 1: Basic subrule invocation**
+
 ```python
 # test_subrule.bzl
 def _my_subrule_impl(ctx, *, _helper):
@@ -1651,6 +1900,7 @@ my_rule = rule(
 ```
 
 **Test 2: SubruleContext limitations**
+
 ```python
 def _bad_subrule_impl(ctx, **kwargs):
     # These should NOT exist on SubruleContext:
@@ -1663,6 +1913,7 @@ def _bad_subrule_impl(ctx, **kwargs):
 ```
 
 **Test 3: Undeclared subrule error**
+
 ```python
 def _rule_impl(ctx):
     other_subrule()  # Should ERROR - not in subrules list
@@ -1679,16 +1930,52 @@ my_rule = rule(
 For rules_cc compatibility, the minimum viable implementation needs:
 
 1. **Phase 8a** - Basic SubruleContext with `ctx.actions`, `ctx.label`
-2. **Phase 8b** - Attribute lifting (implicit deps)
+2. **Phase 8b** - Attribute lifting (implicit deps) + rule() subrules parameter
 3. **Phase 8c** - Basic call semantics (inject ctx + implicit deps)
 
-Phase 8d (toolchains) and 8e (aspects) can be deferred if not immediately needed.
+**Effort Estimates:**
+
+| Phase | Scope | Files | Complexity |
+|-------|-------|-------|------------|
+| 8a | SubruleContext | 2 new | Medium - wraps existing AnalysisContext |
+| 8b | rule() integration | 3-4 modify | Medium-High - attr lifting and name mangling |
+| 8c | Call semantics | 2 modify | High - context threading, dep resolution |
+| 8d | Toolchains | 2-3 modify | Medium - merge toolchain requirements |
+| 8e | Aspects | Depends on aspect impl | Low (once aspects exist) |
+| 8f | Nested subrules | 2 modify | Medium - recursive attr lifting |
+
+**Recommended Order:**
+
+1. Start with 8b (rule integration) since it's needed for validation
+2. Then 8c (call semantics) - the core functionality
+3. Then 8a (SubruleContext) - can be refined incrementally
+4. Defer 8d/8e/8f until needed
+
+Phase 8d (toolchains), 8e (aspects), and 8f (nested) can be deferred if not immediately needed by rules_cc.
 
 ### References
 
+**Design Documentation:**
 - **Design Doc**: `thoughts/shared/research/bazel-subrule-design.md`
-- **Bazel Source**: `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkSubrule.java`
-- **Bazel Tests**: `src/test/java/com/google/devtools/build/lib/analysis/starlark/SubruleTest.java`
-- **rules_cc usage**: `cc/private/rules_impl/fdo/fdo_context.bzl`
+- **Original Google Doc**: https://docs.google.com/document/d/1RbNC88QieKvBEwir7iV5zZU08AaMlOzxhVkPnmKDedQ
+
+**Bazel Source Files:**
+
+| File | Purpose |
+|------|---------|
+| `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkSubrule.java` | Main subrule implementation |
+| `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkSubruleContext.java` | SubruleContext implementation |
+| `src/main/java/com/google/devtools/build/lib/packages/SubruleFactory.java` | Subrule factory |
+| `src/test/java/com/google/devtools/build/lib/analysis/starlark/SubruleTest.java` | Comprehensive tests |
+
+**Real-world Usage Examples:**
+- `rules_cc`: `cc/private/rules_impl/fdo/fdo_context.bzl`
+- `rules_java`: `java_common/compile.bzl`
+
+**Kuro Implementation Files:**
+- `app/kuro_interpreter_for_build/src/subrule.rs` - Current stub implementation
+- `app/kuro_interpreter_for_build/src/rule.rs` - rule() function (needs subrules param)
+- `app/kuro_node/src/rule.rs` - Rule struct (needs subrules field)
+- `app/kuro_build_api/src/interpreter/rule_defs/` - Analysis context (needs SubruleContext)
 
 ---
