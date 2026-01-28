@@ -10,17 +10,46 @@
 
 //! Implementation of Bazel's `subrule()` built-in function.
 //!
-//! Subrules are a building block for writing rules with shared code. They allow
-//! encapsulating part of a rule's functionality into a reusable component.
+//! Design Reference: `thoughts/shared/research/bazel-subrule-design.md`
+//! (Original: https://docs.google.com/document/d/1RbNC88QieKvBEwir7iV5zZU08AaMlOzxhVkPnmKDedQ)
 //!
-//! When a rule declares a subrule in its `subrules` parameter, the attributes
-//! from the subrule are "lifted" into the rule. The subrule's implementation
-//! can then be called from within the rule's implementation function.
+//! ## Current Status: STUB IMPLEMENTATION
 //!
-//! Example usage in Starlark:
+//! This is a minimal stub that allows subrule() to be called and returns a Subrule
+//! object. The full Bazel semantics are NOT yet implemented.
+//!
+//! ## Missing Features (TODO)
+//!
+//! Per the Bazel design document, the following need to be implemented:
+//!
+//! 1. **SubruleContext**: A stripped-down context object passed to implementation:
+//!    - `ctx.actions` - for creating actions (with implicit toolchain/exec_group)
+//!    - `ctx.toolchains` - for accessing declared toolchains
+//!    - `ctx.label` - target label for naming artifacts
+//!    - Possibly `ctx.fragments` for configuration access
+//!    - NOT provided: attr, file, files, executable, bin_dir, etc.
+//!
+//! 2. **Attribute lifting**: When a rule declares `subrules=[my_subrule]`:
+//!    - Subrule's implicit deps (attrs starting with `_`) are lifted to the rule
+//!    - All attrs must be `attr.label` or `attr.label_list` only
+//!    - No public attrs allowed on subrules
+//!
+//! 3. **Call semantics**: When subrule is invoked from rule implementation:
+//!    - First positional arg is SubruleContext (not RuleContext)
+//!    - Implicit deps passed as keyword arguments
+//!    - Error if subrule called but not declared in `subrules=[]`
+//!    - Can return arbitrary values (not limited to providers)
+//!
+//! 4. **rule() and aspect() changes**: Add `subrules` parameter
+//!
+//! 5. **Toolchain/exec_group support**: Subrules can declare their own toolchains
+//!
+//! ## Example usage in Starlark:
+//!
 //! ```python
-//! def _my_subrule_impl(subrule_ctx, *, _some_attr):
-//!     # Implementation logic
+//! def _my_subrule_impl(ctx, *, _some_attr):
+//!     # ctx is SubruleContext (NOT RuleContext)
+//!     # _some_attr is the resolved implicit dependency
 //!     return struct(result = "computed value")
 //!
 //! my_subrule = subrule(
@@ -28,13 +57,18 @@
 //!     attrs = {
 //!         "_some_attr": attr.label(default = "//some:target"),
 //!     },
-//!     fragments = ["cpp"],
+//!     toolchains = ["//my:toolchain_type"],
 //! )
 //!
 //! # Then in a rule:
+//! def _rule_impl(ctx):
+//!     result = my_subrule(source_files=ctx.files.srcs)  # Called directly!
+//!     return [DefaultInfo()]
+//!
 //! my_rule = rule(
-//!     implementation = _my_rule_impl,
-//!     subrules = [my_subrule],
+//!     implementation = _rule_impl,
+//!     attrs = {"srcs": attr.label_list()},
+//!     subrules = [my_subrule],  # Must declare subrules used
 //! )
 //! ```
 

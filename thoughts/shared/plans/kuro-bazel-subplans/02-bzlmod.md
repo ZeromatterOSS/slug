@@ -113,10 +113,11 @@ Test 9 - ProtoInfo is None: True
 - **cc_common module**: Internal APIs for rules_cc (stub implementations)
 - **ctx.fragments.cpp**: Fragment access for C++ configuration
 - **ctx.attr**: Attribute access on analysis context
-- **subrule() built-in**: Implemented `subrule()` function for Bazel 7.0+ compatibility ✅
+- **subrule() built-in (STUB)**: Implemented stub `subrule()` function for Bazel 7.0+ compatibility ✅
   - `StarlarkSubruleCallable` and `FrozenStarlarkSubruleCallable` types
   - Supports `implementation`, `attrs`, `fragments`, `toolchains`, `subrules` parameters
   - Located in `app/kuro_interpreter_for_build/src/subrule.rs`
+  - **NOTE**: This is a STUB - see Phase 8 for full implementation requirements
 
 **Key Version Requirement:**
 
@@ -1504,5 +1505,190 @@ rules_cc 0.2.16 depends on protobuf 27.0, and the load chain hits:
 - [ ] Test rules_cc loading with chosen approach
 - [ ] Document decision and rationale
 - [ ] `@rules_cc//cc:defs.bzl` loads completely (if possible with proto stub)
+
+---
+
+## Phase 8: Full subrule() Implementation
+
+### Overview
+
+Complete the `subrule()` implementation to match Bazel's semantics per the design document.
+
+**Design Reference**: `thoughts/shared/research/bazel-subrule-design.md`
+(Original: https://docs.google.com/document/d/1RbNC88QieKvBEwir7iV5zZU08AaMlOzxhVkPnmKDedQ)
+
+### Current Status: STUB ONLY
+
+The current implementation (`app/kuro_interpreter_for_build/src/subrule.rs`) is a minimal stub that:
+- ✅ Accepts `subrule()` calls and returns a `Subrule` object
+- ✅ Stores implementation function, attrs, fragments, toolchains, subrules
+- ❌ Does NOT implement SubruleContext
+- ❌ Does NOT lift attrs to parent rules
+- ❌ Does NOT inject implicit deps as keyword args
+- ❌ Does NOT add `subrules` parameter to `rule()` and `aspect()`
+
+### Phase 8a: SubruleContext Implementation
+
+**Goal**: Create a restricted context object for subrule implementations.
+
+**SubruleContext members (per design doc):**
+
+| Member | Description |
+|--------|-------------|
+| `ctx.actions` | For creating actions (implicit toolchain/exec_group from subrule) |
+| `ctx.toolchains` | Access to declared toolchains |
+| `ctx.label` | Target label for naming artifacts |
+| `ctx.fragments` | Configuration fragments (possibly - helps encapsulation) |
+
+**Members NOT provided (encapsulation):**
+
+| Member | Reason |
+|--------|--------|
+| `ctx.attr`, `ctx.file`, `ctx.files`, `ctx.executable` | Use function parameters instead |
+| `ctx.bin_dir` | Use `file.root.path` on declared artifacts |
+| `ctx.exec_groups` | Only one exec group per subrule |
+| `ctx.rule`, `ctx.aspect_ids` | Breaks encapsulation |
+| `ctx.outputs` | Outputs must be public attributes, subrules can't have public attrs |
+| `ctx.split_attr` | No split transitions on implicit deps |
+
+**Files to Create/Modify:**
+- Create `app/kuro_build_api/src/interpreter/rule_defs/subrule_ctx.rs`
+- Modify `app/kuro_build_api/src/interpreter/rule_defs/mod.rs` to register
+
+### Phase 8b: Attribute Lifting
+
+**Goal**: When a rule declares `subrules=[my_subrule]`, lift subrule's implicit deps.
+
+**Requirements:**
+- Subrule attrs MUST start with `_` (private/implicit)
+- Subrule attrs MUST be `attr.label` or `attr.label_list` only
+- No other attr types allowed (no strings, ints, etc.)
+- Lifted attrs are namespaced to avoid collisions:
+  ```
+  # In blaze query output:
+  @rules_java//java_common/compile.bzl%compile$java_toolchain
+  ```
+
+**Files to Modify:**
+- `app/kuro_interpreter_for_build/src/rule.rs` - Add `subrules` parameter to `rule()`
+- `app/kuro_interpreter_for_build/src/subrule.rs` - Validate attr restrictions
+- `app/kuro_node/src/rule.rs` - Store subrule references and lifted attrs
+
+### Phase 8c: Call Semantics
+
+**Goal**: Implement proper subrule invocation from rule implementations.
+
+**When subrule is called:**
+1. Verify the subrule is declared in parent's `subrules=[]` list
+2. Create SubruleContext (NOT RuleContext) from parent context
+3. Resolve implicit deps from lifted attrs
+4. Call implementation with:
+   - First positional arg: SubruleContext
+   - Keyword args for implicit deps (e.g., `_java_toolchain=<resolved_dep>`)
+   - User-provided args passed through
+5. Return implementation's return value (arbitrary type, not limited to providers)
+
+**Error cases:**
+- Subrule called but not declared → runtime error
+- Subrule called outside of rule/aspect implementation → error
+
+**Files to Modify:**
+- `app/kuro_interpreter_for_build/src/subrule.rs` - Implement `FrozenStarlarkSubruleCallable::invoke()`
+- May need access to current analysis context to resolve deps
+
+### Phase 8d: Toolchain and Exec Group Support
+
+**Goal**: Subrules can declare their own toolchains and execution requirements.
+
+**Parameters (per design doc):**
+- `toolchains` - List of toolchain types this subrule requires
+- `exec_compatible_with` - Execution platform constraints (NOT in MVP)
+- `exec_group` - Named execution group (NOT in MVP)
+
+**Behavior:**
+- When subrule declares toolchains, they're merged with parent rule's toolchains
+- Actions created by subrule implicitly use its toolchain/exec_group
+- Toolchain type collisions are merged (may pick different exec platform)
+
+### Phase 8e: Aspect Support
+
+**Goal**: Aspects can also use subrules.
+
+**Files to Modify:**
+- `app/kuro_interpreter_for_build/src/aspect.rs` (if exists) - Add `subrules` parameter
+
+### Success Criteria
+
+#### Automated Verification:
+```bash
+cargo test -p kuro_interpreter_for_build
+cargo test -p kuro_build_api
+```
+
+#### Manual Verification:
+
+**Test 1: Basic subrule invocation**
+```python
+# test_subrule.bzl
+def _my_subrule_impl(ctx, *, _helper):
+    print("subrule invoked with helper:", _helper)
+    return struct(value = 42)
+
+my_subrule = subrule(
+    implementation = _my_subrule_impl,
+    attrs = {"_helper": attr.label(default = "//tools:helper")},
+)
+
+def _my_rule_impl(ctx):
+    result = my_subrule()  # Should print and return struct
+    print("subrule returned:", result.value)
+    return [DefaultInfo()]
+
+my_rule = rule(
+    implementation = _my_rule_impl,
+    subrules = [my_subrule],
+)
+```
+
+**Test 2: SubruleContext limitations**
+```python
+def _bad_subrule_impl(ctx, **kwargs):
+    # These should NOT exist on SubruleContext:
+    print(hasattr(ctx, "attr"))       # Should be False
+    print(hasattr(ctx, "outputs"))    # Should be False
+    # These SHOULD exist:
+    print(hasattr(ctx, "actions"))    # Should be True
+    print(hasattr(ctx, "label"))      # Should be True
+    return struct()
+```
+
+**Test 3: Undeclared subrule error**
+```python
+def _rule_impl(ctx):
+    other_subrule()  # Should ERROR - not in subrules list
+    return [DefaultInfo()]
+
+my_rule = rule(
+    implementation = _rule_impl,
+    subrules = [],  # Empty - other_subrule not declared
+)
+```
+
+### Implementation Priority
+
+For rules_cc compatibility, the minimum viable implementation needs:
+
+1. **Phase 8a** - Basic SubruleContext with `ctx.actions`, `ctx.label`
+2. **Phase 8b** - Attribute lifting (implicit deps)
+3. **Phase 8c** - Basic call semantics (inject ctx + implicit deps)
+
+Phase 8d (toolchains) and 8e (aspects) can be deferred if not immediately needed.
+
+### References
+
+- **Design Doc**: `thoughts/shared/research/bazel-subrule-design.md`
+- **Bazel Source**: `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkSubrule.java`
+- **Bazel Tests**: `src/test/java/com/google/devtools/build/lib/analysis/starlark/SubruleTest.java`
+- **rules_cc usage**: `cc/private/rules_impl/fdo/fdo_context.bzl`
 
 ---
