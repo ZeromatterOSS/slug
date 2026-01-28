@@ -781,6 +781,7 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
     /// Bazel-compatible: equivalent to attrs.list(attrs.dep()).
     ///
     /// `aspects` is a list of aspects to be applied to the targets of this attribute.
+    /// `allow_empty` controls whether the list can be empty (default True).
     fn label_list<'v>(
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         providers: UnpackListOrTuple<Value<'v>>,
@@ -789,6 +790,9 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] mandatory: bool,
         // Bazel-compatible: allow_files can be bool or list of extension strings
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
+        // Bazel-compatible: whether the list can be empty (default True)
+        // Currently accepted but not enforced
+        #[starlark(require = named, default = true)] allow_empty: bool,
         // Bazel's `flags` parameter for internal attribute metadata (e.g., DIRECT_COMPILE_TIME_INPUT).
         // Currently accepted but ignored.
         #[starlark(require = named, default = UnpackListOrTuple::default())]
@@ -801,7 +805,8 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
     ) -> starlark::Result<StarlarkAttribute> {
         let allow_files_bool = parse_allow_files_param(allow_files, "allow_files", eval)?;
         // TODO(bazel-aspects): Store aspects and apply during analysis (Phase 8b-8c)
-        let _unused = (mandatory, allow_files_bool, flags, aspects);
+        // TODO(bazel): Enforce allow_empty constraint during coercion
+        let _unused = (mandatory, allow_files_bool, allow_empty, flags, aspects);
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         let inner = AttrType::dep(required_providers, PluginKindSet::EMPTY);
         let coercer = AttrType::list(inner);
@@ -814,9 +819,12 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
+        // Bazel-compatible: whether the list can be empty (default True)
+        #[starlark(require = named, default = true)] allow_empty: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = mandatory;
+        // TODO(bazel): Enforce allow_empty constraint during coercion
+        let _unused = (mandatory, allow_empty);
         let coercer = AttrType::list(AttrType::string());
         Ok(Attribute::attr(eval, default, doc, coercer)?)
     }
@@ -827,9 +835,12 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
+        // Bazel-compatible: whether the list can be empty (default True)
+        #[starlark(require = named, default = true)] allow_empty: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = mandatory;
+        // TODO(bazel): Enforce allow_empty constraint during coercion
+        let _unused = (mandatory, allow_empty);
         let coercer = AttrType::list(AttrType::int());
         Ok(Attribute::attr(eval, default, doc, coercer)?)
     }
