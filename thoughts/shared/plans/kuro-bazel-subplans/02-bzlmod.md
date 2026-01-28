@@ -79,8 +79,10 @@ When implementing new features:
 
 - **@bazel_tools http.bzl/git.bzl**: Needs `repository_rule` and `repository_ctx` (Phase 5)
 - **Module extensions**: Parsing complete, synthetic repo workaround implemented, full execution not implemented
-- **rules_cc loading**: ~~Blocked on `aspect()` built-in~~ **RESOLVED** (Phase 8a complete)
-  - **NEW BLOCKER**: Missing `allow_empty` parameter on `attr.label_list()` (objc_import.bzl:86)
+- **rules_cc loading**: Progress made, now blocked on `PackageSpecificationInfo` provider
+  - ~~`aspect()` built-in~~ **RESOLVED** (Phase 8a)
+  - ~~`allow_empty` parameter~~ **RESOLVED**
+  - **NEW BLOCKER**: `PackageSpecificationInfo` provider (cc_toolchain.bzl:64)
 
 ### Resolved Issues
 
@@ -336,7 +338,7 @@ Bridge the gap between bzlmod module resolution and Kuro's build system. This ph
 #### Automated Verification:
 
 - [x] `@bazel_skylib//:defs.bzl` loads successfully after bzlmod resolution
-- [ ] `@rules_cc//cc:defs.bzl` loads after fetching from BCR - ~~BLOCKED on aspects~~ Now blocked on `allow_empty` param
+- [ ] `@rules_cc//cc:defs.bzl` loads after fetching from BCR - Now blocked on `PackageSpecificationInfo` provider
 - [ ] `@local_module//:target` works with local_path_override
 - [x] Repo aliasing works: `bazel_dep(name="foo", repo_name="bar")` makes `@bar` available
 - [x] Transitive repo_name aliases created via `collect_transitive_repo_aliases()`
@@ -362,7 +364,8 @@ Bridge the gap between bzlmod module resolution and Kuro's build system. This ph
 - [x] **Version compatibility via `native.bazel_version`** - COMPLETE
 - [x] **ProtoInfo built-in provider** - COMPLETE (returns NoneType per Bazel 8+ behavior)
 - [x] **`aspect()` built-in** - See **[08-aspects.md](./08-aspects.md)** (Phase 8a COMPLETE)
-- [ ] **`allow_empty` parameter for attr.label_list()** - NEW BLOCKER for rules_cc
+- [x] **`allow_empty` parameter for attr.label_list()** - COMPLETE
+- [ ] **`PackageSpecificationInfo` provider** - NEW BLOCKER for rules_cc (cc_toolchain.bzl:64)
 
 #### Manual Verification:
 
