@@ -67,9 +67,29 @@ print("Test 7 - cc_common methods exist:", _has_empty_vars and _has_get_tool)
 _internal = cc_common.internal_DO_NOT_USE
 print("Test 8 - cc_common.internal_DO_NOT_USE returned:", type(_internal))
 
-# Test 9: rules_cc loading (now with transitive deps resolved)
-# BLOCKED: protobuf requires ProtoInfo built-in provider which isn't implemented yet
+# Test 9: Provider globals are None (per Bazel's CcRules.java)
+# These are defined by rules_cc in Starlark, not as native builtins
+_ccinfo_is_none = CcInfo == None
+_debug_pkg_is_none = DebugPackageInfo == None
+_shared_lib_is_none = CcSharedLibraryInfo == None
+_protoinfo_is_none = ProtoInfo == None
+print("Test 9 - CcInfo is None:", _ccinfo_is_none)
+print("Test 9 - DebugPackageInfo is None:", _debug_pkg_is_none)
+print("Test 9 - CcSharedLibraryInfo is None:", _shared_lib_is_none)
+print("Test 9 - ProtoInfo is None:", _protoinfo_is_none)
+
+# Test 10: CcToolchainConfigInfo should NOT exist as a global
+# It's created via cc_common.create_cc_toolchain_config_info()
+# This test would fail if we tried to access CcToolchainConfigInfo directly
+
+# Test 10: cc_common.CcToolchainInfo should still work
+_cc_toolchain_info = cc_common.CcToolchainInfo
+print("Test 10 - cc_common.CcToolchainInfo exists:", _cc_toolchain_info != None)
+
+# Test 11: rules_cc loading (now with transitive deps resolved)
+# PROGRESS: Provider registrations fixed (CcInfo, DebugPackageInfo, etc. are now None)
+# Next blocker: subrule() built-in needed by fdo_context.bzl
 # load("@rules_cc//cc:defs.bzl", "cc_library")
-# print("Test 9 - rules_cc loaded successfully!")
+# print("Test 11 - rules_cc loaded successfully!")
 
 print("All manual tests passed!")

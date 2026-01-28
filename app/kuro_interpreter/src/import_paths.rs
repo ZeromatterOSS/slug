@@ -69,6 +69,7 @@ impl ImplicitImportPaths {
                 })?
                 .as_deref(),
         )?;
+
         Ok(ImplicitImportPaths {
             root_import,
             package_imports,

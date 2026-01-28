@@ -12,10 +12,13 @@ use starlark::environment::GlobalsBuilder;
 
 use crate::interpreter::rule_defs::provider::registration::register_builtin_providers;
 
+pub mod apple_common;
 pub mod artifact;
 pub mod artifact_tagging;
 pub mod cc_common;
 pub mod cmd_args;
+pub mod config_common;
+pub mod proto_common;
 pub mod config;
 pub mod configuration_field;
 pub mod depset;

@@ -152,6 +152,136 @@ fn create_callable_function_signature(
     Ok((parameters_spec, TyCallable::new(param_spec, ret_ty)))
 }
 
+// ============================================================================
+// InitProviderConstructor - Wraps a provider with an init function
+// ============================================================================
+
+/// A provider constructor that uses an init function to transform arguments.
+///
+/// When a provider is defined with `init=fn`, this wrapper is returned as part
+/// of the tuple. When invoked, it:
+/// 1. Calls the init function with all provided arguments
+/// 2. Expects init to return a dict mapping field names to values
+/// 3. Uses that dict to construct the provider instance
+///
+/// This is used by rules_cc and other rulesets that define providers with
+/// custom construction logic.
+#[derive(Debug, ProvidesStaticType, Trace, NoSerialize, Allocative)]
+pub struct InitProviderConstructor<'v> {
+    /// The underlying provider callable
+    provider: Value<'v>,
+    /// The init function that transforms arguments
+    init_fn: Value<'v>,
+}
+
+impl<'v> Display for InitProviderConstructor<'v> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "InitProviderConstructor({})", self.provider)
+    }
+}
+
+impl<'v> AllocValue<'v> for InitProviderConstructor<'v> {
+    fn alloc_value(self, heap: Heap<'v>) -> Value<'v> {
+        heap.alloc_complex(self)
+    }
+}
+
+impl Freeze for InitProviderConstructor<'_> {
+    type Frozen = FrozenInitProviderConstructor;
+    fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
+        Ok(FrozenInitProviderConstructor {
+            provider: freezer.freeze(self.provider)?,
+            init_fn: freezer.freeze(self.init_fn)?,
+        })
+    }
+}
+
+#[starlark_value(type = "InitProviderConstructor")]
+impl<'v> StarlarkValue<'v> for InitProviderConstructor<'v> {
+    type Canonical = FrozenInitProviderConstructor;
+
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        invoke_init_provider_constructor(self.init_fn, self.provider, args, eval)
+    }
+}
+
+/// Frozen version of InitProviderConstructor
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct FrozenInitProviderConstructor {
+    /// The underlying provider callable
+    provider: FrozenValue,
+    /// The init function that transforms arguments
+    init_fn: FrozenValue,
+}
+
+impl Display for FrozenInitProviderConstructor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "InitProviderConstructor({})", self.provider)
+    }
+}
+
+starlark_simple_value!(FrozenInitProviderConstructor);
+
+#[starlark_value(type = "InitProviderConstructor")]
+impl<'v> StarlarkValue<'v> for FrozenInitProviderConstructor {
+    type Canonical = Self;
+
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        invoke_init_provider_constructor(
+            self.init_fn.to_value(),
+            self.provider.to_value(),
+            args,
+            eval,
+        )
+    }
+}
+
+/// Shared implementation for invoking init provider constructor
+fn invoke_init_provider_constructor<'v>(
+    init_fn: Value<'v>,
+    provider: Value<'v>,
+    args: &Arguments<'v, '_>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> starlark::Result<Value<'v>> {
+    // Call the init function with all the provided arguments
+    let init_result = init_fn.invoke(args, eval)?;
+
+    // The init function should return a dict mapping field names to values
+    let dict = DictRef::from_value(init_result).ok_or_else(|| {
+        kuro_error::kuro_error!(
+            kuro_error::ErrorTag::Input,
+            "provider init function must return a dict, got {}",
+            init_result.get_type()
+        )
+    })?;
+
+    // Convert the dict to keyword arguments for the provider constructor
+    let mut named_args: Vec<(&str, Value<'v>)> = Vec::new();
+    for (k, v) in dict.iter() {
+        let key_str = k.unpack_str().ok_or_else(|| {
+            kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "provider init function must return a dict with string keys, got key of type {}",
+                k.get_type()
+            )
+        })?;
+        named_args.push((key_str, v));
+    }
+
+    // Call the provider with the dict as keyword arguments
+    eval.eval_function(provider, &[], &named_args)
+}
+
 #[derive(Debug, Allocative)]
 pub(crate) struct UserProviderCallableData {
     pub(crate) provider_id: Arc<ProviderId>,
@@ -593,22 +723,23 @@ pub fn register_provider(builder: &mut GlobalsBuilder) {
         // Allow doc as positional or named argument for Bazel compatibility
         // Bazel supports both: provider("doc", fields={...}) and provider(doc="doc", fields={...})
         #[starlark(default = "")] doc: &str,
-        #[starlark(require=named)] fields: Either<
+        // Fields is optional in Bazel - when not specified, provider accepts any fields
+        #[starlark(require=named)] fields: Option<Either<
             UnpackListOrTuple<String>,
             SmallMap<String, Value<'v>>,
-        >,
+        >>,
         // Bazel-compatible: init function for custom construction logic
         // When specified, provider() returns (ProviderType, constructor_fn)
-        // TODO(bazel): Implement proper init function support with tuple return
         #[starlark(require=named)] init: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        let _unused_init = init;
         let docstring = DocString::from_docstring(DocStringKind::Starlark, doc);
         let path = starlark_path_from_build_context(eval)?.path();
 
-        let fields = match fields {
-            Either::Left(fields) => {
+        // If fields not specified, default to empty (provider accepts any field names)
+        let fields: IndexMap<String, UserProviderField, StarlarkHasherSmallPromoteBuilder> = match fields {
+            None => IndexMap::with_hasher(StarlarkHasherSmallPromoteBuilder::default()),
+            Some(Either::Left(fields)) => {
                 let new_fields: IndexMap<
                     String,
                     UserProviderField,
@@ -628,7 +759,7 @@ pub fn register_provider(builder: &mut GlobalsBuilder) {
                 }
                 new_fields
             }
-            Either::Right(fields) => {
+            Some(Either::Right(fields)) => {
                 let mut new_fields = IndexMap::with_capacity_and_hasher(
                     fields.len(),
                     StarlarkHasherSmallPromoteBuilder::default(),
@@ -651,12 +782,20 @@ pub fn register_provider(builder: &mut GlobalsBuilder) {
         };
         let provider = UserProviderCallable::new(path.into_owned(), docstring, fields);
 
-        // If init is provided, return (provider, constructor) tuple
-        // The constructor is the same as the provider itself since it's callable
-        if init.is_some() {
+        // If init is provided, return (init_wrapped_provider, raw_provider) tuple
+        // The first element wraps the provider with the init function
+        // The second element is the raw provider constructor
+        if let Some(init_fn) = init {
             let provider_val = eval.heap().alloc(provider);
-            // Return tuple of (provider, provider) - the provider is both type and constructor
-            Ok(eval.heap().alloc((provider_val, provider_val)))
+            // Create init-wrapped constructor that calls init then provider
+            let init_constructor = InitProviderConstructor {
+                provider: provider_val,
+                init_fn,
+            };
+            let init_constructor_val = eval.heap().alloc(init_constructor);
+            // Return tuple of (init_wrapped, raw_provider)
+            // Most code uses the first element which goes through init
+            Ok(eval.heap().alloc((init_constructor_val, provider_val)))
         } else {
             Ok(eval.heap().alloc(provider))
         }

@@ -65,23 +65,67 @@ When implementing new features:
 
 **Current Blockers:**
 
-- **rules_cc loading blocked on ProtoInfo provider**: Transitive dependencies now resolved correctly. rules_cc loads and its dependencies (protobuf, platforms) are registered as cells. However, `protobuf//bazel/private/native.bzl` requires the `ProtoInfo` built-in provider which isn't implemented:
+- **rules_cc loading blocked on subrule()**: Significant progress made! The following are now implemented:
+  - `ProtoInfo` provider and `proto_common_do_not_use` module (**see issues below**)
+  - `provider()` init function support (InitProviderConstructor)
+  - `Label()` function for Starlark
+  - `config_common.toolchain_type()` for toolchain requirements
+  - `apple_common` module with apple_toolchain(), platform_type, etc.
+  - C++ globals: `DebugPackageInfo`, `CcToolchainConfigInfo`, `CcSharedLibraryInfo` (**see issues below**)
+
+  The load chain now reaches `fdo_context.bzl` which needs the `subrule()` built-in:
   ```
   @rules_cc//cc:defs.bzl
-    -> @rules_cc//cc/objc_import.bzl
-    -> @cc_compatibility_proxy//proxy.bzl
-    -> @rules_cc//cc/private/rules_impl/cc_shared_library.bzl
-    -> @protobuf//bazel/common/proto_info.bzl
-    -> @protobuf//bazel/private/native.bzl <- needs ProtoInfo
+    -> @rules_cc//cc/toolchains/cc_toolchain.bzl
+    -> @rules_cc//cc/private/rules_impl/cc_toolchain.bzl
+    -> @rules_cc//cc/private/rules_impl/fdo/fdo_context.bzl <- needs subrule()
   ```
 - **@bazel_tools http.bzl/git.bzl**: Needs `repository_rule` and `repository_ctx` (Phase 5)
 - **Module extensions**: Parsing complete, synthetic repo workaround implemented, full execution not implemented
+
+**Implementation Issues to Address:**
+
+The following implementations are incorrect and need to be fixed:
+
+1. **CcToolchainConfigInfoProvider should not exist** ([CcRules.java reference](https://github.com/bazelbuild/bazel/blob/3ad9562ae006151d40a0ebcc90b84889888c2111/src/main/java/com/google/devtools/build/lib/bazel/rules/CcRules.java#L44)):
+   - Bazel does NOT register `CcToolchainConfigInfo` as a builtin toplevel
+   - The provider is created via `cc_common.create_cc_toolchain_config_info()`, not as a standalone global
+   - **Fix**: Remove `CcToolchainConfigInfoProvider` from `cc_common.rs` entirely
+
+2. **DebugPackageInfo, CcSharedLibraryInfo should be None**:
+   - Bazel's CcRules.java sets these to `Starlark.NONE`, not actual provider types:
+     ```java
+     builder.addBzlToplevel("CcInfo", Starlark.NONE);
+     builder.addBzlToplevel("DebugPackageInfo", Starlark.NONE);
+     builder.addBzlToplevel("CcSharedLibraryInfo", Starlark.NONE);
+     builder.addBzlToplevel("CcSharedLibraryHintInfo", Starlark.NONE);
+     ```
+   - The actual providers are defined in Starlark by the rule repositories themselves
+   - **Fix**: Change these registrations to return `NoneType` instead of provider structs
+
+3. **ProtoInfo native implementation is deprecated in Bazel 8+**:
+   - Native proto rules are deprecated; `*_proto_library` rules moved to [protobuf repository](https://github.com/protocolbuffers/protobuf)
+   - `ProtoInfo` should come from `@protobuf//bazel/common:proto_info.bzl`, not as a native builtin
+   - rules_cc 0.2.16 depends on protobuf 27.0 which still expects backward compatibility
+   - **Fix**: Either set `ProtoInfo = None` (Bazel's approach) or keep stub temporarily with clear documentation that it's transitional
+
+**Files requiring changes:**
+- `app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs` - Remove CcToolchainConfigInfoProvider, change DebugPackageInfo/CcSharedLibraryInfo to None
+- `app/kuro_build_api/src/interpreter/rule_defs/proto_common.rs` - Evaluate ProtoInfo approach
+- `app/kuro_build_api/src/interpreter/more.rs` - Update registrations
 
 **Completed:**
 
 - **Transitive dependency resolution (MVS)**: Full MVS algorithm now runs in `resolve_bzlmod_dependencies()`, resolving all transitive deps
 - **repo_name aliasing**: Both direct and transitive `bazel_dep(..., repo_name = "alias")` create cell aliases via `collect_transitive_repo_aliases()`
 - **Source fetching**: `MvsResolver::fetch_sources()` downloads and extracts all resolved modules to cache
+- **ProtoInfo provider**: Native stub implementation (**NEEDS REVISION** - native ProtoInfo deprecated in Bazel 8+)
+- **proto_common_do_not_use module**: Internal proto compilation utilities (stub only)
+- **provider() init function**: Custom construction logic support (InitProviderConstructor)
+- **Label() function**: Starlark Label constructor for absolute/relative labels
+- **config_common module**: toolchain_type() for toolchain requirements
+- **apple_common module**: Apple platform utilities (apple_toolchain, platform_type, etc.)
+- **CC globals**: DebugPackageInfo, CcToolchainConfigInfo, CcSharedLibraryInfo (**NEEDS REVISION** - should be None, not provider types; CcToolchainConfigInfo should not exist)
 
 **Key Version Requirement:**
 
@@ -1411,63 +1455,63 @@ The current `visibility()` implementation is a no-op stub - it accepts all value
 
 ---
 
-## Phase 7: Proto Support (ProtoInfo Provider)
+## Phase 7: Proto Support (ProtoInfo Provider) - NEEDS RE-EVALUATION
 
 ### Overview
 
-Implement the `ProtoInfo` built-in provider required by protobuf rules. This is the current blocker for loading `@rules_cc//cc:defs.bzl`.
+**Current Status**: Native `ProtoInfo` is deprecated in Bazel 8+. The approach taken in the current implementation may be incorrect.
 
-### Why This Is Needed
+### What Bazel Actually Does (Research Complete)
 
-The load chain for rules_cc hits protobuf's native.bzl which expects ProtoInfo as a built-in:
+Per [Bazel 8.0 release notes](https://blog.bazel.build/2024/12/09/bazel-8-release.html):
+- Native `*_proto_library` rules have been **moved to the protobuf repository**
+- `ProtoInfo` should come from `@protobuf//bazel/common:proto_info.bzl`, not as a native builtin
+- Bazel provides `--incompatible_autoload_externally` flag to automatically load rules from their repositories
 
+### Current Implementation (Incorrect)
+
+The current implementation in `app/kuro_build_api/src/interpreter/rule_defs/proto_common.rs` creates:
+- `ProtoInfo` as a native builtin provider type
+- `proto_common_do_not_use` module with stub methods
+
+This mirrors the **deprecated** Bazel 7.x behavior, not Bazel 8+/9.0.
+
+### Why rules_cc Still Needs It
+
+rules_cc 0.2.16 depends on protobuf 27.0, and the load chain hits:
 ```
 @rules_cc//cc:defs.bzl
-  -> @rules_cc//cc/objc_import.bzl
-  -> @cc_compatibility_proxy//proxy.bzl
-  -> @rules_cc//cc/private/rules_impl/cc_shared_library.bzl
-  -> @protobuf//bazel/common/proto_info.bzl
   -> @protobuf//bazel/private/native.bzl:3
-       NativeProtoInfo = ProtoInfo  <- ERROR: Variable `ProtoInfo` not found
+       NativeProtoInfo = ProtoInfo  <- Expects builtin ProtoInfo
 ```
 
-### Research Needed
+**protobuf 27.0** still assumes `ProtoInfo` exists as a native builtin for backward compatibility during the transition period.
 
-Before implementation, research is needed to understand:
+### Recommended Approach
 
-1. **Is ProtoInfo a native Bazel provider in 9.0?** Or has it moved to the protobuf rules?
-2. **What fields does ProtoInfo have?** Check Bazel source and protobuf rules docs
-3. **How do rules_cc and protobuf v27+ interact?** The protobuf rules may have changed how they expose ProtoInfo
-4. **Can we stub ProtoInfo?** Or does it need full implementation?
+**Option A: Bazel-compatible stub (Recommended for now)**
+- Set `ProtoInfo = None` (matches how Bazel sets `CcInfo`, `DebugPackageInfo`, etc. to `Starlark.NONE`)
+- Let protobuf rules fail gracefully or provide their own implementation
+- Test if this breaks rules_cc loading
 
-**References to study:**
+**Option B: Keep transitional stub**
+- Keep current stub but document it as transitional
+- Plan to remove once protobuf rules fully migrate
 
-- Bazel source: `src/main/java/com/google/devtools/build/lib/rules/proto/ProtoInfo.java`
-- Protobuf rules: `https://github.com/protocolbuffers/protobuf/tree/main/bazel`
-- BCR protobuf 27.0: Check `bazel/private/native.bzl` and `bazel/common/proto_info.bzl`
+**Option C: Remove entirely**
+- Remove `proto_common.rs` and let errors surface
+- May break rules_cc until protobuf rules can fully load
 
-### Potential Implementation
+### Files to Modify
 
-**File**: `app/kuro_interpreter/src/starlark/providers/proto_info.rs` (new)
-
-```rust
-/// ProtoInfo provider - information about proto files and their compilation
-#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct ProtoInfo {
-    // Core fields (research needed for exact API)
-    pub direct_sources: Vec<Artifact>,
-    pub transitive_sources: Depset<Artifact>,
-    pub direct_descriptor_set: Artifact,
-    pub transitive_descriptor_sets: Depset<Artifact>,
-    // ... additional fields
-}
-```
+- `app/kuro_build_api/src/interpreter/rule_defs/proto_common.rs` - Evaluate approach
+- `app/kuro_build_api/src/interpreter/more.rs` - Update registration if needed
 
 ### Success Criteria
 
-- [ ] `ProtoInfo` available as a built-in global in Starlark
-- [ ] `protobuf//bazel/private/native.bzl` loads successfully
-- [ ] `@rules_cc//cc:defs.bzl` loads completely
-- [ ] Can define a `cc_proto_library` target (stretch goal)
+- [ ] Determine correct approach (Option A, B, or C)
+- [ ] Test rules_cc loading with chosen approach
+- [ ] Document decision and rationale
+- [ ] `@rules_cc//cc:defs.bzl` loads completely (if possible with proto stub)
 
 ---

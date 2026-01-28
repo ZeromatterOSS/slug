@@ -31,6 +31,61 @@ use crate::interpreter::module_internals::ModuleInternals;
 /// These are functions that can be called at the top level of .bzl files.
 #[starlark_module]
 pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
+    /// Creates a Label object from a string.
+    ///
+    /// This is Bazel's built-in `Label()` function that creates a label from a string.
+    /// Labels can be absolute (starting with `//` or `@`) or relative to the current package.
+    ///
+    /// Examples:
+    /// ```python
+    /// Label("//foo:bar")  # Absolute label in the main repository
+    /// Label("@repo//foo:bar")  # Label in an external repository
+    /// Label(":target")  # Relative to current package (only in BUILD files)
+    /// ```
+    ///
+    /// See: https://bazel.build/rules/lib/builtins/Label
+    fn Label<'v>(
+        #[starlark(require = pos)] label_string: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<StringValue<'v>> {
+        // Handle absolute labels (starting with @ or //)
+        // These don't need package context
+        let resolved = if label_string.starts_with('@') {
+            // Already fully qualified with repository
+            label_string.to_owned()
+        } else if label_string.starts_with("//") {
+            // Absolute path within some repo - in .bzl file context, assume main repo
+            // Get the cell/repo context if available
+            match BuildContext::from_context(eval) {
+                Ok(build_ctx) => {
+                    let cell_name = build_ctx.cell_info().name();
+                    format!("@{}{}", cell_name, label_string)
+                }
+                Err(_) => {
+                    // No build context available, return as-is
+                    label_string.to_owned()
+                }
+            }
+        } else if let Some(target) = label_string.strip_prefix(':') {
+            // Relative target in current package - requires build context
+            let build_ctx = BuildContext::from_context(eval)?;
+            let base_path = build_ctx.base_path()?;
+            let cell_name = build_ctx.cell_info().name();
+            format!("@{}//{}:{}", cell_name, base_path.path(), target)
+        } else {
+            // Treat as relative target in current package - requires build context
+            let build_ctx = BuildContext::from_context(eval)?;
+            let base_path = build_ctx.base_path()?;
+            let cell_name = build_ctx.cell_info().name();
+            format!("@{}//{}:{}", cell_name, base_path.path(), label_string)
+        };
+
+        // Return as a string for now - full Label type integration would require
+        // parsing and resolving the label through the cell resolver
+        // TODO(label): Return actual StarlarkTargetLabel once label resolution is wired up
+        Ok(eval.heap().alloc_str(&resolved))
+    }
+
     /// Declares the visibility of the current .bzl file.
     ///
     /// This function is called at the module level in Bazel .bzl files to control

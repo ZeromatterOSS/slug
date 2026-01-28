@@ -576,18 +576,65 @@ starlark_simple_value!(CcInfoProvider);
 impl<'v> StarlarkValue<'v> for CcInfoProvider {}
 
 // ============================================================================
+// DebugPackageInfo - Debug information provider
+// ============================================================================
+
+/// DebugPackageInfo provider for debug/symbol information.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct DebugPackageInfoProvider;
+
+impl Display for DebugPackageInfoProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<provider DebugPackageInfo>")
+    }
+}
+
+starlark_simple_value!(DebugPackageInfoProvider);
+
+#[starlark_value(type = "DebugPackageInfo")]
+impl<'v> StarlarkValue<'v> for DebugPackageInfoProvider {}
+
+// ============================================================================
+// CcSharedLibraryInfo - Shared library information provider
+// ============================================================================
+
+/// CcSharedLibraryInfo provider for shared library information.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct CcSharedLibraryInfoProvider;
+
+impl Display for CcSharedLibraryInfoProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<provider CcSharedLibraryInfo>")
+    }
+}
+
+starlark_simple_value!(CcSharedLibraryInfoProvider);
+
+#[starlark_value(type = "CcSharedLibraryInfo")]
+impl<'v> StarlarkValue<'v> for CcSharedLibraryInfoProvider {}
+
+// ============================================================================
 // Registration
 // ============================================================================
 
 /// Register the cc_common global and related providers.
+///
+/// Note: Per Bazel's CcRules.java, some providers are set to None because
+/// they are defined in Starlark by rules_cc.
 #[starlark_module]
 pub fn register_cc_common(globals: &mut GlobalsBuilder) {
     /// The cc_common module provides C/C++ compilation support.
     const cc_common: CcCommonModule = CcCommonModule;
 
-    /// CcInfo provider for C++ compilation and linking information.
-    const CcInfo: CcInfoProvider = CcInfoProvider;
+    /// CcInfo - None placeholder. Actual provider defined in rules_cc Starlark.
+    const CcInfo: NoneType = NoneType;
 
     /// CcToolchainInfo provider for C++ toolchain information.
     const CcToolchainInfo: CcToolchainInfoProvider = CcToolchainInfoProvider;
+
+    /// DebugPackageInfo - None placeholder. Actual provider defined in rules_cc Starlark.
+    const DebugPackageInfo: NoneType = NoneType;
+
+    /// CcSharedLibraryInfo - None placeholder. Actual provider defined in rules_cc Starlark.
+    const CcSharedLibraryInfo: NoneType = NoneType;
 }
