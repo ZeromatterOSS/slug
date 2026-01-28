@@ -742,6 +742,8 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
     /// - `True` (allow any single file)
     /// - `False` (default, don't allow files)
     /// - A list of extensions like `[".txt", ".json"]` (allow single file with those extensions)
+    ///
+    /// `aspects` is a list of aspects to be applied to the targets of this attribute.
     fn label<'v>(
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         providers: UnpackListOrTuple<Value<'v>>,
@@ -757,13 +759,18 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // Currently accepted but ignored.
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         flags: UnpackListOrTuple<&str>,
+        // Bazel-compatible: aspects to apply to targets of this attribute
+        // Currently accepted but not executed (stub implementation - Phase 8a)
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        aspects: UnpackListOrTuple<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
         // Parse allow_files: can be bool or list of extension strings
         let allow_files_bool = parse_allow_files_param(allow_files, "allow_files", eval)?;
         // Parse allow_single_file: can be bool or list of extension strings
         let allow_single_file_bool = parse_allow_files_param(allow_single_file, "allow_single_file", eval)?;
-        let _unused = (mandatory, executable, allow_files_bool, allow_single_file_bool, flags);
+        // TODO(bazel-aspects): Store aspects and apply during analysis (Phase 8b-8c)
+        let _unused = (mandatory, executable, allow_files_bool, allow_single_file_bool, flags, aspects);
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         let coercer = AttrType::dep(required_providers, PluginKindSet::EMPTY);
         Ok(Attribute::attr(eval, default, doc, coercer)?)
@@ -772,6 +779,8 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
     /// Takes a list of target labels from the user and supplies a list of
     /// dependencies to the rule.
     /// Bazel-compatible: equivalent to attrs.list(attrs.dep()).
+    ///
+    /// `aspects` is a list of aspects to be applied to the targets of this attribute.
     fn label_list<'v>(
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         providers: UnpackListOrTuple<Value<'v>>,
@@ -784,10 +793,15 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // Currently accepted but ignored.
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         flags: UnpackListOrTuple<&str>,
+        // Bazel-compatible: aspects to apply to targets of this attribute
+        // Currently accepted but not executed (stub implementation - Phase 8a)
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        aspects: UnpackListOrTuple<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
         let allow_files_bool = parse_allow_files_param(allow_files, "allow_files", eval)?;
-        let _unused = (mandatory, allow_files_bool, flags);
+        // TODO(bazel-aspects): Store aspects and apply during analysis (Phase 8b-8c)
+        let _unused = (mandatory, allow_files_bool, flags, aspects);
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         let inner = AttrType::dep(required_providers, PluginKindSet::EMPTY);
         let coercer = AttrType::list(inner);

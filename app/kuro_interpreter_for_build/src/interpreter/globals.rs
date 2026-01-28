@@ -46,6 +46,7 @@ use crate::interpreter::natives::register_module_natives;
 use crate::interpreter::selector::register_select;
 use crate::interpreter::selector::register_select_internal;
 use crate::plugins::register_plugins;
+use crate::aspect::register_aspect_function;
 use crate::rule::register_rule_function;
 use crate::subrule::register_subrule_function;
 use crate::super_package::defs::register_package_natives;
@@ -76,6 +77,7 @@ pub fn register_load_natives(builder: &mut GlobalsBuilder) {
     register_load_symbols(builder);
     register_rule_function(builder);
     register_subrule_function(builder);
+    register_aspect_function(builder);
     register_attrs(builder);
     register_plugins(builder);
     register_providers_label(builder);

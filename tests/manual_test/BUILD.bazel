@@ -103,13 +103,31 @@ print("Test 12 - Starlark proto_common_helpers.proto_path_flag:", _proto_flag)
 _has_subrule = "subrule" in dir(struct)  # Check if subrule is a recognized global
 print("Test 13 - subrule built-in registered:", True)  # subrule() is registered via register_subrule_function
 
-# Test 14: rules_cc loading - BLOCKED on missing aspect() built-in
-# PROGRESS: Provider registrations fixed (CcInfo, DebugPackageInfo, etc. are now None)
-# PROGRESS: Starlark cc_common/proto_common helpers now available
-# PROGRESS: subrule() built-in implemented
-# BLOCKER: rules_cc//cc/private/rules_impl/cc_shared_library.bzl uses aspect()
+# Test 14: aspect() built-in (Phase 8a)
+# Load the test aspect definitions
+load(":test_aspect.bzl", "test_aspects_available", "test_aspect")
+
+_aspect_results = test_aspects_available()
+print("Test 14 - aspect() built-in works:", _aspect_results)
+
+# Test 14b: Verify aspect can be passed to attr.label_list
+# This is the key requirement for rules_cc compatibility
+_test_rule_attrs = {
+    "deps": attr.label_list(
+        providers = [DefaultInfo],
+        aspects = [test_aspect],
+        doc = "Dependencies with aspect attached",
+    ),
+}
+print("Test 14b - attr.label_list(aspects=[...]) accepted:", _test_rule_attrs != None)
+
+# Test 14c: rules_cc loading - aspect() BLOCKER RESOLVED by Phase 8a
+# PROGRESS: aspect() built-in implemented (Phase 8a)
+# NEW BLOCKER: rules_cc uses allow_empty parameter on attr.label_list() which isn't implemented
+# Error: Found `allow_empty` extra named parameter(s) for call to label_list
+#   at bazel-external/rules_cc/0.2.16/cc/private/rules_impl/objc_import.bzl:86
 # load("@rules_cc//cc:defs.bzl", "cc_library")
-print("Test 14 - rules_cc loading BLOCKED (needs aspect() built-in - Phase 8e)")
+print("Test 14c - rules_cc aspect() blocker resolved; new blocker: allow_empty param")
 
 # Test 15: config_common module (Phase 6a Starlark migration)
 _has_toolchain_type = hasattr(config_common, "toolchain_type")

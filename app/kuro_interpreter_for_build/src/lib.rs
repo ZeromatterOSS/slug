@@ -15,6 +15,7 @@
 
 use std::sync::Once;
 
+pub mod aspect;
 pub mod attrs;
 pub mod call_stack;
 pub mod interpreter;
