@@ -83,49 +83,50 @@ When implementing new features:
 - **@bazel_tools http.bzl/git.bzl**: Needs `repository_rule` and `repository_ctx` (Phase 5)
 - **Module extensions**: Parsing complete, synthetic repo workaround implemented, full execution not implemented
 
-**Implementation Issues to Address:**
+**Implementation Issues - RESOLVED:**
 
-The following implementations are incorrect and need to be fixed:
+The following have been fixed:
 
-1. **CcToolchainConfigInfoProvider should not exist** ([CcRules.java reference](https://github.com/bazelbuild/bazel/blob/3ad9562ae006151d40a0ebcc90b84889888c2111/src/main/java/com/google/devtools/build/lib/bazel/rules/CcRules.java#L44)):
-   - Bazel does NOT register `CcToolchainConfigInfo` as a builtin toplevel
-   - The provider is created via `cc_common.create_cc_toolchain_config_info()`, not as a standalone global
-   - **Fix**: Remove `CcToolchainConfigInfoProvider` from `cc_common.rs` entirely
+1. ~~**CcToolchainConfigInfoProvider should not exist**~~ ✅ **RESOLVED**
+   - Removed from cc_common.rs
 
-2. **DebugPackageInfo, CcSharedLibraryInfo should be None**:
-   - Bazel's CcRules.java sets these to `Starlark.NONE`, not actual provider types:
-     ```java
-     builder.addBzlToplevel("CcInfo", Starlark.NONE);
-     builder.addBzlToplevel("DebugPackageInfo", Starlark.NONE);
-     builder.addBzlToplevel("CcSharedLibraryInfo", Starlark.NONE);
-     builder.addBzlToplevel("CcSharedLibraryHintInfo", Starlark.NONE);
-     ```
-   - The actual providers are defined in Starlark by the rule repositories themselves
-   - **Fix**: Change these registrations to return `NoneType` instead of provider structs
+2. ~~**DebugPackageInfo, CcSharedLibraryInfo, CcInfo should be None**~~ ✅ **RESOLVED**
+   - Changed to `const CcInfo: NoneType = NoneType` etc. in `cc_common.rs`
+   - These must stay native (not in Starlark prelude) because code checks `if CcInfo == None` before prelude loads
 
-3. **ProtoInfo native implementation is deprecated in Bazel 8+**:
-   - Native proto rules are deprecated; `*_proto_library` rules moved to [protobuf repository](https://github.com/protocolbuffers/protobuf)
-   - `ProtoInfo` should come from `@protobuf//bazel/common:proto_info.bzl`, not as a native builtin
-   - rules_cc 0.2.16 depends on protobuf 27.0 which still expects backward compatibility
-   - **Fix**: Either set `ProtoInfo = None` (Bazel's approach) or keep stub temporarily with clear documentation that it's transitional
+3. ~~**ProtoInfo should be None**~~ ✅ **RESOLVED**
+   - Changed to `const ProtoInfo: NoneType = NoneType` in `proto_common.rs`
 
-**Files requiring changes:**
-- `app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs` - Remove CcToolchainConfigInfoProvider, change DebugPackageInfo/CcSharedLibraryInfo to None
-- `app/kuro_build_api/src/interpreter/rule_defs/proto_common.rs` - Evaluate ProtoInfo approach
-- `app/kuro_build_api/src/interpreter/more.rs` - Update registrations
+**Architecture Note:**
+
+The None placeholders **must remain in native Rust code** rather than being moved to Starlark prelude because:
+- Code checks `if CcInfo == None` during early loading, before any Starlark is evaluated
+- Prelude injection happens after base globals are established
+- See [06-prelude-architecture.md](./06-prelude-architecture.md) for detailed architecture explanation
+
+**Verified in manual_test:**
+```
+Test 9 - CcInfo is None: True
+Test 9 - DebugPackageInfo is None: True
+Test 9 - CcSharedLibraryInfo is None: True
+Test 9 - ProtoInfo is None: True
+```
 
 **Completed:**
 
 - **Transitive dependency resolution (MVS)**: Full MVS algorithm now runs in `resolve_bzlmod_dependencies()`, resolving all transitive deps
 - **repo_name aliasing**: Both direct and transitive `bazel_dep(..., repo_name = "alias")` create cell aliases via `collect_transitive_repo_aliases()`
 - **Source fetching**: `MvsResolver::fetch_sources()` downloads and extracts all resolved modules to cache
-- **ProtoInfo provider**: Native stub implementation (**NEEDS REVISION** - native ProtoInfo deprecated in Bazel 8+)
+- **ProtoInfo provider**: `const ProtoInfo: NoneType = NoneType` ✅
 - **proto_common_do_not_use module**: Internal proto compilation utilities (stub only)
 - **provider() init function**: Custom construction logic support (InitProviderConstructor)
 - **Label() function**: Starlark Label constructor for absolute/relative labels
 - **config_common module**: toolchain_type() for toolchain requirements
 - **apple_common module**: Apple platform utilities (apple_toolchain, platform_type, etc.)
-- **CC globals**: DebugPackageInfo, CcToolchainConfigInfo, CcSharedLibraryInfo (**NEEDS REVISION** - should be None, not provider types; CcToolchainConfigInfo should not exist)
+- **CC globals**: CcInfo, DebugPackageInfo, CcSharedLibraryInfo all set to `NoneType` ✅
+- **cc_common module**: Internal APIs for rules_cc (stub implementations)
+- **ctx.fragments.cpp**: Fragment access for C++ configuration
+- **ctx.attr**: Attribute access on analysis context
 
 **Key Version Requirement:**
 

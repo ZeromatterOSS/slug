@@ -86,10 +86,24 @@ print("Test 9 - ProtoInfo is None:", _protoinfo_is_none)
 _cc_toolchain_info = cc_common.CcToolchainInfo
 print("Test 10 - cc_common.CcToolchainInfo exists:", _cc_toolchain_info != None)
 
-# Test 11: rules_cc loading (now with transitive deps resolved)
+# Test 11: Load Starlark cc_common helpers from bazel_tools
+load("@bazel_tools//tools/cpp:cc_common.bzl", "cc_common_helpers")
+
+# Verify the Starlark helpers work
+_starlark_tool = cc_common_helpers.get_tool_for_action(None, "c++-compile")
+print("Test 11 - Starlark cc_common_helpers.get_tool_for_action:", _starlark_tool)
+
+# Test 12: Load Starlark proto_common helpers
+load("@bazel_tools//tools/build_defs/proto:proto_common.bzl", "proto_common_helpers")
+
+_proto_flag = proto_common_helpers.proto_path_flag(None)
+print("Test 12 - Starlark proto_common_helpers.proto_path_flag:", _proto_flag)
+
+# Test 13: rules_cc loading (now with transitive deps resolved)
 # PROGRESS: Provider registrations fixed (CcInfo, DebugPackageInfo, etc. are now None)
+# PROGRESS: Starlark cc_common/proto_common helpers now available
 # Next blocker: subrule() built-in needed by fdo_context.bzl
 # load("@rules_cc//cc:defs.bzl", "cc_library")
-# print("Test 11 - rules_cc loaded successfully!")
+# print("Test 13 - rules_cc loaded successfully!")
 
 print("All manual tests passed!")

@@ -115,8 +115,9 @@ The detailed implementation is split into focused sub-plans:
 | Sub-Plan                                                                 | Phases | Description                                                   | Status          |
 | ------------------------------------------------------------------------ | ------ | ------------------------------------------------------------- | --------------- |
 | [01-foundation.md](./kuro-bazel-subplans/01-foundation.md)               | 1-3    | Fork, rebrand, Starlark dialect, BUILD.bazel detection        | **Complete**    |
-| [02-bzlmod.md](./kuro-bazel-subplans/02-bzlmod.md)                       | 4a-5b  | bzlmod module system, BCR integration, resolution, extensions | **In Progress** |
-| [03-rule-primitives.md](./kuro-bazel-subplans/03-rule-primitives.md)     | 6      | ctx/actions/providers API alignment                           | Not Started     |
+| [02-bzlmod.md](./kuro-bazel-subplans/02-bzlmod.md)                       | 4a-5c  | bzlmod module system, BCR integration, resolution, extensions | **In Progress** |
+| [03-rule-primitives.md](./kuro-bazel-subplans/03-rule-primitives.md)     | 6a     | ctx/actions/providers API alignment                           | Not Started     |
+| [06-prelude-architecture.md](./kuro-bazel-subplans/06-prelude-architecture.md) | 6b | Prelude preservation, Bazel shim migration, cleanup          | Not Started     |
 | [04-rules-integration.md](./kuro-bazel-subplans/04-rules-integration.md) | 7-10   | rules_cc, rules_rust, rules_python, rules_oci                 | Not Started     |
 | [05-infrastructure.md](./kuro-bazel-subplans/05-infrastructure.md)       | 11-14  | Stable Rust, sandboxing, platform support, query              | Not Started     |
 
@@ -153,11 +154,20 @@ Quick reference to all phases and their locations:
 | 5b    | bzlmod Build Integration         | [ ] In Progress                               |
 | 5c    | Bundle @bazel_tools Repository   | [x] Bundled (file loading blocked by APIs)    |
 
-### Rule Primitives (Phase 6) - [Sub-plan](./kuro-bazel-subplans/03-rule-primitives.md)
+### Rule Primitives (Phase 6a) - [Sub-plan](./kuro-bazel-subplans/03-rule-primitives.md)
 
 | Phase | Title                                      | Status          |
 | ----- | ------------------------------------------ | --------------- |
-| 6     | Rule Primitives and Provider Compatibility | [ ] Not Started |
+| 6a    | Rule Primitives and Provider Compatibility | [ ] Not Started |
+
+### Prelude Architecture (Phase 6b) - [Sub-plan](./kuro-bazel-subplans/06-prelude-architecture.md)
+
+| Phase | Title                                          | Status          |
+| ----- | ---------------------------------------------- | --------------- |
+| 6b.1  | Preserve Buck2 Prelude Loading Mechanism       | [ ] Not Started |
+| 6b.2  | Migrate Bazel Shims from Native Rust to Starlark | [ ] Not Started |
+| 6b.3  | Remove Unused Buck2 Prelude Code               | [ ] Not Started |
+| 6b.4  | Simplify Native Module Registration            | [ ] Not Started |
 
 ### Rules Integration (Phases 7-10) - [Sub-plan](./kuro-bazel-subplans/04-rules-integration.md)
 
