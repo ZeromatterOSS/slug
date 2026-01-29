@@ -48,6 +48,7 @@ A manual test project is maintained at `tests/manual_test/` for validating bzlmo
 | @bazel_tools bundled      | `audit cell`      | bazel_tools registered without .buckconfig entry         |
 | @bazel_tools file loads   | `targets root//:` | cache.bzl loaded: True (visibility() function works)     |
 | Synthetic extension repos | `targets root//:` | bazel_features_version, bazel_features_globals created   |
+| **rules_cc loading**      | `targets root//:` | Test 14c - rules_cc loaded successfully: True            |
 
 ### Extending Tests
 
@@ -352,7 +353,7 @@ Bridge the gap between bzlmod module resolution and Kuro's build system. This ph
 #### Automated Verification:
 
 - [x] `@bazel_skylib//:defs.bzl` loads successfully after bzlmod resolution
-- [ ] `@rules_cc//cc:defs.bzl` loads after fetching from BCR - Now blocked on `PackageSpecificationInfo` provider
+- [x] `@rules_cc//cc:defs.bzl` loads after fetching from BCR - **COMPLETE**
 - [ ] `@local_module//:target` works with local_path_override
 - [x] Repo aliasing works: `bazel_dep(name="foo", repo_name="bar")` makes `@bar` available
 - [x] Transitive repo_name aliases created via `collect_transitive_repo_aliases()`
