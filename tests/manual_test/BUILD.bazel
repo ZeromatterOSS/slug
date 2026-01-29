@@ -160,4 +160,24 @@ load(":test_globals.bzl", "test_bazel_modules_available")
 _bzl_results = test_bazel_modules_available()
 print("Test 19 - Bazel modules available in .bzl context:", _bzl_results)
 
+# Test 20: module_extension() and tag_class() globals (Phase 5)
+# These are needed to define module extensions in .bzl files
+load(":test_module_extension.bzl", "test_module_extension_available", "test_extension")
+_ext_available = test_module_extension_available()
+print("Test 20 - module_extension() and tag_class() available:", _ext_available)
+print("Test 20 - test_extension type:", type(test_extension))
+
+# Test 21: repository_rule() and repository_ctx (Phase 5 - Repository Rule Infrastructure)
+# These are needed by @bazel_tools//tools/build_defs/repo:http.bzl
+load(":test_repository_rule.bzl", "test_repository_rule_available", "test_repo")
+_repo_rule_available = test_repository_rule_available()
+print("Test 21 - repository_rule() available:", _repo_rule_available)
+print("Test 21 - test_repo type:", type(test_repo))
+
+# Test 22: Load http.bzl from @bazel_tools (requires repository_rule)
+# This is the key test - http.bzl defines http_archive which is used everywhere
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+print("Test 22 - @bazel_tools http.bzl loaded:", http_archive != None)
+print("Test 22 - http_archive type:", type(http_archive))
+
 print("All manual tests passed!")

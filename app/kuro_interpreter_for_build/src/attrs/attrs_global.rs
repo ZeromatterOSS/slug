@@ -918,8 +918,8 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         Ok(Attribute::attr(eval, default, doc, coercer)?)
     }
 
-    /// Takes a dict with string keys and label values.
-    /// Bazel-compatible: equivalent to attrs.dict(attrs.string(), attrs.dep()).
+    /// Takes a dict with label keys and string values.
+    /// Bazel-compatible: equivalent to attrs.dict(attrs.dep(), attrs.string()).
     fn label_keyed_string_dict<'v>(
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         providers: UnpackListOrTuple<Value<'v>>,
@@ -933,6 +933,27 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         let label_type = AttrType::dep(required_providers, PluginKindSet::EMPTY);
         let coercer = AttrType::dict(label_type, AttrType::string(), false);
+        Ok(Attribute::attr(eval, default, doc, coercer)?)
+    }
+
+    /// Takes a dict with string keys and label values.
+    /// Bazel-compatible: equivalent to attrs.dict(attrs.string(), attrs.dep()).
+    /// Used by @bazel_tools//tools/build_defs/repo:http.bzl for the "files" attribute.
+    fn string_keyed_label_dict<'v>(
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        providers: UnpackListOrTuple<Value<'v>>,
+        #[starlark(require = named)] default: Option<Value<'v>>,
+        #[starlark(require = named, default = "")] doc: &str,
+        #[starlark(require = named, default = false)] mandatory: bool,
+        #[starlark(require = named, default = false)] allow_files: bool,
+        #[starlark(require = named, default = false)] allow_single_file: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<StarlarkAttribute> {
+        let _unused = (mandatory, allow_files, allow_single_file);
+        let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
+        let label_type = AttrType::dep(required_providers, PluginKindSet::EMPTY);
+        // Note: string keys, label values (inverse of label_keyed_string_dict)
+        let coercer = AttrType::dict(AttrType::string(), label_type, false);
         Ok(Attribute::attr(eval, default, doc, coercer)?)
     }
 

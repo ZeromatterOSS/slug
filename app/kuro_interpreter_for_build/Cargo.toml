@@ -7,7 +7,9 @@ repository = { workspace = true }
 version = "0.1.0"
 
 [dependencies]
+anyhow = { workspace = true }
 async-trait = { workspace = true }
+base64 = { workspace = true }
 bumpalo = { workspace = true }
 cmp_any = { workspace = true }
 derivative = { workspace = true }
@@ -17,6 +19,7 @@ fancy-regex = { workspace = true }
 futures = { workspace = true }
 glob = { workspace = true }
 hashbrown = { workspace = true }
+flate2 = { workspace = true }
 hex = { workspace = true }
 indoc = { workspace = true }
 itertools = { workspace = true }
@@ -26,8 +29,11 @@ serde_json = { workspace = true }
 sha1 = { workspace = true }
 sha2 = { workspace = true }
 smallvec = { workspace = true }
+tar = { workspace = true }
+tokio = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
+zip = { workspace = true }
 twox-hash = { workspace = true }
 
 allocative = { workspace = true }
@@ -37,7 +43,9 @@ gazebo = { workspace = true }
 starlark = { workspace = true }
 starlark_map = { workspace = true }
 
+kuro_bzlmod = { workspace = true }
 kuro_common = { workspace = true }
+kuro_http = { workspace = true }
 kuro_core = { workspace = true }
 kuro_data = { workspace = true }
 kuro_error = { workspace = true }
@@ -50,3 +58,6 @@ kuro_query = { workspace = true }
 kuro_query_parser = { workspace = true }
 kuro_util = { workspace = true }
 dice_futures = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
