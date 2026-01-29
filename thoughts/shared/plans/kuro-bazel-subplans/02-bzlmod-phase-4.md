@@ -1,14 +1,12 @@
-# bzlmod Completed Phases
+# bzlmod Phase 4: Foundation (Complete)
 
-> **Parent Plan**: [Kuro Bazel-Compatible Build Tool](../2026-01-21-kuro-bazel-compatible-build-tool.md)
-> **Active Work**: [02-bzlmod.md](./02-bzlmod.md)
-> **Future Work**: [02-bzlmod-future.md](./02-bzlmod-future.md)
+> **Main Plan**: [02-bzlmod.md](./02-bzlmod.md)
 
-This file archives completed bzlmod phases for reference. All success criteria in these phases have been met.
+This file documents completed foundation phases for bzlmod. All success criteria have been met.
 
 ---
 
-## Phase 4a: bzlmod - Workspace Recognition ✅
+## Phase 4a: Workspace Recognition
 
 ### Overview
 
@@ -68,9 +66,9 @@ pub struct BazelDep {
 
 ### Test Migration (Complete)
 
-- [x] DELETE `tests/core/cells/` directory (cells → bzlmod)
-- [x] DELETE `tests/core/external_cells/test_bundled.py` (bundled cells → bzlmod)
-- [x] DELETE `tests/core/external_cells/test_git.py` (git cells → git_override)
+- [x] DELETE `tests/core/cells/` directory (cells -> bzlmod)
+- [x] DELETE `tests/core/external_cells/test_bundled.py` (bundled cells -> bzlmod)
+- [x] DELETE `tests/core/external_cells/test_git.py` (git cells -> git_override)
 - [x] ADD `tests/core/bzlmod/test_module_parsing.py` for MODULE.bazel parsing
 - [x] ADD `tests/core/bzlmod/test_module_directive.py` for module() directive
 - [x] ADD `tests/core/bzlmod/test_bazel_dep.py` for bazel_dep() directive
@@ -78,7 +76,7 @@ pub struct BazelDep {
 
 ---
 
-## Phase 4b: bzlmod - Local Dependencies ✅
+## Phase 4b: Local Dependencies
 
 ### Overview
 
@@ -128,7 +126,7 @@ pub fn resolve_local_override(
 
 ---
 
-## Phase 4c: bzlmod - BCR Integration ✅
+## Phase 4c: BCR Integration
 
 ### Overview
 
@@ -198,7 +196,7 @@ Cache structure:
 
 ---
 
-## Phase 4d: bzlmod - Resolution and Lockfile ✅
+## Phase 4d: Resolution and Lockfile
 
 ### Overview
 
@@ -230,7 +228,7 @@ Diamond dependency example:
 Root requires A@1.0, B@1.0
 A@1.0 requires C@1.0
 B@1.0 requires C@1.1
-→ MVS selects C@1.1 (highest required)
+-> MVS selects C@1.1 (highest required)
 ```
 
 #### 2. Compatibility Level Checking
@@ -262,78 +260,3 @@ Generates MODULE.bazel.lock in Bazel-compatible JSON format (lock_file_version: 
 - [x] ADD Rust unit tests for lockfile in `lockfile.rs` (roundtrip, validity, etc.)
 
 **Note**: Phase 4d core functionality is complete. Python e2e tests are deferred until CLI integration is complete.
-
----
-
-## Phase 6: Migrate Stubs to Starlark ✅
-
-### Overview
-
-Originally planned to migrate language/platform-specific compatibility modules from native Rust to Starlark. **Completed with architectural constraint discovered.**
-
-### Priority Order (Original)
-
-1. `config_common`, `platform_common` (low-risk)
-2. `apple_common`, `coverage_common` (medium complexity)
-3. `proto_common` stub methods (partial - keep `compile()` native)
-4. `cc_common` internals (complex, deferred)
-
-### ARCHITECTURAL CONSTRAINT DISCOVERED
-
-**Date**: 2026-01-28
-
-**Finding**: The Bazel compatibility modules **cannot be migrated to pure Starlark** due to Kuro/Buck2's global injection architecture.
-
-#### Symbol Availability by Context
-
-| Context                     | Base Globals | Prelude Symbols | native.* Extraction |
-|-----------------------------|--------------|-----------------|---------------------|
-| Root cell BUILD file        | ✓            | ✓               | ✓                   |
-| Root cell .bzl file         | ✓            | ✓               | ✗                   |
-| External cell .bzl file     | ✓            | ✗               | ✗                   |
-
-#### Two Injection Mechanisms
-
-1. **`REGISTER_BUCK2_BUILD_API_GLOBALS` (Native Registration)**
-   - **When**: During interpreter initialization (before any Starlark evaluation)
-   - **Where**: Available in ALL Starlark contexts
-   - **Code**: `app/kuro_build_api/src/interpreter/more.rs`
-
-2. **Prelude Injection**
-   - **When**: During file evaluation (after base globals exist)
-   - **Where**: Only BUILD files and .bzl files within the prelude cell
-   - **Code**: `interpreter_for_dir.rs:create_env()` lines 323-335
-
-#### Why External Cells Need Native Registration
-
-External cells (rules_cc, bazel_skylib, protobuf, etc.) access these modules at **module level** in their .bzl files:
-
-```python
-# rules_cc//cc/private/rules_impl/objc_common.bzl:22
-_apple_toolchain = apple_common.apple_toolchain()
-
-# rules_cc//cc/find_cc_toolchain.bzl:131
-return [config_common.toolchain_type(CC_TOOLCHAIN_TYPE, mandatory = mandatory)]
-```
-
-These external .bzl files only see **base globals** from `REGISTER_BUCK2_BUILD_API_GLOBALS`.
-
-**Implication**: These modules MUST remain as native Rust registrations to be available in external cells.
-
-### Native Implementations (Must Remain)
-
-Located in `app/kuro_build_api/src/interpreter/rule_defs/`:
-- `apple_common.rs`
-- `config_common.rs`
-- `coverage_common.rs`
-- `platform_common.rs`
-
-### Success Criteria (All Met)
-
-- [x] `config_common.toolchain_type()` works (Test 15 verified)
-- [x] `platform_common.TemplateVariableInfo` works (Test 16 verified)
-- [x] `apple_common.platform_type.ios` returns "ios" (Test 17 verified)
-- [x] `coverage_common.instrumented_files_info` exists (Test 18 verified)
-- [x] All existing tests pass
-- [x] No regression in rules_cc loading (blocked on aspect(), not these modules)
-- [N/A] Native code reduced - See architectural constraint above

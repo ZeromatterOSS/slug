@@ -1,116 +1,45 @@
-# bzlmod Future Phases
+# bzlmod Phase 8: Full subrule() Implementation (Future)
 
-> **Parent Plan**: [Kuro Bazel-Compatible Build Tool](../2026-01-21-kuro-bazel-compatible-build-tool.md)
-> **Active Work**: [02-bzlmod.md](./02-bzlmod.md)
-> **Completed Work**: [02-bzlmod-completed.md](./02-bzlmod-completed.md)
+> **Main Plan**: [02-bzlmod.md](./02-bzlmod.md)
 
-This file contains future work not yet started. These phases will be moved to the active file when work begins.
-
----
-
-## Phase 7: Proto Support (ProtoInfo Provider) - NEEDS RE-EVALUATION
-
-### Overview
-
-**Current Status**: Native `ProtoInfo` is deprecated in Bazel 8+. The approach taken in the current implementation may be incorrect.
-
-### What Bazel Actually Does (Research Complete)
-
-Per [Bazel 8.0 release notes](https://blog.bazel.build/2024/12/09/bazel-8-release.html):
-
-- Native `*_proto_library` rules have been **moved to the protobuf repository**
-- `ProtoInfo` should come from `@protobuf//bazel/common:proto_info.bzl`, not as a native builtin
-- Bazel provides `--incompatible_autoload_externally` flag to automatically load rules from their repositories
-
-### Current Implementation (Incorrect)
-
-The current implementation in `app/kuro_build_api/src/interpreter/rule_defs/proto_common.rs` creates:
-
-- `ProtoInfo` as a native builtin provider type
-- `proto_common_do_not_use` module with stub methods
-
-This mirrors the **deprecated** Bazel 7.x behavior, not Bazel 8+/9.0.
-
-### Why rules_cc Still Needs It
-
-rules_cc 0.2.16 depends on protobuf 27.0, and the load chain hits:
-
-```
-@rules_cc//cc:defs.bzl
-  -> @protobuf//bazel/private/native.bzl:3
-       NativeProtoInfo = ProtoInfo  <- Expects builtin ProtoInfo
-```
-
-**protobuf 27.0** still assumes `ProtoInfo` exists as a native builtin for backward compatibility during the transition period.
-
-### Recommended Approach
-
-**Option A: Bazel-compatible stub (Recommended for now)**
-
-- Set `ProtoInfo = None` (matches how Bazel sets `CcInfo`, `DebugPackageInfo`, etc. to `Starlark.NONE`)
-- Let protobuf rules fail gracefully or provide their own implementation
-- Test if this breaks rules_cc loading
-
-**Option B: Keep transitional stub**
-
-- Keep current stub but document it as transitional
-- Plan to remove once protobuf rules fully migrate
-
-**Option C: Remove entirely**
-
-- Remove `proto_common.rs` and let errors surface
-- May break rules_cc until protobuf rules can fully load
-
-### Files to Modify
-
-- `app/kuro_build_api/src/interpreter/rule_defs/proto_common.rs` - Evaluate approach
-- `app/kuro_build_api/src/interpreter/more.rs` - Update registration if needed
-
-### Success Criteria
-
-- [ ] Determine correct approach (Option A, B, or C)
-- [ ] Test rules_cc loading with chosen approach
-- [ ] Document decision and rationale
-- [ ] `@rules_cc//cc:defs.bzl` loads completely (if possible with proto stub)
-
----
-
-## Phase 8: Full subrule() Implementation
-
-### Overview
+## Overview
 
 Complete the `subrule()` implementation to match Bazel's semantics per the design document.
 
 **Design Reference**: `thoughts/shared/research/bazel-subrule-design.md`
 (Original: https://docs.google.com/document/d/1RbNC88QieKvBEwir7iV5zZU08AaMlOzxhVkPnmKDedQ)
 
-### Current Status: STUB ONLY
+---
+
+## Current Status: STUB ONLY
 
 The current implementation (`app/kuro_interpreter_for_build/src/subrule.rs`) is a minimal stub.
 
 **What's implemented:**
-- ✅ `subrule()` Starlark global function
-- ✅ `StarlarkSubruleCallable` - unfrozen callable with RefCell for name
-- ✅ `FrozenStarlarkSubruleCallable` - frozen version
-- ✅ Accepts parameters: `implementation`, `attrs`, `fragments`, `toolchains`, `subrules`, `doc`
-- ✅ Validates called only in `.bzl` files
-- ✅ Export_as() sets name when assigned to variable
-- ✅ Basic documentation generation
-- ✅ Accessors: `name()`, `attrs()`, `fragments()`, `toolchains()`, `implementation()`
+- `subrule()` Starlark global function
+- `StarlarkSubruleCallable` - unfrozen callable with RefCell for name
+- `FrozenStarlarkSubruleCallable` - frozen version
+- Accepts parameters: `implementation`, `attrs`, `fragments`, `toolchains`, `subrules`, `doc`
+- Validates called only in `.bzl` files
+- Export_as() sets name when assigned to variable
+- Basic documentation generation
+- Accessors: `name()`, `attrs()`, `fragments()`, `toolchains()`, `implementation()`
 
 **What's NOT implemented:**
-- ❌ SubruleContext - currently just passes args through to implementation
-- ❌ `subrules` parameter on `rule()` function
-- ❌ `subrules` parameter on `aspect()` function
-- ❌ Attribute lifting (subrule attrs → parent rule attrs)
-- ❌ Attribute name mangling for collision avoidance
-- ❌ Implicit dep injection as keyword arguments
-- ❌ Runtime validation that subrule is declared in parent's subrules list
-- ❌ Toolchain resolution for subrules
-- ❌ Exec group support for subrules
-- ❌ Nested subrule composition
+- SubruleContext - currently just passes args through to implementation
+- `subrules` parameter on `rule()` function
+- `subrules` parameter on `aspect()` function
+- Attribute lifting (subrule attrs -> parent rule attrs)
+- Attribute name mangling for collision avoidance
+- Implicit dep injection as keyword arguments
+- Runtime validation that subrule is declared in parent's subrules list
+- Toolchain resolution for subrules
+- Exec group support for subrules
+- Nested subrule composition
 
-### Phase 8a: SubruleContext Implementation
+---
+
+## Phase 8a: SubruleContext Implementation
 
 **Goal**: Create a restricted context object for subrule implementations.
 
@@ -155,7 +84,9 @@ pub struct SubruleContext<'v> {
 - Modify `app/kuro_build_api/src/interpreter/rule_defs/mod.rs` to register
 - May need to modify `AnalysisActions` to support implicit exec_group
 
-### Phase 8b: Attribute Lifting and rule() Integration
+---
+
+## Phase 8b: Attribute Lifting and rule() Integration
 
 **Goal**: When a rule declares `subrules=[my_subrule]`, lift subrule's implicit deps.
 
@@ -181,7 +112,9 @@ pub struct SubruleContext<'v> {
 - `app/kuro_node/src/rule.rs` - Store subrule references and lifted attrs
 - `app/kuro_node/src/attrs/spec.rs` - Support lifted attrs in AttributeSpec
 
-### Phase 8c: Call Semantics
+---
+
+## Phase 8c: Call Semantics
 
 **Goal**: Implement proper subrule invocation from rule implementations.
 
@@ -207,7 +140,9 @@ pub struct SubruleContext<'v> {
 - `app/kuro_interpreter_for_build/src/subrule.rs` - Rewrite `FrozenStarlarkSubruleCallable::invoke()`
 - `app/kuro_build_api/src/interpreter/rule_defs/` - Expose analysis context to subrule
 
-### Phase 8d: Toolchain and Exec Group Support
+---
+
+## Phase 8d: Toolchain and Exec Group Support
 
 **Goal**: Subrules can declare their own toolchains and execution requirements.
 
@@ -225,7 +160,9 @@ pub struct SubruleContext<'v> {
 2. Make `ctx.toolchains` on SubruleContext return subrule's declared toolchains
 3. Defer exec_compatible_with and exec_group to later phase
 
-### Phase 8e: Aspect Support
+---
+
+## Phase 8e: Aspect Support
 
 **Goal**: Aspects can also use subrules.
 
@@ -237,7 +174,9 @@ pub struct SubruleContext<'v> {
 - Aspects should be able to call declared subrules during analysis
 - SubruleContext works the same in aspect context
 
-### Phase 8f: Nested Subrule Support
+---
+
+## Phase 8f: Nested Subrule Support
 
 **Goal**: Subrules can declare other subrules they depend on.
 
@@ -255,9 +194,11 @@ pub struct SubruleContext<'v> {
 - `app/kuro_interpreter_for_build/src/subrule.rs` - Process nested subrules during freeze
 - `app/kuro_interpreter_for_build/src/rule.rs` - Recursively lift attrs from nested subrules
 
-### Success Criteria
+---
 
-#### Automated Verification:
+## Success Criteria
+
+### Automated Verification
 
 ```bash
 cargo test -p kuro_interpreter_for_build
@@ -273,10 +214,10 @@ cargo test -p kuro_build_api
 - [ ] `rule.rs`: Lifted attrs added to rule's AttributeSpec
 - [ ] `subrule_ctx.rs`: Only allowed members are accessible
 - [ ] `subrule_ctx.rs`: Disallowed members raise appropriate errors
-- [ ] Integration: Subrule not declared → clear error message
-- [ ] Integration: Subrule called outside analysis → clear error message
+- [ ] Integration: Subrule not declared -> clear error message
+- [ ] Integration: Subrule called outside analysis -> clear error message
 
-#### Manual Verification:
+### Manual Verification
 
 **Test 1: Basic subrule invocation**
 
@@ -314,7 +255,9 @@ my_rule = rule(
 )
 ```
 
-### Implementation Priority
+---
+
+## Implementation Priority
 
 For rules_cc compatibility, the minimum viable implementation needs:
 
@@ -333,9 +276,11 @@ For rules_cc compatibility, the minimum viable implementation needs:
 | 8e | Aspects | Depends on aspect impl | Low |
 | 8f | Nested subrules | 2 modify | Medium |
 
-**Recommended Order:** 8b → 8c → 8a → defer 8d/8e/8f
+**Recommended Order:** 8b -> 8c -> 8a -> defer 8d/8e/8f
 
-### References
+---
+
+## References
 
 **Design Documentation:**
 - **Design Doc**: `thoughts/shared/research/bazel-subrule-design.md`
