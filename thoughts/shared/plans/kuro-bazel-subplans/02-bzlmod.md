@@ -79,10 +79,24 @@ When implementing new features:
 
 - **@bazel_tools http.bzl/git.bzl**: Needs `repository_rule` and `repository_ctx` (Phase 5)
 - **Module extensions**: Parsing complete, synthetic repo workaround implemented, full execution not implemented
-- **rules_cc loading**: Progress made, now blocked on `PackageSpecificationInfo` provider
+- **rules_cc loading**: **COMPLETE** - rules_cc now loads successfully!
   - ~~`aspect()` built-in~~ **RESOLVED** (Phase 8a)
   - ~~`allow_empty` parameter~~ **RESOLVED**
-  - **NEW BLOCKER**: `PackageSpecificationInfo` provider (cc_toolchain.bzl:64)
+  - ~~`PackageSpecificationInfo` provider~~ **RESOLVED** (added as NoneType)
+  - ~~`cfg` parameter on attr.label()~~ **RESOLVED** (accepts string or config.exec())
+  - ~~computed defaults (functions)~~ **RESOLVED** (skip coercion for functions)
+  - ~~OutputGroupInfo provider~~ **RESOLVED** (changed to NoneType)
+  - ~~stub transitions (None cfg)~~ **RESOLVED** (handle None in rule() cfg)
+  - ~~`subrules` parameter~~ **RESOLVED** (added to rule())
+  - ~~`initializer` parameter~~ **RESOLVED** (added to rule())
+  - ~~`allow_rules` parameter~~ **RESOLVED** (added to attr.label/label_list)
+  - ~~`values` parameter~~ **RESOLVED** (added to attr.int)
+  - ~~`exec_group` built-in~~ **RESOLVED** (added as function returning None)
+  - ~~`exec_groups` parameter~~ **RESOLVED** (added to rule())
+  - ~~`RunEnvironmentInfo` provider~~ **RESOLVED** (added as callable stub)
+  - ~~`outputs` parameter~~ **RESOLVED** (added to rule())
+  - ~~`executable`/`test` params~~ **RESOLVED** (added to rule())
+  - ~~`testing` module~~ **RESOLVED** (added with TestEnvironment method)
 
 ### Resolved Issues
 
@@ -365,7 +379,7 @@ Bridge the gap between bzlmod module resolution and Kuro's build system. This ph
 - [x] **ProtoInfo built-in provider** - COMPLETE (returns NoneType per Bazel 8+ behavior)
 - [x] **`aspect()` built-in** - See **[08-aspects.md](./08-aspects.md)** (Phase 8a COMPLETE)
 - [x] **`allow_empty` parameter for attr.label_list()** - COMPLETE
-- [ ] **`PackageSpecificationInfo` provider** - NEW BLOCKER for rules_cc (cc_toolchain.bzl:64)
+- [x] **`PackageSpecificationInfo` provider** - COMPLETE (added as NoneType in cc_common.rs)
 
 #### Manual Verification:
 

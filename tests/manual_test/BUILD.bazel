@@ -124,10 +124,10 @@ print("Test 14b - attr.label_list(aspects=[...]) accepted:", _test_rule_attrs !=
 # Test 14c: rules_cc loading - Progress tracking
 # RESOLVED: aspect() built-in implemented (Phase 8a)
 # RESOLVED: allow_empty parameter added to attr.label_list()
-# NEW BLOCKER: PackageSpecificationInfo provider not found
-#   at bazel-external/rules_cc/0.2.16/cc/private/rules_impl/cc_toolchain.bzl:64
-# load("@rules_cc//cc:defs.bzl", "cc_library")
-print("Test 14c - rules_cc blocked on PackageSpecificationInfo provider")
+# RESOLVED: PackageSpecificationInfo provider added (as NoneType in cc_common.rs)
+# Try loading rules_cc to find next blocker:
+load("@rules_cc//cc:defs.bzl", "cc_library")
+print("Test 14c - rules_cc loaded successfully:", cc_library != None)
 
 # Test 15: config_common module (Phase 6a Starlark migration)
 _has_toolchain_type = hasattr(config_common, "toolchain_type")

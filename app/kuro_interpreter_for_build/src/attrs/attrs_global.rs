@@ -87,7 +87,13 @@ impl AttributeExt for Attribute {
                 // Skip coercion for configuration_field() values - these are placeholders
                 // indicating the value comes from configuration, not a static default.
                 // The actual value will be resolved at analysis time from the configuration.
-                if x.get_type() == "configuration_field" {
+                //
+                // Also skip coercion for computed defaults (functions). In Bazel, you can
+                // pass a function as the default value, and it gets called during analysis
+                // to compute the actual default. For now, we treat these as "no default"
+                // to allow modules to load. Full computed default support is future work.
+                let value_type = x.get_type();
+                if value_type == "configuration_field" || value_type == "function" {
                     None
                 } else {
                     Some(Arc::new(
@@ -710,13 +716,20 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
 
     /// Takes an int from the user, supplies an int to the rule.
     /// Bazel-compatible alias for attrs.int().
+    ///
+    /// `values` restricts the allowed values to a specific set (not yet enforced).
     fn int<'v>(
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
+        // Bazel-compatible: restrict to specific values (e.g., [0, 1, -1] for stamp attribute)
+        // Currently accepted but not enforced
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        values: UnpackListOrTuple<i32>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = mandatory;
+        // TODO(bazel): Enforce values constraint during coercion
+        let _unused = (mandatory, values);
         Ok(Attribute::attr(eval, default, doc, AttrType::int())?)
     }
 
@@ -743,6 +756,10 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
     /// - `False` (default, don't allow files)
     /// - A list of extensions like `[".txt", ".json"]` (allow single file with those extensions)
     ///
+    /// `cfg` specifies a configuration transition:
+    /// - `"exec"` - dependency runs in the execution platform (for tools)
+    /// - `"target"` - dependency runs in the target platform (default)
+    ///
     /// `aspects` is a list of aspects to be applied to the targets of this attribute.
     fn label<'v>(
         #[starlark(require = named, default = UnpackListOrTuple::default())]
@@ -755,6 +772,13 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // True = allow any file, False = don't allow, ["ext"] = allow files with extension
         #[starlark(require = named)] allow_files: Option<Value<'v>>,
         #[starlark(require = named)] allow_single_file: Option<Value<'v>>,
+        // Bazel-compatible: configuration transition for the dependency
+        // Can be a string ("exec", "target") or a config_transition object (config.exec(...))
+        #[starlark(require = named)] cfg: Option<Value<'v>>,
+        // Bazel-compatible: allow_rules restricts which rule types can be used
+        // Currently accepted but not enforced
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        allow_rules: UnpackListOrTuple<&str>,
         // Bazel's `flags` parameter for internal attribute metadata (e.g., DIRECT_COMPILE_TIME_INPUT).
         // Currently accepted but ignored.
         #[starlark(require = named, default = UnpackListOrTuple::default())]
@@ -770,9 +794,26 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // Parse allow_single_file: can be bool or list of extension strings
         let allow_single_file_bool = parse_allow_files_param(allow_single_file, "allow_single_file", eval)?;
         // TODO(bazel-aspects): Store aspects and apply during analysis (Phase 8b-8c)
-        let _unused = (mandatory, executable, allow_files_bool, allow_single_file_bool, flags, aspects);
+        // TODO(bazel): Enforce allow_rules constraint during coercion
+        let _unused = (mandatory, executable, allow_files_bool, allow_single_file_bool, allow_rules, flags, aspects);
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
-        let coercer = AttrType::dep(required_providers, PluginKindSet::EMPTY);
+        // Handle cfg parameter: "exec" or config.exec(...) means use exec_dep, otherwise use regular dep
+        let is_exec = match cfg {
+            Some(v) => {
+                if let Some(s) = v.unpack_str() {
+                    s == "exec"
+                } else {
+                    // Check if it's a config.exec transition (contains "exec" in repr)
+                    v.to_repr().contains("exec")
+                }
+            }
+            None => false,
+        };
+        let coercer = if is_exec {
+            AttrType::exec_dep(required_providers)
+        } else {
+            AttrType::dep(required_providers, PluginKindSet::EMPTY)
+        };
         Ok(Attribute::attr(eval, default, doc, coercer)?)
     }
 
@@ -782,6 +823,7 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
     ///
     /// `aspects` is a list of aspects to be applied to the targets of this attribute.
     /// `allow_empty` controls whether the list can be empty (default True).
+    /// `allow_rules` restricts which rule types can be used (not yet enforced).
     fn label_list<'v>(
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         providers: UnpackListOrTuple<Value<'v>>,
@@ -793,6 +835,10 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // Bazel-compatible: whether the list can be empty (default True)
         // Currently accepted but not enforced
         #[starlark(require = named, default = true)] allow_empty: bool,
+        // Bazel-compatible: allow_rules restricts which rule types can be used
+        // Currently accepted but not enforced
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        allow_rules: UnpackListOrTuple<&str>,
         // Bazel's `flags` parameter for internal attribute metadata (e.g., DIRECT_COMPILE_TIME_INPUT).
         // Currently accepted but ignored.
         #[starlark(require = named, default = UnpackListOrTuple::default())]
@@ -806,7 +852,8 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         let allow_files_bool = parse_allow_files_param(allow_files, "allow_files", eval)?;
         // TODO(bazel-aspects): Store aspects and apply during analysis (Phase 8b-8c)
         // TODO(bazel): Enforce allow_empty constraint during coercion
-        let _unused = (mandatory, allow_files_bool, allow_empty, flags, aspects);
+        // TODO(bazel): Enforce allow_rules constraint during coercion
+        let _unused = (mandatory, allow_files_bool, allow_empty, allow_rules, flags, aspects);
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         let inner = AttrType::dep(required_providers, PluginKindSet::EMPTY);
         let coercer = AttrType::list(inner);

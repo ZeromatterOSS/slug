@@ -227,7 +227,15 @@ impl<'v> StarlarkRuleCallable<'v> {
 
         let cfg = match (cfg, supports_incoming_transition) {
             (Some(_), Some(_)) => return Err(RuleError::CfgAndSupportsIncomingTransition.into()),
-            (Some(cfg), None) => RuleIncomingTransition::Fixed(transition_id_from_value(cfg)?),
+            (Some(cfg), None) => {
+                // Handle the case where cfg is passed but is None (e.g., from a stub transition)
+                // In Bazel compat mode, some transitions are stubbed as None
+                if cfg.is_none() {
+                    RuleIncomingTransition::None
+                } else {
+                    RuleIncomingTransition::Fixed(transition_id_from_value(cfg)?)
+                }
+            }
             (None, Some(true)) => RuleIncomingTransition::FromAttribute,
             (None, Some(false) | None) => RuleIncomingTransition::None,
         };
@@ -646,12 +654,31 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         // Bazel-compatible: configuration fragments required by this rule (e.g., ["cpp", "java"])
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         fragments: UnpackListOrTuple<&str>,
+        // Bazel-compatible: subrules that this rule uses (not yet implemented, just accepted)
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        subrules: UnpackListOrTuple<Value<'v>>,
+        // Bazel-compatible: initializer function called before implementation (not yet implemented)
+        #[starlark(require = named)] initializer: Option<Value<'v>>,
+        // Bazel-compatible: execution groups for the rule (not yet implemented)
+        #[starlark(require = named)] exec_groups: Option<Value<'v>>,
+        // Bazel-compatible: implicit outputs defined by the rule (e.g., {"dwp_file": "%{name}.dwp"})
+        #[starlark(require = named)] outputs: Option<Value<'v>>,
+        // Bazel-compatible: whether this rule produces an executable
+        #[starlark(require = named, default = false)] executable: bool,
+        // Bazel-compatible: whether this rule is a test rule
+        #[starlark(require = named, default = false)] test: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkRuleCallable<'v>> {
         // TODO(bazel): Use the provides parameter to validate rule outputs
         // TODO(bazel): Use the toolchains parameter for toolchain resolution
         // TODO(bazel): Use the fragments parameter for configuration fragment access
-        let _unused = (provides, toolchains, fragments);
+        // TODO(bazel): Use the subrules parameter for subrule composition
+        // TODO(bazel): Use the initializer parameter for pre-analysis attribute validation
+        // TODO(bazel): Use the exec_groups parameter for execution groups
+        // TODO(bazel): Use the outputs parameter for implicit outputs
+        // TODO(bazel): Use the executable parameter
+        // TODO(bazel): Use the test parameter
+        let _unused = (provides, toolchains, fragments, subrules, initializer, exec_groups, outputs, executable, test);
         // Support both `implementation` (Bazel) and `impl` (Kuro) parameter names
         let impl_fn = match (implementation, r#impl) {
             (Some(implementation), None) => implementation,
@@ -708,4 +735,38 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
 
     /// Type symbol for Rule.
     const Rule: StarlarkValueAsType<StarlarkRuleCallable> = StarlarkValueAsType::new();
+
+    /// Define an execution group for a rule.
+    ///
+    /// Execution groups allow a rule to define different execution platforms for different
+    /// actions. For example, a C++ rule might have one group for compilation and another
+    /// for linking, each potentially running on different machines.
+    ///
+    /// Bazel example:
+    /// ```python
+    /// my_rule = rule(
+    ///     exec_groups = {
+    ///         "compile": exec_group(toolchains = use_cc_toolchain()),
+    ///         "link": exec_group(toolchains = use_cc_toolchain()),
+    ///     },
+    /// )
+    /// ```
+    ///
+    /// Currently this is a stub that returns a placeholder value.
+    /// TODO(bazel): Implement proper execution group support.
+    fn exec_group<'v>(
+        // Bazel-compatible: toolchains required by this exec group
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        toolchains: UnpackListOrTuple<Value<'v>>,
+        // Bazel-compatible: execution requirements (e.g., {"cpu": "4"})
+        #[starlark(require = named)] exec_compatible_with: Option<Value<'v>>,
+        // Bazel-compatible: copy from rule (no-op for stub)
+        #[starlark(require = named, default = false)] copy_from_rule: bool,
+        _eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        // TODO(bazel): Implement proper execution group support
+        let _unused = (toolchains, exec_compatible_with, copy_from_rule);
+        // Return a stub struct that can be used in exec_groups dict
+        Ok(Value::new_none())
+    }
 }

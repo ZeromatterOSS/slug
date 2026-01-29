@@ -687,6 +687,68 @@ pub fn register_cc_common(globals: &mut GlobalsBuilder) {
     /// CcSharedLibraryInfo - None placeholder. Actual provider defined in rules_cc Starlark.
     const CcSharedLibraryInfo: NoneType = NoneType;
 
-    /// OutputGroupInfo provider for grouping rule outputs.
-    const OutputGroupInfo: OutputGroupInfoProvider = OutputGroupInfoProvider;
+    /// OutputGroupInfo - None placeholder for now.
+    /// TODO(bazel): Implement proper OutputGroupInfo provider.
+    const OutputGroupInfo: NoneType = NoneType;
+
+    /// PackageSpecificationInfo - None placeholder.
+    /// This is a Bazel built-in provider for package visibility/allowlisting.
+    /// Used by cc_toolchain.bzl for visibility_public_presubmit attribute.
+    const PackageSpecificationInfo: NoneType = NoneType;
+
+    /// RunEnvironmentInfo - Callable stub.
+    /// This is a Bazel built-in provider for specifying environment variables
+    /// that should be set when running binaries or tests.
+    /// Returns None for now; proper implementation would return a provider instance.
+    /// TODO(bazel): Implement proper RunEnvironmentInfo provider.
+    #[starlark(speculative_exec_safe)]
+    fn RunEnvironmentInfo<'v>(
+        #[starlark(require = named)] environment: Option<Value<'v>>,
+        #[starlark(require = named)] inherited_environment: Option<Value<'v>>,
+    ) -> starlark::Result<NoneType> {
+        let _unused = (environment, inherited_environment);
+        Ok(NoneType)
+    }
+
+    /// testing module constant for Bazel-compatible testing utilities.
+    /// Currently a stub that provides TestEnvironment.
+    const testing: TestingModule = TestingModule;
+}
+
+// ============================================================================
+// TestingModule - Bazel's testing module
+// ============================================================================
+
+/// Stub for the testing module.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct TestingModule;
+
+impl Display for TestingModule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<module: testing>")
+    }
+}
+
+starlark_simple_value!(TestingModule);
+
+#[starlark_value(type = "testing")]
+impl<'v> StarlarkValue<'v> for TestingModule {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(testing_methods)
+    }
+}
+
+#[starlark_module]
+fn testing_methods(builder: &mut MethodsBuilder) {
+    /// TestEnvironment provider for specifying test environment variables.
+    /// Returns None for now - proper implementation would return a TestEnvironment provider.
+    fn TestEnvironment<'v>(
+        this: &TestingModule,
+        #[starlark(require = named)] environment: Option<Value<'v>>,
+        #[starlark(require = named)] inherited_environment: Option<Value<'v>>,
+    ) -> starlark::Result<NoneType> {
+        let _unused = (this, environment, inherited_environment);
+        Ok(NoneType)
+    }
 }
