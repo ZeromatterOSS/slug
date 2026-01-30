@@ -56,8 +56,11 @@ use std::fmt;
 use allocative::Allocative;
 use derive_more::Display;
 use kuro_bzlmod::RepoAttrValue;
+use kuro_bzlmod::RepoSpec;
 use kuro_bzlmod::RepositoryInvocation;
+use kuro_bzlmod::in_extension_context;
 use kuro_bzlmod::record_invocation;
+use kuro_bzlmod::record_repo_spec;
 use starlark::any::ProvidesStaticType;
 use starlark::docs::DocFunction;
 use starlark::docs::DocItem;
@@ -383,21 +386,48 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRepositoryRule {
             name,
         );
 
-        // Build the invocation record
-        let mut invocation = RepositoryInvocation::new(
-            name.to_owned(),
-            self.name.clone(),
-        );
+        // Check if we're in module extension execution context.
+        // In extension context, we capture RepoSpecs for deferred execution.
+        // Outside extension context, we record RepositoryInvocations for immediate tracking.
+        if in_extension_context() {
+            // Build a RepoSpec for deferred execution
+            // The repo_rule_id uses the rule name; full path will be enhanced later
+            let mut spec = RepoSpec::new(self.name.clone());
 
-        // Convert all kwargs to RepoAttrValue
-        for (key, value) in kwargs.iter() {
-            let attr_value = starlark_to_repo_attr_value(*value);
-            invocation.attrs.insert(key.as_str().to_owned(), attr_value);
+            // Convert all kwargs (except 'name') to attributes
+            for (key, value) in kwargs.iter() {
+                let key_str = key.as_str();
+                if key_str != "name" {
+                    let attr_value = starlark_to_repo_attr_value(*value);
+                    spec.attributes.insert(key_str.to_owned(), attr_value);
+                }
+            }
+
+            // Record the spec in the extension registry
+            record_repo_spec(name.to_owned(), spec);
+
+            tracing::debug!(
+                "Captured RepoSpec for '{}' from repository rule '{}' (extension context)",
+                name,
+                self.name,
+            );
+        } else {
+            // Build the invocation record for MODULE.bazel/WORKSPACE context
+            let mut invocation = RepositoryInvocation::new(
+                name.to_owned(),
+                self.name.clone(),
+            );
+
+            // Convert all kwargs to RepoAttrValue
+            for (key, value) in kwargs.iter() {
+                let attr_value = starlark_to_repo_attr_value(*value);
+                invocation.attrs.insert(key.as_str().to_owned(), attr_value);
+            }
+
+            // Record the invocation in the thread-local registry
+            // This will be collected after MODULE.bazel/extension parsing completes
+            record_invocation(invocation);
         }
-
-        // Record the invocation in the thread-local registry
-        // This will be collected after MODULE.bazel/extension parsing completes
-        record_invocation(invocation);
 
         Ok(Value::new_none())
     }

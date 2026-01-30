@@ -3,6 +3,30 @@
 > **Main Plan**: [02-bzlmod.md](./02-bzlmod.md)
 > **Parent Phase**: [Phase 5 Overview](./02-bzlmod-phase-5-overview.md)
 
+## Status: COMPLETE
+
+**Completed:** 2026-01-29
+**Commit:** d9fe62d - Implement DICE integration for repository rule execution (Phase 5d)
+
+### Implementation Summary
+
+| Component | File | Description |
+|-----------|------|-------------|
+| Invocation Registry | `kuro_bzlmod/src/repository_invocations.rs` | Thread-local registry for recording rule invocations |
+| DICE Execution Key | `kuro_bzlmod/src/repository_execution.rs` | `RepositoryRuleExecutionKey` implementing `Key` trait |
+| Repository Executor | `kuro_bzlmod/src/repository_executor.rs` | Actual execution logic for http_archive, git_repository, local_repository |
+| Lockfile Integration | `kuro_bzlmod/src/lockfile.rs` | `RepositoryRuleLockEntry` for caching |
+
+### Key Features Implemented
+
+- **http_archive**: Download with URL fallback, SHA256/SRI verification, tar.gz/zip extraction, strip_prefix
+- **git_repository**: Clone, fetch specific commit/tag/branch
+- **local_repository**: Symlink to local paths
+- **Stub generation**: Unknown rules get minimal BUILD.bazel
+- **Completion markers**: `.kuro_repo_complete` prevents re-execution
+
+---
+
 ## Overview
 
 Enable repository rules (like `http_archive`) to actually execute during module resolution, downloading and extracting dependencies. This bridges the gap between repository rule definitions (which exist) and actual repository materialization.

@@ -31,9 +31,9 @@ Execute module extensions using **deferred execution** model matching Bazel:
 
 **What's missing:**
 
-1. `RepoSpec` type for deferred execution (captures rule + attrs, no execution)
-2. DICE key for extension execution (`ModuleExtensionExecutionKey`)
-3. DICE key for lazy repo execution (`ExtensionRepoExecutionKey`)
+1. ~~`RepoSpec` type for deferred execution (captures rule + attrs, no execution)~~ - DONE (Phase 5e-1)
+2. ~~DICE key for extension execution (`ModuleExtensionExecutionKey`)~~ - DONE (Phase 5e-2)
+3. ~~DICE key for lazy repo execution (`ExtensionRepoExecutionKey`)~~ - DONE (Phase 5e-3)
 4. Temporary working directory for `module_ctx` (deleted after extension)
 5. Cell registration for extension-generated repositories (pending until accessed)
 6. Lockfile integration with `generatedRepoSpecs` format
@@ -274,25 +274,27 @@ impl ModuleExtensionResult {
 
 ## Implementation Phases
 
-### Phase 5e-1: RepoSpec Capture Infrastructure
+### Phase 5e-1: RepoSpec Capture Infrastructure - COMPLETE
 
 **Goal**: Create infrastructure to capture RepoSpecs during extension execution.
 
-1. Create `kuro_bzlmod/src/repo_spec.rs`:
-   - `RepoSpec` type with `repo_rule_id` and `attributes`
-   - Thread-local `RepoSpecRegistry` for capture during execution
-   - `with_repo_spec_registry()` for scoped capture
-   - `record_repo_spec()` for recording during rule invocation
+1. [x] Create `kuro_bzlmod/src/repo_spec.rs`:
+   - [x] `RepoSpec` type with `repo_rule_id` and `attributes`
+   - [x] Thread-local `RepoSpecRegistry` for capture during execution
+   - [x] `with_repo_spec_registry()` for scoped capture
+   - [x] `record_repo_spec()` for recording during rule invocation
+   - [x] `in_extension_context()` to check execution context
+   - [x] Unit tests for all functionality
 
-2. Modify `FrozenStarlarkRepositoryRule::invoke()` in `repository_rule.rs`:
-   - Check if in extension context via `in_extension_context()`
-   - If true: capture RepoSpec (NOT execute), return None
-   - If false: fall back to existing behavior (record RepositoryInvocation)
+2. [x] Modify `FrozenStarlarkRepositoryRule::invoke()` in `repository_rule.rs`:
+   - [x] Check if in extension context via `in_extension_context()`
+   - [x] If true: capture RepoSpec (NOT execute), return None
+   - [x] If false: fall back to existing behavior (record RepositoryInvocation)
 
-3. Update `kuro_bzlmod/src/lib.rs`:
-   - Export `RepoSpec`, `record_repo_spec`, `in_extension_context`
+3. [x] Update `kuro_bzlmod/src/lib.rs`:
+   - [x] Export `RepoSpec`, `record_repo_spec`, `in_extension_context`, `with_repo_spec_registry`
 
-**Files to modify**:
+**Files modified**:
 - `kuro_bzlmod/src/repo_spec.rs` (new)
 - `kuro_bzlmod/src/lib.rs`
 - `kuro_interpreter_for_build/src/repository_rule.rs`
@@ -381,11 +383,33 @@ fn build_canonical_names(
 - `kuro_bzlmod/src/lib.rs`
 - `kuro_interpreter_for_build/src/extension_execution.rs`
 
-### Phase 5e-3: Lazy Repository Execution
+### Phase 5e-3: Lazy Repository Execution - COMPLETE
 
 **Goal**: Execute repository rules on-demand when repos are accessed.
 
-1. Create `ExtensionRepoExecutionKey` in `repository_execution.rs`:
+1. [x] Create `ExtensionRepoExecutionKey` in `repository_execution.rs`:
+   - [x] DICE key with canonical_name, extension_id, spec_hash, repo_spec fields
+   - [x] Manual Hash/Eq implementation (since RepoSpec contains HashMap)
+   - [x] compute() implementation with logging and stub execution
+   - [x] Helper function `repo_spec_to_invocation()` for conversion
+   - [x] Helper function `extract_rule_name_from_id()` for parsing repo_rule_id
+
+2. [x] Export from `kuro_bzlmod/src/lib.rs`:
+   - [x] `ExtensionRepoExecutionKey`
+   - [x] `repo_spec_to_invocation`
+
+3. [x] Unit tests:
+   - [x] `test_extension_repo_key_creation` - basic key creation
+   - [x] `test_extension_repo_key_from_arcs` - Arc-based creation
+   - [x] `test_extension_repo_key_display` - Display format
+   - [x] `test_extension_repo_key_hash_stability` - hash determinism
+   - [x] `test_repo_spec_to_invocation_basic` - basic conversion
+   - [x] `test_repo_spec_to_invocation_with_complex_attrs` - complex attributes
+   - [x] `test_repo_spec_to_invocation_no_attrs` - empty attributes
+   - [x] `test_repo_spec_to_invocation_invalid_rule_id` - error handling
+   - [x] `test_extract_rule_name_from_id` - rule name extraction
+
+**Code sample** (original plan for reference):
 
 ```rust
 /// DICE key for lazy execution of extension-generated repositories.
@@ -438,15 +462,16 @@ impl Key for ExtensionRepoExecutionKey {
 }
 ```
 
-2. Integration with cell resolver:
+4. [ ] Integration with cell resolver (FUTURE - Phase 5e-5):
    - When `@repo_name` is accessed and cell is "pending"
    - Look up the extension result for this repo
    - Trigger `ExtensionRepoExecutionKey` computation
    - Update cell path to materialized location
 
-**Files to modify**:
-- `kuro_bzlmod/src/repository_execution.rs`
-- `kuro_common/src/legacy_configs/cells.rs`
+**Files modified**:
+- `kuro_bzlmod/src/repository_execution.rs` - DONE
+- `kuro_bzlmod/src/lib.rs` - DONE
+- `kuro_common/src/legacy_configs/cells.rs` - FUTURE (Phase 5e-5)
 
 ### Phase 5e-4: Extension Lockfile Integration
 

@@ -27,6 +27,7 @@
 //! - [`lockfile`]: MODULE.bazel.lock file handling
 
 pub mod cache;
+pub mod extension_execution_dice;
 pub mod extensions;
 pub mod fetch;
 pub mod globals;
@@ -34,6 +35,7 @@ pub mod integrity;
 pub mod lockfile;
 pub mod parser;
 pub mod registry;
+pub mod repo_spec;
 pub mod repository_execution;
 pub mod repository_executor;
 pub mod repository_invocations;
@@ -67,10 +69,20 @@ pub use resolution::ResolvedLocalModules;
 pub use resolution::ResolvedModuleInfo;
 pub use resolution::ResolvedRemoteModule;
 pub use resolution::ResolvedRemoteModules;
+pub use extension_execution_dice::ModuleExtensionExecutionKey;
+pub use extension_execution_dice::ModuleExtensionResult;
+pub use extension_execution_dice::build_canonical_names;
+pub use extension_execution_dice::extract_extension_name;
+pub use repository_execution::ExtensionRepoExecutionKey;
 pub use repository_execution::RepositoryRegistry;
 pub use repository_execution::RepositoryRuleExecutionKey;
 pub use repository_execution::RepositoryRuleResult;
+pub use repository_execution::repo_spec_to_invocation;
 pub use repository_executor::execute_repository_rule;
+pub use repo_spec::RepoSpec;
+pub use repo_spec::in_extension_context;
+pub use repo_spec::record_repo_spec;
+pub use repo_spec::with_repo_spec_registry;
 pub use repository_invocations::AttrValue as RepoAttrValue;
 pub use repository_invocations::RegistryGuard;
 pub use repository_invocations::RepositoryInvocation;
