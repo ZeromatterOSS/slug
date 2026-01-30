@@ -15,11 +15,14 @@
 //! - `AspectContext` - The context object (`ctx`) passed to aspect implementations
 //! - `AspectRuleInfo` - Access to the underlying rule's information (`ctx.rule`)
 //! - `AspectTargetProviders` - Wrapper for the target argument with `target[SomeInfo]` support
+//! - `execution` - Basic aspect execution for Phase 8b testing
 
 pub mod context;
+pub mod execution;
 pub mod rule_info;
 pub mod target_providers;
 
 pub use context::AspectContext;
+pub use execution::run_aspect_basic;
 pub use rule_info::AspectRuleInfo;
 pub use target_providers::AspectTargetProviders;

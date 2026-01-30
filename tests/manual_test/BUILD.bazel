@@ -105,7 +105,7 @@ print("Test 13 - subrule built-in registered:", True)  # subrule() is registered
 
 # Test 14: aspect() built-in (Phase 8a)
 # Load the test aspect definitions
-load(":test_aspect.bzl", "test_aspects_available", "test_aspect")
+load(":test_aspect.bzl", "test_aspects_available", "test_aspect", "test_rule_with_aspect")
 
 _aspect_results = test_aspects_available()
 print("Test 14 - aspect() built-in works:", _aspect_results)
@@ -181,3 +181,24 @@ print("Test 22 - @bazel_tools http.bzl loaded:", http_archive != None)
 print("Test 22 - http_archive type:", type(http_archive))
 
 print("All manual tests passed!")
+
+# Test 23: Phase 8b - Aspect execution with AspectContext
+# Create targets to test aspect execution
+
+# A simple library target (no deps) - aspect should run on this
+test_rule_with_aspect(
+    name = "test_lib_base",
+    deps = [],
+)
+
+# A library target that depends on test_lib_base - aspect should run on both
+test_rule_with_aspect(
+    name = "test_lib_with_deps",
+    deps = [":test_lib_base"],
+)
+
+# Top-level target - aspect should run on entire dependency chain
+test_rule_with_aspect(
+    name = "test_aspect_execution",
+    deps = [":test_lib_with_deps"],
+)
