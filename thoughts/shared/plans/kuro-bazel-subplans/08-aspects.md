@@ -232,6 +232,15 @@ pub struct Aspect {
 
 #### Success Criteria (Phase 8b)
 
+**Completed (Types and Structures):**
+- [x] `FrozenStarlarkAspectCallable` preserves all fields from unfrozen version
+- [x] `AspectContext` type compiles with `ctx.attr`, `ctx.actions`, `ctx.label`, `ctx.rule`
+- [x] `AspectRuleInfo` provides `ctx.rule.kind` and `ctx.rule.attr` members
+- [x] `AspectTargetProviders` supports `target[SomeInfo]` and `SomeInfo in target`
+- [x] `try_from_aspect_value()` rejects DefaultInfo
+- [x] All crates build: `cargo build -p kuro_build_api -p kuro_interpreter_for_build`
+
+**Deferred to Phase 8c (Requires DICE Integration):**
 - [ ] Aspect implementation function can be called
 - [ ] `ctx.rule.kind` returns correct rule kind
 - [ ] `ctx.rule.attr` provides access to rule attributes

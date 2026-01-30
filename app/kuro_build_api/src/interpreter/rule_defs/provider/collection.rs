@@ -116,6 +116,11 @@ enum ProviderCollectionError {
         format_provider_keys_for_error(_1)
     )]
     AtNotFound(String, Vec<String>),
+    #[error(
+        "aspects cannot return DefaultInfo provider. Aspects should return custom providers \
+        that augment the target's build graph, not replace the target's outputs."
+    )]
+    AspectCannotReturnDefaultInfo,
 }
 
 #[derive(Debug, ProvidesStaticType, Allocative)]
@@ -313,6 +318,27 @@ impl<'v, V: ValueLike<'v>> ProviderCollectionGen<V> {
         value: Value<'v>,
     ) -> kuro_error::Result<ProviderCollection<'v>> {
         let providers = Self::try_from_value_impl(value)?;
+
+        Ok(ProviderCollection::<'v> { providers })
+    }
+
+    /// Takes a value (return from an aspect implementation) and builds a `ProviderCollection` from it.
+    ///
+    /// Aspects have different requirements than rules:
+    /// - Aspects **cannot** return `DefaultInfo` (it's an error to do so)
+    /// - Aspects don't **require** `DefaultInfo`
+    ///
+    /// An error is returned if:
+    ///  - `value` is not a list
+    ///  - Two instances of the same provider are provided
+    ///  - `DefaultInfo` is provided (aspects cannot return DefaultInfo)
+    pub fn try_from_aspect_value(value: Value<'v>) -> kuro_error::Result<ProviderCollection<'v>> {
+        let providers = Self::try_from_value_impl(value)?;
+
+        // Aspects cannot return DefaultInfo
+        if providers.contains_key(DefaultInfoCallable::provider_id()) {
+            return Err(ProviderCollectionError::AspectCannotReturnDefaultInfo.into());
+        }
 
         Ok(ProviderCollection::<'v> { providers })
     }

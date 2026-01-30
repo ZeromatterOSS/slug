@@ -289,6 +289,15 @@ pub struct FrozenStarlarkAspectCallable {
     attr_aspects: Vec<String>,
     /// Aspect-specific attributes.
     attrs: Vec<(String, StarlarkAttribute)>,
+    /// Filter: only apply to targets providing these providers.
+    /// Outer list is OR, inner list is AND.
+    required_providers: Vec<Vec<FrozenValue>>,
+    /// Access providers from other aspects that have already run.
+    required_aspect_providers: Vec<Vec<FrozenValue>>,
+    /// Providers that this aspect declares it will return.
+    provides: Vec<FrozenValue>,
+    /// Other aspects that must run before this one.
+    requires: Vec<FrozenValue>,
     /// Configuration fragments this aspect needs access to.
     fragments: Vec<String>,
     /// Toolchains this aspect requires.
@@ -297,6 +306,10 @@ pub struct FrozenStarlarkAspectCallable {
     doc: Option<String>,
     /// Apply to generating rule of output files.
     apply_to_generating_rules: bool,
+    /// Execution platform constraints.
+    exec_compatible_with: Vec<String>,
+    /// Subrules used by this aspect.
+    subrules: Vec<FrozenValue>,
 }
 
 starlark_simple_value!(FrozenStarlarkAspectCallable);
@@ -312,15 +325,66 @@ impl<'v> Freeze for StarlarkAspectCallable<'v> {
             }
         };
 
+        // Freeze nested provider values in required_providers
+        let required_providers = self
+            .required_providers
+            .into_iter()
+            .map(|inner| {
+                inner
+                    .into_iter()
+                    .map(|v| v.freeze(freezer))
+                    .collect::<FreezeResult<Vec<_>>>()
+            })
+            .collect::<FreezeResult<Vec<_>>>()?;
+
+        // Freeze nested provider values in required_aspect_providers
+        let required_aspect_providers = self
+            .required_aspect_providers
+            .into_iter()
+            .map(|inner| {
+                inner
+                    .into_iter()
+                    .map(|v| v.freeze(freezer))
+                    .collect::<FreezeResult<Vec<_>>>()
+            })
+            .collect::<FreezeResult<Vec<_>>>()?;
+
+        // Freeze provides
+        let provides = self
+            .provides
+            .into_iter()
+            .map(|v| v.freeze(freezer))
+            .collect::<FreezeResult<Vec<_>>>()?;
+
+        // Freeze requires
+        let requires = self
+            .requires
+            .into_iter()
+            .map(|v| v.freeze(freezer))
+            .collect::<FreezeResult<Vec<_>>>()?;
+
+        // Freeze subrules
+        let subrules = self
+            .subrules
+            .into_iter()
+            .map(|v| v.freeze(freezer))
+            .collect::<FreezeResult<Vec<_>>>()?;
+
         Ok(FrozenStarlarkAspectCallable {
             name,
             implementation: self.implementation.freeze(freezer)?,
             attr_aspects: self.attr_aspects,
             attrs: self.attrs,
+            required_providers,
+            required_aspect_providers,
+            provides,
+            requires,
             fragments: self.fragments,
             toolchains: self.toolchains,
             doc: self.doc,
             apply_to_generating_rules: self.apply_to_generating_rules,
+            exec_compatible_with: self.exec_compatible_with,
+            subrules,
         })
     }
 }
@@ -341,6 +405,27 @@ impl FrozenStarlarkAspectCallable {
         &self.attr_aspects
     }
 
+    /// Get the required providers filter.
+    /// Outer list is OR, inner list is AND.
+    pub fn required_providers(&self) -> &[Vec<FrozenValue>] {
+        &self.required_providers
+    }
+
+    /// Get the required aspect providers.
+    pub fn required_aspect_providers(&self) -> &[Vec<FrozenValue>] {
+        &self.required_aspect_providers
+    }
+
+    /// Get the providers this aspect declares it returns.
+    pub fn provides(&self) -> &[FrozenValue] {
+        &self.provides
+    }
+
+    /// Get the aspects that must run before this one.
+    pub fn requires(&self) -> &[FrozenValue] {
+        &self.requires
+    }
+
     /// Get the fragments this aspect requires.
     pub fn fragments(&self) -> &[String] {
         &self.fragments
@@ -359,6 +444,16 @@ impl FrozenStarlarkAspectCallable {
     /// Get whether this aspect applies to generating rules of output files.
     pub fn apply_to_generating_rules(&self) -> bool {
         self.apply_to_generating_rules
+    }
+
+    /// Get the execution platform constraints.
+    pub fn exec_compatible_with(&self) -> &[String] {
+        &self.exec_compatible_with
+    }
+
+    /// Get the subrules used by this aspect.
+    pub fn subrules(&self) -> &[FrozenValue] {
+        &self.subrules
     }
 }
 
