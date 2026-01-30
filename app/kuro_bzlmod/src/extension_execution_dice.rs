@@ -44,6 +44,8 @@ use dupe::Dupe;
 
 use crate::extensions::AggregatedExtension;
 use crate::extensions::compute_extension_input_hash;
+use crate::lockfile::Lockfile;
+use crate::lockfile::lockfile_path;
 use crate::module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
 use crate::repo_spec::RepoSpec;
 
@@ -138,18 +140,21 @@ impl ModuleExtensionResult {
 /// DICE key for module extension evaluation.
 ///
 /// When computed, this:
-/// 1. Creates a temporary working directory for module_ctx
-/// 2. Loads the extension's .bzl file
-/// 3. Builds module_ctx from aggregated tags
-/// 4. Executes implementation(module_ctx) with RepoSpec capture
-/// 5. Cleans up the temporary directory
-/// 6. Returns ModuleExtensionResult with captured specs
+/// 1. Checks lockfile for cached result (if project_root is set)
+/// 2. Creates a temporary working directory for module_ctx
+/// 3. Loads the extension's .bzl file
+/// 4. Builds module_ctx from aggregated tags
+/// 5. Executes implementation(module_ctx) with RepoSpec capture
+/// 6. Cleans up the temporary directory
+/// 7. Updates lockfile with result (if project_root is set)
+/// 8. Returns ModuleExtensionResult with captured specs
 ///
 /// Note: NO downloads or repository materialization happens during this computation.
 /// Repositories are materialized lazily via `ExtensionRepoExecutionKey`.
 ///
 /// Note: Hash and Eq are implemented manually because `AggregatedExtension` contains
 /// HashMap. The `input_hash` field is used for hashing, ensuring deterministic cache behavior.
+/// The `project_root` field is intentionally excluded from Hash/Eq as it's runtime configuration.
 #[derive(Clone, Debug, Display, Allocative)]
 #[display("ModuleExtensionKey({}, {})", extension_id, input_hash)]
 pub struct ModuleExtensionExecutionKey {
@@ -166,11 +171,17 @@ pub struct ModuleExtensionExecutionKey {
 
     /// Root module name (needed for build_module_context).
     pub root_module_name: Arc<str>,
+
+    /// Project root for lockfile access (optional).
+    /// If set, lockfile caching will be used.
+    /// Excluded from Hash/Eq as it's runtime configuration.
+    pub project_root: Option<Arc<PathBuf>>,
 }
 
 impl std::hash::Hash for ModuleExtensionExecutionKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // Hash the identifying fields; input_hash represents the aggregated data
+        // Note: project_root is intentionally not hashed - it's runtime configuration
         self.extension_id.hash(state);
         self.input_hash.hash(state);
     }
@@ -179,6 +190,7 @@ impl std::hash::Hash for ModuleExtensionExecutionKey {
 impl PartialEq for ModuleExtensionExecutionKey {
     fn eq(&self, other: &Self) -> bool {
         // Compare by identifying fields; input_hash represents the aggregated data
+        // Note: project_root is intentionally not compared - it's runtime configuration
         self.extension_id == other.extension_id && self.input_hash == other.input_hash
     }
 }
@@ -193,6 +205,7 @@ impl Dupe for ModuleExtensionExecutionKey {
             input_hash: self.input_hash.dupe(),
             aggregated: self.aggregated.dupe(),
             root_module_name: self.root_module_name.dupe(),
+            project_root: self.project_root.clone(),
         }
     }
 }
@@ -207,6 +220,24 @@ impl ModuleExtensionExecutionKey {
             input_hash,
             aggregated: Arc::new(aggregated),
             root_module_name: Arc::from(root_module_name.as_str()),
+            project_root: None,
+        }
+    }
+
+    /// Create a new extension execution key with lockfile support.
+    pub fn new_with_lockfile(
+        aggregated: AggregatedExtension,
+        root_module_name: String,
+        project_root: PathBuf,
+    ) -> Self {
+        let extension_id = Arc::from(aggregated.extension_id.as_str());
+        let input_hash = Arc::from(compute_extension_input_hash(&aggregated).as_str());
+        Self {
+            extension_id,
+            input_hash,
+            aggregated: Arc::new(aggregated),
+            root_module_name: Arc::from(root_module_name.as_str()),
+            project_root: Some(Arc::new(project_root)),
         }
     }
 
@@ -222,6 +253,24 @@ impl ModuleExtensionExecutionKey {
             input_hash,
             aggregated,
             root_module_name,
+            project_root: None,
+        }
+    }
+
+    /// Create from Arc references with lockfile support.
+    pub fn from_arcs_with_lockfile(
+        extension_id: Arc<str>,
+        input_hash: Arc<str>,
+        aggregated: Arc<AggregatedExtension>,
+        root_module_name: Arc<str>,
+        project_root: Arc<PathBuf>,
+    ) -> Self {
+        Self {
+            extension_id,
+            input_hash,
+            aggregated,
+            root_module_name,
+            project_root: Some(project_root),
         }
     }
 
@@ -233,6 +282,7 @@ impl ModuleExtensionExecutionKey {
             input_hash: Arc::from(input_hash.as_str()),
             aggregated: Arc::new(AggregatedExtension::default()),
             root_module_name: Arc::from("_main"),
+            project_root: None,
         }
     }
 
@@ -244,6 +294,11 @@ impl ModuleExtensionExecutionKey {
     /// Get the root module name.
     pub fn root_module_name(&self) -> &str {
         &self.root_module_name
+    }
+
+    /// Get the project root (if set for lockfile support).
+    pub fn project_root(&self) -> Option<&PathBuf> {
+        self.project_root.as_ref().map(|p| p.as_ref())
     }
 }
 
@@ -262,6 +317,54 @@ impl Key for ModuleExtensionExecutionKey {
             self.input_hash
         );
 
+        // Compute digests for lockfile cache validation
+        // Note: bzl_transitive_digest ideally hashes all .bzl files the extension depends on.
+        // For now, we use a simpler approach based on extension_id. This can be improved
+        // later when we have better access to the Starlark module dependency graph.
+        let bzl_transitive_digest = compute_bzl_transitive_digest(&self.extension_id);
+        let usages_digest = self.input_hash.to_string();
+
+        // 1. Check lockfile cache (if project_root is set)
+        if let Some(project_root) = &self.project_root {
+            let lock_path = lockfile_path(project_root);
+            if lock_path.exists() {
+                match Lockfile::read(&lock_path) {
+                    Ok(lockfile) => {
+                        if let Some(cached_specs) = lockfile.get_extension_cache(
+                            &self.extension_id,
+                            &bzl_transitive_digest,
+                            &usages_digest,
+                        ) {
+                            tracing::info!(
+                                "Extension '{}' cache HIT: using {} cached repo specs",
+                                self.extension_id,
+                                cached_specs.len()
+                            );
+
+                            let result = ModuleExtensionResult::new(
+                                self.extension_id.clone(),
+                                self.input_hash.to_string(),
+                                cached_specs,
+                            );
+
+                            return Ok(Arc::new(result));
+                        } else {
+                            tracing::debug!(
+                                "Extension '{}' cache MISS: digests don't match",
+                                self.extension_id
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        tracing::debug!(
+                            "Could not read lockfile for cache check: {}",
+                            e
+                        );
+                    }
+                }
+            }
+        }
+
         // Log the modules that use this extension
         let module_count = self.aggregated.tags_by_module.len();
         let tag_count: usize = self.aggregated.tags_by_module.values().map(|v| v.len()).sum();
@@ -272,10 +375,10 @@ impl Key for ModuleExtensionExecutionKey {
             tag_count
         );
 
-        // 1. Create temporary working directory for module_ctx I/O
+        // 2. Create temporary working directory for module_ctx I/O
         let temp_dir = create_temp_extension_dir(&self.extension_id)?;
 
-        // 2-4. Execute extension via late binding to kuro_interpreter_for_build
+        // 3-5. Execute extension via late binding to kuro_interpreter_for_build
         //
         // The late binding pattern allows us to call into kuro_interpreter_for_build
         // without a direct dependency. The implementation:
@@ -326,7 +429,7 @@ impl Key for ModuleExtensionExecutionKey {
             }
         };
 
-        // 5. Clean up temporary working directory
+        // 6. Clean up temporary working directory
         if temp_dir.exists() {
             if let Err(e) = std::fs::remove_dir_all(&temp_dir) {
                 tracing::warn!(
@@ -340,11 +443,11 @@ impl Key for ModuleExtensionExecutionKey {
         // Check for execution errors
         let output = execution_result?;
 
-        // 6. Build result with canonical names
+        // 7. Build result with canonical names
         let result = ModuleExtensionResult::new(
             self.extension_id.clone(),
             self.input_hash.to_string(),
-            output.generated_repo_specs,
+            output.generated_repo_specs.clone(),
         );
 
         tracing::info!(
@@ -352,6 +455,32 @@ impl Key for ModuleExtensionExecutionKey {
             self.extension_id,
             result.repo_count()
         );
+
+        // 8. Update lockfile cache (if project_root is set)
+        if let Some(project_root) = &self.project_root {
+            let lock_path = lockfile_path(project_root);
+            match update_lockfile_extension_cache(
+                &lock_path,
+                &self.extension_id,
+                &bzl_transitive_digest,
+                &usages_digest,
+                &output.generated_repo_specs,
+            ) {
+                Ok(()) => {
+                    tracing::debug!(
+                        "Updated lockfile cache for extension '{}'",
+                        self.extension_id
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to update lockfile cache for extension '{}': {}",
+                        self.extension_id,
+                        e
+                    );
+                }
+            }
+        }
 
         Ok(Arc::new(result))
     }
@@ -461,6 +590,70 @@ pub fn extract_extension_name(extension_id: &str) -> String {
             .filter(|c| c.is_alphanumeric() || *c == '_')
             .collect()
     }
+}
+
+/// Compute a transitive digest for the extension's .bzl files.
+///
+/// Ideally, this would hash all .bzl files that the extension transitively depends on.
+/// For now, we use a simplified approach that hashes the extension ID. This provides
+/// basic cache invalidation when the extension changes but doesn't capture all
+/// transitive .bzl file changes.
+///
+/// TODO: Improve this by integrating with the Starlark module loading system
+/// to get the actual transitive digest of all loaded .bzl files.
+fn compute_bzl_transitive_digest(extension_id: &str) -> String {
+    use base64::Engine;
+    use sha2::Digest;
+    use sha2::Sha256;
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"bzl_transitive_v1:");
+    hasher.update(extension_id.as_bytes());
+
+    let hash = hasher.finalize();
+    format!(
+        "sha256-{}",
+        base64::engine::general_purpose::STANDARD.encode(hash)
+    )
+}
+
+/// Update the lockfile with extension cache data.
+///
+/// This reads the existing lockfile (or creates a new one), adds/updates the
+/// extension cache entry, and writes it back atomically.
+fn update_lockfile_extension_cache(
+    lock_path: &std::path::Path,
+    extension_id: &str,
+    bzl_transitive_digest: &str,
+    usages_digest: &str,
+    generated_repo_specs: &HashMap<String, RepoSpec>,
+) -> kuro_error::Result<()> {
+    // Read existing lockfile or create new one
+    let mut lockfile = if lock_path.exists() {
+        match Lockfile::read(lock_path) {
+            Ok(lf) => lf,
+            Err(_) => {
+                // If we can't read it, start fresh
+                tracing::debug!("Creating new lockfile for extension cache");
+                Lockfile::new()
+            }
+        }
+    } else {
+        Lockfile::new()
+    };
+
+    // Update the extension cache
+    lockfile.set_extension_cache(
+        extension_id.to_owned(),
+        bzl_transitive_digest.to_owned(),
+        usages_digest.to_owned(),
+        generated_repo_specs,
+    );
+
+    // Write back
+    lockfile.write(lock_path)?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -711,5 +904,180 @@ mod tests {
         let mut names: Vec<_> = result.repo_names().collect();
         names.sort();
         assert_eq!(names, vec!["a", "b", "c"]);
+    }
+
+    // =========================================================================
+    // Lockfile Integration Tests
+    // =========================================================================
+
+    #[test]
+    fn test_compute_bzl_transitive_digest() {
+        let digest1 = compute_bzl_transitive_digest("@@module//ext.bzl%test");
+        let digest2 = compute_bzl_transitive_digest("@@module//ext.bzl%test");
+        let digest3 = compute_bzl_transitive_digest("@@other//ext.bzl%test");
+
+        // Same extension ID should produce same digest
+        assert_eq!(digest1, digest2);
+        // Different extension ID should produce different digest
+        assert_ne!(digest1, digest3);
+        // Should be in SRI format
+        assert!(digest1.starts_with("sha256-"));
+    }
+
+    #[test]
+    fn test_update_lockfile_extension_cache() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let lock_path = temp_dir.path().join("MODULE.bazel.lock");
+
+        // Create test repo specs
+        let mut specs = HashMap::new();
+        specs.insert(
+            "numpy".to_owned(),
+            RepoSpec::new("@@rules_python//pip:pip.bzl%pip_install".to_owned())
+                .with_attr("version".to_owned(), AttrValue::String("1.24.0".to_owned())),
+        );
+
+        // Update lockfile
+        update_lockfile_extension_cache(
+            &lock_path,
+            "@@rules_python//pip:pip.bzl%pip",
+            "bzl-digest-123",
+            "usages-digest-456",
+            &specs,
+        )
+        .unwrap();
+
+        // Verify lockfile was created and contains the extension cache
+        let lockfile = Lockfile::read(&lock_path).unwrap();
+        assert!(lockfile.has_extension_cache());
+
+        let cached = lockfile.get_extension_cache(
+            "@@rules_python//pip:pip.bzl%pip",
+            "bzl-digest-123",
+            "usages-digest-456",
+        );
+        assert!(cached.is_some());
+        let cached_specs = cached.unwrap();
+        assert_eq!(cached_specs.len(), 1);
+        assert!(cached_specs.contains_key("numpy"));
+    }
+
+    #[test]
+    fn test_update_lockfile_preserves_existing_data() {
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let lock_path = temp_dir.path().join("MODULE.bazel.lock");
+
+        // Create initial lockfile with some data
+        let mut lockfile = Lockfile::new();
+        lockfile.module_file_hash = "initial-hash".to_owned();
+        lockfile.write(&lock_path).unwrap();
+
+        // Update with extension cache
+        let specs = HashMap::new();
+        update_lockfile_extension_cache(
+            &lock_path,
+            "@@ext//ext.bzl%ext",
+            "bzl",
+            "usages",
+            &specs,
+        )
+        .unwrap();
+
+        // Verify existing data is preserved
+        let lockfile = Lockfile::read(&lock_path).unwrap();
+        assert_eq!(lockfile.module_file_hash, "initial-hash");
+        assert!(lockfile.has_extension_cache());
+    }
+
+    #[test]
+    fn test_new_with_lockfile_constructor() {
+        use crate::extensions::AggregatedExtension;
+
+        let aggregated = AggregatedExtension::new("@@module//ext.bzl", "test");
+        let key = ModuleExtensionExecutionKey::new_with_lockfile(
+            aggregated,
+            "_main".to_owned(),
+            PathBuf::from("/tmp/project"),
+        );
+
+        assert_eq!(key.extension_id.as_ref(), "@@module//ext.bzl%test");
+        assert!(key.project_root.is_some());
+        assert_eq!(
+            key.project_root().unwrap(),
+            &PathBuf::from("/tmp/project")
+        );
+    }
+
+    #[test]
+    fn test_project_root_not_in_hash_or_eq() {
+        use crate::extensions::AggregatedExtension;
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::Hash;
+        use std::hash::Hasher;
+
+        let aggregated1 = AggregatedExtension::new("@@mod//ext.bzl", "ext");
+        let aggregated2 = AggregatedExtension::new("@@mod//ext.bzl", "ext");
+
+        // Create keys with different project_roots
+        let key1 = ModuleExtensionExecutionKey::new_with_lockfile(
+            aggregated1,
+            "_main".to_owned(),
+            PathBuf::from("/project1"),
+        );
+        let key2 = ModuleExtensionExecutionKey::new_with_lockfile(
+            aggregated2,
+            "_main".to_owned(),
+            PathBuf::from("/project2"),
+        );
+
+        // Keys should be equal (project_root not in comparison)
+        assert_eq!(key1, key2);
+
+        // Hashes should be equal (project_root not in hash)
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+        key1.hash(&mut hasher1);
+        key2.hash(&mut hasher2);
+        assert_eq!(hasher1.finish(), hasher2.finish());
+    }
+
+    #[test]
+    fn test_from_arcs_with_lockfile() {
+        use crate::extensions::AggregatedExtension;
+
+        let extension_id = Arc::from("@@mod//ext.bzl%ext");
+        let input_hash = Arc::from("sha256-abc");
+        let aggregated = Arc::new(AggregatedExtension::new("@@mod//ext.bzl", "ext"));
+        let root_module_name = Arc::from("_main");
+        let project_root = Arc::new(PathBuf::from("/tmp/test"));
+
+        let key = ModuleExtensionExecutionKey::from_arcs_with_lockfile(
+            extension_id,
+            input_hash,
+            aggregated,
+            root_module_name,
+            project_root,
+        );
+
+        assert!(key.project_root.is_some());
+        assert_eq!(
+            key.project_root().unwrap(),
+            &PathBuf::from("/tmp/test")
+        );
+    }
+
+    #[test]
+    fn test_key_without_lockfile_has_no_project_root() {
+        use crate::extensions::AggregatedExtension;
+
+        let aggregated = AggregatedExtension::new("@@mod//ext.bzl", "ext");
+        let key = ModuleExtensionExecutionKey::new(aggregated, "_main".to_owned());
+
+        assert!(key.project_root.is_none());
+        assert!(key.project_root().is_none());
     }
 }
