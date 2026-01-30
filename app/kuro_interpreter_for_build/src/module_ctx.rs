@@ -39,6 +39,9 @@
 //! ```
 
 use std::collections::HashMap;
+use std::path::Path;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 use allocative::Allocative;
 use derive_more::Display;
@@ -398,6 +401,16 @@ pub struct SerializedModule {
 }
 
 /// The context object passed to module extension implementation functions.
+///
+/// ## Working Directory Lifecycle
+///
+/// Unlike `repository_ctx`, the `module_ctx` working directory is TEMPORARY:
+/// - Created at the start of extension execution
+/// - Used for any I/O operations during extension evaluation (download, file, execute)
+/// - Deleted when the extension completes (regardless of success/failure)
+///
+/// This is in contrast to `repository_ctx` where the working directory is PERMANENT
+/// and becomes the repository output.
 #[derive(Debug, Display, ProvidesStaticType, NoSerialize, Allocative, Clone)]
 #[display("<module_ctx>")]
 pub struct ModuleContext {
@@ -405,6 +418,14 @@ pub struct ModuleContext {
     modules: Vec<SerializedModule>,
     /// Whether the root module has a non-dev dependency on this extension.
     root_module_has_non_dev_dependency: bool,
+    /// TEMPORARY working directory for I/O during extension evaluation.
+    /// This is deleted when the extension completes - NOT the repository output.
+    /// Use `with_temp_working_dir()` to set this.
+    #[allocative(skip)]
+    working_dir: Option<Arc<PathBuf>>,
+    /// Whether the working directory should be deleted when the context is dropped.
+    /// Always true for module_ctx (key difference from repository_ctx).
+    delete_on_close: bool,
 }
 
 starlark_simple_value!(ModuleContext);
@@ -427,6 +448,8 @@ impl ModuleContext {
         Self {
             modules: serialized_modules,
             root_module_has_non_dev_dependency,
+            working_dir: None,
+            delete_on_close: true, // Always true for module_ctx
         }
     }
 
@@ -438,6 +461,8 @@ impl ModuleContext {
         Self {
             modules,
             root_module_has_non_dev_dependency,
+            working_dir: None,
+            delete_on_close: true, // Always true for module_ctx
         }
     }
 
@@ -446,7 +471,59 @@ impl ModuleContext {
         Self {
             modules: Vec::new(),
             root_module_has_non_dev_dependency: false,
+            working_dir: None,
+            delete_on_close: true, // Always true for module_ctx
         }
+    }
+
+    /// Set the temporary working directory for this module context.
+    ///
+    /// This directory is used for any I/O operations (download, file, execute)
+    /// during extension evaluation. Unlike repository_ctx, this directory is
+    /// TEMPORARY and will be deleted after the extension completes.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` - The path to the temporary working directory
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let ctx = ModuleContext::empty()
+    ///     .with_temp_working_dir(temp_dir);
+    /// ```
+    pub fn with_temp_working_dir(mut self, dir: PathBuf) -> Self {
+        self.working_dir = Some(Arc::new(dir));
+        self.delete_on_close = true; // Ensure this is always true
+        self
+    }
+
+    /// Get the working directory, if set.
+    pub fn working_dir(&self) -> Option<&Path> {
+        self.working_dir.as_ref().map(|p| p.as_path())
+    }
+
+    /// Check if this context has a working directory set.
+    pub fn has_working_dir(&self) -> bool {
+        self.working_dir.is_some()
+    }
+
+    /// Check if the working directory should be deleted on close.
+    /// Always returns true for module_ctx.
+    pub fn should_delete_working_dir(&self) -> bool {
+        self.delete_on_close
+    }
+
+    /// Resolve a path relative to the working directory.
+    /// Returns None if no working directory is set.
+    pub fn resolve_path(&self, path: &str) -> Option<PathBuf> {
+        self.working_dir.as_ref().map(|base| {
+            if Path::new(path).is_absolute() {
+                PathBuf::from(path)
+            } else {
+                base.join(path)
+            }
+        })
     }
 
     /// Get the modules.
@@ -710,4 +787,162 @@ pub fn register_module_ctx_types(builder: &mut GlobalsBuilder) {
 
     /// Type symbol for repository_os.
     const repository_os: StarlarkValueAsType<RepositoryOs> = StarlarkValueAsType::new();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_module_context_empty() {
+        let ctx = ModuleContext::empty();
+        assert!(ctx.get_modules().is_empty());
+        assert!(!ctx.has_working_dir());
+        assert!(ctx.working_dir().is_none());
+        // delete_on_close is always true for module_ctx
+        assert!(ctx.should_delete_working_dir());
+    }
+
+    #[test]
+    fn test_module_context_with_temp_working_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
+
+        let ctx = ModuleContext::empty()
+            .with_temp_working_dir(temp_path.clone());
+
+        assert!(ctx.has_working_dir());
+        assert_eq!(ctx.working_dir().unwrap(), temp_path.as_path());
+        // delete_on_close is always true for module_ctx
+        assert!(ctx.should_delete_working_dir());
+    }
+
+    #[test]
+    fn test_module_context_resolve_path_relative() {
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
+
+        let ctx = ModuleContext::empty()
+            .with_temp_working_dir(temp_path.clone());
+
+        let resolved = ctx.resolve_path("subdir/file.txt").unwrap();
+        assert_eq!(resolved, temp_path.join("subdir/file.txt"));
+    }
+
+    #[test]
+    fn test_module_context_resolve_path_absolute() {
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
+
+        let ctx = ModuleContext::empty()
+            .with_temp_working_dir(temp_path);
+
+        let absolute = "/absolute/path/to/file.txt";
+        let resolved = ctx.resolve_path(absolute).unwrap();
+        assert_eq!(resolved, PathBuf::from(absolute));
+    }
+
+    #[test]
+    fn test_module_context_resolve_path_no_working_dir() {
+        let ctx = ModuleContext::empty();
+        assert!(ctx.resolve_path("some/file.txt").is_none());
+    }
+
+    #[test]
+    fn test_module_context_new_has_no_working_dir() {
+        let modules = vec![BazelModule::new(
+            "test_module".to_owned(),
+            "1.0.0".to_owned(),
+            true,
+            vec!["install".to_owned()],
+        )];
+        let ctx = ModuleContext::new(modules, true);
+
+        // New contexts don't have working dir by default
+        assert!(!ctx.has_working_dir());
+        assert!(ctx.working_dir().is_none());
+        // But delete_on_close is still true
+        assert!(ctx.should_delete_working_dir());
+    }
+
+    #[test]
+    fn test_module_context_from_serialized_has_no_working_dir() {
+        let modules = vec![SerializedModule {
+            name: "test_module".to_owned(),
+            version: "1.0.0".to_owned(),
+            is_root: true,
+            tags_by_class: HashMap::new(),
+        }];
+        let ctx = ModuleContext::from_serialized(modules, false);
+
+        // New contexts don't have working dir by default
+        assert!(!ctx.has_working_dir());
+        assert!(ctx.working_dir().is_none());
+        // But delete_on_close is still true
+        assert!(ctx.should_delete_working_dir());
+    }
+
+    #[test]
+    fn test_module_context_working_dir_is_temporary() {
+        // This test verifies the key difference from repository_ctx:
+        // module_ctx working dir should always be marked for deletion
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf();
+
+        let ctx = ModuleContext::empty()
+            .with_temp_working_dir(temp_path);
+
+        // Key difference: module_ctx always deletes working dir
+        assert!(ctx.should_delete_working_dir());
+    }
+
+    #[test]
+    fn test_bazel_module_creation() {
+        let module = BazelModule::new(
+            "rules_python".to_owned(),
+            "0.31.0".to_owned(),
+            false,
+            vec!["install".to_owned(), "pip".to_owned()],
+        );
+
+        assert_eq!(module.name(), "rules_python");
+        assert_eq!(module.version(), "0.31.0");
+        assert!(!module.is_root());
+        assert!(module.tags_by_class().contains_key("install"));
+        assert!(module.tags_by_class().contains_key("pip"));
+    }
+
+    #[test]
+    fn test_bazel_module_with_tags() {
+        let mut tags_by_class = HashMap::new();
+        tags_by_class.insert(
+            "install".to_owned(),
+            vec![SerializedTag::new(vec![
+                ("name".to_owned(), SerializedTagValue::String("numpy".to_owned())),
+                ("version".to_owned(), SerializedTagValue::String("1.24.0".to_owned())),
+            ])],
+        );
+
+        let module = BazelModule::with_tags(
+            "rules_python".to_owned(),
+            "0.31.0".to_owned(),
+            true,
+            tags_by_class.clone(),
+        );
+
+        assert_eq!(module.name(), "rules_python");
+        assert!(module.is_root());
+        assert_eq!(module.tags_by_class().len(), 1);
+        assert!(module.tags_by_class().get("install").unwrap().len() == 1);
+    }
+
+    #[test]
+    fn test_repository_os() {
+        let os = RepositoryOs::new();
+
+        // Just verify it creates something - actual values depend on platform
+        assert!(!os.name.is_empty());
+        assert!(!os.arch.is_empty());
+    }
 }

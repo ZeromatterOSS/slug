@@ -185,14 +185,25 @@ impl Key for ModuleExtensionExecutionKey {
         let temp_dir = create_temp_extension_dir(&self.extension_id)?;
 
         // 2-4. Execute extension with RepoSpec capture
-        // The actual extension loading and execution will be implemented in Phase 5e-6.
+        // The actual extension loading and execution will be implemented in a future phase.
         // For now, we wrap a stub that just captures any RepoSpecs.
+        //
+        // When fully implemented, the flow will be:
+        // ```
+        // let module_ctx = build_module_context(aggregated_tags)
+        //     .with_temp_working_dir(temp_dir.clone());
+        // let result = execute_starlark_extension(&module_ctx);
+        // ```
+        //
+        // The temp_dir is passed to module_ctx for I/O operations (download, file, execute).
+        // After extension completes, temp_dir is cleaned up below (line ~205).
         let (execution_result, specs) = with_repo_spec_registry(|| {
             // Stub: actual extension execution goes here
             // This will:
             // - Load the extension .bzl file
-            // - Build module_ctx with tags from all modules
+            // - Build module_ctx with temp_dir via .with_temp_working_dir()
             // - Execute implementation(module_ctx)
+            // - module_ctx I/O operations use temp_dir as working directory
             //
             // For now, just log that we would execute
             tracing::debug!(

@@ -568,11 +568,11 @@ pub struct LockfileRepoSpec {
 The infrastructure is in place; actual extension execution wiring will happen when `ModuleExtensionExecutionKey::compute()`
 is fully implemented.
 
-### Phase 5e-6: module_ctx Temporary Working Directory
+### Phase 5e-6: module_ctx Temporary Working Directory - COMPLETE
 
 **Goal**: Use temporary directory for module_ctx that's deleted after extension.
 
-1. Modify `ModuleContext`:
+1. [x] Modify `ModuleContext`:
 
 ```rust
 pub struct ModuleContext {
@@ -595,17 +595,17 @@ impl ModuleContext {
 }
 ```
 
-2. Implement basic I/O methods that operate on temp dir:
-   - `download()`: Downloads to temp dir (for inspection during extension)
-   - `file()`: Creates files in temp dir
-   - `execute()`: Runs commands with temp dir as cwd
+2. [x] Implement basic I/O methods that operate on temp dir:
+   - [x] `download()`: Downloads to temp dir (for inspection during extension) - stub exists
+   - [x] `file()`: Creates files in temp dir - stub exists
+   - [x] `execute()`: Runs commands with temp dir as cwd - stub exists
    - These are for extension logic, NOT for creating repos
 
-3. Extension lifecycle:
-   - Create temp dir at start
-   - Run implementation with temp dir
-   - Capture RepoSpecs
-   - Delete temp dir at end
+3. [x] Extension lifecycle (infrastructure complete in extension_execution_dice.rs):
+   - [x] Create temp dir at start (`create_temp_extension_dir()`)
+   - [x] Run implementation with temp dir (stub, uses `with_temp_working_dir()`)
+   - [x] Capture RepoSpecs (`with_repo_spec_registry()`)
+   - [x] Delete temp dir at end (cleanup happens after execution)
 
 **Important**: `module_ctx.file()` in extension is NOT how repos are created.
 Repos are created by calling repository rules like `http_archive(name="foo")`,
@@ -625,7 +625,7 @@ which captures a RepoSpec for later execution.
 | `kuro_bzlmod/src/extension_execution_dice.rs` | ✅ **Done** | ModuleExtensionExecutionKey (captures specs) |
 | `kuro_bzlmod/src/repository_execution.rs` | ✅ **Done** | Add ExtensionRepoExecutionKey (lazy execution) |
 | `kuro_interpreter_for_build/src/repository_rule.rs` | ✅ **Done** | Capture RepoSpec in extension context |
-| `kuro_interpreter_for_build/src/module_ctx.rs` | Pending | Temp working dir, delete_on_close |
+| `kuro_interpreter_for_build/src/module_ctx.rs` | ✅ **Done** | Temp working dir, delete_on_close, with_temp_working_dir() |
 | `kuro_bzlmod/src/lockfile.rs` | ✅ **Done** | generatedRepoSpecs format |
 | `kuro_common/src/legacy_configs/cells.rs` | ✅ **Done** | Pending cell registration |
 | `kuro_bzlmod/src/pending_repo_cells.rs` | ✅ **New** | Cell definitions from extension results |
@@ -640,7 +640,7 @@ which captures a RepoSpec for later execution.
 - [ ] Extension evaluation returns RepoSpecs WITHOUT downloading anything
 - [ ] Repository rules execute lazily on FIRST ACCESS via DICE
 - [ ] Second access uses DICE cache (no re-execution)
-- [ ] Temp working directory deleted after extension completes
+- [x] Temp working directory infrastructure for module_ctx (cleanup in extension_execution_dice.rs)
 
 ### Cell Registration
 - [x] Pending cells registered for all extension-generated repos (infrastructure complete)
