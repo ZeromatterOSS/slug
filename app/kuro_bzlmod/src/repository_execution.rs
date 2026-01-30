@@ -66,7 +66,7 @@ pub enum RepositoryExecutionError {
     #[error("Failed to convert RepoSpec to invocation for '{canonical_name}': {reason}")]
     RepoSpecConversionFailed { canonical_name: String, reason: String },
 
-    #[error("Invalid repo_rule_id format: '{repo_rule_id}'")]
+    #[error("Invalid repo_rule_id format: '{repo_rule_id}' (expected format: @@module//path:file.bzl%rule_name)")]
     InvalidRepoRuleId { repo_rule_id: String },
 }
 

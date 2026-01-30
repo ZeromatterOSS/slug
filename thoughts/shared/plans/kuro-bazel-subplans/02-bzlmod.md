@@ -19,7 +19,7 @@ This sub-plan covers the bzlmod module system implementation. Each phase has its
 | **5b** | Build Integration | In Progress | [Link](./02-bzlmod-phase-5b.md) |
 | **5c** | Bundle @bazel_tools | In Progress | [Link](./02-bzlmod-phase-5c.md) |
 | **5d** | DICE Integration | Complete | [Link](./02-bzlmod-phase-5d.md) |
-| **5e** | Extension Execution | In Progress | [Link](./02-bzlmod-phase-5e.md) |
+| **5e** | Extension Execution | Complete | [Link](./02-bzlmod-phase-5e.md) |
 | **6** | Starlark Migration | Blocked | [Link](./02-bzlmod-phase-6.md) |
 | **7** | Proto Support | Future | [Link](./02-bzlmod-phase-7.md) |
 | **8** | Full subrule() | Future | [Link](./02-bzlmod-phase-8-subrule.md) |

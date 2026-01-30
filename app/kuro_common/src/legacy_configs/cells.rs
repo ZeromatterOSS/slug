@@ -1070,8 +1070,8 @@ impl BuckConfigBasedCells {
             let cached_specs = match cached_specs {
                 Some(specs) => specs,
                 None => {
-                    tracing::debug!(
-                        "Extension '{}' not cached or cache invalid, skipping",
+                    tracing::info!(
+                        "Extension '{}' not in lockfile cache - repos will be resolved on first access (run a build to populate lockfile)",
                         ext_id
                     );
                     continue;
