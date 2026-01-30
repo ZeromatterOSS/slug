@@ -14,13 +14,13 @@ This sub-plan covers the bzlmod module system implementation. Each phase has its
 | **4b** | Local Dependencies | Complete | [Link](./02-bzlmod-phase-4.md#phase-4b-local-dependencies) |
 | **4c** | BCR Integration | Complete | [Link](./02-bzlmod-phase-4.md#phase-4c-bcr-integration) |
 | **4d** | Resolution & Lockfile | Complete | [Link](./02-bzlmod-phase-4.md#phase-4d-resolution-and-lockfile) |
-| **5** | Module Extensions | In Progress | [Link](./02-bzlmod-phase-5-overview.md) |
+| **5** | Module Extensions | Complete | [Link](./02-bzlmod-phase-5-overview.md) |
 | **5a** | Extension Parsing | Complete | [Link](./02-bzlmod-phase-5-overview.md#phase-5a-extension-parsing) |
-| **5b** | Build Integration | In Progress | [Link](./02-bzlmod-phase-5b.md) |
-| **5c** | Bundle @bazel_tools | In Progress | [Link](./02-bzlmod-phase-5c.md) |
+| **5b** | Build Integration | Complete | [Link](./02-bzlmod-phase-5b.md) |
+| **5c** | Bundle @bazel_tools | Complete | [Link](./02-bzlmod-phase-5c.md) |
 | **5d** | DICE Integration | Complete | [Link](./02-bzlmod-phase-5d.md) |
 | **5e** | Extension Execution | Complete | [Link](./02-bzlmod-phase-5e.md) |
-| **6** | Starlark Migration | Blocked | [Link](./02-bzlmod-phase-6.md) |
+| **6** | Starlark Migration | Complete (N/A) | [Link](./02-bzlmod-phase-6.md) - Architectural constraint: must stay native |
 | **7** | Proto Support | Future | [Link](./02-bzlmod-phase-7.md) |
 | **8** | Full subrule() | Future | [Link](./02-bzlmod-phase-8-subrule.md) |
 
@@ -32,9 +32,11 @@ This sub-plan covers the bzlmod module system implementation. Each phase has its
 | 4b | `local_path_override()` works; local modules integrated via cell system |
 | 4c | Modules fetched to `~/.cache/kuro/`; SRI integrity verification works |
 | 4d | MVS algorithm in `resolution.rs`; lockfile format compatible with Bazel 9.0 |
+| 5b | BCR modules fetched and registered as cells; cross-cell `load()` works; `@bazel_skylib`, `@rules_cc` load successfully |
+| 5c | `@bazel_tools` bundled from Bazel 9.0.0; automatically registered; `http.bzl`, `cache.bzl` load successfully |
 | 5d | DICE key in `repository_execution.rs`; actual execution in `repository_executor.rs` with http_archive/git support |
 | 5e | **Deferred execution**: Extensions capture RepoSpecs (not execute); repos materialize lazily on first access; module_ctx uses temp dir (deleted after) |
-| 6 | **BLOCKED**: Modules must stay native due to global injection architecture |
+| 6 | **N/A**: Modules must stay native due to global injection architecture (external cells only see base globals) |
 
 ---
 
