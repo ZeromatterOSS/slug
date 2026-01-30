@@ -977,6 +977,7 @@ impl BuckConfigBasedCells {
                 extension_id: Arc::from(cell.extension_id.as_str()),
                 internal_name: Arc::from(cell.internal_name.as_str()),
                 spec_hash: Arc::from(cell.spec_hash.as_str()),
+                repo_spec_json: Arc::from(cell.repo_spec_json.as_str()),
                 materialized: false,
             };
 

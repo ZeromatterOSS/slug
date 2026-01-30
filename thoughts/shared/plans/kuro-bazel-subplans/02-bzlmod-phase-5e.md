@@ -631,9 +631,10 @@ which captures a RepoSpec for later execution.
 | `kuro_bzlmod/src/lockfile.rs` | ✅ **Done** | generatedRepoSpecs format |
 | `kuro_common/src/legacy_configs/cells.rs` | ✅ **Done** | Pending cell registration |
 | `kuro_bzlmod/src/pending_repo_cells.rs` | ✅ **New** | Cell definitions from extension results |
-| `kuro_core/src/cells/external.rs` | ✅ **Done** | ExtensionRepoCellSetup + ExtensionRepo variant |
+| `kuro_core/src/cells/external.rs` | ✅ **Done** | ExtensionRepoCellSetup + ExtensionRepo variant + repo_spec_json field |
 | `kuro_bzlmod/src/lib.rs` | ✅ **Done** | Export new types |
 | `kuro_interpreter_for_build/src/lib.rs` | ✅ **Done** | Export + init late binding |
+| `kuro_external_cells/src/extension_repo.rs` | ✅ **Done** | Lazy materialization via ExtensionRepoExecutionKey |
 
 ---
 
@@ -738,6 +739,41 @@ Extension execution needs to use `AggregatedExtension` from `kuro_bzlmod` AND
 This provides basic cache invalidation but doesn't capture transitive .bzl file changes.
 Can be improved later by integrating with the Starlark module loading system.
 
+### 6. Cell Resolver Integration (Phase 5e-11) - COMPLETE
+
+**Goal**: Trigger lazy materialization when extension-generated repos are first accessed.
+
+**Implementation**:
+- [x] Add `repo_spec_json: Arc<str>` field to `ExtensionRepoCellSetup` in `kuro_core/src/cells/external.rs`
+  - Stores serialized RepoSpec for lazy execution
+- [x] Add `repo_spec_json: String` field to `PendingRepoCell` in `kuro_bzlmod/src/pending_repo_cells.rs`
+- [x] Update `build_extension_cells()` to serialize RepoSpec to JSON when creating pending cells
+- [x] Update `register_extension_cells()` in `kuro_common/src/legacy_configs/cells.rs` to include repo_spec_json
+- [x] Add `kuro_bzlmod` and `serde_json` dependencies to `kuro_external_cells`
+- [x] Modify `get_file_ops_delegate()` in `kuro_external_cells/src/extension_repo.rs`:
+  - Check if repo exists on disk
+  - If not, deserialize RepoSpec from `repo_spec_json`
+  - Create and compute `ExtensionRepoExecutionKey` via DICE
+  - This triggers repository rule execution (http_archive, git_repository, etc.)
+  - Return file ops delegate pointing to materialized content
+- [x] Add error types for deserialization and materialization failures
+
+**Files modified**:
+- `kuro_core/src/cells/external.rs` - Added repo_spec_json field
+- `kuro_bzlmod/src/pending_repo_cells.rs` - Added repo_spec_json field, updated build_extension_cells()
+- `kuro_common/src/legacy_configs/cells.rs` - Updated register_extension_cells()
+- `kuro_external_cells/Cargo.toml` - Added kuro_bzlmod, serde_json, tracing dependencies
+- `kuro_external_cells/src/extension_repo.rs` - Implemented lazy materialization
+
+**How it works**:
+1. When extension evaluates, RepoSpecs are captured and serialized to JSON
+2. Cell is registered with `ExtensionRepoCellSetup` containing the serialized spec
+3. When cell is accessed, `get_file_ops_delegate()` is called
+4. If repo doesn't exist on disk, the RepoSpec is deserialized
+5. `ExtensionRepoExecutionKey::compute()` is called via DICE
+6. This executes the repository rule (downloads, extracts, etc.)
+7. File ops delegate is returned pointing to the now-materialized content
+
 ### What Remains for Full Integration
 
 1. **Starlark Extension Execution** (Phase 2 in module_extension_executor_impl.rs):
@@ -746,12 +782,9 @@ Can be improved later by integrating with the Starlark module loading system.
    - Invoke `extension.implementation(module_ctx)` in Starlark evaluator
    - RepoSpecs will be captured by the already-wired `with_repo_spec_registry()`
 
-2. **Cell Resolver Integration**: When `@repo_name` is accessed and cell is "pending":
-   - Look up the extension result for this repo
-   - Trigger `ExtensionRepoExecutionKey` computation
-   - Update cell path to materialized location
-
-3. **Lockfile Integration**: Store and retrieve extension results from lockfile cache
+2. **Wire extension execution to cell resolution**:
+   - Execute extensions during MODULE.bazel resolution
+   - Register extension cells with the CellsAggregator
 
 ---
 
@@ -767,7 +800,7 @@ Can be improved later by integrating with the Starlark module loading system.
 - [x] Pending cells registered for all extension-generated repos (infrastructure complete)
 - [x] Canonical naming: `_main~{ext}~{repo}` format used (`build_canonical_names()`)
 - [x] `use_repo()` apparent names resolve to canonical (`build_use_repo_aliases()`)
-- [ ] Cell access triggers lazy materialization (needs cell resolver wiring)
+- [x] Cell access triggers lazy materialization (`get_file_ops_delegate()` in extension_repo.rs)
 
 ### Lockfile
 - [x] Lockfile contains `generatedRepoSpecs` with full RepoSpec data

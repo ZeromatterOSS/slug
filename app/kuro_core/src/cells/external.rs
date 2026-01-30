@@ -124,6 +124,10 @@ pub struct ExtensionRepoCellSetup {
     pub internal_name: Arc<str>,
     /// Hash of the RepoSpec for cache invalidation.
     pub spec_hash: Arc<str>,
+    /// JSON-serialized RepoSpec for lazy execution.
+    /// When the repo is first accessed, this is deserialized and used to
+    /// create an ExtensionRepoExecutionKey for materialization.
+    pub repo_spec_json: Arc<str>,
     /// Whether this repo has been materialized yet.
     /// When false, accessing the repo triggers lazy execution.
     pub materialized: bool,

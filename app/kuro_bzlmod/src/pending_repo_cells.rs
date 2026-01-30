@@ -53,6 +53,8 @@ pub struct PendingRepoCell {
     pub internal_name: String,
     /// Hash of the RepoSpec for cache invalidation.
     pub spec_hash: String,
+    /// JSON-serialized RepoSpec for lazy execution.
+    pub repo_spec_json: String,
     /// Project-relative path where the repo will be materialized.
     pub path: String,
 }
@@ -111,6 +113,7 @@ impl ExtensionCellDefinitions {
 /// 1. A cell for each generated repository with its canonical name
 /// 2. A project-relative path at `bazel-external/{canonical_name}`
 /// 3. Metadata for lazy materialization
+/// 4. Serialized RepoSpec for lazy execution
 ///
 /// # Arguments
 /// * `result` - The module extension execution result
@@ -134,11 +137,22 @@ pub fn build_extension_cells(result: &ModuleExtensionResult) -> kuro_error::Resu
         // Path: bazel-external/{canonical_name}
         let path = format!("bazel-external/{}", canonical);
 
+        // Serialize RepoSpec to JSON for lazy execution
+        let repo_spec_json = serde_json::to_string(repo_spec).map_err(|e| {
+            kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "Failed to serialize RepoSpec for repo '{}': {}",
+                internal_name,
+                e
+            )
+        })?;
+
         let cell = PendingRepoCell {
             canonical_name: canonical.to_owned(),
             extension_id: result.extension_id.to_string(),
             internal_name: internal_name.clone(),
             spec_hash: repo_spec.compute_hash(),
+            repo_spec_json,
             path,
         };
 
@@ -512,5 +526,10 @@ mod tests {
         assert_eq!(numpy_cell.internal_name, "numpy");
         assert!(numpy_cell.spec_hash.starts_with("sha256-"));
         assert_eq!(numpy_cell.path, "bazel-external/_main~pip~numpy");
+
+        // Verify repo_spec_json is valid JSON and can be deserialized
+        let deserialized: RepoSpec = serde_json::from_str(&numpy_cell.repo_spec_json).unwrap();
+        assert_eq!(deserialized.repo_rule_id, "@@rules_python//pip:pip.bzl%pip_install");
+        assert!(deserialized.attributes.contains_key("version"));
     }
 }

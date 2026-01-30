@@ -17,9 +17,8 @@
 //! 2. When a repo is first accessed, the `RepoSpec` is executed to materialize it
 //! 3. Materialized repos are stored at `bazel-external/{canonical_name}`
 //!
-//! This module provides file operations for extension repos. If a repo isn't
-//! materialized yet, operations will fail with an error indicating lazy execution
-//! is needed (full lazy execution wiring is done at a higher level).
+//! This module provides file operations for extension repos. When a repo isn't
+//! materialized yet, lazy materialization is triggered via `ExtensionRepoExecutionKey`.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -28,6 +27,8 @@ use async_trait::async_trait;
 use cmp_any::PartialEqAny;
 use compact_str::CompactString;
 use dice::DiceComputations;
+use kuro_bzlmod::ExtensionRepoExecutionKey;
+use kuro_bzlmod::RepoSpec;
 use kuro_common::dice::data::HasIoProvider;
 use kuro_common::external_symlink::ExternalSymlink;
 use kuro_common::file_ops::delegate::FileOpsDelegate;
@@ -47,7 +48,7 @@ use kuro_execute::digest_config::DigestConfig;
 use kuro_execute::digest_config::HasDigestConfig;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 
-/// Error for extension repos that haven't been materialized yet.
+/// Error for extension repos.
 #[derive(Debug, kuro_error::Error)]
 #[kuro(tag = Input)]
 pub enum ExtensionRepoError {
@@ -59,6 +60,24 @@ pub enum ExtensionRepoError {
     NotMaterialized {
         canonical_name: String,
         extension_id: String,
+    },
+
+    #[error(
+        "Failed to deserialize RepoSpec for extension repository '{}': {}",
+        canonical_name, reason
+    )]
+    DeserializationFailed {
+        canonical_name: String,
+        reason: String,
+    },
+
+    #[error(
+        "Failed to materialize extension repository '{}': {}",
+        canonical_name, reason
+    )]
+    MaterializationFailed {
+        canonical_name: String,
+        reason: String,
     },
 }
 
@@ -268,11 +287,16 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
 /// Get the file ops delegate for an extension-generated repository cell.
 ///
 /// This computes the expected path for the materialized repository
-/// (`bazel-external/{canonical_name}`) and checks if it exists.
+/// (`bazel-external/{canonical_name}`) and triggers lazy materialization
+/// if the repository hasn't been materialized yet.
 ///
-/// If the repository hasn't been materialized yet, this returns an error.
-/// The higher-level code should handle this by triggering lazy execution
-/// via `ExtensionRepoExecutionKey`.
+/// ## Lazy Materialization Flow
+///
+/// 1. Check if the repository is already materialized (exists on disk)
+/// 2. If not materialized, deserialize the `RepoSpec` from `repo_spec_json`
+/// 3. Create and compute `ExtensionRepoExecutionKey` via DICE
+/// 4. This executes the repository rule (e.g., http_archive) and materializes the repo
+/// 5. Return a file ops delegate pointing to the materialized content
 pub(crate) async fn get_file_ops_delegate(
     ctx: &mut DiceComputations<'_>,
     cell_name: CellName,
@@ -283,28 +307,63 @@ pub(crate) async fn get_file_ops_delegate(
     // Compute the expected path for the materialized repository
     let io = ctx.global_data().get_io_provider();
     let project_root = io.project_root();
-    let source_path = project_root
-        .root()
-        .as_path()
+    let project_root_path = project_root.root().to_path_buf();
+    let source_path = project_root_path
         .join("bazel-external")
         .join(setup.canonical_name.as_ref());
 
-    // Check if the repository is materialized
-    if !setup.materialized {
-        // The repo hasn't been materialized yet
-        // The higher-level code should trigger lazy execution
-        return Err(ExtensionRepoError::NotMaterialized {
-            canonical_name: setup.canonical_name.to_string(),
-            extension_id: setup.extension_id.to_string(),
-        }
-        .into());
+    // Check if the repository is already materialized (exists on disk)
+    if !source_path.exists() {
+        tracing::info!(
+            "Extension repo '{}' not materialized, triggering lazy execution",
+            setup.canonical_name
+        );
+
+        // Deserialize the RepoSpec from JSON
+        let repo_spec: RepoSpec = serde_json::from_str(&setup.repo_spec_json).map_err(|e| {
+            ExtensionRepoError::DeserializationFailed {
+                canonical_name: setup.canonical_name.to_string(),
+                reason: e.to_string(),
+            }
+        })?;
+
+        // Create the execution key for lazy materialization
+        let key = ExtensionRepoExecutionKey::new(
+            setup.canonical_name.to_string(),
+            setup.extension_id.to_string(),
+            repo_spec,
+            project_root_path.clone(),
+        );
+
+        // Execute via DICE to materialize the repository
+        // This downloads/extracts the repository content to bazel-external/{canonical_name}
+        let result = ctx.compute(&key).await.map_err(|e| {
+            ExtensionRepoError::MaterializationFailed {
+                canonical_name: setup.canonical_name.to_string(),
+                reason: format!("DICE computation failed: {}", e),
+            }
+        })?;
+
+        // Check if the execution succeeded
+        let repo_result = result.map_err(|e| {
+            ExtensionRepoError::MaterializationFailed {
+                canonical_name: setup.canonical_name.to_string(),
+                reason: format!("Repository rule execution failed: {}", e),
+            }
+        })?;
+
+        tracing::info!(
+            "Successfully materialized extension repo '{}' at {:?}",
+            setup.canonical_name,
+            repo_result.repo_path
+        );
     }
 
-    // Verify the source path exists
+    // At this point, the repository should exist on disk
     if !source_path.exists() {
-        return Err(ExtensionRepoError::NotMaterialized {
+        return Err(ExtensionRepoError::MaterializationFailed {
             canonical_name: setup.canonical_name.to_string(),
-            extension_id: setup.extension_id.to_string(),
+            reason: "Repository not found after materialization".to_owned(),
         }
         .into());
     }
@@ -321,6 +380,10 @@ pub(crate) async fn get_file_ops_delegate(
 ///
 /// This is used by the expand function to copy the materialized repository content
 /// into the project's external directory.
+///
+/// Note: This function cannot trigger lazy materialization because it doesn't
+/// have access to DICE. The caller should ensure the repo is materialized
+/// (via `get_file_ops_delegate`) before calling this function.
 pub(crate) async fn copy_to_destination(
     setup: &ExtensionRepoCellSetup,
     project_root: &kuro_fs::paths::abs_norm_path::AbsNormPath,
@@ -333,7 +396,7 @@ pub(crate) async fn copy_to_destination(
         .join(setup.canonical_name.as_ref());
 
     // Check if materialized
-    if !setup.materialized || !source_path.exists() {
+    if !source_path.exists() {
         return Err(ExtensionRepoError::NotMaterialized {
             canonical_name: setup.canonical_name.to_string(),
             extension_id: setup.extension_id.to_string(),

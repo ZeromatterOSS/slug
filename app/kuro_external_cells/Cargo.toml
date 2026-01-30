@@ -16,9 +16,12 @@ async-trait = { workspace = true }
 blake3 = { workspace = true }
 compact_str = { workspace = true }
 derive_more = { workspace = true }
+serde_json = { workspace = true }
 tokio = { workspace = true }
+tracing = { workspace = true }
 
 kuro_build_api = { workspace = true }
+kuro_bzlmod = { workspace = true }
 kuro_common = { workspace = true }
 kuro_core = { workspace = true }
 kuro_directory = { workspace = true }
