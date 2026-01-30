@@ -629,7 +629,7 @@ which captures a RepoSpec for later execution.
 | `kuro_interpreter_for_build/src/module_ctx.rs` | ✅ **Done** | Temp working dir, delete_on_close, with_temp_working_dir() |
 | `kuro_interpreter_for_build/src/module_extension_executor_impl.rs` | ✅ **New** | ConcreteModuleExtensionExecutor |
 | `kuro_bzlmod/src/lockfile.rs` | ✅ **Done** | generatedRepoSpecs format |
-| `kuro_common/src/legacy_configs/cells.rs` | ✅ **Done** | Pending cell registration |
+| `kuro_common/src/legacy_configs/cells.rs` | ✅ **Done** | Pending cell registration, lockfile-based extension cell resolution (Phase 5e-12) |
 | `kuro_bzlmod/src/pending_repo_cells.rs` | ✅ **New** | Cell definitions from extension results |
 | `kuro_core/src/cells/external.rs` | ✅ **Done** | ExtensionRepoCellSetup + ExtensionRepo variant + repo_spec_json field |
 | `kuro_bzlmod/src/lib.rs` | ✅ **Done** | Export new types |
@@ -774,17 +774,65 @@ Can be improved later by integrating with the Starlark module loading system.
 6. This executes the repository rule (downloads, extracts, etc.)
 7. File ops delegate is returned pointing to the now-materialized content
 
+### 7. Wire Extension Execution to Cell Resolution (Phase 5e-12) - COMPLETE
+
+**Goal**: Enable `@repo_name` references from `use_repo()` to resolve by wiring extension
+execution results (from lockfile cache) into the cell resolution flow.
+
+**Implementation**:
+- [x] Add `resolve_extension_repos_from_lockfile()` function in `kuro_common/src/legacy_configs/cells.rs`:
+  - Reads lockfile if it exists
+  - Aggregates extension usages from all parsed modules
+  - For each extension, checks lockfile cache using `compute_bzl_transitive_digest()` and `compute_extension_input_hash()`
+  - If cached, builds cells from cached RepoSpecs using `build_extension_cells()`
+  - Creates aliases from `use_repo()` declarations using `build_use_repo_aliases()`
+  - Returns cells and aliases for registration
+- [x] Update `BzlmodResolutionResult` to include `extension_cells` field
+- [x] Call `resolve_extension_repos_from_lockfile()` in `resolve_bzlmod_dependencies()`
+- [x] Register extension cells as external with `ExternalCellOrigin::ExtensionRepo`
+- [x] Export `compute_bzl_transitive_digest()` from `kuro_bzlmod` for consistent digest format
+
+**Files modified**:
+- `kuro_common/src/legacy_configs/cells.rs`:
+  - Added imports for lockfile and extension cell building
+  - Added `extension_cells` field to `BzlmodResolutionResult`
+  - Added `resolve_extension_repos_from_lockfile()` function
+  - Updated `resolve_bzlmod_dependencies()` to call new function
+  - Updated `parse_with_file_ops_and_options_inner()` to register extension cells
+- `kuro_bzlmod/src/extension_execution_dice.rs` - Made `compute_bzl_transitive_digest()` public
+- `kuro_bzlmod/src/lib.rs` - Export `compute_bzl_transitive_digest`
+
+**How it works**:
+1. During cell resolution in `resolve_bzlmod_dependencies()`:
+   - After resolving bazel_deps and generating synthetic repos
+   - Build `parsed_modules` list from root and dependency MODULE.bazel files
+   - Call `resolve_extension_repos_from_lockfile()` with the parsed modules
+2. For each extension usage in the parsed modules:
+   - Compute digests (`bzl_transitive_digest`, `usages_digest`)
+   - Check lockfile cache with `lockfile.get_extension_cache()`
+   - If cached: build `ModuleExtensionResult` from cached data
+   - Build cells using `build_extension_cells()`
+   - Build aliases using `build_use_repo_aliases()`
+3. Return cells and aliases to be registered:
+   - Cells are registered with `CellsAggregator` as `ExternalCellOrigin::ExtensionRepo`
+   - Aliases are merged into root_aliases for resolution
+4. When a cell is accessed:
+   - If not materialized, lazy execution via `ExtensionRepoExecutionKey` kicks in
+   - Repository rule is executed, content is materialized
+   - Subsequent accesses use the materialized content
+
+**Note**: Extensions NOT in the lockfile are skipped during cell resolution. They will either:
+- Be executed when first accessed (via lazy materialization, requires full Starlark execution)
+- Fail with "unknown cell" error (user needs to run build first to populate lockfile)
+
 ### What Remains for Full Integration
 
-1. **Starlark Extension Execution** (Phase 2 in module_extension_executor_impl.rs):
+1. **Starlark Extension Execution** (requires full interpreter integration):
    - Load the extension's .bzl file via interpreter DICE key
    - Get `FrozenStarlarkModuleExtension` from loaded module
    - Invoke `extension.implementation(module_ctx)` in Starlark evaluator
    - RepoSpecs will be captured by the already-wired `with_repo_spec_registry()`
-
-2. **Wire extension execution to cell resolution**:
-   - Execute extensions during MODULE.bazel resolution
-   - Register extension cells with the CellsAggregator
+   - This enables extensions NOT in lockfile to be executed on first build
 
 ---
 

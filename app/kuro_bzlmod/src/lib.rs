@@ -75,6 +75,7 @@ pub use extension_execution_dice::ModuleExtensionError;
 pub use extension_execution_dice::ModuleExtensionExecutionKey;
 pub use extension_execution_dice::ModuleExtensionResult;
 pub use extension_execution_dice::build_canonical_names;
+pub use extension_execution_dice::compute_bzl_transitive_digest;
 pub use extension_execution_dice::extract_extension_name;
 pub use extensions::AggregatedExtension;
 pub use extensions::compute_extension_input_hash;

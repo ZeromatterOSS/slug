@@ -601,7 +601,7 @@ pub fn extract_extension_name(extension_id: &str) -> String {
 ///
 /// TODO: Improve this by integrating with the Starlark module loading system
 /// to get the actual transitive digest of all loaded .bzl files.
-fn compute_bzl_transitive_digest(extension_id: &str) -> String {
+pub fn compute_bzl_transitive_digest(extension_id: &str) -> String {
     use base64::Engine;
     use sha2::Digest;
     use sha2::Sha256;
