@@ -31,6 +31,7 @@ tracing = { workspace = true }
 kuro_error = { workspace = true }
 kuro_fs = { workspace = true }
 kuro_http = { workspace = true }
+kuro_util = { workspace = true }
 
 [dev-dependencies]
 httptest = { workspace = true }

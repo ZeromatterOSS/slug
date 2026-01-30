@@ -622,15 +622,18 @@ which captures a RepoSpec for later execution.
 | File | Status | Changes |
 |------|--------|---------|
 | `kuro_bzlmod/src/repo_spec.rs` | ✅ **Done** | RepoSpec type, thread-local capture registry |
-| `kuro_bzlmod/src/extension_execution_dice.rs` | ✅ **Done** | ModuleExtensionExecutionKey (captures specs) |
+| `kuro_bzlmod/src/extension_execution_dice.rs` | ✅ **Done** | ModuleExtensionExecutionKey (captures specs), late binding call |
+| `kuro_bzlmod/src/module_extension_executor.rs` | ✅ **New** | ModuleExtensionExecutorImpl trait, LateBinding |
 | `kuro_bzlmod/src/repository_execution.rs` | ✅ **Done** | Add ExtensionRepoExecutionKey (lazy execution) |
 | `kuro_interpreter_for_build/src/repository_rule.rs` | ✅ **Done** | Capture RepoSpec in extension context |
 | `kuro_interpreter_for_build/src/module_ctx.rs` | ✅ **Done** | Temp working dir, delete_on_close, with_temp_working_dir() |
+| `kuro_interpreter_for_build/src/module_extension_executor_impl.rs` | ✅ **New** | ConcreteModuleExtensionExecutor |
 | `kuro_bzlmod/src/lockfile.rs` | ✅ **Done** | generatedRepoSpecs format |
 | `kuro_common/src/legacy_configs/cells.rs` | ✅ **Done** | Pending cell registration |
 | `kuro_bzlmod/src/pending_repo_cells.rs` | ✅ **New** | Cell definitions from extension results |
 | `kuro_core/src/cells/external.rs` | ✅ **Done** | ExtensionRepoCellSetup + ExtensionRepo variant |
 | `kuro_bzlmod/src/lib.rs` | ✅ **Done** | Export new types |
+| `kuro_interpreter_for_build/src/lib.rs` | ✅ **Done** | Export + init late binding |
 
 ---
 
@@ -676,12 +679,50 @@ Added exports:
 - `compute_extension_input_hash`
 - `aggregate_extensions`
 
+### 4. Late Binding Infrastructure for Extension Execution (Phase 5e-8)
+
+**Goal**: Allow `ModuleExtensionExecutionKey::compute()` in `kuro_bzlmod` to call
+`build_module_context()` from `kuro_interpreter_for_build` without a direct dependency.
+
+**Problem**: The crate dependency direction is `kuro_interpreter_for_build` → `kuro_bzlmod`.
+Extension execution needs to use `AggregatedExtension` from `kuro_bzlmod` AND
+`build_module_context()` from `kuro_interpreter_for_build`.
+
+**Solution**: Late binding pattern (like `EXTERNAL_CELLS_IMPL` in `kuro_common`).
+
+**Files created/modified**:
+- [x] `kuro_bzlmod/src/module_extension_executor.rs` (NEW):
+  - `ModuleExtensionExecutorImpl` trait with `execute_extension()` method
+  - `ExtensionExecutionOutput` result type
+  - `MODULE_EXTENSION_EXECUTOR_IMPL` LateBinding static
+- [x] `kuro_bzlmod/src/lib.rs`: Export new types
+- [x] `kuro_bzlmod/Cargo.toml`: Add `kuro_util` dependency for `LateBinding`
+- [x] `kuro_bzlmod/src/extension_execution_dice.rs`:
+  - Updated `compute()` to call via late binding
+  - Falls back to stub mode if late binding not initialized
+- [x] `kuro_interpreter_for_build/src/module_extension_executor_impl.rs` (NEW):
+  - `ConcreteModuleExtensionExecutor` implementing the trait
+  - Uses `build_module_context()` and `with_repo_spec_registry()`
+  - `init_module_extension_executor()` registration function
+- [x] `kuro_interpreter_for_build/src/lib.rs`:
+  - Export new module
+  - Call `init_module_extension_executor()` in `init_late_bindings()`
+
+**Current behavior**:
+- Late binding infrastructure is in place and working
+- `compute()` creates `ModuleContext` from `AggregatedExtension`
+- `with_repo_spec_registry()` captures any RepoSpecs from repo rule invocations
+- Logs extension execution context for debugging
+
+**Next step**: Wire actual Starlark .bzl file loading and extension implementation invocation.
+
 ### What Remains for Full Integration
 
-1. **Starlark Extension Execution**: Wire `ModuleExtensionExecutionKey::compute()` to:
-   - Load the extension's .bzl file via Starlark interpreter
-   - Call `build_module_context()` from `kuro_interpreter_for_build`
-   - Execute `extension.implementation(module_ctx)` via Starlark evaluator
+1. **Starlark Extension Execution** (Phase 2 in module_extension_executor_impl.rs):
+   - Load the extension's .bzl file via interpreter DICE key
+   - Get `FrozenStarlarkModuleExtension` from loaded module
+   - Invoke `extension.implementation(module_ctx)` in Starlark evaluator
+   - RepoSpecs will be captured by the already-wired `with_repo_spec_registry()`
 
 2. **Cell Resolver Integration**: When `@repo_name` is accessed and cell is "pending":
    - Look up the extension result for this repo

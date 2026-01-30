@@ -23,6 +23,7 @@ pub mod interpreter;
 pub mod label;
 pub mod module_ctx;
 pub mod module_extension;
+pub mod module_extension_executor_impl;
 pub mod nodes;
 pub(crate) mod plugins;
 pub mod repository_ctx;
@@ -41,5 +42,6 @@ pub fn init_late_bindings() {
         plugins::init_plugin_kind_from_value_impl();
         rule::init_frozen_rule_get_impl();
         rule::init_frozen_promise_artifact_mappings_get_impl();
+        module_extension_executor_impl::init_module_extension_executor();
     });
 }

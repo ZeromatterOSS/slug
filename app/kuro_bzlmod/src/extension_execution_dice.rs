@@ -44,8 +44,8 @@ use dupe::Dupe;
 
 use crate::extensions::AggregatedExtension;
 use crate::extensions::compute_extension_input_hash;
+use crate::module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
 use crate::repo_spec::RepoSpec;
-use crate::repo_spec::with_repo_spec_registry;
 
 /// Errors during module extension execution.
 #[derive(Debug, kuro_error::Error)]
@@ -253,7 +253,7 @@ impl Key for ModuleExtensionExecutionKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         tracing::info!(
@@ -275,51 +275,56 @@ impl Key for ModuleExtensionExecutionKey {
         // 1. Create temporary working directory for module_ctx I/O
         let temp_dir = create_temp_extension_dir(&self.extension_id)?;
 
-        // 2-4. Execute extension with RepoSpec capture
+        // 2-4. Execute extension via late binding to kuro_interpreter_for_build
         //
-        // The full integration flow (requires kuro_interpreter_for_build):
-        // ```rust
-        // // Load the extension's .bzl file via Starlark interpreter
-        // let bzl_file = &self.aggregated.extension_bzl_file;
-        // let extension_name = &self.aggregated.extension_name;
-        //
-        // // Build module_ctx from aggregated tags
-        // // This uses kuro_interpreter_for_build::extension_execution::build_module_context()
-        // let module_ctx = build_module_context(&self.aggregated, &self.root_module_name)
-        //     .with_temp_working_dir(temp_dir.clone());
-        //
-        // // Execute the extension implementation
-        // let extension = load_extension(bzl_file, extension_name)?;
-        // extension.implementation.invoke(module_ctx)?;
-        // ```
-        //
-        // For now, we log the extension info and capture any RepoSpecs from
-        // repository rule invocations.
-        let (execution_result, specs) = with_repo_spec_registry(|| {
-            tracing::debug!(
-                "Extension '{}' execution context:",
-                self.extension_id
-            );
-            tracing::debug!("  - BZL file: {}", self.aggregated.extension_bzl_file);
-            tracing::debug!("  - Extension name: {}", self.aggregated.extension_name);
-            tracing::debug!("  - Root module: {}", self.root_module_name);
-            tracing::debug!("  - Temp working dir: {:?}", temp_dir);
-            tracing::debug!("  - Imported repos: {:?}", self.aggregated.imported_repos);
-
-            // Log tags by module
-            for (module_name, tags) in &self.aggregated.tags_by_module {
-                tracing::debug!("  - Module '{}' tags:", module_name);
-                for tag in tags {
-                    tracing::debug!("    - {}: {} kwarg(s)", tag.tag_name, tag.kwargs.len());
-                }
+        // The late binding pattern allows us to call into kuro_interpreter_for_build
+        // without a direct dependency. The implementation:
+        // - Loads the extension's .bzl file via Starlark interpreter
+        // - Builds module_ctx from aggregated tags using build_module_context()
+        // - Executes extension.implementation(module_ctx) in Starlark
+        // - Captures RepoSpecs from repository rule invocations
+        let execution_result = match MODULE_EXTENSION_EXECUTOR_IMPL.get() {
+            Ok(executor) => {
+                executor
+                    .execute_extension(
+                        ctx,
+                        &self.aggregated,
+                        &self.root_module_name,
+                        &temp_dir,
+                    )
+                    .await
             }
+            Err(e) => {
+                // Late binding not initialized - fall back to logging only (testing mode)
+                tracing::warn!(
+                    "MODULE_EXTENSION_EXECUTOR_IMPL not initialized: {}. \
+                     Extension execution will be a no-op.",
+                    e
+                );
+                tracing::debug!(
+                    "Extension '{}' execution context (stub mode):",
+                    self.extension_id
+                );
+                tracing::debug!("  - BZL file: {}", self.aggregated.extension_bzl_file);
+                tracing::debug!("  - Extension name: {}", self.aggregated.extension_name);
+                tracing::debug!("  - Root module: {}", self.root_module_name);
+                tracing::debug!("  - Temp working dir: {:?}", temp_dir);
+                tracing::debug!("  - Imported repos: {:?}", self.aggregated.imported_repos);
 
-            // TODO: Actual Starlark execution will be wired in at kuro_interpreter_for_build level
-            // For now, this is a stub that doesn't execute any Starlark code.
-            // Repository rules like http_archive() will capture RepoSpecs when executed.
+                // Log tags by module in stub mode
+                for (module_name, tags) in &self.aggregated.tags_by_module {
+                    tracing::debug!("  - Module '{}' tags:", module_name);
+                    for tag in tags {
+                        tracing::debug!("    - {}: {} kwarg(s)", tag.tag_name, tag.kwargs.len());
+                    }
+                }
 
-            Ok::<(), kuro_error::Error>(())
-        });
+                // Return empty result in stub mode
+                Ok(crate::module_extension_executor::ExtensionExecutionOutput {
+                    generated_repo_specs: HashMap::new(),
+                })
+            }
+        };
 
         // 5. Clean up temporary working directory
         if temp_dir.exists() {
@@ -333,13 +338,13 @@ impl Key for ModuleExtensionExecutionKey {
         }
 
         // Check for execution errors
-        execution_result?;
+        let output = execution_result?;
 
         // 6. Build result with canonical names
         let result = ModuleExtensionResult::new(
             self.extension_id.clone(),
             self.input_hash.to_string(),
-            specs,
+            output.generated_repo_specs,
         );
 
         tracing::info!(
