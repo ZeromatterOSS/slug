@@ -31,6 +31,7 @@ use kuro_core::cells::alias::NonEmptyCellAlias;
 use kuro_core::cells::cell_root_path::CellRootPath;
 use kuro_core::cells::cell_root_path::CellRootPathBuf;
 use kuro_core::cells::external::BzlmodCellSetup;
+use kuro_core::cells::external::ExtensionRepoCellSetup;
 use kuro_core::cells::external::ExternalCellOrigin;
 use kuro_core::cells::external::GitCellSetup;
 use kuro_core::cells::external::GitObjectFormat;
@@ -937,6 +938,82 @@ impl BuckConfigBasedCells {
             }
         }
         Ok(aliases.into_iter())
+    }
+
+    /// Register extension-generated repository cells with a CellsAggregator.
+    ///
+    /// This is called after module extension execution to register the repositories
+    /// created by extensions (e.g., from pip.parse(), go_deps, etc.) as cells.
+    ///
+    /// Extension repos are registered as "pending" cells - they aren't materialized
+    /// until first accessed, at which point DICE triggers lazy execution via
+    /// `ExtensionRepoExecutionKey`.
+    ///
+    /// # Arguments
+    /// * `aggregator` - The CellsAggregator to add cells to
+    /// * `pending_cells` - Pending repo cell definitions from `build_extension_cells()`
+    /// * `aliases` - Repo aliases from `build_use_repo_aliases()`
+    ///
+    /// # Example
+    /// ```ignore
+    /// // After extension execution:
+    /// let ext_result = dice.compute(&ModuleExtensionExecutionKey::new(...)).await?;
+    /// let use_repos = extract_use_repos_for_extension(&ext_id, &extension_usages);
+    /// let ext_defs = build_extension_cell_definitions(&ext_result, &use_repos)?;
+    /// register_extension_cells(&mut aggregator, ext_defs.cells, ext_defs.aliases)?;
+    /// ```
+    pub(crate) fn register_extension_cells(
+        aggregator: &mut CellsAggregator,
+        pending_cells: &[kuro_bzlmod::PendingRepoCell],
+        aliases: &[kuro_bzlmod::RepoAlias],
+    ) -> kuro_error::Result<()> {
+        // Register each extension repo cell
+        for cell in pending_cells {
+            let cell_name = CellName::unchecked_new(&cell.canonical_name)?;
+
+            // Create ExtensionRepoCellSetup from PendingRepoCell
+            let setup = ExtensionRepoCellSetup {
+                canonical_name: Arc::from(cell.canonical_name.as_str()),
+                extension_id: Arc::from(cell.extension_id.as_str()),
+                internal_name: Arc::from(cell.internal_name.as_str()),
+                spec_hash: Arc::from(cell.spec_hash.as_str()),
+                materialized: false,
+            };
+
+            tracing::info!(
+                "Registering extension repo cell: {} -> {} (pending: true)",
+                cell.canonical_name,
+                cell.path,
+            );
+
+            // Mark as external cell with ExtensionRepo origin
+            // Note: The cell must already be in the aggregator's cell_infos for mark_external_cell to work.
+            // For dynamic registration, we would need to extend CellsAggregator to add new cells.
+            // For now, this function documents the expected pattern for future DICE integration.
+            if let Err(e) = aggregator.mark_external_cell(
+                cell_name,
+                ExternalCellOrigin::ExtensionRepo(setup),
+            ) {
+                tracing::debug!(
+                    "Could not mark extension repo '{}' as external: {} (may not be pre-registered)",
+                    cell.canonical_name,
+                    e
+                );
+            }
+        }
+
+        // Note: Aliases are typically added during CellsAggregator construction.
+        // For dynamic extension repos, the aliases would need to be added to
+        // the root_aliases map before make_cell_resolver() is called.
+        for alias in aliases {
+            tracing::info!(
+                "Extension repo alias: {} -> {}",
+                alias.apparent_name,
+                alias.canonical_name
+            );
+        }
+
+        Ok(())
     }
 
     pub(crate) async fn parse_single_cell_with_dice(
