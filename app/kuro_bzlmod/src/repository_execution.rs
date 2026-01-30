@@ -231,11 +231,17 @@ pub struct ExtensionRepoExecutionKey {
 
     /// The RepoSpec to execute.
     pub repo_spec: Arc<RepoSpec>,
+
+    /// Project root for repository materialization.
+    /// Repositories are created under {project_root}/bazel-external/{canonical_name}/
+    pub project_root: Arc<PathBuf>,
 }
 
 impl std::hash::Hash for ExtensionRepoExecutionKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         // Hash the identifying fields; spec_hash represents the repo_spec
+        // Note: project_root is intentionally not hashed - it's a runtime configuration
+        // that doesn't affect cache identity
         self.canonical_name.hash(state);
         self.extension_id.hash(state);
         self.spec_hash.hash(state);
@@ -245,6 +251,7 @@ impl std::hash::Hash for ExtensionRepoExecutionKey {
 impl PartialEq for ExtensionRepoExecutionKey {
     fn eq(&self, other: &Self) -> bool {
         // Compare by identifying fields; spec_hash represents the repo_spec
+        // Note: project_root is intentionally not compared - it's a runtime configuration
         self.canonical_name == other.canonical_name
             && self.extension_id == other.extension_id
             && self.spec_hash == other.spec_hash
@@ -259,6 +266,7 @@ impl ExtensionRepoExecutionKey {
         canonical_name: String,
         extension_id: String,
         repo_spec: RepoSpec,
+        project_root: PathBuf,
     ) -> Self {
         let spec_hash = repo_spec.compute_hash();
         Self {
@@ -266,6 +274,7 @@ impl ExtensionRepoExecutionKey {
             extension_id: Arc::from(extension_id.as_str()),
             spec_hash: Arc::from(spec_hash.as_str()),
             repo_spec: Arc::new(repo_spec),
+            project_root: Arc::new(project_root),
         }
     }
 
@@ -274,6 +283,7 @@ impl ExtensionRepoExecutionKey {
         canonical_name: Arc<str>,
         extension_id: Arc<str>,
         repo_spec: Arc<RepoSpec>,
+        project_root: Arc<PathBuf>,
     ) -> Self {
         let spec_hash = repo_spec.compute_hash();
         Self {
@@ -281,7 +291,23 @@ impl ExtensionRepoExecutionKey {
             extension_id,
             spec_hash: Arc::from(spec_hash.as_str()),
             repo_spec,
+            project_root,
         }
+    }
+
+    /// Create with default project root (current directory).
+    /// Primarily for testing.
+    pub fn new_with_cwd(
+        canonical_name: String,
+        extension_id: String,
+        repo_spec: RepoSpec,
+    ) -> Self {
+        Self::new(
+            canonical_name,
+            extension_id,
+            repo_spec,
+            std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+        )
     }
 }
 
@@ -303,29 +329,27 @@ impl Key for ExtensionRepoExecutionKey {
         // Convert RepoSpec to RepositoryInvocation
         let invocation = repo_spec_to_invocation(&self.canonical_name, &self.repo_spec)?;
 
-        // Determine output path: bazel-external/{canonical_name}/
-        let repo_path = PathBuf::from("bazel-external").join(self.canonical_name.as_ref());
-
         tracing::debug!(
-            "Materializing extension repo '{}' using rule '{}' to {:?}",
+            "Materializing extension repo '{}' using rule '{}' at project root {:?}",
             self.canonical_name,
             invocation.rule_name,
-            repo_path
+            self.project_root
         );
 
-        // For now, create a stub result that indicates the repository was "executed"
-        // The actual execution will integrate with execute_repository_rule() from
-        // repository_executor.rs in Phase 5e-4 (full integration)
-        //
-        // The full implementation will:
-        // 1. Create/clean the working directory at repo_path
-        // 2. Execute the repository rule (http_archive, git_repository, etc.)
-        // 3. Verify the repository was created successfully
+        // Execute the repository rule using the repository executor
+        // This handles http_archive, git_repository, local_repository, etc.
+        let result = crate::repository_executor::execute_repository_rule(
+            &invocation,
+            &self.project_root,
+        )?;
 
-        Ok(Arc::new(RepositoryRuleResult::success(
-            self.canonical_name.to_string(),
-            repo_path,
-        )))
+        tracing::info!(
+            "Successfully materialized repository '{}' at {:?}",
+            self.canonical_name,
+            result.repo_path
+        );
+
+        Ok(Arc::new(result))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -573,12 +597,14 @@ mod tests {
             "_main~pip~numpy".to_owned(),
             "@@rules_python//pip:pip.bzl%pip".to_owned(),
             repo_spec,
+            PathBuf::from("/tmp/project"),
         );
 
         assert_eq!(key.canonical_name.as_ref(), "_main~pip~numpy");
         assert_eq!(key.extension_id.as_ref(), "@@rules_python//pip:pip.bzl%pip");
         assert!(key.spec_hash.starts_with("sha256-"));
         assert_eq!(key.repo_spec.repo_rule_id, "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive");
+        assert_eq!(key.project_root.as_ref(), &PathBuf::from("/tmp/project"));
     }
 
     #[test]
@@ -592,6 +618,7 @@ mod tests {
             Arc::from("_main~go_deps~gazelle"),
             Arc::from("@@rules_go//deps:go_deps.bzl%go_deps"),
             repo_spec.clone(),
+            Arc::new(PathBuf::from("/project")),
         );
 
         assert_eq!(key.canonical_name.as_ref(), "_main~go_deps~gazelle");
@@ -603,7 +630,7 @@ mod tests {
     #[test]
     fn test_extension_repo_key_display() {
         let repo_spec = RepoSpec::new("@@tools//repo:http.bzl%http_archive".to_owned());
-        let key = ExtensionRepoExecutionKey::new(
+        let key = ExtensionRepoExecutionKey::new_with_cwd(
             "_main~ext~repo".to_owned(),
             "@@module//ext.bzl%ext".to_owned(),
             repo_spec,
@@ -622,18 +649,40 @@ mod tests {
         let spec2 = RepoSpec::new("@@tools//repo:http.bzl%http_archive".to_owned())
             .with_attr("url".to_owned(), AttrValue::String("https://example.com".to_owned()));
 
-        let key1 = ExtensionRepoExecutionKey::new(
+        let key1 = ExtensionRepoExecutionKey::new_with_cwd(
             "_main~ext~repo".to_owned(),
             "@@m//e.bzl%ext".to_owned(),
             spec1,
         );
-        let key2 = ExtensionRepoExecutionKey::new(
+        let key2 = ExtensionRepoExecutionKey::new_with_cwd(
             "_main~ext~repo".to_owned(),
             "@@m//e.bzl%ext".to_owned(),
             spec2,
         );
 
         assert_eq!(key1.spec_hash, key2.spec_hash);
+    }
+
+    #[test]
+    fn test_extension_repo_key_hash_ignores_project_root() {
+        // Same spec with different project roots should have same hash
+        let spec = RepoSpec::new("@@tools//repo:http.bzl%http_archive".to_owned());
+
+        let key1 = ExtensionRepoExecutionKey::new(
+            "_main~ext~repo".to_owned(),
+            "@@m//e.bzl%ext".to_owned(),
+            spec.clone(),
+            PathBuf::from("/project1"),
+        );
+        let key2 = ExtensionRepoExecutionKey::new(
+            "_main~ext~repo".to_owned(),
+            "@@m//e.bzl%ext".to_owned(),
+            spec,
+            PathBuf::from("/project2"),
+        );
+
+        // Keys should be equal (project_root not in comparison)
+        assert_eq!(key1, key2);
     }
 
     // Tests for repo_spec_to_invocation

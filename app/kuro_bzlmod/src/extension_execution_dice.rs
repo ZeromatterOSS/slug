@@ -42,6 +42,8 @@ use dice::DiceComputations;
 use dice::Key;
 use dupe::Dupe;
 
+use crate::extensions::AggregatedExtension;
+use crate::extensions::compute_extension_input_hash;
 use crate::repo_spec::RepoSpec;
 use crate::repo_spec::with_repo_spec_registry;
 
@@ -145,7 +147,10 @@ impl ModuleExtensionResult {
 ///
 /// Note: NO downloads or repository materialization happens during this computation.
 /// Repositories are materialized lazily via `ExtensionRepoExecutionKey`.
-#[derive(Clone, Debug, Display, PartialEq, Eq, Hash, Allocative, Dupe)]
+///
+/// Note: Hash and Eq are implemented manually because `AggregatedExtension` contains
+/// HashMap. The `input_hash` field is used for hashing, ensuring deterministic cache behavior.
+#[derive(Clone, Debug, Display, Allocative)]
 #[display("ModuleExtensionKey({}, {})", extension_id, input_hash)]
 pub struct ModuleExtensionExecutionKey {
     /// Extension identifier: "@@module//path:file.bzl%extension_name"
@@ -154,15 +159,91 @@ pub struct ModuleExtensionExecutionKey {
     /// Hash of input tags for cache invalidation.
     /// This hash covers all tags from all modules that use this extension.
     pub input_hash: Arc<str>,
+
+    /// Aggregated extension data from all modules.
+    /// Contains all the tags needed to build module_ctx.
+    pub aggregated: Arc<AggregatedExtension>,
+
+    /// Root module name (needed for build_module_context).
+    pub root_module_name: Arc<str>,
+}
+
+impl std::hash::Hash for ModuleExtensionExecutionKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // Hash the identifying fields; input_hash represents the aggregated data
+        self.extension_id.hash(state);
+        self.input_hash.hash(state);
+    }
+}
+
+impl PartialEq for ModuleExtensionExecutionKey {
+    fn eq(&self, other: &Self) -> bool {
+        // Compare by identifying fields; input_hash represents the aggregated data
+        self.extension_id == other.extension_id && self.input_hash == other.input_hash
+    }
+}
+
+impl Eq for ModuleExtensionExecutionKey {}
+
+// Manual Dupe implementation
+impl Dupe for ModuleExtensionExecutionKey {
+    fn dupe(&self) -> Self {
+        Self {
+            extension_id: self.extension_id.dupe(),
+            input_hash: self.input_hash.dupe(),
+            aggregated: self.aggregated.dupe(),
+            root_module_name: self.root_module_name.dupe(),
+        }
+    }
 }
 
 impl ModuleExtensionExecutionKey {
-    /// Create a new extension execution key.
-    pub fn new(extension_id: String, input_hash: String) -> Self {
+    /// Create a new extension execution key from aggregated extension data.
+    pub fn new(aggregated: AggregatedExtension, root_module_name: String) -> Self {
+        let extension_id = Arc::from(aggregated.extension_id.as_str());
+        let input_hash = Arc::from(compute_extension_input_hash(&aggregated).as_str());
+        Self {
+            extension_id,
+            input_hash,
+            aggregated: Arc::new(aggregated),
+            root_module_name: Arc::from(root_module_name.as_str()),
+        }
+    }
+
+    /// Create from Arc references (avoids cloning for repeated use).
+    pub fn from_arcs(
+        extension_id: Arc<str>,
+        input_hash: Arc<str>,
+        aggregated: Arc<AggregatedExtension>,
+        root_module_name: Arc<str>,
+    ) -> Self {
+        Self {
+            extension_id,
+            input_hash,
+            aggregated,
+            root_module_name,
+        }
+    }
+
+    /// Create a minimal key (for testing or when aggregated data is not available).
+    /// This is primarily for backward compatibility with tests.
+    pub fn new_minimal(extension_id: String, input_hash: String) -> Self {
         Self {
             extension_id: Arc::from(extension_id.as_str()),
             input_hash: Arc::from(input_hash.as_str()),
+            aggregated: Arc::new(AggregatedExtension::default()),
+            root_module_name: Arc::from("_main"),
         }
+    }
+
+    /// Get the aggregated extension data.
+    pub fn aggregated(&self) -> &AggregatedExtension {
+        &self.aggregated
+    }
+
+    /// Get the root module name.
+    pub fn root_module_name(&self) -> &str {
+        &self.root_module_name
     }
 }
 
@@ -181,36 +262,62 @@ impl Key for ModuleExtensionExecutionKey {
             self.input_hash
         );
 
+        // Log the modules that use this extension
+        let module_count = self.aggregated.tags_by_module.len();
+        let tag_count: usize = self.aggregated.tags_by_module.values().map(|v| v.len()).sum();
+        tracing::debug!(
+            "Extension '{}' used by {} module(s) with {} total tag(s)",
+            self.extension_id,
+            module_count,
+            tag_count
+        );
+
         // 1. Create temporary working directory for module_ctx I/O
         let temp_dir = create_temp_extension_dir(&self.extension_id)?;
 
         // 2-4. Execute extension with RepoSpec capture
-        // The actual extension loading and execution will be implemented in a future phase.
-        // For now, we wrap a stub that just captures any RepoSpecs.
         //
-        // When fully implemented, the flow will be:
-        // ```
-        // let module_ctx = build_module_context(aggregated_tags)
+        // The full integration flow (requires kuro_interpreter_for_build):
+        // ```rust
+        // // Load the extension's .bzl file via Starlark interpreter
+        // let bzl_file = &self.aggregated.extension_bzl_file;
+        // let extension_name = &self.aggregated.extension_name;
+        //
+        // // Build module_ctx from aggregated tags
+        // // This uses kuro_interpreter_for_build::extension_execution::build_module_context()
+        // let module_ctx = build_module_context(&self.aggregated, &self.root_module_name)
         //     .with_temp_working_dir(temp_dir.clone());
-        // let result = execute_starlark_extension(&module_ctx);
+        //
+        // // Execute the extension implementation
+        // let extension = load_extension(bzl_file, extension_name)?;
+        // extension.implementation.invoke(module_ctx)?;
         // ```
         //
-        // The temp_dir is passed to module_ctx for I/O operations (download, file, execute).
-        // After extension completes, temp_dir is cleaned up below (line ~205).
+        // For now, we log the extension info and capture any RepoSpecs from
+        // repository rule invocations.
         let (execution_result, specs) = with_repo_spec_registry(|| {
-            // Stub: actual extension execution goes here
-            // This will:
-            // - Load the extension .bzl file
-            // - Build module_ctx with temp_dir via .with_temp_working_dir()
-            // - Execute implementation(module_ctx)
-            // - module_ctx I/O operations use temp_dir as working directory
-            //
-            // For now, just log that we would execute
             tracing::debug!(
-                "Extension execution stub for '{}' in temp dir: {:?}",
-                self.extension_id,
-                temp_dir
+                "Extension '{}' execution context:",
+                self.extension_id
             );
+            tracing::debug!("  - BZL file: {}", self.aggregated.extension_bzl_file);
+            tracing::debug!("  - Extension name: {}", self.aggregated.extension_name);
+            tracing::debug!("  - Root module: {}", self.root_module_name);
+            tracing::debug!("  - Temp working dir: {:?}", temp_dir);
+            tracing::debug!("  - Imported repos: {:?}", self.aggregated.imported_repos);
+
+            // Log tags by module
+            for (module_name, tags) in &self.aggregated.tags_by_module {
+                tracing::debug!("  - Module '{}' tags:", module_name);
+                for tag in tags {
+                    tracing::debug!("    - {}: {} kwarg(s)", tag.tag_name, tag.kwargs.len());
+                }
+            }
+
+            // TODO: Actual Starlark execution will be wired in at kuro_interpreter_for_build level
+            // For now, this is a stub that doesn't execute any Starlark code.
+            // Repository rules like http_archive() will capture RepoSpecs when executed.
+
             Ok::<(), kuro_error::Error>(())
         });
 
@@ -474,24 +581,93 @@ mod tests {
 
     #[test]
     fn test_module_extension_key_creation() {
+        use crate::extensions::AggregatedExtension;
+
+        let mut aggregated = AggregatedExtension::new("@@module//ext.bzl", "test");
+        aggregated.add_module_tags("root", vec![]);
+
         let key = ModuleExtensionExecutionKey::new(
+            aggregated,
+            "_main".to_owned(),
+        );
+
+        assert_eq!(key.extension_id.as_ref(), "@@module//ext.bzl%test");
+        assert!(key.input_hash.starts_with("sha256-"));
+        assert_eq!(key.root_module_name.as_ref(), "_main");
+    }
+
+    #[test]
+    fn test_module_extension_key_minimal() {
+        let key = ModuleExtensionExecutionKey::new_minimal(
             "@@module//ext.bzl%test".to_owned(),
             "sha256-abc".to_owned(),
         );
 
         assert_eq!(key.extension_id.as_ref(), "@@module//ext.bzl%test");
         assert_eq!(key.input_hash.as_ref(), "sha256-abc");
+        assert_eq!(key.root_module_name.as_ref(), "_main");
     }
 
     #[test]
     fn test_module_extension_key_display() {
-        let key = ModuleExtensionExecutionKey::new(
+        let key = ModuleExtensionExecutionKey::new_minimal(
             "@@m//e.bzl%x".to_owned(),
             "hash123".to_owned(),
         );
 
         let display = format!("{}", key);
         assert_eq!(display, "ModuleExtensionKey(@@m//e.bzl%x, hash123)");
+    }
+
+    #[test]
+    fn test_module_extension_key_with_tags() {
+        use crate::extensions::AggregatedExtension;
+        use crate::types::ExtensionTag;
+        use crate::types::TagValue;
+
+        let mut aggregated = AggregatedExtension::new("@@rules_python//pip:pip.bzl", "pip");
+
+        let mut parse_tag = ExtensionTag::new("parse".to_owned());
+        parse_tag.kwargs.push(("hub_name".to_owned(), TagValue::String("pip".to_owned())));
+
+        let mut install_tag = ExtensionTag::new("install".to_owned());
+        install_tag.kwargs.push(("name".to_owned(), TagValue::String("numpy".to_owned())));
+
+        aggregated.add_module_tags("root", vec![parse_tag]);
+        aggregated.add_module_tags("dep_a", vec![install_tag]);
+
+        let key = ModuleExtensionExecutionKey::new(
+            aggregated,
+            "root".to_owned(),
+        );
+
+        assert_eq!(key.extension_id.as_ref(), "@@rules_python//pip:pip.bzl%pip");
+        assert_eq!(key.root_module_name.as_ref(), "root");
+        assert_eq!(key.aggregated().tags_by_module.len(), 2);
+    }
+
+    #[test]
+    fn test_module_extension_key_hash_eq() {
+        use crate::extensions::AggregatedExtension;
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::Hash;
+        use std::hash::Hasher;
+
+        let aggregated1 = AggregatedExtension::new("@@mod//ext.bzl", "ext");
+        let aggregated2 = AggregatedExtension::new("@@mod//ext.bzl", "ext");
+
+        let key1 = ModuleExtensionExecutionKey::new(aggregated1, "_main".to_owned());
+        let key2 = ModuleExtensionExecutionKey::new(aggregated2, "_main".to_owned());
+
+        // Keys with same aggregated data should be equal
+        assert_eq!(key1, key2);
+
+        // Keys with same aggregated data should have same hash
+        let mut hasher1 = DefaultHasher::new();
+        let mut hasher2 = DefaultHasher::new();
+        key1.hash(&mut hasher1);
+        key2.hash(&mut hasher2);
+        assert_eq!(hasher1.finish(), hasher2.finish());
     }
 
     #[test]

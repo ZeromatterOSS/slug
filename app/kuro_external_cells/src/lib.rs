@@ -26,6 +26,7 @@ use dice::DiceComputations;
 
 mod bundled;
 mod bzlmod;
+mod extension_repo;
 mod git;
 mod local;
 mod repository_rule;
@@ -62,6 +63,10 @@ impl kuro_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
             }
             ExternalCellOrigin::RepositoryRule(setup) => {
                 Ok(repository_rule::get_file_ops_delegate(ctx, cell_name, setup).await? as _)
+            }
+            ExternalCellOrigin::ExtensionRepo(setup) => {
+                // Extension repos are lazily materialized via DICE when first accessed
+                Ok(extension_repo::get_file_ops_delegate(ctx, cell_name, setup).await? as _)
             }
         }
     }
@@ -123,6 +128,12 @@ impl kuro_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
                 // Repository rule cells are at materialized paths, copy from there
                 let abs_dest = io.project_root().resolve(&dest_path);
                 repository_rule::copy_to_destination(&setup, abs_dest.as_path()).await?;
+            }
+            ExternalCellOrigin::ExtensionRepo(setup) => {
+                // Extension repo cells are at bazel-external/{canonical_name}, copy from there
+                let abs_dest = io.project_root().resolve(&dest_path);
+                let project_root = io.project_root().root();
+                extension_repo::copy_to_destination(&setup, project_root, abs_dest.as_path()).await?;
             }
         }
 

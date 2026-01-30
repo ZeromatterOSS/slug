@@ -634,19 +634,77 @@ which captures a RepoSpec for later execution.
 
 ---
 
+## Integration Work (Phase 5e-7) - COMPLETE
+
+Additional integration work done to connect the pieces together:
+
+### 1. ModuleExtensionExecutionKey Enhanced
+
+**File**: `kuro_bzlmod/src/extension_execution_dice.rs`
+
+Changes:
+- [x] Added `AggregatedExtension` field to store all extension tags
+- [x] Added `root_module_name` field for ModuleContext construction
+- [x] Manual Hash/Eq implementation (AggregatedExtension contains HashMap)
+- [x] `compute()` logs extension tags and modules for debugging
+- [x] Documented the full Starlark execution flow (requires kuro_interpreter_for_build)
+- [x] Added `new_minimal()` constructor for backward compatibility
+
+**Note**: Full Starlark extension execution requires cross-crate integration with
+`kuro_interpreter_for_build::extension_execution::build_module_context()`. This will be
+implemented in a future phase when the interpreter is wired up to DICE.
+
+### 2. ExtensionRepoExecutionKey Wired to Repository Executor
+
+**File**: `kuro_bzlmod/src/repository_execution.rs`
+
+Changes:
+- [x] Added `project_root` field for repository materialization path
+- [x] `compute()` now calls `execute_repository_rule()` for actual execution
+- [x] Supports http_archive, git_repository, local_repository rules
+- [x] Added `new_with_cwd()` constructor for testing convenience
+
+This enables lazy repository materialization when extension-generated repos are accessed.
+
+### 3. New Exports from kuro_bzlmod
+
+**File**: `kuro_bzlmod/src/lib.rs`
+
+Added exports:
+- `ModuleExtensionError`
+- `AggregatedExtension`
+- `compute_extension_input_hash`
+- `aggregate_extensions`
+
+### What Remains for Full Integration
+
+1. **Starlark Extension Execution**: Wire `ModuleExtensionExecutionKey::compute()` to:
+   - Load the extension's .bzl file via Starlark interpreter
+   - Call `build_module_context()` from `kuro_interpreter_for_build`
+   - Execute `extension.implementation(module_ctx)` via Starlark evaluator
+
+2. **Cell Resolver Integration**: When `@repo_name` is accessed and cell is "pending":
+   - Look up the extension result for this repo
+   - Trigger `ExtensionRepoExecutionKey` computation
+   - Update cell path to materialized location
+
+3. **Lockfile Integration**: Store and retrieve extension results from lockfile cache
+
+---
+
 ## Success Criteria
 
 ### Core Deferred Behavior
-- [ ] Extension evaluation returns RepoSpecs WITHOUT downloading anything
-- [ ] Repository rules execute lazily on FIRST ACCESS via DICE
-- [ ] Second access uses DICE cache (no re-execution)
+- [ ] Extension evaluation returns RepoSpecs WITHOUT downloading anything (needs Starlark execution)
+- [x] Repository rules execute lazily on FIRST ACCESS via DICE (`ExtensionRepoExecutionKey::compute()` calls `execute_repository_rule()`)
+- [x] Second access uses DICE cache (no re-execution) - DICE Key infrastructure in place
 - [x] Temp working directory infrastructure for module_ctx (cleanup in extension_execution_dice.rs)
 
 ### Cell Registration
 - [x] Pending cells registered for all extension-generated repos (infrastructure complete)
 - [x] Canonical naming: `_main~{ext}~{repo}` format used (`build_canonical_names()`)
 - [x] `use_repo()` apparent names resolve to canonical (`build_use_repo_aliases()`)
-- [ ] Cell access triggers lazy materialization (future: needs DICE wiring)
+- [ ] Cell access triggers lazy materialization (needs cell resolver wiring)
 
 ### Lockfile
 - [ ] Lockfile contains `generatedRepoSpecs` with full RepoSpec data
