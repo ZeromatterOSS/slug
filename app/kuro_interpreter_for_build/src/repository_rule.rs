@@ -50,10 +50,14 @@
 //! extension execution engine.
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt;
 
 use allocative::Allocative;
 use derive_more::Display;
+use kuro_bzlmod::RepoAttrValue;
+use kuro_bzlmod::RepositoryInvocation;
+use kuro_bzlmod::record_invocation;
 use starlark::any::ProvidesStaticType;
 use starlark::docs::DocFunction;
 use starlark::docs::DocItem;
@@ -77,7 +81,9 @@ use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
+use starlark::values::dict::DictRef;
 use starlark::values::dict::UnpackDictEntries;
+use starlark::values::list::ListRef;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::starlark_value;
 use starlark::values::starlark_value_as_type::StarlarkValueAsType;
@@ -98,6 +104,52 @@ enum RepositoryRuleError {
     RuleNotInBzl,
     #[error("Repository rule cannot be invoked before freezing")]
     RuleCalledBeforeFreezing,
+    #[error("Repository rule `name` attribute is required")]
+    NameAttributeRequired,
+}
+
+/// Convert a Starlark value to a RepoAttrValue for recording invocations.
+fn starlark_to_repo_attr_value(value: Value) -> RepoAttrValue {
+    if value.is_none() {
+        return RepoAttrValue::None;
+    }
+
+    if let Some(s) = value.unpack_str() {
+        // Check if it looks like a label
+        if s.starts_with("//") || s.starts_with("@") || s.starts_with(":") {
+            return RepoAttrValue::Label(s.to_owned());
+        }
+        return RepoAttrValue::String(s.to_owned());
+    }
+
+    if let Some(b) = value.unpack_bool() {
+        return RepoAttrValue::Bool(b);
+    }
+
+    if let Some(i) = value.unpack_i32() {
+        return RepoAttrValue::Int(i as i64);
+    }
+
+    if let Some(list) = ListRef::from_value(value) {
+        let items: Vec<String> = list
+            .iter()
+            .filter_map(|v| v.unpack_str().map(|s| s.to_owned()))
+            .collect();
+        return RepoAttrValue::StringList(items);
+    }
+
+    if let Some(dict) = DictRef::from_value(value) {
+        let mut map = HashMap::new();
+        for (k, v) in dict.iter() {
+            if let Some(key) = k.unpack_str() {
+                map.insert(key.to_owned(), starlark_to_repo_attr_value(v));
+            }
+        }
+        return RepoAttrValue::Dict(map);
+    }
+
+    // Fallback: convert to string representation
+    RepoAttrValue::String(value.to_repr())
 }
 
 // ============================================================================
@@ -306,22 +358,46 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRepositoryRule {
     fn invoke(
         &self,
         _me: Value<'v>,
-        _args: &Arguments<'v, '_>,
+        args: &Arguments<'v, '_>,
         _eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         // When a frozen repository_rule is invoked (e.g., http_archive(name = "foo", ...)),
-        // we should record the invocation for later execution.
+        // we record the invocation for later execution via DICE.
         //
-        // For now, we just return None to indicate success.
-        // The actual repository creation happens during extension execution.
-        // Full argument validation will be implemented when we add DICE integration.
-        //
-        // TODO: Register this repository invocation in the execution context
-        // TODO: Parse and validate the 'name' argument (required for repository rules)
+        // The actual repository creation happens during the DICE computation phase.
+
+        // Parse all keyword arguments
+        let kwargs = args.names_map()?;
+
+        // The 'name' attribute is required for all repository rules
+        let name = kwargs
+            .get("name")
+            .and_then(|v| v.unpack_str())
+            .ok_or_else(|| {
+                kuro_error::Error::from(RepositoryRuleError::NameAttributeRequired)
+            })?;
+
         tracing::debug!(
-            "Repository rule '{}' invoked",
+            "Repository rule '{}' invoked with name '{}'",
             self.name,
+            name,
         );
+
+        // Build the invocation record
+        let mut invocation = RepositoryInvocation::new(
+            name.to_owned(),
+            self.name.clone(),
+        );
+
+        // Convert all kwargs to RepoAttrValue
+        for (key, value) in kwargs.iter() {
+            let attr_value = starlark_to_repo_attr_value(*value);
+            invocation.attrs.insert(key.as_str().to_owned(), attr_value);
+        }
+
+        // Record the invocation in the thread-local registry
+        // This will be collected after MODULE.bazel/extension parsing completes
+        record_invocation(invocation);
 
         Ok(Value::new_none())
     }

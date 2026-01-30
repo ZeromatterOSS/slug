@@ -28,6 +28,7 @@ mod bundled;
 mod bzlmod;
 mod git;
 mod local;
+mod repository_rule;
 
 struct ConcreteExternalCellsImpl;
 
@@ -58,6 +59,9 @@ impl kuro_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
             }
             ExternalCellOrigin::Bzlmod(setup) => {
                 Ok(bzlmod::get_file_ops_delegate(ctx, cell_name, setup).await? as _)
+            }
+            ExternalCellOrigin::RepositoryRule(setup) => {
+                Ok(repository_rule::get_file_ops_delegate(ctx, cell_name, setup).await? as _)
             }
         }
     }
@@ -114,6 +118,11 @@ impl kuro_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
                 // Bzlmod cells are at absolute cache paths, copy directly from there
                 let abs_dest = io.project_root().resolve(&dest_path);
                 bzlmod::copy_to_destination(&setup, abs_dest.as_path()).await?;
+            }
+            ExternalCellOrigin::RepositoryRule(setup) => {
+                // Repository rule cells are at materialized paths, copy from there
+                let abs_dest = io.project_root().resolve(&dest_path);
+                repository_rule::copy_to_destination(&setup, abs_dest.as_path()).await?;
             }
         }
 

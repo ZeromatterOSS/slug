@@ -27,6 +27,8 @@ pub enum ExternalCellOrigin {
     LocalPath(LocalPathCellSetup),
     /// Remote module from bzlmod `bazel_dep()` fetched from a registry (e.g., BCR).
     Bzlmod(BzlmodCellSetup),
+    /// Repository created by a repository rule (http_archive, git_repository, etc.)
+    RepositoryRule(RepositoryRuleCellSetup),
 }
 
 /// Setup for a local path external cell (from bzlmod local_path_override).
@@ -71,6 +73,27 @@ pub struct BzlmodCellSetup {
     pub source_path: Arc<str>,
 }
 
+/// Setup for a repository created by a repository rule (http_archive, git_repository, etc.)
+#[derive(
+    Debug,
+    derive_more::Display,
+    Clone,
+    Dupe,
+    Allocative,
+    PartialEq,
+    Eq,
+    Hash
+)]
+#[display("repository_rule({}, {})", repo_name, rule_name)]
+pub struct RepositoryRuleCellSetup {
+    /// The repository name (from the `name` attribute).
+    pub repo_name: Arc<str>,
+    /// The repository rule that created this (e.g., "http_archive").
+    pub rule_name: Arc<str>,
+    /// The path to the materialized repository content.
+    pub source_path: Arc<str>,
+}
+
 #[derive(
     Debug,
     derive_more::Display,
@@ -96,6 +119,7 @@ impl fmt::Display for ExternalCellOrigin {
             Self::Git(git) => write!(f, "{git}"),
             Self::LocalPath(local) => write!(f, "local_path({}, {})", local.module_name, local.path),
             Self::Bzlmod(bzlmod) => write!(f, "{bzlmod}"),
+            Self::RepositoryRule(repo) => write!(f, "{repo}"),
         }
     }
 }

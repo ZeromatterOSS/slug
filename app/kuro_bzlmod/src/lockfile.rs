@@ -120,6 +120,11 @@ pub struct Lockfile {
     /// Keys are extension identifiers.
     #[serde(default)]
     pub module_extensions: HashMap<String, LockfileExtensionData>,
+
+    /// Repository rule execution results.
+    /// Keys are repository names (e.g., "rules_cc").
+    #[serde(default)]
+    pub repository_rules: HashMap<String, RepositoryRuleLockEntry>,
 }
 
 /// A module node in the lockfile dependency graph.
@@ -195,6 +200,85 @@ pub struct LockfileGeneratedRepo {
     pub attributes: HashMap<String, serde_json::Value>,
 }
 
+/// Lock entry for a repository rule execution result.
+///
+/// This caches the result of executing a repository rule (like `http_archive`
+/// or `git_repository`) so that subsequent builds don't need to re-download
+/// or re-execute the rule.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RepositoryRuleLockEntry {
+    /// The repository rule that created this repository (e.g., "http_archive").
+    pub rule_name: String,
+
+    /// Hash of input attributes for cache invalidation.
+    pub attrs_hash: String,
+
+    /// Hash of the downloaded/generated content (for integrity verification).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_hash: Option<String>,
+
+    /// Files that were downloaded during execution.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub downloaded_files: Vec<DownloadedFileLockEntry>,
+
+    /// Timestamp when this entry was created (for debugging).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
+}
+
+/// A file downloaded during repository rule execution.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadedFileLockEntry {
+    /// The URL the file was downloaded from.
+    pub url: String,
+
+    /// Integrity hash in SRI format (e.g., "sha256-base64hash").
+    pub integrity: String,
+
+    /// Output path relative to repository root.
+    pub output_path: String,
+}
+
+impl RepositoryRuleLockEntry {
+    /// Create a new lock entry for a repository rule.
+    pub fn new(rule_name: String, attrs_hash: String) -> Self {
+        Self {
+            rule_name,
+            attrs_hash,
+            content_hash: None,
+            downloaded_files: Vec::new(),
+            created_at: None,
+        }
+    }
+
+    /// Set the content hash.
+    pub fn with_content_hash(mut self, hash: String) -> Self {
+        self.content_hash = Some(hash);
+        self
+    }
+
+    /// Add a downloaded file entry.
+    pub fn with_downloaded_file(mut self, url: String, integrity: String, output_path: String) -> Self {
+        self.downloaded_files.push(DownloadedFileLockEntry {
+            url,
+            integrity,
+            output_path,
+        });
+        self
+    }
+
+    /// Set the creation timestamp.
+    pub fn with_timestamp(mut self) -> Self {
+        use std::time::SystemTime;
+        if let Ok(duration) = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            self.created_at = Some(format!("{}", duration.as_secs()));
+        }
+        self
+    }
+}
+
 impl Lockfile {
     /// Create a new empty lockfile.
     pub fn new() -> Self {
@@ -205,6 +289,7 @@ impl Lockfile {
             selected_yanked_versions: HashMap::new(),
             module_dep_graph: HashMap::new(),
             module_extensions: HashMap::new(),
+            repository_rules: HashMap::new(),
         }
     }
 
@@ -343,6 +428,44 @@ impl Lockfile {
     pub fn add_registry_hash(&mut self, url: &str, content: &str) {
         let hash = compute_sri_hash(content.as_bytes());
         self.registry_file_hashes.insert(url.to_string(), hash);
+    }
+
+    /// Check if a repository rule has a valid cache entry.
+    ///
+    /// Returns `Some(&entry)` if the repository exists in the lockfile and
+    /// the attrs_hash matches (indicating the inputs haven't changed).
+    pub fn get_repository_rule_cache(
+        &self,
+        repo_name: &str,
+        attrs_hash: &str,
+    ) -> Option<&RepositoryRuleLockEntry> {
+        self.repository_rules.get(repo_name).filter(|entry| {
+            entry.attrs_hash == attrs_hash
+        })
+    }
+
+    /// Add or update a repository rule cache entry.
+    pub fn set_repository_rule_cache(
+        &mut self,
+        repo_name: String,
+        entry: RepositoryRuleLockEntry,
+    ) {
+        self.repository_rules.insert(repo_name, entry);
+    }
+
+    /// Remove a repository rule cache entry.
+    pub fn remove_repository_rule_cache(&mut self, repo_name: &str) -> Option<RepositoryRuleLockEntry> {
+        self.repository_rules.remove(repo_name)
+    }
+
+    /// Check if any repository rules are cached.
+    pub fn has_repository_rules(&self) -> bool {
+        !self.repository_rules.is_empty()
+    }
+
+    /// Get all cached repository rule names.
+    pub fn repository_rule_names(&self) -> impl Iterator<Item = &str> {
+        self.repository_rules.keys().map(|s| s.as_str())
     }
 }
 
@@ -583,5 +706,87 @@ mod tests {
         assert_eq!(LockfileMode::from_str("error"), Some(LockfileMode::Error));
         assert_eq!(LockfileMode::from_str("off"), Some(LockfileMode::Off));
         assert_eq!(LockfileMode::from_str("invalid"), None);
+    }
+
+    #[test]
+    fn test_repository_rule_lock_entry() {
+        let entry = RepositoryRuleLockEntry::new(
+            "http_archive".to_string(),
+            "sha256-abc123".to_string(),
+        )
+        .with_content_hash("sha256-def456".to_string())
+        .with_downloaded_file(
+            "https://example.com/archive.tar.gz".to_string(),
+            "sha256-xyz789".to_string(),
+            "archive.tar.gz".to_string(),
+        );
+
+        assert_eq!(entry.rule_name, "http_archive");
+        assert_eq!(entry.attrs_hash, "sha256-abc123");
+        assert_eq!(entry.content_hash, Some("sha256-def456".to_string()));
+        assert_eq!(entry.downloaded_files.len(), 1);
+        assert_eq!(entry.downloaded_files[0].url, "https://example.com/archive.tar.gz");
+    }
+
+    #[test]
+    fn test_lockfile_repository_rule_cache() {
+        let mut lockfile = Lockfile::new();
+
+        // Initially empty
+        assert!(!lockfile.has_repository_rules());
+        assert!(lockfile.get_repository_rule_cache("foo", "hash1").is_none());
+
+        // Add an entry
+        let entry = RepositoryRuleLockEntry::new(
+            "http_archive".to_string(),
+            "hash1".to_string(),
+        );
+        lockfile.set_repository_rule_cache("foo".to_string(), entry);
+
+        // Now it should exist
+        assert!(lockfile.has_repository_rules());
+        assert!(lockfile.get_repository_rule_cache("foo", "hash1").is_some());
+
+        // Wrong hash should not match
+        assert!(lockfile.get_repository_rule_cache("foo", "hash2").is_none());
+
+        // Wrong name should not match
+        assert!(lockfile.get_repository_rule_cache("bar", "hash1").is_none());
+
+        // Remove it
+        let removed = lockfile.remove_repository_rule_cache("foo");
+        assert!(removed.is_some());
+        assert!(!lockfile.has_repository_rules());
+    }
+
+    #[test]
+    fn test_lockfile_repository_rules_serialization() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("MODULE.bazel.lock");
+
+        let mut lockfile = Lockfile::new();
+        lockfile.set_repository_rule_cache(
+            "rules_cc".to_string(),
+            RepositoryRuleLockEntry::new(
+                "http_archive".to_string(),
+                "sha256-abc".to_string(),
+            )
+            .with_content_hash("sha256-def".to_string())
+            .with_downloaded_file(
+                "https://github.com/rules_cc/archive.tar.gz".to_string(),
+                "sha256-ghi".to_string(),
+                "rules_cc.tar.gz".to_string(),
+            ),
+        );
+
+        lockfile.write(&path).unwrap();
+
+        let loaded = Lockfile::read(&path).unwrap();
+        assert!(loaded.has_repository_rules());
+
+        let entry = loaded.get_repository_rule_cache("rules_cc", "sha256-abc").unwrap();
+        assert_eq!(entry.rule_name, "http_archive");
+        assert_eq!(entry.content_hash, Some("sha256-def".to_string()));
+        assert_eq!(entry.downloaded_files.len(), 1);
     }
 }
