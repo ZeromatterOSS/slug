@@ -18,8 +18,8 @@ This sub-plan covers the bzlmod module system implementation. Each phase has its
 | **5a** | Extension Parsing | Complete | [Link](./02-bzlmod-phase-5-overview.md#phase-5a-extension-parsing) |
 | **5b** | Build Integration | In Progress | [Link](./02-bzlmod-phase-5b.md) |
 | **5c** | Bundle @bazel_tools | In Progress | [Link](./02-bzlmod-phase-5c.md) |
-| **5d** | DICE Integration | Not Started | [Link](./02-bzlmod-phase-5d.md) |
-| **5e** | Extension Execution | Future | [Link](./02-bzlmod-phase-5-overview.md#phase-5e-extension-execution-future) |
+| **5d** | DICE Integration | Complete | [Link](./02-bzlmod-phase-5d.md) |
+| **5e** | Extension Execution | In Progress | [Link](./02-bzlmod-phase-5e.md) |
 | **6** | Starlark Migration | Blocked | [Link](./02-bzlmod-phase-6.md) |
 | **7** | Proto Support | Future | [Link](./02-bzlmod-phase-7.md) |
 | **8** | Full subrule() | Future | [Link](./02-bzlmod-phase-8-subrule.md) |
@@ -32,6 +32,8 @@ This sub-plan covers the bzlmod module system implementation. Each phase has its
 | 4b | `local_path_override()` works; local modules integrated via cell system |
 | 4c | Modules fetched to `~/.cache/kuro/`; SRI integrity verification works |
 | 4d | MVS algorithm in `resolution.rs`; lockfile format compatible with Bazel 9.0 |
+| 5d | DICE key in `repository_execution.rs`; actual execution in `repository_executor.rs` with http_archive/git support |
+| 5e | **Deferred execution**: Extensions capture RepoSpecs (not execute); repos materialize lazily on first access; module_ctx uses temp dir (deleted after) |
 | 6 | **BLOCKED**: Modules must stay native due to global injection architecture |
 
 ---
@@ -97,8 +99,8 @@ When implementing new features:
 ### Current Blockers
 
 - ~~**@bazel_tools http.bzl/git.bzl**: Needs `repository_rule` and `repository_ctx`~~ **RESOLVED** (Phase 5)
-- **Repository rule execution**: `repository_rule()` and `repository_ctx` implemented, but rules are not actually invoked - see **Phase 5d** for DICE integration
-- **Module extensions**: Parsing complete, execution requires repository rule execution - blocked on Phase 5d
+- ~~**Repository rule execution**: `repository_rule()` and `repository_ctx` implemented, but rules are not actually invoked~~ **RESOLVED** (Phase 5d) - DICE key + executor implemented
+- **Module extensions**: Parsing complete, execution requires DICE integration - see **Phase 5e**
 - **rules_cc loading**: **COMPLETE** - rules_cc now loads successfully!
   - ~~`aspect()` built-in~~ **RESOLVED** (Phase 8a)
   - ~~`allow_empty` parameter~~ **RESOLVED**

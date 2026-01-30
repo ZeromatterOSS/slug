@@ -11,8 +11,8 @@ This phase implements module extensions which allow custom dependency resolution
 | **5a** | Extension Parsing | Complete | Below |
 | **5b** | Build Integration | In Progress | [02-bzlmod-phase-5b.md](./02-bzlmod-phase-5b.md) |
 | **5c** | Bundle @bazel_tools | In Progress | [02-bzlmod-phase-5c.md](./02-bzlmod-phase-5c.md) |
-| **5d** | DICE Integration | Not Started | [02-bzlmod-phase-5d.md](./02-bzlmod-phase-5d.md) |
-| **5e** | Extension Execution | Future | Below (depends on 5d) |
+| **5d** | DICE Integration | Complete | [02-bzlmod-phase-5d.md](./02-bzlmod-phase-5d.md) |
+| **5e** | Extension Execution | In Progress | [02-bzlmod-phase-5e.md](./02-bzlmod-phase-5e.md) |
 
 ---
 
@@ -83,22 +83,46 @@ Parse `use_extension()` and collect tags from MODULE.bazel files.
 
 ---
 
-## Phase 5e: Extension Execution (Future)
+## Phase 5e: Extension Execution - Deferred Model
 
-> **Depends on**: Phase 5d (DICE Integration for Repository Rule Execution)
+> **Depends on**: Phase 5d (DICE Integration for Repository Rule Execution) - **COMPLETE**
 
 ### Overview
 
-Execute module extensions and generate repositories. This phase cannot proceed until repository rules can actually execute (Phase 5d).
+Execute module extensions using **deferred execution** model matching Bazel:
+- Extensions capture `RepoSpec` objects (NO downloads during extension evaluation)
+- Repository rules execute lazily via DICE when repos are first accessed
+- Temporary working directory for `module_ctx` (deleted after extension completes)
+
+### Architecture: Deferred Execution Flow
+
+```
+Extension Evaluation                     Lazy Repository Execution
+├─ Load extension .bzl file             ├─ When @repo_name accessed
+├─ Build module_ctx + temp working dir  ├─ DICE key: ExtensionRepoExecutionKey
+├─ Run implementation(module_ctx)       ├─ Execute repository rule (download)
+├─ Capture RepoSpec per repo rule call  ├─ Materialize to bazel-external/
+├─ Return ModuleExtensionResult         └─ Cache in DICE + lockfile
+├─ Delete temp working directory
+└─ Register pending cells
+```
+
+### Key Insight: module_ctx vs repository_ctx
+
+| Aspect | module_ctx | repository_ctx |
+|--------|-----------|----------------|
+| Working dir | **Temporary** (deleted after) | **Permanent** (is the repo) |
+| Purpose | Compute RepoSpecs | Materialize repository |
+| Lifecycle | `shouldDeleteWorkingDirectoryOnClose()` = true | Never deleted |
 
 ### Remaining Work
 
-- DICE integration to load extension .bzl files and invoke implementations
-  - Challenge: Cell resolution happens before DICE is fully initialized
-  - Requires architectural changes to support Starlark evaluation during cell resolution
-- `module_ctx.download()` actual file fetching
-- `module_ctx.execute()` actual command execution
-- Lockfile integration for caching extension results
+- `RepoSpec` type for capturing repository rule calls (not executing)
+- `ModuleExtensionExecutionKey` DICE key (returns specs, no downloads)
+- `ExtensionRepoExecutionKey` DICE key (lazy execution on access)
+- Temporary working directory for `module_ctx` I/O
+- Pending cell registration (`_main~{ext}~{repo}` format)
+- Lockfile with `generatedRepoSpecs` format
 
 ### Current Workaround
 
@@ -108,18 +132,20 @@ Execute module extensions and generate repositories. This phase cannot proceed u
 
 ### Success Criteria
 
-- [ ] `module_ctx.download()` fetches files (after 5d)
-- [ ] `module_ctx.execute()` runs commands (after 5d)
-- [ ] Extension implementation function invoked via DICE
-- [ ] Generated repositories are accessible via @repo_name
-- [ ] Extension results cached in lockfile
-- [ ] Lockfile cache hit skips re-execution
+- [ ] Extension evaluation captures RepoSpecs WITHOUT downloading
+- [ ] Repository rules execute lazily on FIRST ACCESS via DICE
+- [ ] Temp working directory deleted after extension completes
+- [ ] Pending cells resolve correctly when accessed
+- [ ] Canonical naming: `_main~{ext}~{repo}` format
+- [ ] Lockfile contains `generatedRepoSpecs` with full RepoSpec data
+- [ ] Second build uses lockfile cache (no extension re-execution)
 
 ### Manual Verification
 
-- [ ] Simple extension creating a filegroup works
-- [ ] Extension that downloads a file works
-- [ ] Extension that executes a command works
+- [ ] Simple extension captures RepoSpecs (no network activity during extension)
+- [ ] Access `@repo_name` triggers lazy download
+- [ ] Second access uses DICE cache, no re-download
+- [ ] Temp dir cleaned up after extension
 - [ ] rules_python's `pip.parse()` extension works (stretch goal)
 
 ---
