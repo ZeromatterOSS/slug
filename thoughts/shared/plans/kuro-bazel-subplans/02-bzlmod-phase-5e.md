@@ -473,11 +473,11 @@ impl Key for ExtensionRepoExecutionKey {
 - `kuro_bzlmod/src/lib.rs` - DONE
 - `kuro_common/src/legacy_configs/cells.rs` - FUTURE (Phase 5e-5)
 
-### Phase 5e-4: Extension Lockfile Integration
+### Phase 5e-4: Extension Lockfile Integration - COMPLETE
 
 **Goal**: Cache extension evaluation results with Bazel-compatible format.
 
-1. Update `lockfile.rs` with new format:
+1. [x] Update `lockfile.rs` with new format:
 
 ```rust
 /// Extension lock data matching Bazel's format.
@@ -517,14 +517,16 @@ pub struct LockfileRepoSpec {
 }
 ```
 
-2. Lockfile operations:
-   - `get_extension_cache()`: Check for valid cached result
-   - `set_extension_cache()`: Store extension result
-   - Cache hit validation: compare `bzl_transitive_digest` + `usages_digest`
+2. [x] Lockfile operations:
+   - [x] `get_extension_cache()`: Check for valid cached result
+   - [x] `set_extension_cache()`: Store extension result
+   - [x] Cache hit validation: compare `bzl_transitive_digest` + `usages_digest`
+   - [x] `AttrValue` <-> `serde_json::Value` conversion functions
+   - [x] `LockfileRepoSpec::from_repo_spec()` and `to_repo_spec()` conversions
+   - [x] Unit tests for all functionality (14 new tests)
 
-**Files to modify**:
-- `kuro_bzlmod/src/lockfile.rs`
-- `kuro_bzlmod/src/extension_execution_dice.rs`
+**Files modified**:
+- `kuro_bzlmod/src/lockfile.rs` - DONE
 
 ### Phase 5e-5: Cell Registration for Pending Repos
 
