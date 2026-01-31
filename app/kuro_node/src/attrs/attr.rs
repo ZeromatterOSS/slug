@@ -36,6 +36,8 @@ pub struct Attribute {
     /// The coercer to take this parameter's value from Starlark value -> an
     /// internal representation
     coercer: AttrType,
+    /// Aspects to apply to dependencies of this attribute (Phase 8c)
+    aspects: Vec<Arc<String>>,
 }
 
 impl Attribute {
@@ -47,6 +49,7 @@ impl Attribute {
             },
             doc: doc.to_owned(),
             coercer,
+            aspects: Vec::new(),
         }
     }
 
@@ -55,6 +58,7 @@ impl Attribute {
             default: AttributeDefault::DefaultOnly(default),
             doc: doc.to_owned(),
             coercer,
+            aspects: Vec::new(),
         }
     }
 
@@ -76,6 +80,17 @@ impl Attribute {
 
     pub fn doc(&self) -> &str {
         &self.doc
+    }
+
+    /// Add aspects to this attribute (Phase 8c).
+    pub fn with_aspects(mut self, aspects: Vec<Arc<String>>) -> Self {
+        self.aspects = aspects;
+        self
+    }
+
+    /// Get the aspects attached to this attribute (Phase 8c).
+    pub fn aspects(&self) -> &[Arc<String>] {
+        &self.aspects
     }
 }
 

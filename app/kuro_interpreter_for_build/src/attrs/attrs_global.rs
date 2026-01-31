@@ -34,6 +34,7 @@ use starlark::starlark_module;
 use starlark::values::StringValue;
 use starlark::values::Value;
 use starlark::values::ValueError;
+use starlark::values::ValueLike;
 use starlark::values::ValueOf;
 use starlark::values::ValueTypedComplex;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
@@ -793,9 +794,24 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         let allow_files_bool = parse_allow_files_param(allow_files, "allow_files", eval)?;
         // Parse allow_single_file: can be bool or list of extension strings
         let allow_single_file_bool = parse_allow_files_param(allow_single_file, "allow_single_file", eval)?;
-        // TODO(bazel-aspects): Store aspects and apply during analysis (Phase 8b-8c)
         // TODO(bazel): Enforce allow_rules constraint during coercion
-        let _unused = (mandatory, executable, allow_files_bool, allow_single_file_bool, allow_rules, flags, aspects);
+        let _unused = (mandatory, executable, allow_files_bool, allow_single_file_bool, allow_rules, flags);
+
+        // Extract aspect names from the aspects parameter (Phase 8c)
+        use crate::aspect::FrozenStarlarkAspectCallable;
+        let mut aspect_names = Vec::new();
+        for aspect_val in aspects.items {
+            if let Some(frozen) = aspect_val.unpack_frozen() {
+                if let Some(aspect) = frozen.downcast_ref::<FrozenStarlarkAspectCallable>() {
+                    aspect_names.push(Arc::new(aspect.name().to_owned()));
+                } else {
+                    return Err(ValueError::IncorrectParameterTypeNamed(
+                        "aspects".to_owned()
+                    ).into());
+                }
+            }
+        }
+
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         // Handle cfg parameter: "exec" or config.exec(...) means use exec_dep, otherwise use regular dep
         let is_exec = match cfg {
@@ -814,7 +830,14 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         } else {
             AttrType::dep(required_providers, PluginKindSet::EMPTY)
         };
-        Ok(Attribute::attr(eval, default, doc, coercer)?)
+
+        // Create attribute with aspects attached (Phase 8c)
+        let base_attr = Attribute::attr(eval, default, doc, coercer)?;
+        Ok(if aspect_names.is_empty() {
+            base_attr
+        } else {
+            StarlarkAttribute::new(base_attr.clone_attribute().with_aspects(aspect_names))
+        })
     }
 
     /// Takes a list of target labels from the user and supplies a list of
@@ -850,14 +873,36 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
         let allow_files_bool = parse_allow_files_param(allow_files, "allow_files", eval)?;
-        // TODO(bazel-aspects): Store aspects and apply during analysis (Phase 8b-8c)
         // TODO(bazel): Enforce allow_empty constraint during coercion
         // TODO(bazel): Enforce allow_rules constraint during coercion
-        let _unused = (mandatory, allow_files_bool, allow_empty, allow_rules, flags, aspects);
+        let _unused = (mandatory, allow_files_bool, allow_empty, allow_rules, flags);
+
+        // Extract aspect names from the aspects parameter (Phase 8c)
+        use crate::aspect::FrozenStarlarkAspectCallable;
+        let mut aspect_names = Vec::new();
+        for aspect_val in aspects.items {
+            if let Some(frozen) = aspect_val.unpack_frozen() {
+                if let Some(aspect) = frozen.downcast_ref::<FrozenStarlarkAspectCallable>() {
+                    aspect_names.push(Arc::new(aspect.name().to_owned()));
+                } else {
+                    return Err(ValueError::IncorrectParameterTypeNamed(
+                        "aspects".to_owned()
+                    ).into());
+                }
+            }
+        }
+
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         let inner = AttrType::dep(required_providers, PluginKindSet::EMPTY);
         let coercer = AttrType::list(inner);
-        Ok(Attribute::attr(eval, default, doc, coercer)?)
+
+        // Create attribute with aspects attached (Phase 8c)
+        let base_attr = Attribute::attr(eval, default, doc, coercer)?;
+        Ok(if aspect_names.is_empty() {
+            base_attr
+        } else {
+            StarlarkAttribute::new(base_attr.clone_attribute().with_aspects(aspect_names))
+        })
     }
 
     /// Takes a list of strings from the user.

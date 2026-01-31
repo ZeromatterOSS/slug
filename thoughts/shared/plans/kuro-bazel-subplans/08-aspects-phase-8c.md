@@ -33,7 +33,7 @@ Implement recursive aspect propagation through dependency graphs with DICE integ
 
 ## Implementation Steps
 
-### Step 1: Add Unit Tests for run_aspect_basic() (Phase 8b Completion)
+### Step 1: Add Unit Tests for run_aspect_basic() (Phase 8b Completion) ✅
 
 **File:** `app/kuro_build_api/src/interpreter/rule_defs/aspect/execution.rs`
 
@@ -73,7 +73,7 @@ mod tests {
 
 ---
 
-### Step 2: Extend Attribute Struct to Store Aspects
+### Step 2: Extend Attribute Struct to Store Aspects ✅
 
 **File:** `app/kuro_node/src/attrs/attr.rs`
 
@@ -115,7 +115,7 @@ Update `new()` constructor to initialize `aspects: Vec::new()`.
 
 ---
 
-### Step 3: Store Aspects in attr.label() and attr.label_list()
+### Step 3: Store Aspects in attr.label() and attr.label_list() ✅
 
 **File:** `app/kuro_interpreter_for_build/src/attrs/attrs_global.rs`
 
@@ -154,7 +154,7 @@ Ok(if aspect_names.is_empty() {
 
 ---
 
-### Step 4: Create AspectKey for DICE Caching
+### Step 4: Create AspectKey for DICE Caching ✅
 
 **New File:** `app/kuro_analysis/src/analysis/aspect_key.rs`
 
@@ -197,7 +197,7 @@ impl AspectValue {
 
 ---
 
-### Step 5: Implement DICE Key Computation for Aspects
+### Step 5: Implement DICE Key Computation for Aspects ✅
 
 **New File:** `app/kuro_analysis/src/analysis/aspect_calculation.rs`
 
@@ -323,7 +323,36 @@ fn aspect_applies_to_target(
 
 **File:** `app/kuro_configured/src/nodes.rs`
 
-After dependency collection in `gather_deps()` (around line 750), add:
+**Location:** Lines 439-557 (gather_deps function), Lines 431-437 (GatheredDeps struct)
+
+#### 6.1: Modify GatheredDeps Struct (Lines 431-437)
+
+Add aspect_results field to the struct:
+
+```rust
+#[derive(Default)]
+pub(crate) struct GatheredDeps {
+    pub(crate) deps: Vec<ConfiguredTargetNode>,
+    pub(crate) exec_deps: SmallMap<ConfiguredProvidersLabel, CheckVisibility>,
+    pub(crate) toolchain_deps: SmallSet<TargetConfiguredTargetLabel>,
+    pub(crate) plugin_lists: PluginLists,
+    /// Aspect results for dependencies with aspects attached (Phase 8c)
+    pub(crate) aspect_results: HashMap<(ConfiguredTargetLabel, ArcStr), AspectValue>,
+}
+```
+
+**Import additions needed at top of file:**
+```rust
+use std::collections::HashMap;
+use kuro_util::arc_str::ArcStr;
+use crate::analysis::aspect_key::{AspectKey, AspectValue};
+```
+
+#### 6.2: Collect Aspect Keys During Attribute Traversal
+
+**Insert after line 495** (after `configured_attr.traverse()` completes):
+
+Add a second traversal pass to collect aspect requirements:
 
 ```rust
 // Phase 8c: Collect aspects that need to be applied to dependencies
@@ -334,46 +363,115 @@ for a in target_node.attrs(AttrInspectOptions::All) {
 
     // Check if this attribute has aspects attached
     if !attr.aspects().is_empty() {
-        let configured_attr = a.configure(&attr_cfg_ctx)?;
+        let configured_attr = a.configure(attr_cfg_ctx)?;
 
-        // Extract dependencies from this attribute
-        let deps = extract_deps_from_attr(&configured_attr)?;
+        // Extract dependency labels from this configured attribute
+        // Using the same ConfiguredAttrTraversal pattern
+        struct AspectDepsCollector {
+            deps: Vec<ConfiguredTargetLabel>,
+        }
+
+        impl ConfiguredAttrTraversal for AspectDepsCollector {
+            fn dep(&mut self, dep: &ConfiguredProvidersLabel) -> kuro_error::Result<()> {
+                self.deps.push(dep.target().dupe());
+                Ok(())
+            }
+
+            fn dep_with_plugins(
+                &mut self,
+                dep: &ConfiguredProvidersLabel,
+                _plugin_kinds: &PluginKindSet,
+            ) -> kuro_error::Result<()> {
+                self.deps.push(dep.target().dupe());
+                Ok(())
+            }
+
+            // Exec deps and toolchain deps don't propagate aspects in Phase 8c
+            fn exec_dep(&mut self, _dep: &ConfiguredProvidersLabel) -> kuro_error::Result<()> {
+                Ok(())
+            }
+
+            fn toolchain_dep(&mut self, _dep: &ConfiguredProvidersLabel) -> kuro_error::Result<()> {
+                Ok(())
+            }
+
+            fn plugin_dep(&mut self, _dep: &TargetLabel, _kind: &PluginKind) -> kuro_error::Result<()> {
+                Ok(())
+            }
+        }
+
+        let mut collector = AspectDepsCollector { deps: Vec::new() };
+        configured_attr.traverse(target_node.label().pkg(), &mut collector)?;
 
         // Schedule aspect computation for each dep
-        for dep_label in deps {
+        for dep_label in collector.deps {
             for aspect_name in attr.aspects() {
                 aspect_keys.push(AspectKey::new(
                     dep_label.dupe(),
-                    aspect_name.as_ref().clone(),
+                    aspect_name.dupe(),
                 ));
             }
         }
     }
 }
-
-// Compute all aspects in parallel via DICE
-if !aspect_keys.is_empty() {
-    let aspect_results = ctx.compute_join(aspect_keys.iter(), |ctx, key| {
-        async move { ctx.compute(key).await }.boxed()
-    }).await;
-
-    // Store in gathered_deps for later use during rule analysis
-    gathered_deps.aspect_results = process_aspect_results(aspect_results)?;
-}
 ```
 
-Also modify `GatheredDeps` struct to include:
+#### 6.3: Compute Aspects in Parallel via DICE
+
+**Insert after aspect key collection** (continuing from above):
+
 ```rust
-pub struct GatheredDeps {
-    // ... existing fields ...
-    /// Aspect results for dependencies with aspects attached (Phase 8c)
-    pub aspect_results: HashMap<(ConfiguredTargetLabel, String), AspectValue>,
-}
+// Compute all aspects in parallel via DICE (following pattern from lines 497-501)
+let aspect_results = if !aspect_keys.is_empty() {
+    ctx.compute_join(aspect_keys.iter(), |ctx, key| {
+        async move {
+            // Returns Result<AspectValue>
+            ctx.compute(key).await
+        }.boxed()
+    })
+    .await
+} else {
+    Vec::new()
+};
 ```
+
+#### 6.4: Process Aspect Results
+
+**Insert after DICE computation** (continuing from above):
+
+```rust
+// Process aspect results and handle errors
+// Following the pattern from lines 506-535 (processing dep_results)
+let mut aspect_results_map = HashMap::new();
+
+for (key, result) in aspect_keys.iter().zip(aspect_results) {
+    match result {
+        Ok(aspect_value) => {
+            aspect_results_map.insert(
+                (key.target.dupe(), key.aspect_name.dupe()),
+                aspect_value,
+            );
+        }
+        Err(e) => {
+            // Add to errors_and_incompats following existing error handling pattern
+            errors_and_incompats.errs.push(e);
+        }
+    }
+}
+
+// Store in gathered_deps for later use during rule analysis
+gathered_deps.aspect_results = aspect_results_map;
+```
+
+#### 6.5: Update Function Return
+
+The `aspect_results` field is now populated in `GatheredDeps`, no changes needed to the return statement at lines 548-556.
+
+**Note:** The integration point is **before** the execution platform resolution (lines 757-788) so that aspect computation happens early in the dependency gathering phase, similar to regular dependencies.
 
 ---
 
-### Step 7: Add Aspect Modules to kuro_analysis
+### Step 7: Add Aspect Modules to kuro_analysis ✅
 
 **File:** `app/kuro_analysis/src/analysis/mod.rs`
 
@@ -381,6 +479,184 @@ Add:
 ```rust
 pub mod aspect_calculation;
 pub mod aspect_key;
+```
+
+---
+
+### Step 8: Run Automated Tests ✅
+
+**Commands to run:**
+
+```bash
+# Check all modified crates compile
+cargo check -p kuro_build_api -p kuro_node -p kuro_interpreter_for_build -p kuro_analysis
+
+# Run unit tests for kuro_build_api
+cargo test -p kuro_build_api
+
+# Full build to verify integration
+cargo build
+```
+
+**Verify:**
+- All crates compile without errors
+- Unit tests for `run_aspect_basic()` pass
+- No new warnings introduced
+
+---
+
+### Step 9: Create Manual Test Files
+
+**Objective:** Create test files to manually verify aspect propagation works end-to-end.
+
+#### 9.1: Create Test Aspect Definition
+
+**New file:** `tests/manual_test/test_aspect_8c.bzl`
+
+```python
+# Provider to collect names from dependency chain
+CollectNamesInfo = provider(fields=["names"])
+
+def _collect_aspect_impl(target, ctx):
+    """Aspect that collects target names through the dependency graph."""
+    print("Aspect visiting:", ctx.label)
+    print("  Rule kind:", ctx.rule.kind)
+
+    # Start with current target's name
+    names = [str(ctx.label)]
+
+    # Collect names from dependencies if they have the aspect's provider
+    if hasattr(ctx.rule.attr, "deps"):
+        for dep in ctx.rule.attr.deps:
+            if CollectNamesInfo in dep:
+                names.extend(dep[CollectNamesInfo].names)
+
+    return [CollectNamesInfo(names=names)]
+
+collect_aspect = aspect(
+    implementation = _collect_aspect_impl,
+    attr_aspects = ["deps"],  # Propagate through deps attribute
+)
+
+def _test_rule_impl(ctx):
+    """Simple rule that just returns DefaultInfo."""
+    return [DefaultInfo()]
+
+test_rule = rule(
+    implementation = _test_rule_impl,
+    attrs = {
+        "deps": attr.label_list(aspects=[collect_aspect]),
+    },
+)
+```
+
+#### 9.2: Create Test BUILD File
+
+**New file:** `tests/manual_test/BUILD.bazel`
+
+```python
+load(":test_aspect_8c.bzl", "test_rule")
+
+# Create a dependency chain: c -> b -> a
+test_rule(name = "a")
+test_rule(name = "b", deps = [":a"])
+test_rule(name = "c", deps = [":b"])
+
+# Create a wider dependency graph: d -> [b, c]
+test_rule(name = "d", deps = [":b", ":c"])
+```
+
+#### 9.3: Manual Verification Steps
+
+Run the following commands and verify output:
+
+```bash
+# Test 1: Simple linear chain
+kuro build //tests/manual_test:c
+
+# Expected output should show aspect visiting all three targets:
+# Aspect visiting: //tests/manual_test:a
+#   Rule kind: test_rule
+# Aspect visiting: //tests/manual_test:b
+#   Rule kind: test_rule
+# Aspect visiting: //tests/manual_test:c
+#   Rule kind: test_rule
+```
+
+**Verify:**
+- Aspect executes on all targets in dependency chain
+- Aspect visits dependencies before dependents (depth-first)
+- `ctx.rule.kind` returns "test_rule"
+- `ctx.label` returns correct target label
+- `ctx.rule.attr.deps` contains aspect results (shadow graph)
+
+```bash
+# Test 2: Wider dependency graph
+kuro build //tests/manual_test:d
+
+# Expected: Aspect visits a, b, c, and d
+# Order should respect dependency structure (a before b, b before d)
+```
+
+#### 9.4: Create Integration Test (Optional)
+
+**New file:** `tests/core/aspects/test_propagation.py`
+
+```python
+def test_simple_aspect_propagation(tmp_path):
+    """Test aspect propagates through deps attribute."""
+
+    # Create test files (bzl and BUILD.bazel from above)
+    bzl_content = """
+CollectNamesInfo = provider(fields=["names"])
+
+def _collect_aspect_impl(target, ctx):
+    names = [str(ctx.label)]
+    if hasattr(ctx.rule.attr, "deps"):
+        for dep in ctx.rule.attr.deps:
+            if CollectNamesInfo in dep:
+                names.extend(dep[CollectNamesInfo].names)
+    return [CollectNamesInfo(names=names)]
+
+collect_aspect = aspect(
+    implementation=_collect_aspect_impl,
+    attr_aspects=["deps"],
+)
+
+def _test_rule_impl(ctx):
+    return [DefaultInfo()]
+
+test_rule = rule(
+    implementation=_test_rule_impl,
+    attrs={"deps": attr.label_list(aspects=[collect_aspect])},
+)
+"""
+
+    build_content = """
+load(":test.bzl", "test_rule")
+test_rule(name="a")
+test_rule(name="b", deps=[":a"])
+test_rule(name="c", deps=[":b"])
+"""
+
+    (tmp_path / "test.bzl").write_text(bzl_content)
+    (tmp_path / "BUILD.bazel").write_text(build_content)
+
+    # Run kuro build
+    result = subprocess.run(
+        ["kuro", "build", f"//{tmp_path}:c"],
+        capture_output=True,
+        text=True
+    )
+
+    # Verify aspect executed on all targets
+    assert "Aspect visiting:" in result.stdout
+    assert "test:a" in result.stdout
+    assert "test:b" in result.stdout
+    assert "test:c" in result.stdout
+
+    # Verify build succeeded
+    assert result.returncode == 0
 ```
 
 ---
@@ -410,72 +686,34 @@ pub mod aspect_key;
 
 ### Automated Verification
 
-- [ ] Unit tests pass for `run_aspect_basic()` (Phase 8b completion)
-- [ ] Attribute struct stores aspects field
-- [ ] attr.label(aspects=[...]) extracts and stores aspect names
-- [ ] AspectKey DICE computation works
-- [ ] `cargo build` succeeds for all crates
-- [ ] `cargo test -p kuro_build_api` passes
+- [x] Unit tests pass for `run_aspect_basic()` (Phase 8b completion)
+- [x] Attribute struct stores aspects field
+- [x] attr.label(aspects=[...]) extracts and stores aspect names
+- [x] AspectKey DICE computation skeleton works
+- [x] `cargo build` succeeds for all crates
+- [x] `cargo test -p kuro_build_api` passes
+- [ ] Step 6 integration compiles (after implementation)
+- [ ] gather_deps() collects aspect keys correctly
 
 ### Manual Verification
 
-**Test file:** `tests/manual_test/test_aspect_8c.bzl`
+**Test files created in Step 9:**
 
-```python
-CollectNamesInfo = provider(fields=["names"])
-
-def _collect_aspect_impl(target, ctx):
-    print("Aspect visiting:", ctx.label)
-    print("  Rule kind:", ctx.rule.kind)
-    names = [str(ctx.label)]
-    if hasattr(ctx.rule.attr, "deps"):
-        for dep in ctx.rule.attr.deps:
-            if CollectNamesInfo in dep:
-                names.extend(dep[CollectNamesInfo].names)
-    return [CollectNamesInfo(names=names)]
-
-collect_aspect = aspect(
-    implementation=_collect_aspect_impl,
-    attr_aspects=["deps"],
-)
-
-def _test_rule_impl(ctx):
-    return [DefaultInfo()]
-
-test_rule = rule(
-    implementation=_test_rule_impl,
-    attrs={
-        "deps": attr.label_list(aspects=[collect_aspect]),
-    },
-)
-```
-
-**BUILD.bazel:**
-```python
-test_rule(name="a")
-test_rule(name="b", deps=[":a"])
-test_rule(name="c", deps=[":b"])
-```
-
-**Verification:**
+- [ ] `tests/manual_test/test_aspect_8c.bzl` created
+- [ ] `tests/manual_test/BUILD.bazel` created
 - [ ] Run `kuro build //tests/manual_test:c`
 - [ ] Output shows "Aspect visiting: //tests/manual_test:a"
 - [ ] Output shows "Aspect visiting: //tests/manual_test:b"
 - [ ] Output shows "Aspect visiting: //tests/manual_test:c"
-- [ ] Aspect propagates through dependency chain
+- [ ] Aspect propagates through dependency chain (depth-first order)
+- [ ] `ctx.rule.kind` returns "test_rule"
 - [ ] `ctx.rule.attr.deps` contains aspect results (shadow graph)
+- [ ] Run `kuro build //tests/manual_test:d` (wider graph test)
 
-### Integration Test
+### Integration Test (Optional)
 
-**New file:** `tests/core/aspects/test_propagation.py`
-
-```python
-def test_simple_aspect_propagation(kuro):
-    """Test aspect propagates through deps attribute."""
-    # Create test files
-    # Run kuro build
-    # Verify aspect executed on all targets in dependency chain
-```
+- [ ] `tests/core/aspects/test_propagation.py` created
+- [ ] Integration test passes with `cargo test -p kuro_core_tests`
 
 ---
 

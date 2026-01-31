@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+pub mod aspect_calculation;
+pub mod aspect_key;
 pub mod calculation;
 pub mod env;
 mod plugins;

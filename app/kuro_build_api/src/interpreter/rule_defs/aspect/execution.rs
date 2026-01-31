@@ -129,7 +129,35 @@ mod tests {
 
     #[test]
     fn test_aspect_execution_compiles() {
-        // This test just verifies that the function signature compiles
-        // Actual testing will be done via manual verification in Phase 8b
+        // This test verifies that the function signature compiles correctly
+        // Full integration testing requires Starlark module setup and will be
+        // done via manual verification in Phase 8c.
     }
+
+    #[test]
+    fn test_run_aspect_basic_signature() {
+        // Verify the function exists with correct signature by checking it compiles
+        // with the expected types. This is a compile-time verification.
+        let _f: fn(
+            Heap,
+            FrozenProviderCollectionValueRef,
+            ConfiguredTargetLabel,
+            String,
+            ValueOfUnchecked<StructRef<'static>>,
+            FrozenValue,
+            bool,
+            &mut Evaluator,
+            AnalysisRegistry,
+            DigestConfig,
+        ) -> kuro_error::Result<ProviderCollection> = run_aspect_basic;
+    }
+
+    // TODO(Phase 8c): Add integration tests once manual verification is complete:
+    // - test_aspect_executes_and_receives_context: Verify aspect impl is called
+    // - test_aspect_ctx_rule_kind: Verify ctx.rule.kind returns correct value
+    // - test_aspect_ctx_rule_attr: Verify ctx.rule.attr is accessible
+    // - test_aspect_ctx_label: Verify ctx.label returns target label
+    // - test_aspect_empty_providers: Verify empty provider list is valid
+    // - test_aspect_rejects_default_info: Verify DefaultInfo is rejected
+    // - test_target_provider_access: Verify target[SomeInfo] syntax works
 }
