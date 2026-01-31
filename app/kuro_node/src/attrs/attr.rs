@@ -15,6 +15,7 @@ use std::sync::Arc;
 use allocative::Allocative;
 use pagable::Pagable;
 
+use crate::aspect_type::StarlarkAspectType;
 use crate::attrs::attr_type::AttrType;
 use crate::attrs::coerced_attr::CoercedAttr;
 use crate::attrs::display::AttrDisplayWithContextExt;
@@ -37,7 +38,8 @@ pub struct Attribute {
     /// internal representation
     coercer: AttrType,
     /// Aspects to apply to dependencies of this attribute (Phase 8c)
-    aspects: Vec<Arc<String>>,
+    /// Uses Arc<StarlarkAspectType> to enable DICE-based module loading with cheap cloning
+    aspects: Vec<Arc<StarlarkAspectType>>,
 }
 
 impl Attribute {
@@ -83,13 +85,13 @@ impl Attribute {
     }
 
     /// Add aspects to this attribute (Phase 8c).
-    pub fn with_aspects(mut self, aspects: Vec<Arc<String>>) -> Self {
+    pub fn with_aspects(mut self, aspects: Vec<Arc<StarlarkAspectType>>) -> Self {
         self.aspects = aspects;
         self
     }
 
     /// Get the aspects attached to this attribute (Phase 8c).
-    pub fn aspects(&self) -> &[Arc<String>] {
+    pub fn aspects(&self) -> &[Arc<StarlarkAspectType>] {
         &self.aspects
     }
 }

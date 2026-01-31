@@ -797,13 +797,14 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // TODO(bazel): Enforce allow_rules constraint during coercion
         let _unused = (mandatory, executable, allow_files_bool, allow_single_file_bool, allow_rules, flags);
 
-        // Extract aspect names from the aspects parameter (Phase 8c)
+        // Extract aspect types from the aspects parameter (Phase 8c - UPDATED)
         use crate::aspect::FrozenStarlarkAspectCallable;
-        let mut aspect_names = Vec::new();
+        use std::sync::Arc;
+        let mut aspect_types = Vec::new();
         for aspect_val in aspects.items {
             if let Some(frozen) = aspect_val.unpack_frozen() {
                 if let Some(aspect) = frozen.downcast_ref::<FrozenStarlarkAspectCallable>() {
-                    aspect_names.push(Arc::new(aspect.name().to_owned()));
+                    aspect_types.push(Arc::new(aspect.aspect_type()));  // Wrap in Arc
                 } else {
                     return Err(ValueError::IncorrectParameterTypeNamed(
                         "aspects".to_owned()
@@ -833,10 +834,10 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
 
         // Create attribute with aspects attached (Phase 8c)
         let base_attr = Attribute::attr(eval, default, doc, coercer)?;
-        Ok(if aspect_names.is_empty() {
+        Ok(if aspect_types.is_empty() {
             base_attr
         } else {
-            StarlarkAttribute::new(base_attr.clone_attribute().with_aspects(aspect_names))
+            StarlarkAttribute::new(base_attr.clone_attribute().with_aspects(aspect_types))
         })
     }
 
@@ -877,13 +878,14 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // TODO(bazel): Enforce allow_rules constraint during coercion
         let _unused = (mandatory, allow_files_bool, allow_empty, allow_rules, flags);
 
-        // Extract aspect names from the aspects parameter (Phase 8c)
+        // Extract aspect types from the aspects parameter (Phase 8c - UPDATED)
         use crate::aspect::FrozenStarlarkAspectCallable;
-        let mut aspect_names = Vec::new();
+        use std::sync::Arc;
+        let mut aspect_types = Vec::new();
         for aspect_val in aspects.items {
             if let Some(frozen) = aspect_val.unpack_frozen() {
                 if let Some(aspect) = frozen.downcast_ref::<FrozenStarlarkAspectCallable>() {
-                    aspect_names.push(Arc::new(aspect.name().to_owned()));
+                    aspect_types.push(Arc::new(aspect.aspect_type()));  // Wrap in Arc
                 } else {
                     return Err(ValueError::IncorrectParameterTypeNamed(
                         "aspects".to_owned()
@@ -898,10 +900,10 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
 
         // Create attribute with aspects attached (Phase 8c)
         let base_attr = Attribute::attr(eval, default, doc, coercer)?;
-        Ok(if aspect_names.is_empty() {
+        Ok(if aspect_types.is_empty() {
             base_attr
         } else {
-            StarlarkAttribute::new(base_attr.clone_attribute().with_aspects(aspect_names))
+            StarlarkAttribute::new(base_attr.clone_attribute().with_aspects(aspect_types))
         })
     }
 

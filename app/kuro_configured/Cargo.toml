@@ -18,6 +18,7 @@ gazebo = { workspace = true }
 ref-cast = { workspace = true }
 starlark_map = { workspace = true }
 
+kuro_analysis = { workspace = true }
 kuro_build_api = { workspace = true }
 kuro_build_signals = { workspace = true }
 kuro_common = { workspace = true }

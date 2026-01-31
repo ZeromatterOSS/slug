@@ -29,6 +29,7 @@ kuro_error = { workspace = true }
 kuro_events = { workspace = true }
 kuro_execute = { workspace = true }
 kuro_interpreter = { workspace = true }
+kuro_interpreter_for_build = { workspace = true }
 kuro_node = { workspace = true }
 kuro_query = { workspace = true }
 kuro_util = { workspace = true }

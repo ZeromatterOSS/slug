@@ -10,7 +10,7 @@
 //! DICE keys for aspect computation (Phase 8c).
 //!
 //! AspectKey is the cache key for aspect computation results:
-//! - Key: (target, aspect_name)
+//! - Key: (target, aspect_type)
 //! - Value: AspectValue (provider collection returned by the aspect)
 
 use std::sync::Arc;
@@ -18,30 +18,30 @@ use std::sync::Arc;
 use allocative::Allocative;
 use derive_more::Display;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
-use kuro_util::arc_str::ArcStr;
+use kuro_node::aspect_type::StarlarkAspectType;
 use dupe::Dupe;
 
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 
 /// DICE key for caching aspect computation results (Phase 8c).
 ///
-/// Key = (target, aspect_name) → Value = AspectValue (providers)
+/// Key = (target, aspect_type) → Value = AspectValue (providers)
 ///
 /// This key identifies a unique aspect computation:
 /// - `target`: The configured target this aspect is applied to
-/// - `aspect_name`: The name of the aspect (e.g., "my_aspect")
+/// - `aspect_type`: The full aspect identity (module path + name) for loading via DICE
 #[derive(Clone, Dupe, Display, Debug, Eq, Hash, PartialEq, Allocative)]
-#[display("AspectKey({}, {})", target, aspect_name)]
+#[display("AspectKey({}, {})", target, aspect_type)]
 pub struct AspectKey {
     pub target: ConfiguredTargetLabel,
-    pub aspect_name: ArcStr,
+    pub aspect_type: Arc<StarlarkAspectType>,
 }
 
 impl AspectKey {
-    pub fn new(target: ConfiguredTargetLabel, aspect_name: ArcStr) -> Self {
+    pub fn new(target: ConfiguredTargetLabel, aspect_type: Arc<StarlarkAspectType>) -> Self {
         Self {
             target,
-            aspect_name,
+            aspect_type,
         }
     }
 }

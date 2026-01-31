@@ -14,8 +14,7 @@ ignore = \
     app/kuro_explain, \
     app_dep_graph_rules, \
     examples, \
-    integrations/rust-project/tests, \
-    tests
+    integrations/rust-project/tests
 
 [rust]
 default_edition = 2024

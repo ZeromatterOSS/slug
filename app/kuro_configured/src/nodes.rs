@@ -434,6 +434,8 @@ pub(crate) struct GatheredDeps {
     pub(crate) exec_deps: SmallMap<ConfiguredProvidersLabel, CheckVisibility>,
     pub(crate) toolchain_deps: SmallSet<TargetConfiguredTargetLabel>,
     pub(crate) plugin_lists: PluginLists,
+    /// Aspect results for dependencies with aspects attached (Phase 8c)
+    pub(crate) aspect_results: std::collections::HashMap<(ConfiguredTargetLabel, std::sync::Arc<kuro_node::aspect_type::StarlarkAspectType>), kuro_analysis::analysis::aspect_key::AspectValue>,
 }
 
 pub(crate) async fn gather_deps(
@@ -494,6 +496,80 @@ pub(crate) async fn gather_deps(
         configured_attr.traverse(target_node.label().pkg(), &mut traversal)?;
     }
 
+    // Phase 8c: Collect aspects that need to be applied to dependencies
+    let mut aspect_keys = Vec::new();
+
+    for a in target_node.attrs(AttrInspectOptions::All) {
+        // Check if this attribute has aspects attached
+        if !a.attr.aspects().is_empty() {
+            let configured_attr = a.configure(attr_cfg_ctx)?;
+
+            // Extract dependency labels from this configured attribute
+            // Using the same ConfiguredAttrTraversal pattern
+            struct AspectDepsCollector {
+                deps: Vec<ConfiguredTargetLabel>,
+            }
+
+            impl ConfiguredAttrTraversal for AspectDepsCollector {
+                fn dep(&mut self, dep: &ConfiguredProvidersLabel) -> kuro_error::Result<()> {
+                    self.deps.push(dep.target().dupe());
+                    Ok(())
+                }
+
+                fn dep_with_plugins(
+                    &mut self,
+                    dep: &ConfiguredProvidersLabel,
+                    _plugin_kinds: &PluginKindSet,
+                ) -> kuro_error::Result<()> {
+                    self.deps.push(dep.target().dupe());
+                    Ok(())
+                }
+
+                // Exec deps and toolchain deps don't propagate aspects in Phase 8c
+                fn exec_dep(&mut self, _dep: &ConfiguredProvidersLabel) -> kuro_error::Result<()> {
+                    Ok(())
+                }
+
+                fn toolchain_dep(&mut self, _dep: &ConfiguredProvidersLabel) -> kuro_error::Result<()> {
+                    Ok(())
+                }
+
+                fn plugin_dep(&mut self, _dep: &TargetLabel, _kind: &PluginKind) -> kuro_error::Result<()> {
+                    Ok(())
+                }
+            }
+
+            let mut collector = AspectDepsCollector { deps: Vec::new() };
+            configured_attr.traverse(target_node.label().pkg(), &mut collector)?;
+
+            // Schedule aspect computation for each dep (Phase 8c)
+            for dep_label in collector.deps {
+                for aspect_type in a.attr.aspects() {
+                    aspect_keys.push(kuro_analysis::analysis::aspect_key::AspectKey::new(
+                        dep_label.dupe(),
+                        aspect_type.dupe(),
+                    ));
+                }
+            }
+        }
+    }
+
+    // Compute all aspects in parallel via DICE (following pattern from lines 499-503)
+    let aspect_results = if !aspect_keys.is_empty() {
+        ctx.compute_join(aspect_keys.iter(), |ctx, key| {
+            async move {
+                // Returns Result<AspectValue>
+                ctx.compute(key).await
+            }.boxed()
+        })
+        .await
+    } else {
+        Vec::new()
+    };
+
+    // Store aspect results temporarily, will process errors after errors_and_incompats is created
+    let aspect_results_with_keys: Vec<_> = aspect_keys.into_iter().zip(aspect_results).collect();
+
     let dep_results = ctx
         .compute_join(traversal.deps.iter(), |ctx, v| {
             async move { ctx.get_internal_configured_target_node(v.0.target()).await }.boxed()
@@ -545,12 +621,34 @@ pub(crate) async fn gather_deps(
         }
     }
 
+    // Process aspect results and handle errors (Phase 8c)
+    let mut aspect_results_map = std::collections::HashMap::new();
+    for (key, result) in aspect_results_with_keys {
+        match result {
+            Ok(Ok(aspect_value)) => {
+                aspect_results_map.insert(
+                    (key.target.dupe(), key.aspect_type.dupe()),
+                    aspect_value,
+                );
+            }
+            Ok(Err(e)) => {
+                // Add to errors following existing error handling pattern
+                errors_and_incompats.errs.push(e);
+            }
+            Err(e) => {
+                // DICE error - convert to kuro_error::Error
+                errors_and_incompats.errs.push(e.into());
+            }
+        }
+    }
+
     Ok((
         GatheredDeps {
             deps,
             exec_deps,
             toolchain_deps: traversal.toolchain_deps,
             plugin_lists,
+            aspect_results: aspect_results_map,
         },
         errors_and_incompats,
     ))

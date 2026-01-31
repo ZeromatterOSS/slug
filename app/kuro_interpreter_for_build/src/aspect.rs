@@ -79,6 +79,8 @@ use std::fmt;
 
 use allocative::Allocative;
 use derive_more::Display;
+use kuro_node::aspect_type::StarlarkAspectType;
+use kuro_node::bzl_or_bxl_path::BzlOrBxlPath;
 use starlark::any::ProvidesStaticType;
 use starlark::docs::DocFunction;
 use starlark::docs::DocItem;
@@ -131,6 +133,8 @@ enum AspectError {
 /// the aspect implementation function.
 #[derive(Debug, ProvidesStaticType, Trace, NoSerialize, Allocative)]
 pub struct StarlarkAspectCallable<'v> {
+    /// The import path that contains the aspect() call (Phase 8c)
+    aspect_path: BzlOrBxlPath,
     /// The name of this aspect (set when exported/assigned to a variable).
     name: RefCell<Option<String>>,
     /// The implementation function for this aspect.
@@ -183,6 +187,7 @@ impl<'v> AllocValue<'v> for StarlarkAspectCallable<'v> {
 impl<'v> StarlarkAspectCallable<'v> {
     #[allow(clippy::too_many_arguments)]
     fn new(
+        aspect_path: BzlOrBxlPath,
         implementation: Value<'v>,
         attr_aspects: Vec<String>,
         attrs: UnpackDictEntries<&'v str, &'v StarlarkAttribute>,
@@ -196,16 +201,7 @@ impl<'v> StarlarkAspectCallable<'v> {
         apply_to_generating_rules: bool,
         exec_compatible_with: Vec<String>,
         subrules: Vec<Value<'v>>,
-        eval: &mut Evaluator<'v, '_, '_>,
     ) -> kuro_error::Result<StarlarkAspectCallable<'v>> {
-        let build_context = BuildContext::from_context(eval)?;
-
-        // Verify we're in a .bzl file
-        match &build_context.additional {
-            PerFileTypeContext::Bzl(_) => {}
-            _ => return Err(AspectError::AspectNotInBzl.into()),
-        }
-
         let attrs_vec: Vec<(String, StarlarkAttribute)> = attrs
             .entries
             .into_iter()
@@ -213,6 +209,7 @@ impl<'v> StarlarkAspectCallable<'v> {
             .collect();
 
         Ok(StarlarkAspectCallable {
+            aspect_path,
             name: RefCell::new(None),
             implementation,
             attr_aspects,
@@ -281,6 +278,8 @@ impl<'v> StarlarkValue<'v> for StarlarkAspectCallable<'v> {
 #[derive(Debug, Display, ProvidesStaticType, NoSerialize, Allocative)]
 #[display("<aspect {}>", name)]
 pub struct FrozenStarlarkAspectCallable {
+    /// The import path that contains the aspect() call (Phase 8c)
+    aspect_path: BzlOrBxlPath,
     /// The name of this aspect.
     name: String,
     /// The implementation function for this aspect.
@@ -371,6 +370,7 @@ impl<'v> Freeze for StarlarkAspectCallable<'v> {
             .collect::<FreezeResult<Vec<_>>>()?;
 
         Ok(FrozenStarlarkAspectCallable {
+            aspect_path: self.aspect_path,
             name,
             implementation: self.implementation.freeze(freezer)?,
             attr_aspects: self.attr_aspects,
@@ -454,6 +454,11 @@ impl FrozenStarlarkAspectCallable {
     /// Get the subrules used by this aspect.
     pub fn subrules(&self) -> &[FrozenValue] {
         &self.subrules
+    }
+
+    /// Get the full aspect type (module path + name) for DICE module loading (Phase 8c).
+    pub fn aspect_type(&self) -> StarlarkAspectType {
+        StarlarkAspectType::new(self.aspect_path.clone(), self.name.clone())
     }
 }
 
@@ -573,6 +578,13 @@ pub fn register_aspect_function(builder: &mut GlobalsBuilder) {
         // exec_groups is accepted but ignored for now
         let _unused = exec_groups;
 
+        // Capture the module path where aspect() is being called (Phase 8c)
+        let build_context = BuildContext::from_context(eval)?;
+        let aspect_path = match &build_context.additional {
+            PerFileTypeContext::Bzl(bzl_path) => BzlOrBxlPath::Bzl(bzl_path.bzl_path.clone()),
+            _ => return Err(kuro_error::Error::from(AspectError::AspectNotInBzl).into()),
+        };
+
         // Convert toolchains to strings (they're typically labels but we store as strings for now)
         let toolchains_strings: Vec<String> = toolchains.items.iter().map(|v| v.to_str()).collect();
 
@@ -581,6 +593,7 @@ pub fn register_aspect_function(builder: &mut GlobalsBuilder) {
         let required_aspect_providers_parsed = parse_required_providers(required_aspect_providers);
 
         Ok(StarlarkAspectCallable::new(
+            aspect_path,
             implementation,
             attr_aspects.items,
             attrs,
@@ -594,7 +607,6 @@ pub fn register_aspect_function(builder: &mut GlobalsBuilder) {
             apply_to_generating_rules,
             exec_compatible_with.items,
             subrules.items,
-            eval,
         )?)
     }
 

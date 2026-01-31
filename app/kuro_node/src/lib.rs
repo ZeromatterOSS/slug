@@ -12,6 +12,7 @@
 #![feature(box_patterns)]
 #![allow(clippy::len_without_is_empty)]
 
+pub mod aspect_type;
 pub mod attrs;
 pub mod bzl_or_bxl_path;
 pub mod call_stack;

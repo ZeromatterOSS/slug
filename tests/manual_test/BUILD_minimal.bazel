@@ -1,0 +1,11 @@
+# Minimal test for Phase 8c - Aspect propagation through dependency graph
+
+load(":test_aspect_8c_debug.bzl", "test_rule")
+
+# Create a dependency chain: c -> b -> a
+test_rule(name = "a")
+test_rule(name = "b", deps = [":a"])
+test_rule(name = "c", deps = [":b"])
+
+# Create a wider dependency graph: d -> [b, c]
+test_rule(name = "d", deps = [":b", ":c"])

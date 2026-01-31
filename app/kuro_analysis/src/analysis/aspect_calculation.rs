@@ -12,17 +12,21 @@
 //! This module implements the `Key` trait for `AspectKey`, enabling incremental
 //! computation and caching of aspect results through DICE.
 
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use dice::{CancellationContext, DiceComputations, Key};
 use dupe::Dupe;
-use futures::FutureExt;
 
 use kuro_build_api::analysis::AnalysisResult;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_error::BuckErrorContext;
+use kuro_interpreter::load_module::InterpreterCalculation;
+use kuro_interpreter::paths::module::StarlarkModulePath;
+use kuro_interpreter::file_loader::LoadedModule;
+use kuro_node::bzl_or_bxl_path::BzlOrBxlPath;
+use kuro_node::aspect_type::StarlarkAspectType;
 
 use super::aspect_key::{AspectKey, AspectValue};
 use super::calculation::AnalysisKey;
@@ -43,38 +47,17 @@ impl Key for AspectKey {
             .buck_error_context("Failed to get target analysis result for aspect")?
             .require_compatible()?;
 
-        // 2. Load aspect callable from module registry
-        // TODO(Phase 8c): Implement load_aspect_by_name()
-        // let aspect = load_aspect_by_name(ctx, &self.aspect_name).await?;
+        // 2. Load and validate aspect module exists (Phase 8c - follows rule loading pattern)
+        let _module = load_aspect_module(ctx, &self.aspect_type).await?;
+        // TODO(Phase 8c): Extract aspect callable and check required_providers
+        // let aspect = get_aspect_from_module(&module, &self.aspect_type.name)?;
+        // if !aspect_applies_to_target(aspect, &target_result)? { ... }
 
-        // 3. Check required_providers filter
-        // TODO(Phase 8c): Implement aspect_applies_to_target()
-        // if !aspect_applies_to_target(&aspect, &target_result)? {
-        //     return Ok(AspectValue::empty());
-        // }
+        // 3-6. Execute aspect (Phase 8c - TODO)
+        // TODO(Phase 8c): Implement recursive propagation, shadow graph, and execution
+        // For now, just return the target's providers as a stub
 
-        // 4. Recursively compute aspects on dependencies (depth-first)
-        // TODO(Phase 8c): Implement compute_dep_aspects()
-        // let dep_aspect_results = compute_dep_aspects(ctx, &self.target, &aspect).await?;
-
-        // 5. Build shadow graph (replace deps in ctx.rule.attr with aspect results)
-        // TODO(Phase 8c): Implement build_shadow_attrs()
-        // let shadow_attrs = build_shadow_attrs(&target_result, &dep_aspect_results)?;
-
-        // 6. Execute aspect using run_aspect_basic()
-        // TODO(Phase 8c): Implement execute_aspect_impl()
-        // let providers = execute_aspect_impl(
-        //     ctx,
-        //     &self.target,
-        //     &aspect,
-        //     &target_result,
-        //     shadow_attrs,
-        // ).await?;
-
-        // For now, return a stub result (Phase 8c stub)
-        // TODO(Phase 8c): Return actual aspect computation result
         let providers_ref = target_result.providers()?;
-
         Ok(AspectValue {
             providers: providers_ref.to_owned(),
         })
@@ -86,56 +69,27 @@ impl Key for AspectKey {
     }
 }
 
-/// Load an aspect callable by name from the module registry.
-///
-/// This finds the module where the aspect was defined and retrieves the
-/// frozen aspect callable.
-#[allow(dead_code)]
-async fn load_aspect_by_name(
-    _ctx: &mut DiceComputations<'_>,
-    _aspect_name: &str,
-) -> kuro_error::Result<()> {
-    // TODO(Phase 8c): Implement aspect loading from module registry
-    // This needs to:
-    // 1. Find which module defined this aspect (requires module registry lookup)
-    // 2. Load that module
-    // 3. Get the frozen aspect callable by name
-    todo!("Phase 8c: Implement aspect loading")
+/// Load the module containing the aspect definition (Phase 8c).
+/// Follows the same pattern as get_loaded_module() for rules.
+async fn load_aspect_module(
+    ctx: &mut DiceComputations<'_>,
+    aspect_type: &Arc<StarlarkAspectType>,
+) -> kuro_error::Result<LoadedModule> {
+    let module = match &aspect_type.path {
+        BzlOrBxlPath::Bzl(import_path) => {
+            ctx.get_loaded_module_from_import_path(import_path).await?
+        }
+        BzlOrBxlPath::Bxl(bxl_path) => {
+            ctx.get_loaded_module(StarlarkModulePath::BxlFile(&bxl_path))
+                .await?
+        }
+    };
+    Ok(module)
 }
 
-/// Check if an aspect applies to a target based on required_providers.
-///
-/// Returns true if:
-/// - The aspect has no required_providers (applies to all targets), OR
-/// - The target provides at least one of the required provider sets
-///
-/// The required_providers structure is: [[A], [B, C]] means A OR (B AND C)
-#[allow(dead_code)]
-fn aspect_applies_to_target(
-    _aspect: &(), // TODO: Replace with FrozenStarlarkAspectCallable
-    _target_result: &AnalysisResult,
-) -> kuro_error::Result<bool> {
-    // TODO(Phase 8c): Implement required_providers filtering
-    // let required_providers = aspect.required_providers();
-    //
-    // // Empty required_providers = applies to all targets
-    // if required_providers.is_empty() {
-    //     return Ok(true);
-    // }
-    //
-    // // Check any-of logic: [[A], [B, C]] means A OR (B AND C)
-    // for provider_set in required_providers {
-    //     let has_all = provider_set.iter().all(|provider_id| {
-    //         target_result.providers().contains_provider(provider_id)
-    //     });
-    //     if has_all {
-    //         return Ok(true);
-    //     }
-    // }
-    //
-    // Ok(false)
-    Ok(true) // Stub: apply to all targets for now
-}
+// TODO(Phase 8c): Implement get_aspect_from_module() and aspect_applies_to_target()
+// These require proper Starlark value handling which needs more infrastructure.
+// For now, we just validate that the module loads successfully.
 
 /// Recursively compute aspects on dependencies.
 ///
