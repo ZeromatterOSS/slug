@@ -11,6 +11,30 @@ Implement recursive aspect propagation through dependency graphs with DICE integ
 
 ---
 
+## Research Summary (2026-01-30)
+
+**Problem discovered:** The original plan stored only aspect names in attributes, but
+`AspectKey::compute()` needs the module path to load the aspect callable via DICE.
+
+**Research conducted:**
+1. **Module loading in Kuro** - No global registry; rules use `StarlarkRuleType = (path, name)`
+2. **DICE constraints** - Keys must be Hash+Eq (no FrozenValue); Values can contain FrozenModule
+3. **Bazel architecture** - Uses `AspectDescriptor = (AspectClass, AspectParameters)` with `bzl_file%aspect_name`
+
+**Solution:** Store `StarlarkAspectType = (BzlOrBxlPath, name)` instead of just names.
+This matches Bazel's architecture and follows the existing rule loading pattern in Kuro.
+
+**Files affected by the update:**
+- `app/kuro_node/src/aspect_type.rs` (NEW)
+- `app/kuro_interpreter_for_build/src/aspect.rs` (add aspect_path field)
+- `app/kuro_node/src/attrs/attr.rs` (change aspects field type)
+- `app/kuro_interpreter_for_build/src/attrs/attrs_global.rs` (extract full type)
+- `app/kuro_analysis/src/analysis/aspect_key.rs` (use StarlarkAspectType)
+- `app/kuro_analysis/src/analysis/aspect_calculation.rs` (implement module loading)
+- `app/kuro_configured/src/nodes.rs` (update aspect key creation)
+
+---
+
 ## Current State (Phase 8b Complete)
 
 **What exists:**
@@ -197,20 +221,175 @@ impl AspectValue {
 
 ---
 
-### Step 5: Implement DICE Key Computation for Aspects ✅
+### Step 5: Implement DICE Key Computation for Aspects ✅ (NEEDS UPDATE)
 
-**New File:** `app/kuro_analysis/src/analysis/aspect_calculation.rs`
+**UPDATED (2026-01-30):** The original stub implementation is in place, but needs to be
+updated to use proper module-based aspect loading. See Step 5a for the required changes.
+
+**Current File:** `app/kuro_analysis/src/analysis/aspect_calculation.rs`
+
+The current implementation is a stub that returns the target's providers without executing
+the aspect. The following changes are needed to complete aspect execution:
+
+### Step 5a: Add AspectType for Module-Based Aspect Identity (NEW)
+
+**New Type:** `app/kuro_node/src/aspect_type.rs`
+
+Similar to `StarlarkRuleType` for rules, create `StarlarkAspectType` for aspects:
 
 ```rust
-use dice::{CancellationContext, DiceComputations, Key};
-use async_trait::async_trait;
-use std::sync::Arc;
-use std::collections::HashMap;
+use allocative::Allocative;
+use derive_more::Display;
+use dupe::Dupe;
+use kuro_core::bzl_or_bxl_path::BzlOrBxlPath;
 
-use super::aspect_key::{AspectKey, AspectValue};
-use super::calculation::AnalysisKey;
-use kuro_build_api::interpreter::rule_defs::aspect::run_aspect_basic;
+/// Identifies an aspect by its defining module and exported name.
+/// Analogous to StarlarkRuleType for rules.
+#[derive(Clone, Dupe, Debug, Display, Eq, Hash, PartialEq, Allocative)]
+#[display("{path}:{name}")]
+pub struct StarlarkAspectType {
+    /// The .bzl file that defines this aspect
+    pub path: BzlOrBxlPath,
+    /// The exported symbol name (e.g., "my_aspect")
+    pub name: String,
+}
 
+impl StarlarkAspectType {
+    pub fn new(path: BzlOrBxlPath, name: String) -> Self {
+        Self { path, name }
+    }
+}
+```
+
+### Step 5b: Update StarlarkAspectCallable to Store Path (NEW)
+
+**File:** `app/kuro_interpreter_for_build/src/aspect.rs`
+
+Add `aspect_path` field (following the pattern from `rule_path` in StarlarkRuleCallable):
+
+```rust
+pub struct StarlarkAspectCallable<'v> {
+    /// The import path that contains the aspect() call
+    aspect_path: BzlOrBxlPath,  // NEW FIELD
+    /// The name of this aspect (set when exported/assigned to a variable)
+    name: RefCell<Option<String>>,
+    // ... existing fields ...
+}
+```
+
+In the `aspect()` function, capture the path from BuildContext:
+
+```rust
+fn aspect<'v>(..., eval: &mut Evaluator<'v, '_, '_>) -> starlark::Result<StarlarkAspectCallable<'v>> {
+    let build_context = BuildContext::from_context(eval)?;
+    let aspect_path = match &build_context.additional {
+        PerFileTypeContext::Bzl(bzl_path) => BzlOrBxlPath::Bzl(bzl_path.bzl_path.clone()),
+        _ => return Err(AspectError::AspectNotInBzl.into()),
+    };
+
+    Ok(StarlarkAspectCallable {
+        aspect_path,  // Store the path
+        name: RefCell::new(None),
+        // ... other fields ...
+    })
+}
+```
+
+Add getter to `FrozenStarlarkAspectCallable`:
+
+```rust
+impl FrozenStarlarkAspectCallable {
+    pub fn aspect_type(&self) -> StarlarkAspectType {
+        StarlarkAspectType::new(self.aspect_path.clone(), self.name.clone())
+    }
+}
+```
+
+### Step 5c: Update Attribute to Store AspectType (MODIFY Step 2)
+
+**File:** `app/kuro_node/src/attrs/attr.rs`
+
+Change the aspects field from names to full types:
+
+```rust
+pub struct Attribute {
+    default: AttributeDefault,
+    doc: String,
+    coercer: AttrType,
+    /// Aspects to apply to dependencies of this attribute (Phase 8c)
+    /// Uses StarlarkAspectType to enable DICE-based module loading
+    aspects: Vec<StarlarkAspectType>,  // CHANGED from Vec<Arc<String>>
+}
+
+impl Attribute {
+    pub fn with_aspects(mut self, aspects: Vec<StarlarkAspectType>) -> Self {
+        self.aspects = aspects;
+        self
+    }
+
+    pub fn aspects(&self) -> &[StarlarkAspectType] {
+        &self.aspects
+    }
+}
+```
+
+### Step 5d: Update attrs_global.rs to Extract Full AspectType (MODIFY Step 3)
+
+**File:** `app/kuro_interpreter_for_build/src/attrs/attrs_global.rs`
+
+Change aspect extraction to capture full type:
+
+```rust
+// Extract aspect types from the aspects parameter (Phase 8c - UPDATED)
+use crate::aspect::FrozenStarlarkAspectCallable;
+let mut aspect_types = Vec::new();
+for aspect_val in aspects.items {
+    if let Some(frozen) = aspect_val.unpack_frozen() {
+        if let Some(aspect) = frozen.downcast_ref::<FrozenStarlarkAspectCallable>() {
+            aspect_types.push(aspect.aspect_type());  // Full type, not just name
+        } else {
+            return Err(ValueError::IncorrectParameterTypeNamed("aspects".to_owned()).into());
+        }
+    }
+}
+
+// Create attribute with aspects attached
+let base_attr = Attribute::attr(eval, default, doc, coercer)?;
+Ok(if aspect_types.is_empty() {
+    base_attr
+} else {
+    StarlarkAttribute::new(base_attr.clone_attribute().with_aspects(aspect_types))
+})
+```
+
+### Step 5e: Update AspectKey to Use Module Path (MODIFY Step 4)
+
+**File:** `app/kuro_analysis/src/analysis/aspect_key.rs`
+
+```rust
+use kuro_node::aspect_type::StarlarkAspectType;
+
+/// DICE key for caching aspect computation results.
+/// Key = (target, aspect_type) → Value = AspectValue (providers)
+#[derive(Clone, Dupe, Display, Debug, Eq, Hash, PartialEq, Allocative)]
+#[display("AspectKey({}, {})", target, aspect_type)]
+pub struct AspectKey {
+    pub target: ConfiguredTargetLabel,
+    pub aspect_type: StarlarkAspectType,  // CHANGED: full type instead of just name
+}
+
+impl AspectKey {
+    pub fn new(target: ConfiguredTargetLabel, aspect_type: StarlarkAspectType) -> Self {
+        Self { target, aspect_type }
+    }
+}
+```
+
+### Step 5f: Implement Proper AspectKey::compute() (MODIFY Step 5)
+
+**File:** `app/kuro_analysis/src/analysis/aspect_calculation.rs`
+
+```rust
 #[async_trait]
 impl Key for AspectKey {
     type Value = kuro_error::Result<AspectValue>;
@@ -218,43 +397,72 @@ impl Key for AspectKey {
     async fn compute(
         &self,
         ctx: &mut DiceComputations,
-        _cancellations: &CancellationContext,
+        cancellations: &CancellationContext,
     ) -> Self::Value {
         // 1. Get target's analysis result (ensures target is analyzed first)
-        let target_result = ctx.compute(&AnalysisKey(self.target.dupe())).await??;
+        let target_result = ctx
+            .compute(&AnalysisKey(self.target.dupe()))
+            .await?
+            .buck_error_context("Failed to get target analysis result for aspect")?
+            .require_compatible()?;
 
-        // 2. Load aspect callable from module registry
-        let aspect = load_aspect_by_name(ctx, &self.aspect_name).await?;
+        // 2. Load aspect callable from module (follows rule loading pattern)
+        let module = load_aspect_module(ctx, &self.aspect_type).await?;
+        let aspect = get_aspect_from_module(&module, &self.aspect_type.name)?;
 
         // 3. Check required_providers filter
         if !aspect_applies_to_target(&aspect, &target_result)? {
             return Ok(AspectValue::empty());
         }
 
-        // 4. Recursively compute aspects on dependencies (depth-first)
-        let dep_aspect_results = compute_dep_aspects(
-            ctx,
-            &self.target,
-            &aspect,
-        ).await?;
-
-        // 5. Build shadow graph (replace deps with aspect results)
-        let shadow_attrs = build_shadow_attrs(&target_result, &dep_aspect_results)?;
-
-        // 6. Execute aspect using run_aspect_basic()
-        let providers = execute_aspect_impl(
+        // 4. Execute aspect (similar to rule analysis pattern)
+        // This requires setting up Starlark evaluation context
+        let providers = execute_aspect(
             ctx,
             &self.target,
             &aspect,
             &target_result,
-            shadow_attrs,
+            cancellations,
         ).await?;
 
-        Ok(AspectValue {
-            providers: Arc::new(providers.freeze()?),
-        })
+        Ok(AspectValue { providers })
     }
 }
+
+/// Load the module containing the aspect definition.
+/// Follows the same pattern as get_loaded_module() for rules.
+async fn load_aspect_module(
+    ctx: &mut DiceComputations<'_>,
+    aspect_type: &StarlarkAspectType,
+) -> kuro_error::Result<LoadedModule> {
+    match &aspect_type.path {
+        BzlOrBxlPath::Bzl(import_path) => {
+            ctx.get_loaded_module_from_import_path(import_path).await
+        }
+        BzlOrBxlPath::Bxl(bxl_path) => {
+            ctx.get_loaded_module(StarlarkModulePath::BxlFile(bxl_path)).await
+        }
+    }
+}
+
+/// Extract the frozen aspect callable from a loaded module by name.
+/// Follows the same pattern as get_rule_callable() for rules.
+fn get_aspect_from_module(
+    module: &LoadedModule,
+    name: &str,
+) -> kuro_error::Result<&FrozenStarlarkAspectCallable> {
+    let aspect_value = module
+        .env()
+        .get_any_visibility(name)
+        .map_err(|e| from_any_with_tag(e, kuro_error::ErrorTag::Tier0))
+        .with_buck_error_context(|| format!("Couldn't find aspect `{name}`"))?
+        .0;
+
+    aspect_value
+        .downcast_ref::<FrozenStarlarkAspectCallable>()
+        .internal_error("Expected aspect callable")
+}
+```
 
 async fn compute_dep_aspects(
     ctx: &mut DiceComputations,
@@ -686,21 +894,33 @@ test_rule(name="c", deps=[":b"])
 
 ### Automated Verification
 
+**Phase 8c Infrastructure (COMPLETE):**
 - [x] Unit tests pass for `run_aspect_basic()` (Phase 8b completion)
 - [x] Attribute struct stores aspects field
 - [x] attr.label(aspects=[...]) extracts and stores aspect names
 - [x] AspectKey DICE computation skeleton works
 - [x] `cargo build` succeeds for all crates
 - [x] `cargo test -p kuro_build_api` passes
-- [ ] Step 6 integration compiles (after implementation)
-- [ ] gather_deps() collects aspect keys correctly
+- [x] Step 6 integration compiles (after implementation)
+- [x] gather_deps() collects aspect keys correctly
+
+**Phase 8c Execution (PENDING - requires Steps 5a-5f):**
+- [ ] StarlarkAspectType created in kuro_node
+- [ ] StarlarkAspectCallable stores aspect_path
+- [ ] FrozenStarlarkAspectCallable exposes aspect_type()
+- [ ] Attribute.aspects stores Vec<StarlarkAspectType>
+- [ ] attrs_global.rs extracts full AspectType
+- [ ] AspectKey uses StarlarkAspectType
+- [ ] load_aspect_module() implemented (follows rule loading pattern)
+- [ ] get_aspect_from_module() implemented
+- [ ] Aspects execute and print output during builds
 
 ### Manual Verification
 
 **Test files created in Step 9:**
 
-- [ ] `tests/manual_test/test_aspect_8c.bzl` created
-- [ ] `tests/manual_test/BUILD.bazel` created
+- [x] `tests/manual_test/test_aspect_8c.bzl` created
+- [x] `tests/manual_test/BUILD.bazel` updated with Phase 8c tests
 - [ ] Run `kuro build //tests/manual_test:c`
 - [ ] Output shows "Aspect visiting: //tests/manual_test:a"
 - [ ] Output shows "Aspect visiting: //tests/manual_test:b"
@@ -741,14 +961,35 @@ test_rule(name="c", deps=[":b"])
 
 ## Design Decisions
 
-### Decision 1: Store aspect names vs full callable?
+### Decision 1: Store aspect identity in Attribute
 
-**Choice:** Store aspect names (`Vec<Arc<String>>`) in Attribute
+**Choice:** Store `AspectId = (module_path, aspect_name)` in Attribute
 
-**Why:**
-- Avoids circular dependencies between crates
-- Simpler serialization/hashing for DICE
-- Load callable on-demand from module registry
+**UPDATED based on research (2026-01-30):**
+
+The original plan stored only aspect names (`Vec<Arc<String>>`), but this is insufficient
+because `AspectKey::compute()` needs to load the aspect callable from its defining module.
+
+**Research findings:**
+- Kuro has no global module registry
+- Rules use `StarlarkRuleType = (BzlOrBxlPath, name)` for identification
+- Bazel uses `AspectDescriptor = (AspectClass, AspectParameters)` where AspectClass contains `bzl_file%aspect_name`
+- DICE keys cannot contain FrozenValue/FrozenModule (no Hash/Eq), but CAN use strings/paths
+- DICE values CAN contain FrozenModule (via Arc, implements Dupe)
+
+**Solution - follows existing rule pattern:**
+1. Add `aspect_path: BzlOrBxlPath` field to `StarlarkAspectCallable` (like `rule_path` in rules)
+2. Create `StarlarkAspectType = (BzlOrBxlPath, String)` similar to `StarlarkRuleType`
+3. Store `StarlarkAspectType` in `FrozenStarlarkAspectCallable` after export/freeze
+4. In `attrs_global.rs`, extract full `StarlarkAspectType` (not just name) from frozen aspect
+5. Change `Attribute.aspects` from `Vec<Arc<String>>` to `Vec<StarlarkAspectType>`
+6. In `AspectKey`, use module path to load module via DICE, then extract aspect by name
+
+**Why this matches Buck2/Bazel architecture:**
+- Reuses existing DICE module loading infrastructure (EvalImportKey)
+- No new global registry needed
+- Follows same pattern as rule analysis
+- Module caching handled automatically by DICE
 
 ### Decision 2: Propagation order?
 
