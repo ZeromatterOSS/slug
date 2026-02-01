@@ -59,3 +59,81 @@ impl AspectValue {
     // TODO(Phase 8c): Implement empty() once we have a way to create empty FrozenProviderCollection
     // For now, this is not used since aspect computation is stubbed out
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use dupe::Dupe;
+    use kuro_core::bzl::ImportPath;
+    use kuro_core::configuration::data::ConfigurationData;
+    use kuro_core::target::label::label::TargetLabel;
+    use kuro_node::aspect_type::StarlarkAspectType;
+    use kuro_node::bzl_or_bxl_path::BzlOrBxlPath;
+
+    use super::AspectKey;
+
+    fn make_aspect_type(path: &str, name: &str) -> Arc<StarlarkAspectType> {
+        Arc::new(StarlarkAspectType::new(
+            BzlOrBxlPath::Bzl(ImportPath::testing_new(path)),
+            name.to_owned(),
+        ))
+    }
+
+    fn make_configured_label(label: &str) -> kuro_core::target::configured_target_label::ConfiguredTargetLabel {
+        TargetLabel::testing_parse(label).configure(ConfigurationData::testing_new())
+    }
+
+    #[test]
+    fn aspect_key_display() {
+        let target = make_configured_label("root//pkg:target");
+        let aspect_type = make_aspect_type("root//aspects:defs.bzl", "my_aspect");
+        let key = AspectKey::new(target, aspect_type);
+
+        // Verify Display includes both target and aspect
+        let display = key.to_string();
+        assert!(display.contains("root//pkg:target"));
+        assert!(display.contains("my_aspect"));
+    }
+
+    #[test]
+    fn aspect_key_equality() {
+        let target1 = make_configured_label("root//pkg:t1");
+        let target2 = make_configured_label("root//pkg:t1");
+        let target3 = make_configured_label("root//pkg:t2");
+
+        let aspect1 = make_aspect_type("root//a:a.bzl", "asp");
+        let aspect2 = make_aspect_type("root//a:a.bzl", "asp");
+
+        let key1 = AspectKey::new(target1, aspect1.clone());
+        let key2 = AspectKey::new(target2, aspect2);
+        let key3 = AspectKey::new(target3, aspect1);
+
+        assert_eq!(key1, key2); // Same target and aspect
+        assert_ne!(key1, key3); // Different target
+    }
+
+    #[test]
+    fn aspect_key_dupe() {
+        let target = make_configured_label("root//pkg:target");
+        let aspect_type = make_aspect_type("root//aspects:defs.bzl", "my_aspect");
+        let key = AspectKey::new(target, aspect_type);
+
+        let duped = key.dupe();
+        assert_eq!(key, duped);
+        // Verify Arc sharing (cheap clone)
+        assert!(Arc::ptr_eq(&key.aspect_type, &duped.aspect_type));
+    }
+
+    #[test]
+    fn aspect_key_different_aspects_not_equal() {
+        let target = make_configured_label("root//pkg:target");
+        let aspect1 = make_aspect_type("root//aspects:defs.bzl", "aspect1");
+        let aspect2 = make_aspect_type("root//aspects:defs.bzl", "aspect2");
+
+        let key1 = AspectKey::new(target.clone(), aspect1);
+        let key2 = AspectKey::new(target, aspect2);
+
+        assert_ne!(key1, key2); // Different aspects on same target
+    }
+}

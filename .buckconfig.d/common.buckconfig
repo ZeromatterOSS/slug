@@ -1,11 +1,11 @@
 [cells]
-prelude = prelude
+# prelude = prelude  # DISABLED: Phase 8c-interim
 none = none
-bazel_tools = bazel_tools
+# bazel_tools = bazel_tools  # DISABLED: Phase 8c-interim
 
 [cell_aliases]
-config = prelude
-ovr_config = prelude
+# config = prelude  # DISABLED: Phase 8c-interim
+# ovr_config = prelude  # DISABLED: Phase 8c-interim
 bazel_skylib = gh_facebook_kuro_shims_meta
 bazel_features = gh_facebook_kuro_shims_meta
 rules_cc = gh_facebook_kuro_shims_meta
@@ -17,11 +17,11 @@ shim = gh_facebook_kuro_shims_meta
 toolchains = gh_facebook_kuro_shims_meta
 
 [external_cells]
-bazel_tools = bundled
-prelude = bundled
+# bazel_tools = bundled  # DISABLED: Phase 8c-interim
+# prelude = bundled  # DISABLED: Phase 8c-interim
 
-[build]
-execution_platforms = prelude//platforms:default
+# [build]  # DISABLED: Phase 8c-interim
+# execution_platforms = prelude//platforms:default
 
-[parser]
-target_platform_detector_spec = target:root//...->prelude//platforms:default target:shim//...->prelude//platforms:default
+# [parser]  # DISABLED: Phase 8c-interim
+# target_platform_detector_spec = target:root//...->prelude//platforms:default target:shim//...->prelude//platforms:default

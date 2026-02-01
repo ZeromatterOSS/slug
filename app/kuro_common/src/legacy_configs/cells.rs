@@ -445,19 +445,17 @@ impl BuckConfigBasedCells {
                 // Collect repo_name aliases for later merging
                 bzlmod_aliases = bzlmod_result.aliases;
 
-                // Auto-register @bazel_tools as a bundled cell for bzlmod projects
-                // Many BCR modules (rules_cc, etc.) load from @bazel_tools
-                let bazel_tools_name = CellName::unchecked_new("bazel_tools")?;
-                if !cell_definitions.iter().any(|(n, _)| *n == bazel_tools_name) {
-                    // Use "bazel_tools" as the path - bundled cells are resolved via file ops delegate
-                    // which overrides the actual filesystem path. The path just needs to be non-empty.
-                    let bazel_tools_path = CellRootPathBuf::new(
-                        ProjectRelativePath::new("bazel_tools")?.to_owned(),
-                    );
-                    cell_definitions.push((bazel_tools_name, bazel_tools_path));
-                    bzlmod_bundled_cells.push(bazel_tools_name);
-                    tracing::info!("Auto-registered bundled cell: bazel_tools");
-                }
+                // DISABLED: Auto-register @bazel_tools (Phase 8c-interim)
+                // Bazel_tools bundled cell removed - Kuro doesn't need buck2 compatibility
+                // let bazel_tools_name = CellName::unchecked_new("bazel_tools")?;
+                // if !cell_definitions.iter().any(|(n, _)| *n == bazel_tools_name) {
+                //     let bazel_tools_path = CellRootPathBuf::new(
+                //         ProjectRelativePath::new("bazel_tools")?.to_owned(),
+                //     );
+                //     cell_definitions.push((bazel_tools_name, bazel_tools_path));
+                //     bzlmod_bundled_cells.push(bazel_tools_name);
+                //     tracing::info!("Auto-registered bundled cell: bazel_tools");
+                // }
             }
         }
         // ===== End Bzlmod Integration =====

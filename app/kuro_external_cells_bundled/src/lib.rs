@@ -98,7 +98,8 @@ const TEST_CELL: BundledCell = BundledCell {
 };
 
 pub const fn get_bundled_data() -> &'static [BundledCell] {
-    &[TEST_CELL, PRELUDE, BAZEL_TOOLS]
+    // Prelude and bazel_tools removed - Kuro doesn't need buck2 compatibility
+    &[TEST_CELL]
 }
 
 #[cfg(test)]
