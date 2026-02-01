@@ -351,8 +351,48 @@ impl Key for AspectKey {
 - [x] `required_aspect_providers` filtering works (checks target's own providers)
 - [x] Both `required_providers` AND `required_aspect_providers` must match
 
-#### Remaining (Phase 8f+)
+#### Phase 8f: rules_cc Loading (Completed 2026-01-31)
 
+**Discovered Issues and Fixes:**
+
+1. **`bazel_tools` bundled cell disabled** - Was removed from `get_bundled_data()` in
+   `kuro_external_cells_bundled/src/lib.rs`. Fixed by re-adding `BAZEL_TOOLS` to the returned array.
+
+2. **`bazel_tools` cell auto-registration disabled** - Was commented out in
+   `kuro_common/src/legacy_configs/cells.rs:448-458`. Fixed by uncommenting.
+
+3. **External cell symlinks not created** - The MVS resolver downloads sources to
+   `~/.cache/kuro/registry/bcr.bazel.build/modules/{module}/{version}/source` but cells
+   are registered with paths like `bazel-external/{module}/{version}`. These directories
+   don't exist, causing file operation failures.
+
+   **Workaround**: Manually create symlinks:
+   ```bash
+   ln -sf ~/.cache/kuro/.../source bazel-external/{module}/{version}
+   ```
+
+4. **Synthetic repos use Bazel-specific `package()` calls** - Synthetic repos generated in
+   `kuro_bzlmod/src/synthetic_repos.rs` contained `package(default_visibility=["//visibility:public"])`
+   which only works in Bazel BUILD files, not in Kuro's Buck2-based model where `package()` is
+   only valid in PACKAGE files. Fixed by removing `package()` calls and adding explicit
+   `visibility = ["//visibility:public"]` to each rule.
+
+**Success Criteria (Phase 8f):**
+- [x] `bazel_tools` bundled cell re-enabled
+- [x] `bazel_tools` cell auto-registration re-enabled
+- [x] Synthetic repos don't use Bazel-specific `package()` calls
+- [x] `@rules_cc//cc:defs.bzl` loads successfully (with manual symlinks)
+- [ ] Automatic symlink creation during MVS resolution (deferred to Phase 8g)
+
+**Known Limitations:**
+- `cc_library()` instantiation fails because rules_cc expects internal attributes like
+  `_def_parser` that Kuro doesn't provide. The rule *definition* loads correctly, but
+  *using* the rule requires additional work to provide expected implicit attributes.
+
+#### Remaining (Phase 8g+)
+
+- [ ] Automatic symlink/copy creation for external cells during MVS resolution
+- [ ] Implicit rule attributes like `_def_parser` for rules_cc compatibility
 - [ ] `requires` ensures aspect ordering
 - [ ] Aspect toolchain resolution works
 - [ ] `apply_to_generating_rules` works
@@ -419,8 +459,8 @@ aspect_rule(
 
 ### This Plan Unblocks
 
-- [ ] `@rules_cc//cc:defs.bzl` loading (Phase 8a sufficient)
-- [ ] Full rules_cc functionality (Phase 8c required)
+- [x] `@rules_cc//cc:defs.bzl` loading (Phase 8f complete, requires symlinks)
+- [ ] Full rules_cc functionality (needs automatic symlinks, Phase 8g)
 - [ ] IDE integration aspects
 - [ ] Coverage/linting aspects
 - [ ] License compliance aspects

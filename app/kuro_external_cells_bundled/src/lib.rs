@@ -98,8 +98,9 @@ const TEST_CELL: BundledCell = BundledCell {
 };
 
 pub const fn get_bundled_data() -> &'static [BundledCell] {
-    // Prelude and bazel_tools removed - Kuro doesn't need buck2 compatibility
-    &[TEST_CELL]
+    // bazel_tools is required for rules_cc (references @bazel_tools//tools/cpp:...)
+    // prelude removed - Kuro doesn't need buck2 compatibility
+    &[BAZEL_TOOLS, TEST_CELL]
 }
 
 #[cfg(test)]

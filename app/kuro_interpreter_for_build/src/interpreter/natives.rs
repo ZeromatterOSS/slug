@@ -117,6 +117,93 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
 
 #[starlark_module]
 pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
+    /// Declares which files in a package are publicly visible.
+    ///
+    /// This is a Bazel built-in function that marks files for export. In Kuro,
+    /// this is currently a no-op stub - all files in a package are accessible.
+    ///
+    /// Example:
+    /// ```python
+    /// exports_files(["version.bzl", "globals.bzl"])
+    /// exports_files(["data.txt"], visibility = ["//some/package:__pkg__"])
+    /// ```
+    ///
+    /// See: https://bazel.build/reference/be/functions#exports_files
+    fn exports_files<'v>(
+        #[starlark(require = pos)] srcs: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        _visibility: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        _licenses: UnpackListOrTuple<String>,
+    ) -> starlark::Result<NoneType> {
+        // TODO(bazel-compat): Implement file visibility enforcement.
+        // Currently a no-op - Kuro doesn't enforce file-level visibility.
+        let _unused = srcs;
+        Ok(NoneType)
+    }
+
+    /// Declares a toolchain for use by rules that support toolchain resolution.
+    ///
+    /// This is a Bazel built-in function for declaring toolchains. In Kuro,
+    /// this is currently a no-op stub - toolchain resolution is not yet implemented.
+    ///
+    /// Example:
+    /// ```python
+    /// toolchain(
+    ///     name = "cc_toolchain",
+    ///     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+    ///     toolchain = ":cc_compiler",
+    /// )
+    /// ```
+    ///
+    /// See: https://bazel.build/reference/be/platforms-and-toolchains#toolchain
+    fn toolchain<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named)] toolchain_type: &str,
+        #[starlark(require = named)] toolchain: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        _exec_compatible_with: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        _target_compatible_with: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        _target_settings: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        _visibility: UnpackListOrTuple<String>,
+    ) -> starlark::Result<NoneType> {
+        // TODO(toolchains): Implement toolchain registration and resolution.
+        // Currently a no-op - Kuro doesn't yet support Bazel-style toolchains.
+        let _unused = (name, toolchain_type, toolchain);
+        Ok(NoneType)
+    }
+
+    /// Creates an alias target that points to another target.
+    ///
+    /// This is a Bazel built-in function that creates a symbolic link-like target.
+    /// In Kuro, this is currently a no-op stub.
+    ///
+    /// Example:
+    /// ```python
+    /// alias(
+    ///     name = "my_alias",
+    ///     actual = "//some/package:target",
+    /// )
+    /// ```
+    ///
+    /// See: https://bazel.build/reference/be/general#alias
+    fn alias<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named)] actual: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        _visibility: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        _tags: UnpackListOrTuple<String>,
+    ) -> starlark::Result<NoneType> {
+        // TODO(alias): Implement alias target resolution.
+        // Currently a no-op - Kuro doesn't yet support alias targets.
+        let _unused = (name, actual);
+        Ok(NoneType)
+    }
+
     /// Check if the target with `name` has already been defined,
     /// returns `True` if it has.
     ///

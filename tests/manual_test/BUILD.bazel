@@ -38,3 +38,11 @@ top_rule(
     name = "top_chain_8e",
     deps = [":has_info2"],
 )
+
+# =============================================================================
+# Phase 8f: rules_cc loading test
+# This successfully loads rules_cc from BCR (requires symlinks in bazel-external/)
+# Note: cc_library() instantiation fails because rules_cc expects internal attributes
+# like _def_parser that Kuro doesn't provide. Loading the rule definition works.
+# =============================================================================
+load("@rules_cc//cc:defs.bzl", "cc_library")

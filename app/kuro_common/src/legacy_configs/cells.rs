@@ -445,17 +445,19 @@ impl BuckConfigBasedCells {
                 // Collect repo_name aliases for later merging
                 bzlmod_aliases = bzlmod_result.aliases;
 
-                // DISABLED: Auto-register @bazel_tools (Phase 8c-interim)
-                // Bazel_tools bundled cell removed - Kuro doesn't need buck2 compatibility
-                // let bazel_tools_name = CellName::unchecked_new("bazel_tools")?;
-                // if !cell_definitions.iter().any(|(n, _)| *n == bazel_tools_name) {
-                //     let bazel_tools_path = CellRootPathBuf::new(
-                //         ProjectRelativePath::new("bazel_tools")?.to_owned(),
-                //     );
-                //     cell_definitions.push((bazel_tools_name, bazel_tools_path));
-                //     bzlmod_bundled_cells.push(bazel_tools_name);
-                //     tracing::info!("Auto-registered bundled cell: bazel_tools");
-                // }
+                // Auto-register @bazel_tools for bzlmod projects
+                // rules_cc requires @bazel_tools//tools/cpp:...
+                let bazel_tools_name = CellName::unchecked_new("bazel_tools")?;
+                if !cell_definitions.iter().any(|(n, _)| *n == bazel_tools_name) {
+                    let bazel_tools_path = CellRootPathBuf::new(
+                        ProjectRelativePath::new("bazel_tools")?.to_owned(),
+                    );
+                    cell_definitions.push((bazel_tools_name, bazel_tools_path));
+                    bzlmod_bundled_cells.push(bazel_tools_name);
+                    // Note: Cell is automatically added as an alias in CellsAggregator::new()
+                    // so we don't need to add it to bzlmod_aliases explicitly
+                    tracing::info!("Auto-registered bundled cell: bazel_tools");
+                }
             }
         }
         // ===== End Bzlmod Integration =====
