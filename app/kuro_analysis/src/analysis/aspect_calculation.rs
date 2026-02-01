@@ -18,6 +18,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use dice::{CancellationContext, DiceComputations, Key};
 use dupe::Dupe;
+use futures::FutureExt;
 
 use kuro_build_api::analysis::AnalysisResult;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
@@ -205,27 +206,250 @@ async fn compute_dep_aspects(
 ///
 /// This sets up the Starlark evaluation context and calls run_aspect_basic()
 /// to execute the aspect implementation function.
-///
-/// NOTE: For the initial implementation, this returns empty providers.
-/// Full execution with Starlark evaluation context setup will be added next.
 #[allow(dead_code)]
 async fn execute_aspect(
-    _ctx: &mut DiceComputations<'_>,
-    _target: &ConfiguredTargetLabel,
-    _aspect: &OwnedFrozenValueTyped<FrozenStarlarkAspectCallable>,
+    ctx: &mut DiceComputations<'_>,
+    target: &ConfiguredTargetLabel,
+    aspect: &OwnedFrozenValueTyped<FrozenStarlarkAspectCallable>,
     target_result: &AnalysisResult,
-    _cancellations: &CancellationContext,
+    cancellations: &CancellationContext,
 ) -> kuro_error::Result<kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue> {
-    // TODO(Phase 8d): Implement full aspect execution
-    // This requires:
-    // 1. Creating a Starlark Heap and Evaluator
-    // 2. Building AnalysisRegistry for action registration
-    // 3. Extracting rule kind and attributes from target
-    // 4. Calling run_aspect_basic() with all parameters
-    // 5. Freezing the result providers
-    //
-    // For now, return the target's providers as a placeholder.
-    // This allows aspects to pass through without execution.
-    let providers = target_result.providers()?;
-    Ok(providers.to_owned())
+    use kuro_build_api::analysis::registry::AnalysisRegistry;
+    use kuro_build_api::interpreter::rule_defs::aspect::AspectContext;
+    use kuro_build_api::interpreter::rule_defs::aspect::AspectRuleInfo;
+    use kuro_build_api::interpreter::rule_defs::aspect::AspectTargetProviders;
+    use kuro_build_api::interpreter::rule_defs::provider::collection::ProviderCollection;
+    use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
+    use kuro_core::unsafe_send_future::UnsafeSendFuture;
+    use kuro_events::dispatch::get_dispatcher;
+    use kuro_execute::digest_config::HasDigestConfig;
+    use kuro_interpreter::dice::starlark_provider::StarlarkEvalKind;
+    use kuro_interpreter::factory::BuckStarlarkModule;
+    use kuro_interpreter::factory::StarlarkEvaluatorProvider;
+    use kuro_interpreter::print_handler::EventDispatcherPrintHandler;
+    use kuro_interpreter::soft_error::KuroStarlarkSoftErrorHandler;
+    use kuro_node::attrs::inspect_options::AttrInspectOptions;
+    use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
+    use starlark::values::structs::AllocStruct;
+    use starlark::values::ValueOfUnchecked;
+
+    use crate::attrs::resolve::configured_attr::ConfiguredAttrExt;
+    use crate::attrs::resolve::ctx::AttrResolutionContext;
+
+    // 1. Get the configured target node to access rule kind and attributes
+    let node = ctx
+        .get_configured_target_node(target)
+        .await?
+        .require_compatible()?;
+
+    // 2. Extract rule kind (name of the rule, e.g., "cc_library")
+    let rule_kind = node.rule_type().name().to_owned();
+
+    // Extract execution platform before moving node into async block
+    let execution_platform = node.execution_platform_resolution().dupe();
+
+    // Get target providers before moving into async block
+    let target_providers_frozen = target_result.providers()?.to_owned();
+
+    // Collect attributes before moving into async block
+    let attrs_to_resolve: Vec<_> = node.attrs(AttrInspectOptions::All).collect();
+
+    // Collect dependency labels from the node's deps
+    let dep_labels: Vec<ConfiguredTargetLabel> = node.deps().map(|d| d.label().dupe()).collect();
+
+    // Fetch dependency analysis results in parallel via DICE
+    let dep_analysis_results: std::collections::HashMap<ConfiguredTargetLabel, kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue> = {
+        let dep_results = ctx.compute_join(dep_labels.iter(), |ctx, label| {
+            async move {
+                ctx.compute(&AnalysisKey(label.dupe())).await
+            }.boxed()
+        }).await;
+
+        let mut map = std::collections::HashMap::new();
+        for (label, result) in dep_labels.iter().zip(dep_results) {
+            if let Ok(Ok(analysis_result)) = result {
+                if let Ok(compatible) = analysis_result.require_compatible() {
+                    if let Ok(providers) = compatible.providers() {
+                        map.insert(label.dupe(), providers.to_owned());
+                    }
+                }
+            }
+        }
+        map
+    };
+
+    // Execute aspect in a Starlark module environment (similar to rule analysis)
+    let fut = async move {
+        let result = BuckStarlarkModule::with_profiling_async(|env| async move {
+            let print = EventDispatcherPrintHandler(get_dispatcher());
+
+            // 3. Build attribute resolution context for resolving rule attributes
+            struct AspectAttrResolutionContext<'v> {
+                module: &'v starlark::environment::Module,
+                dep_analysis_results: std::collections::HashMap<ConfiguredTargetLabel, kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue>,
+                execution_platform: kuro_core::execution_types::execution::ExecutionPlatformResolution,
+            }
+
+            impl<'v> AttrResolutionContext<'v> for &'_ AspectAttrResolutionContext<'v> {
+                fn starlark_module(&self) -> &'v starlark::environment::Module {
+                    self.module
+                }
+
+                fn get_dep(
+                    &mut self,
+                    target: &kuro_core::provider::label::ConfiguredProvidersLabel,
+                ) -> kuro_error::Result<starlark::values::FrozenValueTyped<'v, kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection>> {
+                    // Look up the dep's analysis result from our collected map
+                    // For Phase 8c, this returns the target's providers (not aspect shadow graph)
+                    match self.dep_analysis_results.get(target.target()) {
+                        Some(providers) => {
+                            let providers_ref = providers.lookup_inner(target)?;
+                            Ok(providers_ref.add_heap_ref(self.module.frozen_heap()))
+                        }
+                        None => Err(kuro_error::kuro_error!(
+                            kuro_error::ErrorTag::Tier0,
+                            "Dependency {} not found in aspect resolution context",
+                            target
+                        )),
+                    }
+                }
+
+                fn resolve_unkeyed_placeholder(
+                    &mut self,
+                    _name: &str,
+                ) -> kuro_error::Result<Option<kuro_build_api::interpreter::rule_defs::cmd_args::value::FrozenCommandLineArg>> {
+                    Ok(None)
+                }
+
+                fn resolve_query(
+                    &mut self,
+                    _query: &str,
+                ) -> kuro_error::Result<Arc<crate::attrs::resolve::ctx::AnalysisQueryResult>> {
+                    Err(kuro_error::internal_error!(
+                        "Aspect attribute resolution does not support queries yet"
+                    ))
+                }
+
+                fn execution_platform_resolution(&self) -> &kuro_core::execution_types::execution::ExecutionPlatformResolution {
+                    &self.execution_platform
+                }
+            }
+
+            // 4. Extract rule attributes as a Starlark struct (ctx.rule.attr)
+            let rule_attrs = {
+                let resolution_ctx = AspectAttrResolutionContext {
+                    module: &env,
+                    dep_analysis_results,
+                    execution_platform: execution_platform.clone(),
+                };
+
+                let mut resolved_attrs = Vec::with_capacity(attrs_to_resolve.len());
+                for a in attrs_to_resolve {
+                    // Resolve each attribute value
+                    resolved_attrs.push((
+                        a.name,
+                        a.value.resolve_single(target.pkg(), &mut &resolution_ctx)?,
+                    ));
+                }
+                env.heap().alloc_typed_unchecked(AllocStruct(resolved_attrs))
+            };
+
+            // 5. Create AnalysisRegistry for action registration
+            let registry = AnalysisRegistry::new_from_owner(
+                BaseDeferredKey::TargetLabel(target.dupe()),
+                execution_platform,
+            )?;
+
+            // 6. Set up Starlark evaluator
+            let eval_kind = StarlarkEvalKind::Analysis(target.dupe());
+            let eval_provider = StarlarkEvaluatorProvider::new(ctx, eval_kind).await?;
+            let mut reentrant_eval =
+                eval_provider.make_reentrant_evaluator(&env, cancellations.into())?;
+
+            // 7. Execute aspect implementation function (inlined from run_aspect_basic)
+            let (aspect_context, provider_collection) = reentrant_eval.with_evaluator(|mut eval| {
+                eval.set_print_handler(&print);
+                eval.set_soft_error_handler(&KuroStarlarkSoftErrorHandler);
+
+                // Get target providers for aspect execution (as a reference)
+                let target_providers = target_providers_frozen.as_ref();
+
+                // Get aspect implementation function
+                let aspect_impl = aspect.as_ref().implementation();
+
+                // Check if aspect has custom attributes
+                let has_attrs = !aspect.as_ref().attrs().is_empty();
+
+                // Create aspect-specific attributes
+                let aspect_attr = if has_attrs {
+                    let attrs_struct = eval.heap().alloc(AllocStruct::EMPTY);
+                    Some(ValueOfUnchecked::new(attrs_struct))
+                } else {
+                    None
+                };
+
+                // Create AspectRuleInfo
+                let rule_info = eval.heap().alloc_typed(AspectRuleInfo::new(rule_kind.clone(), rule_attrs.cast()));
+
+                // Create AspectContext
+                let ctx = AspectContext::prepare(
+                    eval.heap(),
+                    aspect_attr,
+                    target.dupe(),
+                    rule_info,
+                    registry,
+                    ctx.global_data().get_digest_config(),
+                );
+
+                // Wrap target providers for target[SomeInfo] syntax
+                let target_val = eval.heap().alloc(AspectTargetProviders::new(
+                    target_providers,
+                    target.dupe(),
+                ));
+
+                // Invoke aspect implementation: impl(target, ctx)
+                let result = eval
+                    .eval_function(
+                        aspect_impl.to_value(),
+                        &[target_val, ctx.to_value()],
+                        &[],
+                    )
+                    .buck_error_context("Aspect implementation failed")?;
+
+                // Validate and convert to ProviderCollection
+                let providers = ProviderCollection::try_from_aspect_value(result)?;
+
+                Ok((ctx, providers))
+            })?;
+
+            // 8. Store the provider collection in the analysis registry
+            use starlark::values::ValueTypedComplex;
+            let provider_collection_value = ValueTypedComplex::new_err(env.heap().alloc(provider_collection))
+                .internal_error("Just allocated provider collection")?;
+
+            let analysis_registry = aspect_context.take_state();
+            analysis_registry.analysis_value_storage.set_result_value(provider_collection_value)?;
+
+            // Finalize the registry before freezing
+            let registry_finalizer = analysis_registry.finalize(&env)?;
+
+            // 9. Freeze the environment
+            // Note: provider_collection was moved into alloc(), aspect_context was consumed by take_state()
+            let finished_eval = reentrant_eval.finish_evaluation();
+            let (token, frozen_env, _) = finished_eval.freeze_and_finish(env)?;
+
+            // 10. Get the frozen provider collection
+            let recorded_values = registry_finalizer(&frozen_env)?;
+            let frozen_providers = recorded_values.provider_collection()?;
+
+            Ok((token, frozen_providers.to_owned()))
+        })
+        .await;
+
+        // Return the FrozenProviderCollectionValue
+        // with_profiling_async automatically handles the profiling token
+        result
+    };
+
+    unsafe { UnsafeSendFuture::new_encapsulates_starlark(fut) }.await
 }

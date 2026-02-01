@@ -1,0 +1,8 @@
+# Simple test for Phase 8c - Aspect execution without shadow graph
+
+load(":test_aspect_8c_simple.bzl", "simple_rule")
+
+# Create a dependency chain: c -> b -> a
+simple_rule(name = "simple_a")
+simple_rule(name = "simple_b", deps = [":simple_a"])
+simple_rule(name = "simple_c", deps = [":simple_b"])

@@ -798,18 +798,28 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         let _unused = (mandatory, executable, allow_files_bool, allow_single_file_bool, allow_rules, flags);
 
         // Extract aspect types from the aspects parameter (Phase 8c - UPDATED)
+        // Note: aspects may be unfrozen at rule definition time, so handle both cases
         use crate::aspect::FrozenStarlarkAspectCallable;
+        use crate::aspect::StarlarkAspectCallable;
         use std::sync::Arc;
         let mut aspect_types = Vec::new();
         for aspect_val in aspects.items {
+            // Try frozen first, then unfrozen
             if let Some(frozen) = aspect_val.unpack_frozen() {
                 if let Some(aspect) = frozen.downcast_ref::<FrozenStarlarkAspectCallable>() {
-                    aspect_types.push(Arc::new(aspect.aspect_type()));  // Wrap in Arc
+                    aspect_types.push(Arc::new(aspect.aspect_type()));
                 } else {
                     return Err(ValueError::IncorrectParameterTypeNamed(
                         "aspects".to_owned()
                     ).into());
                 }
+            } else if let Some(aspect) = aspect_val.downcast_ref::<StarlarkAspectCallable>() {
+                // For unfrozen aspects, use the aspect_type_unfrozen method
+                aspect_types.push(Arc::new(aspect.aspect_type_unfrozen()?));
+            } else {
+                return Err(ValueError::IncorrectParameterTypeNamed(
+                    "aspects".to_owned()
+                ).into());
             }
         }
 
@@ -879,18 +889,28 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         let _unused = (mandatory, allow_files_bool, allow_empty, allow_rules, flags);
 
         // Extract aspect types from the aspects parameter (Phase 8c - UPDATED)
+        // Note: aspects may be unfrozen at rule definition time, so handle both cases
         use crate::aspect::FrozenStarlarkAspectCallable;
+        use crate::aspect::StarlarkAspectCallable;
         use std::sync::Arc;
         let mut aspect_types = Vec::new();
         for aspect_val in aspects.items {
+            // Try frozen first, then unfrozen
             if let Some(frozen) = aspect_val.unpack_frozen() {
                 if let Some(aspect) = frozen.downcast_ref::<FrozenStarlarkAspectCallable>() {
-                    aspect_types.push(Arc::new(aspect.aspect_type()));  // Wrap in Arc
+                    aspect_types.push(Arc::new(aspect.aspect_type()));
                 } else {
                     return Err(ValueError::IncorrectParameterTypeNamed(
                         "aspects".to_owned()
                     ).into());
                 }
+            } else if let Some(aspect) = aspect_val.downcast_ref::<StarlarkAspectCallable>() {
+                // For unfrozen aspects, use the aspect_type_unfrozen method
+                aspect_types.push(Arc::new(aspect.aspect_type_unfrozen()?));
+            } else {
+                return Err(ValueError::IncorrectParameterTypeNamed(
+                    "aspects".to_owned()
+                ).into());
             }
         }
 

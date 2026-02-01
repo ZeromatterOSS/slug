@@ -230,6 +230,16 @@ impl<'v> StarlarkAspectCallable<'v> {
             subrules,
         })
     }
+
+    /// Get the aspect type for an unfrozen aspect (Phase 8c).
+    /// Returns an error if the aspect hasn't been assigned to a variable yet.
+    pub fn aspect_type_unfrozen(&self) -> kuro_error::Result<StarlarkAspectType> {
+        let name = self.name.borrow();
+        match &*name {
+            Some(n) => Ok(StarlarkAspectType::new(self.aspect_path.clone(), n.clone())),
+            None => Err(AspectError::AspectNotAssigned.into()),
+        }
+    }
 }
 
 #[starlark_value(type = "Aspect")]
