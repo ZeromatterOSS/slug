@@ -23,6 +23,7 @@ This sub-plan covers the bzlmod module system implementation. Each phase has its
 | **6** | Starlark Migration | Complete (N/A) | [Link](./02-bzlmod-phase-6.md) - Architectural constraint: must stay native |
 | **7** | Proto Support | Future | [Link](./02-bzlmod-phase-7.md) |
 | **8** | Full subrule() | Future | [Link](./02-bzlmod-phase-8-subrule.md) |
+| **9** | External Cell Symlinks | Planned | [Link](./02-bzlmod-phase-9-external-symlinks.md) - Create bazel-external/ symlinks |
 
 **Key Learnings from Completed Phases:**
 
@@ -37,6 +38,7 @@ This sub-plan covers the bzlmod module system implementation. Each phase has its
 | 5d | DICE key in `repository_execution.rs`; actual execution in `repository_executor.rs` with http_archive/git support |
 | 5e | **Deferred execution**: Extensions capture RepoSpecs (not execute); repos materialize lazily on first access; module_ctx uses temp dir (deleted after) |
 | 6 | **N/A**: Modules must stay native due to global injection architecture (external cells only see base globals) |
+| 9 | **Planned**: Create `bazel-external/` symlinks to cache; required for external tools and some code paths that bypass `FileOpsDelegate` |
 
 ---
 

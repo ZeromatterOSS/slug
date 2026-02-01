@@ -382,7 +382,7 @@ impl Key for AspectKey {
 - [x] `bazel_tools` cell auto-registration re-enabled
 - [x] Synthetic repos don't use Bazel-specific `package()` calls
 - [x] `@rules_cc//cc:defs.bzl` loads successfully (with manual symlinks)
-- [ ] Automatic symlink creation during MVS resolution (deferred to Phase 8g)
+- [ ] Automatic symlink creation during MVS resolution (moved to [bzlmod Phase 9](./02-bzlmod-phase-9-external-symlinks.md))
 
 **Known Limitations:**
 - `cc_library()` instantiation fails because rules_cc expects internal attributes like
@@ -391,13 +391,14 @@ impl Key for AspectKey {
 
 #### Remaining (Phase 8g+)
 
-- [ ] Automatic symlink/copy creation for external cells during MVS resolution
 - [ ] Implicit rule attributes like `_def_parser` for rules_cc compatibility
 - [ ] `requires` ensures aspect ordering
 - [ ] Aspect toolchain resolution works
 - [ ] `apply_to_generating_rules` works
 - [ ] All rules_cc aspects function correctly
 - [ ] Complex aspect chains (aspect-on-aspect) work
+
+**Note**: External cell symlinks moved to [bzlmod Phase 9](./02-bzlmod-phase-9-external-symlinks.md)
 
 ---
 
