@@ -67,15 +67,16 @@ impl Key for AspectKey {
             });
         }
 
-        // 4. Compute aspects on dependencies (shadow graph - TODO for Phase 8d)
-        let _dep_aspects = compute_dep_aspects(ctx, &self.target, &aspect).await?;
+        // 4. Compute aspects on dependencies (shadow graph propagation)
+        let dep_aspects = compute_dep_aspects(ctx, &self.target, &aspect, &self.aspect_type).await?;
 
-        // 5. Execute aspect implementation function
+        // 5. Execute aspect implementation function with shadow graph
         let providers = execute_aspect(
             ctx,
             &self.target,
             &aspect,
             &target_result,
+            dep_aspects,
             cancellations,
         ).await?;
 
@@ -174,44 +175,158 @@ fn aspect_applies_to_target(
     Ok(false)
 }
 
-/// Recursively compute aspects on dependencies.
+/// Recursively compute aspects on dependencies via DICE.
 ///
 /// This follows the aspect's attr_aspects to determine which dependency
-/// attributes to propagate through, then computes the aspect on each
-/// dependency in parallel via DICE.
+/// attributes to propagate through. For each dependency found:
+/// 1. Check if attribute name matches attr_aspects (or "*" matches all)
+/// 2. Extract dependency labels using ConfiguredAttrTraversal
+/// 3. Recursively compute AspectKey for each (dep, aspect_type) pair
+/// 4. Collect results into a HashMap for shadow graph injection
 ///
-/// NOTE: For the initial implementation, this returns an empty map.
-/// The gather_deps() function in kuro_configured/nodes.rs already handles
-/// aspect triggering based on attributes with aspects=[...] attached.
-/// Full shadow graph propagation via attr_aspects will be implemented later.
-#[allow(dead_code)]
+/// The recursive DICE computation ensures depth-first execution order:
+/// dependencies' aspects complete before the parent's aspect executes.
 async fn compute_dep_aspects(
-    _ctx: &mut DiceComputations<'_>,
-    _target: &ConfiguredTargetLabel,
-    _aspect: &OwnedFrozenValueTyped<FrozenStarlarkAspectCallable>,
+    ctx: &mut DiceComputations<'_>,
+    target: &ConfiguredTargetLabel,
+    aspect: &OwnedFrozenValueTyped<FrozenStarlarkAspectCallable>,
+    aspect_type: &Arc<StarlarkAspectType>,
 ) -> kuro_error::Result<HashMap<ConfiguredTargetLabel, AspectValue>> {
-    // TODO(Phase 8d): Implement full shadow graph propagation
-    // This requires:
-    // 1. Getting the configured target node from DICE
-    // 2. Extracting attributes matching aspect.attr_aspects()
-    // 3. Recursively computing aspects on those dependencies
-    // 4. Building shadow graph (ctx.rule.attr.deps contains aspect results)
-    //
-    // For now, aspects execute on individual targets without recursive propagation.
-    // gather_deps() in kuro_configured/nodes.rs handles initial aspect triggering.
-    Ok(HashMap::new())
+    use kuro_node::attrs::configured_traversal::ConfiguredAttrTraversal;
+    use kuro_node::attrs::inspect_options::AttrInspectOptions;
+    use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
+    use kuro_core::plugins::PluginKind;
+    use kuro_core::plugins::PluginKindSet;
+    use kuro_core::provider::label::ConfiguredProvidersLabel;
+    use kuro_core::target::label::label::TargetLabel;
+
+    // 1. Get the configured target node
+    let node = ctx
+        .get_configured_target_node(target)
+        .await?
+        .require_compatible()?;
+
+    // 2. Get attr_aspects from the aspect (which attributes to propagate through)
+    let attr_aspects = aspect.as_ref().attr_aspects();
+    let propagate_all = attr_aspects.iter().any(|a| a == "*");
+
+    // If no attr_aspects specified, no propagation
+    if attr_aspects.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    // 3. Collector for dependency labels
+    struct AspectDepsCollector {
+        deps: Vec<ConfiguredTargetLabel>,
+    }
+
+    impl ConfiguredAttrTraversal for AspectDepsCollector {
+        fn dep(&mut self, dep: &ConfiguredProvidersLabel) -> kuro_error::Result<()> {
+            self.deps.push(dep.target().dupe());
+            Ok(())
+        }
+
+        fn dep_with_plugins(
+            &mut self,
+            dep: &ConfiguredProvidersLabel,
+            _plugin_kinds: &PluginKindSet,
+        ) -> kuro_error::Result<()> {
+            self.deps.push(dep.target().dupe());
+            Ok(())
+        }
+
+        // Exec deps and toolchain deps do not propagate aspects (Bazel semantics)
+        fn exec_dep(&mut self, _dep: &ConfiguredProvidersLabel) -> kuro_error::Result<()> {
+            Ok(())
+        }
+
+        fn toolchain_dep(&mut self, _dep: &ConfiguredProvidersLabel) -> kuro_error::Result<()> {
+            Ok(())
+        }
+
+        fn plugin_dep(&mut self, _dep: &TargetLabel, _kind: &PluginKind) -> kuro_error::Result<()> {
+            Ok(())
+        }
+    }
+
+    // 4. Traverse configured attributes matching attr_aspects
+    // ConfiguredTargetNode::attrs() returns already-configured attributes (ConfiguredAttrFull)
+    let mut aspect_keys = Vec::new();
+
+    for a in node.attrs(AttrInspectOptions::All) {
+        // Check if this attribute should propagate the aspect
+        let should_propagate = propagate_all || attr_aspects.iter().any(|aa| aa == a.name);
+
+        if !should_propagate {
+            continue;
+        }
+
+        // Only propagate through label and label_list attributes
+        // (Other attribute types cannot have dependencies)
+        if !a.attr.coercer().is_label_type() {
+            continue;
+        }
+
+        // Traverse the configured attribute to collect dependencies
+        let mut collector = AspectDepsCollector { deps: Vec::new() };
+        a.traverse(node.label().pkg(), &mut collector)?;
+
+        // Create AspectKey for each dependency
+        for dep_label in collector.deps {
+            aspect_keys.push(AspectKey::new(dep_label, aspect_type.dupe()));
+        }
+    }
+
+    // 5. Compute all aspects in parallel via DICE
+    if aspect_keys.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let dep_aspect_results = ctx
+        .compute_join(aspect_keys.iter(), |ctx, key| {
+            async move {
+                ctx.compute(key).await
+            }
+            .boxed()
+        })
+        .await;
+
+    // 6. Collect results into HashMap
+    let mut result = HashMap::new();
+    for (key, res) in aspect_keys.into_iter().zip(dep_aspect_results) {
+        match res {
+            Ok(Ok(aspect_value)) => {
+                result.insert(key.target.dupe(), aspect_value);
+            }
+            Ok(Err(e)) => {
+                // Propagate aspect computation errors
+                return Err(e);
+            }
+            Err(e) => {
+                // Convert DICE errors
+                return Err(e.into());
+            }
+        }
+    }
+
+    Ok(result)
 }
 
 /// Execute an aspect on a target, returning the provider collection.
 ///
 /// This sets up the Starlark evaluation context and calls run_aspect_basic()
 /// to execute the aspect implementation function.
-#[allow(dead_code)]
+///
+/// The `dep_aspects` parameter contains shadow graph results: aspect providers
+/// for dependencies that have been processed by this aspect. When resolving
+/// `ctx.rule.attr.deps`, these aspect providers take precedence over the
+/// target's regular providers.
 async fn execute_aspect(
     ctx: &mut DiceComputations<'_>,
     target: &ConfiguredTargetLabel,
     aspect: &OwnedFrozenValueTyped<FrozenStarlarkAspectCallable>,
     target_result: &AnalysisResult,
+    dep_aspects: HashMap<ConfiguredTargetLabel, AspectValue>,
     cancellations: &CancellationContext,
 ) -> kuro_error::Result<kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue> {
     use kuro_build_api::analysis::registry::AnalysisRegistry;
@@ -257,25 +372,55 @@ async fn execute_aspect(
     // Collect dependency labels from the node's deps
     let dep_labels: Vec<ConfiguredTargetLabel> = node.deps().map(|d| d.label().dupe()).collect();
 
-    // Fetch dependency analysis results in parallel via DICE
+    // Build dep_analysis_results: aspect results take precedence (shadow graph)
+    // Only fetch regular analysis for deps that don't have aspect results
     let dep_analysis_results: std::collections::HashMap<ConfiguredTargetLabel, kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue> = {
-        let dep_results = ctx.compute_join(dep_labels.iter(), |ctx, label| {
-            async move {
-                ctx.compute(&AnalysisKey(label.dupe())).await
-            }.boxed()
-        }).await;
+        // Determine which deps need regular analysis (no aspect result available)
+        let deps_needing_analysis: Vec<_> = dep_labels
+            .iter()
+            .filter(|label| !dep_aspects.contains_key(*label))
+            .cloned()
+            .collect();
 
-        let mut map = std::collections::HashMap::new();
-        for (label, result) in dep_labels.iter().zip(dep_results) {
-            if let Ok(Ok(analysis_result)) = result {
-                if let Ok(compatible) = analysis_result.require_compatible() {
-                    if let Ok(providers) = compatible.providers() {
-                        map.insert(label.dupe(), providers.to_owned());
+        // Fetch regular analysis results only for deps without aspect results
+        let regular_analysis: HashMap<ConfiguredTargetLabel, kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue> = if !deps_needing_analysis.is_empty() {
+            let results = ctx.compute_join(deps_needing_analysis.iter(), |ctx, label| {
+                async move {
+                    ctx.compute(&AnalysisKey(label.dupe())).await
+                }.boxed()
+            }).await;
+
+            let mut map = HashMap::new();
+            for (label, result) in deps_needing_analysis.iter().zip(results) {
+                if let Ok(Ok(analysis_result)) = result {
+                    if let Ok(compatible) = analysis_result.require_compatible() {
+                        if let Ok(providers) = compatible.providers() {
+                            map.insert(label.dupe(), providers.to_owned());
+                        }
                     }
                 }
             }
+            map
+        } else {
+            HashMap::new()
+        };
+
+        // Build combined map: aspect results take precedence
+        let mut combined = HashMap::new();
+
+        // First, add aspect results (shadow graph - these take precedence)
+        for (label, aspect_value) in &dep_aspects {
+            combined.insert(label.dupe(), aspect_value.providers.dupe());
         }
-        map
+
+        // Then add regular analysis results for deps without aspects
+        for (label, providers) in regular_analysis {
+            if !combined.contains_key(&label) {
+                combined.insert(label, providers);
+            }
+        }
+
+        combined
     };
 
     // Execute aspect in a Starlark module environment (similar to rule analysis)
@@ -299,8 +444,9 @@ async fn execute_aspect(
                     &mut self,
                     target: &kuro_core::provider::label::ConfiguredProvidersLabel,
                 ) -> kuro_error::Result<starlark::values::FrozenValueTyped<'v, kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection>> {
-                    // Look up the dep's analysis result from our collected map
-                    // For Phase 8c, this returns the target's providers (not aspect shadow graph)
+                    // Look up the dep's providers from our collected map
+                    // Shadow graph: if dep has aspect result, return aspect providers
+                    // Otherwise, return target's regular providers
                     match self.dep_analysis_results.get(target.target()) {
                         Some(providers) => {
                             let providers_ref = providers.lookup_inner(target)?;

@@ -415,6 +415,28 @@ impl AttrType {
         }))
     }
 
+    /// Check if this attribute type can contain label dependencies.
+    /// Used by aspect propagation to filter which attributes to traverse.
+    ///
+    /// Returns true for attribute types that can reference targets:
+    /// - Dep, ConfiguredDep, SplitTransitionDep, TransitionDep, Label
+    /// - Collections (List, Tuple, Option, Dict, OneOf) containing label types
+    pub fn is_label_type(&self) -> bool {
+        match &self.0.inner {
+            AttrTypeInner::Dep(_) => true,
+            AttrTypeInner::ConfiguredDep(_) => true,
+            AttrTypeInner::SplitTransitionDep(_) => true,
+            AttrTypeInner::TransitionDep(_) => true,
+            AttrTypeInner::Label(_) => true,
+            AttrTypeInner::List(inner) => inner.inner.is_label_type(),
+            AttrTypeInner::Tuple(inner) => inner.xs.iter().any(|t| t.is_label_type()),
+            AttrTypeInner::Option(inner) => inner.inner.is_label_type(),
+            AttrTypeInner::Dict(inner) => inner.key.is_label_type() || inner.value.is_label_type(),
+            AttrTypeInner::OneOf(inner) => inner.xs.iter().any(|a| a.is_label_type()),
+            _ => false,
+        }
+    }
+
     /// Used when we first detect that concatenation is going to happen for an attr
     /// while loading a build file. Returning false here will make us provide an error
     /// during the loading phase at the point that the concatenation happens.
@@ -456,5 +478,138 @@ impl AttrType {
 impl Display for AttrType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.fmt_with_default(f, None)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_label_type_dep() {
+        let attr_type = AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY);
+        assert!(attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_exec_dep() {
+        let attr_type = AttrType::exec_dep(ProviderIdSet::EMPTY);
+        assert!(attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_toolchain_dep() {
+        let attr_type = AttrType::toolchain_dep(ProviderIdSet::EMPTY);
+        assert!(attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_configured_dep() {
+        let attr_type = AttrType::configured_dep(ProviderIdSet::EMPTY);
+        assert!(attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_label() {
+        let attr_type = AttrType::label();
+        assert!(attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_list_of_deps() {
+        let inner = AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY);
+        let attr_type = AttrType::list(inner);
+        assert!(attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_list_of_strings() {
+        let inner = AttrType::string();
+        let attr_type = AttrType::list(inner);
+        assert!(!attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_option_of_dep() {
+        let inner = AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY);
+        let attr_type = AttrType::option(inner);
+        assert!(attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_option_of_string() {
+        let inner = AttrType::string();
+        let attr_type = AttrType::option(inner);
+        assert!(!attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_string() {
+        let attr_type = AttrType::string();
+        assert!(!attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_int() {
+        let attr_type = AttrType::int();
+        assert!(!attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_bool() {
+        let attr_type = AttrType::bool();
+        assert!(!attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_dict_with_label_value() {
+        let key = AttrType::string();
+        let value = AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY);
+        let attr_type = AttrType::dict(key, value, false);
+        assert!(attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_dict_with_string_only() {
+        let key = AttrType::string();
+        let value = AttrType::string();
+        let attr_type = AttrType::dict(key, value, false);
+        assert!(!attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_tuple_with_dep() {
+        let attr_type = AttrType::tuple(vec![
+            AttrType::string(),
+            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+        ]);
+        assert!(attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_tuple_without_deps() {
+        let attr_type = AttrType::tuple(vec![
+            AttrType::string(),
+            AttrType::int(),
+        ]);
+        assert!(!attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_one_of_with_dep() {
+        let attr_type = AttrType::one_of(vec![
+            AttrType::string(),
+            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+        ]);
+        assert!(attr_type.is_label_type());
+    }
+
+    #[test]
+    fn test_is_label_type_one_of_without_deps() {
+        let attr_type = AttrType::one_of(vec![
+            AttrType::string(),
+            AttrType::int(),
+        ]);
+        assert!(!attr_type.is_label_type());
     }
 }
