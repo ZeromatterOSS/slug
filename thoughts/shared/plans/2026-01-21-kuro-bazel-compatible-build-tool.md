@@ -84,6 +84,47 @@ The `bazel_features` module (https://github.com/bazel-contrib/bazel_features) pr
 5. **Remote execution initially** - Local execution first, RE later
 6. **GUI/IDE integration** - CLI only initially
 7. **Removing type annotations** - Keep starlark-rust's type support (Bazel is adding this)
+8. **Built-in language rules** - In Bazel 9.0, language rules (cc_*, java_*, py_*, proto_*) require `load()` from external repos (rules_cc, rules_java, etc.). We follow this pattern.
+
+## BXL Preservation Strategy
+
+BXL (Buck Extension Language) is a powerful build graph introspection system inherited from Buck2. It will be preserved as a **Kuro-specific extension feature** that enhances Bazel-compatible builds.
+
+### Why Preserve BXL
+
+1. **IDE Integration** - Generates `compile_commands.json` for clangd/LSP support
+2. **Build Analysis** - Custom queries and analysis beyond standard Bazel query
+3. **Developer Tooling** - Project file generation (VSCode, Visual Studio, etc.)
+4. **No Bazel Conflict** - BXL uses separate `.bxl` files and `kuro bxl` command
+
+### BXL vs Bazel Aspects
+
+| Feature | BXL | Bazel Aspects |
+|---------|-----|---------------|
+| **Invocation** | External (`kuro bxl`) | Internal (during analysis) |
+| **Purpose** | User-facing automation | Rule-internal computation |
+| **Execution** | After build/analysis | During analysis phase |
+| **Use Case** | IDE integration, custom analysis | Provider propagation, cross-cutting |
+
+BXL and aspects solve different problems - BXL is for external introspection, aspects are for internal computation. Both are needed.
+
+### Preservation Approach
+
+1. **Keep `kuro bxl` command** - Separate from Bazel build commands
+2. **Keep `.bxl` file extension** - No conflict with `.bzl` files
+3. **Keep `prelude/bxl/` directory** - BXL support files
+4. **Document as extension** - Position as "Kuro Extension Language"
+5. **Update examples** - Ensure BXL examples work with Bazel-style rules (rules_cc, etc.)
+
+### Key BXL Features
+
+- `ctx.uquery()`, `ctx.cquery()`, `ctx.aquery()` - Query operations
+- `ctx.analysis(targets)` - Run analysis and access providers
+- `ctx.build(artifacts)` - Build and materialize artifacts
+- `ctx.bxl_actions()` - Create custom actions
+- `ctx.output.print()`, `ctx.output.ensure()` - Output handling
+
+See `docs/bxl/` for full documentation.
 
 ## Implementation Approach
 
@@ -118,9 +159,10 @@ The detailed implementation is split into focused sub-plans:
 | [02-bzlmod.md](./kuro-bazel-subplans/02-bzlmod.md)                       | 4a-5c  | bzlmod module system, BCR integration, resolution, extensions | **In Progress** |
 | [03-rule-primitives.md](./kuro-bazel-subplans/03-rule-primitives.md)     | 6a     | ctx/actions/providers API alignment                           | Not Started     |
 | [06-prelude-architecture.md](./kuro-bazel-subplans/06-prelude-architecture.md) | 6b | Prelude preservation, Bazel shim migration, cleanup          | Not Started     |
+| [07-builtins-compatibility.md](./kuro-bazel-subplans/07-builtins-compatibility.md) | 7a-7d | Bazel native rules, global functions, modules, Buck2 removal | Not Started     |
 | [08-aspects.md](./kuro-bazel-subplans/08-aspects.md)                     | 8a-8d  | Bazel aspects implementation (blocks rules_cc)                | **8a Complete** |
-| [04-rules-integration.md](./kuro-bazel-subplans/04-rules-integration.md) | 7-10   | rules_cc, rules_rust, rules_python, rules_oci                 | Not Started     |
-| [05-infrastructure.md](./kuro-bazel-subplans/05-infrastructure.md)       | 11-14  | Stable Rust, sandboxing, platform support, query              | Not Started     |
+| [04-rules-integration.md](./kuro-bazel-subplans/04-rules-integration.md) | 9-12   | rules_cc, rules_rust, rules_python, rules_oci                 | Not Started     |
+| [05-infrastructure.md](./kuro-bazel-subplans/05-infrastructure.md)       | 13-16  | Stable Rust, sandboxing, platform support, query              | Not Started     |
 
 ### Related Research Documents
 
@@ -170,32 +212,41 @@ Quick reference to all phases and their locations:
 | 6b.3  | Remove Unused Buck2 Prelude Code               | [ ] Not Started |
 | 6b.4  | Simplify Native Module Registration            | [ ] Not Started |
 
+### Builtins Compatibility (Phases 7a-7d) - [Sub-plan](./kuro-bazel-subplans/07-builtins-compatibility.md)
+
+| Phase | Title                                    | Status          |
+| ----- | ---------------------------------------- | --------------- |
+| 7a    | Bazel Native Rules                       | [ ] Not Started |
+| 7b    | Bazel Global Functions                   | [ ] Not Started |
+| 7c    | Bazel Top-Level Modules                  | [ ] Not Started |
+| 7d    | Buck2-Specific Removal                   | [ ] Not Started |
+
 ### Aspects (Phases 8a-8d) - [Sub-plan](./kuro-bazel-subplans/08-aspects.md)
 
 | Phase | Title                              | Status          |
 | ----- | ---------------------------------- | --------------- |
 | 8a    | Stub aspect() Function             | [x] Complete    |
-| 8b    | Aspect Context and Basic Execution | [ ] Not Started |
-| 8c    | Shadow Graph Propagation           | [ ] Not Started |
-| 8d    | Advanced Features                  | [ ] Not Started |
+| 8b    | Aspect Context and Basic Execution | [x] Complete    |
+| 8c    | Shadow Graph Propagation           | [x] Complete    |
+| 8d    | Advanced Features                  | [ ] In Progress |
 
-### Rules Integration (Phases 7-10) - [Sub-plan](./kuro-bazel-subplans/04-rules-integration.md)
+### Rules Integration (Phases 9-12) - [Sub-plan](./kuro-bazel-subplans/04-rules-integration.md)
 
 | Phase | Title                    | Status          |
 | ----- | ------------------------ | --------------- |
-| 7     | rules_cc Integration     | [ ] Not Started |
-| 8     | rules_rust Integration   | [ ] Not Started |
-| 9     | rules_python Integration | [ ] Not Started |
-| 10    | rules_oci Integration    | [ ] Not Started |
+| 9     | rules_cc Integration     | [ ] Not Started |
+| 10    | rules_rust Integration   | [ ] Not Started |
+| 11    | rules_python Integration | [ ] Not Started |
+| 12    | rules_oci Integration    | [ ] Not Started |
 
-### Infrastructure (Phases 11-14) - [Sub-plan](./kuro-bazel-subplans/05-infrastructure.md)
+### Infrastructure (Phases 13-16) - [Sub-plan](./kuro-bazel-subplans/05-infrastructure.md)
 
 | Phase | Title                              | Status          |
 | ----- | ---------------------------------- | --------------- |
-| 11    | Stable Rust Migration              | [ ] Not Started |
-| 12    | Local Build Isolation (Sandboxing) | [ ] Not Started |
-| 13    | Platform Support                   | [ ] Not Started |
-| 14    | Query Commands                     | [ ] Not Started |
+| 13    | Stable Rust Migration              | [ ] Not Started |
+| 14    | Local Build Isolation (Sandboxing) | [ ] Not Started |
+| 15    | Platform Support                   | [ ] Not Started |
+| 16    | Query Commands                     | [ ] Not Started |
 
 ---
 

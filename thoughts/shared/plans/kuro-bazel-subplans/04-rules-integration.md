@@ -1,4 +1,4 @@
-# Rules Integration Phases (7-10)
+# Rules Integration Phases (9-12)
 
 > **Parent Plan**: [Kuro Bazel-Compatible Build Tool](../2026-01-21-kuro-bazel-compatible-build-tool.md)
 >
@@ -8,7 +8,7 @@ This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rus
 
 ---
 
-## Phase 7: rules_cc Integration
+## Phase 9: rules_cc Integration
 
 ### Current Status (2026-01-27)
 
@@ -160,7 +160,7 @@ cc_test(
 - [ ] Verify compile_commands.json generation (via BXL)
 - [ ] Test with both gcc and clang
 
-#### Test Migration (Phase 7):
+#### Test Migration (Phase 9):
 
 - [ ] ADD `tests/core/cc_common/test_compile.py` for cc_common.compile()
 - [ ] ADD `tests/core/cc_common/test_link.py` for cc_common.link()
@@ -170,7 +170,7 @@ cc_test(
 
 ---
 
-## Phase 8: rules_rust Integration
+## Phase 10: rules_rust Integration
 
 ### Overview
 
@@ -232,7 +232,7 @@ use_repo(crate, "crates")
 
 ---
 
-## Phase 9: rules_python Integration
+## Phase 11: rules_python Integration
 
 ### Overview
 
@@ -279,7 +279,7 @@ use_repo(pip, "pip")
 
 ---
 
-## Phase 10: rules_oci Integration
+## Phase 12: rules_oci Integration
 
 ### Overview
 
