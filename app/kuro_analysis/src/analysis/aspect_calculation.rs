@@ -130,35 +130,71 @@ fn get_aspect_from_module(
         )))
 }
 
-/// Check if an aspect should be applied to a target based on required_providers filtering.
+/// Check if an aspect should be applied to a target based on required_providers
+/// and required_aspect_providers filtering.
 ///
-/// The required_providers field implements any-of logic:
-/// - Empty required_providers = applies to all targets
+/// Both filters implement any-of logic:
+/// - Empty list = no filtering (passes)
 /// - [[A], [B, C]] means: target must have A OR (B AND C)
+///
+/// If both required_providers AND required_aspect_providers are specified,
+/// the target must satisfy BOTH (AND logic between the two filters).
+///
+/// Phase 8e: required_aspect_providers checks against the target's own providers.
+/// Phase 8f will check against providers from `requires` aspects.
 fn aspect_applies_to_target(
     aspect: &OwnedFrozenValueTyped<FrozenStarlarkAspectCallable>,
     target_result: &AnalysisResult,
 ) -> kuro_error::Result<bool> {
     let aspect_ref = aspect.as_ref();
     let required_providers = aspect_ref.required_providers();
+    let required_aspect_providers = aspect_ref.required_aspect_providers();
 
-    // Empty required_providers = applies to all targets
-    if required_providers.is_empty() {
+    // If both are empty, applies to all targets
+    if required_providers.is_empty() && required_aspect_providers.is_empty() {
         return Ok(true);
     }
 
     let target_providers = target_result.providers()?;
 
-    // Check any-of logic: [[A], [B, C]] means A OR (B AND C)
-    for provider_set in required_providers {
+    // Check required_providers filter
+    let satisfies_required_providers = if required_providers.is_empty() {
+        true
+    } else {
+        check_any_of_providers(required_providers, &target_providers)?
+    };
+
+    // Check required_aspect_providers filter
+    // Phase 8e: Check against target's providers (simplified implementation)
+    // Phase 8f: Will check against providers from `requires` aspects
+    let satisfies_required_aspect_providers = if required_aspect_providers.is_empty() {
+        true
+    } else {
+        check_any_of_providers(required_aspect_providers, &target_providers)?
+    };
+
+    // Both must be satisfied (Bazel semantics)
+    Ok(satisfies_required_providers && satisfies_required_aspect_providers)
+}
+
+/// Helper to check any-of provider filtering.
+///
+/// Implements the logic: [[A], [B, C]] means A OR (B AND C)
+/// - Outer list: OR (any set must match)
+/// - Inner list: AND (all providers in set must be present)
+fn check_any_of_providers(
+    required: &[Vec<starlark::values::FrozenValue>],
+    target_providers: &kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValueRef<'_>,
+) -> kuro_error::Result<bool> {
+    for provider_set in required {
         // Check if target has all providers in this set (AND logic within set)
         let mut has_all = true;
         for provider_val in provider_set {
             // Extract provider ID from the frozen value
-            // Provider values in required_providers are frozen provider callable objects
+            // Provider values are frozen provider callable objects
             let provider_callable = provider_val
                 .as_provider_callable()
-                .internal_error("required_providers must contain provider callables")?;
+                .internal_error("required providers must contain provider callables")?;
             let provider_id = provider_callable.id()?;
 
             // Access the inner FrozenProviderCollection through the value() method
@@ -171,7 +207,6 @@ fn aspect_applies_to_target(
             return Ok(true);
         }
     }
-
     Ok(false)
 }
 

@@ -10,3 +10,31 @@ test_rule(name = "c", deps = [":b"])
 
 # Create a wider dependency graph (diamond): d -> [b, c]
 test_rule(name = "d", deps = [":b", ":c"])
+
+# =============================================================================
+# Phase 8e: required_aspect_providers filtering tests
+# =============================================================================
+
+load(":test_aspect_8e.bzl", "rule_with_test_info", "rule_without_test_info", "top_rule")
+
+# Target with TestInfo - aspect SHOULD apply
+rule_with_test_info(name = "has_info")
+
+# Target without TestInfo - aspect should NOT apply
+rule_without_test_info(name = "no_info")
+
+# Top-level target with both types of deps
+# Expected: aspect visits :has_info but NOT :no_info
+top_rule(
+    name = "top_8e",
+    deps = [":has_info", ":no_info"],
+)
+
+# Chain: has_info2 -> has_info
+# Expected: aspect visits both (both have TestInfo)
+rule_with_test_info(name = "has_info2", deps = [":has_info"])
+
+top_rule(
+    name = "top_chain_8e",
+    deps = [":has_info2"],
+)

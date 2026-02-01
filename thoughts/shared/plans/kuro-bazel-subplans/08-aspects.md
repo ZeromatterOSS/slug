@@ -342,7 +342,17 @@ impl Key for AspectKey {
 
 #### Success Criteria (Phase 8d)
 
-- [ ] `required_aspect_providers` works
+- [x] Shadow graph propagation via `compute_dep_aspects()` (**Completed 2026-01-31**)
+- [x] `ctx.rule.attr.deps` contains aspect results
+- [x] Depth-first propagation through dependency chains
+
+#### Phase 8e: required_aspect_providers (Completed 2026-01-31)
+
+- [x] `required_aspect_providers` filtering works (checks target's own providers)
+- [x] Both `required_providers` AND `required_aspect_providers` must match
+
+#### Remaining (Phase 8f+)
+
 - [ ] `requires` ensures aspect ordering
 - [ ] Aspect toolchain resolution works
 - [ ] `apply_to_generating_rules` works
