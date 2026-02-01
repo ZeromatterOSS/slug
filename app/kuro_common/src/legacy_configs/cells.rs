@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -76,6 +77,34 @@ use crate::legacy_configs::path::DEFAULT_PROJECT_CONFIG_SOURCES;
 use crate::legacy_configs::path::DOT_BUCKCONFIG_LOCAL;
 use crate::legacy_configs::path::ExternalConfigSource;
 use crate::legacy_configs::path::ProjectConfigSource;
+
+/// Ensure a symlink exists from `link` to `target`. Modeled after Bazel's
+/// [`FileSystemUtils.ensureSymbolicLink`](https://github.com/bazelbuild/bazel/blob/master/src/main/java/com/google/devtools/build/lib/vfs/FileSystemUtils.java).
+///
+/// - If symlink already points to target: no-op
+/// - If symlink points elsewhere: replace it
+/// - If non-symlink exists: return error
+fn ensure_symlink(link: &Path, target: &Path) -> std::io::Result<()> {
+    // Check if symlink already correct
+    if let Ok(existing) = std::fs::read_link(link) {
+        if existing == target {
+            return Ok(());
+        }
+        std::fs::remove_file(link)?;
+    }
+
+    // Create parent directories
+    if let Some(parent) = link.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    // Create symlink (platform-specific)
+    #[cfg(unix)]
+    return std::os::unix::fs::symlink(target, link);
+
+    #[cfg(windows)]
+    return std::os::windows::fs::symlink_dir(target, link);
+}
 
 /// Buckconfigs can partially be loaded from within dice. However, some parts of what makes up the
 /// buckconfig comes from outside the buildgraph, and this type represents those parts.
@@ -613,6 +642,43 @@ impl BuckConfigBasedCells {
                                         _ => None,
                                     })
                                     .collect();
+
+                                // Create symlinks from bazel-external/ to cached sources
+                                // This enables external tools and build actions to access files directly
+                                let external_base_dir = project_root.root().as_path().join("bazel-external");
+                                for (module_name, module_info) in &resolved_graph.modules {
+                                    // Skip root module and local overrides
+                                    if module_name == &parsed.module.name
+                                        || local_override_names.contains(module_name)
+                                    {
+                                        continue;
+                                    }
+
+                                    // Only create symlinks for modules with cached source paths
+                                    if let Some(source_path) = &module_info.source_path {
+                                        let link_path = external_base_dir
+                                            .join(module_name)
+                                            .join(&module_info.version);
+
+                                        match ensure_symlink(&link_path, source_path) {
+                                            Ok(()) => {
+                                                tracing::debug!(
+                                                    "Created symlink: {:?} -> {:?}",
+                                                    link_path,
+                                                    source_path
+                                                );
+                                            }
+                                            Err(e) => {
+                                                tracing::warn!(
+                                                    "Failed to create symlink for {}@{}: {}",
+                                                    module_name,
+                                                    module_info.version,
+                                                    e
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
 
                                 // Register ALL resolved modules as cells
                                 for (module_name, module_info) in &resolved_graph.modules {

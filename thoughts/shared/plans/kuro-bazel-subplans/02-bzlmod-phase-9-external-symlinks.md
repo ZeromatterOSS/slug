@@ -104,12 +104,12 @@ pub fn materialize_synthetic_repos(
 
 #### Success Criteria (Phase 9a)
 
-- [ ] `bazel-external/` directory created in project root
-- [ ] Each bzlmod module has a symlink: `bazel-external/{module}/{version}` → `~/.cache/kuro/.../source/`
-- [ ] Synthetic repos materialized to `bazel-external/{repo_name}/`
-- [ ] Symlinks are idempotent (re-running doesn't fail)
-- [ ] `cargo build -p kuro` succeeds
-- [ ] `kuro build //:a` in manual_test succeeds without manual symlinks
+- [x] `bazel-external/` directory created in project root
+- [x] Each bzlmod module has a symlink: `bazel-external/{module}/{version}` → `~/.cache/kuro/.../source/`
+- [x] Synthetic repos materialized to `bazel-external/{repo_name}/`
+- [x] Symlinks are idempotent (re-running doesn't fail)
+- [x] `cargo build -p kuro` succeeds
+- [x] `kuro build //:a` in manual_test succeeds without manual symlinks
 
 ---
 
