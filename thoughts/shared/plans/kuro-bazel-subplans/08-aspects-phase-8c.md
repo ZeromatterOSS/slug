@@ -1279,7 +1279,7 @@ This prevents `kuro build` from running any targets. The issue is in the prelude
 - [x] Step 6 integration compiles and works correctly
 - [x] gather_deps() collects aspect keys and computes in parallel via DICE
 
-**Phase 8c Execution (COMPLETE - Steps 5a-5f, 2026-01-31):**
+**Phase 8c Execution (PARTIAL - Steps 5a-5f, 2026-01-31):**
 - [x] StarlarkAspectType created in kuro_node
 - [x] StarlarkAspectCallable stores aspect_path
 - [x] FrozenStarlarkAspectCallable exposes aspect_type()
@@ -1287,8 +1287,13 @@ This prevents `kuro build` from running any targets. The issue is in the prelude
 - [x] attrs_global.rs extracts full AspectType
 - [x] AspectKey uses Arc<StarlarkAspectType>
 - [x] load_aspect_module() implemented (follows rule loading pattern)
-- [x] aspect_calculation.rs stub returns target providers (full execution deferred)
-- [ ] Aspects execute and print output during builds (blocked by prelude issue)
+- [x] get_aspect_from_module() implemented (extracts aspect callable)
+- [x] aspect_applies_to_target() implemented (required_providers filtering)
+- [x] AspectKey::compute() wired with module loading and filtering
+- [x] Builds succeed with aspects defined and collected
+- [ ] execute_aspect() fully implemented (needs Starlark eval setup) - TODO
+- [ ] Aspects execute implementation function during builds - TODO
+- [ ] Shadow graph propagation via compute_dep_aspects() - TODO
 
 ### Manual Verification
 
@@ -1296,16 +1301,28 @@ This prevents `kuro build` from running any targets. The issue is in the prelude
 
 - [x] `tests/manual_test/test_aspect_8c.bzl` created
 - [x] `tests/manual_test/BUILD_minimal.bazel` created with Phase 8c tests
-- [ ] Run `kuro build //tests/manual_test:c` - **BLOCKED by prelude typing issue**
-- [ ] Output shows "Aspect visiting: //tests/manual_test:a"
-- [ ] Output shows "Aspect visiting: //tests/manual_test:b"
-- [ ] Output shows "Aspect visiting: //tests/manual_test:c"
-- [ ] Aspect propagates through dependency chain (depth-first order)
-- [ ] `ctx.rule.kind` returns "test_rule"
-- [ ] `ctx.rule.attr.deps` contains aspect results (shadow graph)
-- [ ] Run `kuro build //tests/manual_test:d` (wider graph test)
+- [x] Run `kuro build //tests/manual_test:c` - **BUILD SUCCEEDS**
+- [x] Aspects are loaded and aspect objects created
+- [x] AspectKey computation triggered via DICE
+- [ ] Output shows "Aspect visiting: //tests/manual_test:a" - **TODO: execute_aspect() not implemented**
+- [ ] Output shows "Aspect visiting: //tests/manual_test:b" - **TODO: execute_aspect() not implemented**
+- [ ] Output shows "Aspect visiting: //tests/manual_test:c" - **TODO: execute_aspect() not implemented**
+- [ ] Aspect propagates through dependency chain (depth-first order) - **TODO: compute_dep_aspects() stub**
+- [ ] `ctx.rule.kind` returns "test_rule" - **TODO: execute_aspect() not implemented**
+- [ ] `ctx.rule.attr.deps` contains aspect results (shadow graph) - **TODO: compute_dep_aspects() stub**
+- [ ] Run `kuro build //tests/manual_test:d` (wider graph test) - **TODO: execute_aspect() not implemented**
 
-**Note:** Manual verification is blocked by an unrelated prelude typing error in `attrs_validators.bzl:13` where `Label` type is not recognized. This is not related to Phase 8c implementation - all Phase 8c infrastructure compiles and unit tests pass successfully.
+**Status (2026-01-31):**
+- ✅ Aspect infrastructure complete: aspects can be defined, attached to attributes, and DICE computation is triggered
+- ✅ Module loading and required_providers filtering implemented
+- ❌ Aspect execution not yet implemented: execute_aspect() returns target providers without calling the implementation function
+- ❌ Shadow graph propagation not yet implemented: compute_dep_aspects() returns empty map
+
+**Next Steps for Full Execution:**
+1. Implement execute_aspect() with Starlark Heap, Evaluator, and AnalysisRegistry setup
+2. Call run_aspect_basic() to execute aspect implementation functions
+3. Implement compute_dep_aspects() to build shadow graph
+4. Verify aspect execution with manual tests
 
 ### Integration Test (Optional)
 

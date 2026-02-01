@@ -1,7 +1,4 @@
 [cells]
-root = .
+manual_test = .
 # prelude = prelude  # DISABLED: Phase 8c-interim - prelude removed
 # bazel_tools auto-registration disabled (Phase 8c-interim)
-
-[cell_aliases]
-config = root
