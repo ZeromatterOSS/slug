@@ -71,6 +71,10 @@ use crate::actions::impls::run::new_executor_preference;
 pub(crate) enum RunActionError {
     #[error("expected at least one output artifact, did not get any")]
     NoOutputsSpecified,
+    #[error("`outputs` parameter must be a list or iterable, got `{0}`")]
+    OutputsNotIterable(String),
+    #[error("`outputs` contains invalid value `{0}` - expected artifact from declare_file() or .as_output()")]
+    InvalidOutputType(String),
     #[error("`weight` must be a positive integer, got `{0}`")]
     InvalidWeight(i32),
     #[error("`weight` and `weight_percentage` cannot both be passed")]
@@ -525,21 +529,35 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             (None, None) => Ok(None),
         }?;
 
-        // For Bazel compatibility: if outputs are provided via the `outputs` parameter,
-        // process them and add to declared_outputs.
+        // Bazel compatibility: process the `outputs` parameter if provided.
+        // In Bazel, outputs are passed as a list of File objects to actions.run():
+        //   ctx.actions.run(outputs = [out1, out2], ...)
+        // These File objects come from ctx.actions.declare_file() calls.
         if let NoneOr::Other(bazel_outputs) = outputs {
-            // Bazel passes outputs as a list of File objects (declared artifacts)
-            // We need to iterate over them and add to declared_outputs
-            if let Ok(iter) = bazel_outputs.iterate(eval.heap()) {
-                for output_val in iter {
-                    // Try to get it as a StarlarkDeclaredArtifact (from declare_file)
-                    if let Some(declared) = output_val.downcast_ref::<StarlarkDeclaredArtifact>() {
-                        artifacts.declared_outputs.insert(declared.output_artifact());
-                    }
-                    // Also try StarlarkOutputArtifact (from .as_output())
-                    else if let Some(output_artifact) = output_val.downcast_ref::<StarlarkOutputArtifact>() {
-                        artifacts.declared_outputs.insert(output_artifact.artifact());
-                    }
+            // Try to iterate over the outputs list
+            let iter = bazel_outputs.iterate(eval.heap()).map_err(|_| {
+                kuro_error::Error::from(RunActionError::OutputsNotIterable(
+                    bazel_outputs.to_repr(),
+                ))
+            })?;
+
+            for output_val in iter {
+                // StarlarkDeclaredArtifact: Created by ctx.actions.declare_file("name")
+                // This is the standard Bazel way to declare output files.
+                if let Some(declared) = output_val.downcast_ref::<StarlarkDeclaredArtifact>() {
+                    artifacts.declared_outputs.insert(declared.output_artifact());
+                }
+                // StarlarkOutputArtifact: Created by artifact.as_output()
+                // This is the Buck2 way, also supported for compatibility.
+                else if let Some(output_artifact) = output_val.downcast_ref::<StarlarkOutputArtifact>() {
+                    artifacts.declared_outputs.insert(output_artifact.artifact());
+                }
+                // Unknown type - provide a clear error message
+                else {
+                    return Err(kuro_error::Error::from(RunActionError::InvalidOutputType(
+                        output_val.to_repr(),
+                    ))
+                    .into());
                 }
             }
         }

@@ -523,27 +523,53 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         } else {
             output_name
         };
-        // Handle both uppercase (rules_cc uses artifact_category.STATIC_LIBRARY etc)
-        // and lowercase category names
+        // Category names come in both uppercase (from rules_cc artifact_category_names struct)
+        // and lowercase (from direct string usage). Normalize to uppercase for matching.
+        // Extensions follow Unix/Linux conventions (not Windows .dll/.lib or macOS .dylib).
         let result = match category.to_uppercase().as_str() {
+            // Object files
             "OBJECT_FILE" => format!("{}.o", name),
             "PIC_OBJECT_FILE" => format!("{}.pic.o", name),
-            "EXECUTABLE" => name.to_owned(),
-            "STATIC_LIBRARY" => format!("lib{}.a", name),
-            "ALWAYSLINK_STATIC_LIBRARY" => format!("lib{}.lo", name),
-            "DYNAMIC_LIBRARY" => format!("lib{}.so", name),
-            "INTERFACE_LIBRARY" => format!("lib{}.ifso", name),
             "PIC_FILE" => format!("{}.pic", name),
+
+            // Libraries
+            "STATIC_LIBRARY" => format!("lib{}.a", name),
+            "ALWAYSLINK_STATIC_LIBRARY" => format!("lib{}.lo", name),  // GNU libtool convention
+            "DYNAMIC_LIBRARY" => format!("lib{}.so", name),
+            "INTERFACE_LIBRARY" => format!("lib{}.so", name),  // Same as dynamic per Bazel
+
+            // Executables
+            "EXECUTABLE" => name.to_owned(),
+
+            // Dependency tracking
             "INCLUDED_FILE_LIST" => format!("{}.d", name),
-            "SERIALIZED_DIAGNOSTICS_FILE" => format!("{}.dia", name),
+
+            // Diagnostics
+            "SERIALIZED_DIAGNOSTICS_FILE" => format!("{}.dia", name),  // Clang diagnostics
+
+            // Headers
             "GENERATED_HEADER" => format!("{}.h", name),
             "PROCESSED_HEADER" => format!("{}.h", name),
+
+            // C++20 modules
             "CPP_MODULE" => format!("{}.pcm", name),
             "CPP_MODULES_DDI" => format!("{}.ddi", name),
             "CPP_MODULES_INFO" => format!("{}.modinfo", name),
             "CPP_MODULES_MODMAP" => format!("{}.modmap", name),
             "CPP_MODULES_MODMAP_INPUT" => format!("{}.input_modmap", name),
+
+            // Preprocessing
+            "PREPROCESSED_C_SOURCE" => format!("{}.i", name),
+            "PREPROCESSED_CPP_SOURCE" => format!("{}.ii", name),
+
+            // Coverage (gcov)
+            "COVERAGE_DATA_FILE" => format!("{}.gcno", name),
+            "COVERAGE_NOTES_FILE" => format!("{}.gcda", name),
+
+            // Other
             "CLIF_OUTPUT_PROTO" => format!("{}.opb", name),
+
+            // Unknown category - use category as extension
             _ => format!("{}.{}", name, category),
         };
         Ok(result)
