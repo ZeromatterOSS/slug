@@ -106,6 +106,8 @@ When implementing new features:
 - ~~**Repository rule execution**: `repository_rule()` and `repository_ctx` implemented, but rules are not actually invoked~~ **RESOLVED** (Phase 5d) - DICE key + executor implemented
 - **Module extensions**: Parsing complete, execution requires DICE integration - see **Phase 5e**
 - **rules_cc loading**: **COMPLETE** - rules_cc now loads successfully!
+- **cc_library instantiation**: **COMPLETE** (Phase 8g) - `cc_library()` targets register successfully!
+  - Analysis fails with provider checking issue (`DefaultInfo in artifact`) - separate from loading/instantiation
   - ~~`aspect()` built-in~~ **RESOLVED** (Phase 8a)
   - ~~`allow_empty` parameter~~ **RESOLVED**
   - ~~`PackageSpecificationInfo` provider~~ **RESOLVED** (added as NoneType)

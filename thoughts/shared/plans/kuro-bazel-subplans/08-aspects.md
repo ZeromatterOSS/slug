@@ -385,13 +385,37 @@ impl Key for AspectKey {
 - [x] Automatic symlink creation during MVS resolution (implemented in [bzlmod Phase 9a](./02-bzlmod-phase-9-external-symlinks.md))
 
 **Known Limitations:**
-- `cc_library()` instantiation fails because rules_cc expects internal attributes like
-  `_def_parser` that Kuro doesn't provide. The rule *definition* loads correctly, but
-  *using* the rule requires additional work to provide expected implicit attributes.
+- ~~`cc_library()` instantiation fails because rules_cc expects internal attributes like
+  `_def_parser` that Kuro doesn't provide.~~ **RESOLVED**: Implicit attributes now work via
+  Bazel-compatible `mandatory=False` semantics and computed default handling.
+- `cc_library()` analysis fails with "Operation `in` not supported for types
+  `default_info_callable` and `Artifact`" - provider checking on artifacts not yet implemented.
 
-#### Remaining (Phase 8g+)
+#### Phase 8g: Bazel Attribute Semantics (Completed 2026-02-02)
 
-- [ ] Implicit rule attributes like `_def_parser` for rules_cc compatibility
+Implemented Bazel-compatible attribute semantics:
+
+1. **Computed defaults**: Functions passed as `default` are treated as having a default of `None`.
+   Rule implementations check for `None` and handle appropriately (e.g., `_def_parser`).
+
+2. **mandatory=False semantics**: Bazel attributes default to optional with sensible defaults:
+   - `attr.label()` → None
+   - `attr.label_list()` → []
+   - `attr.string()` → ""
+   - `attr.int()` → 0
+   - `attr.bool()` → False
+
+3. **allow_files support**: `attr.label(allow_files=True)` and `attr.label_list(allow_files=True)`
+   now accept both source files (`"hello.c"`) and labels (`":target"`).
+
+Success criteria:
+- [x] `cc_library()` instantiation succeeds (target registered)
+- [x] `srcs = ["hello.c"]` parses correctly with `allow_files=True`
+- [x] Implicit attributes (`_def_parser`, `_stl`, etc.) have sensible defaults
+
+#### Remaining (Phase 8h+)
+
+- [ ] Provider checking on artifacts (`DefaultInfo in artifact`)
 - [ ] `requires` ensures aspect ordering
 - [ ] Aspect toolchain resolution works
 - [ ] `apply_to_generating_rules` works
