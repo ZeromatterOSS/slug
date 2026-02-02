@@ -40,16 +40,23 @@ top_rule(
 )
 
 # =============================================================================
+# Phase 6: Provider Access Semantics test
+# Test that DefaultInfo in artifact and artifact[DefaultInfo] work correctly.
+# =============================================================================
+load(":test_provider_access.bzl", "test_provider_access")
+
+test_provider_access(
+    name = "test_provider_access",
+    srcs = ["hello.c"],
+)
+
+# =============================================================================
 # Phase 8f/8g: rules_cc loading and instantiation test
-# This successfully loads rules_cc from BCR and cc_library can be instantiated.
-# Analysis phase fails due to provider checking differences (separate issue).
+# Provider access now works (Phase 6). Next blocker: implicit attributes
+# (_def_parser has computed default function).
 # =============================================================================
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
-# Test: cc_library instantiation - NOW WORKS!
-# Parsing succeeds, target is registered.
-# Analysis fails with "Operation `in` not supported for types `default_info_callable` and `Artifact`"
-# This is expected - provider checking on artifacts is not yet fully implemented.
 cc_library(
     name = "hello_lib",
     srcs = ["hello.c"],

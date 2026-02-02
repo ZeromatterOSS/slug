@@ -17,6 +17,7 @@ use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_execute::path::artifact_path::ArtifactPath;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
+use kuro_interpreter::types::provider::callable::ValueAsProviderCallableLike;
 use dupe::Dupe;
 use dupe::OptionDupedExt;
 use serde::Serialize;
@@ -26,6 +27,7 @@ use starlark::collections::StarlarkHasher;
 use starlark::environment::Methods;
 use starlark::environment::MethodsStatic;
 use starlark::values::Demand;
+use starlark::values::Heap;
 use starlark::values::StarlarkValue;
 use starlark::values::StringValue;
 use starlark::values::Value;
@@ -50,6 +52,27 @@ use crate::interpreter::rule_defs::cmd_args::CommandLineBuilder;
 use crate::interpreter::rule_defs::cmd_args::CommandLineContext;
 use crate::interpreter::rule_defs::cmd_args::WriteToFileMacroVisitor;
 use crate::interpreter::rule_defs::cmd_args::command_line_arg_like_type::command_line_arg_like_impl;
+use crate::interpreter::rule_defs::provider::builtin::default_info::DefaultInfo;
+use crate::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
+
+/// Error types for artifact provider access.
+///
+/// In Bazel, source files (artifacts) implicitly have `DefaultInfo` with the file
+/// in the `files` field. This allows patterns like `DefaultInfo in artifact` and
+/// `artifact[DefaultInfo]` to work in rule implementations.
+#[derive(Debug, kuro_error::Error)]
+#[kuro(tag = Input)]
+enum ArtifactProviderError {
+    #[error(
+        "artifact[<provider>] operation requires a provider type, got `{0}`. \
+         Artifacts only support DefaultInfo provider access."
+    )]
+    IndexTypeNotProvider(&'static str),
+    #[error(
+        "artifact does not have provider `{provider}`. Artifacts only have DefaultInfo."
+    )]
+    ProviderNotFound { provider: String },
+}
 
 /// A wrapper for an `Artifact` that is guaranteed to be bound, such as outputs
 /// from dependencies, or source files.
@@ -293,5 +316,57 @@ impl<'v> StarlarkValue<'v> for StarlarkArtifact {
 
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
         demand.provide_value::<&dyn CommandLineArgLike>(self);
+    }
+
+    /// Implements `artifact[SomeInfo]` - get a provider value.
+    ///
+    /// In Bazel, source files (artifacts) implicitly have `DefaultInfo` with the file
+    /// in the `files` field. This enables patterns like:
+    /// ```python
+    /// if DefaultInfo in src:
+    ///     files = src[DefaultInfo].files.to_list()
+    /// ```
+    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        match index.as_provider_callable() {
+            Some(callable) => {
+                let provider_id = callable.id()?;
+                // Artifacts only support DefaultInfo
+                if provider_id == DefaultInfoCallable::provider_id() {
+                    // Create a synthetic DefaultInfo with this artifact as the default output
+                    Ok(heap.alloc(DefaultInfo::from_artifact(heap, self)))
+                } else {
+                    Err(kuro_error::Error::from(ArtifactProviderError::ProviderNotFound {
+                        provider: provider_id.name.clone(),
+                    })
+                    .into())
+                }
+            }
+            None => Err(kuro_error::Error::from(ArtifactProviderError::IndexTypeNotProvider(
+                index.get_type(),
+            ))
+            .into()),
+        }
+    }
+
+    /// Implements `SomeInfo in artifact` - check if provider is present.
+    ///
+    /// In Bazel, source files (artifacts) implicitly have `DefaultInfo`. This enables
+    /// patterns like `if DefaultInfo in src: ...` to work in rule implementations.
+    fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
+        match other.as_provider_callable() {
+            Some(callable) => {
+                let provider_id = callable.id()?;
+                // Artifacts only have DefaultInfo
+                Ok(provider_id == DefaultInfoCallable::provider_id())
+            }
+            None => {
+                // Not a provider type - this isn't an error in Bazel, just returns false
+                // However, to match Bazel behavior we should error for non-provider types
+                Err(kuro_error::Error::from(ArtifactProviderError::IndexTypeNotProvider(
+                    other.get_type(),
+                ))
+                .into())
+            }
+        }
     }
 }

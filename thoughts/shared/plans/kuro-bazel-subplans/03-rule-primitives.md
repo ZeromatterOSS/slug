@@ -223,15 +223,16 @@ pub struct CompilationContext {
 }
 ```
 
-#### 5. Provider Access Semantics
+#### 5. Provider Access Semantics (Completed 2026-02-02)
 
 **Critical for rules_cc analysis phase** - The `in` operator must work for checking providers on targets and artifacts.
 
 | Operation | Bazel Behavior | Kuro Status | Blocker For |
 |-----------|---------------|-------------|-------------|
-| `Provider in target` | Returns `True` if target provides Provider | Not implemented | rules_cc analysis |
-| `Provider in artifact` | Returns `True` (source artifacts have DefaultInfo) | Not implemented | rules_cc analysis |
-| `target[Provider]` | Returns provider instance or error | Needs verification | rules_cc analysis |
+| `Provider in target` | Returns `True` if target provides Provider | ✓ Implemented (Dependency type) | rules_cc analysis |
+| `Provider in artifact` | Returns `True` (source artifacts have DefaultInfo) | ✓ Implemented | rules_cc analysis |
+| `target[Provider]` | Returns provider instance or error | ✓ Implemented | rules_cc analysis |
+| `artifact[Provider]` | Returns DefaultInfo with artifact as default_output | ✓ Implemented | rules_cc analysis |
 
 **Example from rules_cc** (`cc_helper.bzl:369`):
 ```python
@@ -292,10 +293,11 @@ Check Kuro's existing runfiles implementation and align API.
 - [ ] ctx.actions.run() executes actions correctly
 - [ ] ctx.actions.args() builds command lines
 - [ ] depset operations are efficient
-- [ ] DefaultInfo provider works
-- [ ] `Provider in target` operator works (e.g., `DefaultInfo in dep`)
-- [ ] `Provider in artifact` operator works (e.g., `DefaultInfo in src_file`)
-- [ ] `target[Provider]` indexing works
+- [x] DefaultInfo provider works
+- [x] `Provider in target` operator works (e.g., `DefaultInfo in dep`)
+- [x] `Provider in artifact` operator works (e.g., `DefaultInfo in src_file`)
+- [x] `target[Provider]` indexing works
+- [x] `artifact[Provider]` indexing works (returns synthetic DefaultInfo)
 - [ ] Runfiles are collected correctly
 - [ ] All documented ctx methods available
 

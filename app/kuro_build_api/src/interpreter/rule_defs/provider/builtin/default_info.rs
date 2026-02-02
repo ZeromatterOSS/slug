@@ -188,6 +188,25 @@ impl<'v> DefaultInfo<'v> {
             other_outputs,
         }
     }
+
+    /// Create a DefaultInfo containing a single artifact as the default output.
+    ///
+    /// This is used to provide Bazel-compatible semantics where source files (artifacts)
+    /// implicitly have a DefaultInfo with the file in the `files` field. This enables
+    /// patterns like `DefaultInfo in artifact` and `artifact[DefaultInfo]` to work in
+    /// rule implementations.
+    pub fn from_artifact(heap: Heap<'v>, artifact: &StarlarkArtifact) -> Self {
+        let sub_targets = ValueOfUnchecked::<DictType<_, _>>::new(heap.alloc(AllocDict::EMPTY));
+        let default_outputs = ValueOfUnchecked::<ListType<_>>::new(
+            heap.alloc(AllocList([heap.alloc(artifact.dupe())])),
+        );
+        let other_outputs = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
+        DefaultInfo {
+            sub_targets,
+            default_outputs,
+            other_outputs,
+        }
+    }
 }
 
 impl FrozenDefaultInfo {

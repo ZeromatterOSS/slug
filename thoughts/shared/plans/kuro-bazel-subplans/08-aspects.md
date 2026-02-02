@@ -415,7 +415,7 @@ Success criteria:
 
 #### Remaining (Phase 8h+)
 
-- [ ] Provider checking on artifacts - **Moved to [03-rule-primitives.md](./03-rule-primitives.md#5-provider-access-semantics)** (blocks rules_cc analysis)
+- [x] Provider checking on artifacts - **Completed in [03-rule-primitives.md](./03-rule-primitives.md#5-provider-access-semantics)** (2026-02-02)
 - [ ] `requires` ensures aspect ordering
 - [ ] Aspect toolchain resolution works
 - [ ] `apply_to_generating_rules` works
