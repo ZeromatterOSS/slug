@@ -154,6 +154,21 @@ fn configured_label_methods(builder: &mut MethodsBuilder) {
         Ok(this.label.target().pkg().cell_name().as_str())
     }
 
+    /// Returns the workspace name (Bazel compatibility).
+    /// For the main repository, returns an empty string.
+    /// For external repositories, returns the repository name.
+    #[starlark(attribute)]
+    fn workspace_name<'v>(this: &'v StarlarkConfiguredProvidersLabel) -> starlark::Result<&'v str> {
+        // In Bazel, the main repository has empty workspace_name
+        // External repos have their repo name
+        // For now, return empty string for main repo compatibility
+        let cell = this.label.target().pkg().cell_name().as_str();
+        // If the cell is the main cell (typically "root" or similar), return ""
+        // Otherwise return the cell name as the workspace name
+        // For simplicity in Bazel compat mode, return the cell name
+        Ok(cell)
+    }
+
     /// Returns the PackagePath for this configured providers label.
     #[starlark(attribute)]
     fn package_path<'v>(

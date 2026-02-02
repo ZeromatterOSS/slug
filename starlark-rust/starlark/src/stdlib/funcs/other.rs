@@ -50,7 +50,10 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
     /// fail("oops", 1, False)  # fail: oops 1 False
     /// # "#, "oops 1 False");
     /// ```
-    fn fail(#[starlark(args)] args: UnpackTuple<Value>) -> starlark::Result<StarlarkNever> {
+    fn fail<'v>(
+        #[starlark(args)] args: UnpackTuple<Value<'v>>,
+        #[starlark(require = named, default = "")] attr: &str,
+    ) -> starlark::Result<StarlarkNever> {
         let mut s = String::new();
         for x in args.items {
             s.push(' ');
@@ -58,6 +61,10 @@ pub(crate) fn register_other(builder: &mut GlobalsBuilder) {
                 Some(x) => s.push_str(x),
                 None => x.collect_repr(&mut s),
             }
+        }
+        // Include attr info if provided (Bazel compatibility)
+        if !attr.is_empty() {
+            s.push_str(&format!(" (in attribute '{}')", attr));
         }
         Err(starlark::Error::new_kind(starlark::ErrorKind::Fail(
             anyhow::Error::msg(s),

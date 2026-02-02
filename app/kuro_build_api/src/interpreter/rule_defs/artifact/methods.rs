@@ -8,16 +8,21 @@
  * above-listed licenses.
  */
 
+use allocative::Allocative;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::ProvidersName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_interpreter::types::configured_providers_label::StarlarkConfiguredProvidersLabel;
 use dupe::Dupe;
+use starlark::any::ProvidesStaticType;
 use starlark::environment::MethodsBuilder;
 use starlark::values::AllocValue;
 use starlark::values::Heap;
+use starlark::values::NoSerialize;
+use starlark::values::StarlarkValue;
 use starlark::values::StringValue;
+use starlark::values::Value;
 use starlark::values::ValueOf;
 use starlark::values::list::UnpackList;
 use starlark::values::none::NoneOr;
@@ -30,6 +35,35 @@ use crate::interpreter::rule_defs::artifact::starlark_artifact_like::ValueAsInpu
 use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use crate::interpreter::rule_defs::artifact::starlark_output_artifact::StarlarkOutputArtifact;
 use crate::interpreter::rule_defs::artifact::starlark_promise_artifact::StarlarkPromiseArtifact;
+
+/// A stub for artifact root (Bazel compatibility).
+/// Provides `path` attribute for output root path.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct ArtifactRootStub {
+    path: String,
+}
+
+impl std::fmt::Display for ArtifactRootStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<root {}>", self.path)
+    }
+}
+
+starlark::starlark_simple_value!(ArtifactRootStub);
+
+#[starlark::values::starlark_value(type = "root")]
+impl<'v> StarlarkValue<'v> for ArtifactRootStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        attribute == "path"
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "path" => Some(heap.alloc_str(&self.path).to_value()),
+            _ => None,
+        }
+    }
+}
 
 #[derive(StarlarkTypeRepr, AllocValue)]
 pub enum EitherStarlarkInputArtifact<'v> {
@@ -50,7 +84,8 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
     }
 
     /// The file extension of this artifact. e.g. for an artifact at foo/bar.sh,
-    /// this is `.sh`. If no extension is present, `""` is returned.
+    /// this is `sh` (without the leading dot). If no extension is present, `""` is returned.
+    /// Note: Bazel's File.extension returns the extension without a leading dot.
     #[starlark(attribute)]
     fn extension<'v>(
         this: &'v dyn StarlarkArtifactLike<'v>,
@@ -58,7 +93,7 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<StringValue<'v>> {
         Ok(this.with_filename(&|filename| match filename.extension() {
             None => heap.alloc_str(""),
-            Some(x) => heap.alloc_str_concat(".", x),
+            Some(x) => heap.alloc_str(x),  // No leading dot, Bazel-compatible
         })?)
     }
 
@@ -86,6 +121,34 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
         }
     }
 
+    /// The Label of this artifact (Bazel-compatible).
+    ///
+    /// For generated files, this is the owner's label.
+    /// For source files, this returns the short path as a string-like representation.
+    /// This provides compatibility with Bazel's Target.label interface.
+    #[starlark(attribute)]
+    fn label<'v>(
+        this: &'v dyn StarlarkArtifactLike<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        // For Bazel compatibility, return the owner label for generated files,
+        // or a path-based string for source files
+        match this.owner()? {
+            Some(BaseDeferredKey::TargetLabel(target)) => {
+                Ok(heap.alloc(StarlarkConfiguredProvidersLabel::new(
+                    ConfiguredProvidersLabel::new(target.dupe(), ProvidersName::Default),
+                )))
+            }
+            Some(BaseDeferredKey::AnonTarget(_) | BaseDeferredKey::BxlLabel(_)) | None => {
+                // For source files, construct a label-like string from the short path
+                // Format: //<package>:<filename> based on the artifact's short path
+                let path_str = this.with_short_path(&|p| heap.alloc_str(p.as_str()))?;
+                // Return the path string - it will be used in error messages
+                Ok(path_str.to_value())
+            }
+        }
+    }
+
     /// The interesting part of the path, relative to somewhere in the output directory.
     /// For an artifact declared as `foo/bar`, this is `foo/bar`.
     #[starlark(attribute)]
@@ -94,6 +157,33 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'_>,
     ) -> starlark::Result<StringValue<'v>> {
         Ok(this.with_short_path(&|short_path| heap.alloc_str(short_path.as_str()))?)
+    }
+
+    /// The full execution path of this artifact (Bazel-compatible).
+    /// For Bazel compatibility, this returns the same as short_path for source files.
+    #[starlark(attribute)]
+    fn path<'v>(
+        this: &'v dyn StarlarkArtifactLike<'v>,
+        heap: Heap<'_>,
+    ) -> starlark::Result<StringValue<'v>> {
+        Ok(this.with_full_path(&|path| heap.alloc_str(path.as_str()))?)
+    }
+
+    /// The root directory of this artifact (Bazel-compatible).
+    /// Returns a struct with a `path` attribute containing the output root.
+    #[starlark(attribute)]
+    fn root<'v>(
+        this: &'v dyn StarlarkArtifactLike<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        // For generated files, return the output root (e.g., bazel-out/k8-fastbuild/bin)
+        // For source files, return an empty root
+        let root_path = if this.is_source()? {
+            String::new()
+        } else {
+            "bazel-out/k8-fastbuild/bin".to_owned()
+        };
+        Ok(heap.alloc(ArtifactRootStub { path: root_path }))
     }
 }
 

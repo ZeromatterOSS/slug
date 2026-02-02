@@ -53,6 +53,12 @@ pub trait StarlarkArtifactLike<'v>: Display {
         f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
     ) -> kuro_error::Result<StringValue<'v>>;
 
+    /// Returns the full path of the artifact (execution path for Bazel compatibility).
+    fn with_full_path(
+        &self,
+        f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
+    ) -> kuro_error::Result<StringValue<'v>>;
+
     /// It's very important that the Hash/Eq of the StarlarkArtifactLike things doesn't change
     /// during freezing, otherwise Starlark invariants are broken. Use the fingerprint
     /// as the inputs to Hash/Eq to ensure they are consistent

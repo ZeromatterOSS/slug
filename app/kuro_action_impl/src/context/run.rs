@@ -15,6 +15,7 @@ use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::artifact_type::ArtifactErrors;
 use kuro_artifact::artifact::artifact_type::OutputArtifact;
 use kuro_build_api::artifact_groups::ArtifactGroup;
+use kuro_build_api::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_output_artifact::StarlarkOutputArtifact;
 use kuro_build_api::interpreter::rule_defs::artifact_tagging::ArtifactTag;
 use kuro_build_api::interpreter::rule_defs::cmd_args::CommandLineArgLike;
@@ -46,6 +47,7 @@ use starlark::starlark_module;
 use starlark::values::StringValue;
 use starlark::values::UnpackAndDiscard;
 use starlark::values::Value;
+use starlark::values::ValueLike;
 use starlark::values::ValueOf;
 use starlark::values::ValueTyped;
 use starlark::values::dict::DictRef;
@@ -231,8 +233,24 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
     /// and must not be already bound. Output artifacts become "bound" after this call.
     fn run<'v>(
         this: &AnalysisActions<'v>,
-        #[starlark(require = pos)] arguments: StarlarkCommandLineValueUnpack<'v>,
-        #[starlark(require = named)] category: StringValue<'v>,
+        // Accept both positional (Buck2) and named (Bazel) argument passing
+        arguments: StarlarkCommandLineValueUnpack<'v>,
+        #[starlark(require = named, default = NoneOr::None)] category: NoneOr<StringValue<'v>>,
+        // Bazel-compatible parameters
+        #[starlark(require = named, default = NoneOr::None)] mnemonic: NoneOr<StringValue<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] executable: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] inputs: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] outputs: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] progress_message: NoneOr<StringValue<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] resource_set: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = false)] use_default_shell_env: bool,
+        #[starlark(require = named, default = NoneOr::None)] execution_requirements: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] toolchain: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] exec_group: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] tools: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] input_manifests: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] unused_inputs_list: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] shadowed_action: NoneOr<Value<'v>>,
         #[starlark(require = named, default = NoneOr::None)] identifier: NoneOr<StringValue<'v>>,
         #[starlark(require = named)] env: Option<
             ValueOf<'v, UnpackDictEntries<UnpackAndDiscard<&'v str>, ValueAsCommandLineLike<'v>>>,
@@ -432,7 +450,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
         };
 
         let RunCommandArtifactVisitor {
-            inner: artifacts,
+            inner: mut artifacts,
             tagged_outputs,
             inputs_with_multiple_tags_for_dep_files,
             ..
@@ -507,6 +525,24 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             (None, None) => Ok(None),
         }?;
 
+        // For Bazel compatibility: if outputs are provided via the `outputs` parameter,
+        // process them and add to declared_outputs.
+        if let NoneOr::Other(bazel_outputs) = outputs {
+            // Bazel passes outputs as a list of File objects (declared artifacts)
+            // We need to iterate over them and add to declared_outputs
+            if let Ok(iter) = bazel_outputs.iterate(eval.heap()) {
+                for output_val in iter {
+                    // Try to get it as a StarlarkDeclaredArtifact (from declare_file)
+                    if let Some(declared) = output_val.downcast_ref::<StarlarkDeclaredArtifact>() {
+                        artifacts.declared_outputs.insert(declared.output_artifact());
+                    }
+                    // Also try StarlarkOutputArtifact (from .as_output())
+                    else if let Some(output_artifact) = output_val.downcast_ref::<StarlarkOutputArtifact>() {
+                        artifacts.declared_outputs.insert(output_artifact.artifact());
+                    }
+                }
+            }
+        }
         if artifacts.declared_outputs.is_empty() {
             return Err(kuro_error::Error::from(RunActionError::NoOutputsSpecified).into());
         }
@@ -524,6 +560,35 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             }
         }
 
+        // Use category if provided, otherwise fall back to mnemonic (Bazel compatibility)
+        // Convert Bazel mnemonic (PascalCase) to Kuro category (snake_case)
+        let effective_category = match (category.into_option(), mnemonic.into_option()) {
+            (Some(c), _) => c,
+            (None, Some(m)) => {
+                // Convert PascalCase mnemonic to snake_case category
+                let mnemonic_str = m.as_str();
+                let snake_case: String = mnemonic_str
+                    .chars()
+                    .enumerate()
+                    .flat_map(|(i, c)| {
+                        if c.is_uppercase() && i > 0 {
+                            vec!['_', c.to_ascii_lowercase()]
+                        } else {
+                            vec![c.to_ascii_lowercase()]
+                        }
+                    })
+                    .collect();
+                heap.alloc_str(&snake_case)
+            }
+            (None, None) => heap.alloc_str("action"),  // Default fallback
+        };
+
+        // Ignore Bazel-specific parameters for now (they're handled by stubs)
+        // Note: `outputs` is processed above for Bazel compatibility
+        let _ = (executable, inputs, progress_message, resource_set,
+                 use_default_shell_env, execution_requirements, toolchain, exec_group,
+                 tools, input_manifests, unused_inputs_list, shadowed_action);
+
         let starlark_values = heap.alloc_complex(StarlarkRunActionValues {
             exe: heap.alloc_typed(starlark_exe),
             args: heap.alloc_typed(starlark_args),
@@ -531,8 +596,8 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             worker: starlark_worker,
             remote_worker: starlark_remote_worker,
             category: {
-                CategoryRef::new(category.as_str())?;
-                category
+                CategoryRef::new(effective_category.as_str())?;
+                effective_category
             },
             identifier: identifier.into_option(),
             outputs_for_error_handler: outputs_for_error_handler.items,

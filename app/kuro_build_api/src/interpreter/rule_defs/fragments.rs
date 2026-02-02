@@ -93,6 +93,36 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
         Ok(this.compilation_mode.clone())
     }
 
+    /// Returns whether to generate .d dependency files.
+    fn should_generate_dotd_files(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(true)
+    }
+
+    /// Returns whether to save temporary files.
+    fn save_temps(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Returns whether to process headers in dependencies.
+    fn process_headers_in_dependencies(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Returns whether start_end_lib is enabled (for reducing binary size).
+    fn start_end_lib(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Returns whether binaries should be stripped.
+    fn should_strip_binaries(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Returns whether to use specific tool files (incompatible flag).
+    fn incompatible_use_specific_tool_files(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(true)
+    }
+
     /// Returns whether to use LLVM coverage map format.
     fn use_llvm_coverage_map_format(this: &CppFragment) -> starlark::Result<bool> {
         Ok(this.use_llvm_coverage_map_format)
@@ -130,6 +160,140 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
         #[allow(unused_variables)] this: &CppFragment,
     ) -> starlark::Result<bool> {
         Ok(false)
+    }
+
+    /// Returns the GRTE top path (GNU Runtime Environment), or None if not set.
+    ///
+    /// This is used for cross-compilation and specifies the path to the target
+    /// system's runtime libraries.
+    fn grte_top(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+        // TODO(fragments): Implement GRTE top path support
+        Ok(NoneType)
+    }
+
+    /// Whether to disable host/nonhost feature distinction.
+    #[starlark(attribute)]
+    fn _dont_enable_host_nonhost(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        // Return true to skip host/nonhost feature enabling
+        Ok(true)
+    }
+
+    /// Whether per-object debug info is requested.
+    #[starlark(attribute)]
+    fn fission_active_for_current_compilation_mode(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Whether to save temporary files.
+    #[starlark(attribute)]
+    fn save_feature_state(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Custom malloc implementation, or None.
+    fn custom_malloc(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// Whether to generate position-independent code.
+    #[starlark(attribute)]
+    fn copts(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<Vec<String>> {
+        Ok(Vec::new())
+    }
+
+    /// C-specific compilation options.
+    #[starlark(attribute)]
+    fn conlyopts(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<Vec<String>> {
+        Ok(Vec::new())
+    }
+
+    /// C++-specific compilation options.
+    #[starlark(attribute)]
+    fn cxxopts(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<Vec<String>> {
+        Ok(Vec::new())
+    }
+
+    /// Linker options.
+    #[starlark(attribute)]
+    fn linkopts(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<Vec<String>> {
+        Ok(Vec::new())
+    }
+
+    /// FDO prefetch hints label, or None.
+    #[starlark(attribute)]
+    fn _fdo_prefetch_hints_label(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// Propeller optimize label, or None.
+    #[starlark(attribute)]
+    fn _propeller_optimize_label(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// Memprof profile label, or None.
+    #[starlark(attribute)]
+    fn _memprof_profile_label(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// FDO optimize label, or None.
+    #[starlark(attribute)]
+    fn _fdo_optimize_label(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// CS-FDO profile label, or None.
+    #[starlark(attribute)]
+    fn _cs_fdo_profile_label(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// FDO profile label, or None.
+    #[starlark(attribute)]
+    fn _fdo_profile_label(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// XFDO profile label, or None.
+    #[starlark(attribute)]
+    fn _xfdo_profile_label(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// Whether FDO is active.
+    #[starlark(attribute)]
+    fn is_fdo_optimization(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Whether to use minimal debug info.
+    #[starlark(attribute)]
+    fn _use_minimal_debug_info(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Whether to use only fission.
+    #[starlark(attribute)]
+    fn _use_only_fission(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Whether experimental CC implementation deps is enabled.
+    /// This controls visibility of implementation-only dependencies.
+    fn experimental_cc_implementation_deps(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Whether legacy whole archive behavior is removed.
+    fn incompatible_remove_legacy_whole_archive(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
+        Ok(true)  // Use the modern behavior
     }
 }
 

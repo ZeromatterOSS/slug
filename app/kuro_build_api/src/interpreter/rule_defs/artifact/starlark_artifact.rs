@@ -162,6 +162,13 @@ impl<'v> StarlarkArtifactLike<'v> for StarlarkArtifact {
         Ok(self.artifact.get_path().with_short_path(f))
     }
 
+    fn with_full_path(
+        &self,
+        f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
+    ) -> kuro_error::Result<StringValue<'v>> {
+        Ok(self.artifact.get_path().with_full_path(f))
+    }
+
     fn fingerprint<'s>(&'s self) -> ArtifactFingerprint<'s>
     where
         'v: 's,
@@ -332,8 +339,11 @@ impl<'v> StarlarkValue<'v> for StarlarkArtifact {
                 let provider_id = callable.id()?;
                 // Artifacts only support DefaultInfo
                 if provider_id == DefaultInfoCallable::provider_id() {
-                    // Create a synthetic DefaultInfo with this artifact as the default output
-                    Ok(heap.alloc(DefaultInfo::from_artifact(heap, self)))
+                    // Allocate the artifact on the heap and create a synthetic DefaultInfo.
+                    // The artifact value will be used in DefaultInfo.files.
+                    let artifact_value = heap.alloc(self.dupe());
+                    let default_info = DefaultInfo::from_artifact_value(heap, artifact_value);
+                    Ok(heap.alloc(default_info))
                 } else {
                     Err(kuro_error::Error::from(ArtifactProviderError::ProviderNotFound {
                         provider: provider_id.name.clone(),

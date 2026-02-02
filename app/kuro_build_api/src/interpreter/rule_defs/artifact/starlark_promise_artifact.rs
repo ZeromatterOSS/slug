@@ -191,6 +191,16 @@ impl<'v> StarlarkArtifactLike<'v> for StarlarkPromiseArtifact {
         }
     }
 
+    fn with_full_path(
+        &self,
+        f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
+    ) -> kuro_error::Result<StringValue<'v>> {
+        match self.artifact.get() {
+            Some(v) => Ok(v.get_path().with_full_path(f)),
+            None => Ok(f(self.short_path_err()?)),
+        }
+    }
+
     fn fingerprint<'s>(&'s self) -> ArtifactFingerprint<'s>
     where
         'v: 's,
