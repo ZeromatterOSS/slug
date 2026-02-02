@@ -40,9 +40,17 @@ top_rule(
 )
 
 # =============================================================================
-# Phase 8f: rules_cc loading test
-# This successfully loads rules_cc from BCR (requires symlinks in bazel-external/)
-# Note: cc_library() instantiation fails because rules_cc expects internal attributes
-# like _def_parser that Kuro doesn't provide. Loading the rule definition works.
+# Phase 8f/8g: rules_cc loading and instantiation test
+# This successfully loads rules_cc from BCR and cc_library can be instantiated.
+# Analysis phase fails due to provider checking differences (separate issue).
 # =============================================================================
 load("@rules_cc//cc:defs.bzl", "cc_library")
+
+# Test: cc_library instantiation - NOW WORKS!
+# Parsing succeeds, target is registered.
+# Analysis fails with "Operation `in` not supported for types `default_info_callable` and `Artifact`"
+# This is expected - provider checking on artifacts is not yet fully implemented.
+cc_library(
+    name = "hello_lib",
+    srcs = ["hello.c"],
+)

@@ -89,13 +89,21 @@ impl AttributeExt for Attribute {
                 // indicating the value comes from configuration, not a static default.
                 // The actual value will be resolved at analysis time from the configuration.
                 //
-                // Also skip coercion for computed defaults (functions). In Bazel, you can
-                // pass a function as the default value, and it gets called during analysis
-                // to compute the actual default. For now, we treat these as "no default"
-                // to allow modules to load. Full computed default support is future work.
+                // For computed defaults (functions), Bazel calls the function during
+                // analysis with (name, tags) to compute the actual default. We don't
+                // support calling the function yet, but we treat it as having a default
+                // of None. This makes the attribute optional (user doesn't need to
+                // provide a value), and the rule implementation typically checks for
+                // None and handles it appropriately (e.g., _def_parser in rules_cc).
                 let value_type = x.get_type();
-                if value_type == "configuration_field" || value_type == "function" {
+                if value_type == "configuration_field" {
                     None
+                } else if value_type == "function" || x.is_none() {
+                    // Computed default or explicit None: use None as the default value.
+                    // The rule implementation should check for None and handle it.
+                    // For explicit None (from mandatory=False attributes), this makes
+                    // the attribute optional without requiring coercion.
+                    Some(Arc::new(kuro_node::attrs::coerced_attr::CoercedAttr::None))
                 } else {
                     Some(Arc::new(
                         coercer
@@ -711,8 +719,13 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] mandatory: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = mandatory;
-        Ok(Attribute::attr(eval, default, doc, AttrType::string())?)
+        // Bazel semantics: if mandatory = False (default) and no default, use empty string
+        let effective_default = match (default, mandatory) {
+            (Some(d), _) => Some(d),
+            (None, false) => Some(eval.heap().alloc("")),
+            (None, true) => None,
+        };
+        Ok(Attribute::attr(eval, effective_default, doc, AttrType::string())?)
     }
 
     /// Takes an int from the user, supplies an int to the rule.
@@ -730,8 +743,14 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
         // TODO(bazel): Enforce values constraint during coercion
-        let _unused = (mandatory, values);
-        Ok(Attribute::attr(eval, default, doc, AttrType::int())?)
+        let _unused = values;
+        // Bazel semantics: if mandatory = False (default) and no default, use 0
+        let effective_default = match (default, mandatory) {
+            (Some(d), _) => Some(d),
+            (None, false) => Some(eval.heap().alloc(0)),
+            (None, true) => None,
+        };
+        Ok(Attribute::attr(eval, effective_default, doc, AttrType::int())?)
     }
 
     /// Takes a boolean from the user, supplies a boolean to the rule.
@@ -742,8 +761,13 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] mandatory: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = mandatory;
-        Ok(Attribute::attr(eval, default, doc, AttrType::bool())?)
+        // Bazel semantics: if mandatory = False (default) and no default, use False
+        let effective_default = match (default, mandatory) {
+            (Some(d), _) => Some(d),
+            (None, false) => Some(eval.heap().alloc(false)),
+            (None, true) => None,
+        };
+        Ok(Attribute::attr(eval, effective_default, doc, AttrType::bool())?)
     }
 
     /// Takes a target label from the user (e.g., "//pkg:target") and supplies a
@@ -794,8 +818,21 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         let allow_files_bool = parse_allow_files_param(allow_files, "allow_files", eval)?;
         // Parse allow_single_file: can be bool or list of extension strings
         let allow_single_file_bool = parse_allow_files_param(allow_single_file, "allow_single_file", eval)?;
+        // Either allow_files or allow_single_file means we accept source files
+        let accept_files = allow_files_bool || allow_single_file_bool;
         // TODO(bazel): Enforce allow_rules constraint during coercion
-        let _unused = (mandatory, executable, allow_files_bool, allow_single_file_bool, allow_rules, flags);
+        let _unused = (executable, allow_rules, flags);
+
+        // Bazel semantics: if mandatory = False (default) and no default provided,
+        // the attribute defaults to None. If mandatory = True, a value must be provided.
+        let effective_default = match (default, mandatory) {
+            (Some(d), _) => Some(d),
+            (None, false) => {
+                // Not mandatory and no default -> default to None
+                Some(eval.heap().alloc(starlark::values::none::NoneType))
+            }
+            (None, true) => None, // Mandatory, no default -> required attribute
+        };
 
         // Extract aspect types from the aspects parameter (Phase 8c - UPDATED)
         // Note: aspects may be unfrozen at rule definition time, so handle both cases
@@ -836,14 +873,26 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
             }
             None => false,
         };
-        let coercer = if is_exec {
+        // Build the coercer based on cfg and allow_files
+        let coercer = if accept_files {
+            // When files are allowed, use one_of to accept source files or deps
+            let dep_type = if is_exec {
+                AttrType::exec_dep(required_providers)
+            } else {
+                AttrType::dep(required_providers, PluginKindSet::EMPTY)
+            };
+            AttrType::one_of(vec![
+                AttrType::source(false), // allow_directory = false
+                dep_type,
+            ])
+        } else if is_exec {
             AttrType::exec_dep(required_providers)
         } else {
             AttrType::dep(required_providers, PluginKindSet::EMPTY)
         };
 
         // Create attribute with aspects attached (Phase 8c)
-        let base_attr = Attribute::attr(eval, default, doc, coercer)?;
+        let base_attr = Attribute::attr(eval, effective_default, doc, coercer)?;
         Ok(if aspect_types.is_empty() {
             base_attr
         } else {
@@ -886,7 +935,18 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         let allow_files_bool = parse_allow_files_param(allow_files, "allow_files", eval)?;
         // TODO(bazel): Enforce allow_empty constraint during coercion
         // TODO(bazel): Enforce allow_rules constraint during coercion
-        let _unused = (mandatory, allow_files_bool, allow_empty, allow_rules, flags);
+        let _unused = (allow_empty, allow_rules, flags);
+
+        // Bazel semantics: if mandatory = False (default) and no default provided,
+        // the attribute defaults to an empty list. If mandatory = True, a value must be provided.
+        let effective_default = match (default, mandatory) {
+            (Some(d), _) => Some(d),
+            (None, false) => {
+                // Not mandatory and no default -> default to empty list
+                Some(eval.heap().alloc(Vec::<Value>::new()))
+            }
+            (None, true) => None, // Mandatory, no default -> required attribute
+        };
 
         // Extract aspect types from the aspects parameter (Phase 8c - UPDATED)
         // Note: aspects may be unfrozen at rule definition time, so handle both cases
@@ -915,11 +975,21 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         }
 
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
-        let inner = AttrType::dep(required_providers, PluginKindSet::EMPTY);
+        // When allow_files = True, accept both source files and deps
+        // This is critical for srcs attributes which can contain "file.c" or ":target"
+        let inner = if allow_files_bool {
+            // one_of: try source first (files), then dep (labels)
+            AttrType::one_of(vec![
+                AttrType::source(false), // allow_directory = false
+                AttrType::dep(required_providers, PluginKindSet::EMPTY),
+            ])
+        } else {
+            AttrType::dep(required_providers, PluginKindSet::EMPTY)
+        };
         let coercer = AttrType::list(inner);
 
         // Create attribute with aspects attached (Phase 8c)
-        let base_attr = Attribute::attr(eval, default, doc, coercer)?;
+        let base_attr = Attribute::attr(eval, effective_default, doc, coercer)?;
         Ok(if aspect_types.is_empty() {
             base_attr
         } else {
@@ -938,9 +1008,15 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
         // TODO(bazel): Enforce allow_empty constraint during coercion
-        let _unused = (mandatory, allow_empty);
+        let _unused = allow_empty;
+        // Bazel semantics: if mandatory = False (default) and no default, use empty list
+        let effective_default = match (default, mandatory) {
+            (Some(d), _) => Some(d),
+            (None, false) => Some(eval.heap().alloc(Vec::<Value>::new())),
+            (None, true) => None,
+        };
         let coercer = AttrType::list(AttrType::string());
-        Ok(Attribute::attr(eval, default, doc, coercer)?)
+        Ok(Attribute::attr(eval, effective_default, doc, coercer)?)
     }
 
     /// Takes a list of integers from the user.
@@ -954,9 +1030,15 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
         // TODO(bazel): Enforce allow_empty constraint during coercion
-        let _unused = (mandatory, allow_empty);
+        let _unused = allow_empty;
+        // Bazel semantics: if mandatory = False (default) and no default, use empty list
+        let effective_default = match (default, mandatory) {
+            (Some(d), _) => Some(d),
+            (None, false) => Some(eval.heap().alloc(Vec::<Value>::new())),
+            (None, true) => None,
+        };
         let coercer = AttrType::list(AttrType::int());
-        Ok(Attribute::attr(eval, default, doc, coercer)?)
+        Ok(Attribute::attr(eval, effective_default, doc, coercer)?)
     }
 
     /// Takes a dict with string keys and string values.
@@ -967,9 +1049,14 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] mandatory: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = mandatory;
+        // Bazel semantics: if mandatory = False (default) and no default, use empty dict
+        let effective_default = match (default, mandatory) {
+            (Some(d), _) => Some(d),
+            (None, false) => Some(eval.heap().alloc(starlark::collections::SmallMap::<Value, Value>::new())),
+            (None, true) => None,
+        };
         let coercer = AttrType::dict(AttrType::string(), AttrType::string(), false);
-        Ok(Attribute::attr(eval, default, doc, coercer)?)
+        Ok(Attribute::attr(eval, effective_default, doc, coercer)?)
     }
 
     /// Takes a dict with string keys and list of string values.
