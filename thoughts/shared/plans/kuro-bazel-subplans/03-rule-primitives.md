@@ -223,7 +223,52 @@ pub struct CompilationContext {
 }
 ```
 
-#### 5. Runfiles
+#### 5. Provider Access Semantics
+
+**Critical for rules_cc analysis phase** - The `in` operator must work for checking providers on targets and artifacts.
+
+| Operation | Bazel Behavior | Kuro Status | Blocker For |
+|-----------|---------------|-------------|-------------|
+| `Provider in target` | Returns `True` if target provides Provider | Not implemented | rules_cc analysis |
+| `Provider in artifact` | Returns `True` (source artifacts have DefaultInfo) | Not implemented | rules_cc analysis |
+| `target[Provider]` | Returns provider instance or error | Needs verification | rules_cc analysis |
+
+**Example from rules_cc** (`cc_helper.bzl:369`):
+```python
+# This pattern is used extensively in rules_cc
+if DefaultInfo in attr_value:
+    files = attr_value[DefaultInfo].files.to_list()
+    # ... process files
+```
+
+**Current Error:**
+```
+error: Operation `in` not supported for types `default_info_callable` and `Artifact`
+```
+
+**Files to Modify:**
+
+1. **Artifact type** - `app/kuro_build_api/src/artifact/artifact_type.rs`
+   - Implement `StarlarkValue::is_in()` for Artifact to support `Provider in artifact`
+
+2. **Target/dependency type** - Location TBD
+   - Implement `StarlarkValue::is_in()` for configured targets
+
+3. **Provider callable** - `app/kuro_build_api/src/interpreter/rule_defs/provider/`
+   - Ensure `DefaultInfo` and other providers work as dict keys for `in` checks
+
+**Implementation Notes:**
+
+In Bazel, source files (artifacts) implicitly have `DefaultInfo` with the file in `files`. The `in` operator checks if a provider type is available on a target/artifact.
+
+```python
+# Bazel behavior:
+src_file = ctx.file.src  # An artifact
+DefaultInfo in src_file  # Returns True
+src_file[DefaultInfo]    # Returns DefaultInfo(files=depset([src_file]))
+```
+
+#### 6. Runfiles
 
 **File**: Likely in `app/kuro_build_api/src/interpreter/rule_defs/`
 
@@ -248,6 +293,9 @@ Check Kuro's existing runfiles implementation and align API.
 - [ ] ctx.actions.args() builds command lines
 - [ ] depset operations are efficient
 - [ ] DefaultInfo provider works
+- [ ] `Provider in target` operator works (e.g., `DefaultInfo in dep`)
+- [ ] `Provider in artifact` operator works (e.g., `DefaultInfo in src_file`)
+- [ ] `target[Provider]` indexing works
 - [ ] Runfiles are collected correctly
 - [ ] All documented ctx methods available
 
@@ -266,6 +314,7 @@ Check Kuro's existing runfiles implementation and align API.
 - [ ] ADD `tests/core/analysis/test_ctx_actions_write.py` for ctx.actions.write()
 - [ ] ADD `tests/core/analysis/test_ctx_actions_declare.py` for declare_file/directory
 - [ ] ADD `tests/core/analysis/test_default_info.py` for DefaultInfo provider
+- [ ] ADD `tests/core/analysis/test_provider_in_operator.py` for `Provider in target/artifact`
 - [ ] ADD `tests/core/analysis/test_runfiles.py` for runfiles collection
 - [ ] ADD `tests/core/analysis/test_depset_ordering.py` for depset order parameter
 - [ ] ADD `tests/core/analysis/test_provider_definition.py` for custom providers
