@@ -440,48 +440,149 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// Files from attributes (Bazel-compatible).
     ///
     /// Provides access to files from label/label_list attributes as ctx.files.<attr>.
-    /// Returns a struct-like object that returns empty lists for any attribute.
+    /// For example, `ctx.files.srcs` returns a list of files from the `srcs` attribute.
     #[starlark(attribute)]
     fn files<'v>(
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(CtxFilesStub))
+        match this.0.attrs {
+            Some(attrs) => Ok(heap.alloc(CtxFiles::new(attrs))),
+            None => {
+                // Fallback for dynamic_output or BXL contexts
+                Ok(heap.alloc(CtxFilesStub))
+            }
+        }
     }
 
     /// Single file from attributes (Bazel-compatible).
     ///
     /// Similar to ctx.files but for attrs that expect a single file.
+    /// For example, `ctx.file.src` returns a single File from the `src` attribute.
     #[starlark(attribute)]
     fn file<'v>(
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(CtxFileStub))
+        match this.0.attrs {
+            Some(attrs) => Ok(heap.alloc(CtxFile::new(attrs))),
+            None => {
+                // Fallback for dynamic_output or BXL contexts
+                Ok(heap.alloc(CtxFileStub))
+            }
+        }
     }
 
     /// Executable from attributes (Bazel-compatible).
     ///
-    /// Returns executables from label attributes.
+    /// Returns executables from label attributes declared with `executable=True`.
+    /// For example, `ctx.executable._compiler` returns the compiler executable.
     #[starlark(attribute)]
     fn executable<'v>(
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(CtxExecutableStub))
+        match this.0.attrs {
+            Some(attrs) => Ok(heap.alloc(CtxExecutable::new(attrs))),
+            None => {
+                // Fallback for dynamic_output or BXL contexts
+                Ok(heap.alloc(CtxExecutableStub))
+            }
+        }
     }
 
     /// Build file path (Bazel-compatible).
+    ///
+    /// Returns the path to the BUILD file relative to the workspace root.
     #[starlark(attribute)]
     fn build_file_path<'v>(
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = this;
+        // Try to get the actual BUILD file path from the label
+        if let Some(label) = this.0.label {
+            let label_str = format!("{}", label);
+            // Extract package path from label like "//foo/bar:target"
+            if let Some(pkg) = label_str.strip_prefix("//") {
+                if let Some(colon_pos) = pkg.find(':') {
+                    let pkg_path = &pkg[..colon_pos];
+                    if pkg_path.is_empty() {
+                        return Ok(heap.alloc_str("BUILD.bazel").to_value());
+                    }
+                    let build_path = format!("{}/BUILD.bazel", pkg_path);
+                    return Ok(heap.alloc_str(&build_path).to_value());
+                }
+            }
+        }
+        // Fallback
         Ok(heap.alloc_str("BUILD.bazel").to_value())
+    }
+
+    /// Workspace name (Bazel-compatible).
+    ///
+    /// Returns the name of the current workspace/module from MODULE.bazel.
+    /// Returns an empty string if the workspace name is not available.
+    #[starlark(attribute)]
+    fn workspace_name<'v>(
+        this: RefAnalysisContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        // TODO: Get actual workspace name from MODULE.bazel or cell configuration
+        // For now, return empty string (matches Bazel behavior when repo is unnamed)
+        let _ = this;
+        Ok(heap.alloc_str("").to_value())
+    }
+
+    /// Output directory for binary artifacts (Bazel-compatible).
+    ///
+    /// Returns a root object representing the output tree for binaries.
+    /// Access the path via `ctx.bin_dir.path`.
+    #[starlark(attribute)]
+    fn bin_dir<'v>(
+        this: RefAnalysisContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        // Return a stub that provides a path attribute
+        // TODO: Get actual configuration-specific output path
+        Ok(heap.alloc(CtxDirRoot { path: "bazel-out/k8-fastbuild/bin".to_owned() }))
+    }
+
+    /// Output directory for generated files (Bazel-compatible).
+    ///
+    /// Returns a root object representing the output tree for generated files.
+    /// Access the path via `ctx.genfiles_dir.path`.
+    #[starlark(attribute)]
+    fn genfiles_dir<'v>(
+        this: RefAnalysisContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        // Return a stub that provides a path attribute
+        // TODO: Get actual configuration-specific output path
+        Ok(heap.alloc(CtxDirRoot { path: "bazel-out/k8-fastbuild/genfiles".to_owned() }))
+    }
+
+    /// Make variable access (Bazel-compatible).
+    ///
+    /// Returns a dict-like object providing access to Make variables.
+    /// Common variables include:
+    /// - `BINDIR`: Binary output directory
+    /// - `GENDIR`: Generated files directory
+    /// - `TARGET_CPU`: Target CPU architecture
+    /// - `COMPILATION_MODE`: Current compilation mode (fastbuild, dbg, opt)
+    ///
+    /// Example:
+    /// ```python
+    /// bin_dir = ctx.var["BINDIR"]
+    /// ```
+    #[starlark(attribute)]
+    fn var<'v>(
+        this: RefAnalysisContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        Ok(heap.alloc(CtxVarDict))
     }
 
     /// Returns whether this target should be instrumented for coverage (Bazel-compatible).
@@ -954,7 +1055,185 @@ impl<'v> StarlarkValue<'v> for LinkingContextStub {
     }
 }
 
+/// Provides access to files from label/label_list attributes as ctx.files.<attr>.
+///
+/// In Bazel, `ctx.files.foo` returns a list of Files from attribute `foo`.
+/// This implementation extracts files from the resolved attribute values.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
+pub struct CtxFiles<'v> {
+    /// The resolved attributes struct as a Value
+    attrs: Value<'v>,
+}
+
+impl<'v> CtxFiles<'v> {
+    pub fn new(attrs: ValueOfUnchecked<'v, StructRef<'static>>) -> Self {
+        Self { attrs: attrs.get().to_value() }
+    }
+}
+
+impl<'v> std::fmt::Display for CtxFiles<'v> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<ctx.files>")
+    }
+}
+
+#[starlark::values::starlark_value(type = "ctx_files")]
+impl<'v> StarlarkValue<'v> for CtxFiles<'v> {
+    fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
+        // Check if the attribute exists in attrs using StarlarkValue method
+        self.attrs.has_attr(attribute, heap)
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        // Get the attribute value from attrs
+        // Value::get_attr returns Result<Option<Value>, Error>, we ignore errors
+        let attr_value = self.attrs.get_attr(attribute, heap).ok().flatten()?;
+
+        // Extract files from the attribute value
+        // If it's a list, return it as-is (assuming list of artifacts/deps)
+        // If it's a single value, wrap it in a list
+        // If it's None, return empty list
+        if attr_value.is_none() {
+            use starlark::values::list::AllocList;
+            return Some(heap.alloc(AllocList::EMPTY));
+        }
+
+        // Check if it's already a list
+        if starlark::values::list::ListRef::from_value(attr_value).is_some() {
+            // It's already a list, return as-is
+            // The list should contain artifacts/deps
+            Some(attr_value)
+        } else {
+            // Single value - wrap in a list
+            Some(heap.alloc(vec![attr_value]))
+        }
+    }
+}
+
+impl<'v> AllocValue<'v> for CtxFiles<'v> {
+    fn alloc_value(self, heap: Heap<'v>) -> Value<'v> {
+        heap.alloc_complex_no_freeze(self)
+    }
+}
+
+/// Provides access to single files from label attributes as ctx.file.<attr>.
+///
+/// In Bazel, `ctx.file.foo` returns a single File from attribute `foo`.
+/// If the attribute contains multiple files, this is an error in Bazel,
+/// but for compatibility we return the first file.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
+pub struct CtxFile<'v> {
+    /// The resolved attributes struct as a Value
+    attrs: Value<'v>,
+}
+
+impl<'v> CtxFile<'v> {
+    pub fn new(attrs: ValueOfUnchecked<'v, StructRef<'static>>) -> Self {
+        Self { attrs: attrs.get().to_value() }
+    }
+}
+
+impl<'v> std::fmt::Display for CtxFile<'v> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<ctx.file>")
+    }
+}
+
+#[starlark::values::starlark_value(type = "ctx_file")]
+impl<'v> StarlarkValue<'v> for CtxFile<'v> {
+    fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
+        self.attrs.has_attr(attribute, heap)
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        // Get the attribute value from attrs
+        // Value::get_attr returns Result<Option<Value>, Error>, we ignore errors
+        let attr_value = self.attrs.get_attr(attribute, heap).ok().flatten()?;
+
+        // If it's None, return None
+        if attr_value.is_none() {
+            return Some(Value::new_none());
+        }
+
+        // If it's a list, return the first element (or None if empty)
+        if let Some(list) = starlark::values::list::ListRef::from_value(attr_value) {
+            if list.is_empty() {
+                return Some(Value::new_none());
+            }
+            return Some(list.content()[0]);
+        }
+
+        // Single value - return as-is
+        Some(attr_value)
+    }
+}
+
+impl<'v> AllocValue<'v> for CtxFile<'v> {
+    fn alloc_value(self, heap: Heap<'v>) -> Value<'v> {
+        heap.alloc_complex_no_freeze(self)
+    }
+}
+
+/// Provides access to executable files from label attributes as ctx.executable.<attr>.
+///
+/// In Bazel, `ctx.executable.foo` returns the executable File from attribute `foo`
+/// (which must be declared with `executable=True`).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
+pub struct CtxExecutable<'v> {
+    /// The resolved attributes struct as a Value
+    attrs: Value<'v>,
+}
+
+impl<'v> CtxExecutable<'v> {
+    pub fn new(attrs: ValueOfUnchecked<'v, StructRef<'static>>) -> Self {
+        Self { attrs: attrs.get().to_value() }
+    }
+}
+
+impl<'v> std::fmt::Display for CtxExecutable<'v> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<ctx.executable>")
+    }
+}
+
+#[starlark::values::starlark_value(type = "ctx_executable")]
+impl<'v> StarlarkValue<'v> for CtxExecutable<'v> {
+    fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
+        self.attrs.has_attr(attribute, heap)
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        // Get the attribute value from attrs
+        // Value::get_attr returns Result<Option<Value>, Error>, we ignore errors
+        let attr_value = self.attrs.get_attr(attribute, heap).ok().flatten()?;
+
+        // If it's None, return None
+        if attr_value.is_none() {
+            return Some(Value::new_none());
+        }
+
+        // For executable attributes, Bazel expects the executable from the dependency's
+        // DefaultInfo.files_to_run.executable or the artifact itself.
+        // For now, return the value directly (similar to ctx.file)
+        if let Some(list) = starlark::values::list::ListRef::from_value(attr_value) {
+            if list.is_empty() {
+                return Some(Value::new_none());
+            }
+            return Some(list.content()[0]);
+        }
+
+        Some(attr_value)
+    }
+}
+
+impl<'v> AllocValue<'v> for CtxExecutable<'v> {
+    fn alloc_value(self, heap: Heap<'v>) -> Value<'v> {
+        heap.alloc_complex_no_freeze(self)
+    }
+}
+
 /// A stub for ctx.files that returns empty lists for all attributes.
+/// Used as fallback when attrs is not available (e.g., dynamic_output, BXL).
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct CtxFilesStub;
 
@@ -969,18 +1248,17 @@ starlark::starlark_simple_value!(CtxFilesStub);
 #[starlark::values::starlark_value(type = "ctx_files")]
 impl<'v> StarlarkValue<'v> for CtxFilesStub {
     fn has_attr(&self, _attribute: &str, _heap: Heap<'v>) -> bool {
-        // All attributes exist but return empty lists
         true
     }
 
     fn get_attr(&self, _attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        // Return empty list for any attribute
         use starlark::values::list::AllocList;
         Some(heap.alloc(AllocList::EMPTY))
     }
 }
 
 /// A stub for ctx.file that returns None for all attributes.
+/// Used as fallback when attrs is not available.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct CtxFileStub;
 
@@ -1004,6 +1282,7 @@ impl<'v> StarlarkValue<'v> for CtxFileStub {
 }
 
 /// A stub for ctx.executable that returns None for all attributes.
+/// Used as fallback when attrs is not available.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct CtxExecutableStub;
 
@@ -1023,6 +1302,154 @@ impl<'v> StarlarkValue<'v> for CtxExecutableStub {
 
     fn get_attr(&self, _attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         Some(Value::new_none())
+    }
+}
+
+/// Output directory root for ctx.bin_dir and ctx.genfiles_dir (Bazel-compatible).
+///
+/// In Bazel, `ctx.bin_dir` and `ctx.genfiles_dir` are root objects that provide
+/// a `path` attribute containing the directory path string.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct CtxDirRoot {
+    path: String,
+}
+
+impl std::fmt::Display for CtxDirRoot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<root: {}>", self.path)
+    }
+}
+
+starlark::starlark_simple_value!(CtxDirRoot);
+
+#[starlark::values::starlark_value(type = "root")]
+impl<'v> StarlarkValue<'v> for CtxDirRoot {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(ctx_dir_root_methods)
+    }
+
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "path")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "path" => Some(heap.alloc_str(&self.path).to_value()),
+            _ => None,
+        }
+    }
+}
+
+#[starlark_module]
+fn ctx_dir_root_methods(builder: &mut MethodsBuilder) {
+    /// The path to this output directory.
+    #[starlark(attribute)]
+    fn path<'v>(this: &CtxDirRoot, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        Ok(heap.alloc_str(&this.path).to_value())
+    }
+}
+
+/// A dict-like object for ctx.var providing access to Make variables (Bazel-compatible).
+///
+/// In Bazel, `ctx.var` is a dictionary containing Make variables that can be
+/// accessed using `ctx.var["VAR_NAME"]` or `ctx.var.get("VAR_NAME")`.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct CtxVarDict;
+
+impl std::fmt::Display for CtxVarDict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<ctx.var>")
+    }
+}
+
+starlark::starlark_simple_value!(CtxVarDict);
+
+#[starlark::values::starlark_value(type = "dict")]
+impl<'v> StarlarkValue<'v> for CtxVarDict {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(ctx_var_dict_methods)
+    }
+
+    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let key = index.unpack_str().unwrap_or("");
+        // Return common Make variables
+        let value = match key {
+            "BINDIR" => "bazel-out/k8-fastbuild/bin",
+            "GENDIR" => "bazel-out/k8-fastbuild/genfiles",
+            "TARGET_CPU" => "k8",
+            "COMPILATION_MODE" => "fastbuild",
+            "CC" => "/usr/bin/gcc",
+            "CC_FLAGS" => "",
+            "JAVA" => "/usr/bin/java",
+            "JAVA_RUNFILES" => "",
+            "JAVABASE" => "",
+            "ABI_GLIBC_VERSION" => "2.17",
+            "ABI" => "local",
+            _ => "",  // Unknown variables return empty string
+        };
+        Ok(heap.alloc_str(value).to_value())
+    }
+
+    fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
+        // Return true for known Make variables
+        if let Some(key) = other.unpack_str() {
+            Ok(matches!(
+                key,
+                "BINDIR" | "GENDIR" | "TARGET_CPU" | "COMPILATION_MODE"
+                    | "CC" | "CC_FLAGS" | "JAVA" | "JAVA_RUNFILES" | "JAVABASE"
+                    | "ABI_GLIBC_VERSION" | "ABI"
+            ))
+        } else {
+            Ok(false)
+        }
+    }
+}
+
+#[starlark_module]
+fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
+    /// Get a Make variable by name, with optional default.
+    fn get<'v>(
+        this: &CtxVarDict,
+        #[starlark(require = pos)] key: &str,
+        #[starlark(default = NoneType)] default: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        let value = match key {
+            "BINDIR" => Some("bazel-out/k8-fastbuild/bin"),
+            "GENDIR" => Some("bazel-out/k8-fastbuild/genfiles"),
+            "TARGET_CPU" => Some("k8"),
+            "COMPILATION_MODE" => Some("fastbuild"),
+            "CC" => Some("/usr/bin/gcc"),
+            "CC_FLAGS" => Some(""),
+            "JAVA" => Some("/usr/bin/java"),
+            "JAVA_RUNFILES" => Some(""),
+            "JAVABASE" => Some(""),
+            "ABI_GLIBC_VERSION" => Some("2.17"),
+            "ABI" => Some("local"),
+            _ => None,
+        };
+        match value {
+            Some(v) => Ok(heap.alloc_str(v).to_value()),
+            None => Ok(default),
+        }
+    }
+
+    /// Get all keys in the Make variables dict.
+    fn keys<'v>(
+        this: &CtxVarDict,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        let keys = vec![
+            "BINDIR", "GENDIR", "TARGET_CPU", "COMPILATION_MODE",
+            "CC", "CC_FLAGS", "JAVA", "JAVA_RUNFILES", "JAVABASE",
+            "ABI_GLIBC_VERSION", "ABI",
+        ];
+        let values: Vec<Value> = keys.iter().map(|k| heap.alloc_str(k).to_value()).collect();
+        Ok(heap.alloc(values))
     }
 }
 

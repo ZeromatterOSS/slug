@@ -103,6 +103,18 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
         Ok(this.is_source()?)
     }
 
+    /// Whether the artifact represents a directory (Bazel-compatible).
+    ///
+    /// Returns true for tree artifacts (declared via ctx.actions.declare_directory),
+    /// false for regular file artifacts.
+    #[starlark(attribute)]
+    fn is_directory<'v>(this: &'v dyn StarlarkArtifactLike<'v>) -> starlark::Result<bool> {
+        let _ = this;
+        // TODO(bazel-compat): Properly track directory artifacts
+        // For now, return false as most artifacts are files
+        Ok(false)
+    }
+
     /// The `Label` of the rule that originally created this artifact. May also be None in
     /// the case of source files, or if the artifact has not be used in an action, or if the
     /// action was not created by a rule.

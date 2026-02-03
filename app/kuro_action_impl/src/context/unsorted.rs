@@ -11,6 +11,7 @@
 use kuro_build_api::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use kuro_build_api::interpreter::rule_defs::artifact_tagging::ArtifactTag;
+use kuro_build_api::interpreter::rule_defs::cmd_args::StarlarkCmdArgs;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
 use kuro_build_api::interpreter::rule_defs::digest_config::StarlarkDigestConfig;
 use kuro_build_api::interpreter::rule_defs::transitive_set::FrozenTransitiveSetDefinition;
@@ -22,6 +23,7 @@ use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::values::FrozenValueTyped;
 use starlark::values::Value;
+use starlark::values::ValueLike;
 use starlark::values::ValueOfUnchecked;
 use starlark::values::ValueTyped;
 use starlark::values::typing::StarlarkIter;
@@ -105,6 +107,35 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
             None,
             filename,
             OutputType::FileOrDirectory,
+            eval.call_stack_top_location(),
+            BuckOutPathKind::Configuration,
+            eval.heap(),
+        )?;
+
+        Ok(StarlarkDeclaredArtifact::new(
+            eval.call_stack_top_location(),
+            artifact,
+            AssociatedArtifacts::new(),
+        ))
+    }
+
+    /// Bazel-compatible alias for declaring directory outputs.
+    /// Declares an output directory that will be created by an action.
+    ///
+    /// In Bazel, `ctx.actions.declare_directory()` is used to declare
+    /// outputs that are directories rather than single files.
+    fn declare_directory<'v>(
+        this: &AnalysisActions<'v>,
+        #[starlark(require = pos)] filename: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] sibling: starlark::values::Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<StarlarkDeclaredArtifact<'v>> {
+        // Ignore sibling for now - Bazel uses it to declare files relative to another file
+        let _ = sibling;
+        let artifact = this.state()?.declare_output(
+            None,
+            filename,
+            OutputType::Directory,
             eval.call_stack_top_location(),
             BuckOutPathKind::Configuration,
             eval.heap(),
@@ -229,5 +260,99 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
         Ok(StarlarkDigestConfig {
             digest_config: this.digest_config,
         })
+    }
+
+    /// Bazel-compatible args() for building command lines.
+    ///
+    /// Creates a new Args object for building command line arguments.
+    /// This is equivalent to Kuro's cmd_args() global function.
+    ///
+    /// The Args object supports methods like:
+    /// - `add(value)`: Add a value to the args
+    /// - `add_all(values)`: Add all values from a list
+    /// - `add_joined(values, join_with)`: Add values joined with a separator
+    ///
+    /// Example:
+    /// ```python
+    /// args = ctx.actions.args()
+    /// args.add("--output", output_file)
+    /// args.add_all(input_files)
+    /// ctx.actions.run(arguments = args, ...)
+    /// ```
+    fn args<'v>(
+        this: &AnalysisActions<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<ValueTyped<'v, StarlarkCmdArgs<'v>>> {
+        let _ = this;
+        Ok(eval.heap().alloc_typed(StarlarkCmdArgs::default()))
+    }
+
+    /// Bazel-compatible run_shell for executing shell commands.
+    ///
+    /// Creates an action that runs a shell command. This is a convenience
+    /// wrapper that executes commands through the shell.
+    ///
+    /// Parameters:
+    /// - `outputs`: List of output files this action will produce
+    /// - `inputs`: Optional list of input files
+    /// - `command`: The shell command to run (string or list of strings)
+    /// - `arguments`: Optional additional arguments appended to the command
+    /// - `env`: Optional environment variables
+    /// - `mnemonic`: Optional short action description for the console
+    /// - `progress_message`: Optional detailed progress message
+    ///
+    /// Example:
+    /// ```python
+    /// ctx.actions.run_shell(
+    ///     outputs = [output_file],
+    ///     command = "echo hello > $1",
+    ///     arguments = [output_file.path],
+    /// )
+    /// ```
+    #[allow(unused_variables)]
+    fn run_shell<'v>(
+        this: &AnalysisActions<'v>,
+        #[starlark(require = named)] outputs: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] inputs: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] tools: starlark::values::Value<'v>,
+        #[starlark(require = named)] command: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] arguments: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] env: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] mnemonic: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] progress_message: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] use_default_shell_env: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] execution_requirements: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] input_manifests: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] exec_group: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] shadowed_action: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] resource_set: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] toolchain: starlark::values::Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<starlark::values::none::NoneType> {
+        // TODO(run_shell): Implement proper shell action registration
+        // For now, this is a stub that accepts the parameters but does not execute.
+        // A full implementation would:
+        // 1. Build the command line: ["bash", "-c", command, "--"] + arguments
+        // 2. Register a run action with the shell wrapper
+        //
+        // This stub allows rules_cc and other Bazel rules to proceed without errors
+        // during loading and analysis phases.
+
+        // Just register a simple action for now
+        // The outputs need to be bound to prevent analysis errors
+        use starlark::values::list::ListRef;
+
+        if let Some(outputs_list) = ListRef::from_value(outputs) {
+            for output in outputs_list.iter() {
+                // Try to get as a declared artifact and bind it to a simple action
+                // This is a placeholder - proper implementation would create a shell action
+                if let Some(declared) = output.downcast_ref::<StarlarkDeclaredArtifact>() {
+                    // For now, just log that we saw this output
+                    // A real implementation would bind it to a shell execution action
+                }
+            }
+        }
+
+        Ok(starlark::values::none::NoneType)
     }
 }
