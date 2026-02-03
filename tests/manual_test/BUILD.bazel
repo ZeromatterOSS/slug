@@ -43,10 +43,16 @@ top_rule(
 # Phase 6: Provider Access Semantics test
 # Test that DefaultInfo in artifact and artifact[DefaultInfo] work correctly.
 # =============================================================================
-load(":test_provider_access.bzl", "test_provider_access")
+load(":test_provider_access.bzl", "test_provider_access", "test_bazel_label_list")
 
 test_provider_access(
     name = "test_provider_access",
+    srcs = ["hello.c"],
+)
+
+# Test Bazel-style attr.label_list with source files
+test_bazel_label_list(
+    name = "test_bazel_label_list",
     srcs = ["hello.c"],
 )
 
@@ -56,8 +62,15 @@ test_provider_access(
 # (_def_parser has computed default function).
 # =============================================================================
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load(":debug_cc_library.bzl", "debug_cc_library")
 
 cc_library(
     name = "hello_lib",
+    srcs = ["hello.c"],
+)
+
+# Debug wrapper to trace cc_library analysis
+debug_cc_library(
+    name = "debug_hello_lib",
     srcs = ["hello.c"],
 )

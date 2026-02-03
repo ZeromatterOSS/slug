@@ -60,6 +60,121 @@ use crate::interpreter::rule_defs::fragments::ConfigurationFragments;
 use crate::interpreter::rule_defs::provider::ProviderLike;
 
 // ============================================================================
+// FeatureConfiguration - C++ feature configuration
+// ============================================================================
+
+/// FeatureConfiguration holds the enabled features for C++ compilation.
+///
+/// This is created by cc_common.configure_features() and used to control
+/// which compiler flags and behaviors are enabled.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Clone)]
+pub struct FeatureConfiguration {
+    /// Whether PIC is enabled
+    pub pic_enabled: bool,
+    /// Whether to use preprocessor defines
+    pub defines_enabled: bool,
+}
+
+impl Default for FeatureConfiguration {
+    fn default() -> Self {
+        Self {
+            pic_enabled: true,
+            defines_enabled: true,
+        }
+    }
+}
+
+impl Display for FeatureConfiguration {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "FeatureConfiguration(pic={})", self.pic_enabled)
+    }
+}
+
+starlark_simple_value!(FeatureConfiguration);
+
+#[starlark_value(type = "FeatureConfiguration")]
+impl<'v> StarlarkValue<'v> for FeatureConfiguration {}
+
+// ============================================================================
+// CcCompilationContext - Compilation context for C++ builds
+// ============================================================================
+
+/// CcCompilationContext holds the compilation context (headers, includes, defines).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[repr(C)]
+pub struct CcCompilationContextGen<V: ValueLifetimeless> {
+    /// Headers depset
+    headers: V,
+    /// Include directories
+    includes: V,
+    /// Defines
+    defines: V,
+}
+
+starlark_complex_value!(pub CcCompilationContext);
+
+impl<V: ValueLifetimeless> Display for CcCompilationContextGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<CcCompilationContext>")
+    }
+}
+
+#[starlark::values::starlark_value(type = "CcCompilationContext")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for CcCompilationContextGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(
+            attribute,
+            "headers" | "includes" | "quote_includes" | "system_includes"
+                | "framework_includes" | "external_includes" | "defines"
+                | "local_defines" | "direct_headers" | "direct_public_headers"
+                | "direct_private_headers" | "direct_textual_headers"
+                | "validation_artifacts" | "_header_info"
+        )
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "headers" => {
+                if self.headers.to_value().is_none() {
+                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                } else {
+                    Some(self.headers.to_value())
+                }
+            }
+            "includes" | "quote_includes" | "system_includes" | "framework_includes"
+            | "external_includes" => {
+                if self.includes.to_value().is_none() {
+                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                } else {
+                    Some(self.includes.to_value())
+                }
+            }
+            "defines" | "local_defines" => {
+                if self.defines.to_value().is_none() {
+                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                } else {
+                    Some(self.defines.to_value())
+                }
+            }
+            "direct_headers" | "direct_public_headers" | "direct_private_headers"
+            | "direct_textual_headers" => {
+                Some(heap.alloc(AllocList::EMPTY))
+            }
+            "validation_artifacts" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_header_info" => {
+                Some(heap.alloc(HeaderInfoStub))
+            }
+            _ => None,
+        }
+    }
+}
+
+// ============================================================================
 // CcToolchainVariables - Variables for C++ toolchain configuration
 // ============================================================================
 
@@ -1098,6 +1213,236 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         Ok(CcCommonInternal)
     }
 
+    /// Configures C++ features based on toolchain and requested features.
+    ///
+    /// Returns a FeatureConfiguration that controls which compiler flags are enabled.
+    #[allow(unused_variables)]
+    fn configure_features<'v>(
+        #[starlark(this)] this: &CcCommonModule,
+        #[starlark(require = named)] ctx: Value<'v>,
+        #[starlark(require = named)] cc_toolchain: Value<'v>,
+        #[starlark(require = named, default = NoneType)] requested_features: Value<'v>,
+        #[starlark(require = named, default = NoneType)] unsupported_features: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<FeatureConfiguration> {
+        eprintln!("[cc_common.configure_features] called with ctx={}, cc_toolchain={}", ctx, cc_toolchain);
+        // TODO(cc_common): Properly process features from toolchain and config
+        // For now, return a default feature configuration
+        Ok(FeatureConfiguration::default())
+    }
+
+    /// Compiles C/C++ source files.
+    ///
+    /// This is the main compilation function that creates compile actions for each
+    /// source file and returns compilation context and outputs.
+    ///
+    /// Returns a tuple of (CcCompilationContext, CompilationOutputs).
+    #[allow(unused_variables)]
+    fn compile<'v>(
+        #[starlark(this)] this: &CcCommonModule,
+        #[starlark(require = named)] actions: Value<'v>,
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named)] cc_toolchain: Value<'v>,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        #[starlark(require = named, default = NoneType)] srcs: Value<'v>,
+        #[starlark(require = named, default = NoneType)] public_hdrs: Value<'v>,
+        #[starlark(require = named, default = NoneType)] private_hdrs: Value<'v>,
+        #[starlark(require = named, default = NoneType)] textual_hdrs: Value<'v>,
+        #[starlark(require = named, default = NoneType)] additional_inputs: Value<'v>,
+        #[starlark(require = named, default = NoneType)] includes: Value<'v>,
+        #[starlark(require = named, default = NoneType)] loose_includes: Value<'v>,
+        #[starlark(require = named, default = NoneType)] quote_includes: Value<'v>,
+        #[starlark(require = named, default = NoneType)] system_includes: Value<'v>,
+        #[starlark(require = named, default = NoneType)] framework_includes: Value<'v>,
+        #[starlark(require = named, default = NoneType)] defines: Value<'v>,
+        #[starlark(require = named, default = NoneType)] local_defines: Value<'v>,
+        #[starlark(require = named, default = NoneType)] include_prefix: Value<'v>,
+        #[starlark(require = named, default = NoneType)] strip_include_prefix: Value<'v>,
+        #[starlark(require = named, default = NoneType)] user_compile_flags: Value<'v>,
+        #[starlark(require = named, default = NoneType)] conly_flags: Value<'v>,
+        #[starlark(require = named, default = NoneType)] cxx_flags: Value<'v>,
+        #[starlark(require = named, default = NoneType)] compilation_contexts: Value<'v>,
+        #[starlark(require = named, default = NoneType)] implementation_compilation_contexts: Value<'v>,
+        #[starlark(require = named, default = false)] disallow_pic_outputs: bool,
+        #[starlark(require = named, default = false)] disallow_nopic_outputs: bool,
+        #[starlark(require = named, default = NoneType)] additional_include_scanning_roots: Value<'v>,
+        #[starlark(require = named, default = false)] do_not_generate_module_map: bool,
+        #[starlark(require = named, default = false)] code_coverage_enabled: bool,
+        #[starlark(require = named, default = NoneType)] hdrs_checking_mode: Value<'v>,
+        #[starlark(require = named, default = NoneType)] variables_extension: Value<'v>,
+        #[starlark(require = named, default = NoneType)] language: Value<'v>,
+        #[starlark(require = named, default = NoneType)] purpose: Value<'v>,
+        #[starlark(require = named, default = NoneType)] copts_filter: Value<'v>,
+        #[starlark(require = named, default = NoneType)] separate_module_headers: Value<'v>,
+        #[starlark(require = named, default = NoneType)] module_interfaces: Value<'v>,
+        #[starlark(require = named, default = NoneType)] non_compilation_additional_inputs: Value<'v>,
+        #[starlark(kwargs)] kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
+
+        // Debug logging
+        eprintln!("[cc_common.compile] name={}, srcs={}, srcs.is_none()={}", name, srcs, srcs.is_none());
+
+        // Collect source files to compile
+        let mut object_files: Vec<Value<'v>> = Vec::new();
+        let mut pic_object_files: Vec<Value<'v>> = Vec::new();
+
+        // Get the declare_file method from actions
+        let declare_file_method = actions.get_attr("declare_file", heap)
+            .ok()
+            .flatten();
+        let run_method = actions.get_attr("run", heap)
+            .ok()
+            .flatten();
+
+        eprintln!("[cc_common.compile] declare_file_method={:?}, run_method={:?}",
+            declare_file_method.map(|v| v.to_string()),
+            run_method.map(|v| v.to_string()));
+
+        // Process source files if provided
+        // srcs is a list of (Artifact, Label) tuples from cc_helper.get_srcs()
+        if !srcs.is_none() {
+            eprintln!("[cc_common.compile] Processing srcs...");
+            // Try to iterate over srcs
+            if let Ok(iter) = srcs.iterate(heap) {
+                let items: Vec<_> = iter.collect();
+                eprintln!("[cc_common.compile] srcs has {} items", items.len());
+                for src_tuple in items {
+                    eprintln!("[cc_common.compile] Processing src_tuple: {}", src_tuple);
+                    // Extract the artifact from the (Artifact, Label) tuple
+                    // Try tuple index first, then fall back to treating it as artifact directly
+                    let src = src_tuple.at(heap.alloc(0i32).to_value(), heap)
+                        .unwrap_or(src_tuple);
+
+                    // Get source file path
+                    let src_path = src.get_attr("path", heap)
+                        .ok()
+                        .flatten()
+                        .and_then(|v| v.unpack_str())
+                        .unwrap_or("unknown.c");
+
+                    // Determine output filename (replace extension with .o)
+                    let basename = src_path.rsplit('/').next().unwrap_or(src_path);
+                    let output_name = if let Some(dot_pos) = basename.rfind('.') {
+                        format!("_objs/{}/{}.o", name, &basename[..dot_pos])
+                    } else {
+                        format!("_objs/{}/{}.o", name, basename)
+                    };
+                    let pic_output_name = if let Some(dot_pos) = basename.rfind('.') {
+                        format!("_objs/{}/{}.pic.o", name, &basename[..dot_pos])
+                    } else {
+                        format!("_objs/{}/{}.pic.o", name, basename)
+                    };
+
+                    // Declare output files
+                    if let Some(declare_file) = declare_file_method {
+                        // Regular object file
+                        let output_file = eval.eval_function(
+                            declare_file,
+                            &[heap.alloc_str(&output_name).to_value()],
+                            &[],
+                        ).ok();
+
+                        // PIC object file
+                        let pic_output_file = eval.eval_function(
+                            declare_file,
+                            &[heap.alloc_str(&pic_output_name).to_value()],
+                            &[],
+                        ).ok();
+
+                        // Register compile action if run method available
+                        if let (Some(run), Some(out), Some(pic_out)) = (run_method, output_file, pic_output_file) {
+                            // Get output as output artifact
+                            let output_artifact = out.get_attr("as_output", heap)
+                                .ok()
+                                .flatten()
+                                .and_then(|method| eval.eval_function(method, &[], &[]).ok())
+                                .unwrap_or(out);
+                            let pic_output_artifact = pic_out.get_attr("as_output", heap)
+                                .ok()
+                                .flatten()
+                                .and_then(|method| eval.eval_function(method, &[], &[]).ok())
+                                .unwrap_or(pic_out);
+
+                            // Build compile command: gcc -c src -o output
+                            let args = heap.alloc(vec![
+                                heap.alloc_str("/usr/bin/gcc").to_value(),
+                                heap.alloc_str("-c").to_value(),
+                                src,
+                                heap.alloc_str("-o").to_value(),
+                                output_artifact,
+                            ]);
+                            let outputs_list = heap.alloc(vec![output_artifact]);
+                            let progress = heap.alloc_str(&format!("Compiling {}", basename)).to_value();
+
+                            // Call actions.run() for regular compile
+                            // Use unique identifier to avoid "multiple actions with same category" error
+                            let identifier = heap.alloc_str(&format!("{}.o", basename)).to_value();
+                            let _ = eval.eval_function(
+                                run,
+                                &[args],
+                                &[
+                                    ("outputs", outputs_list),
+                                    ("category", heap.alloc_str("cpp_compile").to_value()),
+                                    ("identifier", identifier),
+                                    ("progress_message", progress),
+                                ],
+                            );
+
+                            // Register PIC compile action with unique identifier
+                            let pic_args = heap.alloc(vec![
+                                heap.alloc_str("/usr/bin/gcc").to_value(),
+                                heap.alloc_str("-c").to_value(),
+                                heap.alloc_str("-fPIC").to_value(),
+                                src,
+                                heap.alloc_str("-o").to_value(),
+                                pic_output_artifact,
+                            ]);
+                            let pic_outputs_list = heap.alloc(vec![pic_output_artifact]);
+                            let pic_progress = heap.alloc_str(&format!("Compiling {} (PIC)", basename)).to_value();
+                            let pic_identifier = heap.alloc_str(&format!("{}.pic.o", basename)).to_value();
+
+                            let _ = eval.eval_function(
+                                run,
+                                &[pic_args],
+                                &[
+                                    ("outputs", pic_outputs_list),
+                                    ("category", heap.alloc_str("cpp_compile").to_value()),
+                                    ("identifier", pic_identifier),
+                                    ("progress_message", pic_progress),
+                                ],
+                            );
+
+                            object_files.push(out);
+                            pic_object_files.push(pic_out);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Create compilation context
+        let none_val = Value::new_none();
+        let compilation_context = heap.alloc(CcCompilationContextGen {
+            headers: none_val,
+            includes: none_val,
+            defines: none_val,
+        });
+
+        // Create compilation outputs
+        // Return lists of object files - these support len() which is needed by rules_cc
+        let objects_list = heap.alloc(object_files.clone());
+        let pic_objects_list = heap.alloc(pic_object_files.clone());
+        let compilation_outputs = heap.alloc(CompilationOutputsGen {
+            objects: objects_list,
+            pic_objects: pic_objects_list,
+        });
+
+        // Return tuple of (compilation_context, compilation_outputs)
+        Ok(heap.alloc((compilation_context, compilation_outputs)))
+    }
+
     /// Gets the tool path for a given action.
     #[allow(unused_variables)]
     fn get_tool_for_action<'v>(
@@ -1420,6 +1765,30 @@ impl<V: ValueLifetimeless> Display for CompilationOutputsGen<V> {
     }
 }
 
+/// Methods on CompilationOutputs for accessing coverage files.
+#[starlark_module]
+fn compilation_outputs_methods(builder: &mut MethodsBuilder) {
+    /// Returns coverage (gcno) files from non-PIC compilation.
+    fn gcno_files<'v>(
+        this: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        // Return empty list - no coverage files in this stub
+        Ok(heap.alloc(AllocList::EMPTY))
+    }
+
+    /// Returns coverage (gcno) files from PIC compilation.
+    fn pic_gcno_files<'v>(
+        this: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        // Return empty list - no coverage files in this stub
+        Ok(heap.alloc(AllocList::EMPTY))
+    }
+}
+
 #[starlark::values::starlark_value(type = "CompilationOutputs")]
 impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for CompilationOutputsGen<V>
 where
@@ -1431,22 +1800,19 @@ where
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "objects" => {
-                if self.objects.to_value().is_none() {
-                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-                } else {
-                    Some(self.objects.to_value())
-                }
-            }
-            "pic_objects" => {
-                if self.pic_objects.to_value().is_none() {
-                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-                } else {
-                    Some(self.pic_objects.to_value())
-                }
+            "objects" => Some(self.objects.to_value()),
+            "pic_objects" => Some(self.pic_objects.to_value()),
+            // These are additional attributes that rules_cc may access
+            "_gcno_files" | "_pic_gcno_files" => {
+                Some(heap.alloc(AllocList::EMPTY))
             }
             _ => None,
         }
+    }
+
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(compilation_outputs_methods)
     }
 }
 
