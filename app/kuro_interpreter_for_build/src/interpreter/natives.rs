@@ -204,6 +204,71 @@ pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
+    /// Groups a set of files under a single name for convenience.
+    ///
+    /// This is a Bazel built-in rule that creates a named reference to a set of files.
+    /// Other rules can depend on a filegroup instead of listing individual files.
+    ///
+    /// Example:
+    /// ```python
+    /// filegroup(
+    ///     name = "headers",
+    ///     srcs = ["foo.h", "bar.h"],
+    /// )
+    ///
+    /// cc_library(
+    ///     name = "lib",
+    ///     hdrs = [":headers"],  # Use the filegroup
+    /// )
+    /// ```
+    ///
+    /// See: https://bazel.build/reference/be/general#filegroup
+    fn filegroup<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(kwargs)] _kwargs: Value<'v>,
+    ) -> starlark::Result<NoneType> {
+        // TODO(filegroup): Implement filegroup target that forwards its srcs.
+        // Currently a no-op stub that allows parsing of BUILD files that use filegroup.
+        // A full implementation would register a target that makes srcs available
+        // to dependent rules.
+        let _unused = name;
+        Ok(NoneType)
+    }
+
+    /// Legacy cc_toolchain_suite rule (BUILD file version).
+    ///
+    /// This is a Bazel built-in native rule that was used before toolchain resolution.
+    /// In modern Bazel (and rules_cc 0.2.16+), this is deprecated in favor of toolchain()
+    /// rules, but native cc_toolchain_suite must still exist for backwards compatibility.
+    ///
+    /// Currently a no-op stub that allows parsing.
+    fn cc_toolchain_suite<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(kwargs)] _kwargs: Value<'v>,
+    ) -> starlark::Result<NoneType> {
+        // TODO(toolchains): Implement cc_toolchain_suite target registration.
+        // Currently a no-op stub for parsing compatibility.
+        let _unused = name;
+        Ok(NoneType)
+    }
+
+    /// Legacy cc_toolchain rule (BUILD file version).
+    ///
+    /// This is a Bazel built-in native rule for C++ toolchain definition.
+    /// In modern Bazel with rules_cc 0.2.16+, the pure Starlark cc_toolchain rule
+    /// is preferred, but native cc_toolchain must exist for backwards compatibility.
+    ///
+    /// Currently a no-op stub that allows parsing.
+    fn cc_toolchain<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(kwargs)] _kwargs: Value<'v>,
+    ) -> starlark::Result<NoneType> {
+        // TODO(toolchains): Implement cc_toolchain target registration.
+        // Currently a no-op stub for parsing compatibility.
+        let _unused = name;
+        Ok(NoneType)
+    }
+
     /// Check if the target with `name` has already been defined,
     /// returns `True` if it has.
     ///
@@ -269,6 +334,56 @@ pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
 /// ```
 #[starlark_module]
 fn bazel_native_module(registry: &mut GlobalsBuilder) {
+    /// Legacy native cc_toolchain_suite rule.
+    ///
+    /// This is a Bazel built-in native rule that was used before toolchain resolution.
+    /// In modern Bazel (and rules_cc 0.2.16+), this is deprecated in favor of toolchain()
+    /// rules, but the native.cc_toolchain_suite function must still exist for backwards
+    /// compatibility with the wrapper in rules_cc.
+    ///
+    /// Currently a no-op stub that allows parsing.
+    fn cc_toolchain_suite<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = NoneOr::None)]
+        _toolchains: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        _visibility: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        _tags: UnpackListOrTuple<String>,
+        #[starlark(kwargs)] _kwargs: Value<'v>,
+    ) -> starlark::Result<NoneType> {
+        // TODO(toolchains): Implement cc_toolchain_suite target registration.
+        // Currently a no-op stub for parsing compatibility.
+        let _unused = name;
+        Ok(NoneType)
+    }
+
+    /// Legacy native cc_toolchain rule.
+    ///
+    /// This is a Bazel built-in native rule for C++ toolchain definition.
+    /// In modern Bazel with rules_cc 0.2.16+, the pure Starlark cc_toolchain rule
+    /// is preferred, but native.cc_toolchain must exist for backwards compatibility.
+    ///
+    /// Currently a no-op stub that allows parsing.
+    fn cc_toolchain<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = NoneOr::None)]
+        _all_files: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)]
+        _toolchain_config: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)]
+        _toolchain_identifier: NoneOr<&str>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        _visibility: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        _tags: UnpackListOrTuple<String>,
+        #[starlark(kwargs)] _kwargs: Value<'v>,
+    ) -> starlark::Result<NoneType> {
+        // TODO(toolchains): Implement cc_toolchain target registration.
+        // Currently a no-op stub for parsing compatibility.
+        let _unused = name;
+        Ok(NoneType)
+    }
     /// The `glob()` function specifies a set of files using patterns.
     /// Bazel-compatible: can be called as `native.glob()` from .bzl files.
     ///
