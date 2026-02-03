@@ -194,7 +194,10 @@ pub fn register_depset(builder: &mut GlobalsBuilder) {
 **DefaultInfo** (line 136 in `default_info.rs`):
 
 - ✓ Already exists with `files`, `runfiles`, `executable`
-- CHECK: Parameter names match Bazel exactly
+- ✓ Bazel-style `files` parameter now properly converts depset to default_outputs (fixed 2026-02-03)
+  - Added `extract_depset_elements()` helper to handle both frozen and live depsets
+  - Supports nested depsets with transitive children
+  - Test: `tests/simple_files_test:bazel_files_test` verifies this works
 
 **NEED: OutputGroupInfo**
 
@@ -293,7 +296,7 @@ Check Kuro's existing runfiles implementation and align API.
 - [ ] ctx.actions.run() executes actions correctly
 - [x] ctx.actions.args() builds command lines (implemented 2026-02-02)
 - [ ] depset operations are efficient
-- [x] DefaultInfo provider works
+- [x] DefaultInfo provider works (including Bazel-style `files` parameter - fixed 2026-02-03)
 - [x] `Provider in target` operator works (e.g., `DefaultInfo in dep`)
 - [x] `Provider in artifact` operator works (e.g., `DefaultInfo in src_file`)
 - [x] `target[Provider]` indexing works

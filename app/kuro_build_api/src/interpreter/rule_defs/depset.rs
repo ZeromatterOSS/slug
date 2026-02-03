@@ -88,7 +88,7 @@ impl Depset {
 
     /// Collect all elements from this depset and its transitive children.
     /// Uses preorder traversal (direct elements first, then transitive).
-    fn collect_all_frozen(&self) -> Vec<FrozenValue> {
+    pub fn collect_all_frozen(&self) -> Vec<FrozenValue> {
         let mut result = Vec::new();
         self.collect_frozen_recursive(&mut result);
         result
@@ -186,9 +186,9 @@ fn frozen_depset_methods(builder: &mut MethodsBuilder) {
 #[repr(C)]
 pub struct LiveDepsetGen<V: ValueLifetimeless> {
     /// Direct elements (stored as Values that freeze to FrozenValues)
-    direct: V,  // Actually a list value
+    pub(crate) direct: V,  // Actually a list value
     /// Transitive children (depsets)
-    transitive: V,  // Actually a list value
+    pub(crate) transitive: V,  // Actually a list value
     /// Iteration order
     #[freeze(identity)]
     order: String,

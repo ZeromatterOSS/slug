@@ -1,0 +1,11 @@
+# Test DefaultInfo files parameter
+load("//tests/manual_test:test_files_param.bzl", "test_files_param", "test_outputs_param", "test_nested_depset")
+
+# Test 1: Bazel-style files parameter
+test_files_param(name = "bazel_files_test")
+
+# Test 2: Buck-style default_output parameter
+test_outputs_param(name = "buck_output_test")
+
+# Test 3: Nested depsets with transitive parameter
+test_nested_depset(name = "nested_depset_test")

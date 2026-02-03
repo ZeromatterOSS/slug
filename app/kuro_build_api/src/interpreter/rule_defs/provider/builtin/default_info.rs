@@ -62,6 +62,7 @@ use crate::interpreter::rule_defs::artifact_tagging::ArtifactTag;
 use crate::interpreter::rule_defs::cmd_args::CommandLineArtifactVisitor;
 use crate::interpreter::rule_defs::cmd_args::value_as::ValueAsCommandLineLike;
 use crate::interpreter::rule_defs::depset::Depset;
+use crate::interpreter::rule_defs::depset::LiveDepsetGen;
 use crate::interpreter::rule_defs::provider::ProviderCollection;
 use crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 
@@ -581,6 +582,51 @@ fn depset_with_list_methods(builder: &mut MethodsBuilder) {
     }
 }
 
+/// Extract elements from a Bazel depset value.
+/// Handles both frozen Depset and live LiveDepsetGen types.
+fn extract_depset_elements<'v>(depset_val: Value<'v>, heap: Heap<'v>) -> Vec<Value<'v>> {
+    // Try LiveDepsetGen first (unfrozen depset during evaluation)
+    if let Some(live_depset) = depset_val.downcast_ref::<LiveDepsetGen<Value<'v>>>() {
+        let mut elements = Vec::new();
+        // Collect direct elements from the live depset
+        if let Ok(direct_iter) = live_depset.direct.iterate(heap) {
+            for elem in direct_iter {
+                elements.push(elem);
+            }
+        }
+        // Collect transitive elements
+        if let Ok(transitive_iter) = live_depset.transitive.iterate(heap) {
+            for child in transitive_iter {
+                // Recursively extract from child depsets
+                elements.extend(extract_depset_elements(child, heap));
+            }
+        }
+        return elements;
+    }
+
+    // Try frozen Depset
+    if let Some(frozen_depset) = depset_val.downcast_ref::<Depset>() {
+        return frozen_depset
+            .collect_all_frozen()
+            .into_iter()
+            .map(|v| v.to_value())
+            .collect();
+    }
+
+    // If it's already a list, just collect its elements
+    if let Some(list) = ListRef::from_value(depset_val) {
+        return list.iter().collect();
+    }
+
+    // Fallback: try to iterate the value directly
+    if let Ok(iter) = depset_val.iterate(heap) {
+        return iter.collect();
+    }
+
+    // Last resort: return empty
+    Vec::new()
+}
+
 #[starlark_module]
 fn default_info_creator(builder: &mut GlobalsBuilder) {
     #[starlark(as_type = FrozenDefaultInfo)]
@@ -611,13 +657,8 @@ fn default_info_creator(builder: &mut GlobalsBuilder) {
     ) -> starlark::Result<DefaultInfo<'v>> {
         let heap = eval.heap();
 
-        // Handle Bazel-style 'files' parameter: use it as default_outputs if present
-        // and no Buck-style default_outputs/default_output were provided
-        let files_as_outputs = files.into_option().and_then(|f| {
-            // Try to convert files depset to a list of outputs
-            // For now, just ignore files if default_outputs is also provided
-            None::<ValueOf<'v, UnpackList<UnpackAndDiscard<ValueIsInputArtifactAnnotation>>>>
-        });
+        // Extract files value once (NoneOr is consumed by into_option)
+        let files_val = files.into_option();
 
         // support both list and singular options for now until we migrate all the rules.
         let valid_default_outputs: ValueOfUnchecked<ListType<ValueIsInputArtifactAnnotation>> =
@@ -632,10 +673,10 @@ fn default_info_creator(builder: &mut GlobalsBuilder) {
                 }
                 (None, None) => {
                     // Bazel compatibility: if 'files' was provided, use it as default_outputs
-                    if let Some(files_val) = files.into_option() {
-                        // Try to iterate the files depset and collect artifacts
-                        // For now, just use an empty list as fallback
-                        ValueOfUnchecked::<ListType<_>>::new(eval.heap().alloc(AllocList::EMPTY))
+                    if let Some(files_depset) = files_val {
+                        // Convert the files depset to a list of outputs
+                        let elements: Vec<Value<'v>> = extract_depset_elements(files_depset, heap);
+                        ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList(elements)))
                     } else {
                         ValueOfUnchecked::<ListType<_>>::new(eval.heap().alloc(AllocList::EMPTY))
                     }
