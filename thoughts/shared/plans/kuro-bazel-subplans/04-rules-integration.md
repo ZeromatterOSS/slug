@@ -30,7 +30,12 @@ This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rus
 
 **Blocking:**
 - [ ] Transitive dependency resolution - rules_cc depends on `protobuf` (via `repo_name = "com_google_protobuf"`) and `platforms`, which aren't being resolved
-- [ ] `repo_name` aliasing in bzlmod - `bazel_dep(..., repo_name = "alias")` should create cell aliases
+
+**Completed (2026-02-04):**
+- [x] `repo_name` aliasing in bzlmod - `bazel_dep(..., repo_name = "alias")` now creates cell aliases correctly
+  - Aliases are collected from transitive deps' MODULE.bazel via `collect_transitive_repo_aliases()`
+  - Registered with cell resolver via `CellsAggregator::new(root_aliases)`
+  - Example: `com_google_protobuf -> protobuf`, `com_google_absl -> abseil-cpp`, `io_bazel_stardoc -> stardoc`
 
 **Files:**
 - `app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs` - cc_common implementation

@@ -234,7 +234,7 @@ Quick reference to all phases and their locations:
 
 | Phase | Title                    | Status          |
 | ----- | ------------------------ | --------------- |
-| 9     | rules_cc Integration     | [ ] Not Started |
+| 9     | rules_cc Integration     | [x] In Progress (cc_library works, repo_name aliasing works) |
 | 10    | rules_rust Integration   | [ ] Not Started |
 | 11    | rules_python Integration | [ ] Not Started |
 | 12    | rules_oci Integration    | [ ] Not Started |
@@ -323,3 +323,45 @@ We preserve the existing pytest infrastructure because:
 - Depset operation tests
 - Sandbox isolation tests
 - Query function tests
+
+---
+
+## Key Learnings
+
+This section documents important lessons learned during development that are broadly applicable.
+
+### Build System Debugging
+
+#### Debug vs Release Binary Mismatch (2026-02-04)
+
+**Problem:** Debug logging (eprintln!, tracing::warn!, file writes) wasn't appearing during development.
+
+**Root Cause:** The `kuro` symlink at project root points to `target/debug/kuro`, but development was using `cargo build --release` which outputs to `target/release/kuro`.
+
+**Solution:** Always match the build type to the symlink target:
+- Use `cargo build -p kuro` (debug) when using the `./kuro` symlink
+- Or update the symlink to point to release if using `cargo build --release`
+
+**Detection Method:** Added `panic!("DEBUG: message")` to verify code path was being reached - this confirmed the release binary was running, not the debug binary being built.
+
+#### Bazel Artifact Path Model
+
+**Critical Insight:** Bazel's `File.path` returns full execution-time paths (e.g., `bazel-out/k8-fastbuild/bin/pkg/__target__/file.o`), while Buck2's original implementation returned relative paths. This breaks rules that store paths as strings for later command-line use.
+
+**Fix:** Modified `artifact.path` to construct full buck-out paths: `buck-out/v2/gen/<cell>/<cfg_hash>[/<pkg>]/__<target>__/<artifact_path>`
+
+#### Buck2 Dependency Tracking
+
+Buck2 tracks action dependencies by visiting artifacts in command lines via `CommandLineArgLike::visit_artifacts`. When string paths are used (common in Bazel rules), Buck2 doesn't see them as dependencies. Added `bazel_inputs` field to explicitly track Bazel-style inputs.
+
+### bzlmod Implementation
+
+#### repo_name Aliasing
+
+The `bazel_dep(..., repo_name="alias")` pattern creates cell aliases that allow `@alias//...` to resolve to the actual module. Implementation involves:
+1. `collect_transitive_repo_aliases()` extracts aliases from transitive deps' MODULE.bazel files
+2. Aliases returned in `BzlmodResolutionResult.aliases`
+3. Merged into `root_aliases` HashMap
+4. Passed to `CellsAggregator::new()` for cell resolver registration
+
+Example aliases created: `com_google_protobuf -> protobuf`, `com_google_absl -> abseil-cpp`
