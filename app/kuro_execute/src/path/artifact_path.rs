@@ -13,6 +13,7 @@ use std::fmt;
 use std::hash::Hash;
 
 use kuro_core::content_hash::ContentBasedPathHash;
+use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::fs::artifact_path_resolver::ArtifactFs;
 use kuro_core::fs::buck_out_path::BuildArtifactPath;
 use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
@@ -21,6 +22,7 @@ use kuro_error::ErrorTag;
 use kuro_error::kuro_error;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
+use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use either::Either;
 use gazebo::cell::ARef;
 
@@ -76,23 +78,70 @@ impl ArtifactPath<'_> {
         f(path)
     }
 
+    /// Returns the full execution path of the artifact.
+    /// For build artifacts, returns the complete buck-out path that can be used in commands.
+    /// For source files, returns the cell-relative path.
     pub fn with_full_path<F, T>(&self, f: F) -> T
     where
         for<'b> F: FnOnce(&'b ForwardRelativePath) -> T,
     {
-        let base_path = match self.base_path.as_ref() {
-            Either::Left(buck_out) => Cow::Borrowed(buck_out.path()),
-            Either::Right(buck) => Cow::Owned(
-                buck.package()
+        match self.base_path.as_ref() {
+            Either::Left(buck_out) => {
+                // For build artifacts, construct the full buck-out path
+                // Path structure: buck-out/v2/gen/<cell_name>/<cfg_hash>/<cell_relative_path>/__<target_name>__/<artifact_path>
+                let owner = buck_out.owner().owner();
+                if let BaseDeferredKey::TargetLabel(target) = owner {
+                    let cfg_hash = target.cfg().output_hash().as_str();
+                    let cell_name = target.pkg().cell_name().as_str();
+                    let cell_relative_path = target.pkg().cell_relative_path().as_str();
+                    let target_name = target.name().as_str();
+                    let artifact_path = buck_out.path();
+
+                    // Escape target name (replace = with special sequence)
+                    let escaped_target_name = target_name.replace('=', "__EQ__");
+
+                    // Build the full path
+                    // Path format: buck-out/v2/gen/<cell>/<cfg_hash>[/<pkg_path>]/__<target>__/<artifact_path>
+                    let full_path = if cell_relative_path.is_empty() {
+                        format!(
+                            "buck-out/v2/gen/{}/{}/__{}__/{}",
+                            cell_name,
+                            cfg_hash,
+                            escaped_target_name,
+                            artifact_path.join(self.projected_path)
+                        )
+                    } else {
+                        format!(
+                            "buck-out/v2/gen/{}/{}/{}/__{}__/{}",
+                            cell_name,
+                            cfg_hash,
+                            cell_relative_path,
+                            escaped_target_name,
+                            artifact_path.join(self.projected_path)
+                        )
+                    };
+
+                    // Convert to ForwardRelativePathBuf and call f
+                    let full_path_buf = ForwardRelativePathBuf::unchecked_new(full_path);
+                    f(&full_path_buf)
+                } else {
+                    // Fallback for non-target owners (anon targets, BXL)
+                    let base_path = Cow::Borrowed(buck_out.path());
+                    let path = base_path.join_cow(self.projected_path);
+                    f(&path)
+                }
+            }
+            Either::Right(buck) => {
+                // For source files, return cell-relative path + source path
+                let path = buck
+                    .package()
                     .cell_relative_path()
                     .as_forward_relative_path()
-                    .join(buck.path()),
-            ),
-        };
-
-        let path = base_path.join_cow(self.projected_path);
-
-        f(&path)
+                    .join(buck.path());
+                let path = path.join_cow(self.projected_path);
+                f(&path)
+            }
+        }
     }
 
     /// Returns the project relative path of the artifact.

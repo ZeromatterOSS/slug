@@ -15,6 +15,8 @@ use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::artifact_type::ArtifactErrors;
 use kuro_artifact::artifact::artifact_type::OutputArtifact;
 use kuro_build_api::artifact_groups::ArtifactGroup;
+use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
+use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_output_artifact::StarlarkOutputArtifact;
 use kuro_build_api::interpreter::rule_defs::artifact_tagging::ArtifactTag;
@@ -400,7 +402,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
 
         let mut artifact_visitor = RunCommandArtifactVisitor::new(&dep_files);
 
-        let starlark_args = StarlarkCmdArgs::try_from_value_typed(arguments)?;
+        let mut starlark_args = StarlarkCmdArgs::try_from_value_typed(arguments)?;
         starlark_args.visit_artifacts(&mut artifact_visitor)?;
 
         // TODO(nga): we should not accept output artifacts in worker.
@@ -419,7 +421,19 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
                 starlark_exe.visit_artifacts(&mut artifact_visitor)?;
                 (starlark_exe, None, None)
             }
-            None => (StarlarkCmdArgs::default(), None, None),
+            None => {
+                // Bazel compatibility: If no Buck2-style `exe` is provided,
+                // check for Bazel-style `executable` parameter.
+                // In Bazel, `executable` is prepended to `arguments` to form the command.
+                match executable.into_option() {
+                    Some(exec_val) => {
+                        let starlark_exe = StarlarkCmdArgs::try_from_value(exec_val)?;
+                        starlark_exe.visit_artifacts(&mut artifact_visitor)?;
+                        (starlark_exe, None, None)
+                    }
+                    None => (StarlarkCmdArgs::default(), None, None),
+                }
+            }
         };
 
         let weight = match (weight, weight_percentage) {
@@ -601,9 +615,153 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             (None, None) => heap.alloc_str("action"),  // Default fallback
         };
 
-        // Ignore Bazel-specific parameters for now (they're handled by stubs)
-        // Note: `outputs` is processed above for Bazel compatibility
-        let _ = (executable, inputs, progress_message, resource_set,
+        // Bazel compatibility: process the `inputs` parameter if provided.
+        // In Bazel, inputs specify the dependencies of an action:
+        //   ctx.actions.run(inputs = depset([artifact1, artifact2]), ...)
+        // These input artifacts must be added to establish proper action dependencies.
+
+        // Debug logging for inputs processing
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+            let _ = writeln!(f, "[actions.run] inputs parameter: {:?}, category: {}",
+                match &inputs { NoneOr::None => "None".to_string(), NoneOr::Other(v) => format!("Some({})", v) },
+                effective_category);
+        }
+
+        // Collect bazel inputs to pass to StarlarkRunActionValues for dependency tracking
+        let mut collected_bazel_inputs: Vec<Value<'v>> = vec![];
+
+        if let NoneOr::Other(bazel_inputs) = inputs {
+            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                let _ = writeln!(f, "  inputs type: {}, value: {}", bazel_inputs.get_type(), bazel_inputs);
+            }
+
+            // Try to get the to_list method (for depset) or iterate directly (for list)
+            let items_to_process: Vec<Value<'v>> = if let Ok(Some(to_list)) = bazel_inputs.get_attr("to_list", eval.heap()) {
+                // It's a depset - call to_list() to get the items
+                if let Ok(list_val) = eval.eval_function(to_list, &[], &[]) {
+                    if let Ok(iter) = list_val.iterate(eval.heap()) {
+                        iter.collect()
+                    } else {
+                        vec![]
+                    }
+                } else {
+                    vec![]
+                }
+            } else if let Ok(iter) = bazel_inputs.iterate(eval.heap()) {
+                // It's already iterable (list, tuple, etc.)
+                iter.collect()
+            } else {
+                // Single value - wrap in vec
+                vec![bazel_inputs]
+            };
+
+            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                let _ = writeln!(f, "  items_to_process count: {}", items_to_process.len());
+            }
+
+            // Collect the bazel inputs for passing to StarlarkRunActionValues
+            // This allows visit_artifacts to include them as dependencies
+            collected_bazel_inputs = items_to_process.clone();
+
+            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                let _ = writeln!(f, "  collected_bazel_inputs count: {}", collected_bazel_inputs.len());
+                for (i, v) in collected_bazel_inputs.iter().enumerate() {
+                    let _ = writeln!(f, "    [{}] type={}, value={}", i, v.get_type(), v);
+                }
+            }
+
+            // Create a cmd_args with the input artifacts as hidden dependencies
+            // This ensures they are tracked as dependencies without appearing on the command line
+            if !items_to_process.is_empty() {
+                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                    let _ = writeln!(f, "  attempting to add hidden inputs to cmd_args");
+                }
+
+                // Get the cmd_args function from the module
+                let cmd_args_fn_opt = eval.module().get("cmd_args");
+                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                    let _ = writeln!(f, "  cmd_args function lookup: {:?}", cmd_args_fn_opt.map(|v| v.to_string()));
+                }
+
+                if let Some(cmd_args_fn) = cmd_args_fn_opt {
+                    // Create a list of the input artifacts
+                    let input_list = heap.alloc(items_to_process.clone());
+
+                    // Call cmd_args(hidden=inputs) to create a cmd_args with hidden inputs
+                    if let Ok(hidden_cmd) = eval.eval_function(
+                        cmd_args_fn,
+                        &[],
+                        &[("hidden", input_list)],
+                    ) {
+                        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                            let _ = writeln!(f, "  created hidden cmd_args: {}", hidden_cmd);
+                        }
+
+                        // Add this hidden cmd_args to the main args so it's included in visit_artifacts
+                        // First allocate starlark_args to get a Value, then call .add() on it
+                        let args_value = heap.alloc_complex(std::mem::take(&mut starlark_args));
+                        if let Ok(Some(add_method)) = args_value.get_attr("add", heap) {
+                            let add_result = eval.eval_function(add_method, &[hidden_cmd], &[]);
+                            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                                let _ = writeln!(f, "  add result: {:?}", add_result.as_ref().map(|v| v.to_string()));
+                            }
+                            // Update starlark_args with the result if successful
+                            if let Ok(new_args) = add_result {
+                                if let Ok(typed_args) = StarlarkCmdArgs::try_from_value(new_args) {
+                                    starlark_args = typed_args;
+                                }
+                            }
+                        } else {
+                            // Restore starlark_args if we couldn't call add
+                            if let Ok(restored) = StarlarkCmdArgs::try_from_value(args_value) {
+                                starlark_args = restored;
+                            }
+                        }
+                    }
+                }
+            }
+
+            for input_val in items_to_process {
+                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                    let _ = writeln!(f, "    processing input: type={}, value={}", input_val.get_type(), input_val);
+                }
+
+                // Try to extract an artifact from the input value and add it as an input dependency
+                // StarlarkArtifact: A frozen/bound artifact (source or build artifact)
+                if let Some(artifact) = input_val.downcast_ref::<StarlarkArtifact>() {
+                    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                        let _ = writeln!(f, "      -> StarlarkArtifact: added as input");
+                    }
+                    artifacts.inputs.insert(ArtifactGroup::Artifact(artifact.artifact().dupe()));
+                }
+                // StarlarkDeclaredArtifact: An artifact declared in the current analysis
+                // When used as an input, this creates a dependency on the action that produces it
+                else if let Some(declared) = input_val.downcast_ref::<StarlarkDeclaredArtifact>() {
+                    // Use get_artifact_group() to get the artifact and establish dependency
+                    if let Ok(artifact_group) = declared.get_artifact_group() {
+                        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                            let _ = writeln!(f, "      -> StarlarkDeclaredArtifact: added as input");
+                        }
+                        artifacts.inputs.insert(artifact_group);
+                    }
+                }
+                // Note: StarlarkOutputArtifact is typically not expected in `inputs` parameter,
+                // as it represents outputs of an action. If needed, it can be handled by getting
+                // the underlying artifact via the Starlark as_input() method.
+                else {
+                    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                        let _ = writeln!(f, "      -> unrecognized type, ignored");
+                    }
+                }
+            }
+        }
+
+        // Ignore other Bazel-specific parameters that are not yet implemented.
+        // Note: `outputs` is processed above for Bazel compatibility.
+        // Note: `executable` is handled above for Bazel compatibility.
+        // Note: `inputs` is processed above for Bazel compatibility.
+        let _ = (progress_message, resource_set,
                  use_default_shell_env, execution_requirements, toolchain, exec_group,
                  tools, input_manifests, unused_inputs_list, shadowed_action);
 
@@ -619,6 +777,8 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             },
             identifier: identifier.into_option(),
             outputs_for_error_handler: outputs_for_error_handler.items,
+            // Bazel compatibility: track extra input artifacts from the `inputs` parameter
+            bazel_inputs: collected_bazel_inputs,
         });
 
         let re_dependencies = remote_execution_dependencies

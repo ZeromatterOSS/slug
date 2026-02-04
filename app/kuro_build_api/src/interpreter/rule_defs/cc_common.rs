@@ -50,6 +50,7 @@ use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::ValueLifetimeless;
 use starlark::values::dict::Dict;
+use starlark::values::dict::DictRef;
 use starlark::values::list::AllocList;
 use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
@@ -181,23 +182,54 @@ where
 /// CcToolchainVariables holds build variables for C++ toolchain configuration.
 ///
 /// Used by cc_common functions to pass configuration to compile/link actions.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Clone)]
-pub struct CcToolchainVariables {
-    // Internal storage for variables - currently a stub
-    // TODO(cc_common): Implement full variable storage and lookup
-    _empty: bool,
+/// This version stores a reference to the original variables dict for access
+/// by get_link_args.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[repr(C)]
+pub struct CcToolchainVariablesGen<V: ValueLifetimeless> {
+    /// The original variables dict
+    vars: V,
 }
 
-impl Display for CcToolchainVariables {
+starlark_complex_value!(pub CcToolchainVariables);
+
+impl<V: ValueLifetimeless> Display for CcToolchainVariablesGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "CcToolchainVariables()")
     }
 }
 
-starlark_simple_value!(CcToolchainVariables);
+#[starlark::values::starlark_value(type = "CcToolchainVariables")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for CcToolchainVariablesGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        // Allow attribute access to underlying variables dict
+        let vars_value = self.vars.to_value();
+        if vars_value.is_none() {
+            return None;
+        }
+        // Use DictRef to access dict values by string key
+        if let Some(dict_ref) = DictRef::from_value(vars_value) {
+            dict_ref.get_str(attribute)
+        } else {
+            None
+        }
+    }
 
-#[starlark_value(type = "CcToolchainVariables")]
-impl<'v> StarlarkValue<'v> for CcToolchainVariables {}
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        let vars_value = self.vars.to_value();
+        if vars_value.is_none() {
+            return false;
+        }
+        if let Some(dict_ref) = DictRef::from_value(vars_value) {
+            dict_ref.get_str(attribute).is_some()
+        } else {
+            false
+        }
+    }
+}
 
 // ============================================================================
 // CtxCheatStub - Stub for actions2ctx_cheat return value
@@ -665,26 +697,51 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<NoneType> {
         let heap = eval.heap();
 
+        // Log call for debugging
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+            let _ = writeln!(f, "[create_cc_compile_action] source={}, output_file={}, action_name={:?}",
+                source, output_file, action_name);
+            let _ = writeln!(f, "  action_construction_context type: {}", action_construction_context.get_type());
+        }
+
         // Validate required parameters
         if source.is_none() || output_file.is_none() {
             // Cannot create compile action without source and output
+            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                let _ = writeln!(f, "  EARLY RETURN: source or output_file is None");
+            }
             return Ok(NoneType);
         }
 
         // Get the actions from action_construction_context
         // The context is a CtxCheatWithActions that has the real actions
-        let actions_value = if let Ok(Some(actions)) = action_construction_context.get_attr("actions", heap) {
+        let actions_attr_result = action_construction_context.get_attr("actions", heap);
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+            let _ = writeln!(f, "  actions attr result: {:?}", actions_attr_result.as_ref().map(|o| o.map(|v| v.to_string())));
+        }
+        let actions_value = if let Ok(Some(actions)) = actions_attr_result {
             actions
         } else {
             // Fallback: action_construction_context might itself be actions
             action_construction_context
         };
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+            let _ = writeln!(f, "  actions_value type: {}", actions_value.get_type());
+        }
 
         // Try to get the run method from actions
-        let run_method = match actions_value.get_attr("run", heap) {
+        let run_attr_result = actions_value.get_attr("run", heap);
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+            let _ = writeln!(f, "  run attr result: {:?}", run_attr_result.as_ref().map(|o| o.map(|v| v.to_string())));
+        }
+        let run_method = match run_attr_result {
             Ok(Some(method)) => method,
             _ => {
                 // No run method available - this is a stub context
+                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                    let _ = writeln!(f, "  EARLY RETURN: no run method available");
+                }
                 return Ok(NoneType);
             }
         };
@@ -738,6 +795,18 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             args_vec.push(heap.alloc_str("-fPIC").to_value());
         }
 
+        // Add dependency file generation flags if dotd_file is specified
+        if !dotd_file.is_none() {
+            args_vec.push(heap.alloc_str("-MMD").to_value());  // Generate deps, excluding system headers
+            args_vec.push(heap.alloc_str("-MF").to_value());   // Output dependency file to specified path
+            // Get the path of the dotd_file artifact
+            if let Ok(Some(path_method)) = dotd_file.get_attr("as_output", heap) {
+                if let Ok(dotd_output) = eval.eval_function(path_method, &[], &[]) {
+                    args_vec.push(dotd_output);
+                }
+            }
+        }
+
         let arguments = heap.alloc(args_vec);
 
         // Build the outputs list with all output artifacts
@@ -778,9 +847,16 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
 
         // Invoke actions.run() using Starlark's function evaluation
         // This properly registers the action through Kuro's infrastructure
-        // Errors are silently ignored to allow partial progress - rules_cc may have
-        // features we haven't fully implemented yet
-        let _ = eval.eval_function(run_method, &[arguments], &named_args);
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+            let _ = writeln!(f, "  Calling run_method with:");
+            let _ = writeln!(f, "    arguments: {}", arguments);
+            let _ = writeln!(f, "    outputs: {}", outputs_list);
+            let _ = writeln!(f, "    mnemonic: {}", action_name_str);
+        }
+        let run_result = eval.eval_function(run_method, &[arguments], &named_args);
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+            let _ = writeln!(f, "  run result: {:?}", run_result.as_ref().map(|v| v.to_string()).map_err(|e| e.to_string()));
+        }
 
         Ok(NoneType)
     }
@@ -796,6 +872,10 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = "")] output_name: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<String> {
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+            let _ = writeln!(f, "[get_artifact_name_for_category] category={:?}, output_name={:?}", category, output_name);
+        }
         // TODO(cc_common): Implement proper artifact naming based on toolchain
         // For now, return basic naming conventions
         let name = if output_name.is_empty() {
@@ -852,6 +932,9 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             // Unknown category - use category as extension
             _ => format!("{}.{}", name, category),
         };
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+            let _ = writeln!(f, "  result = {:?}", result);
+        }
         Ok(result)
     }
 
@@ -862,9 +945,14 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] parent: Value<'v>,
         #[starlark(require = pos)] child: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<CcToolchainVariables> {
-        // TODO(cc_common): Implement proper variable combination
-        Ok(CcToolchainVariables { _empty: false })
+    ) -> starlark::Result<Value<'v>> {
+        // For now, return the child variables (last one wins)
+        // TODO(cc_common): Implement proper merging of variables
+        if child.is_none() {
+            Ok(parent)
+        } else {
+            Ok(child)
+        }
     }
 
     /// Gets the rule context from an actions object.
@@ -888,9 +976,9 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] this: &CcCommonInternal,
         #[starlark(require = named, default = NoneType)] vars: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<CcToolchainVariables> {
-        // TODO(cc_common): Implement proper variable creation from dict
-        Ok(CcToolchainVariables { _empty: false })
+    ) -> starlark::Result<Value<'v>> {
+        // Wrap the variables dict in CcToolchainVariables
+        Ok(eval.heap().alloc(CcToolchainVariablesGen { vars }))
     }
 
     /// Freezes a list to an immutable tuple.
@@ -966,6 +1054,14 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Gets link arguments for a given feature configuration.
+    ///
+    /// This function extracts variables from build_variables and constructs
+    /// the linker command line arguments. For rules_cc compatibility, this
+    /// returns an Args-like list that can be passed to actions.run(arguments=...).
+    ///
+    /// Note: In Bazel, this is a complex function that uses action_configs and
+    /// feature definitions to expand variables into flags. For now, we extract
+    /// basic string variables and return them as arguments.
     #[allow(unused_variables)]
     fn get_link_args<'v>(
         #[starlark(this)] this: &CcCommonInternal,
@@ -973,11 +1069,243 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] action_name: Value<'v>,
         #[starlark(require = named)] build_variables: Value<'v>,
         #[starlark(require = named, default = NoneType)] parameter_file_type: Value<'v>,
+        // Kuro extension: Optional input artifacts for proper path resolution.
+        // When provided, artifact paths from _NamedLibraryInfo.name will be matched
+        // against these artifacts and replaced with actual artifact references.
+        #[starlark(require = named, default = NoneType)] input_artifacts: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // TODO(cc_common): Implement proper link args extraction
-        // Return empty Args for now
-        Ok(eval.heap().alloc(AllocList::EMPTY))
+        let heap = eval.heap();
+
+        // Log to file for debugging
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+            let _ = writeln!(f, "[get_link_args] action_name={}, build_variables type={}",
+                action_name, build_variables.get_type());
+            // Log the libraries_to_link content
+            let get_var = |key: &str| -> Option<Value<'v>> {
+                if let Some(v) = build_variables.get_attr(key, heap).ok().flatten() {
+                    return Some(v);
+                }
+                if let Some(dict_ref) = DictRef::from_value(build_variables) {
+                    if let Some(v) = dict_ref.get_str(key) {
+                        return Some(v);
+                    }
+                }
+                None
+            };
+            if let Some(libs) = get_var("libraries_to_link") {
+                let _ = writeln!(f, "  libraries_to_link: {}", libs);
+                if let Ok(iter) = libs.iterate(heap) {
+                    for (i, lib) in iter.enumerate() {
+                        let _ = writeln!(f, "    [{}] type={}, value={}", i, lib.get_type(), lib);
+                        if let Ok(Some(name)) = lib.get_attr("name", heap) {
+                            let _ = writeln!(f, "      .name = {}", name);
+                        }
+                        // Check for artifact attribute
+                        if let Ok(Some(artifact)) = lib.get_attr("artifact", heap) {
+                            let _ = writeln!(f, "      .artifact = {} (type={})", artifact, artifact.get_type());
+                        }
+                    }
+                }
+            }
+            // Log expanded_linker_inputs if present
+            if let Some(inputs) = get_var("expanded_linker_inputs") {
+                let _ = writeln!(f, "  expanded_linker_inputs: {} (type={})", inputs, inputs.get_type());
+                if let Ok(iter) = inputs.iterate(heap) {
+                    for (i, input) in iter.enumerate() {
+                        let _ = writeln!(f, "    [{}] type={}, value={}", i, input.get_type(), input);
+                    }
+                }
+            }
+            // Log all available keys in build_variables
+            if let Some(dict_ref) = DictRef::from_value(build_variables) {
+                let _ = writeln!(f, "  all build_variables keys:");
+                for (k, _v) in dict_ref.iter() {
+                    let _ = writeln!(f, "    - {}", k);
+                }
+            }
+        }
+
+        // Get action name as string
+        let action_name_str = action_name.unpack_str().unwrap_or("c++-link-executable");
+
+        // Extract variables from build_variables
+        // build_variables can be either:
+        // 1. CcToolchainVariables wrapping a dict (Kuro style)
+        // 2. A raw dict (if passed directly)
+        let mut args: Vec<Value<'v>> = Vec::new();
+
+        // Helper to get a variable value from either CcToolchainVariables or a raw dict
+        let get_var = |key: &str| -> Option<Value<'v>> {
+            // First try get_attr (works for CcToolchainVariables)
+            if let Some(v) = build_variables.get_attr(key, heap).ok().flatten() {
+                return Some(v);
+            }
+            // Also try direct dict access (if build_variables is a dict)
+            if let Some(dict_ref) = DictRef::from_value(build_variables) {
+                if let Some(v) = dict_ref.get_str(key) {
+                    return Some(v);
+                }
+            }
+            None
+        };
+
+        // Build a map from artifact short paths to artifacts (for Kuro compatibility)
+        // This allows us to replace string paths from _NamedLibraryInfo.name with actual artifacts
+        let mut artifact_map: std::collections::HashMap<String, Value<'v>> = std::collections::HashMap::new();
+        if !input_artifacts.is_none() {
+            // Handle depset or list of artifacts
+            let artifacts_iter = if let Ok(Some(to_list)) = input_artifacts.get_attr("to_list", heap) {
+                // It's a depset
+                if let Ok(list_val) = eval.eval_function(to_list, &[], &[]) {
+                    list_val.iterate(heap).ok()
+                } else {
+                    None
+                }
+            } else {
+                // Try direct iteration (list)
+                input_artifacts.iterate(heap).ok()
+            };
+            if let Some(iter) = artifacts_iter {
+                for artifact in iter {
+                    // Get the artifact's short path (without buck-out prefix)
+                    if let Ok(Some(short_path)) = artifact.get_attr("short_path", heap) {
+                        if let Some(path_str) = short_path.unpack_str() {
+                            artifact_map.insert(path_str.to_owned(), artifact);
+                        }
+                    }
+                    // Also try "path" attribute for declared artifacts
+                    if let Ok(Some(path_attr)) = artifact.get_attr("path", heap) {
+                        if let Some(path_str) = path_attr.unpack_str() {
+                            artifact_map.insert(path_str.to_owned(), artifact);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Try to get output_execpath (can be a string or an artifact)
+        if let Some(output) = get_var("output_execpath") {
+
+            // For static library (ar): rcs <output>
+            // For dynamic/executable (gcc): -o <output>
+            // For dynamic library: -shared -o <output>
+            if action_name_str.contains("static-library") {
+                args.push(heap.alloc_str("rcs").to_value());
+            } else if action_name_str.contains("dynamic-library") {
+                // Add -shared flag for shared library linking
+                args.push(heap.alloc_str("-shared").to_value());
+                args.push(heap.alloc_str("-o").to_value());
+            } else {
+                args.push(heap.alloc_str("-o").to_value());
+            }
+
+            // For output artifacts, we need to call .as_output() to get an output marker
+            // that can be used in command-line arguments with proper path expansion.
+            if output.unpack_str().is_some() {
+                // Already a string path, use directly
+                args.push(output);
+            } else {
+                let path_result = output.get_attr("path", heap);
+
+                // For declared output artifacts, call .as_output() for proper path expansion
+                if let Ok(Some(as_output_method)) = output.get_attr("as_output", heap) {
+                    match eval.eval_function(as_output_method, &[], &[]) {
+                        Ok(output_artifact) => {
+                            args.push(output_artifact);
+                        }
+                        Err(_) => {
+                            // Fallback to path string
+                            if let Ok(Some(path)) = path_result {
+                                args.push(path);
+                            } else {
+                                args.push(heap.alloc_str(&output.to_str()).to_value());
+                            }
+                        }
+                    }
+                } else {
+                    // No .as_output() method, use path fallback
+                    if let Ok(Some(path)) = path_result {
+                        args.push(path);
+                    } else {
+                        args.push(heap.alloc_str(&output.to_str()).to_value());
+                    }
+                }
+            }
+        }
+
+        // Try to get libraries_to_link (list of _NamedLibraryInfo or artifacts or strings)
+        if let Some(libs) = get_var("libraries_to_link") {
+            if let Ok(iter) = libs.iterate(heap) {
+                for lib in iter {
+                    // Helper closure to look up artifact by path and add to args
+                    let mut add_path_or_artifact = |path_str: &str| {
+                        // First check if we have an artifact with this path
+                        if let Some(&artifact) = artifact_map.get(path_str) {
+                            args.push(artifact);
+                            return;
+                        }
+                        // Fallback to string path
+                        args.push(heap.alloc_str(path_str).to_value());
+                    };
+
+                    // Try various ways to get the input file:
+                    // 1. Direct string - check artifact_map first
+                    if let Some(path_str) = lib.unpack_str() {
+                        add_path_or_artifact(path_str);
+                    }
+                    // 2. _NamedLibraryInfo has a .artifact attribute (the actual file)
+                    else if let Some(artifact) = lib.get_attr("artifact", heap).ok().flatten() {
+                        // Check if artifact is None (Starlark None)
+                        if artifact.is_none() {
+                            // Fall through to use .name - check artifact_map first
+                            if let Some(name) = lib.get_attr("name", heap).ok().flatten() {
+                                if let Some(name_str) = name.unpack_str() {
+                                    add_path_or_artifact(name_str);
+                                } else {
+                                    args.push(name);
+                                }
+                            }
+                        } else {
+                            // Push artifact directly for CommandLineArgLike expansion
+                            args.push(artifact);
+                        }
+                    }
+                    // 3. Try .name attribute if no .artifact - check artifact_map first
+                    else if let Some(name) = lib.get_attr("name", heap).ok().flatten() {
+                        if let Some(name_str) = name.unpack_str() {
+                            add_path_or_artifact(name_str);
+                        } else {
+                            args.push(name);
+                        }
+                    }
+                    // 4. If it's an artifact directly (not wrapped in _NamedLibraryInfo)
+                    else if lib.get_type() == "Artifact" {
+                        args.push(lib);
+                    }
+                    // 5. Last resort - use string representation, check artifact_map
+                    else {
+                        let path_str = lib.to_str();
+                        add_path_or_artifact(&path_str);
+                    }
+                }
+            }
+        }
+
+        // Try to get user_link_flags (should be strings)
+        if let Some(flags) = get_var("user_link_flags") {
+            if let Ok(iter) = flags.iterate(heap) {
+                for flag in iter {
+                    if flag.unpack_str().is_some() {
+                        args.push(flag);
+                    }
+                }
+            }
+        }
+
+        // Return as a list that can be passed to actions.run(arguments=...)
+        Ok(heap.alloc(args))
     }
 
     /// Declares a compile output file.
@@ -992,6 +1320,11 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] configuration: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+            let _ = writeln!(f, "[declare_compile_output_file] output_name={:?}", output_name);
+        }
+
         let heap = eval.heap();
         let _ = (label, configuration); // Unused for now
 
@@ -1016,8 +1349,20 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         // Call declare_file(output_name) using Starlark's function evaluation
         let filename = heap.alloc_str(output_name).to_value();
         match eval.eval_function(declare_file_method, &[filename], &[]) {
-            Ok(artifact) => Ok(artifact),
-            Err(_) => {
+            Ok(artifact) => {
+                // Log the artifact's path attribute
+                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                    let _ = writeln!(f, "  declared artifact: {}", artifact);
+                    if let Ok(Some(path)) = artifact.get_attr("path", heap) {
+                        let _ = writeln!(f, "  artifact.path = {}", path);
+                    }
+                }
+                Ok(artifact)
+            }
+            Err(e) => {
+                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                    let _ = writeln!(f, "  declare_file error: {}", e);
+                }
                 // Fallback to stub on error
                 Ok(heap.alloc(CtxCheatArtifactStub { path: output_name.to_owned() }))
             }
@@ -1049,6 +1394,9 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Computes the output name prefix directory.
+    ///
+    /// This returns the directory prefix for object files, typically `_objs/{purpose}`.
+    /// In Bazel, this creates object files in a target-specific subdirectory.
     #[allow(unused_variables)]
     fn compute_output_name_prefix_dir<'v>(
         #[starlark(this)] this: &CcCommonInternal,
@@ -1056,8 +1404,32 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] purpose: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<String> {
-        // TODO(cc_common): Implement proper output prefix computation
-        Ok(String::new())
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+            let _ = writeln!(f, "[compute_output_name_prefix_dir] purpose={}", purpose);
+        }
+
+        // The purpose is typically the target name or a unique identifier.
+        // Object files should go in `_objs/{purpose}/` directory.
+        if purpose.is_none() {
+            // No purpose specified, use a default
+            return Ok("_objs".to_owned());
+        }
+
+        // Try to get a string value from purpose
+        if let Some(purpose_str) = purpose.unpack_str() {
+            return Ok(format!("_objs/{}", purpose_str));
+        }
+
+        // If purpose has a 'name' attribute (like a Label), use that
+        if let Ok(Some(name)) = purpose.get_attr("name", eval.heap()) {
+            if let Some(name_str) = name.unpack_str() {
+                return Ok(format!("_objs/{}", name_str));
+            }
+        }
+
+        // Fallback: just use _objs
+        Ok("_objs".to_owned())
     }
 
     /// Interns a string sequence variable value for efficiency.
@@ -1281,6 +1653,12 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         let heap = eval.heap();
 
+        // Write debug to file
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+            let _ = writeln!(f, "[cc_common.compile] name={}, srcs={}, srcs.is_none()={}", name, srcs, srcs.is_none());
+        }
+
         // Debug logging
         eprintln!("[cc_common.compile] name={}, srcs={}, srcs.is_none()={}", name, srcs, srcs.is_none());
 
@@ -1335,6 +1713,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                         format!("_objs/{}/{}.pic.o", name, basename)
                     };
 
+                    // Log what we're about to do
+                    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                        let _ = writeln!(f, "  Declaring output: {}, pic: {}", output_name, pic_output_name);
+                    }
+
                     // Declare output files
                     if let Some(declare_file) = declare_file_method {
                         // Regular object file
@@ -1342,7 +1725,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                             declare_file,
                             &[heap.alloc_str(&output_name).to_value()],
                             &[],
-                        ).ok();
+                        );
+                        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                            let _ = writeln!(f, "  declare_file result: {:?}", output_file.as_ref().map(|v| v.to_string()));
+                        }
+                        let output_file = output_file.ok();
 
                         // PIC object file
                         let pic_output_file = eval.eval_function(
@@ -1379,7 +1766,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                             // Call actions.run() for regular compile
                             // Use unique identifier to avoid "multiple actions with same category" error
                             let identifier = heap.alloc_str(&format!("{}.o", basename)).to_value();
-                            let _ = eval.eval_function(
+                            let run_result = eval.eval_function(
                                 run,
                                 &[args],
                                 &[
@@ -1389,6 +1776,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                     ("progress_message", progress),
                                 ],
                             );
+                            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                                let _ = writeln!(f, "  actions.run result (regular): {:?}", run_result.as_ref().map(|v| v.to_string()).map_err(|e| e.to_string()));
+                            }
 
                             // Register PIC compile action with unique identifier
                             let pic_args = heap.alloc(vec![
@@ -1518,10 +1908,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Creates empty toolchain variables.
-    fn empty_variables(
+    fn empty_variables<'v>(
         #[starlark(this)] _this: &CcCommonModule,
-    ) -> starlark::Result<CcToolchainVariables> {
-        Ok(CcToolchainVariables { _empty: true })
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(eval.heap().alloc(CcToolchainVariablesGen { vars: Value::new_none() }))
     }
 
     /// Gets legacy CC_FLAGS make variable value.

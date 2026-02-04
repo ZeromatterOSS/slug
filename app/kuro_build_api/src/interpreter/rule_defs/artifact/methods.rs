@@ -172,7 +172,8 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
     }
 
     /// The full execution path of this artifact (Bazel-compatible).
-    /// For Bazel compatibility, this returns the same as short_path for source files.
+    /// For build artifacts, returns the complete buck-out path that can be used in commands.
+    /// For source files, returns the cell-relative path.
     #[starlark(attribute)]
     fn path<'v>(
         this: &'v dyn StarlarkArtifactLike<'v>,

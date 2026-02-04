@@ -74,3 +74,23 @@ debug_cc_library(
     name = "debug_hello_lib",
     srcs = ["hello.c"],
 )
+
+# =============================================================================
+# Test actions.run() with Bazel-style executable + arguments
+# =============================================================================
+load(":test_actions_run.bzl", "test_bazel_run", "test_bazel_run_with_args_builder")
+
+test_bazel_run(
+    name = "test_bazel_run",
+)
+
+test_bazel_run_with_args_builder(
+    name = "test_bazel_run_args",
+)
+
+# Test Buck2-style DefaultInfo
+load(":test_simple_default_info.bzl", "simple_rule")
+
+simple_rule(
+    name = "test_simple",
+)

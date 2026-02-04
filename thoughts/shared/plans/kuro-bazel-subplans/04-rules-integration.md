@@ -10,7 +10,7 @@ This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rus
 
 ## Phase 9: rules_cc Integration
 
-### Current Status (2026-01-27)
+### Current Status (2026-02-03)
 
 **Implemented:**
 - [x] Native `cc_common` module with `internal_DO_NOT_USE()` method
@@ -19,6 +19,14 @@ This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rus
 - [x] `CcInfo` and `CcToolchainInfo` provider stubs
 - [x] Public API methods: `get_tool_for_action`, `get_execution_requirements`, `action_is_enabled`, `get_memory_inefficient_command_line`, `get_environment_variables`, `empty_variables`
 - [x] Internal methods: `create_cc_compile_action`, `get_artifact_name_for_category`, `combine_cc_toolchain_variables`, `actions2ctx_cheat`, `freeze`, etc.
+- [x] **`get_link_args` working** - returns proper linker arguments with full buck-out paths
+- [x] **`artifact.path` returns full buck-out paths** - critical for Bazel compatibility
+- [x] **cc_library compiles and links successfully** - produces both .a and .so files
+
+**Working End-to-End:**
+- [x] `cc_common.compile()` - creates compile actions with proper outputs
+- [x] `cc_common.link()` / archive - creates static library (.a)
+- [x] `cc_common.link()` / shared - creates shared library (.so) with `-shared` flag
 
 **Blocking:**
 - [ ] Transitive dependency resolution - rules_cc depends on `protobuf` (via `repo_name = "com_google_protobuf"`) and `platforms`, which aren't being resolved
@@ -26,7 +34,51 @@ This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rus
 
 **Files:**
 - `app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs` - cc_common implementation
+- `app/kuro_execute/src/path/artifact_path.rs` - artifact path resolution (full buck-out paths)
+- `app/kuro_build_api/src/interpreter/rule_defs/artifact/methods.rs` - artifact `.path` attribute
 - `tests/manual_test/BUILD.bazel` - cc_common verification tests
+
+### Key Learnings (2026-02-03)
+
+#### 1. Bazel vs Buck2 Artifact Path Model
+
+**Critical Insight:** Bazel's `File.path` attribute returns the full execution-time path (e.g., `bazel-out/k8-fastbuild/bin/pkg/__target__/file.o`), while Buck2's original `with_full_path` only returned the artifact's relative path (e.g., `_objs/cc_library-compile/hello.o`).
+
+**Why This Matters:** rules_cc stores `object_file.path` as a string in `_NamedLibraryInfo.name`. When `get_link_args` later uses this string in the linker command line, it must be a valid execution-time path. If the path is relative, the linker can't find the file.
+
+**Fix:** Modified `ArtifactPath::with_full_path()` in `artifact_path.rs` to construct the full buck-out path:
+```
+buck-out/v2/gen/<cell>/<cfg_hash>[/<pkg_path>]/__<target>__/<artifact_path>
+```
+
+#### 2. Buck2 Dependency Tracking via Artifacts vs Strings
+
+**Critical Insight:** Buck2 tracks action dependencies by visiting artifacts in command lines (via `CommandLineArgLike::visit_artifacts`). When a string is added to cmd_args, it's used verbatim without dependency tracking. When an artifact is added, Buck2 automatically:
+1. Resolves it to the full buck-out path
+2. Tracks it as an input dependency
+
+**Implication for Bazel Compatibility:** Bazel rules often pass string paths (from `.path`) through providers, expecting them to work in commands. For Kuro compatibility, either:
+- Make `.path` return the full execution path (implemented), OR
+- Maintain an artifact registry to resolve strings back to artifacts
+
+#### 3. Action Input Dependencies via `bazel_inputs`
+
+**Problem:** Bazel's `actions.run(inputs=...)` explicitly specifies input dependencies. Buck2's run action infers dependencies from command line artifacts. When rules_cc passes string paths (not artifacts) in the command, Buck2 doesn't see them as dependencies.
+
+**Fix:** Added `bazel_inputs` field to `StarlarkRunActionValues` to explicitly track Bazel-style inputs. These are visited in `visit_artifacts()` to ensure proper dependency ordering.
+
+#### 4. Buck-Out Path Structure
+
+The full buck-out path format is:
+```
+buck-out/v2/gen/<cell_name>/<cfg_hash>[/<cell_relative_pkg_path>]/__<target_name>__/<artifact_path>
+```
+
+Components available from `ConfiguredTargetLabel`:
+- `target.pkg().cell_name().as_str()` - cell name
+- `target.cfg().output_hash().as_str()` - configuration hash (16 hex chars)
+- `target.pkg().cell_relative_path().as_str()` - package path within cell
+- `target.name().as_str()` - target name (escaped with `__EQ__` for `=`)
 
 ### Overview
 

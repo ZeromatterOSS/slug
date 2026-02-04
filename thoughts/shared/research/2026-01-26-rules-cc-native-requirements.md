@@ -222,3 +222,60 @@ For Bazel 9.0+, these rules are **pure Starlark** in rules_cc:
 ### Linking
 - `cc/private/link/link.bzl` - cc_common.link()
 - `cc/private/link/cc_linking_helper.bzl` - Link action creation
+- `cc/private/link/create_libraries_to_link_values.bzl` - Creates `_NamedLibraryInfo` providers
+
+---
+
+## Implementation Notes (2026-02-03)
+
+### Critical: `artifact.path` Must Return Full Execution Paths
+
+**Problem Discovered:** rules_cc stores `object_file.path` as a string in `_NamedLibraryInfo.name` (see `create_libraries_to_link_values.bzl`). When `get_link_args` reads this string and adds it to the linker command line, it must be a valid execution-time path.
+
+In Bazel, `File.path` returns the full execution path like `bazel-out/k8-fastbuild/bin/pkg/__target__/file.o`. Buck2's original implementation only returned the relative path like `_objs/cc_library-compile/hello.o`, which caused linker failures.
+
+**Solution:** Modified `ArtifactPath::with_full_path()` to construct the complete buck-out path:
+```
+buck-out/v2/gen/<cell_name>/<cfg_hash>[/<cell_rel_pkg>]/__<target>__/<artifact_path>
+```
+
+**File:** `app/kuro_execute/src/path/artifact_path.rs`
+
+### Action Dependencies: String Paths vs Artifact References
+
+Buck2's action dependency tracking works by visiting artifacts in command lines via `CommandLineArgLike::visit_artifacts()`. When:
+- An **artifact** is added to cmd_args → Buck2 tracks it as a dependency and resolves it to full path
+- A **string** is added to cmd_args → Buck2 uses it verbatim with no dependency tracking
+
+Since rules_cc passes string paths (from `.path`) through providers, Kuro needed to either:
+1. Make `.path` return the full execution path ✓ (implemented)
+2. Or maintain an artifact registry to resolve strings back to artifacts
+
+### `get_link_args` Implementation Details
+
+The `get_link_args` function extracts variables from `build_variables` (a `CcToolchainVariables`) and constructs linker arguments:
+
+1. **output_execpath**: The output artifact (passed through `.as_output()` for proper path expansion)
+2. **libraries_to_link**: List of `_NamedLibraryInfo` providers containing input files
+   - Each has `.name` (string path) and optionally `.artifact`
+   - Current implementation uses `.name` which now contains full buck-out path
+3. **user_link_flags**: Additional flags passed through
+
+**Action name handling:**
+- `*static-library*` → Use `ar rcs <output>` format
+- `*dynamic-library*` → Use `-shared -o <output>` format
+- Other → Use `-o <output>` format (for executables)
+
+### Buck-Out Path Construction
+
+Path format: `buck-out/v2/gen/<cell>/<cfg_hash>[/<pkg>]/__<target>__/<artifact>`
+
+Available from `ConfiguredTargetLabel`:
+```rust
+target.pkg().cell_name().as_str()        // cell name
+target.cfg().output_hash().as_str()      // 16-char hex config hash
+target.pkg().cell_relative_path().as_str() // package path (may be empty)
+target.name().as_str()                   // target name
+```
+
+Target name escaping: Replace `=` with `__EQ__` to avoid path conflicts.

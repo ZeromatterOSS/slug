@@ -103,8 +103,10 @@ use starlark::values::Freeze;
 use starlark::values::FreezeResult;
 use starlark::values::Freezer;
 use starlark::values::FrozenStringValue;
+use starlark::values::FrozenValue;
 use starlark::values::FrozenValueOfUnchecked;
 use starlark::values::FrozenValueTyped;
+use starlark::values::Value;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::OwnedFrozenValue;
@@ -277,6 +279,9 @@ pub(crate) struct StarlarkRunActionValues<'v> {
     pub(crate) category: StringValue<'v>,
     pub(crate) identifier: Option<StringValue<'v>>,
     pub(crate) outputs_for_error_handler: Vec<ValueTyped<'v, StarlarkOutputArtifact<'v>>>,
+    // Bazel compatibility: extra input artifacts from the Bazel `inputs` parameter.
+    // These are tracked as dependencies but don't appear on the command line.
+    pub(crate) bazel_inputs: Vec<Value<'v>>,
 }
 
 #[derive(Debug, Display, Trace, ProvidesStaticType, NoSerialize, Allocative)]
@@ -292,6 +297,8 @@ pub(crate) struct FrozenStarlarkRunActionValues {
     pub(crate) identifier: Option<FrozenStringValue>,
     pub(crate) outputs_for_error_handler:
         Vec<FrozenValueTyped<'static, FrozenStarlarkOutputArtifact>>,
+    // Bazel compatibility: extra input artifacts from the Bazel `inputs` parameter.
+    pub(crate) bazel_inputs: Vec<FrozenValue>,
 }
 
 #[starlark_value(type = "RunActionValues")]
@@ -314,6 +321,7 @@ impl<'v> Freeze for StarlarkRunActionValues<'v> {
             category,
             identifier,
             outputs_for_error_handler,
+            bazel_inputs,
         } = self;
         Ok(FrozenStarlarkRunActionValues {
             exe: exe.freeze(freezer)?,
@@ -326,6 +334,10 @@ impl<'v> Freeze for StarlarkRunActionValues<'v> {
             outputs_for_error_handler: outputs_for_error_handler
                 .iter()
                 .copied()
+                .map(|x| x.freeze(freezer))
+                .collect::<FreezeResult<_>>()?,
+            bazel_inputs: bazel_inputs
+                .into_iter()
                 .map(|x| x.freeze(freezer))
                 .collect::<FreezeResult<_>>()?,
         })
@@ -449,6 +461,32 @@ impl RunAction {
         }
         for (_, v) in values.env.iter() {
             v.visit_artifacts(artifact_visitor)?;
+        }
+        // Bazel compatibility: visit extra input artifacts from the `inputs` parameter.
+        // These artifacts are tracked as dependencies but don't appear on the command line.
+        use std::io::Write;
+        if !self.starlark_values.bazel_inputs.is_empty() {
+            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                let _ = writeln!(f, "[visit_artifacts] category={}, bazel_inputs count: {}",
+                    self.starlark_values.category.as_str(),
+                    self.starlark_values.bazel_inputs.len());
+            }
+        }
+        for bazel_input in &self.starlark_values.bazel_inputs {
+            let val = bazel_input.to_value();
+            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                let _ = writeln!(f, "  [visit_artifacts] bazel_input type={}, value={}", val.get_type(), val);
+            }
+            if let Some(cmd_arg) = ValueAsCommandLineLike::unpack_value_opt(val) {
+                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                    let _ = writeln!(f, "    -> unpacked as CommandLineArgLike, visiting artifacts");
+                }
+                cmd_arg.0.visit_artifacts(artifact_visitor)?;
+            } else {
+                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                    let _ = writeln!(f, "    -> could NOT unpack as CommandLineArgLike!");
+                }
+            }
         }
         Ok(())
     }
