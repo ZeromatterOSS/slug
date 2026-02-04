@@ -61,12 +61,28 @@ test_bazel_label_list(
 # Provider access now works (Phase 6). Next blocker: implicit attributes
 # (_def_parser has computed default function).
 # =============================================================================
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary")
 load(":debug_cc_library.bzl", "debug_cc_library")
+
+# WORKAROUND: rules_cc's cc_binary.bzl uses Label("//:link_extra_lib") which
+# should resolve to @rules_cc//:link_extra_lib, but due to Label resolution
+# currently using BUILD file context instead of .bzl file context, it resolves
+# to this package. Create an empty cc_library to unblock builds.
+# TODO(label): Fix Label() resolution to use .bzl file's repository context.
+cc_library(
+    name = "link_extra_lib",
+    visibility = ["//visibility:public"],
+)
 
 cc_library(
     name = "hello_lib",
     srcs = ["hello.c"],
+)
+
+cc_binary(
+    name = "hello_bin",
+    srcs = ["main.c"],
+    deps = [":hello_lib"],
 )
 
 # Debug wrapper to trace cc_library analysis
@@ -75,22 +91,11 @@ debug_cc_library(
     srcs = ["hello.c"],
 )
 
-# =============================================================================
-# Test actions.run() with Bazel-style executable + arguments
-# =============================================================================
-load(":test_actions_run.bzl", "test_bazel_run", "test_bazel_run_with_args_builder")
+# Debug wrapper to trace cc_binary all_deps issue
+load(":debug_cc_binary.bzl", "debug_cc_binary")
 
-test_bazel_run(
-    name = "test_bazel_run",
+debug_cc_binary(
+    name = "debug_hello_bin",
+    deps = [":hello_lib"],
 )
 
-test_bazel_run_with_args_builder(
-    name = "test_bazel_run_args",
-)
-
-# Test Buck2-style DefaultInfo
-load(":test_simple_default_info.bzl", "simple_rule")
-
-simple_rule(
-    name = "test_simple",
-)

@@ -939,19 +939,25 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Combines toolchain variables from multiple sources.
+    ///
+    /// Takes 2 or 3 positional arguments - base variables plus 1-2 override variables.
+    /// Variables are merged, with later arguments taking precedence.
     #[allow(unused_variables)]
     fn combine_cc_toolchain_variables<'v>(
         #[starlark(this)] this: &CcCommonInternal,
-        #[starlark(require = pos)] parent: Value<'v>,
-        #[starlark(require = pos)] child: Value<'v>,
+        #[starlark(require = pos)] base: Value<'v>,
+        #[starlark(require = pos)] first_override: Value<'v>,
+        #[starlark(default = NoneType)] second_override: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // For now, return the child variables (last one wins)
+        // For now, return the last non-None variables (last one wins)
         // TODO(cc_common): Implement proper merging of variables
-        if child.is_none() {
-            Ok(parent)
+        if !second_override.is_none() {
+            Ok(second_override)
+        } else if !first_override.is_none() {
+            Ok(first_override)
         } else {
-            Ok(child)
+            Ok(base)
         }
     }
 
@@ -992,6 +998,21 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         Ok(value)
     }
 
+    /// Returns the execution requirements for a given action.
+    ///
+    /// Returns a list of execution requirements (like "requires-worker-protocol:json")
+    /// that should be added to actions using the specified tool.
+    #[allow(unused_variables)]
+    fn get_tool_requirement_for_action<'v>(
+        #[starlark(this)] _this: &CcCommonInternal,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        #[starlark(require = named)] action_name: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        // Return an empty list - no special execution requirements
+        Ok(eval.heap().alloc(Vec::<String>::new()))
+    }
+
     /// Creates a tree artifact compile action template.
     fn create_cc_compile_action_template<'v>(
         #[starlark(this)] _this: &CcCommonInternal,
@@ -1002,10 +1023,17 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Wraps link actions for platform compatibility.
+    ///
+    /// Arguments:
+    /// - actions: The ctx.actions object
+    /// - build_config: Build configuration (usually ctx.configuration), optional
+    /// - use_shareable_artifact_factory: Whether to use shareable artifact factory, optional
     #[allow(unused_variables)]
     fn wrap_link_actions<'v>(
         #[starlark(this)] this: &CcCommonInternal,
         #[starlark(require = pos)] actions: Value<'v>,
+        #[starlark(default = NoneType)] build_config: Value<'v>,
+        #[starlark(default = false)] use_shareable_artifact_factory: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         // TODO(cc_common): Implement link action wrapping
@@ -2133,6 +2161,21 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             interface_library,
             alwayslink,
         }))
+    }
+
+    /// Returns tool execution requirements for an action.
+    ///
+    /// Returns a list of execution requirements (strings like "requires-network")
+    /// that should be added to actions using the specified tool.
+    #[allow(unused_variables)]
+    fn get_tool_requirement_for_action<'v>(
+        #[starlark(this)] _this: &CcCommonModule,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        #[starlark(require = named)] action_name: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        // Return an empty list - no special execution requirements
+        Ok(eval.heap().alloc(Vec::<String>::new()))
     }
 }
 

@@ -88,6 +88,9 @@ impl AttributeExt for Attribute {
                 // Skip coercion for configuration_field() values - these are placeholders
                 // indicating the value comes from configuration, not a static default.
                 // The actual value will be resolved at analysis time from the configuration.
+                // We treat these as having a default of None - this makes the attribute
+                // optional (user doesn't need to provide a value), and the rule
+                // implementation can check for None and handle it appropriately.
                 //
                 // For computed defaults (functions), Bazel calls the function during
                 // analysis with (name, tags) to compute the actual default. We don't
@@ -96,9 +99,7 @@ impl AttributeExt for Attribute {
                 // provide a value), and the rule implementation typically checks for
                 // None and handles it appropriately (e.g., _def_parser in rules_cc).
                 let value_type = x.get_type();
-                if value_type == "configuration_field" {
-                    None
-                } else if value_type == "function" || x.is_none() {
+                if value_type == "configuration_field" || value_type == "function" || x.is_none() {
                     // Computed default or explicit None: use None as the default value.
                     // The rule implementation should check for None and handle it.
                     // For explicit None (from mandatory=False attributes), this makes
@@ -874,16 +875,17 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
             None => false,
         };
         // Build the coercer based on cfg and allow_files
+        // IMPORTANT: Try dep first, then source. Both accept label strings like ":foo",
+        // but deps (targets) should take precedence over source files.
         let coercer = if accept_files {
-            // When files are allowed, use one_of to accept source files or deps
             let dep_type = if is_exec {
                 AttrType::exec_dep(required_providers)
             } else {
                 AttrType::dep(required_providers, PluginKindSet::EMPTY)
             };
             AttrType::one_of(vec![
-                AttrType::source(false), // allow_directory = false
                 dep_type,
+                AttrType::source(false), // allow_directory = false
             ])
         } else if is_exec {
             AttrType::exec_dep(required_providers)
@@ -977,11 +979,13 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         // When allow_files = True, accept both source files and deps
         // This is critical for srcs attributes which can contain "file.c" or ":target"
+        // IMPORTANT: Try dep first, then source. Both accept label strings like ":foo",
+        // but deps (targets) should take precedence over source files. Source files
+        // are typically specified as bare filenames like "file.c", not labels.
         let inner = if allow_files_bool {
-            // one_of: try source first (files), then dep (labels)
             AttrType::one_of(vec![
-                AttrType::source(false), // allow_directory = false
                 AttrType::dep(required_providers, PluginKindSet::EMPTY),
+                AttrType::source(false), // allow_directory = false
             ])
         } else {
             AttrType::dep(required_providers, PluginKindSet::EMPTY)

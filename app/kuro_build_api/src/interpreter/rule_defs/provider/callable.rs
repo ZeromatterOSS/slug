@@ -79,6 +79,7 @@ use crate::interpreter::rule_defs::provider::ty::provider::ty_provider;
 use crate::interpreter::rule_defs::provider::ty::provider_callable::ty_provider_callable;
 use crate::interpreter::rule_defs::provider::user::UserProvider;
 use crate::interpreter::rule_defs::provider::user::user_provider_creator;
+use crate::interpreter::rule_defs::provider::user::user_provider_creator_schemaless;
 
 #[derive(Debug, kuro_error::Error)]
 #[kuro(tag = Input)]
@@ -128,8 +129,12 @@ impl Hasher for StarlarkHasherSmallPromote {
 fn create_callable_function_signature(
     function_name: &str,
     fields: &IndexMap<String, UserProviderField, StarlarkHasherSmallPromoteBuilder>,
+    schemaless: bool,
     ret_ty: Ty,
 ) -> kuro_error::Result<(ParametersSpec<FrozenValue>, TyCallable)> {
+    // For schemaless providers, accept **kwargs instead of specific field names
+    let kwargs = if schemaless { Some(Ty::any()) } else { None };
+
     let (parameters_spec, param_spec) = param_specs(
         function_name,
         [],
@@ -145,7 +150,7 @@ fn create_callable_function_signature(
                 field.ty.as_ty().dupe(),
             )
         }),
-        None,
+        kwargs,
     )
     .internal_error("Must have created correct signature")?;
 
@@ -327,6 +332,9 @@ pub(crate) struct UserProviderCallableData {
     /// Type id of provider callable instance.
     pub(crate) ty_provider_type_instance_id: TypeInstanceId,
     pub(crate) fields: IndexMap<String, UserProviderField, StarlarkHasherSmallPromoteBuilder>,
+    /// If true, this provider accepts arbitrary fields (created without `fields=` param).
+    /// Bazel-compatible: `provider("doc")` without fields creates a schemaless provider.
+    pub(crate) schemaless: bool,
 }
 
 /// Initialized after the name is assigned to the provider.
@@ -342,6 +350,8 @@ struct UserProviderCallableNamed {
     ty_provider: Ty,
     /// Type of provider callable.
     ty_callable: Ty,
+    /// If true, this provider accepts arbitrary fields via **kwargs.
+    schemaless: bool,
 }
 
 impl UserProviderCallableNamed {
@@ -350,9 +360,14 @@ impl UserProviderCallableNamed {
         args: &Arguments<'v, '_>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        self.signature.parser(args, eval, |parser, eval| {
-            user_provider_creator(self.data, eval, parser).map_err(Into::into)
-        })
+        if self.schemaless {
+            // For schemaless providers, get kwargs directly and create provider
+            user_provider_creator_schemaless(self.data, args, eval).map_err(Into::into)
+        } else {
+            self.signature.parser(args, eval, |parser, eval| {
+                user_provider_creator(self.data, eval, parser).map_err(Into::into)
+            })
+        }
     }
 }
 
@@ -408,6 +423,8 @@ pub struct UserProviderCallable {
     docs: Option<DocString>,
     /// The names of the fields used in `callable`
     fields: IndexMap<String, UserProviderField, StarlarkHasherSmallPromoteBuilder>,
+    /// If true, this provider accepts arbitrary fields (created without `fields=` param).
+    schemaless: bool,
     /// Field is initialized after the provider is assigned to a variable.
     callable: OnceCell<UserProviderCallableNamed>,
 }
@@ -447,12 +464,14 @@ impl UserProviderCallable {
         path: CellPath,
         docs: Option<DocString>,
         fields: IndexMap<String, UserProviderField, StarlarkHasherSmallPromoteBuilder>,
+        schemaless: bool,
     ) -> Self {
         Self {
             callable: OnceCell::new(),
             path,
             docs,
             fields,
+            schemaless,
         }
     }
 }
@@ -493,6 +512,7 @@ impl Freeze for UserProviderCallable {
         Ok(FrozenUserProviderCallable::new(
             self.docs,
             self.fields,
+            self.schemaless,
             callable,
         ))
     }
@@ -547,6 +567,7 @@ impl<'v> StarlarkValue<'v> for UserProviderCallable {
             let (signature, creator_func) = create_callable_function_signature(
                 &provider_id.name,
                 &self.fields,
+                self.schemaless,
                 ty_provider.clone(),
             )?;
             let ty_callable = ty_provider_callable::<UserProviderCallable>(creator_func)?;
@@ -557,9 +578,11 @@ impl<'v> StarlarkValue<'v> for UserProviderCallable {
                     provider_id,
                     fields: self.fields.clone(),
                     ty_provider_type_instance_id,
+                    schemaless: self.schemaless,
                 }),
                 ty_provider,
                 ty_callable,
+                schemaless: self.schemaless,
             })
         })?;
         Ok(())
@@ -620,6 +643,9 @@ pub struct FrozenUserProviderCallable {
     docs: Option<DocString>,
     /// The names of the fields used in `callable`
     fields: IndexMap<String, UserProviderField, StarlarkHasherSmallPromoteBuilder>,
+    /// If true, this provider accepts arbitrary fields.
+    #[allow(dead_code)]
+    schemaless: bool,
     /// The actual callable that creates instances of `UserProvider`
     callable: UserProviderCallableNamed,
 }
@@ -635,11 +661,13 @@ impl FrozenUserProviderCallable {
     fn new(
         docs: Option<DocString>,
         fields: IndexMap<String, UserProviderField, StarlarkHasherSmallPromoteBuilder>,
+        schemaless: bool,
         callable: UserProviderCallableNamed,
     ) -> Self {
         Self {
             docs,
             fields,
+            schemaless,
             callable,
         }
     }
@@ -775,7 +803,9 @@ pub fn register_provider(builder: &mut GlobalsBuilder) {
         let docstring = DocString::from_docstring(DocStringKind::Starlark, doc);
         let path = starlark_path_from_build_context(eval)?.path();
 
-        // If fields not specified, default to empty (provider accepts any field names)
+        // If fields not specified, the provider is schemaless (accepts any field names)
+        let schemaless = fields.is_none();
+
         let fields: IndexMap<String, UserProviderField, StarlarkHasherSmallPromoteBuilder> = match fields {
             None => IndexMap::with_hasher(StarlarkHasherSmallPromoteBuilder::default()),
             Some(Either::Left(fields)) => {
@@ -819,7 +849,7 @@ pub fn register_provider(builder: &mut GlobalsBuilder) {
                 new_fields
             }
         };
-        let provider = UserProviderCallable::new(path.into_owned(), docstring, fields);
+        let provider = UserProviderCallable::new(path.into_owned(), docstring, fields, schemaless);
 
         // If init is provided, return (init_wrapped_provider, raw_provider) tuple
         // The first element wraps the provider with the init function

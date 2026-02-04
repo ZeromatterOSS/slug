@@ -246,6 +246,11 @@ impl<'v, V: ValueLike<'v>> ProviderCollectionGen<V> {
 
         let mut providers = SmallMap::with_capacity(list.len());
         for value in list.iter() {
+            // For Bazel compatibility, skip None values in provider lists.
+            // Bazel rules often conditionally return providers and may include None.
+            if value.is_none() {
+                continue;
+            }
             match ValueAsProviderLike::unpack_value(value)? {
                 Some(provider) => {
                     if let Some(existing_value) = providers.insert(provider.0.id().dupe(), value) {

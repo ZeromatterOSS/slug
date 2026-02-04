@@ -184,6 +184,9 @@ pub struct AnalysisContext<'v> {
     /// Only `None` when running a `dynamic_output` action from Bxl.
     label: Option<ValueTyped<'v, StarlarkConfiguredProvidersLabel>>,
     plugins: Option<ValueTypedComplex<'v, AnalysisPlugins<'v>>>,
+    /// Cached outputs for Bazel-compatible ctx.outputs access.
+    /// This is computed lazily on first access and cached thereafter.
+    outputs: RefCell<Option<Value<'v>>>,
 }
 
 impl<'v> Display for AnalysisContext<'v> {
@@ -219,6 +222,7 @@ impl<'v> AnalysisContext<'v> {
             }),
             label,
             plugins,
+            outputs: RefCell::new(None),
         }
     }
 
@@ -390,6 +394,83 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
         Ok(heap.alloc(ToolchainsStub))
+    }
+
+    /// Predeclared outputs from the rule definition (Bazel-compatible).
+    ///
+    /// In Bazel, rules can declare output patterns in their `outputs` parameter.
+    /// These are accessible via `ctx.outputs.<name>`. For example, if a rule has:
+    ///   outputs = {"stripped_binary": "%{name}.stripped"}
+    /// Then ctx.outputs.stripped_binary would be the file for that output.
+    ///
+    /// This implementation pre-declares common outputs when first accessed and caches
+    /// the result for subsequent accesses.
+    /// TODO(outputs): Populate from actual rule definition outputs.
+    #[starlark(attribute)]
+    fn outputs<'v>(
+        this: RefAnalysisContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        // Check if we already have cached outputs
+        if let Some(cached) = this.0.outputs.borrow().as_ref() {
+            return Ok(*cached);
+        }
+
+        use kuro_execute::execute::request::OutputType;
+        use kuro_core::fs::buck_out_path::BuckOutPathKind;
+
+        let target_name = this.0.label.as_ref()
+            .map(|l| l.label().name().to_string())
+            .unwrap_or_else(|| "output".to_string());
+
+        // Pre-declare common outputs using the analysis registry
+        let mut state = this.0.actions.state()?;
+
+        // Declare stripped_binary: <name>.stripped
+        let stripped_filename = format!("{}.stripped", target_name);
+        let stripped_binary = state.declare_output(
+            None,
+            &stripped_filename,
+            OutputType::File,
+            None,
+            BuckOutPathKind::default(),
+            heap,
+        ).ok();
+
+        // Declare executable (the main binary)
+        let executable = state.declare_output(
+            None,
+            &target_name,
+            OutputType::File,
+            None,
+            BuckOutPathKind::default(),
+            heap,
+        ).ok();
+
+        // Declare dwp_file: <name>.dwp
+        let dwp_filename = format!("{}.dwp", target_name);
+        let dwp_file = state.declare_output(
+            None,
+            &dwp_filename,
+            OutputType::File,
+            None,
+            BuckOutPathKind::default(),
+            heap,
+        ).ok();
+
+        drop(state); // Release the mutable borrow
+
+        // DeclaredArtifact needs to be converted to StarlarkDeclaredArtifact for allocation
+        let outputs_value = heap.alloc(CtxOutputs {
+            stripped_binary: stripped_binary.map(|a| heap.alloc(crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact::new(None, a, crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts::new()))),
+            executable: executable.map(|a| heap.alloc(crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact::new(None, a, crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts::new()))),
+            dwp_file: dwp_file.map(|a| heap.alloc(crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact::new(None, a, crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts::new()))),
+        });
+
+        // Cache the result
+        *this.0.outputs.borrow_mut() = Some(outputs_value);
+
+        Ok(outputs_value)
     }
 
     /// Feature flags enabled for this target (Bazel-compatible).
@@ -585,9 +666,15 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         Ok(heap.alloc(CtxVarDict))
     }
 
-    /// Returns whether this target should be instrumented for coverage (Bazel-compatible).
-    fn coverage_instrumented(this: RefAnalysisContext) -> starlark::Result<bool> {
-        let _ = this;
+    /// Returns whether a target should be instrumented for coverage (Bazel-compatible).
+    ///
+    /// If dep is provided, returns whether that dependency is instrumented.
+    /// If dep is None, returns whether the current rule is instrumented.
+    #[allow(unused_variables)]
+    fn coverage_instrumented<'v>(
+        this: RefAnalysisContext,
+        #[starlark(default = NoneType)] dep: Value<'v>,
+    ) -> starlark::Result<bool> {
         // For now, coverage is not enabled
         Ok(false)
     }
@@ -608,6 +695,59 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         // Return an empty runfiles stub
         Ok(heap.alloc(crate::interpreter::rule_defs::provider::builtin::default_info::RunfilesStub))
+    }
+}
+
+// ============================================================================
+// CtxOutputs - Provides predeclared output files
+// ============================================================================
+
+/// Holds predeclared output files for ctx.outputs.
+///
+/// In Bazel, rules can declare output patterns via `outputs = {...}` in the rule()
+/// definition. When `ctx.outputs.<name>` is accessed, it returns the declared file.
+///
+/// This struct holds the pre-declared artifacts that were created when ctx.outputs
+/// was accessed.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
+pub struct CtxOutputs<'v> {
+    /// The stripped binary output file: <name>.stripped
+    stripped_binary: Option<Value<'v>>,
+    /// The main executable output: <name>
+    executable: Option<Value<'v>>,
+    /// The DWP (debug info) file: <name>.dwp
+    dwp_file: Option<Value<'v>>,
+}
+
+impl<'v> std::fmt::Display for CtxOutputs<'v> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<ctx.outputs>")
+    }
+}
+
+impl<'v> AllocValue<'v> for CtxOutputs<'v> {
+    fn alloc_value(self, heap: Heap<'v>) -> Value<'v> {
+        heap.alloc_complex_no_freeze(self)
+    }
+}
+
+#[starlark::values::starlark_value(type = "ctx_outputs")]
+impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "stripped_binary" | "executable" | "dwp_file")
+    }
+
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "stripped_binary" => self.stripped_binary.or(Some(Value::new_none())),
+            "executable" => self.executable.or(Some(Value::new_none())),
+            "dwp_file" => self.dwp_file.or(Some(Value::new_none())),
+            _ => None,
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec!["stripped_binary".to_owned(), "executable".to_owned(), "dwp_file".to_owned()]
     }
 }
 
@@ -685,7 +825,15 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
                 | "_build_variables" | "_coverage_files" | "_strip_files"
                 | "_cpp_configuration" | "_if_so_builder" | "_solib_dir"
                 | "_build_variables_dict" | "_ar_files" | "_linker_files"
-                | "_supports_param_files"
+                | "_supports_param_files" | "_stamp_binaries"
+                | "_is_tool_configuration" | "_is_sibling_repository_layout"
+                | "_static_runtime_lib_depset" | "_dynamic_runtime_lib_depset"
+                | "_compiler_files_without_includes" | "_as_files"
+                | "_dwp_files" | "_builtin_include_files" | "_additional_make_variables"
+                | "_all_files_including_libc" | "_build_info_files"
+                | "_allowlist_for_layering_check" | "_cc_info" | "_objcopy_files"
+                | "_aggregate_ddi" | "_toolchain_label" | "_link_dynamic_library_tool"
+                | "_grep_includes" | "_compiler_files"
         )
     }
 
@@ -724,6 +872,27 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
             "_ar_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
             "_linker_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
             "_supports_param_files" => Some(Value::new_bool(true)),
+            "_stamp_binaries" => Some(Value::new_bool(false)),
+            "_is_sibling_repository_layout" => Some(Value::new_bool(false)),
+            "_static_runtime_lib_depset" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_dynamic_runtime_lib_depset" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_compiler_files_without_includes" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_as_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_dwp_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_builtin_include_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_additional_make_variables" => {
+                let map: SmallMap<Value, Value> = SmallMap::new();
+                Some(heap.alloc(Dict::new(map)))
+            }
+            "_all_files_including_libc" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_build_info_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_allowlist_for_layering_check" => Some(Value::new_none()),
+            "_objcopy_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_aggregate_ddi" => Some(Value::new_none()),
+            "_toolchain_label" => Some(heap.alloc_str("@bazel_tools//tools/cpp:toolchain").to_value()),
+            "_link_dynamic_library_tool" => Some(Value::new_none()),
+            "_grep_includes" => Some(Value::new_none()),
+            "_compiler_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
             _ => None,
         }
     }
@@ -1490,6 +1659,14 @@ fn build_configuration_stub_methods(builder: &mut MethodsBuilder) {
     /// Returns whether sibling repository layout is used.
     fn is_sibling_repository_layout(this: &BuildConfigurationStub) -> starlark::Result<bool> {
         let _ = this;
+        Ok(false)
+    }
+
+    /// Returns whether this is a tool configuration (exec configuration).
+    /// Tool configurations are used for build tools that run on the host machine.
+    fn is_tool_configuration(this: &BuildConfigurationStub) -> starlark::Result<bool> {
+        let _ = this;
+        // TODO(bazel): Properly determine if this is an exec configuration
         Ok(false)
     }
 }

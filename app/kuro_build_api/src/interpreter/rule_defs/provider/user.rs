@@ -32,12 +32,15 @@ use starlark::typing::Ty;
 use starlark::values::Demand;
 use starlark::values::Freeze;
 use starlark::values::FrozenRef;
+use starlark::values::FrozenValue;
 use starlark::values::Heap;
+use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::starlark_value;
+use starlark_map::small_map::SmallMap;
 
 use crate::interpreter::rule_defs::provider::ProviderLike;
 use crate::interpreter::rule_defs::provider::callable::UserProviderCallableData;
@@ -202,4 +205,117 @@ pub(crate) fn user_provider_creator<'v>(
         attributes: values,
         _marker: PhantomData,
     }))
+}
+
+/// Creates instances of schemaless `UserProvider`s; called for providers created without `fields=`.
+/// Schemaless providers accept arbitrary keyword arguments.
+///
+/// For schemaless providers, we dynamically add the kwargs as fields to the callable,
+/// then create a regular UserProvider. This allows it to work with the existing freeze machinery.
+pub(crate) fn user_provider_creator_schemaless<'v>(
+    callable: FrozenRef<'static, UserProviderCallableData>,
+    args: &starlark::eval::Arguments<'v, '_>,
+    eval: &Evaluator<'v, '_, '_>,
+) -> kuro_error::Result<Value<'v>> {
+    let heap = eval.heap();
+
+    // Get all named arguments as a map
+    let names_map = args.names_map()?;
+
+    // Convert to a vector of (name, value) pairs, sorted by key for determinism
+    let mut pairs: Vec<_> = names_map.iter().map(|(k, v)| (k.as_str().to_owned(), *v)).collect();
+    pairs.sort_by(|a, b| a.0.cmp(&b.0));
+
+    // Build a SchemalessUserProvider with the sorted fields
+    let (field_names, values): (Vec<String>, Vec<Value<'v>>) = pairs.into_iter().unzip();
+
+    Ok(heap.alloc(SchemalessUserProvider {
+        callable,
+        field_names: field_names.into_boxed_slice(),
+        values: values.into_boxed_slice(),
+        _marker: PhantomData,
+    }))
+}
+
+// ============================================================================
+// SchemalessUserProvider - For providers created without fields= parameter
+// ============================================================================
+
+/// A provider instance created from a schemaless provider definition.
+/// Uses separate arrays for field names and values, similar to UserProviderGen.
+///
+/// This is a complex value that supports freeze/thaw operations.
+#[derive(Debug, Clone, Coerce, Trace, Freeze, ProvidesStaticType, Allocative)]
+#[repr(C)]
+pub struct SchemalessUserProviderGen<'v, V: ValueLike<'v>> {
+    pub(crate) callable: FrozenRef<'static, UserProviderCallableData>,
+    /// Field names (sorted for determinism)
+    field_names: Box<[String]>,
+    /// Field values (in same order as field_names)
+    values: Box<[V]>,
+    _marker: PhantomData<&'v ()>,
+}
+
+starlark_complex_value!(pub SchemalessUserProvider<'v>);
+
+impl<'v, V: ValueLike<'v>> SchemalessUserProviderGen<'v, V> {
+    fn iter_items(&self) -> impl Iterator<Item = (&str, V)> {
+        assert_eq!(self.field_names.len(), self.values.len());
+        self.field_names
+            .iter()
+            .map(|s| s.as_str())
+            .zip(self.values.iter().copied())
+    }
+}
+
+impl<'v, V: ValueLike<'v>> Display for SchemalessUserProviderGen<'v, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt_keyed_container(
+            f,
+            &format!("{}(", self.callable.provider_id.name),
+            ")",
+            "=",
+            self.iter_items(),
+        )
+    }
+}
+
+#[starlark_value(type = "Provider")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for SchemalessUserProviderGen<'v, V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    fn dir_attr(&self) -> Vec<String> {
+        self.field_names.iter().cloned().collect()
+    }
+
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        self.field_names
+            .iter()
+            .position(|n| n == attribute)
+            .map(|idx| self.values[idx].to_value())
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
+    }
+}
+
+impl<'v, V: ValueLike<'v>> serde::Serialize for SchemalessUserProviderGen<'v, V> {
+    fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        s.collect_map(self.iter_items())
+    }
+}
+
+impl<'v, V: ValueLike<'v>> ProviderLike<'v> for SchemalessUserProviderGen<'v, V> {
+    fn id(&self) -> &Arc<ProviderId> {
+        &self.callable.provider_id
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        self.iter_items().map(|(k, v)| (k, v.to_value())).collect()
+    }
 }

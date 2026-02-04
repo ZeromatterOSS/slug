@@ -202,7 +202,8 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
         this: &AnalysisActions<'v>,
         #[starlark(require = pos)] output: OutputArtifactArg<'v>,
         #[starlark(require = pos)] content: WriteContentArg<'v>,
-        #[starlark(require = named, default = false)] is_executable: bool,
+        // Bazel allows is_executable as positional: ctx.actions.write(output, content, is_executable)
+        #[starlark(default = false)] is_executable: bool,
         #[starlark(require = named, default = false)] allow_args: bool,
         // If set, add artifacts in content as associated artifacts of the output. This will only work for bound artifacts.
         #[starlark(require = named, default = false)] with_inputs: bool,

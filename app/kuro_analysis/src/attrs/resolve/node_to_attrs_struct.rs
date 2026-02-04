@@ -22,10 +22,18 @@ pub(crate) fn node_to_attrs_struct<'v>(
     node: ConfiguredTargetNodeRef,
     ctx: &mut dyn AttrResolutionContext<'v>,
 ) -> kuro_error::Result<ValueOfUnchecked<'v, StructRef<'static>>> {
+    let target_name = node.label().to_string();
+    let is_cc_binary = target_name.contains("hello_bin");
     let attrs_iter = node.attrs(AttrInspectOptions::All);
     let mut resolved_attrs = Vec::with_capacity(attrs_iter.size_hint().0);
     for a in attrs_iter {
-        resolved_attrs.push((a.name, a.value.resolve_single(node.label().pkg(), ctx)?));
+        let resolved = a.value.resolve_single(node.label().pkg(), ctx)?;
+        // Debug: trace dep-related attributes for cc_binary
+        if is_cc_binary && (a.name == "deps" || a.name == "link_extra_lib" || a.name == "malloc") {
+            eprintln!("DEBUG[{}]: {} configured={:?} resolved={} type={}",
+                target_name, a.name, a.value, resolved, resolved.get_type());
+        }
+        resolved_attrs.push((a.name, resolved));
     }
     Ok(ctx
         .heap()

@@ -94,39 +94,72 @@ pub(crate) fn register_package_function(globals: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
+    /// Sets package-level attributes.
+    ///
+    /// In PACKAGE files (Buck2-style), this sets visibility and within_view for the package.
+    /// In BUILD files (Bazel-style), this sets default_visibility and other package defaults.
+    ///
+    /// The function auto-detects the context:
+    /// - If in a PACKAGE file: uses Buck2 semantics (inherit, visibility, within_view)
+    /// - If in a BUILD file: uses Bazel semantics (default_visibility, etc.) as a no-op stub
     fn package(
         #[starlark(require=named, default=false)] inherit: bool,
         #[starlark(require=named, default=UnpackListOrTuple::default())]
         visibility: UnpackListOrTuple<String>,
         #[starlark(require=named, default=UnpackListOrTuple::default())]
         within_view: UnpackListOrTuple<String>,
+        // Bazel-compatible parameters (used in BUILD files)
+        #[starlark(require=named, default=UnpackListOrTuple::default())]
+        default_visibility: UnpackListOrTuple<String>,
+        #[starlark(require=named)] default_testonly: Option<bool>,
+        #[starlark(require=named, default=UnpackListOrTuple::default())]
+        default_deprecation: UnpackListOrTuple<String>,
+        #[starlark(require=named, default=UnpackListOrTuple::default())]
+        features: UnpackListOrTuple<String>,
+        #[starlark(require=named, default=UnpackListOrTuple::default())]
+        default_applicable_licenses: UnpackListOrTuple<String>,
+        #[starlark(require=named, default=UnpackListOrTuple::default())]
+        default_package_metadata: UnpackListOrTuple<String>,
         eval: &mut Evaluator,
     ) -> starlark::Result<NoneType> {
         let build_context = BuildContext::from_context(eval)?;
-        let package_file_eval_ctx = build_context.additional.require_package_file("package")?;
-        let visibility = parse_visibility(
-            &visibility.items,
-            build_context.cell_info().name().name(),
-            build_context.cell_info().cell_resolver(),
-            build_context.cell_info().cell_alias_resolver(),
-        )?;
-        let within_view = parse_within_view(
-            &within_view.items,
-            build_context.cell_info().name().name(),
-            build_context.cell_info().cell_resolver(),
-            build_context.cell_info().cell_alias_resolver(),
-        )?;
 
-        match &mut *package_file_eval_ctx.visibility.borrow_mut() {
-            Some(_) => return Err(kuro_error::Error::from(PackageFileError::AtMostOnce).into()),
-            x => {
-                *x = Some(PackageFileVisibilityFields {
-                    visibility,
-                    within_view,
-                    inherit,
-                })
+        // Try to get PACKAGE file context - if it fails, we're in a BUILD file
+        match build_context.additional.require_package_file("package") {
+            Ok(package_file_eval_ctx) => {
+                // PACKAGE file context - use Buck2 semantics
+                let visibility = parse_visibility(
+                    &visibility.items,
+                    build_context.cell_info().name().name(),
+                    build_context.cell_info().cell_resolver(),
+                    build_context.cell_info().cell_alias_resolver(),
+                )?;
+                let within_view = parse_within_view(
+                    &within_view.items,
+                    build_context.cell_info().name().name(),
+                    build_context.cell_info().cell_resolver(),
+                    build_context.cell_info().cell_alias_resolver(),
+                )?;
+
+                match &mut *package_file_eval_ctx.visibility.borrow_mut() {
+                    Some(_) => return Err(kuro_error::Error::from(PackageFileError::AtMostOnce).into()),
+                    x => {
+                        *x = Some(PackageFileVisibilityFields {
+                            visibility,
+                            within_view,
+                            inherit,
+                        })
+                    }
+                };
             }
-        };
+            Err(_) => {
+                // BUILD file context - use Bazel semantics (currently no-op)
+                // TODO(bazel-compat): Implement package-level defaults for BUILD files
+                // For now, just accept the parameters silently to allow parsing
+                let _ = (default_visibility, default_testonly, default_deprecation,
+                         features, default_applicable_licenses, default_package_metadata);
+            }
+        }
 
         Ok(NoneType)
     }

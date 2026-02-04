@@ -117,6 +117,26 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
 
 #[starlark_module]
 pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
+    /// Declares the license type for the targets in this BUILD file.
+    ///
+    /// This is a legacy Bazel built-in function for declaring licenses. In modern
+    /// Bazel (9.0+), licenses are deprecated and this is a no-op.
+    ///
+    /// Example:
+    /// ```python
+    /// licenses(["notice"])  # Apache 2.0
+    /// licenses(["restricted", "notice"])  # Multiple license types
+    /// ```
+    ///
+    /// See: https://bazel.build/reference/be/functions#licenses
+    fn licenses<'v>(
+        #[starlark(require = pos)] _license_types: UnpackListOrTuple<String>,
+    ) -> starlark::Result<NoneType> {
+        // This is a legacy/deprecated function in Bazel 9.0+
+        // Currently a no-op - Kuro doesn't track license metadata.
+        Ok(NoneType)
+    }
+
     /// Declares which files in a package are publicly visible.
     ///
     /// This is a Bazel built-in function that marks files for export. In Kuro,

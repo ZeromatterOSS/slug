@@ -193,6 +193,7 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Custom malloc implementation, or None.
+    #[starlark(attribute)]
     fn custom_malloc(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
         Ok(NoneType)
     }
@@ -294,6 +295,41 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
         #[allow(unused_variables)] this: &CppFragment,
     ) -> starlark::Result<bool> {
         Ok(true)  // Use the modern behavior
+    }
+
+    /// Returns the dynamic linking mode: "FULLY", "OFF", or "DEFAULT".
+    ///
+    /// - "FULLY": Use fully dynamic linking (shared libraries)
+    /// - "OFF": Use static linking only
+    /// - "DEFAULT": Use default behavior (let linkstatic attribute decide)
+    fn dynamic_mode(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<String> {
+        Ok("DEFAULT".to_owned())
+    }
+
+    /// Returns strip options to pass to the strip command.
+    fn strip_opts(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<Vec<String>> {
+        // Default: strip all symbols
+        Ok(vec!["-S".to_owned(), "-p".to_owned()])
+    }
+
+    /// Returns the C++ standard to use (e.g., "c++17", "c++20").
+    fn cxx_standard(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<String> {
+        Ok("c++17".to_owned())
+    }
+
+    /// Returns whether to use fission (split DWARF).
+    fn use_fission(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Returns whether to generate LLVM LCOV coverage format.
+    fn generate_llvm_lcov(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Returns whether to output assembly when compiling.
+    fn output_assembly(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(false)
     }
 }
 
