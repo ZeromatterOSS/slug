@@ -368,6 +368,33 @@ impl<T: PatternType> ParsedPattern<T> {
         Self::from_parsed_pattern_with_modifiers(pattern_with_modifiers)
     }
 
+    /// Parse a target pattern with Bazel-compatible default target inference.
+    /// When a pattern like `@repo//path` is provided without an explicit target name,
+    /// it is inferred to be `@repo//path:path` (target name = last path component).
+    ///
+    /// This is needed for Bazel compatibility where `deps = ["@rules_cc//cc/runfiles"]`
+    /// is a valid dependency reference meaning `@rules_cc//cc/runfiles:runfiles`.
+    pub fn parse_infer_target(
+        pattern: &str,
+        relative: TargetParsingRel<'_>,
+        cell_resolver: &CellResolver,
+        cell_alias_resolver: &CellAliasResolver,
+    ) -> kuro_error::Result<Self> {
+        let pattern_with_modifiers = parse_target_pattern(
+            cell_resolver,
+            cell_alias_resolver,
+            TargetParsingOptions {
+                relative,
+                infer_target: true,
+                strip_package_trailing_slash: false,
+            },
+            pattern,
+        )
+        .with_buck_error_context(|| format!("Invalid target pattern `{pattern}` is not allowed"))?;
+
+        Self::from_parsed_pattern_with_modifiers(pattern_with_modifiers)
+    }
+
     /// Parse a TargetPattern out, resolving aliases via `cell_resolver`, resolving relative
     /// targets via `relative_dir`, inferring a target name if no target or recursive pattern
     /// is provided (e.g. `//foo/bar` is inferred to be equivalent to `//foo/bar:bar`), and

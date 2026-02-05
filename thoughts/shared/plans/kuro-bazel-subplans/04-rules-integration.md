@@ -41,6 +41,20 @@ This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rus
   - `kuro run` now checks `DefaultInfo.executable` as fallback when no `RunInfo` is present
   - Modified `build/outputs.rs` and `build/result_report.rs` to support this
 
+**Completed (2026-02-05):**
+- [x] **Bazel default target pattern support** - `@repo//path` now resolves to `@repo//path:path`
+  - Added `ParsedPattern::parse_infer_target()` in `kuro_core/src/pattern/pattern.rs`
+  - Modified `BuildAttrCoercionContext` to use Bazel-compatible parsing for label coercion
+  - This fixes deps like `"@rules_cc//cc/runfiles"` which should mean `@rules_cc//cc/runfiles:runfiles`
+  - Files: `app/kuro_core/src/pattern/pattern.rs`, `app/kuro_interpreter_for_build/src/attrs/coerce/ctx.rs`
+
+**Blocking for cc_test:**
+- [ ] Native `filegroup()` and `exports_files()` don't register targets - they're stubs
+  - cc_test depends on `@bazel_tools//tools/test:collect_cc_coverage` (a filegroup target)
+  - The filegroup stub in `natives.rs` doesn't call `internals.record()` to register targets
+  - Fix: Implement proper `filegroup()` that creates TargetNode instances
+  - Workaround attempted: Simplified bazel_tools/tools/test/BUILD but filegroup still needed
+
 **Files:**
 - `app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs` - cc_common implementation
 - `app/kuro_execute/src/path/artifact_path.rs` - artifact path resolution (full buck-out paths)

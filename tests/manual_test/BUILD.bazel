@@ -99,3 +99,14 @@ debug_cc_binary(
     deps = [":hello_lib"],
 )
 
+# =============================================================================
+# Phase 9: cc_test for testing kuro test command
+# =============================================================================
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
+cc_test(
+    name = "hello_test",
+    srcs = ["hello_test.c"],
+    deps = [":hello_lib"],
+)
+

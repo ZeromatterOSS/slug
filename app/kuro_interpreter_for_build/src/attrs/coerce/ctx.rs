@@ -182,7 +182,32 @@ impl BuildAttrCoercionContext {
         &self,
         value: &str,
     ) -> kuro_error::Result<ParsedPattern<P>> {
-        let target_parsing_rel = match self.enclosing_package.as_ref().map(|x| x.0.as_cell_path()) {
+        let target_parsing_rel = self.target_parsing_rel();
+        ParsedPattern::parse_not_relaxed(
+            value,
+            target_parsing_rel,
+            &self.cell_resolver,
+            &self.cell_alias_resolver,
+        )
+    }
+
+    /// Parse pattern with Bazel-compatible default target inference.
+    /// This enables patterns like `@repo//path` to be interpreted as `@repo//path:path`.
+    pub fn parse_pattern_bazel_compat<P: PatternType>(
+        &self,
+        value: &str,
+    ) -> kuro_error::Result<ParsedPattern<P>> {
+        let target_parsing_rel = self.target_parsing_rel();
+        ParsedPattern::parse_infer_target(
+            value,
+            target_parsing_rel,
+            &self.cell_resolver,
+            &self.cell_alias_resolver,
+        )
+    }
+
+    fn target_parsing_rel(&self) -> TargetParsingRel<'_> {
+        match self.enclosing_package.as_ref().map(|x| x.0.as_cell_path()) {
             Some(package) => {
                 if self
                     .current_dir_with_allowed_relative_dirs
@@ -197,18 +222,12 @@ impl BuildAttrCoercionContext {
                 }
             }
             None => TargetParsingRel::RequireAbsolute(self.cell_name),
-        };
-        ParsedPattern::parse_not_relaxed(
-            value,
-            target_parsing_rel,
-            &self.cell_resolver,
-            &self.cell_alias_resolver,
-        )
+        }
     }
 
     fn coerce_label_no_cache(&self, value: &str) -> kuro_error::Result<ProvidersLabel> {
-        // TODO(nmj): Make this take an import path / package
-        match self.parse_pattern::<ProvidersPatternExtra>(value)? {
+        // Use Bazel-compatible parsing which allows `@repo//pkg` to mean `@repo//pkg:pkg`
+        match self.parse_pattern_bazel_compat::<ProvidersPatternExtra>(value)? {
             ParsedPattern::Target(package, target_name, providers) => {
                 Ok(providers.into_providers_label(package, target_name.as_ref()))
             }
