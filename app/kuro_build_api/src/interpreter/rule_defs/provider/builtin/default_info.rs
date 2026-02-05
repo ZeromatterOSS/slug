@@ -225,7 +225,9 @@ impl<'v> DefaultInfo<'v> {
 }
 
 impl FrozenDefaultInfo {
-    pub(crate) fn testing_empty(heap: &FrozenHeap) -> FrozenValueTyped<'static, FrozenDefaultInfo> {
+    /// Create an empty FrozenDefaultInfo on the given heap.
+    /// Used for testing and native rule analysis.
+    pub fn testing_empty(heap: &FrozenHeap) -> FrozenValueTyped<'static, FrozenDefaultInfo> {
         let sub_targets = heap
             .alloc_typed_unchecked(AllocDict(
                 iter::empty::<(String, FrozenProviderCollection)>(),

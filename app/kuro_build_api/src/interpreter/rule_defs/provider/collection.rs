@@ -461,6 +461,12 @@ impl<'v> Freeze for ProviderCollection<'v> {
 }
 
 impl FrozenProviderCollection {
+    /// Create a new FrozenProviderCollection from a map of providers.
+    /// Used for native rule analysis where providers are created from Rust code.
+    pub fn new(providers: SmallMap<Arc<ProviderId>, FrozenValue>) -> Self {
+        Self { providers }
+    }
+
     pub fn default_info<'a>(&'a self) -> kuro_error::Result<FrozenRef<'a, FrozenDefaultInfo>> {
         self.builtin_provider().internal_error(
             "DefaultInfo should always be set for providers returned from rule function",

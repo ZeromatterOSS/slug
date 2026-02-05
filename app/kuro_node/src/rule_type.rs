@@ -52,12 +52,18 @@ pub struct StarlarkRuleType {
 pub enum NativeRuleKind {
     #[display("filegroup")]
     Filegroup,
+    #[display("constraint_setting")]
+    ConstraintSetting,
+    #[display("constraint_value")]
+    ConstraintValue,
 }
 
 impl NativeRuleKind {
     pub fn as_str(&self) -> &'static str {
         match self {
             NativeRuleKind::Filegroup => "filegroup",
+            NativeRuleKind::ConstraintSetting => "constraint_setting",
+            NativeRuleKind::ConstraintValue => "constraint_value",
         }
     }
 }

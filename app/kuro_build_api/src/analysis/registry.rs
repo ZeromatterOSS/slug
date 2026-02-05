@@ -405,6 +405,23 @@ pub struct FrozenAnalysisValueStorage {
     result_value: Option<FrozenValueTyped<'static, FrozenProviderCollection>>,
 }
 
+impl FrozenAnalysisValueStorage {
+    /// Create a new FrozenAnalysisValueStorage for native rule analysis.
+    pub fn new_native(
+        self_key: DeferredHolderKey,
+        lambda_params: Box<dyn FrozenDynamicLambdaParamsStorage>,
+        result_value: Option<FrozenValueTyped<'static, FrozenProviderCollection>>,
+    ) -> Self {
+        Self {
+            self_key,
+            action_data: SmallMap::new(),
+            transitive_sets: vec![],
+            lambda_params,
+            result_value,
+        }
+    }
+}
+
 unsafe impl<'v> Trace<'v> for AnalysisValueStorage<'v> {
     fn trace(&mut self, tracer: &Tracer<'v>) {
         let AnalysisValueStorage {
@@ -623,6 +640,20 @@ pub struct RecordedAnalysisValues {
 }
 
 impl RecordedAnalysisValues {
+    /// Create a new RecordedAnalysisValues for native rule analysis.
+    /// Used when creating analysis results from Rust code rather than Starlark.
+    pub fn new_native(
+        self_key: DeferredHolderKey,
+        analysis_storage: Option<OwnedFrozenValueTyped<StarlarkAnyComplex<FrozenAnalysisValueStorage>>>,
+        actions: RecordedActions,
+    ) -> Self {
+        Self {
+            self_key,
+            analysis_storage,
+            actions,
+        }
+    }
+
     pub fn testing_new(
         self_key: DeferredHolderKey,
         transitive_sets: Vec<(TransitiveSetKey, OwnedFrozenValueTyped<FrozenTransitiveSet>)>,

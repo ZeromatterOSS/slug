@@ -40,6 +40,7 @@ use crate::interpreter::functions::sha256::register_sha256;
 use crate::interpreter::functions::soft_error::register_soft_error;
 use crate::interpreter::functions::starlark::register_set_starlark_peak_allocated_byte_limit;
 use crate::interpreter::functions::warning::register_warning;
+use crate::interpreter::native_rules::register_native_rules;
 use crate::interpreter::natives::register_bazel_native;
 use crate::interpreter::natives::register_bzl_module_globals;
 use crate::interpreter::natives::register_module_natives;
@@ -68,6 +69,7 @@ pub fn register_load_natives(builder: &mut GlobalsBuilder) {
     from_late_binding(&REGISTER_BUCK2_CFG_CONSTRUCTOR_GLOBALS, builder);
     from_late_binding(&REGISTER_BUCK2_TRANSITION_GLOBALS, builder);
     register_module_natives(builder);
+    register_native_rules(builder);
     register_host_info(builder);
     register_read_config(builder);
     register_read_package_value(builder);

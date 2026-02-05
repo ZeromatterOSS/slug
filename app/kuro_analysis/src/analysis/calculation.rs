@@ -358,18 +358,19 @@ async fn get_analysis_result_inner(
             ((res, now), spans)
         }
         RuleType::Native(kind) => {
-            // Native rules are built-in rules like filegroup that don't have Starlark implementations.
-            // For now, native rules should use Starlark implementations loaded from bazel_tools.
-            // This match arm handles the case where a target was registered with RuleType::Native
-            // but analysis is attempted. In the current implementation, we use Starlark filegroup
-            // instead, so this path shouldn't be reached.
+            // Native rules are built-in rules like constraint_setting and constraint_value
+            // that are required for Bazel compatibility with BCR packages like @platforms.
+            let dep_analysis = get_dep_analysis(configured_node, ctx).await?;
+
             let now = TimeSpan::start_now();
             let (res, spans) = record_root_spans(|| {
-                Err(internal_error!(
-                    "Native rule {:?} analysis not yet implemented. \
-                     Use Starlark implementation instead.",
-                    kind
-                ))
+                let result = crate::analysis::native_rule_analysis::analyze_native_rule(
+                    target,
+                    configured_node,
+                    kind,
+                    dep_analysis,
+                )?;
+                Ok(MaybeCompatible::Compatible(result))
             });
 
             ((res, now), spans)

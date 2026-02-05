@@ -12,4 +12,5 @@ pub mod aspect_calculation;
 pub mod aspect_key;
 pub mod calculation;
 pub mod env;
+pub mod native_rule_analysis;
 mod plugins;
