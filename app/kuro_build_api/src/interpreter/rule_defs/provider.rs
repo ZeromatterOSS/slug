@@ -117,6 +117,11 @@ impl<'v> ValueAsProviderLike<'v> {
     pub(crate) fn unpack(value: Value<'v>) -> Option<Self> {
         Some(ValueAsProviderLike(value.request_value()?))
     }
+
+    /// Get the provider ID of this provider.
+    pub fn provider_id(&self) -> &Arc<ProviderId> {
+        self.0.id()
+    }
 }
 
 impl<'v> UnpackValue<'v> for ValueAsProviderLike<'v> {

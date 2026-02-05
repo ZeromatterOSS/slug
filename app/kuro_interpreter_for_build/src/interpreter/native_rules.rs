@@ -97,6 +97,7 @@ mod rule_defs {
             rule_kind: RuleKind::Configuration,
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
+            is_test: false,
         })
     });
 
@@ -108,6 +109,7 @@ mod rule_defs {
             rule_kind: RuleKind::Configuration,
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
+            is_test: false,
         })
     });
 
@@ -136,6 +138,7 @@ mod rule_defs {
             rule_kind: RuleKind::Normal, // Aliases can be used anywhere
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
+            is_test: false,
         })
     });
 }

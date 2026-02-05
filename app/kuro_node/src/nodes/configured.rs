@@ -816,6 +816,14 @@ impl<'a> ConfiguredTargetNodeRef<'a> {
         self.0.get().target_node.rule_type()
     }
 
+    /// Whether this is a Bazel test rule (created with `rule(test=True)`).
+    pub fn is_test(self) -> bool {
+        match &self.0.get().target_node {
+            TargetNodeOrForward::TargetNode(target_node) => target_node.is_test(),
+            TargetNodeOrForward::Forward(_, _) => false,
+        }
+    }
+
     pub fn execution_platform_resolution(self) -> &'a ExecutionPlatformResolution {
         &self.0.get().execution_platform_resolution
     }

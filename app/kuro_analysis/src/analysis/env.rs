@@ -20,6 +20,11 @@ use kuro_build_api::analysis::anon_promises_dyn::RunAnonPromisesAccessorPair;
 use kuro_build_api::analysis::registry::AnalysisRegistry;
 use kuro_build_api::interpreter::rule_defs::cmd_args::value::FrozenCommandLineArg;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisContext;
+use kuro_build_api::interpreter::rule_defs::provider::FrozenBuiltinProviderLike;
+use kuro_build_api::interpreter::rule_defs::provider::ValueAsProviderLike;
+use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
+use kuro_build_api::interpreter::rule_defs::provider::builtin::external_runner_test_info::FrozenExternalRunnerTestInfo;
+use kuro_build_api::interpreter::rule_defs::provider::builtin::external_runner_test_info::create_external_runner_test_info_for_bazel_test;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::template_placeholder_info::FrozenTemplatePlaceholderInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::validation_info::FrozenValidationInfo;
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
@@ -51,15 +56,86 @@ use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::values::FrozenValue;
 use starlark::values::FrozenValueTyped;
+use starlark::values::Heap;
 use starlark::values::Value;
 use starlark::values::ValueTyped;
 use starlark::values::ValueTypedComplex;
+use starlark::values::list::ListRef;
 use starlark_map::small_map::SmallMap;
 
 use crate::analysis::plugins::plugins_to_starlark_value;
 use crate::attrs::resolve::ctx::AnalysisQueryResult;
 use crate::attrs::resolve::ctx::AttrResolutionContext;
 use crate::attrs::resolve::node_to_attrs_struct::node_to_attrs_struct;
+
+/// For Bazel test rules (`rule(test=True)`) that return `DefaultInfo(executable=...)`
+/// without an explicit `ExternalRunnerTestInfo`, auto-inject a synthetic
+/// `ExternalRunnerTestInfo` so Kuro's test runner can execute them.
+///
+/// This bridges the gap between Bazel (where test rules are marked with `test=True`
+/// and the executable comes from `DefaultInfo`) and Buck2/Kuro (where test targets
+/// must provide `ExternalRunnerTestInfo`).
+fn maybe_inject_test_info<'v>(
+    heap: Heap<'v>,
+    list_res: Value<'v>,
+) -> kuro_error::Result<Value<'v>> {
+    let list = match ListRef::from_value(list_res) {
+        Some(v) => v,
+        None => return Ok(list_res),
+    };
+
+    let test_info_id = FrozenExternalRunnerTestInfo::builtin_provider_id();
+    let default_info_id = DefaultInfoCallable::provider_id();
+
+    let mut has_test_info = false;
+    let mut default_info_value: Option<Value<'v>> = None;
+
+    for value in list.iter() {
+        if value.is_none() {
+            continue;
+        }
+        if let Ok(Some(provider)) =
+            <ValueAsProviderLike as starlark::values::UnpackValue>::unpack_value(value)
+        {
+            if provider.provider_id() == test_info_id {
+                has_test_info = true;
+                break;
+            }
+            if provider.provider_id() == default_info_id {
+                default_info_value = Some(value);
+            }
+        }
+    }
+
+    if has_test_info {
+        return Ok(list_res);
+    }
+
+    // Get executable from DefaultInfo
+    if let Some(di_value) = default_info_value {
+        if let Ok(Some(executable_list)) = di_value.get_attr("executable", heap) {
+            if let Ok(iter) = executable_list.iterate(heap) {
+                let items: Vec<Value<'v>> = iter.collect();
+                if let Some(exe) = items.first() {
+                    // Create ExternalRunnerTestInfo with the executable as command
+                    let test_type = heap.alloc_str("custom").to_value();
+                    let command = heap.alloc(vec![*exe]);
+                    let test_info =
+                        create_external_runner_test_info_for_bazel_test(test_type, command);
+                    let test_info_value = heap.alloc(test_info);
+
+                    // Create new list with test_info appended
+                    let mut new_list: Vec<Value<'v>> = list.iter().collect();
+                    new_list.push(test_info_value);
+                    return Ok(heap.alloc(new_list));
+                }
+            }
+        }
+    }
+
+    // No executable found or no DefaultInfo, return original list
+    Ok(list_res)
+}
 
 #[derive(kuro_error::Error, Debug)]
 #[kuro(tag = Tier0)]
@@ -303,6 +379,14 @@ async fn run_analysis_with_env_underlying(
 
         // Pull the ctx object back out, and steal ctx.action's state back
         let analysis_registry = ctx.take_state();
+
+        // For Bazel test rules (rule(test=True)), auto-inject ExternalRunnerTestInfo
+        // if the implementation returned DefaultInfo(executable=...) but no ExternalRunnerTestInfo.
+        let list_res = if node.is_test() {
+            maybe_inject_test_info(env.heap(), list_res)?
+        } else {
+            list_res
+        };
 
         // TODO: Convert the ValueError from `try_from_value` better than just printing its Debug
         let res_typed = ProviderCollection::try_from_value(list_res)?;

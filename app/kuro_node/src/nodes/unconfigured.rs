@@ -195,6 +195,11 @@ impl TargetNode {
         self.0.rule.rule_kind
     }
 
+    /// Whether this is a Bazel test rule (created with `rule(test=True)`).
+    pub fn is_test(&self) -> bool {
+        self.0.rule.is_test
+    }
+
     pub fn is_configuration_rule(&self) -> bool {
         self.0.rule.rule_kind == RuleKind::Configuration
     }
@@ -705,6 +710,7 @@ pub mod testing {
                     rule_kind: RuleKind::Normal,
                     cfg: RuleIncomingTransition::None,
                     uses_plugins: Vec::new(),
+                    is_test: false,
                 }),
                 Arc::new(Package {
                     buildfile_path,

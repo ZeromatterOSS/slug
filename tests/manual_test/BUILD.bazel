@@ -108,5 +108,6 @@ cc_test(
     name = "hello_test",
     srcs = ["hello_test.c"],
     deps = [":hello_lib"],
+    linkstatic = True,
 )
 

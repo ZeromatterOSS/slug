@@ -20,8 +20,8 @@
 //! Reference: https://bazel.build/rules/lib/toplevel/platform_common
 
 use std::fmt;
-use std::fmt::Display;
 use std::fmt::Debug;
+use std::fmt::Display;
 use std::sync::Arc;
 use std::sync::OnceLock;
 

@@ -543,6 +543,16 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
         // Return an empty runfiles stub for Bazel compatibility
         Ok(heap.alloc(RunfilesStub))
     }
+
+    /// The executable artifact for this target (Bazel compatibility).
+    ///
+    /// Returns the executable artifact list (empty if not set, single element if set).
+    #[starlark(attribute)]
+    fn executable<'v>(
+        this: &DefaultInfo<'v>,
+    ) -> starlark::Result<ValueOfUnchecked<'v, ListType<ValueIsInputArtifactAnnotation>>> {
+        Ok(this.executable.to_value())
+    }
 }
 
 /// A depset wrapper that holds an unfrozen list internally.

@@ -122,6 +122,8 @@ pub struct StarlarkRuleCallable<'v> {
     /// Optional map of the promise artifact name to starlark function.
     /// `None` for normal rules, `Some` for anon targets.
     artifact_promise_mappings: Option<ArtifactPromiseMappings<'v>>,
+    /// Whether this is a Bazel test rule (created with `rule(test=True)`).
+    is_test: bool,
 }
 
 /// Mappings of promise artifact name to the starlark function that will produce it, for anon targets.
@@ -192,6 +194,7 @@ impl<'v> StarlarkRuleCallable<'v> {
         is_toolchain_rule: bool,
         uses_plugins: Vec<PluginKind>,
         artifact_promise_mappings: Option<ArtifactPromiseMappings<'v>>,
+        is_test: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> kuro_error::Result<StarlarkRuleCallable<'v>> {
         let build_context = BuildContext::from_context(eval)?;
@@ -280,6 +283,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             docs: Some(doc.to_owned()),
             ignore_attrs_for_profiling: build_context.ignore_attrs_for_profiling,
             artifact_promise_mappings,
+            is_test,
         })
     }
 
@@ -308,6 +312,7 @@ impl<'v> StarlarkRuleCallable<'v> {
                     .map(|(k, v)| (*k, v.0))
                     .collect::<SmallMap<_, _>>(),
             }),
+            false, // anon rules are never test rules
             eval,
         )
     }
@@ -477,6 +482,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
                 cfg: self.cfg,
                 rule_kind: self.rule_kind,
                 uses_plugins: self.uses_plugins,
+                is_test: self.is_test,
             }),
             rule_type,
             implementation: frozen_impl,
@@ -726,7 +732,6 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         // TODO(bazel): Use the exec_groups parameter for execution groups
         // TODO(bazel): Use the outputs parameter for implicit outputs
         // TODO(bazel): Use the executable parameter
-        // TODO(bazel): Use the test parameter
         let _unused = (
             provides,
             toolchains,
@@ -736,7 +741,6 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             exec_groups,
             outputs,
             executable,
-            test,
         );
         // Support both `implementation` (Bazel) and `impl` (Kuro) parameter names
         let impl_fn = match (implementation, r#impl) {
@@ -764,6 +768,7 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
                 .map(|PluginKindArg { plugin_kind }| plugin_kind)
                 .collect(),
             None,
+            test,
             eval,
         )?)
     }

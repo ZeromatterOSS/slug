@@ -44,6 +44,10 @@ pub struct Rule {
     pub cfg: RuleIncomingTransition,
     /// The plugin kinds that are used by the target
     pub uses_plugins: Vec<PluginKind>,
+    /// Whether this rule is a Bazel test rule (created with `rule(test=True)`).
+    /// Test rules auto-generate `ExternalRunnerTestInfo` from `DefaultInfo.executable`
+    /// during analysis if no explicit `ExternalRunnerTestInfo` is provided.
+    pub is_test: bool,
 }
 
 interner!(INTERNER, BuckHasher, Rule);

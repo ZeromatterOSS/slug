@@ -504,6 +504,30 @@ where
     Ok(())
 }
 
+/// Create an `ExternalRunnerTestInfo` from Rust code.
+///
+/// Used to auto-inject test info for Bazel test rules (`rule(test=True)`)
+/// that return `DefaultInfo(executable=...)` without explicit `ExternalRunnerTestInfo`.
+pub fn create_external_runner_test_info_for_bazel_test<'v>(
+    test_type: Value<'v>,
+    command: Value<'v>,
+) -> ExternalRunnerTestInfo<'v> {
+    ExternalRunnerTestInfo {
+        test_type: ValueOfUnchecked::new(test_type),
+        command: ValueOfUnchecked::new(command),
+        env: ValueOfUnchecked::new(Value::new_none()),
+        labels: ValueOfUnchecked::new(Value::new_none()),
+        contacts: ValueOfUnchecked::new(Value::new_none()),
+        use_project_relative_paths: ValueOfUnchecked::new(Value::new_none()),
+        run_from_project_root: ValueOfUnchecked::new(Value::new_none()),
+        default_executor: ValueOfUnchecked::new(Value::new_none()),
+        executor_overrides: ValueOfUnchecked::new(Value::new_none()),
+        local_resources: ValueOfUnchecked::new(Value::new_none()),
+        required_local_resources: ValueOfUnchecked::new(Value::new_none()),
+        worker: ValueOfUnchecked::new(Value::new_none()),
+    }
+}
+
 #[starlark_module]
 fn external_runner_test_info_creator(globals: &mut GlobalsBuilder) {
     #[starlark(as_type = FrozenExternalRunnerTestInfo)]
