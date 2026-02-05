@@ -330,7 +330,8 @@ impl<'v> AllocValue<'v> for StarlarkDeclaredArtifact<'v> {
     }
 }
 
-#[starlark_value(type = "Artifact", StarlarkTypeRepr, UnpackValue)]
+// Use "File" type for Bazel compatibility - Bazel calls declared artifacts "File"
+#[starlark_value(type = "File", StarlarkTypeRepr, UnpackValue)]
 impl<'v> StarlarkValue<'v> for StarlarkDeclaredArtifact<'v> {
     type Canonical = StarlarkArtifact;
 

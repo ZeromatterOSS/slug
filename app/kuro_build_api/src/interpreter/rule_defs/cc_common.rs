@@ -1309,7 +1309,8 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                         }
                     }
                     // 4. If it's an artifact directly (not wrapped in _NamedLibraryInfo)
-                    else if lib.get_type() == "Artifact" {
+                    // Note: Artifacts have type "File" for Bazel compatibility
+                    else if lib.get_type() == "File" {
                         args.push(lib);
                     }
                     // 5. Last resort - use string representation, check artifact_map
@@ -1446,12 +1447,20 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
 
         // Try to get a string value from purpose
         if let Some(purpose_str) = purpose.unpack_str() {
+            // If purpose is empty string, return just "_objs" without trailing slash
+            // to avoid double slashes like "_objs//main.o"
+            if purpose_str.is_empty() {
+                return Ok("_objs".to_owned());
+            }
             return Ok(format!("_objs/{}", purpose_str));
         }
 
         // If purpose has a 'name' attribute (like a Label), use that
         if let Ok(Some(name)) = purpose.get_attr("name", eval.heap()) {
             if let Some(name_str) = name.unpack_str() {
+                if name_str.is_empty() {
+                    return Ok("_objs".to_owned());
+                }
                 return Ok(format!("_objs/{}", name_str));
             }
         }

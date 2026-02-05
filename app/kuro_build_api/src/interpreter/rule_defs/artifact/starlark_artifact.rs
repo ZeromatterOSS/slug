@@ -306,7 +306,8 @@ impl<'v> CommandLineArgLike<'v> for StarlarkArtifact {
     }
 }
 
-#[starlark_value(type = "Artifact")]
+// Use "File" type for Bazel compatibility - Bazel calls artifacts "File"
+#[starlark_value(type = "File")]
 impl<'v> StarlarkValue<'v> for StarlarkArtifact {
     fn get_methods() -> Option<&'static Methods> {
         static RES: MethodsStatic = MethodsStatic::new();

@@ -202,14 +202,16 @@ impl<V: ValueLifetimeless> Display for LiveDepsetGen<V> {
     }
 }
 
+// Generic implementation for LiveDepsetGen that works with both unfrozen (Value) and frozen (FrozenValue) variants
 #[starlark::values::starlark_value(type = "depset")]
 impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for LiveDepsetGen<V>
 where
     Self: ProvidesStaticType<'v>,
 {
     fn get_methods() -> Option<&'static Methods> {
+        // Use the generic method implementation that handles all depset variants
         static RES: MethodsStatic = MethodsStatic::new();
-        RES.methods(live_depset_methods)
+        RES.methods(generic_live_depset_methods)
     }
 
     fn to_bool(&self) -> bool {
@@ -217,54 +219,82 @@ where
         // For simplicity, assume non-empty - proper check would iterate
         true
     }
+
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "direct" | "transitive")
+    }
+
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "direct" => Some(self.direct.to_value()),
+            "transitive" => Some(self.transitive.to_value()),
+            _ => None,
+        }
+    }
 }
 
-#[starlark_module]
-fn live_depset_methods(builder: &mut MethodsBuilder) {
-    /// Return a list of all elements in the depset.
-    fn to_list<'v>(
-        #[starlark(this)] this: &LiveDepsetGen<Value<'v>>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        let mut elements: Vec<Value<'v>> = Vec::new();
-
+/// Helper function to recursively collect elements from any depset type.
+fn collect_depset_elements<'v>(
+    value: Value<'v>,
+    elements: &mut Vec<Value<'v>>,
+    heap: Heap<'v>,
+) {
+    // Try unfrozen live depset first
+    if let Some(live) = value.downcast_ref::<LiveDepsetGen<Value>>() {
         // Collect direct elements
-        if let Ok(direct_iter) = this.direct.iterate(heap) {
+        if let Ok(direct_iter) = live.direct.iterate(heap) {
             for elem in direct_iter {
                 elements.push(elem);
             }
         }
-
-        // Collect transitive elements
-        if let Ok(transitive_iter) = this.transitive.iterate(heap) {
-            for child in transitive_iter {
-                // Try to iterate child depset
-                if let Some(child_live) = child.downcast_ref::<LiveDepsetGen<Value>>() {
-                    // Recursively collect from child live depset
-                    if let Ok(child_direct_iter) = child_live.direct.iterate(heap) {
-                        for elem in child_direct_iter {
-                            elements.push(elem);
-                        }
-                    }
-                    // Also collect transitive from child
-                    if let Ok(child_trans_iter) = child_live.transitive.iterate(heap) {
-                        for grandchild in child_trans_iter {
-                            if let Some(frozen_depset) = grandchild.downcast_ref::<Depset>() {
-                                for elem in frozen_depset.collect_all_frozen() {
-                                    elements.push(elem.to_value());
-                                }
-                            }
-                        }
-                    }
-                } else if let Some(frozen_depset) = child.downcast_ref::<Depset>() {
-                    // Handle frozen depsets in transitive
-                    for elem in frozen_depset.collect_all_frozen() {
-                        elements.push(elem.to_value());
-                    }
+        // Recursively collect transitive
+        if let Ok(trans_iter) = live.transitive.iterate(heap) {
+            for child in trans_iter {
+                collect_depset_elements(child, elements, heap);
+            }
+        }
+    }
+    // Try regular frozen depset
+    else if let Some(frozen_depset) = value.downcast_ref::<Depset>() {
+        for elem in frozen_depset.collect_all_frozen() {
+            elements.push(elem.to_value());
+        }
+    }
+    // If type is "depset", try to access via attributes (handles frozen LiveDepset)
+    else if value.get_type() == "depset" {
+        // Use get_attr to access direct and transitive fields
+        if let Some(direct_attr) = value.get_attr("direct", heap).ok().flatten() {
+            if let Ok(direct_iter) = direct_attr.iterate(heap) {
+                for elem in direct_iter {
+                    elements.push(elem);
                 }
             }
         }
+        if let Some(trans_attr) = value.get_attr("transitive", heap).ok().flatten() {
+            if let Ok(trans_iter) = trans_attr.iterate(heap) {
+                for child in trans_iter {
+                    collect_depset_elements(child, elements, heap);
+                }
+            }
+        }
+    }
+    // Else: not a depset, ignore
+}
 
+// Removed live_depset_methods - using generic_live_depset_methods for all cases
+
+/// Generic methods for depsets that use Value and handle any depset variant.
+/// This handles both LiveDepset and FrozenLiveDepset via the Value interface.
+#[starlark_module]
+fn generic_live_depset_methods(builder: &mut MethodsBuilder) {
+    /// Return a list of all elements in the depset.
+    fn to_list<'v>(
+        #[starlark(this)] this: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let mut elements: Vec<Value<'v>> = Vec::new();
+        // Use the generic collector which handles all depset variants
+        collect_depset_elements(this, &mut elements, heap);
         Ok(heap.alloc(AllocList(elements)))
     }
 }
