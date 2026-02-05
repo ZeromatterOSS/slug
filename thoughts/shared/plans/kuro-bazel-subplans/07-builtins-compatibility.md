@@ -41,8 +41,8 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 
 | Rule | Description | Kuro Status | Location |
 |------|-------------|-------------|----------|
-| `constraint_setting` | Introduces new constraint type | Needs implementation | TBD |
-| `constraint_value` | Defines value for constraint type | Needs implementation | TBD |
+| `constraint_setting` | Introduces new constraint type | ✓ Implemented (native) | `native_rules.rs`, `native_rule_analysis.rs` |
+| `constraint_value` | Defines value for constraint type | ✓ Implemented (native, with ConstraintValueInfo) | `native_rules.rs`, `native_rule_analysis.rs`, `platform_common.rs` |
 | `platform` | Defines platform with constraints | Needs implementation | TBD |
 | `toolchain` | Declares toolchain type/constraints | Needs implementation | TBD |
 | `toolchain_type` | Defines new toolchain type | Needs implementation | TBD |
@@ -223,13 +223,13 @@ These modules must be available as globals in .bzl files.
 
 | Function | Description | Kuro Status |
 |----------|-------------|-------------|
-| `ConstraintSettingInfo` | Provider | Not implemented |
-| `ConstraintValueInfo` | Provider | Not implemented |
-| `PlatformInfo` | Provider | Not implemented |
-| `TemplateVariableInfo` | Provider | Not implemented |
-| `ToolchainInfo` | Provider | Needs verification |
+| `ConstraintSettingInfo` | Provider | ✓ Implemented (ProviderCallableLike) |
+| `ConstraintValueInfo` | Provider | ✓ Implemented (ProviderCallableLike + ProviderLike instance) |
+| `PlatformInfo` | Provider | Stub (not callable yet) |
+| `TemplateVariableInfo` | Provider | ✓ Implemented (callable, creates instances) |
+| `ToolchainInfo` | Provider | Stub (not callable yet) |
 
-**Status**: Not implemented (needed for platform/toolchain rules)
+**Status**: Partially implemented - ConstraintValueInfo, ConstraintSettingInfo, TemplateVariableInfo work
 
 ### Module: `testing`
 

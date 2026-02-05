@@ -68,8 +68,26 @@ This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rus
   - Implemented in `native_rules.rs` with proper target registration
   - Analysis forwards providers from the actual target
 
-**Blocking for cc_test:**
-- [ ] `ctx.exec_groups` attribute needed - rules_cc's cc_test.bzl accesses `ctx.exec_groups["test"].toolchains`
+**Completed (2026-02-05) - cc_test support:**
+- [x] **ctx.exec_groups** - Stub implementation that returns `ExecGroupsDict`
+  - `ExecGroupToolchains.at()` returns None → forces legacy cc_test path
+  - Files: `context.rs` (ExecGroupsDict/ExecGroupInfo/ExecGroupToolchains), `rule.rs` (ExecGroupValue)
+- [x] **File.dirname attribute** - `artifact.dirname` returns directory part of path
+  - File: `artifact/methods.rs`
+- [x] **platform_common.ConstraintValueInfo** - Proper provider with ProviderCallableLike
+  - `ConstraintValueInfoProvider` implements `ProviderCallableLike` trait
+  - `ConstraintValueInfoInstance` implements `ProviderLike` trait
+  - Native constraint_value targets now include ConstraintValueInfo in provider collections
+  - Files: `platform_common.rs`, `native_rule_analysis.rs`
+- [x] **ctx.target_platform_has_constraint()** - Always returns false (no platform constraints yet)
+  - File: `context.rs`
+- **cc_test builds successfully** with `linkstatic=True`
+- **Known issue:** `linkstatic=False` (default for cc_test) hits dynamic linking bug in cc_common.link
+  - Library names passed instead of artifact paths when dynamic linking
+
+**Blocking for cc_test runtime:**
+- [ ] Test runner integration (kuro test with cc_test)
+- [ ] Dynamic linking support in cc_common.link
 
 **Files:**
 - `app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs` - cc_common implementation

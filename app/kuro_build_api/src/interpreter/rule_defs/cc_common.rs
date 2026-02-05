@@ -47,8 +47,8 @@ use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
-use starlark::values::ValueLike;
 use starlark::values::ValueLifetimeless;
+use starlark::values::ValueLike;
 use starlark::values::dict::Dict;
 use starlark::values::dict::DictRef;
 use starlark::values::list::AllocList;
@@ -101,7 +101,15 @@ impl<'v> StarlarkValue<'v> for FeatureConfiguration {}
 // ============================================================================
 
 /// CcCompilationContext holds the compilation context (headers, includes, defines).
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
 #[repr(C)]
 pub struct CcCompilationContextGen<V: ValueLifetimeless> {
     /// Headers depset
@@ -128,11 +136,20 @@ where
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
-            "headers" | "includes" | "quote_includes" | "system_includes"
-                | "framework_includes" | "external_includes" | "defines"
-                | "local_defines" | "direct_headers" | "direct_public_headers"
-                | "direct_private_headers" | "direct_textual_headers"
-                | "validation_artifacts" | "_header_info"
+            "headers"
+                | "includes"
+                | "quote_includes"
+                | "system_includes"
+                | "framework_includes"
+                | "external_includes"
+                | "defines"
+                | "local_defines"
+                | "direct_headers"
+                | "direct_public_headers"
+                | "direct_private_headers"
+                | "direct_textual_headers"
+                | "validation_artifacts"
+                | "_header_info"
         )
     }
 
@@ -160,16 +177,14 @@ where
                     Some(self.defines.to_value())
                 }
             }
-            "direct_headers" | "direct_public_headers" | "direct_private_headers"
-            | "direct_textual_headers" => {
-                Some(heap.alloc(AllocList::EMPTY))
-            }
+            "direct_headers"
+            | "direct_public_headers"
+            | "direct_private_headers"
+            | "direct_textual_headers" => Some(heap.alloc(AllocList::EMPTY)),
             "validation_artifacts" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
             }
-            "_header_info" => {
-                Some(heap.alloc(HeaderInfoStub))
-            }
+            "_header_info" => Some(heap.alloc(HeaderInfoStub)),
             _ => None,
         }
     }
@@ -184,7 +199,15 @@ where
 /// Used by cc_common functions to pass configuration to compile/link actions.
 /// This version stores a reference to the original variables dict for access
 /// by get_link_args.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
 #[repr(C)]
 pub struct CcToolchainVariablesGen<V: ValueLifetimeless> {
     /// The original variables dict
@@ -252,20 +275,39 @@ starlark_simple_value!(CtxCheatStub);
 #[starlark_value(type = "ctx_cheat_stub")]
 impl<'v> StarlarkValue<'v> for CtxCheatStub {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "label" | "bin_dir" | "genfiles_dir" | "configuration" | "actions" | "fragments" | "workspace_name" | "exec_groups" | "toolchains")
+        matches!(
+            attribute,
+            "label"
+                | "bin_dir"
+                | "genfiles_dir"
+                | "configuration"
+                | "actions"
+                | "fragments"
+                | "workspace_name"
+                | "exec_groups"
+                | "toolchains"
+        )
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "label" => Some(heap.alloc(CtxCheatLabelStub)),
-            "bin_dir" => Some(heap.alloc(CtxCheatDirStub { path: "bazel-out/k8-fastbuild/bin".to_owned() })),
-            "genfiles_dir" => Some(heap.alloc(CtxCheatDirStub { path: "bazel-out/k8-fastbuild/genfiles".to_owned() })),
+            "bin_dir" => Some(heap.alloc(CtxCheatDirStub {
+                path: "bazel-out/k8-fastbuild/bin".to_owned(),
+            })),
+            "genfiles_dir" => Some(heap.alloc(CtxCheatDirStub {
+                path: "bazel-out/k8-fastbuild/genfiles".to_owned(),
+            })),
             "configuration" => Some(heap.alloc(CtxCheatConfigStub)),
             "actions" => Some(heap.alloc(CtxCheatActionsStub)),
             "fragments" => Some(heap.alloc(ConfigurationFragments::default())),
             "workspace_name" => Some(heap.alloc_str("").to_value()),
-            "exec_groups" => Some(heap.alloc(Dict::new(SmallMap::new()))),
-            "toolchains" => Some(heap.alloc(Dict::new(SmallMap::new()))),
+            "exec_groups" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::context::ExecGroupsDict))
+            }
+            "toolchains" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::context::ToolchainsStub))
+            }
             _ => None,
         }
     }
@@ -290,21 +332,40 @@ impl<'v> Display for CtxCheatWithActions<'v> {
 #[starlark_value(type = "ctx_cheat_stub")]
 impl<'v> StarlarkValue<'v> for CtxCheatWithActions<'v> {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "label" | "bin_dir" | "genfiles_dir" | "configuration" | "actions" | "fragments" | "workspace_name" | "exec_groups" | "toolchains")
+        matches!(
+            attribute,
+            "label"
+                | "bin_dir"
+                | "genfiles_dir"
+                | "configuration"
+                | "actions"
+                | "fragments"
+                | "workspace_name"
+                | "exec_groups"
+                | "toolchains"
+        )
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "label" => Some(heap.alloc(CtxCheatLabelStub)),
-            "bin_dir" => Some(heap.alloc(CtxCheatDirStub { path: "bazel-out/k8-fastbuild/bin".to_owned() })),
-            "genfiles_dir" => Some(heap.alloc(CtxCheatDirStub { path: "bazel-out/k8-fastbuild/genfiles".to_owned() })),
+            "bin_dir" => Some(heap.alloc(CtxCheatDirStub {
+                path: "bazel-out/k8-fastbuild/bin".to_owned(),
+            })),
+            "genfiles_dir" => Some(heap.alloc(CtxCheatDirStub {
+                path: "bazel-out/k8-fastbuild/genfiles".to_owned(),
+            })),
             "configuration" => Some(heap.alloc(CtxCheatConfigStub)),
             // Return the REAL actions object here
             "actions" => Some(self.actions),
             "fragments" => Some(heap.alloc(ConfigurationFragments::default())),
             "workspace_name" => Some(heap.alloc_str("").to_value()),
-            "exec_groups" => Some(heap.alloc(Dict::new(SmallMap::new()))),
-            "toolchains" => Some(heap.alloc(Dict::new(SmallMap::new()))),
+            "exec_groups" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::context::ExecGroupsDict))
+            }
+            "toolchains" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::context::ToolchainsStub))
+            }
             _ => None,
         }
     }
@@ -347,7 +408,9 @@ fn ctx_cheat_actions_stub_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         // Return a stub artifact
-        Ok(heap.alloc(CtxCheatArtifactStub { path: filename.to_owned() }))
+        Ok(heap.alloc(CtxCheatArtifactStub {
+            path: filename.to_owned(),
+        }))
     }
 
     /// Declares a directory in the output tree.
@@ -358,7 +421,9 @@ fn ctx_cheat_actions_stub_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] sibling: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        Ok(heap.alloc(CtxCheatArtifactStub { path: filename.to_owned() }))
+        Ok(heap.alloc(CtxCheatArtifactStub {
+            path: filename.to_owned(),
+        }))
     }
 
     /// Runs an action (stub implementation).
@@ -432,7 +497,16 @@ starlark_simple_value!(CtxCheatArtifactStub);
 #[starlark_value(type = "File")]
 impl<'v> StarlarkValue<'v> for CtxCheatArtifactStub {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "path" | "short_path" | "basename" | "extension" | "is_source" | "root" | "is_directory")
+        matches!(
+            attribute,
+            "path"
+                | "short_path"
+                | "basename"
+                | "extension"
+                | "is_source"
+                | "root"
+                | "is_directory"
+        )
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
@@ -449,7 +523,9 @@ impl<'v> StarlarkValue<'v> for CtxCheatArtifactStub {
             }
             "is_source" => Some(Value::new_bool(false)),
             "is_directory" => Some(Value::new_bool(false)),
-            "root" => Some(heap.alloc(CtxCheatArtifactRootStub { path: "bazel-out/k8-fastbuild/bin".to_owned() })),
+            "root" => Some(heap.alloc(CtxCheatArtifactRootStub {
+                path: "bazel-out/k8-fastbuild/bin".to_owned(),
+            })),
             _ => None,
         }
     }
@@ -616,7 +692,9 @@ impl<'v> StarlarkValue<'v> for HeaderInfoStub {
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "modular_public_headers" | "modular_private_headers" | "textual_headers"
+            "modular_public_headers"
+            | "modular_private_headers"
+            | "textual_headers"
             | "separate_module_headers" => {
                 // Return empty list
                 Some(heap.alloc(AllocList::EMPTY))
@@ -679,7 +757,9 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] copts_filter: Value<'v>,
         #[starlark(require = named, default = NoneType)] feature_configuration: Value<'v>,
         #[starlark(require = named, default = NoneType)] additional_compilation_inputs: Value<'v>,
-        #[starlark(require = named, default = NoneType)] additional_include_scanning_roots: Value<'v>,
+        #[starlark(require = named, default = NoneType)] additional_include_scanning_roots: Value<
+            'v,
+        >,
         #[starlark(require = named, default = NoneType)] source: Value<'v>,
         #[starlark(require = named, default = NoneType)] output_file: Value<'v>,
         #[starlark(require = named, default = NoneType)] diagnostics_file: Value<'v>,
@@ -699,16 +779,31 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
 
         // Log call for debugging
         use std::io::Write;
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
-            let _ = writeln!(f, "[create_cc_compile_action] source={}, output_file={}, action_name={:?}",
-                source, output_file, action_name);
-            let _ = writeln!(f, "  action_construction_context type: {}", action_construction_context.get_type());
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/cc_common_compile.log")
+        {
+            let _ = writeln!(
+                f,
+                "[create_cc_compile_action] source={}, output_file={}, action_name={:?}",
+                source, output_file, action_name
+            );
+            let _ = writeln!(
+                f,
+                "  action_construction_context type: {}",
+                action_construction_context.get_type()
+            );
         }
 
         // Validate required parameters
         if source.is_none() || output_file.is_none() {
             // Cannot create compile action without source and output
-            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("/tmp/cc_common_compile.log")
+            {
                 let _ = writeln!(f, "  EARLY RETURN: source or output_file is None");
             }
             return Ok(NoneType);
@@ -717,8 +812,18 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         // Get the actions from action_construction_context
         // The context is a CtxCheatWithActions that has the real actions
         let actions_attr_result = action_construction_context.get_attr("actions", heap);
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
-            let _ = writeln!(f, "  actions attr result: {:?}", actions_attr_result.as_ref().map(|o| o.map(|v| v.to_string())));
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/cc_common_compile.log")
+        {
+            let _ = writeln!(
+                f,
+                "  actions attr result: {:?}",
+                actions_attr_result
+                    .as_ref()
+                    .map(|o| o.map(|v| v.to_string()))
+            );
         }
         let actions_value = if let Ok(Some(actions)) = actions_attr_result {
             actions
@@ -726,20 +831,36 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             // Fallback: action_construction_context might itself be actions
             action_construction_context
         };
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/cc_common_compile.log")
+        {
             let _ = writeln!(f, "  actions_value type: {}", actions_value.get_type());
         }
 
         // Try to get the run method from actions
         let run_attr_result = actions_value.get_attr("run", heap);
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
-            let _ = writeln!(f, "  run attr result: {:?}", run_attr_result.as_ref().map(|o| o.map(|v| v.to_string())));
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/cc_common_compile.log")
+        {
+            let _ = writeln!(
+                f,
+                "  run attr result: {:?}",
+                run_attr_result.as_ref().map(|o| o.map(|v| v.to_string()))
+            );
         }
         let run_method = match run_attr_result {
             Ok(Some(method)) => method,
             _ => {
                 // No run method available - this is a stub context
-                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("/tmp/cc_common_compile.log")
+                {
                     let _ = writeln!(f, "  EARLY RETURN: no run method available");
                 }
                 return Ok(NoneType);
@@ -747,7 +868,8 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         };
 
         // Get source path for progress message
-        let source_path = source.get_attr("path", heap)
+        let source_path = source
+            .get_attr("path", heap)
             .ok()
             .flatten()
             .and_then(|v| v.unpack_str())
@@ -762,7 +884,8 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         // Get compiler path from toolchain if available, otherwise use default
         let compiler_path = if !cc_toolchain.is_none() {
             // Try to get compiler path from toolchain
-            cc_toolchain.get_attr("compiler_executable", heap)
+            cc_toolchain
+                .get_attr("compiler_executable", heap)
                 .ok()
                 .flatten()
                 .and_then(|v| v.unpack_str().map(|s| s.to_owned()))
@@ -774,9 +897,9 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         // Need to call .as_output() on the output artifact to mark it as an output
         // This is required by Kuro's run() to bind the artifact to an action
         let output_artifact = match output_file.get_attr("as_output", heap) {
-            Ok(Some(as_output_method)) => {
-                eval.eval_function(as_output_method, &[], &[]).unwrap_or(output_file)
-            },
+            Ok(Some(as_output_method)) => eval
+                .eval_function(as_output_method, &[], &[])
+                .unwrap_or(output_file),
             _ => output_file,
         };
 
@@ -788,7 +911,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         args_vec.push(heap.alloc_str("-c").to_value());
         args_vec.push(source);
         args_vec.push(heap.alloc_str("-o").to_value());
-        args_vec.push(output_artifact);  // Use the output artifact, not original output_file
+        args_vec.push(output_artifact); // Use the output artifact, not original output_file
 
         // Add PIC flag if needed
         if use_pic {
@@ -797,8 +920,8 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
 
         // Add dependency file generation flags if dotd_file is specified
         if !dotd_file.is_none() {
-            args_vec.push(heap.alloc_str("-MMD").to_value());  // Generate deps, excluding system headers
-            args_vec.push(heap.alloc_str("-MF").to_value());   // Output dependency file to specified path
+            args_vec.push(heap.alloc_str("-MMD").to_value()); // Generate deps, excluding system headers
+            args_vec.push(heap.alloc_str("-MF").to_value()); // Output dependency file to specified path
             // Get the path of the dotd_file artifact
             if let Ok(Some(path_method)) = dotd_file.get_attr("as_output", heap) {
                 if let Ok(dotd_output) = eval.eval_function(path_method, &[], &[]) {
@@ -835,7 +958,9 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         let outputs_list = heap.alloc(outputs_vec);
 
         // Build the progress message
-        let progress_msg = heap.alloc_str(&format!("Compiling {}", source_path)).to_value();
+        let progress_msg = heap
+            .alloc_str(&format!("Compiling {}", source_path))
+            .to_value();
 
         // Build named arguments for run()
         // run(arguments, outputs=outputs, mnemonic=mnemonic, progress_message=msg)
@@ -847,15 +972,30 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
 
         // Invoke actions.run() using Starlark's function evaluation
         // This properly registers the action through Kuro's infrastructure
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/cc_common_compile.log")
+        {
             let _ = writeln!(f, "  Calling run_method with:");
             let _ = writeln!(f, "    arguments: {}", arguments);
             let _ = writeln!(f, "    outputs: {}", outputs_list);
             let _ = writeln!(f, "    mnemonic: {}", action_name_str);
         }
         let run_result = eval.eval_function(run_method, &[arguments], &named_args);
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
-            let _ = writeln!(f, "  run result: {:?}", run_result.as_ref().map(|v| v.to_string()).map_err(|e| e.to_string()));
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/cc_common_compile.log")
+        {
+            let _ = writeln!(
+                f,
+                "  run result: {:?}",
+                run_result
+                    .as_ref()
+                    .map(|v| v.to_string())
+                    .map_err(|e| e.to_string())
+            );
         }
 
         Ok(NoneType)
@@ -873,8 +1013,16 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<String> {
         use std::io::Write;
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
-            let _ = writeln!(f, "[get_artifact_name_for_category] category={:?}, output_name={:?}", category, output_name);
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/cc_common_compile.log")
+        {
+            let _ = writeln!(
+                f,
+                "[get_artifact_name_for_category] category={:?}, output_name={:?}",
+                category, output_name
+            );
         }
         // TODO(cc_common): Implement proper artifact naming based on toolchain
         // For now, return basic naming conventions
@@ -894,9 +1042,9 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
 
             // Libraries
             "STATIC_LIBRARY" => format!("lib{}.a", name),
-            "ALWAYSLINK_STATIC_LIBRARY" => format!("lib{}.lo", name),  // GNU libtool convention
+            "ALWAYSLINK_STATIC_LIBRARY" => format!("lib{}.lo", name), // GNU libtool convention
             "DYNAMIC_LIBRARY" => format!("lib{}.so", name),
-            "INTERFACE_LIBRARY" => format!("lib{}.so", name),  // Same as dynamic per Bazel
+            "INTERFACE_LIBRARY" => format!("lib{}.so", name), // Same as dynamic per Bazel
 
             // Executables
             "EXECUTABLE" => name.to_owned(),
@@ -905,7 +1053,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             "INCLUDED_FILE_LIST" => format!("{}.d", name),
 
             // Diagnostics
-            "SERIALIZED_DIAGNOSTICS_FILE" => format!("{}.dia", name),  // Clang diagnostics
+            "SERIALIZED_DIAGNOSTICS_FILE" => format!("{}.dia", name), // Clang diagnostics
 
             // Headers
             "GENERATED_HEADER" => format!("{}.h", name),
@@ -932,7 +1080,11 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             // Unknown category - use category as extension
             _ => format!("{}.{}", name, category),
         };
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/cc_common_compile.log")
+        {
             let _ = writeln!(f, "  result = {:?}", result);
         }
         Ok(result)
@@ -1107,9 +1259,17 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
 
         // Log to file for debugging
         use std::io::Write;
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
-            let _ = writeln!(f, "[get_link_args] action_name={}, build_variables type={}",
-                action_name, build_variables.get_type());
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/cc_common_compile.log")
+        {
+            let _ = writeln!(
+                f,
+                "[get_link_args] action_name={}, build_variables type={}",
+                action_name,
+                build_variables.get_type()
+            );
             // Log the libraries_to_link content
             let get_var = |key: &str| -> Option<Value<'v>> {
                 if let Some(v) = build_variables.get_attr(key, heap).ok().flatten() {
@@ -1132,17 +1292,28 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                         }
                         // Check for artifact attribute
                         if let Ok(Some(artifact)) = lib.get_attr("artifact", heap) {
-                            let _ = writeln!(f, "      .artifact = {} (type={})", artifact, artifact.get_type());
+                            let _ = writeln!(
+                                f,
+                                "      .artifact = {} (type={})",
+                                artifact,
+                                artifact.get_type()
+                            );
                         }
                     }
                 }
             }
             // Log expanded_linker_inputs if present
             if let Some(inputs) = get_var("expanded_linker_inputs") {
-                let _ = writeln!(f, "  expanded_linker_inputs: {} (type={})", inputs, inputs.get_type());
+                let _ = writeln!(
+                    f,
+                    "  expanded_linker_inputs: {} (type={})",
+                    inputs,
+                    inputs.get_type()
+                );
                 if let Ok(iter) = inputs.iterate(heap) {
                     for (i, input) in iter.enumerate() {
-                        let _ = writeln!(f, "    [{}] type={}, value={}", i, input.get_type(), input);
+                        let _ =
+                            writeln!(f, "    [{}] type={}, value={}", i, input.get_type(), input);
                     }
                 }
             }
@@ -1181,20 +1352,22 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
 
         // Build a map from artifact short paths to artifacts (for Kuro compatibility)
         // This allows us to replace string paths from _NamedLibraryInfo.name with actual artifacts
-        let mut artifact_map: std::collections::HashMap<String, Value<'v>> = std::collections::HashMap::new();
+        let mut artifact_map: std::collections::HashMap<String, Value<'v>> =
+            std::collections::HashMap::new();
         if !input_artifacts.is_none() {
             // Handle depset or list of artifacts
-            let artifacts_iter = if let Ok(Some(to_list)) = input_artifacts.get_attr("to_list", heap) {
-                // It's a depset
-                if let Ok(list_val) = eval.eval_function(to_list, &[], &[]) {
-                    list_val.iterate(heap).ok()
+            let artifacts_iter =
+                if let Ok(Some(to_list)) = input_artifacts.get_attr("to_list", heap) {
+                    // It's a depset
+                    if let Ok(list_val) = eval.eval_function(to_list, &[], &[]) {
+                        list_val.iterate(heap).ok()
+                    } else {
+                        None
+                    }
                 } else {
-                    None
-                }
-            } else {
-                // Try direct iteration (list)
-                input_artifacts.iterate(heap).ok()
-            };
+                    // Try direct iteration (list)
+                    input_artifacts.iterate(heap).ok()
+                };
             if let Some(iter) = artifacts_iter {
                 for artifact in iter {
                     // Get the artifact's short path (without buck-out prefix)
@@ -1215,7 +1388,6 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
 
         // Try to get output_execpath (can be a string or an artifact)
         if let Some(output) = get_var("output_execpath") {
-
             // For static library (ar): rcs <output>
             // For dynamic/executable (gcc): -o <output>
             // For dynamic library: -shared -o <output>
@@ -1350,8 +1522,16 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         use std::io::Write;
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
-            let _ = writeln!(f, "[declare_compile_output_file] output_name={:?}", output_name);
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/cc_common_compile.log")
+        {
+            let _ = writeln!(
+                f,
+                "[declare_compile_output_file] output_name={:?}",
+                output_name
+            );
         }
 
         let heap = eval.heap();
@@ -1362,7 +1542,9 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             Ok(Some(actions)) => actions,
             _ => {
                 // Fallback to stub if no real actions available
-                return Ok(heap.alloc(CtxCheatArtifactStub { path: output_name.to_owned() }));
+                return Ok(heap.alloc(CtxCheatArtifactStub {
+                    path: output_name.to_owned(),
+                }));
             }
         };
 
@@ -1371,7 +1553,9 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             Ok(Some(method)) => method,
             _ => {
                 // Fallback to stub if declare_file not available
-                return Ok(heap.alloc(CtxCheatArtifactStub { path: output_name.to_owned() }));
+                return Ok(heap.alloc(CtxCheatArtifactStub {
+                    path: output_name.to_owned(),
+                }));
             }
         };
 
@@ -1380,7 +1564,11 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         match eval.eval_function(declare_file_method, &[filename], &[]) {
             Ok(artifact) => {
                 // Log the artifact's path attribute
-                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("/tmp/cc_common_compile.log")
+                {
                     let _ = writeln!(f, "  declared artifact: {}", artifact);
                     if let Ok(Some(path)) = artifact.get_attr("path", heap) {
                         let _ = writeln!(f, "  artifact.path = {}", path);
@@ -1389,11 +1577,17 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                 Ok(artifact)
             }
             Err(e) => {
-                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("/tmp/cc_common_compile.log")
+                {
                     let _ = writeln!(f, "  declare_file error: {}", e);
                 }
                 // Fallback to stub on error
-                Ok(heap.alloc(CtxCheatArtifactStub { path: output_name.to_owned() }))
+                Ok(heap.alloc(CtxCheatArtifactStub {
+                    path: output_name.to_owned(),
+                }))
             }
         }
     }
@@ -1434,7 +1628,11 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<String> {
         use std::io::Write;
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/cc_common_compile.log")
+        {
             let _ = writeln!(f, "[compute_output_name_prefix_dir] purpose={}", purpose);
         }
 
@@ -1615,9 +1813,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
     ///
     /// Used by rules_cc via: cc_internal = cc_common.internal_DO_NOT_USE()
     #[starlark(attribute)]
-    fn internal_DO_NOT_USE(
-        this: &CcCommonModule,
-    ) -> starlark::Result<CcCommonInternal> {
+    fn internal_DO_NOT_USE(this: &CcCommonModule) -> starlark::Result<CcCommonInternal> {
         let _ = this;
         Ok(CcCommonInternal)
     }
@@ -1634,7 +1830,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] unsupported_features: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<FeatureConfiguration> {
-        eprintln!("[cc_common.configure_features] called with ctx={}, cc_toolchain={}", ctx, cc_toolchain);
+        eprintln!(
+            "[cc_common.configure_features] called with ctx={}, cc_toolchain={}",
+            ctx, cc_toolchain
+        );
         // TODO(cc_common): Properly process features from toolchain and config
         // For now, return a default feature configuration
         Ok(FeatureConfiguration::default())
@@ -1671,10 +1870,14 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] conly_flags: Value<'v>,
         #[starlark(require = named, default = NoneType)] cxx_flags: Value<'v>,
         #[starlark(require = named, default = NoneType)] compilation_contexts: Value<'v>,
-        #[starlark(require = named, default = NoneType)] implementation_compilation_contexts: Value<'v>,
+        #[starlark(require = named, default = NoneType)] implementation_compilation_contexts: Value<
+            'v,
+        >,
         #[starlark(require = named, default = false)] disallow_pic_outputs: bool,
         #[starlark(require = named, default = false)] disallow_nopic_outputs: bool,
-        #[starlark(require = named, default = NoneType)] additional_include_scanning_roots: Value<'v>,
+        #[starlark(require = named, default = NoneType)] additional_include_scanning_roots: Value<
+            'v,
+        >,
         #[starlark(require = named, default = false)] do_not_generate_module_map: bool,
         #[starlark(require = named, default = false)] code_coverage_enabled: bool,
         #[starlark(require = named, default = NoneType)] hdrs_checking_mode: Value<'v>,
@@ -1684,7 +1887,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] copts_filter: Value<'v>,
         #[starlark(require = named, default = NoneType)] separate_module_headers: Value<'v>,
         #[starlark(require = named, default = NoneType)] module_interfaces: Value<'v>,
-        #[starlark(require = named, default = NoneType)] non_compilation_additional_inputs: Value<'v>,
+        #[starlark(require = named, default = NoneType)] non_compilation_additional_inputs: Value<
+            'v,
+        >,
         #[starlark(kwargs)] kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
@@ -1692,28 +1897,41 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 
         // Write debug to file
         use std::io::Write;
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
-            let _ = writeln!(f, "[cc_common.compile] name={}, srcs={}, srcs.is_none()={}", name, srcs, srcs.is_none());
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/tmp/cc_common_compile.log")
+        {
+            let _ = writeln!(
+                f,
+                "[cc_common.compile] name={}, srcs={}, srcs.is_none()={}",
+                name,
+                srcs,
+                srcs.is_none()
+            );
         }
 
         // Debug logging
-        eprintln!("[cc_common.compile] name={}, srcs={}, srcs.is_none()={}", name, srcs, srcs.is_none());
+        eprintln!(
+            "[cc_common.compile] name={}, srcs={}, srcs.is_none()={}",
+            name,
+            srcs,
+            srcs.is_none()
+        );
 
         // Collect source files to compile
         let mut object_files: Vec<Value<'v>> = Vec::new();
         let mut pic_object_files: Vec<Value<'v>> = Vec::new();
 
         // Get the declare_file method from actions
-        let declare_file_method = actions.get_attr("declare_file", heap)
-            .ok()
-            .flatten();
-        let run_method = actions.get_attr("run", heap)
-            .ok()
-            .flatten();
+        let declare_file_method = actions.get_attr("declare_file", heap).ok().flatten();
+        let run_method = actions.get_attr("run", heap).ok().flatten();
 
-        eprintln!("[cc_common.compile] declare_file_method={:?}, run_method={:?}",
+        eprintln!(
+            "[cc_common.compile] declare_file_method={:?}, run_method={:?}",
             declare_file_method.map(|v| v.to_string()),
-            run_method.map(|v| v.to_string()));
+            run_method.map(|v| v.to_string())
+        );
 
         // Process source files if provided
         // srcs is a list of (Artifact, Label) tuples from cc_helper.get_srcs()
@@ -1727,11 +1945,13 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     eprintln!("[cc_common.compile] Processing src_tuple: {}", src_tuple);
                     // Extract the artifact from the (Artifact, Label) tuple
                     // Try tuple index first, then fall back to treating it as artifact directly
-                    let src = src_tuple.at(heap.alloc(0i32).to_value(), heap)
+                    let src = src_tuple
+                        .at(heap.alloc(0i32).to_value(), heap)
                         .unwrap_or(src_tuple);
 
                     // Get source file path
-                    let src_path = src.get_attr("path", heap)
+                    let src_path = src
+                        .get_attr("path", heap)
                         .ok()
                         .flatten()
                         .and_then(|v| v.unpack_str())
@@ -1751,8 +1971,16 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     };
 
                     // Log what we're about to do
-                    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
-                        let _ = writeln!(f, "  Declaring output: {}, pic: {}", output_name, pic_output_name);
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open("/tmp/cc_common_compile.log")
+                    {
+                        let _ = writeln!(
+                            f,
+                            "  Declaring output: {}, pic: {}",
+                            output_name, pic_output_name
+                        );
                     }
 
                     // Declare output files
@@ -1763,27 +1991,41 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                             &[heap.alloc_str(&output_name).to_value()],
                             &[],
                         );
-                        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
-                            let _ = writeln!(f, "  declare_file result: {:?}", output_file.as_ref().map(|v| v.to_string()));
+                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open("/tmp/cc_common_compile.log")
+                        {
+                            let _ = writeln!(
+                                f,
+                                "  declare_file result: {:?}",
+                                output_file.as_ref().map(|v| v.to_string())
+                            );
                         }
                         let output_file = output_file.ok();
 
                         // PIC object file
-                        let pic_output_file = eval.eval_function(
-                            declare_file,
-                            &[heap.alloc_str(&pic_output_name).to_value()],
-                            &[],
-                        ).ok();
+                        let pic_output_file = eval
+                            .eval_function(
+                                declare_file,
+                                &[heap.alloc_str(&pic_output_name).to_value()],
+                                &[],
+                            )
+                            .ok();
 
                         // Register compile action if run method available
-                        if let (Some(run), Some(out), Some(pic_out)) = (run_method, output_file, pic_output_file) {
+                        if let (Some(run), Some(out), Some(pic_out)) =
+                            (run_method, output_file, pic_output_file)
+                        {
                             // Get output as output artifact
-                            let output_artifact = out.get_attr("as_output", heap)
+                            let output_artifact = out
+                                .get_attr("as_output", heap)
                                 .ok()
                                 .flatten()
                                 .and_then(|method| eval.eval_function(method, &[], &[]).ok())
                                 .unwrap_or(out);
-                            let pic_output_artifact = pic_out.get_attr("as_output", heap)
+                            let pic_output_artifact = pic_out
+                                .get_attr("as_output", heap)
                                 .ok()
                                 .flatten()
                                 .and_then(|method| eval.eval_function(method, &[], &[]).ok())
@@ -1798,7 +2040,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                 output_artifact,
                             ]);
                             let outputs_list = heap.alloc(vec![output_artifact]);
-                            let progress = heap.alloc_str(&format!("Compiling {}", basename)).to_value();
+                            let progress = heap
+                                .alloc_str(&format!("Compiling {}", basename))
+                                .to_value();
 
                             // Call actions.run() for regular compile
                             // Use unique identifier to avoid "multiple actions with same category" error
@@ -1813,8 +2057,19 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                     ("progress_message", progress),
                                 ],
                             );
-                            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("/tmp/cc_common_compile.log") {
-                                let _ = writeln!(f, "  actions.run result (regular): {:?}", run_result.as_ref().map(|v| v.to_string()).map_err(|e| e.to_string()));
+                            if let Ok(mut f) = std::fs::OpenOptions::new()
+                                .create(true)
+                                .append(true)
+                                .open("/tmp/cc_common_compile.log")
+                            {
+                                let _ = writeln!(
+                                    f,
+                                    "  actions.run result (regular): {:?}",
+                                    run_result
+                                        .as_ref()
+                                        .map(|v| v.to_string())
+                                        .map_err(|e| e.to_string())
+                                );
                             }
 
                             // Register PIC compile action with unique identifier
@@ -1827,8 +2082,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                 pic_output_artifact,
                             ]);
                             let pic_outputs_list = heap.alloc(vec![pic_output_artifact]);
-                            let pic_progress = heap.alloc_str(&format!("Compiling {} (PIC)", basename)).to_value();
-                            let pic_identifier = heap.alloc_str(&format!("{}.pic.o", basename)).to_value();
+                            let pic_progress = heap
+                                .alloc_str(&format!("Compiling {} (PIC)", basename))
+                                .to_value();
+                            let pic_identifier =
+                                heap.alloc_str(&format!("{}.pic.o", basename)).to_value();
 
                             let _ = eval.eval_function(
                                 run,
@@ -1949,7 +2207,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] _this: &CcCommonModule,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        Ok(eval.heap().alloc(CcToolchainVariablesGen { vars: Value::new_none() }))
+        Ok(eval.heap().alloc(CcToolchainVariablesGen {
+            vars: Value::new_none(),
+        }))
     }
 
     /// Gets legacy CC_FLAGS make variable value.
@@ -2058,7 +2318,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] lto_compilation_context: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        Ok(heap.alloc(CompilationOutputsGen { objects, pic_objects }))
+        Ok(heap.alloc(CompilationOutputsGen {
+            objects,
+            pic_objects,
+        }))
     }
 
     /// Merges compilation outputs.
@@ -2071,7 +2334,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // For now, just return a new empty compilation outputs
         // TODO(cc_common): Actually merge the compilation outputs
         let none_val = Value::new_none();
-        Ok(heap.alloc(CompilationOutputsGen { objects: none_val, pic_objects: none_val }))
+        Ok(heap.alloc(CompilationOutputsGen {
+            objects: none_val,
+            pic_objects: none_val,
+        }))
     }
 
     /// Creates a linking context from compilation outputs.
@@ -2193,7 +2459,15 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 // ============================================================================
 
 /// CompilationOutputs holds the output files from C++ compilation.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
 #[repr(C)]
 pub struct CompilationOutputsGen<V: ValueLifetimeless> {
     objects: V,
@@ -2212,20 +2486,14 @@ impl<V: ValueLifetimeless> Display for CompilationOutputsGen<V> {
 #[starlark_module]
 fn compilation_outputs_methods(builder: &mut MethodsBuilder) {
     /// Returns coverage (gcno) files from non-PIC compilation.
-    fn gcno_files<'v>(
-        this: Value<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn gcno_files<'v>(this: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         // Return empty list - no coverage files in this stub
         Ok(heap.alloc(AllocList::EMPTY))
     }
 
     /// Returns coverage (gcno) files from PIC compilation.
-    fn pic_gcno_files<'v>(
-        this: Value<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn pic_gcno_files<'v>(this: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         // Return empty list - no coverage files in this stub
         Ok(heap.alloc(AllocList::EMPTY))
@@ -2246,9 +2514,7 @@ where
             "objects" => Some(self.objects.to_value()),
             "pic_objects" => Some(self.pic_objects.to_value()),
             // These are additional attributes that rules_cc may access
-            "_gcno_files" | "_pic_gcno_files" => {
-                Some(heap.alloc(AllocList::EMPTY))
-            }
+            "_gcno_files" | "_pic_gcno_files" => Some(heap.alloc(AllocList::EMPTY)),
             _ => None,
         }
     }
@@ -2264,7 +2530,15 @@ where
 // ============================================================================
 
 /// LibraryToLink represents a library that can be linked.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
 #[repr(C)]
 pub struct LibraryToLinkGen<V: ValueLifetimeless> {
     static_library: V,
@@ -2290,7 +2564,11 @@ where
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
-            "static_library" | "pic_static_library" | "dynamic_library" | "interface_library" | "alwayslink"
+            "static_library"
+                | "pic_static_library"
+                | "dynamic_library"
+                | "interface_library"
+                | "alwayslink"
         )
     }
 
@@ -2311,7 +2589,15 @@ where
 // ============================================================================
 
 /// CcLinkingOutputs holds the output files from C++ linking.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
 #[repr(C)]
 pub struct CcLinkingOutputsGen<V: ValueLifetimeless> {
     library_to_link: V,
@@ -2488,7 +2774,7 @@ impl<'v> StarlarkValue<'v> for OutputGroupInfoProvider {
         let kwargs = args.names_map()?;
         // Create a dict from the kwargs using AllocDict
         let groups = heap.alloc(starlark::values::dict::AllocDict(
-            kwargs.into_iter().map(|(k, v)| (k.as_str(), v))
+            kwargs.into_iter().map(|(k, v)| (k.as_str(), v)),
         ));
         Ok(heap.alloc(OutputGroupInfoInstanceGen { groups }))
     }
@@ -2499,7 +2785,15 @@ impl<'v> StarlarkValue<'v> for OutputGroupInfoProvider {
 }
 
 /// An instance of OutputGroupInfo containing output groups.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
 #[repr(C)]
 pub struct OutputGroupInfoInstanceGen<V: ValueLifetimeless> {
     /// The groups as a dict value
@@ -2680,7 +2974,15 @@ fn testing_methods(builder: &mut MethodsBuilder) {
 // ============================================================================
 
 /// A stub for LinkerInput used by cc_common.create_linker_input.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
 #[repr(C)]
 pub struct LinkerInputStubGen<V: ValueLifetimeless> {
     owner: V,
@@ -2701,7 +3003,10 @@ where
     Self: ProvidesStaticType<'v>,
 {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "owner" | "libraries" | "user_link_flags" | "additional_inputs")
+        matches!(
+            attribute,
+            "owner" | "libraries" | "user_link_flags" | "additional_inputs"
+        )
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
@@ -2715,8 +3020,12 @@ where
                     Some(self.libraries.to_value())
                 }
             }
-            "user_link_flags" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "additional_inputs" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "user_link_flags" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "additional_inputs" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             _ => None,
         }
     }
@@ -2727,7 +3036,15 @@ where
 // ============================================================================
 
 /// A linking context that stores actual linker inputs.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
 #[repr(C)]
 pub struct LinkingContextWithInputsGen<V: ValueLifetimeless> {
     linker_inputs: V,

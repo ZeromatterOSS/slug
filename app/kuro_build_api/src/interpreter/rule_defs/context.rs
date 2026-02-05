@@ -15,6 +15,9 @@ use std::fmt;
 use std::fmt::Formatter;
 
 use allocative::Allocative;
+use derive_more::Display;
+use dice::DiceComputations;
+use futures::FutureExt;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::ProvidersName;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
@@ -24,9 +27,6 @@ use kuro_execute::digest_config::DigestConfig;
 use kuro_interpreter::late_binding_ty::AnalysisContextReprLate;
 use kuro_interpreter::types::configured_providers_label::StarlarkConfiguredProvidersLabel;
 use kuro_util::late_binding::LateBinding;
-use derive_more::Display;
-use dice::DiceComputations;
-use futures::FutureExt;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::SmallMap;
 use starlark::environment::GlobalsBuilder;
@@ -35,7 +35,6 @@ use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::typing::Ty;
 use starlark::values::AllocValue;
-use starlark::values::dict::Dict;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
@@ -46,6 +45,7 @@ use starlark::values::ValueLike;
 use starlark::values::ValueOfUnchecked;
 use starlark::values::ValueTyped;
 use starlark::values::ValueTypedComplex;
+use starlark::values::dict::Dict;
 use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
@@ -366,10 +366,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// Provides access to language-specific configuration like `ctx.fragments.cpp`,
     /// `ctx.fragments.java`, etc.
     #[starlark(attribute)]
-    fn fragments<'v>(
-        this: RefAnalysisContext<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn fragments<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         // Return default configuration fragments for now
         // TODO(fragments): Pull actual configuration from target configuration
@@ -388,10 +385,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     ///
     /// TODO(toolchains): Implement proper toolchain resolution.
     #[starlark(attribute)]
-    fn toolchains<'v>(
-        this: RefAnalysisContext<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn toolchains<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         Ok(heap.alloc(ToolchainsStub))
     }
@@ -407,19 +401,19 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// the result for subsequent accesses.
     /// TODO(outputs): Populate from actual rule definition outputs.
     #[starlark(attribute)]
-    fn outputs<'v>(
-        this: RefAnalysisContext<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn outputs<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         // Check if we already have cached outputs
         if let Some(cached) = this.0.outputs.borrow().as_ref() {
             return Ok(*cached);
         }
 
-        use kuro_execute::execute::request::OutputType;
         use kuro_core::fs::buck_out_path::BuckOutPathKind;
+        use kuro_execute::execute::request::OutputType;
 
-        let target_name = this.0.label.as_ref()
+        let target_name = this
+            .0
+            .label
+            .as_ref()
             .map(|l| l.label().name().to_string())
             .unwrap_or_else(|| "output".to_string());
 
@@ -428,35 +422,41 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
 
         // Declare stripped_binary: <name>.stripped
         let stripped_filename = format!("{}.stripped", target_name);
-        let stripped_binary = state.declare_output(
-            None,
-            &stripped_filename,
-            OutputType::File,
-            None,
-            BuckOutPathKind::default(),
-            heap,
-        ).ok();
+        let stripped_binary = state
+            .declare_output(
+                None,
+                &stripped_filename,
+                OutputType::File,
+                None,
+                BuckOutPathKind::default(),
+                heap,
+            )
+            .ok();
 
         // Declare executable (the main binary)
-        let executable = state.declare_output(
-            None,
-            &target_name,
-            OutputType::File,
-            None,
-            BuckOutPathKind::default(),
-            heap,
-        ).ok();
+        let executable = state
+            .declare_output(
+                None,
+                &target_name,
+                OutputType::File,
+                None,
+                BuckOutPathKind::default(),
+                heap,
+            )
+            .ok();
 
         // Declare dwp_file: <name>.dwp
         let dwp_filename = format!("{}.dwp", target_name);
-        let dwp_file = state.declare_output(
-            None,
-            &dwp_filename,
-            OutputType::File,
-            None,
-            BuckOutPathKind::default(),
-            heap,
-        ).ok();
+        let dwp_file = state
+            .declare_output(
+                None,
+                &dwp_filename,
+                OutputType::File,
+                None,
+                BuckOutPathKind::default(),
+                heap,
+            )
+            .ok();
 
         drop(state); // Release the mutable borrow
 
@@ -480,10 +480,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     ///
     /// TODO(features): Populate from actual target configuration.
     #[starlark(attribute)]
-    fn features<'v>(
-        this: RefAnalysisContext<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn features<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         use starlark::values::list::AllocList;
         // Return empty list for now
@@ -523,10 +520,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// Provides access to files from label/label_list attributes as ctx.files.<attr>.
     /// For example, `ctx.files.srcs` returns a list of files from the `srcs` attribute.
     #[starlark(attribute)]
-    fn files<'v>(
-        this: RefAnalysisContext<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn files<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         match this.0.attrs {
             Some(attrs) => Ok(heap.alloc(CtxFiles::new(attrs))),
             None => {
@@ -541,10 +535,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// Similar to ctx.files but for attrs that expect a single file.
     /// For example, `ctx.file.src` returns a single File from the `src` attribute.
     #[starlark(attribute)]
-    fn file<'v>(
-        this: RefAnalysisContext<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn file<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         match this.0.attrs {
             Some(attrs) => Ok(heap.alloc(CtxFile::new(attrs))),
             None => {
@@ -559,10 +550,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// Returns executables from label attributes declared with `executable=True`.
     /// For example, `ctx.executable._compiler` returns the compiler executable.
     #[starlark(attribute)]
-    fn executable<'v>(
-        this: RefAnalysisContext<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn executable<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         match this.0.attrs {
             Some(attrs) => Ok(heap.alloc(CtxExecutable::new(attrs))),
             None => {
@@ -619,14 +607,13 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// Returns a root object representing the output tree for binaries.
     /// Access the path via `ctx.bin_dir.path`.
     #[starlark(attribute)]
-    fn bin_dir<'v>(
-        this: RefAnalysisContext<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn bin_dir<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         // Return a stub that provides a path attribute
         // TODO: Get actual configuration-specific output path
-        Ok(heap.alloc(CtxDirRoot { path: "bazel-out/k8-fastbuild/bin".to_owned() }))
+        Ok(heap.alloc(CtxDirRoot {
+            path: "bazel-out/k8-fastbuild/bin".to_owned(),
+        }))
     }
 
     /// Output directory for generated files (Bazel-compatible).
@@ -641,7 +628,30 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         let _ = this;
         // Return a stub that provides a path attribute
         // TODO: Get actual configuration-specific output path
-        Ok(heap.alloc(CtxDirRoot { path: "bazel-out/k8-fastbuild/genfiles".to_owned() }))
+        Ok(heap.alloc(CtxDirRoot {
+            path: "bazel-out/k8-fastbuild/genfiles".to_owned(),
+        }))
+    }
+
+    /// Execution groups for this rule (Bazel-compatible).
+    ///
+    /// Returns a dict-like object providing access to execution groups defined
+    /// in the rule's `exec_groups` parameter. Each exec group has a `toolchains`
+    /// attribute that provides resolved toolchains for that group.
+    ///
+    /// Example:
+    /// ```python
+    /// tc = ctx.exec_groups["test"].toolchains["@bazel_tools//tools/cpp:test_runner_toolchain_type"]
+    /// ```
+    ///
+    /// TODO(bazel): Implement proper toolchain resolution for exec groups.
+    #[starlark(attribute)]
+    fn exec_groups<'v>(
+        this: RefAnalysisContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        Ok(heap.alloc(ExecGroupsDict))
     }
 
     /// Make variable access (Bazel-compatible).
@@ -658,10 +668,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// bin_dir = ctx.var["BINDIR"]
     /// ```
     #[starlark(attribute)]
-    fn var<'v>(
-        this: RefAnalysisContext<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn var<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         Ok(heap.alloc(CtxVarDict))
     }
@@ -686,15 +693,38 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     fn runfiles<'v>(
         this: RefAnalysisContext<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] files: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] transitive_files: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        transitive_files: Value<'v>,
         #[starlark(require = named, default = false)] collect_default: bool,
         #[starlark(require = named, default = false)] collect_data: bool,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] symlinks: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] root_symlinks: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] symlinks: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        root_symlinks: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         // Return an empty runfiles stub
-        Ok(heap.alloc(crate::interpreter::rule_defs::provider::builtin::default_info::RunfilesStub))
+        Ok(
+            heap.alloc(
+                crate::interpreter::rule_defs::provider::builtin::default_info::RunfilesStub,
+            ),
+        )
+    }
+
+    /// Whether the target platform has the given constraint value (Bazel-compatible).
+    ///
+    /// Used by rules to check if target platform matches certain constraints,
+    /// e.g., checking if building for Apple platforms.
+    ///
+    /// TODO(bazel): Implement real platform constraint checking.
+    #[allow(unused_variables)]
+    fn target_platform_has_constraint<'v>(
+        this: RefAnalysisContext,
+        constraint_value: Value<'v>,
+    ) -> starlark::Result<bool> {
+        // No platform constraints configured yet - always return false
+        Ok(false)
     }
 }
 
@@ -747,7 +777,11 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
     }
 
     fn dir_attr(&self) -> Vec<String> {
-        vec!["stripped_binary".to_owned(), "executable".to_owned(), "dwp_file".to_owned()]
+        vec![
+            "stripped_binary".to_owned(),
+            "executable".to_owned(),
+            "dwp_file".to_owned(),
+        ]
     }
 }
 
@@ -812,28 +846,62 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
         // Report which attributes exist for hasattr() checks
         matches!(
             attribute,
-            "cc" | "cc_provider_in_toolchain" | "toolchain_id" | "compiler"
-                | "cpu" | "target_gnu_system_name" | "dynamic_runtime_lib"
-                | "static_runtime_lib" | "sysroot" | "all_files"
-                | "compiler_files" | "linker_files" | "ar_files"
-                | "objcopy_files" | "strip_files" | "gcov_files"
-                | "_supports_header_parsing" | "_needs_pic_for_dynamic_libraries"
+            "cc" | "cc_provider_in_toolchain"
+                | "toolchain_id"
+                | "compiler"
+                | "cpu"
+                | "target_gnu_system_name"
+                | "dynamic_runtime_lib"
+                | "static_runtime_lib"
+                | "sysroot"
+                | "all_files"
+                | "compiler_files"
+                | "linker_files"
+                | "ar_files"
+                | "objcopy_files"
+                | "strip_files"
+                | "gcov_files"
+                | "_supports_header_parsing"
+                | "_needs_pic_for_dynamic_libraries"
                 | "_use_pic_for_dynamic_libraries_not_for_binaries"
-                | "_supports_start_end_lib" | "_feature_configuration"
-                | "_tool_paths" | "libc" | "_abi_glibc_version" | "_abi"
-                | "_crosstool_top_path" | "_legacy_cc_flags_make_variable"
-                | "_build_variables" | "_coverage_files" | "_strip_files"
-                | "_cpp_configuration" | "_if_so_builder" | "_solib_dir"
-                | "_build_variables_dict" | "_ar_files" | "_linker_files"
-                | "_supports_param_files" | "_stamp_binaries"
-                | "_is_tool_configuration" | "_is_sibling_repository_layout"
-                | "_static_runtime_lib_depset" | "_dynamic_runtime_lib_depset"
-                | "_compiler_files_without_includes" | "_as_files"
-                | "_dwp_files" | "_builtin_include_files" | "_additional_make_variables"
-                | "_all_files_including_libc" | "_build_info_files"
-                | "_allowlist_for_layering_check" | "_cc_info" | "_objcopy_files"
-                | "_aggregate_ddi" | "_toolchain_label" | "_link_dynamic_library_tool"
-                | "_grep_includes" | "_compiler_files"
+                | "_supports_start_end_lib"
+                | "_feature_configuration"
+                | "_tool_paths"
+                | "libc"
+                | "_abi_glibc_version"
+                | "_abi"
+                | "_crosstool_top_path"
+                | "_legacy_cc_flags_make_variable"
+                | "_build_variables"
+                | "_coverage_files"
+                | "_strip_files"
+                | "_cpp_configuration"
+                | "_if_so_builder"
+                | "_solib_dir"
+                | "_build_variables_dict"
+                | "_ar_files"
+                | "_linker_files"
+                | "_supports_param_files"
+                | "_stamp_binaries"
+                | "_is_tool_configuration"
+                | "_is_sibling_repository_layout"
+                | "_static_runtime_lib_depset"
+                | "_dynamic_runtime_lib_depset"
+                | "_compiler_files_without_includes"
+                | "_as_files"
+                | "_dwp_files"
+                | "_builtin_include_files"
+                | "_additional_make_variables"
+                | "_all_files_including_libc"
+                | "_build_info_files"
+                | "_allowlist_for_layering_check"
+                | "_cc_info"
+                | "_objcopy_files"
+                | "_aggregate_ddi"
+                | "_toolchain_label"
+                | "_link_dynamic_library_tool"
+                | "_grep_includes"
+                | "_compiler_files"
         )
     }
 
@@ -870,29 +938,52 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
                 Some(heap.alloc(Dict::new(map)))
             }
             "_ar_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_linker_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_linker_files" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             "_supports_param_files" => Some(Value::new_bool(true)),
             "_stamp_binaries" => Some(Value::new_bool(false)),
             "_is_sibling_repository_layout" => Some(Value::new_bool(false)),
-            "_static_runtime_lib_depset" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_dynamic_runtime_lib_depset" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_compiler_files_without_includes" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_static_runtime_lib_depset" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_dynamic_runtime_lib_depset" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_compiler_files_without_includes" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             "_as_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_dwp_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_builtin_include_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_dwp_files" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_builtin_include_files" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             "_additional_make_variables" => {
                 let map: SmallMap<Value, Value> = SmallMap::new();
                 Some(heap.alloc(Dict::new(map)))
             }
-            "_all_files_including_libc" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_build_info_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_all_files_including_libc" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_build_info_files" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             "_allowlist_for_layering_check" => Some(Value::new_none()),
-            "_objcopy_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_objcopy_files" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             "_aggregate_ddi" => Some(Value::new_none()),
-            "_toolchain_label" => Some(heap.alloc_str("@bazel_tools//tools/cpp:toolchain").to_value()),
+            "_toolchain_label" => Some(
+                heap.alloc_str("@bazel_tools//tools/cpp:toolchain")
+                    .to_value(),
+            ),
             "_link_dynamic_library_tool" => Some(Value::new_none()),
             "_grep_includes" => Some(Value::new_none()),
-            "_compiler_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "_compiler_files" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             _ => None,
         }
     }
@@ -966,10 +1057,7 @@ fn cc_toolchain_info_stub_methods(builder: &mut MethodsBuilder) {
 
     /// All input files for the toolchain.
     #[starlark(attribute)]
-    fn all_files<'v>(
-        this: &CcToolchainInfoStub,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn all_files<'v>(this: &CcToolchainInfoStub, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         Ok(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
     }
@@ -986,30 +1074,21 @@ fn cc_toolchain_info_stub_methods(builder: &mut MethodsBuilder) {
 
     /// Linker input files.
     #[starlark(attribute)]
-    fn linker_files<'v>(
-        this: &CcToolchainInfoStub,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn linker_files<'v>(this: &CcToolchainInfoStub, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         Ok(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
     }
 
     /// Archiver input files.
     #[starlark(attribute)]
-    fn ar_files<'v>(
-        this: &CcToolchainInfoStub,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn ar_files<'v>(this: &CcToolchainInfoStub, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         Ok(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
     }
 
     /// Strip input files.
     #[starlark(attribute)]
-    fn strip_files<'v>(
-        this: &CcToolchainInfoStub,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn strip_files<'v>(this: &CcToolchainInfoStub, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         Ok(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
     }
@@ -1111,14 +1190,31 @@ impl<'v> StarlarkValue<'v> for CompilationContextStub {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
-            "_module_map" | "headers" | "system_includes" | "includes"
-                | "quote_includes" | "defines" | "local_defines" | "framework_includes"
-                | "_exporting_module_maps" | "direct_headers" | "direct_public_headers"
-                | "direct_private_headers" | "direct_textual_headers" | "_header_info"
-                | "external_includes" | "_non_code_inputs" | "_virtual_to_original_headers"
-                | "validation_artifacts" | "_transitive_modules" | "_transitive_pic_modules"
-                | "_modules_info_files" | "_pic_modules_info_files" | "_module_files"
-                | "_pic_module_files" | "_direct_module_maps"
+            "_module_map"
+                | "headers"
+                | "system_includes"
+                | "includes"
+                | "quote_includes"
+                | "defines"
+                | "local_defines"
+                | "framework_includes"
+                | "_exporting_module_maps"
+                | "direct_headers"
+                | "direct_public_headers"
+                | "direct_private_headers"
+                | "direct_textual_headers"
+                | "_header_info"
+                | "external_includes"
+                | "_non_code_inputs"
+                | "_virtual_to_original_headers"
+                | "validation_artifacts"
+                | "_transitive_modules"
+                | "_transitive_pic_modules"
+                | "_modules_info_files"
+                | "_pic_modules_info_files"
+                | "_module_files"
+                | "_pic_module_files"
+                | "_direct_module_maps"
         )
     }
 
@@ -1126,23 +1222,53 @@ impl<'v> StarlarkValue<'v> for CompilationContextStub {
         match attribute {
             "_module_map" => Some(Value::new_none()),
             "headers" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "system_includes" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "system_includes" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             "includes" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "quote_includes" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "quote_includes" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             "defines" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "local_defines" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "framework_includes" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "external_includes" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_non_code_inputs" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_virtual_to_original_headers" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "validation_artifacts" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_transitive_modules" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_transitive_pic_modules" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_modules_info_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_pic_modules_info_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_module_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_pic_module_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_direct_module_maps" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "local_defines" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "framework_includes" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "external_includes" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_non_code_inputs" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_virtual_to_original_headers" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "validation_artifacts" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_transitive_modules" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_transitive_pic_modules" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_modules_info_files" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_pic_modules_info_files" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_module_files" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_pic_module_files" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_direct_module_maps" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             "_exporting_module_maps" => Some(heap.alloc(Vec::<Value>::new())),
             "direct_headers" => Some(heap.alloc(Vec::<Value>::new())),
             "direct_public_headers" => Some(heap.alloc(Vec::<Value>::new())),
@@ -1184,7 +1310,9 @@ impl<'v> StarlarkValue<'v> for HeaderInfoStubSimple {
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "modular_public_headers" | "modular_private_headers" | "textual_headers"
+            "modular_public_headers"
+            | "modular_private_headers"
+            | "textual_headers"
             | "separate_module_headers" => {
                 // Return empty list
                 Some(heap.alloc(Vec::<Value>::new()))
@@ -1218,7 +1346,9 @@ impl<'v> StarlarkValue<'v> for LinkingContextStub {
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "linker_inputs" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "linker_inputs" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             _ => None,
         }
     }
@@ -1236,7 +1366,9 @@ pub struct CtxFiles<'v> {
 
 impl<'v> CtxFiles<'v> {
     pub fn new(attrs: ValueOfUnchecked<'v, StructRef<'static>>) -> Self {
-        Self { attrs: attrs.get().to_value() }
+        Self {
+            attrs: attrs.get().to_value(),
+        }
     }
 }
 
@@ -1298,7 +1430,9 @@ pub struct CtxFile<'v> {
 
 impl<'v> CtxFile<'v> {
     pub fn new(attrs: ValueOfUnchecked<'v, StructRef<'static>>) -> Self {
-        Self { attrs: attrs.get().to_value() }
+        Self {
+            attrs: attrs.get().to_value(),
+        }
     }
 }
 
@@ -1355,7 +1489,9 @@ pub struct CtxExecutable<'v> {
 
 impl<'v> CtxExecutable<'v> {
     pub fn new(attrs: ValueOfUnchecked<'v, StructRef<'static>>) -> Self {
-        Self { attrs: attrs.get().to_value() }
+        Self {
+            attrs: attrs.get().to_value(),
+        }
     }
 }
 
@@ -1556,7 +1692,7 @@ impl<'v> StarlarkValue<'v> for CtxVarDict {
             "JAVABASE" => "",
             "ABI_GLIBC_VERSION" => "2.17",
             "ABI" => "local",
-            _ => "",  // Unknown variables return empty string
+            _ => "", // Unknown variables return empty string
         };
         Ok(heap.alloc_str(value).to_value())
     }
@@ -1566,9 +1702,17 @@ impl<'v> StarlarkValue<'v> for CtxVarDict {
         if let Some(key) = other.unpack_str() {
             Ok(matches!(
                 key,
-                "BINDIR" | "GENDIR" | "TARGET_CPU" | "COMPILATION_MODE"
-                    | "CC" | "CC_FLAGS" | "JAVA" | "JAVA_RUNFILES" | "JAVABASE"
-                    | "ABI_GLIBC_VERSION" | "ABI"
+                "BINDIR"
+                    | "GENDIR"
+                    | "TARGET_CPU"
+                    | "COMPILATION_MODE"
+                    | "CC"
+                    | "CC_FLAGS"
+                    | "JAVA"
+                    | "JAVA_RUNFILES"
+                    | "JAVABASE"
+                    | "ABI_GLIBC_VERSION"
+                    | "ABI"
             ))
         } else {
             Ok(false)
@@ -1607,15 +1751,20 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Get all keys in the Make variables dict.
-    fn keys<'v>(
-        this: &CtxVarDict,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn keys<'v>(this: &CtxVarDict, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         let keys = vec![
-            "BINDIR", "GENDIR", "TARGET_CPU", "COMPILATION_MODE",
-            "CC", "CC_FLAGS", "JAVA", "JAVA_RUNFILES", "JAVABASE",
-            "ABI_GLIBC_VERSION", "ABI",
+            "BINDIR",
+            "GENDIR",
+            "TARGET_CPU",
+            "COMPILATION_MODE",
+            "CC",
+            "CC_FLAGS",
+            "JAVA",
+            "JAVA_RUNFILES",
+            "JAVABASE",
+            "ABI_GLIBC_VERSION",
+            "ABI",
         ];
         let values: Vec<Value> = keys.iter().map(|k| heap.alloc_str(k).to_value()).collect();
         Ok(heap.alloc(values))
@@ -1670,6 +1819,114 @@ fn build_configuration_stub_methods(builder: &mut MethodsBuilder) {
         Ok(false)
     }
 }
+
+// ============================================================================
+// ExecGroupsDict - Stub for ctx.exec_groups
+// ============================================================================
+
+/// A dict-like stub for `ctx.exec_groups`.
+///
+/// In Bazel, `ctx.exec_groups` is a dictionary mapping execution group names
+/// to resolved exec group info objects. Each exec group has a `toolchains`
+/// attribute that provides resolved toolchains.
+///
+/// This stub returns an `ExecGroupInfo` for any key lookup, which in turn
+/// returns `None` for any toolchain lookup. This causes rules to take their
+/// fallback/legacy code paths.
+///
+/// TODO(bazel): Implement proper exec group resolution with real toolchain lookup.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct ExecGroupsDict;
+
+impl std::fmt::Display for ExecGroupsDict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<exec_groups>")
+    }
+}
+
+starlark::starlark_simple_value!(ExecGroupsDict);
+
+#[starlark::values::starlark_value(type = "exec_groups")]
+impl<'v> StarlarkValue<'v> for ExecGroupsDict {
+    /// Returns an ExecGroupInfo for any key.
+    fn at(&self, _index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        Ok(heap.alloc(ExecGroupInfo))
+    }
+
+    /// Returns True for any key - pretends all exec groups are defined.
+    fn is_in(&self, _other: Value<'v>) -> starlark::Result<bool> {
+        Ok(true)
+    }
+}
+
+/// A stub for a resolved execution group.
+///
+/// Provides a `toolchains` attribute that returns `None` for any toolchain
+/// type lookup, causing rules to take their fallback code paths.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct ExecGroupInfo;
+
+impl std::fmt::Display for ExecGroupInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<exec_group_info>")
+    }
+}
+
+starlark::starlark_simple_value!(ExecGroupInfo);
+
+#[starlark::values::starlark_value(type = "exec_group_info")]
+impl<'v> StarlarkValue<'v> for ExecGroupInfo {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "toolchains" | "exec_compatible_with")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "toolchains" => Some(heap.alloc(ExecGroupToolchains)),
+            "exec_compatible_with" => {
+                use starlark::values::list::AllocList;
+                Some(heap.alloc(AllocList::EMPTY))
+            }
+            _ => None,
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec!["toolchains".to_owned(), "exec_compatible_with".to_owned()]
+    }
+}
+
+/// A stub for toolchains within an execution group.
+///
+/// Returns `None` for any toolchain type lookup, indicating that the toolchain
+/// is not resolved. This is consistent with `mandatory = False` toolchains.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct ExecGroupToolchains;
+
+impl std::fmt::Display for ExecGroupToolchains {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<exec_group_toolchains>")
+    }
+}
+
+starlark::starlark_simple_value!(ExecGroupToolchains);
+
+#[starlark::values::starlark_value(type = "exec_group_toolchains")]
+impl<'v> StarlarkValue<'v> for ExecGroupToolchains {
+    /// Returns None for any toolchain type lookup.
+    fn at(&self, _index: Value<'v>, _heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        // Return None - toolchain not resolved
+        // This causes rules to take their fallback/legacy code paths
+        Ok(Value::new_none())
+    }
+
+    /// Returns False for any key - no toolchains resolved.
+    fn is_in(&self, _other: Value<'v>) -> starlark::Result<bool> {
+        Ok(false)
+    }
+}
+
+// ============================================================================
 
 /// A stub for empty depset values.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
@@ -1793,7 +2050,10 @@ fn feature_configuration_stub_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<bool> {
         let _ = this;
         // Return false for most features
-        Ok(matches!(feature_name, "supports_dynamic_linker" | "static_linking_mode"))
+        Ok(matches!(
+            feature_name,
+            "supports_dynamic_linker" | "static_linking_mode"
+        ))
     }
 
     /// Check if a feature was requested by the user.
@@ -1849,8 +2109,18 @@ impl<'v> StarlarkValue<'v> for ToolPathsStub {
         if let Some(key) = other.unpack_str() {
             Ok(matches!(
                 key,
-                "gcc" | "g++" | "cpp" | "ar" | "ld" | "nm" | "objcopy"
-                    | "objdump" | "strip" | "gcov" | "dwp" | "llvm-profdata"
+                "gcc"
+                    | "g++"
+                    | "cpp"
+                    | "ar"
+                    | "ld"
+                    | "nm"
+                    | "objcopy"
+                    | "objdump"
+                    | "strip"
+                    | "gcov"
+                    | "dwp"
+                    | "llvm-profdata"
             ))
         } else {
             Ok(false)

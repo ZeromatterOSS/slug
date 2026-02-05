@@ -16,11 +16,14 @@
 
 use std::collections::HashMap;
 
+use dupe::Dupe;
 use kuro_build_api::actions::registry::RecordedActions;
 use kuro_build_api::analysis::AnalysisResult;
 use kuro_build_api::analysis::registry::FrozenAnalysisValueStorage;
 use kuro_build_api::analysis::registry::RecordedAnalysisValues;
 use kuro_build_api::dynamic::storage::DYNAMIC_LAMBDA_PARAMS_STORAGES;
+use kuro_build_api::interpreter::rule_defs::platform_common::ConstraintValueInfoInstance;
+use kuro_build_api::interpreter::rule_defs::platform_common::ConstraintValueInfoProvider;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::FrozenDefaultInfo;
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
@@ -30,7 +33,6 @@ use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_error::internal_error;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
 use kuro_node::rule_type::NativeRuleKind;
-use dupe::Dupe;
 use starlark::values::FrozenHeap;
 use starlark::values::FrozenValueTyped;
 use starlark::values::OwnedFrozenValue;
@@ -45,20 +47,12 @@ pub fn analyze_native_rule(
     dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
 ) -> kuro_error::Result<AnalysisResult> {
     match kind {
-        NativeRuleKind::ConstraintSetting => {
-            analyze_constraint_setting(target, configured_node)
-        }
-        NativeRuleKind::ConstraintValue => {
-            analyze_constraint_value(target, configured_node)
-        }
-        NativeRuleKind::Filegroup => {
-            Err(internal_error!(
-                "Native filegroup analysis not implemented. Use Starlark filegroup instead."
-            ))
-        }
-        NativeRuleKind::Alias => {
-            analyze_alias(target, dep_analysis)
-        }
+        NativeRuleKind::ConstraintSetting => analyze_constraint_setting(target, configured_node),
+        NativeRuleKind::ConstraintValue => analyze_constraint_value(target, configured_node),
+        NativeRuleKind::Filegroup => Err(internal_error!(
+            "Native filegroup analysis not implemented. Use Starlark filegroup instead."
+        )),
+        NativeRuleKind::Alias => analyze_alias(target, dep_analysis),
     }
 }
 
@@ -73,13 +67,71 @@ fn analyze_constraint_setting(
 }
 
 /// Analyze a constraint_value target.
-/// For now, returns just DefaultInfo. Full ConstraintValueInfo support
-/// can be added later when the infrastructure is in place.
+/// Returns DefaultInfo and ConstraintValueInfo so that
+/// `target[platform_common.ConstraintValueInfo]` works.
 fn analyze_constraint_value(
     target: &ConfiguredTargetLabel,
     _configured_node: ConfiguredTargetNodeRef<'_>,
 ) -> kuro_error::Result<AnalysisResult> {
-    create_minimal_analysis_result(target)
+    let heap = FrozenHeap::new();
+
+    // Create DefaultInfo (empty)
+    let default_info = FrozenDefaultInfo::testing_empty(&heap);
+
+    // Create ConstraintValueInfo with the target's label
+    let constraint_value_info = heap.alloc(ConstraintValueInfoInstance {
+        constraint_setting_label: String::new(), // TODO: resolve from constraint_setting attr
+        label: target.unconfigured().to_string(),
+    });
+
+    // Build provider collection with DefaultInfo and ConstraintValueInfo
+    let providers = SmallMap::from_iter([
+        (
+            DefaultInfoCallable::provider_id().dupe(),
+            default_info.to_frozen_value(),
+        ),
+        (
+            ConstraintValueInfoProvider::provider_id().dupe(),
+            constraint_value_info,
+        ),
+    ]);
+
+    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+        heap.alloc(FrozenProviderCollection::new(providers)),
+    )?;
+
+    // Create analysis storage
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+
+    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+        value: FrozenAnalysisValueStorage::new_native(
+            self_key.dupe(),
+            DYNAMIC_LAMBDA_PARAMS_STORAGES
+                .get()
+                .unwrap()
+                .new_frozen_dynamic_lambda_params_storage(),
+            Some(provider_collection),
+        ),
+    });
+
+    let heap_ref = heap.into_ref();
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
+
+    let recorded_values = RecordedAnalysisValues::new_native(
+        self_key,
+        Some(analysis_storage),
+        RecordedActions::new(0),
+    );
+
+    Ok(AnalysisResult::new(
+        recorded_values,
+        None,
+        HashMap::new(),
+        0,
+        0,
+        None,
+    ))
 }
 
 /// Analyze an alias target.
@@ -143,9 +195,8 @@ fn create_minimal_analysis_result(
     });
 
     let heap_ref = heap.into_ref();
-    let analysis_storage = unsafe {
-        OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()?
-    };
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
 
     let recorded_values = RecordedAnalysisValues::new_native(
         self_key,
@@ -155,10 +206,10 @@ fn create_minimal_analysis_result(
 
     Ok(AnalysisResult::new(
         recorded_values,
-        None, // No profiling data
+        None,           // No profiling data
         HashMap::new(), // No promise artifacts
-        0, // No actions
-        0, // No artifacts
-        None, // No validations
+        0,              // No actions
+        0,              // No artifacts
+        None,           // No validations
     ))
 }

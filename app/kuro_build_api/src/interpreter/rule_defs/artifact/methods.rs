@@ -9,12 +9,12 @@
  */
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::ProvidersName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_interpreter::types::configured_providers_label::StarlarkConfiguredProvidersLabel;
-use dupe::Dupe;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::MethodsBuilder;
 use starlark::values::AllocValue;
@@ -93,7 +93,7 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<StringValue<'v>> {
         Ok(this.with_filename(&|filename| match filename.extension() {
             None => heap.alloc_str(""),
-            Some(x) => heap.alloc_str(x),  // No leading dot, Bazel-compatible
+            Some(x) => heap.alloc_str(x), // No leading dot, Bazel-compatible
         })?)
     }
 
@@ -180,6 +180,24 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'_>,
     ) -> starlark::Result<StringValue<'v>> {
         Ok(this.with_full_path(&|path| heap.alloc_str(path.as_str()))?)
+    }
+
+    /// The directory part of the artifact's execution path (Bazel-compatible).
+    ///
+    /// For an artifact with path `foo/bar/baz.o`, this returns `foo/bar`.
+    /// For an artifact at the root, returns an empty string.
+    #[starlark(attribute)]
+    fn dirname<'v>(
+        this: &'v dyn StarlarkArtifactLike<'v>,
+        heap: Heap<'_>,
+    ) -> starlark::Result<StringValue<'v>> {
+        Ok(this.with_full_path(&|path| {
+            let path_str = path.as_str();
+            match path_str.rfind('/') {
+                Some(pos) => heap.alloc_str(&path_str[..pos]),
+                None => heap.alloc_str(""),
+            }
+        })?)
     }
 
     /// The root directory of this artifact (Bazel-compatible).

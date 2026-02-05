@@ -234,7 +234,7 @@ Quick reference to all phases and their locations:
 
 | Phase | Title                    | Status          |
 | ----- | ------------------------ | --------------- |
-| 9     | rules_cc Integration     | [x] In Progress (cc_library works, repo_name aliasing works) |
+| 9     | rules_cc Integration     | [x] In Progress (cc_library, cc_binary, cc_test build work) |
 | 10    | rules_rust Integration   | [ ] Not Started |
 | 11    | rules_python Integration | [ ] Not Started |
 | 12    | rules_oci Integration    | [ ] Not Started |

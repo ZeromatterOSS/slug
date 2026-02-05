@@ -13,6 +13,10 @@ use std::fmt;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use derive_more::Display;
+use dupe::Dupe;
+use either::Either;
+use itertools::Itertools;
 use kuro_core::plugins::PluginKind;
 use kuro_error::BuckErrorContext;
 use kuro_interpreter::late_binding_ty::AnalysisContextReprLate;
@@ -32,10 +36,6 @@ use kuro_node::rule::Rule;
 use kuro_node::rule::RuleIncomingTransition;
 use kuro_node::rule_type::RuleType;
 use kuro_node::rule_type::StarlarkRuleType;
-use derive_more::Display;
-use dupe::Dupe;
-use either::Either;
-use itertools::Itertools;
 use starlark::any::ProvidesStaticType;
 use starlark::docs::DocFunction;
 use starlark::docs::DocItem;
@@ -596,6 +596,55 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRuleCallable {
     }
 }
 
+// ============================================================================
+// ExecGroupValue - Returned by exec_group() function
+// ============================================================================
+
+/// A Bazel execution group value.
+///
+/// Created by the `exec_group()` function and stored in rule definitions.
+/// At analysis time, these are replaced by resolved exec group info in `ctx.exec_groups`.
+///
+/// TODO(bazel): Implement proper execution group support with real toolchain resolution.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
+pub struct ExecGroupValue<'v> {
+    /// Toolchain requirements for this execution group
+    toolchains: Value<'v>,
+    /// Execution compatibility constraints
+    exec_compatible_with: Value<'v>,
+}
+
+impl<'v> std::fmt::Display for ExecGroupValue<'v> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "exec_group()")
+    }
+}
+
+impl<'v> AllocValue<'v> for ExecGroupValue<'v> {
+    fn alloc_value(self, heap: Heap<'v>) -> Value<'v> {
+        heap.alloc_complex_no_freeze(self)
+    }
+}
+
+#[starlark_value(type = "exec_group")]
+impl<'v> StarlarkValue<'v> for ExecGroupValue<'v> {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "toolchains" | "exec_compatible_with")
+    }
+
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "toolchains" => Some(self.toolchains),
+            "exec_compatible_with" => Some(self.exec_compatible_with),
+            _ => None,
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec!["toolchains".to_owned(), "exec_compatible_with".to_owned()]
+    }
+}
+
 #[starlark_module]
 pub fn register_rule_function(builder: &mut GlobalsBuilder) {
     /// Define a rule. Supports both Bazel-style (`implementation`) and Kuro-style (`impl`)
@@ -678,16 +727,23 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         // TODO(bazel): Use the outputs parameter for implicit outputs
         // TODO(bazel): Use the executable parameter
         // TODO(bazel): Use the test parameter
-        let _unused = (provides, toolchains, fragments, subrules, initializer, exec_groups, outputs, executable, test);
+        let _unused = (
+            provides,
+            toolchains,
+            fragments,
+            subrules,
+            initializer,
+            exec_groups,
+            outputs,
+            executable,
+            test,
+        );
         // Support both `implementation` (Bazel) and `impl` (Kuro) parameter names
         let impl_fn = match (implementation, r#impl) {
             (Some(implementation), None) => implementation,
             (None, Some(impl_fn)) => impl_fn,
             (Some(_), Some(_)) => {
-                return Err(kuro_error::Error::from(
-                    RuleError::BothImplAndImplementation,
-                )
-                .into());
+                return Err(kuro_error::Error::from(RuleError::BothImplAndImplementation).into());
             }
             (None, None) => {
                 return Err(kuro_error::Error::from(RuleError::MissingImplementation).into());
@@ -762,11 +818,14 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         #[starlark(require = named)] exec_compatible_with: Option<Value<'v>>,
         // Bazel-compatible: copy from rule (no-op for stub)
         #[starlark(require = named, default = false)] copy_from_rule: bool,
-        _eval: &mut Evaluator<'v, '_, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // TODO(bazel): Implement proper execution group support
-        let _unused = (toolchains, exec_compatible_with, copy_from_rule);
-        // Return a stub struct that can be used in exec_groups dict
-        Ok(Value::new_none())
+        // TODO(bazel): Implement proper execution group support with real toolchain resolution
+        let _ = copy_from_rule;
+        let heap = eval.heap();
+        Ok(heap.alloc(ExecGroupValue {
+            toolchains: heap.alloc(toolchains.items),
+            exec_compatible_with: exec_compatible_with.unwrap_or(Value::new_none()),
+        }))
     }
 }
