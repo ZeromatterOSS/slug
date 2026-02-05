@@ -111,3 +111,11 @@ cc_test(
     linkstatic = True,
 )
 
+# Test dynamic linking (linkstatic=False is cc_test default)
+cc_test(
+    name = "hello_test_dynamic",
+    srcs = ["hello_test.c"],
+    deps = [":hello_lib"],
+    linkstatic = False,
+)
+

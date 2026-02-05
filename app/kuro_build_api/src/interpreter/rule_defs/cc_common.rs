@@ -712,6 +712,20 @@ impl<'v> StarlarkValue<'v> for HeaderInfoStub {
 // CcCommonInternal - Internal API returned by internal_DO_NOT_USE()
 // ============================================================================
 
+/// Helper: push a path string or its corresponding artifact to the args list.
+fn push_path_or_artifact<'v>(
+    path_str: &str,
+    artifact_map: &std::collections::HashMap<String, Value<'v>>,
+    args: &mut Vec<Value<'v>>,
+    heap: Heap<'v>,
+) {
+    if let Some(&artifact) = artifact_map.get(path_str) {
+        args.push(artifact);
+    } else {
+        args.push(heap.alloc_str(path_str).to_value());
+    }
+}
+
 /// Internal cc_common API struct.
 ///
 /// Returned by `cc_common.internal_DO_NOT_USE()`. Contains internal functions
@@ -1239,9 +1253,14 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
     /// the linker command line arguments. For rules_cc compatibility, this
     /// returns an Args-like list that can be passed to actions.run(arguments=...).
     ///
-    /// Note: In Bazel, this is a complex function that uses action_configs and
-    /// feature definitions to expand variables into flags. For now, we extract
-    /// basic string variables and return them as arguments.
+    /// The build_variables contain `libraries_to_link` which is a list of
+    /// provider instances created by rules_cc:
+    /// - _NamedLibraryInfo: type in {object_file, static_library, dynamic_library, interface_library}
+    /// - _ObjectFileGroupInfo: type = object_file_group, has .object_files list
+    /// - _VersionedLibraryInfo: type = versioned_dynamic_library, has .name and .path
+    ///
+    /// For dynamic_library type, .name is a short library name (e.g., "hello_lib")
+    /// that should be emitted as -l<name>. For other types, .name is a full path.
     #[allow(unused_variables)]
     fn get_link_args<'v>(
         #[starlark(this)] this: &CcCommonInternal,
@@ -1250,98 +1269,32 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] build_variables: Value<'v>,
         #[starlark(require = named, default = NoneType)] parameter_file_type: Value<'v>,
         // Kuro extension: Optional input artifacts for proper path resolution.
-        // When provided, artifact paths from _NamedLibraryInfo.name will be matched
-        // against these artifacts and replaced with actual artifact references.
         #[starlark(require = named, default = NoneType)] input_artifacts: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let heap = eval.heap();
 
-        // Log to file for debugging
+        // Debug logging
         use std::io::Write;
-        if let Ok(mut f) = std::fs::OpenOptions::new()
+        let mut debug_log = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open("/tmp/cc_common_compile.log")
-        {
-            let _ = writeln!(
-                f,
-                "[get_link_args] action_name={}, build_variables type={}",
-                action_name,
-                build_variables.get_type()
-            );
-            // Log the libraries_to_link content
-            let get_var = |key: &str| -> Option<Value<'v>> {
-                if let Some(v) = build_variables.get_attr(key, heap).ok().flatten() {
-                    return Some(v);
-                }
-                if let Some(dict_ref) = DictRef::from_value(build_variables) {
-                    if let Some(v) = dict_ref.get_str(key) {
-                        return Some(v);
-                    }
-                }
-                None
-            };
-            if let Some(libs) = get_var("libraries_to_link") {
-                let _ = writeln!(f, "  libraries_to_link: {}", libs);
-                if let Ok(iter) = libs.iterate(heap) {
-                    for (i, lib) in iter.enumerate() {
-                        let _ = writeln!(f, "    [{}] type={}, value={}", i, lib.get_type(), lib);
-                        if let Ok(Some(name)) = lib.get_attr("name", heap) {
-                            let _ = writeln!(f, "      .name = {}", name);
-                        }
-                        // Check for artifact attribute
-                        if let Ok(Some(artifact)) = lib.get_attr("artifact", heap) {
-                            let _ = writeln!(
-                                f,
-                                "      .artifact = {} (type={})",
-                                artifact,
-                                artifact.get_type()
-                            );
-                        }
-                    }
-                }
-            }
-            // Log expanded_linker_inputs if present
-            if let Some(inputs) = get_var("expanded_linker_inputs") {
-                let _ = writeln!(
-                    f,
-                    "  expanded_linker_inputs: {} (type={})",
-                    inputs,
-                    inputs.get_type()
-                );
-                if let Ok(iter) = inputs.iterate(heap) {
-                    for (i, input) in iter.enumerate() {
-                        let _ =
-                            writeln!(f, "    [{}] type={}, value={}", i, input.get_type(), input);
-                    }
-                }
-            }
-            // Log all available keys in build_variables
-            if let Some(dict_ref) = DictRef::from_value(build_variables) {
-                let _ = writeln!(f, "  all build_variables keys:");
-                for (k, _v) in dict_ref.iter() {
-                    let _ = writeln!(f, "    - {}", k);
-                }
-            }
+            .ok();
+        if let Some(ref mut f) = debug_log {
+            let _ = writeln!(f, "[get_link_args] action_name={}", action_name);
         }
 
         // Get action name as string
         let action_name_str = action_name.unpack_str().unwrap_or("c++-link-executable");
 
-        // Extract variables from build_variables
-        // build_variables can be either:
-        // 1. CcToolchainVariables wrapping a dict (Kuro style)
-        // 2. A raw dict (if passed directly)
         let mut args: Vec<Value<'v>> = Vec::new();
 
         // Helper to get a variable value from either CcToolchainVariables or a raw dict
         let get_var = |key: &str| -> Option<Value<'v>> {
-            // First try get_attr (works for CcToolchainVariables)
             if let Some(v) = build_variables.get_attr(key, heap).ok().flatten() {
                 return Some(v);
             }
-            // Also try direct dict access (if build_variables is a dict)
             if let Some(dict_ref) = DictRef::from_value(build_variables) {
                 if let Some(v) = dict_ref.get_str(key) {
                     return Some(v);
@@ -1350,33 +1303,27 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             None
         };
 
-        // Build a map from artifact short paths to artifacts (for Kuro compatibility)
-        // This allows us to replace string paths from _NamedLibraryInfo.name with actual artifacts
+        // Build a map from artifact paths to artifact values (for resolving string paths)
         let mut artifact_map: std::collections::HashMap<String, Value<'v>> =
             std::collections::HashMap::new();
         if !input_artifacts.is_none() {
-            // Handle depset or list of artifacts
             let artifacts_iter =
                 if let Ok(Some(to_list)) = input_artifacts.get_attr("to_list", heap) {
-                    // It's a depset
                     if let Ok(list_val) = eval.eval_function(to_list, &[], &[]) {
                         list_val.iterate(heap).ok()
                     } else {
                         None
                     }
                 } else {
-                    // Try direct iteration (list)
                     input_artifacts.iterate(heap).ok()
                 };
             if let Some(iter) = artifacts_iter {
                 for artifact in iter {
-                    // Get the artifact's short path (without buck-out prefix)
                     if let Ok(Some(short_path)) = artifact.get_attr("short_path", heap) {
                         if let Some(path_str) = short_path.unpack_str() {
                             artifact_map.insert(path_str.to_owned(), artifact);
                         }
                     }
-                    // Also try "path" attribute for declared artifacts
                     if let Ok(Some(path_attr)) = artifact.get_attr("path", heap) {
                         if let Some(path_str) = path_attr.unpack_str() {
                             artifact_map.insert(path_str.to_owned(), artifact);
@@ -1386,37 +1333,27 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             }
         }
 
-        // Try to get output_execpath (can be a string or an artifact)
+        // --- Output path ---
         if let Some(output) = get_var("output_execpath") {
-            // For static library (ar): rcs <output>
-            // For dynamic/executable (gcc): -o <output>
-            // For dynamic library: -shared -o <output>
             if action_name_str.contains("static-library") {
                 args.push(heap.alloc_str("rcs").to_value());
             } else if action_name_str.contains("dynamic-library") {
-                // Add -shared flag for shared library linking
                 args.push(heap.alloc_str("-shared").to_value());
                 args.push(heap.alloc_str("-o").to_value());
             } else {
                 args.push(heap.alloc_str("-o").to_value());
             }
 
-            // For output artifacts, we need to call .as_output() to get an output marker
-            // that can be used in command-line arguments with proper path expansion.
             if output.unpack_str().is_some() {
-                // Already a string path, use directly
                 args.push(output);
             } else {
                 let path_result = output.get_attr("path", heap);
-
-                // For declared output artifacts, call .as_output() for proper path expansion
                 if let Ok(Some(as_output_method)) = output.get_attr("as_output", heap) {
                     match eval.eval_function(as_output_method, &[], &[]) {
                         Ok(output_artifact) => {
                             args.push(output_artifact);
                         }
                         Err(_) => {
-                            // Fallback to path string
                             if let Ok(Some(path)) = path_result {
                                 args.push(path);
                             } else {
@@ -1424,77 +1361,178 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                             }
                         }
                     }
+                } else if let Ok(Some(path)) = path_result {
+                    args.push(path);
                 } else {
-                    // No .as_output() method, use path fallback
-                    if let Ok(Some(path)) = path_result {
-                        args.push(path);
-                    } else {
-                        args.push(heap.alloc_str(&output.to_str()).to_value());
+                    args.push(heap.alloc_str(&output.to_str()).to_value());
+                }
+            }
+        }
+
+        // Helper: iterate a value that may be a list or depset
+        // For depsets, call .to_list() first to get an iterable
+        let iterate_value =
+            |val: Value<'v>, eval_ref: &mut Evaluator<'v, '_, '_>| -> Vec<Value<'v>> {
+                let h = eval_ref.heap();
+                // Try to_list() for depsets
+                if let Ok(Some(to_list_method)) = val.get_attr("to_list", h) {
+                    if let Ok(list_val) = eval_ref.eval_function(to_list_method, &[], &[]) {
+                        if let Ok(iter) = list_val.iterate(h) {
+                            return iter.collect();
+                        }
+                    }
+                }
+                // Fall back to direct iteration (for lists)
+                if let Ok(iter) = val.iterate(h) {
+                    iter.collect()
+                } else {
+                    Vec::new()
+                }
+            };
+
+        // --- Library search directories (-L flags and -rpath) ---
+        // Must come before libraries_to_link so the linker can find -l libraries.
+        // Also add -rpath for the same directories so the runtime linker can find them.
+        let mut lib_search_dirs: Vec<String> = Vec::new();
+        if let Some(dirs) = get_var("library_search_directories") {
+            for dir in iterate_value(dirs, eval) {
+                if let Some(dir_str) = dir.unpack_str() {
+                    if !dir_str.is_empty() {
+                        args.push(
+                            heap.alloc_str(&format!("-L{}", dir_str)).to_value(),
+                        );
+                        lib_search_dirs.push(dir_str.to_owned());
                     }
                 }
             }
         }
 
-        // Try to get libraries_to_link (list of _NamedLibraryInfo or artifacts or strings)
+        // --- Libraries to link ---
+        // Process based on .type field from rules_cc provider instances
         if let Some(libs) = get_var("libraries_to_link") {
             if let Ok(iter) = libs.iterate(heap) {
                 for lib in iter {
-                    // Helper closure to look up artifact by path and add to args
-                    let mut add_path_or_artifact = |path_str: &str| {
-                        // First check if we have an artifact with this path
-                        if let Some(&artifact) = artifact_map.get(path_str) {
-                            args.push(artifact);
-                            return;
-                        }
-                        // Fallback to string path
-                        args.push(heap.alloc_str(path_str).to_value());
-                    };
+                    // Get the library type to determine how to format the argument
+                    let lib_type = lib
+                        .get_attr("type", heap)
+                        .ok()
+                        .flatten()
+                        .and_then(|v| v.unpack_str().map(|s| s.to_owned()));
 
-                    // Try various ways to get the input file:
-                    // 1. Direct string - check artifact_map first
-                    if let Some(path_str) = lib.unpack_str() {
-                        add_path_or_artifact(path_str);
+                    let is_whole_archive = lib
+                        .get_attr("is_whole_archive", heap)
+                        .ok()
+                        .flatten()
+                        .map(|v| v.unpack_bool() == Some(true))
+                        .unwrap_or(false);
+
+                    if is_whole_archive {
+                        args.push(heap.alloc_str("-Wl,--whole-archive").to_value());
                     }
-                    // 2. _NamedLibraryInfo has a .artifact attribute (the actual file)
-                    else if let Some(artifact) = lib.get_attr("artifact", heap).ok().flatten() {
-                        // Check if artifact is None (Starlark None)
-                        if artifact.is_none() {
-                            // Fall through to use .name - check artifact_map first
+
+                    match lib_type.as_deref() {
+                        Some("dynamic_library") => {
+                            // Dynamic library: emit -l<name> flag
+                            // .name is a short name like "hello_lib" (from "libhello_lib.so")
                             if let Some(name) = lib.get_attr("name", heap).ok().flatten() {
                                 if let Some(name_str) = name.unpack_str() {
-                                    add_path_or_artifact(name_str);
+                                    args.push(
+                                        heap.alloc_str(&format!("-l{}", name_str)).to_value(),
+                                    );
+                                }
+                            }
+                        }
+                        Some("versioned_dynamic_library") => {
+                            // Versioned dynamic library: use -l:<name> for exact match
+                            if let Some(name) = lib.get_attr("name", heap).ok().flatten() {
+                                if let Some(name_str) = name.unpack_str() {
+                                    args.push(
+                                        heap.alloc_str(&format!("-l:{}", name_str)).to_value(),
+                                    );
+                                }
+                            }
+                        }
+                        Some("object_file_group") => {
+                            // Object file group: iterate .object_files and add each
+                            if let Some(object_files) =
+                                lib.get_attr("object_files", heap).ok().flatten()
+                            {
+                                if let Ok(obj_iter) = object_files.iterate(heap) {
+                                    for obj in obj_iter {
+                                        if obj.get_type() == "File" {
+                                            args.push(obj);
+                                        } else if let Some(path_str) = obj.unpack_str() {
+                                            push_path_or_artifact(
+                                                path_str,
+                                                &artifact_map,
+                                                &mut args,
+                                                heap,
+                                            );
+                                        } else {
+                                            args.push(obj);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Some("object_file")
+                        | Some("static_library")
+                        | Some("interface_library") => {
+                            // These types use .name as a full path
+                            if let Some(name) = lib.get_attr("name", heap).ok().flatten() {
+                                if let Some(name_str) = name.unpack_str() {
+                                    push_path_or_artifact(name_str, &artifact_map, &mut args, heap);
                                 } else {
                                     args.push(name);
                                 }
                             }
-                        } else {
-                            // Push artifact directly for CommandLineArgLike expansion
-                            args.push(artifact);
+                        }
+                        _ => {
+                            // Unknown type or no type field - use legacy fallback
+                            if let Some(path_str) = lib.unpack_str() {
+                                push_path_or_artifact(path_str, &artifact_map, &mut args, heap);
+                            } else if let Some(artifact) =
+                                lib.get_attr("artifact", heap).ok().flatten()
+                            {
+                                if artifact.is_none() {
+                                    if let Some(name) = lib.get_attr("name", heap).ok().flatten() {
+                                        if let Some(name_str) = name.unpack_str() {
+                                            push_path_or_artifact(
+                                                name_str,
+                                                &artifact_map,
+                                                &mut args,
+                                                heap,
+                                            );
+                                        } else {
+                                            args.push(name);
+                                        }
+                                    }
+                                } else {
+                                    args.push(artifact);
+                                }
+                            } else if let Some(name) = lib.get_attr("name", heap).ok().flatten() {
+                                if let Some(name_str) = name.unpack_str() {
+                                    push_path_or_artifact(name_str, &artifact_map, &mut args, heap);
+                                } else {
+                                    args.push(name);
+                                }
+                            } else if lib.get_type() == "File" {
+                                args.push(lib);
+                            } else {
+                                let path_str = lib.to_str();
+                                push_path_or_artifact(&path_str, &artifact_map, &mut args, heap);
+                            }
                         }
                     }
-                    // 3. Try .name attribute if no .artifact - check artifact_map first
-                    else if let Some(name) = lib.get_attr("name", heap).ok().flatten() {
-                        if let Some(name_str) = name.unpack_str() {
-                            add_path_or_artifact(name_str);
-                        } else {
-                            args.push(name);
-                        }
-                    }
-                    // 4. If it's an artifact directly (not wrapped in _NamedLibraryInfo)
-                    // Note: Artifacts have type "File" for Bazel compatibility
-                    else if lib.get_type() == "File" {
-                        args.push(lib);
-                    }
-                    // 5. Last resort - use string representation, check artifact_map
-                    else {
-                        let path_str = lib.to_str();
-                        add_path_or_artifact(&path_str);
+
+                    if is_whole_archive {
+                        args.push(heap.alloc_str("-Wl,--no-whole-archive").to_value());
                     }
                 }
             }
         }
 
-        // Try to get user_link_flags (should be strings)
+        // --- User link flags ---
         if let Some(flags) = get_var("user_link_flags") {
             if let Ok(iter) = flags.iterate(heap) {
                 for flag in iter {
@@ -1505,7 +1543,86 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             }
         }
 
-        // Return as a list that can be passed to actions.run(arguments=...)
+        // --- Runtime library search directories (-rpath flags) ---
+        // Use $ORIGIN-relative paths so the runtime linker can find shared libraries
+        // regardless of the working directory when the binary is executed.
+        let output_dir: Option<String> = get_var("output_execpath").and_then(|v| {
+            let path_str = if let Some(s) = v.unpack_str() {
+                s.to_owned()
+            } else if let Ok(Some(path_attr)) = v.get_attr("path", heap) {
+                path_attr.unpack_str().map(|s| s.to_owned()).unwrap_or_else(|| v.to_str())
+            } else {
+                v.to_str()
+            };
+            std::path::Path::new(&path_str)
+                .parent()
+                .map(|p| p.to_string_lossy().to_string())
+        });
+
+        let make_origin_rpath = |dir_str: &str| -> String {
+            if let Some(ref out_dir) = output_dir {
+                // Normalize: strip leading "../" components from dir_str.
+                // rules_cc may produce relative paths like "../../../buck-out/v2/gen/..."
+                // but we need the project-root-relative path for $ORIGIN computation.
+                let mut normalized = dir_str;
+                while normalized.starts_with("../") {
+                    normalized = &normalized[3..];
+                }
+                if normalized == ".." {
+                    normalized = "";
+                }
+
+                // Compute relative path from binary's directory to the library directory
+                let from_components: Vec<&str> =
+                    out_dir.split('/').filter(|s| !s.is_empty()).collect();
+                let to_components: Vec<&str> =
+                    normalized.split('/').filter(|s| !s.is_empty()).collect();
+                let common = from_components
+                    .iter()
+                    .zip(to_components.iter())
+                    .take_while(|(a, b)| a == b)
+                    .count();
+                let up_count = from_components.len() - common;
+                let mut rel = String::from("$ORIGIN");
+                for _ in 0..up_count {
+                    rel.push_str("/..");
+                }
+                for &component in &to_components[common..] {
+                    rel.push('/');
+                    rel.push_str(component);
+                }
+                format!("-Wl,-rpath,{}", rel)
+            } else {
+                // No output path available, use as-is (fallback)
+                format!("-Wl,-rpath,{}", dir_str)
+            }
+        };
+
+        let mut has_rpath = false;
+        let mut seen_rpaths: std::collections::HashSet<String> = std::collections::HashSet::new();
+        if let Some(dirs) = get_var("runtime_library_search_directories") {
+            for dir in iterate_value(dirs, eval) {
+                if let Some(dir_str) = dir.unpack_str() {
+                    if !dir_str.is_empty() {
+                        let rpath = make_origin_rpath(dir_str);
+                        if seen_rpaths.insert(rpath.clone()) {
+                            args.push(heap.alloc_str(&rpath).to_value());
+                        }
+                        has_rpath = true;
+                    }
+                }
+            }
+        }
+        // Fallback: use library_search_directories for rpath if no explicit rpath dirs
+        if !has_rpath && !lib_search_dirs.is_empty() {
+            for dir_str in &lib_search_dirs {
+                let rpath = make_origin_rpath(dir_str);
+                if seen_rpaths.insert(rpath.clone()) {
+                    args.push(heap.alloc_str(&rpath).to_value());
+                }
+            }
+        }
+
         Ok(heap.alloc(args))
     }
 

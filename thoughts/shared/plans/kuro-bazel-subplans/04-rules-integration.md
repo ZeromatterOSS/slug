@@ -81,13 +81,22 @@ This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rus
   - Files: `platform_common.rs`, `native_rule_analysis.rs`
 - [x] **ctx.target_platform_has_constraint()** - Always returns false (no platform constraints yet)
   - File: `context.rs`
-- **cc_test builds successfully** with `linkstatic=True`
-- **Known issue:** `linkstatic=False` (default for cc_test) hits dynamic linking bug in cc_common.link
-  - Library names passed instead of artifact paths when dynamic linking
+- **cc_test builds and runs** with both `linkstatic=True` and `linkstatic=False`
+- `kuro test //:hello_test` and `kuro test //:hello_test_dynamic` both pass
 
-**Blocking for cc_test runtime:**
-- [ ] Test runner integration (kuro test with cc_test)
-- [ ] Dynamic linking support in cc_common.link
+**Completed (2026-02-05) - Dynamic linking & test runner:**
+- [x] **Test runner integration** - `kuro test` works with cc_test rules end-to-end
+  - Auto-injects `ExternalRunnerTestInfo` for rules with `test=True`
+  - `Rule.is_test` field threaded through StarlarkRuleCallable → freeze → Rule → TargetNode
+  - Factory: `create_external_runner_test_info_for_bazel_test()` in `external_runner_test_info.rs`
+- [x] **Dynamic linking support in cc_common.get_link_args** - Full linkstatic=False support
+  - Process `libraries_to_link` based on `.type` field from rules_cc providers
+  - `dynamic_library` → `-l<name>`, `versioned_dynamic_library` → `-l:<name>`
+  - `object_file_group` → iterate `.object_files`, `static_library`/`object_file` → full path
+  - `library_search_directories` → `-L<dir>` flags with depset iteration
+  - `$ORIGIN`-relative RUNPATH for shared library resolution at runtime
+  - Normalize rules_cc relative paths (strip `../` prefix) for proper $ORIGIN computation
+  - Deduplicate rpath entries
 
 **Files:**
 - `app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs` - cc_common implementation
