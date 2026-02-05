@@ -21,6 +21,8 @@ use kuro_build_api::build::ProviderArtifacts;
 use kuro_build_api::interpreter::rule_defs::cmd_args::AbsCommandLineContext;
 use kuro_build_api::interpreter::rule_defs::cmd_args::ArtifactPathMapper;
 use kuro_build_api::interpreter::rule_defs::cmd_args::CommandLineArgLike;
+use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
+use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::FrozenDefaultInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::run_info::FrozenRunInfo;
 use kuro_certs::validate::CertState;
 use kuro_certs::validate::check_cert_state;
@@ -239,6 +241,22 @@ impl<'a> ResultReporter<'a> {
                     Vec::new()
                 } else {
                     cli
+                }
+            } else if let Some(default_info) = providers
+                .provider_collection()
+                .builtin_provider::<FrozenDefaultInfo>()
+            {
+                // Bazel compatibility: check if DefaultInfo has an executable
+                if let Some(executable) = default_info.executable() {
+                    // Get the artifact path for the executable
+                    if let Ok(artifact) = executable.get_bound_artifact() {
+                        let path = artifact.resolve_configuration_hash_path(self.artifact_fs)?;
+                        vec![path.to_string()]
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    Vec::new()
                 }
             } else {
                 Vec::new()

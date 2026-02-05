@@ -155,6 +155,10 @@ pub struct DefaultInfoGen<V: ValueLifetimeless> {
     /// `ArtifactTraversable` can be an `Artifact` (which yields itself), or
     /// `cmd_args`, which expand to all their inputs.
     other_outputs: ValueOfUncheckedGeneric<V, ListType<ValueAsCommandLineLike<'static>>>,
+    /// The executable artifact (Bazel compatibility). When set, this target is runnable
+    /// with `kuro run`. Stored as a list with 0 or 1 elements. When present and no
+    /// explicit RunInfo is provided, a RunInfo will be synthesized from this executable.
+    executable: ValueOfUncheckedGeneric<V, ListType<ValueIsInputArtifactAnnotation>>,
 }
 
 fn validate_default_info(info: &FrozenDefaultInfo) -> kuro_error::Result<()> {
@@ -186,10 +190,12 @@ impl<'v> DefaultInfo<'v> {
         let sub_targets = ValueOfUnchecked::<DictType<_, _>>::new(heap.alloc(AllocDict::EMPTY));
         let default_outputs = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         let other_outputs = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
+        let executable = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         DefaultInfo {
             sub_targets,
             default_outputs,
             other_outputs,
+            executable,
         }
     }
 
@@ -208,10 +214,12 @@ impl<'v> DefaultInfo<'v> {
             heap.alloc(AllocList([artifact_value])),
         );
         let other_outputs = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
+        let executable = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         DefaultInfo {
             sub_targets,
             default_outputs,
             other_outputs,
+            executable,
         }
     }
 }
@@ -227,10 +235,13 @@ impl FrozenDefaultInfo {
             FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         let other_outputs =
             FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
+        let executable =
+            FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         FrozenValueTyped::new_err(heap.alloc(FrozenDefaultInfo {
             sub_targets,
             default_outputs,
             other_outputs,
+            executable,
         }))
         .unwrap()
     }
@@ -322,6 +333,33 @@ impl FrozenDefaultInfo {
 
     pub fn sub_targets_raw(&self) -> FrozenValue {
         self.sub_targets.get()
+    }
+
+    /// Returns the executable artifact if one was specified (Bazel compatibility).
+    /// Returns None if no executable was set.
+    pub fn executable(&self) -> Option<StarlarkArtifact> {
+        let list = ListRef::from_frozen_value(self.executable.get())
+            .expect("should be a list from constructor");
+        if list.is_empty() {
+            return None;
+        }
+        // Get the first (and only) element
+        let value = list.iter().next()?;
+        let frozen_value = value.unpack_frozen()?;
+        if let Some(starlark_artifact) = frozen_value.downcast_ref::<StarlarkArtifact>() {
+            Some(starlark_artifact.dupe())
+        } else {
+            // Try to get from artifact-like value
+            ValueAsInputArtifactLike::unpack_value(frozen_value.to_value())
+                .ok()
+                .flatten()
+                .and_then(|artifact_like| artifact_like.0.get_bound_starlark_artifact().ok())
+        }
+    }
+
+    /// Returns the raw executable list value (for checking if present).
+    pub fn executable_raw(&self) -> FrozenValue {
+        self.executable.get()
     }
 
     pub fn for_each_default_output_artifact_only(
@@ -702,10 +740,19 @@ fn default_info_creator(builder: &mut GlobalsBuilder) {
             })
             .collect::<kuro_error::Result<Vec<(StringValue<'v>, _)>>>()?;
 
-        // Note: default_runfiles, data_runfiles, runfiles, and executable are accepted
-        // for Bazel compatibility but not used in the Buck2 DefaultInfo model.
-        // They would need separate handling or a different provider structure.
-        let _ = (default_runfiles, data_runfiles, runfiles, executable);
+        // Note: default_runfiles, data_runfiles, runfiles are accepted for Bazel compatibility
+        // but not currently used in the Buck2 DefaultInfo model.
+        let _ = (default_runfiles, data_runfiles, runfiles);
+
+        // Store executable as a list (empty if None, single element if Some)
+        // This enables RunInfo synthesis for Bazel compatibility
+        let valid_executable: ValueOfUnchecked<ListType<ValueIsInputArtifactAnnotation>> =
+            match executable.into_option() {
+                Some(exe_val) => {
+                    ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList([exe_val])))
+                }
+                None => ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY)),
+            };
 
         Ok(DefaultInfo {
             default_outputs: valid_default_outputs,
@@ -713,6 +760,7 @@ fn default_info_creator(builder: &mut GlobalsBuilder) {
             sub_targets: heap
                 .alloc_typed_unchecked(AllocDict(valid_sub_targets))
                 .cast(),
+            executable: valid_executable,
         })
     }
 }

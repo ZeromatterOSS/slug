@@ -36,6 +36,10 @@ This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rus
   - Aliases are collected from transitive deps' MODULE.bazel via `collect_transitive_repo_aliases()`
   - Registered with cell resolver via `CellsAggregator::new(root_aliases)`
   - Example: `com_google_protobuf -> protobuf`, `com_google_absl -> abseil-cpp`, `io_bazel_stardoc -> stardoc`
+- [x] **`kuro run` with cc_binary** - Bazel-compatible `DefaultInfo(executable=...)` support
+  - Added `executable` field to `DefaultInfoGen` struct
+  - `kuro run` now checks `DefaultInfo.executable` as fallback when no `RunInfo` is present
+  - Modified `build/outputs.rs` and `build/result_report.rs` to support this
 
 **Files:**
 - `app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs` - cc_common implementation
@@ -84,6 +88,20 @@ Components available from `ConfiguredTargetLabel`:
 - `target.cfg().output_hash().as_str()` - configuration hash (16 hex chars)
 - `target.pkg().cell_relative_path().as_str()` - package path within cell
 - `target.name().as_str()` - target name (escaped with `__EQ__` for `=`)
+
+#### 5. DefaultInfo.executable vs RunInfo
+
+**Problem:** Bazel binaries (cc_binary, etc.) use `DefaultInfo(executable=binary)` to mark targets as runnable. Buck2/Kuro uses a separate `RunInfo` provider. When rules_cc's cc_binary returns DefaultInfo with executable, `kuro run` failed because it only looked for RunInfo.
+
+**Fix:** Modified Kuro to support Bazel's pattern:
+1. Added `executable` field to `DefaultInfoGen` struct (stored as list with 0-1 elements)
+2. `build/outputs.rs`: When no RunInfo exists, check `DefaultInfo.executable` and add the artifact as a Run output
+3. `build/result_report.rs`: When building run_args, fallback to `DefaultInfo.executable` if no RunInfo
+
+**Files:**
+- `app/kuro_build_api/src/interpreter/rule_defs/provider/builtin/default_info.rs` - Store executable
+- `app/kuro_build_api/src/build/outputs.rs` - Include executable as run output
+- `app/kuro_server_commands/src/build/result_report.rs` - Build run_args from executable
 
 ### Overview
 
@@ -202,11 +220,12 @@ cc_test(
 
 #### Automated Verification:
 
-- [ ] Native `cc_common` module is available
-- [ ] `cc_common.compile()` creates compilation actions
-- [ ] `cc_common.link()` creates linking actions
-- [ ] rules_cc's `CcInfo` provider works (uses Starlark `provider()`)
-- [ ] `kuro build //:main` compiles and links successfully
+- [x] Native `cc_common` module is available
+- [x] `cc_common.compile()` creates compilation actions
+- [x] `cc_common.link()` creates linking actions
+- [x] rules_cc's `CcInfo` provider works (uses Starlark `provider()`)
+- [x] `kuro build //:main` compiles and links successfully
+- [x] `kuro run //:hello_bin` executes cc_binary (via DefaultInfo.executable)
 - [ ] Header dependencies tracked correctly
 - [ ] Incremental builds work
 - [ ] `kuro test //:mylib_test` runs tests

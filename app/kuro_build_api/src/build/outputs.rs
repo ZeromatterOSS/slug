@@ -23,8 +23,10 @@ use crate::analysis::calculation::RuleAnalysisCalculation;
 use crate::artifact_groups::ArtifactGroup;
 use crate::build::BuildProviderType;
 use crate::build::ProvidersToBuild;
+use crate::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
 use crate::interpreter::rule_defs::cmd_args::CommandLineArgLike;
 use crate::interpreter::rule_defs::cmd_args::SimpleCommandLineArtifactVisitor;
+use crate::interpreter::rule_defs::provider::builtin::default_info::FrozenDefaultInfo;
 use crate::interpreter::rule_defs::provider::builtin::run_info::FrozenRunInfo;
 use crate::interpreter::rule_defs::provider::test_provider::TestProvider;
 
@@ -83,6 +85,16 @@ pub async fn get_outputs_for_top_level_target(
                     runinfo.visit_artifacts(&mut artifact_visitor)?;
                     for input in artifact_visitor.inputs {
                         outputs.push((input, BuildProviderType::Run));
+                    }
+                } else if let Some(default_info) = providers
+                    .provider_collection()
+                    .builtin_provider::<FrozenDefaultInfo>()
+                {
+                    // Bazel compatibility: check if DefaultInfo has an executable
+                    if let Some(executable) = default_info.executable() {
+                        if let Ok(artifact) = executable.get_bound_artifact() {
+                            outputs.push((ArtifactGroup::Artifact(artifact), BuildProviderType::Run));
+                        }
                     }
                 }
             }
