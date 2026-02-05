@@ -12,9 +12,9 @@ use std::collections::HashSet;
 use std::fmt::Display;
 use std::sync::Arc;
 
+use gazebo::prelude::VecExt;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
-use gazebo::prelude::VecExt;
 
 /// Argv contains the bare process argv and the "expanded" argv. The expanded argv is
 /// the argv after processing flagfiles (args like @mode/opt and --flagfile mode/opt)

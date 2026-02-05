@@ -9,6 +9,12 @@
  */
 
 use allocative::Allocative;
+use derivative::Derivative;
+use derive_more::Display;
+use dice::DiceComputations;
+use dupe::Dupe;
+use futures::FutureExt;
+use gazebo::prelude::OptionExt;
 use kuro_build_api::actions::query::ActionQueryNode;
 use kuro_build_api::query::bxl::BxlAqueryFunctions;
 use kuro_build_api::query::bxl::NEW_BXL_AQUERY_FUNCTIONS;
@@ -19,12 +25,6 @@ use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_query::query::syntax::simple::eval::set::TargetSet;
 use kuro_query::query::syntax::simple::functions::helpers::CapturedExpr;
-use derivative::Derivative;
-use derive_more::Display;
-use dice::DiceComputations;
-use dupe::Dupe;
-use futures::FutureExt;
-use gazebo::prelude::OptionExt;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;

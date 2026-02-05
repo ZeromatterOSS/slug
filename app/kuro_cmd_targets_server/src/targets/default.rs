@@ -14,6 +14,9 @@
 use std::io::Write;
 use std::path::Path;
 
+use dice::DiceTransaction;
+use dupe::Dupe;
+use dupe::OptionDupedExt;
 use kuro_cli_proto::TargetsResponse;
 use kuro_cli_proto::targets_request;
 use kuro_cli_proto::targets_request::TargetHashFileMode;
@@ -31,9 +34,6 @@ use kuro_node::nodes::lookup::ConfiguredTargetNodeLookup;
 use kuro_node::nodes::lookup::TargetNodeLookup;
 use kuro_node::nodes::unconfigured::TargetNode;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
-use dice::DiceTransaction;
-use dupe::Dupe;
-use dupe::OptionDupedExt;
 
 use crate::target_hash::TargetHashes;
 use crate::target_hash::TargetHashesFileMode;

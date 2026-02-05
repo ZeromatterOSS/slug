@@ -11,15 +11,15 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use kuro_build_api::bxl::calculation::BXL_CALCULATION_IMPL;
-use kuro_build_api::bxl::calculation::BxlCalculationDyn;
-use kuro_build_api::bxl::calculation::BxlComputeResult;
-use kuro_core::deferred::base_deferred_key::BaseDeferredKeyBxl;
 use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use futures::future::FutureExt;
+use kuro_build_api::bxl::calculation::BXL_CALCULATION_IMPL;
+use kuro_build_api::bxl::calculation::BxlCalculationDyn;
+use kuro_build_api::bxl::calculation::BxlComputeResult;
+use kuro_core::deferred::base_deferred_key::BaseDeferredKeyBxl;
 
 use crate::bxl;
 use crate::bxl::eval::eval;

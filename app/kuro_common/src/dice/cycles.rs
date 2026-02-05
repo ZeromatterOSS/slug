@@ -13,9 +13,6 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
-use kuro_util::cycle_detector::CycleDescriptor;
-use kuro_util::cycle_detector::LazyCycleDetector;
-use kuro_util::cycle_detector::LazyCycleDetectorGuard;
 use derive_more::Display;
 use dice::DiceComputations;
 use dice::DynKey;
@@ -24,6 +21,9 @@ use dice::UserCycleDetector;
 use dice::UserCycleDetectorGuard;
 use dice_futures::cancellation::CancellationContext;
 use futures::Future;
+use kuro_util::cycle_detector::CycleDescriptor;
+use kuro_util::cycle_detector::LazyCycleDetector;
+use kuro_util::cycle_detector::LazyCycleDetectorGuard;
 use tracing::debug;
 
 /// Additional requirement for a CycleDescriptor to be used for defining a Dice UserCycleDetector through

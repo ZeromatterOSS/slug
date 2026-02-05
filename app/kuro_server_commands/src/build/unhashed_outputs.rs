@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use std::path;
 use std::time::Instant;
 
+use itertools::Itertools;
 use kuro_artifact::artifact::artifact_type::BaseArtifactKind;
 use kuro_build_api::build::BuildProviderType;
 use kuro_build_api::build::ProviderArtifacts;
@@ -22,7 +23,6 @@ use kuro_fs::fs_util;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
 use kuro_fs::paths::abs_path::AbsPath;
 use kuro_query::__derive_refs::indexmap::IndexMap;
-use itertools::Itertools;
 use tracing::info;
 
 pub(crate) fn create_unhashed_outputs(

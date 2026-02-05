@@ -22,15 +22,7 @@ use crate::bzl_or_bxl_path::BzlOrBxlPath;
 /// pattern as rule loading. The module path allows AspectKey::compute() to
 /// load the aspect callable from its defining .bzl file.
 #[derive(
-    Clone,
-    Debug,
-    Display,
-    Eq,
-    Hash,
-    PartialEq,
-    StrongHash,
-    Pagable,
-    Allocative
+    Clone, Debug, Display, Eq, Hash, PartialEq, StrongHash, Pagable, Allocative
 )]
 #[display("{}:{}", path, name)]
 pub struct StarlarkAspectType {
@@ -49,7 +41,8 @@ impl StarlarkAspectType {
 #[cfg(test)]
 mod tests {
     use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    use std::hash::Hash;
+    use std::hash::Hasher;
     use std::sync::Arc;
 
     use kuro_core::bzl::ImportPath;

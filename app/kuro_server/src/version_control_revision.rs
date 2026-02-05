@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use futures::future::BoxFuture;
+use futures::stream::FuturesUnordered;
 use kuro_core::soft_error;
 use kuro_data::VersionControlRevision;
 use kuro_events::dispatch::EventDispatcher;
@@ -15,8 +17,6 @@ use kuro_fs::async_fs_util;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_util::properly_reaped_child::reap_on_drop_command;
-use futures::future::BoxFuture;
-use futures::stream::FuturesUnordered;
 use tokio::sync::OnceCell;
 use tokio_stream::StreamExt;
 

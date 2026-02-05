@@ -10,6 +10,7 @@
 
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_core::configuration::data::ConfigurationData;
 use kuro_core::configuration::pair::ConfigurationNoExec;
 use kuro_core::configuration::pair::ConfigurationWithExec;
@@ -19,7 +20,6 @@ use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_error::BuckErrorContext;
-use dupe::Dupe;
 use starlark_map::ordered_map::OrderedMap;
 use starlark_map::sorted_map::SortedMap;
 

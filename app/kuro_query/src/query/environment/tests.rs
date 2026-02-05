@@ -14,12 +14,12 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
-use kuro_query::query::traversal::NodeLookup;
-use kuro_query::query::traversal::async_depth_first_postorder_traversal;
-use kuro_query::query::traversal::async_depth_limited_traversal;
 use derive_more::Display;
 use derive_more::From;
 use indexmap::IndexSet;
+use kuro_query::query::traversal::NodeLookup;
+use kuro_query::query::traversal::async_depth_first_postorder_traversal;
+use kuro_query::query::traversal::async_depth_limited_traversal;
 
 use super::*;
 

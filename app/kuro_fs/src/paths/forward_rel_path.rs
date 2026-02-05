@@ -16,9 +16,9 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use allocative::Allocative;
-use kuro_util::arc_str::StringInside;
 use derive_more::Display;
 use gazebo::transmute;
+use kuro_util::arc_str::StringInside;
 use pagable::Pagable;
 use ref_cast::RefCastCustom;
 use ref_cast::ref_cast_custom;

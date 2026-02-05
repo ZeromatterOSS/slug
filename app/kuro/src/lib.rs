@@ -13,6 +13,9 @@
 
 use std::thread;
 
+use clap::CommandFactory;
+use clap::FromArgMatches;
+use dupe::Dupe;
 use kuro_client::commands::build::BuildCommand;
 use kuro_client::commands::bxl::BxlCommand;
 use kuro_client::commands::clean::CleanCommand;
@@ -58,14 +61,11 @@ use kuro_data::ErrorReport;
 use kuro_error::BuckErrorContext;
 use kuro_error::ErrorTag;
 use kuro_error::ExitCode;
-use kuro_error::kuro_error;
 use kuro_error::conversion::clap::buck_error_clap_parser;
+use kuro_error::kuro_error;
 use kuro_event_observer::verbosity::Verbosity;
 use kuro_fs::paths::file_name::FileNameBuf;
 use kuro_util::threads::thread_spawn_scoped;
-use clap::CommandFactory;
-use clap::FromArgMatches;
-use dupe::Dupe;
 
 use crate::check_user_allowed::check_user_allowed;
 use crate::process_context::ProcessContext;

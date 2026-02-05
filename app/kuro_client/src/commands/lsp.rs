@@ -9,6 +9,7 @@
  */
 
 use async_trait::async_trait;
+use futures::stream::StreamExt;
 use kuro_cli_proto::LspRequest;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
 use kuro_client_ctx::common::BuckArgMatches;
@@ -25,7 +26,6 @@ use kuro_client_ctx::exit_result::ExitResult;
 use kuro_client_ctx::ide_support::ide_message_stream;
 use kuro_client_ctx::stream_util::reborrow_stream_for_static;
 use kuro_client_ctx::streaming::StreamingCommand;
-use futures::stream::StreamExt;
 use lsp_server::Message;
 use once_cell::sync::Lazy;
 

@@ -11,8 +11,8 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use kuro_error::BuckErrorContext;
 use gazebo::eq_chain;
+use kuro_error::BuckErrorContext;
 
 use crate::legacy_configs::configs::ConfigValue;
 use crate::legacy_configs::configs::LegacyBuckConfig;

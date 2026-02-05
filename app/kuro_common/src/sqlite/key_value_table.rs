@@ -11,8 +11,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use kuro_error::BuckErrorContext;
 use itertools::Itertools;
+use kuro_error::BuckErrorContext;
 use parking_lot::Mutex;
 use rusqlite::Connection;
 

@@ -13,8 +13,8 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 
-use kuro_cli_proto::StreamingRequest;
 use futures::Stream;
+use kuro_cli_proto::StreamingRequest;
 use pin_project::pin_project;
 use tonic::Status;
 

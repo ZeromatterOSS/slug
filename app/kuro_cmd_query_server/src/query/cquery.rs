@@ -11,6 +11,9 @@
 use std::io::Write;
 
 use async_trait::async_trait;
+use dice::DiceTransaction;
+use dice::LinearRecomputeDiceComputations;
+use dupe::Dupe;
 use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 use kuro_build_api::query::oneshot::QUERY_FRONTEND;
@@ -36,9 +39,6 @@ use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use kuro_server_ctx::template::ServerCommandTemplate;
 use kuro_server_ctx::template::run_server_command;
 use kuro_util::truncate::truncate;
-use dice::DiceTransaction;
-use dice::LinearRecomputeDiceComputations;
-use dupe::Dupe;
 
 use crate::query::printer::ProviderLookUp;
 use crate::query::printer::QueryResultPrinter;

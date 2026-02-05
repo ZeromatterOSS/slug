@@ -11,9 +11,9 @@
 use std::borrow::Borrow;
 
 use allocative::Allocative;
-use kuro_util::arc_str::ArcStr;
 use derive_more::Display;
 use dupe::Dupe;
+use kuro_util::arc_str::ArcStr;
 use pagable::Pagable;
 use ref_cast::RefCast;
 use serde::Serialize;

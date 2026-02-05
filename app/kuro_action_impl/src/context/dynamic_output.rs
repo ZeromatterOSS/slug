@@ -10,6 +10,7 @@
 
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_artifact::actions::key::ActionIndex;
 use kuro_artifact::actions::key::ActionKey;
 use kuro_artifact::artifact::artifact_type::BoundBuildArtifact;
@@ -25,7 +26,6 @@ use kuro_core::deferred::dynamic::DynamicLambdaResultsKey;
 use kuro_core::deferred::key::DeferredHolderKey;
 use kuro_error::BuckErrorContext;
 use kuro_error::conversion::from_any_with_tag;
-use dupe::Dupe;
 use starlark::environment::MethodsBuilder;
 use starlark::starlark_module;
 use starlark::values::FrozenValue;

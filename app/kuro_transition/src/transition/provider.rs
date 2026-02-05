@@ -11,8 +11,8 @@
 use std::fmt::Debug;
 
 use allocative::Allocative;
-use kuro_build_api_derive::internal_provider;
 use dupe::Dupe;
+use kuro_build_api_derive::internal_provider;
 use starlark::any::ProvidesStaticType;
 use starlark::coerce::Coerce;
 use starlark::environment::GlobalsBuilder;

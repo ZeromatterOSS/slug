@@ -152,12 +152,19 @@ fn coverage_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] _this: &CoverageCommonModule,
         #[starlark(require = named)] ctx: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] source_attributes: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] dependency_attributes: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] extensions: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] metadata_files: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] coverage_support_files: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] coverage_environment: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] reported_to_actual_sources: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        dependency_attributes: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] extensions: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        metadata_files: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        coverage_support_files: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        coverage_environment: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        reported_to_actual_sources: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<InstrumentedFilesInfoInstance> {
         // TODO: Implement actual coverage instrumentation support

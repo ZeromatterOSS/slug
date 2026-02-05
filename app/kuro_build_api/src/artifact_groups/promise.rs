@@ -15,10 +15,10 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use dupe::Dupe;
 use starlark::codemap::FileSpan;
 
 #[derive(Debug, kuro_error::Error)]

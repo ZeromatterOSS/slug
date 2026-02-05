@@ -13,6 +13,7 @@ use std::fmt::Write;
 use std::iter;
 use std::sync::Arc;
 
+use gazebo::prelude::SliceExt;
 use kuro_build_api::configure_targets::ConfiguredTargetsWithErrors;
 use kuro_cli_proto::ConfiguredTargetsRequest;
 use kuro_cli_proto::HasClientContext;
@@ -44,7 +45,6 @@ use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_node::nodes::unconfigured::TargetNodeRef;
 use kuro_node::super_package::SuperPackage;
 use kuro_util::indent::indent;
-use gazebo::prelude::SliceExt;
 use regex::RegexSet;
 
 use crate::json::QuotedJson;

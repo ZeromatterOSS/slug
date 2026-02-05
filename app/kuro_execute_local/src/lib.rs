@@ -22,13 +22,6 @@ use std::task::Poll;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use kuro_error::BuckErrorContext;
-use kuro_fs::fs_util;
-use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
-use kuro_fs::paths::abs_path::AbsPath;
-use kuro_resource_control::ActionFreezeEventReceiver;
-use kuro_resource_control::action_cgroups::ActionCgroupResult;
-use kuro_resource_control::path::CgroupPathBuf;
 use bytes::Bytes;
 use futures::future::Future;
 use futures::future::FutureExt;
@@ -36,6 +29,13 @@ use futures::future::select;
 use futures::stream::Stream;
 use futures::stream::StreamExt;
 use futures::stream::TryStreamExt;
+use kuro_error::BuckErrorContext;
+use kuro_fs::fs_util;
+use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
+use kuro_fs::paths::abs_path::AbsPath;
+use kuro_resource_control::ActionFreezeEventReceiver;
+use kuro_resource_control::action_cgroups::ActionCgroupResult;
+use kuro_resource_control::path::CgroupPathBuf;
 use pin_project::pin_project;
 use tokio_util::codec::BytesCodec;
 use tokio_util::codec::FramedRead;
@@ -474,9 +474,9 @@ mod tests {
     use std::time::Instant;
 
     use assert_matches::assert_matches;
+    use dupe::Dupe;
     use kuro_error::kuro_error;
     use kuro_util::process::background_command;
-    use dupe::Dupe;
 
     use super::*;
     use crate::status_decoder::DefaultStatusDecoder;
@@ -752,10 +752,7 @@ mod tests {
 
         #[async_trait::async_trait]
         impl StatusDecoder for Decoder {
-            async fn decode_status(
-                self,
-                _status: ExitStatus,
-            ) -> kuro_error::Result<DecodedStatus> {
+            async fn decode_status(self, _status: ExitStatus) -> kuro_error::Result<DecodedStatus> {
                 panic!("Should not be called in this test since we timeout")
             }
 

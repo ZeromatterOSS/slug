@@ -9,10 +9,10 @@
  */
 
 use async_trait::async_trait;
+use dice::LinearRecomputeDiceComputations;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_query::query::traversal::AsyncNodeLookup;
-use dice::LinearRecomputeDiceComputations;
 
 use crate::nodes::configured::ConfiguredTargetNode;
 use crate::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
@@ -32,10 +32,7 @@ pub struct ConfiguredTargetNodeLookup<'c, 'd>(pub &'c LinearRecomputeDiceComputa
 
 #[async_trait]
 impl AsyncNodeLookup<ConfiguredTargetNode> for ConfiguredTargetNodeLookup<'_, '_> {
-    async fn get(
-        &self,
-        label: &ConfiguredTargetLabel,
-    ) -> kuro_error::Result<ConfiguredTargetNode> {
+    async fn get(&self, label: &ConfiguredTargetLabel) -> kuro_error::Result<ConfiguredTargetNode> {
         Ok(self
             .0
             .get()

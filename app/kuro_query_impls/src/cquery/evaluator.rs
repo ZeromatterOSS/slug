@@ -12,6 +12,11 @@
 
 use std::sync::Arc;
 
+use dice::DiceComputations;
+use dupe::Dupe;
+use futures::StreamExt;
+use futures::stream::FuturesUnordered;
+use gazebo::prelude::*;
 use kuro_common::events::HasEvents;
 use kuro_error::BuckErrorContext;
 use kuro_error::conversion::from_any_with_tag;
@@ -21,11 +26,6 @@ use kuro_node::configured_universe::CqueryUniverse;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_query::query::syntax::simple::eval::values::QueryEvaluationResult;
 use kuro_query::query::syntax::simple::functions::DefaultQueryFunctionsModule;
-use dice::DiceComputations;
-use dupe::Dupe;
-use futures::StreamExt;
-use futures::stream::FuturesUnordered;
-use gazebo::prelude::*;
 
 use crate::analysis::evaluator::eval_query;
 use crate::cquery::environment::CqueryEnvironment;

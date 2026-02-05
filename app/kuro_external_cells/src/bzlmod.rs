@@ -18,6 +18,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use cmp_any::PartialEqAny;
+use compact_str::CompactString;
+use dice::DiceComputations;
 use kuro_common::external_symlink::ExternalSymlink;
 use kuro_common::file_ops::delegate::FileOpsDelegate;
 use kuro_common::file_ops::dice::ReadFileProxy;
@@ -35,9 +38,6 @@ use kuro_core::cells::paths::CellRelativePathBuf;
 use kuro_execute::digest_config::DigestConfig;
 use kuro_execute::digest_config::HasDigestConfig;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use cmp_any::PartialEqAny;
-use compact_str::CompactString;
-use dice::DiceComputations;
 
 /// File operations delegate for bzlmod cells from registries.
 ///
@@ -82,18 +82,21 @@ impl FileOpsDelegate for BzlmodFileOpsDelegate {
         path: &'async_trait CellRelativePath,
     ) -> kuro_error::Result<ReadFileProxy> {
         let abs_path = self.resolve_path(path);
-        Ok(ReadFileProxy::new_with_captures(abs_path, |abs_path| async move {
-            match tokio::fs::read_to_string(&abs_path).await {
-                Ok(contents) => Ok(Some(contents)),
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-                Err(e) => Err(kuro_error::kuro_error!(
-                    kuro_error::ErrorTag::Environment,
-                    "Failed to read bzlmod file {:?}: {}",
-                    abs_path,
-                    e
-                )),
-            }
-        }))
+        Ok(ReadFileProxy::new_with_captures(
+            abs_path,
+            |abs_path| async move {
+                match tokio::fs::read_to_string(&abs_path).await {
+                    Ok(contents) => Ok(Some(contents)),
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                    Err(e) => Err(kuro_error::kuro_error!(
+                        kuro_error::ErrorTag::Environment,
+                        "Failed to read bzlmod file {:?}: {}",
+                        abs_path,
+                        e
+                    )),
+                }
+            },
+        ))
     }
 
     async fn read_dir(
@@ -170,7 +173,7 @@ impl FileOpsDelegate for BzlmodFileOpsDelegate {
                     "Failed to get metadata for bzlmod file {:?}: {}",
                     abs_path,
                     e
-                ))
+                ));
             }
         };
 
@@ -206,10 +209,7 @@ impl FileOpsDelegate for BzlmodFileOpsDelegate {
                 )
             })?;
 
-            let source_config = self
-                .digest_config
-                .cas_digest_config()
-                .source_files_config();
+            let source_config = self.digest_config.cas_digest_config().source_files_config();
             let digest = TrackedFileDigest::from_content(&contents, source_config);
 
             #[cfg(unix)]
@@ -275,7 +275,10 @@ pub(crate) async fn copy_to_destination(
 }
 
 /// Recursively copy a directory.
-async fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> kuro_error::Result<()> {
+async fn copy_dir_recursive(
+    src: &std::path::Path,
+    dst: &std::path::Path,
+) -> kuro_error::Result<()> {
     tokio::fs::create_dir_all(dst).await.map_err(|e| {
         kuro_error::kuro_error!(
             kuro_error::ErrorTag::Environment,
@@ -340,23 +343,27 @@ async fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> kur
             {
                 // On Windows, determine if target is dir or file
                 if target.is_dir() {
-                    tokio::fs::symlink_dir(&target, &dst_path).await.map_err(|e| {
-                        kuro_error::kuro_error!(
-                            kuro_error::ErrorTag::Environment,
-                            "Failed to create symlink {:?}: {}",
-                            dst_path,
-                            e
-                        )
-                    })?;
+                    tokio::fs::symlink_dir(&target, &dst_path)
+                        .await
+                        .map_err(|e| {
+                            kuro_error::kuro_error!(
+                                kuro_error::ErrorTag::Environment,
+                                "Failed to create symlink {:?}: {}",
+                                dst_path,
+                                e
+                            )
+                        })?;
                 } else {
-                    tokio::fs::symlink_file(&target, &dst_path).await.map_err(|e| {
-                        kuro_error::kuro_error!(
-                            kuro_error::ErrorTag::Environment,
-                            "Failed to create symlink {:?}: {}",
-                            dst_path,
-                            e
-                        )
-                    })?;
+                    tokio::fs::symlink_file(&target, &dst_path)
+                        .await
+                        .map_err(|e| {
+                            kuro_error::kuro_error!(
+                                kuro_error::ErrorTag::Environment,
+                                "Failed to create symlink {:?}: {}",
+                                dst_path,
+                                e
+                            )
+                        })?;
                 }
             }
         } else {

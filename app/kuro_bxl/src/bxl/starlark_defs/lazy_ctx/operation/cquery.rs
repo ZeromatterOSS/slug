@@ -10,11 +10,11 @@
 
 use allocative::Allocative;
 use async_recursion::async_recursion;
+use dice::DiceComputations;
 use kuro_build_api::query::oneshot::QUERY_FRONTEND;
 use kuro_core::global_cfg_options::GlobalCfgOptions;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_query::query::syntax::simple::eval::values::QueryEvaluationResult;
-use dice::DiceComputations;
 use starlark::values::Heap;
 use starlark::values::Value;
 

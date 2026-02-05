@@ -11,8 +11,8 @@
 use std::ffi::OsString;
 use std::str::FromStr;
 
-use kuro_error::kuro_error;
 use dupe::Dupe;
+use kuro_error::kuro_error;
 use os_str_bytes::OsStrBytes;
 use rand::Rng;
 

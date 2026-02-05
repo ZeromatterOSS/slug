@@ -14,9 +14,9 @@ use std::mem;
 use std::ptr;
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_error::BuckErrorContext;
 use kuro_wrapper_common::win::winapi_handle::WinapiHandle;
-use dupe::Dupe;
 use winapi::shared::basetsd::ULONG_PTR;
 use winapi::shared::minwindef::DWORD;
 use winapi::shared::minwindef::FALSE;

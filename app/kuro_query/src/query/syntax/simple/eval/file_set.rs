@@ -11,11 +11,11 @@
 use std::fmt;
 
 use allocative::Allocative;
-use kuro_core::cells::cell_path::CellPath;
 use derive_more::Display;
 use display_container::fmt_container;
 use fancy_regex::Regex;
 use indexmap::IndexSet;
+use kuro_core::cells::cell_path::CellPath;
 
 use crate::query::environment::QueryEnvironment;
 use crate::query::environment::QueryTarget;

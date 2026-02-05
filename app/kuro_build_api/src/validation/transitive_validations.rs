@@ -11,8 +11,8 @@
 use std::sync::Arc;
 
 use allocative::Allocative;
-use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use dupe::Dupe;
+use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use starlark::values::OwnedFrozenRef;
 use starlark_map::small_set::SmallSet;
 

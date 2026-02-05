@@ -232,6 +232,8 @@ impl UnconfiguredMacroExt for UnconfiguredMacro {}
 
 #[cfg(test)]
 mod tests {
+    use dupe::Dupe;
+    use gazebo::prelude::SliceExt;
     use kuro_core::configuration::data::ConfigurationData;
     use kuro_core::package::PackageLabel;
     use kuro_core::target::label::label::TargetLabel;
@@ -242,8 +244,6 @@ mod tests {
     use kuro_node::attrs::configured_attr_info_for_tests::ConfiguredAttrInfoForTests;
     use kuro_node::attrs::display::AttrDisplayWithContextExt;
     use kuro_node::attrs::testing::configuration_ctx;
-    use dupe::Dupe;
-    use gazebo::prelude::SliceExt;
     use starlark::environment::GlobalsBuilder;
     use starlark::environment::Module;
     use starlark_map::smallset;

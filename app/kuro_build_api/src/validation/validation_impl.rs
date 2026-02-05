@@ -9,9 +9,9 @@
  */
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
 
 #[async_trait]
 pub trait ValidationImpl: Send + Sync + 'static {

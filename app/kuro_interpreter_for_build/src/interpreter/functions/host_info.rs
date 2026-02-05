@@ -9,10 +9,10 @@
  */
 
 use allocative::Allocative;
+use derivative::Derivative;
 use kuro_interpreter::extra::InterpreterHostArchitecture;
 use kuro_interpreter::extra::InterpreterHostPlatform;
 use kuro_interpreter::extra::xcode::XcodeVersionInfo;
-use derivative::Derivative;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;

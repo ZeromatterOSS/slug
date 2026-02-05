@@ -15,6 +15,8 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dice::DiceComputations;
+use dupe::Dupe;
 use kuro_bzlmod::Lockfile;
 use kuro_bzlmod::ModuleCache;
 use kuro_bzlmod::ModuleExtensionResult;
@@ -33,8 +35,6 @@ use kuro_bzlmod::synthetic_repos::collect_synthetic_repos;
 use kuro_bzlmod::synthetic_repos::materialize_synthetic_repos;
 use kuro_bzlmod::types::ExtensionUsage;
 use kuro_bzlmod::types::ParsedModuleFile;
-use kuro_core::kuro_env;
-use kuro_fs::fs_util;
 use kuro_core::cells::CellAliasResolver;
 use kuro_core::cells::CellResolver;
 use kuro_core::cells::alias::NonEmptyCellAlias;
@@ -48,12 +48,12 @@ use kuro_core::cells::external::GitObjectFormat;
 use kuro_core::cells::name::CellName;
 use kuro_core::fs::project::ProjectRoot;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
+use kuro_core::kuro_env;
 use kuro_error::BuckErrorContext;
+use kuro_fs::fs_util;
 use kuro_fs::paths::RelativePath;
 use kuro_fs::paths::abs_path::AbsPath;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
-use dice::DiceComputations;
-use dupe::Dupe;
 
 use crate::dice::cells::HasCellResolver;
 use crate::dice::data::HasIoProvider;
@@ -342,9 +342,14 @@ impl BuckConfigBasedCells {
         follow_includes: bool,
         project_fs: Option<&ProjectRoot>,
     ) -> kuro_error::Result<Self> {
-        Self::parse_with_file_ops_and_options_inner(file_ops, config_args, follow_includes, project_fs)
-            .await
-            .buck_error_context("Parsing cells")
+        Self::parse_with_file_ops_and_options_inner(
+            file_ops,
+            config_args,
+            follow_includes,
+            project_fs,
+        )
+        .await
+        .buck_error_context("Parsing cells")
     }
 
     async fn parse_with_file_ops_and_options_inner(
@@ -478,9 +483,8 @@ impl BuckConfigBasedCells {
                 // rules_cc requires @bazel_tools//tools/cpp:...
                 let bazel_tools_name = CellName::unchecked_new("bazel_tools")?;
                 if !cell_definitions.iter().any(|(n, _)| *n == bazel_tools_name) {
-                    let bazel_tools_path = CellRootPathBuf::new(
-                        ProjectRelativePath::new("bazel_tools")?.to_owned(),
-                    );
+                    let bazel_tools_path =
+                        CellRootPathBuf::new(ProjectRelativePath::new("bazel_tools")?.to_owned());
                     cell_definitions.push((bazel_tools_name, bazel_tools_path));
                     bzlmod_bundled_cells.push(bazel_tools_name);
                     // Note: Cell is automatically added as an alias in CellsAggregator::new()
@@ -595,9 +599,8 @@ impl BuckConfigBasedCells {
         let local_modules = resolve_local_modules(&parsed.module.overrides, workspace_root)?;
         for (name, resolved) in local_modules.iter() {
             let cell_name = CellName::unchecked_new(name)?;
-            let cell_path = CellRootPathBuf::new(
-                ProjectRelativePath::new(&resolved.relative_path)?.to_owned(),
-            );
+            let cell_path =
+                CellRootPathBuf::new(ProjectRelativePath::new(&resolved.relative_path)?.to_owned());
             // Local modules don't need BzlmodCellSetup - they use LocalPath external origin
             // which is handled separately if needed
             cells.push((cell_name, cell_path, None));
@@ -645,7 +648,8 @@ impl BuckConfigBasedCells {
 
                                 // Create symlinks from bazel-external/ to cached sources
                                 // This enables external tools and build actions to access files directly
-                                let external_base_dir = project_root.root().as_path().join("bazel-external");
+                                let external_base_dir =
+                                    project_root.root().as_path().join("bazel-external");
                                 for (module_name, module_info) in &resolved_graph.modules {
                                     // Skip root module and local overrides
                                     if module_name == &parsed.module.name
@@ -706,7 +710,8 @@ impl BuckConfigBasedCells {
                                                 module_name, module_info.version
                                             );
                                             let cell_path = CellRootPathBuf::new(
-                                                ProjectRelativePath::new(&external_path)?.to_owned(),
+                                                ProjectRelativePath::new(&external_path)?
+                                                    .to_owned(),
                                             );
 
                                             tracing::info!(
@@ -717,12 +722,17 @@ impl BuckConfigBasedCells {
                                                 external_path
                                             );
 
-                                            let setup = kuro_core::cells::external::BzlmodCellSetup {
-                                                module_name: Arc::from(module_name.as_str()),
-                                                version: Arc::from(module_info.version.as_str()),
-                                                registry_url: Arc::from(url.as_str()),
-                                                source_path: Arc::from(source_path_str.as_str()),
-                                            };
+                                            let setup =
+                                                kuro_core::cells::external::BzlmodCellSetup {
+                                                    module_name: Arc::from(module_name.as_str()),
+                                                    version: Arc::from(
+                                                        module_info.version.as_str(),
+                                                    ),
+                                                    registry_url: Arc::from(url.as_str()),
+                                                    source_path: Arc::from(
+                                                        source_path_str.as_str(),
+                                                    ),
+                                                };
 
                                             cells.push((cell_name, cell_path, Some(setup)));
                                         }
@@ -750,16 +760,24 @@ impl BuckConfigBasedCells {
                                                 module_name, module_info.version
                                             );
                                             let cell_path = CellRootPathBuf::new(
-                                                ProjectRelativePath::new(&external_path)?.to_owned(),
+                                                ProjectRelativePath::new(&external_path)?
+                                                    .to_owned(),
                                             );
 
                                             // Git modules use Bzlmod setup with empty registry URL
-                                            let setup = kuro_core::cells::external::BzlmodCellSetup {
-                                                module_name: Arc::from(module_name.as_str()),
-                                                version: Arc::from(module_info.version.as_str()),
-                                                registry_url: Arc::from(format!("git+{}", remote).as_str()),
-                                                source_path: Arc::from(source_path_str.as_str()),
-                                            };
+                                            let setup =
+                                                kuro_core::cells::external::BzlmodCellSetup {
+                                                    module_name: Arc::from(module_name.as_str()),
+                                                    version: Arc::from(
+                                                        module_info.version.as_str(),
+                                                    ),
+                                                    registry_url: Arc::from(
+                                                        format!("git+{}", remote).as_str(),
+                                                    ),
+                                                    source_path: Arc::from(
+                                                        source_path_str.as_str(),
+                                                    ),
+                                                };
 
                                             cells.push((cell_name, cell_path, Some(setup)));
                                             tracing::info!(
@@ -782,17 +800,26 @@ impl BuckConfigBasedCells {
                                                 module_name, module_info.version
                                             );
                                             let cell_path = CellRootPathBuf::new(
-                                                ProjectRelativePath::new(&external_path)?.to_owned(),
+                                                ProjectRelativePath::new(&external_path)?
+                                                    .to_owned(),
                                             );
 
                                             // Use first URL as the registry URL
-                                            let url = urls.first().map(|u| u.as_str()).unwrap_or("archive");
-                                            let setup = kuro_core::cells::external::BzlmodCellSetup {
-                                                module_name: Arc::from(module_name.as_str()),
-                                                version: Arc::from(module_info.version.as_str()),
-                                                registry_url: Arc::from(url),
-                                                source_path: Arc::from(source_path_str.as_str()),
-                                            };
+                                            let url = urls
+                                                .first()
+                                                .map(|u| u.as_str())
+                                                .unwrap_or("archive");
+                                            let setup =
+                                                kuro_core::cells::external::BzlmodCellSetup {
+                                                    module_name: Arc::from(module_name.as_str()),
+                                                    version: Arc::from(
+                                                        module_info.version.as_str(),
+                                                    ),
+                                                    registry_url: Arc::from(url),
+                                                    source_path: Arc::from(
+                                                        source_path_str.as_str(),
+                                                    ),
+                                                };
 
                                             cells.push((cell_name, cell_path, Some(setup)));
                                             tracing::info!(
@@ -812,7 +839,8 @@ impl BuckConfigBasedCells {
                                     if let Some(repo_name) = &dep.repo_name {
                                         if repo_name != &dep.name {
                                             let cell_name = CellName::unchecked_new(&dep.name)?;
-                                            let alias_name = NonEmptyCellAlias::new(repo_name.clone())?;
+                                            let alias_name =
+                                                NonEmptyCellAlias::new(repo_name.clone())?;
                                             tracing::info!(
                                                 "Creating repo_name alias: {} -> {}",
                                                 repo_name,
@@ -829,7 +857,8 @@ impl BuckConfigBasedCells {
                                     &resolved_graph,
                                     &parsed.module.name,
                                     &mut aliases,
-                                ).await;
+                                )
+                                .await;
                             }
                             Err(e) => {
                                 tracing::warn!("MVS resolution failed: {}", e);
@@ -856,8 +885,8 @@ impl BuckConfigBasedCells {
         parsed_modules.push((parsed.module.name.clone(), parsed.clone()));
         for (cell_name, _cell_path, setup) in &cells {
             if let Some(bzlmod_setup) = setup {
-                let module_bazel_path =
-                    std::path::PathBuf::from(bzlmod_setup.source_path.as_ref()).join("MODULE.bazel");
+                let module_bazel_path = std::path::PathBuf::from(bzlmod_setup.source_path.as_ref())
+                    .join("MODULE.bazel");
                 if module_bazel_path.exists() {
                     if let Ok(dep_parsed) = parse_module_bazel(&module_bazel_path) {
                         parsed_modules.push((cell_name.as_str().to_string(), dep_parsed));
@@ -872,9 +901,12 @@ impl BuckConfigBasedCells {
         } else {
             &parsed.module.name
         };
-        let (ext_cells, ext_aliases) =
-            Self::resolve_extension_repos_from_lockfile(project_root, &parsed_modules, root_module_name)
-                .await?;
+        let (ext_cells, ext_aliases) = Self::resolve_extension_repos_from_lockfile(
+            project_root,
+            &parsed_modules,
+            root_module_name,
+        )
+        .await?;
 
         // Add extension aliases to the main aliases list
         aliases.extend(ext_aliases);
@@ -935,7 +967,8 @@ impl BuckConfigBasedCells {
                                 ) {
                                     (Ok(alias_name), Ok(cell_name)) => {
                                         // Check if this alias already exists
-                                        let already_exists = aliases.iter().any(|(a, _)| a == &alias_name);
+                                        let already_exists =
+                                            aliases.iter().any(|(a, _)| a == &alias_name);
                                         if !already_exists {
                                             tracing::info!(
                                                 "Creating transitive repo_name alias: {} -> {} (from {})",
@@ -960,11 +993,7 @@ impl BuckConfigBasedCells {
                     }
                 }
                 Err(e) => {
-                    tracing::debug!(
-                        "Failed to parse MODULE.bazel for {}: {}",
-                        module_name,
-                        e
-                    );
+                    tracing::debug!("Failed to parse MODULE.bazel for {}: {}", module_name, e);
                 }
             }
         }
@@ -985,17 +1014,14 @@ impl BuckConfigBasedCells {
         let mut parsed_modules: Vec<(String, ParsedModuleFile)> = Vec::new();
 
         // Add root module
-        parsed_modules.push((
-            root_parsed.module.name.clone(),
-            root_parsed.clone(),
-        ));
+        parsed_modules.push((root_parsed.module.name.clone(), root_parsed.clone()));
 
         // Parse MODULE.bazel from each resolved dependency
         for (cell_name, _cell_path, setup) in resolved_cells {
             if let Some(bzlmod_setup) = setup {
                 // Read MODULE.bazel from the cached source
-                let module_bazel_path =
-                    std::path::PathBuf::from(bzlmod_setup.source_path.as_ref()).join("MODULE.bazel");
+                let module_bazel_path = std::path::PathBuf::from(bzlmod_setup.source_path.as_ref())
+                    .join("MODULE.bazel");
                 if module_bazel_path.exists() {
                     match parse_module_bazel(&module_bazel_path) {
                         Ok(dep_parsed) => {
@@ -1035,7 +1061,11 @@ impl BuckConfigBasedCells {
                     let cell_path =
                         CellRootPathBuf::new(ProjectRelativePath::new(&external_path)?.to_owned());
 
-                    tracing::info!("Registered synthetic repo: {} -> {}", repo.name, external_path);
+                    tracing::info!(
+                        "Registered synthetic repo: {} -> {}",
+                        repo.name,
+                        external_path
+                    );
 
                     // Synthetic repos don't need BzlmodCellSetup - they're local
                     cells.push((cell_name, cell_path, None));
@@ -1132,7 +1162,8 @@ impl BuckConfigBasedCells {
             let usages_digest = compute_extension_input_hash(agg_ext);
 
             // Check lockfile cache
-            let cached_specs = lockfile.get_extension_cache(ext_id, &bzl_transitive_digest, &usages_digest);
+            let cached_specs =
+                lockfile.get_extension_cache(ext_id, &bzl_transitive_digest, &usages_digest);
             let cached_specs = match cached_specs {
                 Some(specs) => specs,
                 None => {
@@ -1161,11 +1192,7 @@ impl BuckConfigBasedCells {
             let cell_defs = match build_extension_cells(&ext_result) {
                 Ok(defs) => defs,
                 Err(e) => {
-                    tracing::warn!(
-                        "Failed to build cells for extension '{}': {}",
-                        ext_id,
-                        e
-                    );
+                    tracing::warn!("Failed to build cells for extension '{}': {}", ext_id, e);
                     continue;
                 }
             };
@@ -1173,9 +1200,8 @@ impl BuckConfigBasedCells {
             // Convert PendingRepoCells to the format expected by cell registration
             for pending_cell in cell_defs.cells {
                 let cell_name = CellName::unchecked_new(&pending_cell.canonical_name)?;
-                let cell_path = CellRootPathBuf::new(
-                    ProjectRelativePath::new(&pending_cell.path)?.to_owned(),
-                );
+                let cell_path =
+                    CellRootPathBuf::new(ProjectRelativePath::new(&pending_cell.path)?.to_owned());
 
                 let setup = ExtensionRepoCellSetup {
                     canonical_name: Arc::from(pending_cell.canonical_name.as_str()),
@@ -1209,11 +1235,7 @@ impl BuckConfigBasedCells {
             let ext_aliases = match build_use_repo_aliases(&ext_result, &all_use_repos) {
                 Ok(a) => a,
                 Err(e) => {
-                    tracing::warn!(
-                        "Failed to build aliases for extension '{}': {}",
-                        ext_id,
-                        e
-                    );
+                    tracing::warn!("Failed to build aliases for extension '{}': {}", ext_id, e);
                     continue;
                 }
             };
@@ -1311,10 +1333,9 @@ impl BuckConfigBasedCells {
             // Note: The cell must already be in the aggregator's cell_infos for mark_external_cell to work.
             // For dynamic registration, we would need to extend CellsAggregator to add new cells.
             // For now, this function documents the expected pattern for future DICE integration.
-            if let Err(e) = aggregator.mark_external_cell(
-                cell_name,
-                ExternalCellOrigin::ExtensionRepo(setup),
-            ) {
+            if let Err(e) =
+                aggregator.mark_external_cell(cell_name, ExternalCellOrigin::ExtensionRepo(setup))
+            {
                 tracing::debug!(
                     "Could not mark extension repo '{}' as external: {} (may not be pre-registered)",
                     cell.canonical_name,
@@ -1547,14 +1568,14 @@ async fn get_project_buckconfig_paths(
 mod tests {
     use std::sync::Arc;
 
+    use dice::DiceComputations;
+    use indoc::indoc;
     use kuro_cli_proto::ConfigOverride;
     use kuro_core::cells::cell_root_path::CellRootPath;
     use kuro_core::cells::cell_root_path::CellRootPathBuf;
     use kuro_core::cells::external::ExternalCellOrigin;
     use kuro_core::cells::external::GitCellSetup;
     use kuro_core::cells::name::CellName;
-    use dice::DiceComputations;
-    use indoc::indoc;
 
     use crate::external_cells::EXTERNAL_CELLS_IMPL;
     use crate::external_cells::ExternalCellsImpl;

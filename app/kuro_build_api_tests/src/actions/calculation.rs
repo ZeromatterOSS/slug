@@ -14,6 +14,11 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use assert_matches::assert_matches;
+use dice::DiceTransaction;
+use dice::UserComputationData;
+use dice::testing::DiceBuilder;
+use dupe::Dupe;
+use indexmap::indexset;
 use kuro_analysis::analysis::calculation::AnalysisKey;
 use kuro_artifact::actions::key::ActionIndex;
 use kuro_artifact::actions::key::ActionKey;
@@ -99,11 +104,6 @@ use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use kuro_http::HttpClientBuilder;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_util::time_span::TimeSpan;
-use dice::DiceTransaction;
-use dice::UserComputationData;
-use dice::testing::DiceBuilder;
-use dupe::Dupe;
-use indexmap::indexset;
 use maplit::btreemap;
 use sorted_vector_map::sorted_vector_map;
 

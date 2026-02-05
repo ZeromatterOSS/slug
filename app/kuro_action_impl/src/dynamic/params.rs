@@ -9,6 +9,7 @@
  */
 
 use allocative::Allocative;
+use gazebo::prelude::OptionExt;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_build_api::dynamic_value::DynamicValue;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_output_artifact::FrozenStarlarkOutputArtifact;
@@ -17,7 +18,6 @@ use kuro_build_api::interpreter::rule_defs::plugins::AnalysisPlugins;
 use kuro_build_api::interpreter::rule_defs::plugins::FrozenAnalysisPlugins;
 use kuro_core::execution_types::execution::ExecutionPlatformResolution;
 use kuro_error::BuckErrorContext;
-use gazebo::prelude::OptionExt;
 use starlark::any::ProvidesStaticType;
 use starlark::values::Freeze;
 use starlark::values::FreezeError;

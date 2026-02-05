@@ -11,10 +11,10 @@
 use std::time::Duration;
 
 use allocative::Allocative;
-use kuro_build_api_derive::internal_provider;
-use kuro_error::BuckErrorContext;
 use either::Either;
 use indexmap::IndexMap;
+use kuro_build_api_derive::internal_provider;
+use kuro_error::BuckErrorContext;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;

@@ -15,6 +15,8 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use cmp_any::PartialEqAny;
+use dupe::Dupe;
 use kuro_build_api::bxl::types::BxlFunctionLabel;
 use kuro_core::content_hash::ContentBasedPathHash;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
@@ -32,8 +34,6 @@ use kuro_error::BuckErrorContext;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_interpreter::dice::starlark_provider::StarlarkEvalKind;
 use kuro_util::strong_hasher::Blake3StrongHasher;
-use cmp_any::PartialEqAny;
-use dupe::Dupe;
 use starlark_map::ordered_map::OrderedMap;
 
 use crate::bxl::starlark_defs::cli_args::CliArgValue;

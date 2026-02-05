@@ -9,6 +9,7 @@
  */
 
 use async_trait::async_trait;
+use gazebo::prelude::*;
 use kuro_cli_proto::FileStatusRequest;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
 use kuro_client_ctx::common::BuckArgMatches;
@@ -23,7 +24,6 @@ use kuro_client_ctx::events_ctx::EventsCtx;
 use kuro_client_ctx::exit_result::ExitResult;
 use kuro_client_ctx::path_arg::PathArg;
 use kuro_client_ctx::streaming::StreamingCommand;
-use gazebo::prelude::*;
 
 #[derive(Debug, clap::Parser)]
 pub struct FileStatusCommand {

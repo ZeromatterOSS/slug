@@ -12,12 +12,12 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
-use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
-use kuro_error::kuro_error;
 use futures::stream;
 use futures::stream::BoxStream;
 use futures::stream::StreamExt;
 use gazebo::prelude::*;
+use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
+use kuro_error::kuro_error;
 
 use crate::artifact_value::ArtifactValue;
 use crate::directory::ActionDirectoryEntry;
@@ -100,10 +100,7 @@ impl Materializer for NoDiskMaterializer {
         ))
     }
 
-    async fn invalidate_many(
-        &self,
-        _paths: Vec<ProjectRelativePathBuf>,
-    ) -> kuro_error::Result<()> {
+    async fn invalidate_many(&self, _paths: Vec<ProjectRelativePathBuf>) -> kuro_error::Result<()> {
         Ok(())
     }
 

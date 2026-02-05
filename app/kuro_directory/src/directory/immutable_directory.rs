@@ -9,11 +9,11 @@
  */
 
 use allocative::Allocative;
-use kuro_core::directory_digest::DirectoryDigest;
-use kuro_fs::paths::file_name::FileNameBuf;
 use derivative::Derivative;
 use derive_more::Display;
 use either::Either;
+use kuro_core::directory_digest::DirectoryDigest;
+use kuro_fs::paths::file_name::FileNameBuf;
 
 use crate::directory::builder::DirectoryBuilder;
 use crate::directory::dashmap_directory_interner::DashMapDirectoryInterner;

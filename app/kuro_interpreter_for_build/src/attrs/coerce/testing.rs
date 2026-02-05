@@ -10,6 +10,7 @@
 
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
 use kuro_common::package_listing::listing::PackageListing;
 use kuro_common::package_listing::listing::testing::PackageListingExt;
@@ -26,7 +27,6 @@ use kuro_interpreter::extra::InterpreterHostArchitecture;
 use kuro_interpreter::extra::InterpreterHostPlatform;
 use kuro_interpreter::file_type::StarlarkFileType;
 use kuro_node::attrs::coercion_context::AttrCoercionContext;
-use dupe::Dupe;
 use maplit::hashmap;
 use starlark::environment::Globals;
 use starlark::environment::Module;

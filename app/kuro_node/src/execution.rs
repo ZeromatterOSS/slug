@@ -11,13 +11,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_core::execution_types::execution::ExecutionPlatformResolution;
 use kuro_core::execution_types::execution_platforms::ExecutionPlatforms;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_core::target::target_configured_target_label::TargetConfiguredTargetLabel;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
 
 use crate::configuration::calculation::CellNameForConfigurationResolution;
 use crate::configuration::resolved::ConfigurationSettingKey;

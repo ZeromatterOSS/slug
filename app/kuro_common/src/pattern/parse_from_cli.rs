@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use dice::DiceComputations;
+use gazebo::prelude::*;
 use kuro_core::cells::CellAliasResolver;
 use kuro_core::cells::CellResolver;
 use kuro_core::cells::cell_path::CellPath;
@@ -16,8 +18,6 @@ use kuro_core::pattern::pattern::ParsedPattern;
 use kuro_core::pattern::pattern::ParsedPatternWithModifiers;
 use kuro_core::pattern::pattern_type::PatternType;
 use kuro_core::pattern::unparsed::UnparsedPatterns;
-use dice::DiceComputations;
-use gazebo::prelude::*;
 
 use crate::dice::cells::HasCellResolver;
 use crate::pattern::resolve::ResolveTargetPatterns;
@@ -53,10 +53,7 @@ impl PatternParser {
         })
     }
 
-    fn parse_pattern<T: PatternType>(
-        &self,
-        pattern: &str,
-    ) -> kuro_error::Result<ParsedPattern<T>> {
+    fn parse_pattern<T: PatternType>(&self, pattern: &str) -> kuro_error::Result<ParsedPattern<T>> {
         ParsedPattern::parse_relaxed(
             &self.target_alias_resolver,
             self.cwd.as_ref(),

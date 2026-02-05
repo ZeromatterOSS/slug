@@ -19,6 +19,9 @@
 //!
 //! Reference: https://bazel.build/rules/lib/config_common
 
+use std::fmt;
+use std::fmt::Display;
+
 use allocative::Allocative;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
@@ -27,17 +30,15 @@ use starlark::environment::MethodsStatic;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
-use starlark::values::dict::Dict;
-use starlark::values::none::NoneOr;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
+use starlark::values::dict::Dict;
+use starlark::values::none::NoneOr;
 use starlark::values::starlark_value;
 use starlark_map::small_map::SmallMap;
-use std::fmt;
-use std::fmt::Display;
 
 // ============================================================================
 // ConfigCommonModule - The main config_common namespace

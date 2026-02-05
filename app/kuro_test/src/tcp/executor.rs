@@ -12,10 +12,10 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::process::Stdio;
 
+use futures::future::Either;
 use kuro_error::BuckErrorContext as _;
 use kuro_events::metadata::username;
 use kuro_util::process::async_background_command;
-use futures::future::Either;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 

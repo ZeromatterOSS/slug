@@ -10,10 +10,10 @@
 
 use std::collections::VecDeque;
 
-use kuro_common::init::ResourceControlConfig;
-use kuro_fs::paths::file_name::FileNameBuf;
 use dupe::Dupe;
 use index_vec::IndexVec;
+use kuro_common::init::ResourceControlConfig;
+use kuro_fs::paths::file_name::FileNameBuf;
 
 use crate::cgroup::CgroupInternal;
 use crate::cgroup::CgroupLeaf;

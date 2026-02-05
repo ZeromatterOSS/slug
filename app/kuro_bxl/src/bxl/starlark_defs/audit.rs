@@ -9,6 +9,10 @@
  */
 
 use allocative::Allocative;
+use derivative::Derivative;
+use derive_more::Display;
+use dupe::Dupe;
+use futures::FutureExt;
 use kuro_build_api::audit_cell::audit_cell;
 use kuro_build_api::audit_output::AuditOutputResult;
 use kuro_build_api::audit_output::audit_output;
@@ -16,10 +20,6 @@ use kuro_core::cells::CellResolver;
 use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
 use kuro_error::BuckErrorContext;
 use kuro_interpreter::types::target_label::StarlarkTargetLabel;
-use derivative::Derivative;
-use derive_more::Display;
-use dupe::Dupe;
-use futures::FutureExt;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;

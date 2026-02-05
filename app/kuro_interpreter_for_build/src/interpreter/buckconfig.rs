@@ -13,12 +13,12 @@ use std::fmt;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
+use dice::DiceComputations;
+use hashbrown::HashTable;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
 use kuro_common::legacy_configs::dice::OpaqueLegacyBuckConfigOnDice;
 use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_core::soft_error;
-use dice::DiceComputations;
-use hashbrown::HashTable;
 use starlark::collections::Hashed;
 use starlark::eval::Evaluator;
 use starlark::values::FrozenStringValue;

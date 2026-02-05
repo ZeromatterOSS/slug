@@ -8,9 +8,9 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
 use kuro_core::soft_error;
 use kuro_error::conversion::from_any_with_tag;
-use dupe::Dupe;
 
 use crate::Event;
 use crate::EventSink;

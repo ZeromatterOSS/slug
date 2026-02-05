@@ -30,8 +30,14 @@ pub(crate) fn node_to_attrs_struct<'v>(
         let resolved = a.value.resolve_single(node.label().pkg(), ctx)?;
         // Debug: trace dep-related attributes for cc_binary
         if is_cc_binary && (a.name == "deps" || a.name == "link_extra_lib" || a.name == "malloc") {
-            eprintln!("DEBUG[{}]: {} configured={:?} resolved={} type={}",
-                target_name, a.name, a.value, resolved, resolved.get_type());
+            eprintln!(
+                "DEBUG[{}]: {} configured={:?} resolved={} type={}",
+                target_name,
+                a.name,
+                a.value,
+                resolved,
+                resolved.get_type()
+            );
         }
         resolved_attrs.push((a.name, resolved));
     }

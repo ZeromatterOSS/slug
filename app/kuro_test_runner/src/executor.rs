@@ -8,9 +8,9 @@
  * above-listed licenses.
  */
 
+use futures::channel::mpsc::UnboundedSender;
 use kuro_test_api::data::ExternalRunnerSpec;
 use kuro_test_api::protocol::TestExecutor;
-use futures::channel::mpsc::UnboundedSender;
 
 pub type SpecSender = UnboundedSender<ExternalRunnerSpec>;
 

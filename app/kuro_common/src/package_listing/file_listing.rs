@@ -9,9 +9,9 @@
  */
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::package::package_relative_path::PackageRelativePath;
 use kuro_util::arc_str::ArcS;
-use dupe::Dupe;
 use serde::Deserialize;
 use serde::Serialize;
 use starlark_map::sorted_set::SortedSet;

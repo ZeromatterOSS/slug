@@ -11,6 +11,8 @@
 use std::time::Instant;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
+use dupe::Dupe;
 use kuro_artifact::artifact::build_artifact::BuildArtifact;
 use kuro_build_signals::env::NodeDuration;
 use kuro_build_signals::env::WaitingData;
@@ -20,8 +22,6 @@ use kuro_events::dispatch::current_span;
 use kuro_events::dispatch::span_async_simple;
 use kuro_execute::materialize::materializer::HasMaterializer;
 use kuro_util::time_span::TimeSpan;
-use dice::DiceComputations;
-use dupe::Dupe;
 
 use crate::build_signals::HasBuildSignals;
 

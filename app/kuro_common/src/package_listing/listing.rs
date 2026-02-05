@@ -11,11 +11,11 @@
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::package::package_relative_path::PackageRelativePath;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::file_name::FileNameBuf;
 use kuro_util::arc_str::ArcS;
-use dupe::Dupe;
 use starlark_map::sorted_set::SortedSet;
 use starlark_map::sorted_vec::SortedVec;
 

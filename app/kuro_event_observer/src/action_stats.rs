@@ -10,8 +10,8 @@
 
 use std::fmt;
 
-use kuro_data::SchedulingMode;
 use dupe::Dupe;
+use kuro_data::SchedulingMode;
 
 use crate::cache_hit_rate::total_cache_hit_rate;
 use crate::last_command_execution_kind::LastCommandExecutionKind;

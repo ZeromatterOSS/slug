@@ -8,6 +8,9 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
+use fxhash::FxHashMap;
+use indexmap::indexset;
 use kuro_artifact::actions::key::ActionIndex;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::artifact_type::testing::BuildArtifactTestingExt;
@@ -49,9 +52,6 @@ use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use kuro_interpreter_for_build::interpreter::build_context::BuildContext;
 use kuro_interpreter_for_build::interpreter::testing::cells;
 use kuro_util::arc_str::ArcS;
-use dupe::Dupe;
-use fxhash::FxHashMap;
-use indexmap::indexset;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;

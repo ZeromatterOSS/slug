@@ -10,13 +10,13 @@
 
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_core::fs::project::ProjectRoot;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
 use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
 use kuro_directory::directory::entry::DirectoryEntry;
 use kuro_error::BuckErrorContext;
 use kuro_fs::fs_util;
-use dupe::Dupe;
 
 use crate::artifact_value::ArtifactValue;
 use crate::digest_config::DigestConfig;

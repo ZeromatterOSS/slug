@@ -9,12 +9,12 @@
  */
 
 use allocative::Allocative;
+use dice::DiceComputations;
+use gazebo::prelude::OptionExt;
 use kuro_build_api::query::oneshot::QUERY_FRONTEND;
 use kuro_node::nodes::unconfigured::TargetNode;
 use kuro_query::query::syntax::simple::eval::values::QueryEvaluationResult;
 use kuro_query::query::syntax::simple::functions::helpers::CapturedExpr;
-use dice::DiceComputations;
-use gazebo::prelude::OptionExt;
 use starlark::values::Heap;
 use starlark::values::Value;
 

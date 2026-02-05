@@ -10,6 +10,10 @@
 
 use std::sync::Arc;
 
+use dupe::Dupe;
+use dupe::OptionDupedExt;
+use either::Either;
+use gazebo::prelude::*;
 use kuro_core::configuration::transition::id::TransitionId;
 use kuro_core::plugins::PluginKindSet;
 use kuro_core::target::label::interner::ConcurrentTargetLabelInterner;
@@ -24,10 +28,6 @@ use kuro_node::attrs::coercion_context::AttrCoercionContext;
 use kuro_node::attrs::configurable::AttrIsConfigurable;
 use kuro_node::attrs::display::AttrDisplayWithContextExt;
 use kuro_node::provider_id_set::ProviderIdSet;
-use dupe::Dupe;
-use dupe::OptionDupedExt;
-use either::Either;
-use gazebo::prelude::*;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
@@ -726,7 +726,12 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
             (None, false) => Some(eval.heap().alloc("")),
             (None, true) => None,
         };
-        Ok(Attribute::attr(eval, effective_default, doc, AttrType::string())?)
+        Ok(Attribute::attr(
+            eval,
+            effective_default,
+            doc,
+            AttrType::string(),
+        )?)
     }
 
     /// Takes an int from the user, supplies an int to the rule.
@@ -751,7 +756,12 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
             (None, false) => Some(eval.heap().alloc(0)),
             (None, true) => None,
         };
-        Ok(Attribute::attr(eval, effective_default, doc, AttrType::int())?)
+        Ok(Attribute::attr(
+            eval,
+            effective_default,
+            doc,
+            AttrType::int(),
+        )?)
     }
 
     /// Takes a boolean from the user, supplies a boolean to the rule.
@@ -768,7 +778,12 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
             (None, false) => Some(eval.heap().alloc(false)),
             (None, true) => None,
         };
-        Ok(Attribute::attr(eval, effective_default, doc, AttrType::bool())?)
+        Ok(Attribute::attr(
+            eval,
+            effective_default,
+            doc,
+            AttrType::bool(),
+        )?)
     }
 
     /// Takes a target label from the user (e.g., "//pkg:target") and supplies a
@@ -818,7 +833,8 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // Parse allow_files: can be bool or list of extension strings
         let allow_files_bool = parse_allow_files_param(allow_files, "allow_files", eval)?;
         // Parse allow_single_file: can be bool or list of extension strings
-        let allow_single_file_bool = parse_allow_files_param(allow_single_file, "allow_single_file", eval)?;
+        let allow_single_file_bool =
+            parse_allow_files_param(allow_single_file, "allow_single_file", eval)?;
         // Either allow_files or allow_single_file means we accept source files
         let accept_files = allow_files_bool || allow_single_file_bool;
         // TODO(bazel): Enforce allow_rules constraint during coercion
@@ -837,9 +853,10 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
 
         // Extract aspect types from the aspects parameter (Phase 8c - UPDATED)
         // Note: aspects may be unfrozen at rule definition time, so handle both cases
+        use std::sync::Arc;
+
         use crate::aspect::FrozenStarlarkAspectCallable;
         use crate::aspect::StarlarkAspectCallable;
-        use std::sync::Arc;
         let mut aspect_types = Vec::new();
         for aspect_val in aspects.items {
             // Try frozen first, then unfrozen
@@ -847,17 +864,15 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
                 if let Some(aspect) = frozen.downcast_ref::<FrozenStarlarkAspectCallable>() {
                     aspect_types.push(Arc::new(aspect.aspect_type()));
                 } else {
-                    return Err(ValueError::IncorrectParameterTypeNamed(
-                        "aspects".to_owned()
-                    ).into());
+                    return Err(
+                        ValueError::IncorrectParameterTypeNamed("aspects".to_owned()).into(),
+                    );
                 }
             } else if let Some(aspect) = aspect_val.downcast_ref::<StarlarkAspectCallable>() {
                 // For unfrozen aspects, use the aspect_type_unfrozen method
                 aspect_types.push(Arc::new(aspect.aspect_type_unfrozen()?));
             } else {
-                return Err(ValueError::IncorrectParameterTypeNamed(
-                    "aspects".to_owned()
-                ).into());
+                return Err(ValueError::IncorrectParameterTypeNamed("aspects".to_owned()).into());
             }
         }
 
@@ -952,9 +967,10 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
 
         // Extract aspect types from the aspects parameter (Phase 8c - UPDATED)
         // Note: aspects may be unfrozen at rule definition time, so handle both cases
+        use std::sync::Arc;
+
         use crate::aspect::FrozenStarlarkAspectCallable;
         use crate::aspect::StarlarkAspectCallable;
-        use std::sync::Arc;
         let mut aspect_types = Vec::new();
         for aspect_val in aspects.items {
             // Try frozen first, then unfrozen
@@ -962,17 +978,15 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
                 if let Some(aspect) = frozen.downcast_ref::<FrozenStarlarkAspectCallable>() {
                     aspect_types.push(Arc::new(aspect.aspect_type()));
                 } else {
-                    return Err(ValueError::IncorrectParameterTypeNamed(
-                        "aspects".to_owned()
-                    ).into());
+                    return Err(
+                        ValueError::IncorrectParameterTypeNamed("aspects".to_owned()).into(),
+                    );
                 }
             } else if let Some(aspect) = aspect_val.downcast_ref::<StarlarkAspectCallable>() {
                 // For unfrozen aspects, use the aspect_type_unfrozen method
                 aspect_types.push(Arc::new(aspect.aspect_type_unfrozen()?));
             } else {
-                return Err(ValueError::IncorrectParameterTypeNamed(
-                    "aspects".to_owned()
-                ).into());
+                return Err(ValueError::IncorrectParameterTypeNamed("aspects".to_owned()).into());
             }
         }
 
@@ -1056,7 +1070,10 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // Bazel semantics: if mandatory = False (default) and no default, use empty dict
         let effective_default = match (default, mandatory) {
             (Some(d), _) => Some(d),
-            (None, false) => Some(eval.heap().alloc(starlark::collections::SmallMap::<Value, Value>::new())),
+            (None, false) => Some(
+                eval.heap()
+                    .alloc(starlark::collections::SmallMap::<Value, Value>::new()),
+            ),
             (None, true) => None,
         };
         let coercer = AttrType::dict(AttrType::string(), AttrType::string(), false);
@@ -1072,7 +1089,11 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
         let _unused = mandatory;
-        let coercer = AttrType::dict(AttrType::string(), AttrType::list(AttrType::string()), false);
+        let coercer = AttrType::dict(
+            AttrType::string(),
+            AttrType::list(AttrType::string()),
+            false,
+        );
         Ok(Attribute::attr(eval, default, doc, coercer)?)
     }
 

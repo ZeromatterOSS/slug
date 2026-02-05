@@ -15,10 +15,10 @@ use std::io::BufRead;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_cli_proto::ConfigOverride;
 use kuro_core::cells::cell_root_path::CellRootPath;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
-use dupe::Dupe;
 use pagable::Pagable;
 use starlark_map::sorted_map::SortedMap;
 
@@ -427,9 +427,9 @@ pub mod testing {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use kuro_core::cells::cell_root_path::CellRootPathBuf;
     use indoc::indoc;
     use itertools::Itertools;
+    use kuro_core::cells::cell_root_path::CellRootPathBuf;
 
     use super::testing::*;
     use super::*;

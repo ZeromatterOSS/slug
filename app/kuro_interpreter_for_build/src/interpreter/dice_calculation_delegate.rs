@@ -12,6 +12,12 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use derive_more::Display;
+use dice::DiceComputations;
+use dice::Key;
+use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
+use futures::FutureExt;
 use kuro_common::dice::cells::HasCellResolver;
 use kuro_common::dice::cycles::CycleGuard;
 use kuro_common::file_ops::dice::DiceFileComputations;
@@ -45,12 +51,6 @@ use kuro_interpreter::paths::path::StarlarkPath;
 use kuro_node::nodes::eval_result::EvaluationResult;
 use kuro_node::super_package::SuperPackage;
 use kuro_util::time_span::TimeSpan;
-use derive_more::Display;
-use dice::DiceComputations;
-use dice::Key;
-use dice_futures::cancellation::CancellationContext;
-use dupe::Dupe;
-use futures::FutureExt;
 use starlark::codemap::FileSpan;
 use starlark::syntax::AstModule;
 
@@ -669,8 +669,8 @@ impl<'c, 'd: 'c> DiceCalculationDelegate<'c, 'd> {
 
 mod keys {
     use allocative::Allocative;
-    use kuro_interpreter::paths::module::OwnedStarlarkModulePath;
     use derive_more::Display;
+    use kuro_interpreter::paths::module::OwnedStarlarkModulePath;
 
     #[derive(Clone, Display, Debug, Eq, Hash, PartialEq, Allocative)]
     pub struct EvalImportKey(pub OwnedStarlarkModulePath);

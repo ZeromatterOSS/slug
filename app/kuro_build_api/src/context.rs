@@ -14,13 +14,13 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
-use kuro_core::fs::buck_out_path::BuckOutPathResolver;
-use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
 use derive_more::Display;
 use dice::DiceComputations;
 use dice::DiceTransactionUpdater;
 use dice::InjectedKey;
 use dupe::Dupe;
+use kuro_core::fs::buck_out_path::BuckOutPathResolver;
+use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
 use pagable::Pagable;
 
 #[async_trait]
@@ -29,10 +29,8 @@ pub trait HasBuildContextData {
 }
 
 pub trait SetBuildContextData {
-    fn set_buck_out_path(
-        &mut self,
-        path: Option<ProjectRelativePathBuf>,
-    ) -> kuro_error::Result<()>;
+    fn set_buck_out_path(&mut self, path: Option<ProjectRelativePathBuf>)
+    -> kuro_error::Result<()>;
 }
 
 #[derive(PartialEq, Eq, Allocative, Pagable)]

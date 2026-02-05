@@ -11,6 +11,7 @@
 use std::io::Write;
 
 use async_trait::async_trait;
+use futures::stream::StreamExt;
 use kuro_cli_proto::ClientContext;
 use kuro_cmd_audit_client::deferred_materializer::DeferredMaterializerCommand;
 use kuro_cmd_audit_client::deferred_materializer::DeferredMaterializerSubcommand;
@@ -18,7 +19,6 @@ use kuro_error::BuckErrorContext;
 use kuro_execute::materialize::materializer::DeferredMaterializerIterItem;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
-use futures::stream::StreamExt;
 
 use crate::ServerAuditSubcommand;
 

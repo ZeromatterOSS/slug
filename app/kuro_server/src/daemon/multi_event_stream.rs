@@ -12,9 +12,9 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 
+use futures::stream::Stream;
 use kuro_cli_proto::CommandProgress;
 use kuro_cli_proto::MultiCommandProgress;
-use futures::stream::Stream;
 use pin_project::pin_project;
 use prost::Message;
 
@@ -103,20 +103,20 @@ where
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
-    use kuro_data::BuckEvent;
     use futures::stream::StreamExt;
     use futures::stream::poll_fn;
+    use kuro_data::BuckEvent;
 
     use super::*;
 
     fn event(span_id: u64) -> CommandProgress {
         CommandProgress {
-            progress: Some(kuro_cli_proto::command_progress::Progress::Event(
-                Box::new(BuckEvent {
+            progress: Some(kuro_cli_proto::command_progress::Progress::Event(Box::new(
+                BuckEvent {
                     span_id,
                     ..Default::default()
-                }),
-            )),
+                },
+            ))),
         }
     }
 

@@ -8,9 +8,9 @@
  * above-listed licenses.
  */
 
+use indoc::indoc;
 use kuro_core::bzl::ImportPath;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
-use indoc::indoc;
 use starlark::environment::GlobalsBuilder;
 use starlark::starlark_module;
 

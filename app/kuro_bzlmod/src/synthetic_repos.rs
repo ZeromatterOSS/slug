@@ -88,7 +88,10 @@ pub fn collect_synthetic_repos(
 /// `None` if the extension is not recognized.
 fn generate_synthetic_repos_for_extension(usage: &ExtensionUsage) -> Option<Vec<SyntheticRepo>> {
     // Match known extensions by their bzl file and name
-    match (usage.extension_bzl_file.as_str(), usage.extension_name.as_str()) {
+    match (
+        usage.extension_bzl_file.as_str(),
+        usage.extension_name.as_str(),
+    ) {
         // bazel_features version_extension
         ("//private:extensions.bzl", "version_extension")
         | ("@bazel_features//private:extensions.bzl", "version_extension") => {
@@ -470,8 +473,9 @@ pub fn materialize_synthetic_repos(
 
     for repo in repos {
         let repo_path = base_dir.join(&repo.name);
-        fs::create_dir_all(&repo_path)
-            .with_context(|| format!("Failed to create synthetic repo directory: {:?}", repo_path))?;
+        fs::create_dir_all(&repo_path).with_context(|| {
+            format!("Failed to create synthetic repo directory: {:?}", repo_path)
+        })?;
 
         for (file_path, content) in &repo.files {
             let full_path = repo_path.join(file_path);
@@ -519,7 +523,10 @@ mod tests {
     #[test]
     fn test_collect_synthetic_repos() {
         let mut parsed = ParsedModuleFile {
-            module: crate::types::Module::new("test".to_string(), crate::version::Version::parse("1.0.0").unwrap()),
+            module: crate::types::Module::new(
+                "test".to_string(),
+                crate::version::Version::parse("1.0.0").unwrap(),
+            ),
             has_module_directive: true,
             extension_usages: vec![],
         };

@@ -214,12 +214,11 @@ impl RegistryClient {
             .buck_error_context("Failed to fetch module metadata")?;
 
         let body = to_bytes(response.into_body()).await?;
-        let metadata: ModuleMetadata = serde_json::from_slice(&body).map_err(|e| {
-            RegistryError::InvalidResponse {
+        let metadata: ModuleMetadata =
+            serde_json::from_slice(&body).map_err(|e| RegistryError::InvalidResponse {
                 url: url.clone(),
                 reason: e.to_string(),
-            }
-        })?;
+            })?;
 
         Ok(metadata)
     }
@@ -231,7 +230,10 @@ impl RegistryClient {
         version: &str,
     ) -> kuro_error::Result<String> {
         // Check cache first
-        if let Some(cached) = self.cache.read_module_bazel(&self.base_url, name, version)? {
+        if let Some(cached) = self
+            .cache
+            .read_module_bazel(&self.base_url, name, version)?
+        {
             tracing::debug!("Using cached MODULE.bazel for {}@{}", name, version);
             return Ok(cached);
         }
@@ -249,10 +251,11 @@ impl RegistryClient {
             .buck_error_context("Failed to fetch MODULE.bazel")?;
 
         let body = to_bytes(response.into_body()).await?;
-        let content = String::from_utf8(body.to_vec()).map_err(|_| RegistryError::InvalidResponse {
-            url: url.clone(),
-            reason: "MODULE.bazel is not valid UTF-8".to_string(),
-        })?;
+        let content =
+            String::from_utf8(body.to_vec()).map_err(|_| RegistryError::InvalidResponse {
+                url: url.clone(),
+                reason: "MODULE.bazel is not valid UTF-8".to_string(),
+            })?;
 
         // Cache the result
         self.cache
@@ -285,10 +288,11 @@ impl RegistryClient {
             .buck_error_context("Failed to fetch source.json")?;
 
         let body = to_bytes(response.into_body()).await?;
-        let content = String::from_utf8(body.to_vec()).map_err(|_| RegistryError::InvalidResponse {
-            url: url.clone(),
-            reason: "source.json is not valid UTF-8".to_string(),
-        })?;
+        let content =
+            String::from_utf8(body.to_vec()).map_err(|_| RegistryError::InvalidResponse {
+                url: url.clone(),
+                reason: "source.json is not valid UTF-8".to_string(),
+            })?;
 
         let source_info: SourceInfo =
             serde_json::from_str(&content).map_err(|e| RegistryError::InvalidResponse {

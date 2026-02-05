@@ -9,10 +9,10 @@
  */
 
 use allocative::Allocative;
-use kuro_core::deferred::key::DeferredHolderKey;
 use derive_more::Display;
 use dice::DiceComputations;
 use dupe::Dupe;
+use kuro_core::deferred::key::DeferredHolderKey;
 use starlark::values::OwnedFrozenValueTyped;
 
 use crate::deferred::calculation::lookup_deferred_holder;

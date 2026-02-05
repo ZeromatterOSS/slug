@@ -13,10 +13,7 @@ use std::ops::ControlFlow;
 use kuro_data::error::ErrorTag;
 use once_cell::sync::Lazy;
 
-pub(crate) fn classify_server_stderr(
-    error: kuro_error::Error,
-    stderr: &str,
-) -> kuro_error::Error {
+pub(crate) fn classify_server_stderr(error: kuro_error::Error, stderr: &str) -> kuro_error::Error {
     let mut tag = if stderr.is_empty() {
         None
     } else if stderr.contains("<jemalloc>: size mismatch detected") {

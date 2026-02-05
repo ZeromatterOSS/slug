@@ -11,13 +11,13 @@
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::configuration::transition::id::TransitionId;
 use kuro_core::package::source_path::SourcePathRef;
 use kuro_core::plugins::PluginKind;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_util::thin_box::ThinBoxSlice;
-use dupe::Dupe;
 use starlark_map::ordered_set::OrderedSet;
 
 use crate::attrs::attr_type::configuration_dep::ConfigurationDepKind;

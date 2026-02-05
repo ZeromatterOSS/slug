@@ -8,6 +8,9 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
+use fxhash::FxHashMap;
+use indoc::indoc;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::artifact_type::OutputArtifact;
 use kuro_build_api::actions::impls::json::JsonUnpack;
@@ -19,9 +22,6 @@ use kuro_build_api::interpreter::rule_defs::artifact_tagging::ArtifactTag;
 use kuro_build_api::interpreter::rule_defs::cmd_args::CommandLineArtifactVisitor;
 use kuro_error::BuckErrorContext;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
-use dupe::Dupe;
-use fxhash::FxHashMap;
-use indoc::indoc;
 use starlark::environment::GlobalsBuilder;
 use starlark::starlark_module;
 use starlark::values::UnpackValue;

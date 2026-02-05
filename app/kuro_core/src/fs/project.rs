@@ -16,13 +16,13 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_error::BuckErrorContext;
 use kuro_fs::fs_util;
 use kuro_fs::paths::RelativePath;
 use kuro_fs::paths::abs_norm_path::AbsNormPath;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
-use dupe::Dupe;
 use ref_cast::RefCast;
 use relative_path::RelativePathBuf;
 

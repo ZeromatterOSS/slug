@@ -8,8 +8,8 @@
  * above-listed licenses.
  */
 
-use kuro_common::file_ops::metadata::TrackedFileDigest;
 use dupe::Dupe;
+use kuro_common::file_ops::metadata::TrackedFileDigest;
 use remote_execution as RE;
 
 use crate::digest_config::DigestConfig;

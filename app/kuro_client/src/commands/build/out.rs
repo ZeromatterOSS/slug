@@ -12,6 +12,7 @@ use std::borrow::Cow;
 use std::io;
 use std::path::Path;
 
+use futures::TryStreamExt;
 use kuro_cli_proto::BuildTarget;
 use kuro_cli_proto::build_target::BuildOutput;
 use kuro_client_ctx::exit_result::ClientIoError;
@@ -26,7 +27,6 @@ use kuro_fs::paths::abs_path::AbsPath;
 use kuro_fs::paths::abs_path::AbsPathBuf;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_fs::working_dir::AbsWorkingDir;
-use futures::TryStreamExt;
 
 #[derive(Clone)]
 struct CopyContext {
@@ -276,8 +276,7 @@ async fn copy_file(src: &Path, dst: &Path) -> kuro_error::Result<()> {
 }
 
 fn convert_broken_pipe_error(e: io::Error) -> kuro_error::Error {
-    kuro_error::Error::from(ClientIoError::from(e))
-        .context("Error writing build artifact to --out")
+    kuro_error::Error::from(ClientIoError::from(e)).context("Error writing build artifact to --out")
 }
 
 #[cfg(test)]

@@ -12,12 +12,12 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
-use kuro_core::configuration::compatibility::MaybeCompatible;
-use kuro_core::provider::label::ConfiguredProvidersLabel;
 use derive_more::Display;
 use dice::CancellationContext;
 use dice::DiceComputations;
 use dice::Key;
+use kuro_core::configuration::compatibility::MaybeCompatible;
+use kuro_core::provider::label::ConfiguredProvidersLabel;
 
 use crate::analysis::calculation::RuleAnalysisCalculation;
 use crate::artifact_groups::ArtifactGroup;
@@ -93,7 +93,8 @@ pub async fn get_outputs_for_top_level_target(
                     // Bazel compatibility: check if DefaultInfo has an executable
                     if let Some(executable) = default_info.executable() {
                         if let Ok(artifact) = executable.get_bound_artifact() {
-                            outputs.push((ArtifactGroup::Artifact(artifact), BuildProviderType::Run));
+                            outputs
+                                .push((ArtifactGroup::Artifact(artifact), BuildProviderType::Run));
                         }
                     }
                 }

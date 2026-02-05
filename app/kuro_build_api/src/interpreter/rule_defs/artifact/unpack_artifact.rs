@@ -8,8 +8,8 @@
  * above-listed licenses.
  */
 
-use kuro_artifact::artifact::artifact_type::Artifact;
 use dupe::Dupe;
+use kuro_artifact::artifact::artifact_type::Artifact;
 use starlark::values::UnpackValue;
 use starlark::values::type_repr::StarlarkTypeRepr;
 

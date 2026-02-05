@@ -10,10 +10,10 @@
 
 use std::future::Future;
 
-use kuro_events::dispatch::EventDispatcher;
-use kuro_events::dispatch::with_dispatcher_async;
 use dice::DiceComputations;
 use dupe::Dupe;
+use kuro_events::dispatch::EventDispatcher;
+use kuro_events::dispatch::with_dispatcher_async;
 
 use crate::events::HasEvents;
 

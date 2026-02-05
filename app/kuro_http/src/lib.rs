@@ -11,8 +11,8 @@
 #![feature(error_generic_member_access)]
 #![feature(if_let_guard)]
 
-use kuro_error::ErrorTag;
 use hyper::StatusCode;
+use kuro_error::ErrorTag;
 
 mod client;
 mod proxy;

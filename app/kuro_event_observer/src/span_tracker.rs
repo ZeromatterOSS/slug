@@ -11,12 +11,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use kuro_error::BuckErrorContext;
-use kuro_events::BuckEvent;
-use kuro_events::span::SpanId;
 use derivative::Derivative;
 use derive_more::From;
 use dupe::Dupe;
+use kuro_error::BuckErrorContext;
+use kuro_events::BuckEvent;
+use kuro_events::span::SpanId;
 use linked_hash_map::LinkedHashMap;
 
 use crate::what_ran::WhatRanRelevantAction;

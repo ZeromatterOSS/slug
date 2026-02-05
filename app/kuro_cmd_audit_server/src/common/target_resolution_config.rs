@@ -8,10 +8,10 @@
  * above-listed licenses.
  */
 
+use dice::DiceComputations;
 use kuro_client_ctx::common::target_cfg::TargetCfgWithUniverseOptions;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
 use kuro_server_ctx::target_resolution_config::TargetResolutionConfig;
-use dice::DiceComputations;
 
 pub(crate) async fn audit_command_target_resolution_config(
     ctx: &mut DiceComputations<'_>,

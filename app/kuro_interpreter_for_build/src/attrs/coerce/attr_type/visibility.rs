@@ -109,7 +109,9 @@ pub(crate) fn parse_visibility_with_view(
                 item.to_owned()
             };
 
-            builder.add(VisibilityPattern(ctx.coerce_target_pattern(&normalized_item)?));
+            builder.add(VisibilityPattern(
+                ctx.coerce_target_pattern(&normalized_item)?,
+            ));
         }
     }
     Ok(builder)

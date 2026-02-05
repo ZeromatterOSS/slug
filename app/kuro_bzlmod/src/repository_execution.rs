@@ -64,9 +64,14 @@ pub enum RepositoryExecutionError {
     NoImplementation { name: String },
 
     #[error("Failed to convert RepoSpec to invocation for '{canonical_name}': {reason}")]
-    RepoSpecConversionFailed { canonical_name: String, reason: String },
+    RepoSpecConversionFailed {
+        canonical_name: String,
+        reason: String,
+    },
 
-    #[error("Invalid repo_rule_id format: '{repo_rule_id}' (expected format: @@module//path:file.bzl%rule_name)")]
+    #[error(
+        "Invalid repo_rule_id format: '{repo_rule_id}' (expected format: @@module//path:file.bzl%rule_name)"
+    )]
     InvalidRepoRuleId { repo_rule_id: String },
 }
 
@@ -107,10 +112,7 @@ impl RepositoryRuleResult {
     ///
     /// This can be used to cache the repository rule execution in the lockfile.
     pub fn to_lock_entry(&self, rule_name: &str, attrs_hash: &str) -> RepositoryRuleLockEntry {
-        let mut entry = RepositoryRuleLockEntry::new(
-            rule_name.to_owned(),
-            attrs_hash.to_owned(),
-        );
+        let mut entry = RepositoryRuleLockEntry::new(rule_name.to_owned(), attrs_hash.to_owned());
 
         if let Some(hash) = &self.content_hash {
             entry = entry.with_content_hash(hash.clone());
@@ -297,11 +299,7 @@ impl ExtensionRepoExecutionKey {
 
     /// Create with default project root (current directory).
     /// Primarily for testing.
-    pub fn new_with_cwd(
-        canonical_name: String,
-        extension_id: String,
-        repo_spec: RepoSpec,
-    ) -> Self {
+    pub fn new_with_cwd(canonical_name: String, extension_id: String, repo_spec: RepoSpec) -> Self {
         Self::new(
             canonical_name,
             extension_id,
@@ -338,10 +336,8 @@ impl Key for ExtensionRepoExecutionKey {
 
         // Execute the repository rule using the repository executor
         // This handles http_archive, git_repository, local_repository, etc.
-        let result = crate::repository_executor::execute_repository_rule(
-            &invocation,
-            &self.project_root,
-        )?;
+        let result =
+            crate::repository_executor::execute_repository_rule(&invocation, &self.project_root)?;
 
         tracing::info!(
             "Successfully materialized repository '{}' at {:?}",
@@ -389,9 +385,8 @@ pub fn repo_spec_to_invocation(
         }
     })?;
 
-    let mut invocation =
-        RepositoryInvocation::new(canonical_name.to_owned(), rule_name.to_owned())
-            .with_rule_source(repo_spec.repo_rule_id.clone());
+    let mut invocation = RepositoryInvocation::new(canonical_name.to_owned(), rule_name.to_owned())
+        .with_rule_source(repo_spec.repo_rule_id.clone());
 
     // Copy all attributes from RepoSpec
     for (key, value) in &repo_spec.attributes {
@@ -407,7 +402,9 @@ pub fn repo_spec_to_invocation(
 /// Returns the `rule_name` part (after the `%`).
 fn extract_rule_name_from_id(repo_rule_id: &str) -> Option<String> {
     // Look for %rule_name at the end
-    repo_rule_id.rfind('%').map(|pos| repo_rule_id[pos + 1..].to_owned())
+    repo_rule_id
+        .rfind('%')
+        .map(|pos| repo_rule_id[pos + 1..].to_owned())
 }
 
 /// Registry of repository rule invocations for DICE lookup.
@@ -553,8 +550,10 @@ mod tests {
     #[test]
     fn test_invocation_attrs() {
         let mut inv = RepositoryInvocation::new("test".to_owned(), "http_archive".to_owned());
-        inv.attrs
-            .insert("url".to_owned(), AttrValue::String("https://example.com".to_owned()));
+        inv.attrs.insert(
+            "url".to_owned(),
+            AttrValue::String("https://example.com".to_owned()),
+        );
         inv.attrs.insert(
             "urls".to_owned(),
             AttrValue::StringList(vec![
@@ -562,7 +561,8 @@ mod tests {
                 "https://example.com/b".to_owned(),
             ]),
         );
-        inv.attrs.insert("build_file_content".to_owned(), AttrValue::None);
+        inv.attrs
+            .insert("build_file_content".to_owned(), AttrValue::None);
 
         let attrs = InvocationAttrs::new(&inv);
 
@@ -570,14 +570,20 @@ mod tests {
         assert_eq!(attrs.get_string("sha256"), None);
         assert_eq!(
             attrs.get_string_list("urls"),
-            Some(&["https://example.com/a".to_owned(), "https://example.com/b".to_owned()][..])
+            Some(
+                &[
+                    "https://example.com/a".to_owned(),
+                    "https://example.com/b".to_owned()
+                ][..]
+            )
         );
     }
 
     #[test]
     fn test_repository_rule_result() {
-        let result = RepositoryRuleResult::success("test".to_owned(), PathBuf::from("bazel-external/test"))
-            .with_content_hash("sha256-abc123".to_owned());
+        let result =
+            RepositoryRuleResult::success("test".to_owned(), PathBuf::from("bazel-external/test"))
+                .with_content_hash("sha256-abc123".to_owned());
 
         assert_eq!(result.repo_name, "test");
         assert_eq!(result.repo_path, PathBuf::from("bazel-external/test"));
@@ -589,9 +595,13 @@ mod tests {
 
     #[test]
     fn test_extension_repo_key_creation() {
-        let repo_spec = RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned())
-            .with_attr("url".to_owned(), AttrValue::String("https://example.com/foo.tar.gz".to_owned()))
-            .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
+        let repo_spec =
+            RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned())
+                .with_attr(
+                    "url".to_owned(),
+                    AttrValue::String("https://example.com/foo.tar.gz".to_owned()),
+                )
+                .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
 
         let key = ExtensionRepoExecutionKey::new(
             "_main~pip~numpy".to_owned(),
@@ -603,15 +613,20 @@ mod tests {
         assert_eq!(key.canonical_name.as_ref(), "_main~pip~numpy");
         assert_eq!(key.extension_id.as_ref(), "@@rules_python//pip:pip.bzl%pip");
         assert!(key.spec_hash.starts_with("sha256-"));
-        assert_eq!(key.repo_spec.repo_rule_id, "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive");
+        assert_eq!(
+            key.repo_spec.repo_rule_id,
+            "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive"
+        );
         assert_eq!(key.project_root.as_ref(), &PathBuf::from("/tmp/project"));
     }
 
     #[test]
     fn test_extension_repo_key_from_arcs() {
         let repo_spec = Arc::new(
-            RepoSpec::new("@@bazel_tools//repo:git.bzl%git_repository".to_owned())
-                .with_attr("remote".to_owned(), AttrValue::String("https://github.com/foo/bar".to_owned())),
+            RepoSpec::new("@@bazel_tools//repo:git.bzl%git_repository".to_owned()).with_attr(
+                "remote".to_owned(),
+                AttrValue::String("https://github.com/foo/bar".to_owned()),
+            ),
         );
 
         let key = ExtensionRepoExecutionKey::from_arcs(
@@ -622,7 +637,10 @@ mod tests {
         );
 
         assert_eq!(key.canonical_name.as_ref(), "_main~go_deps~gazelle");
-        assert_eq!(key.extension_id.as_ref(), "@@rules_go//deps:go_deps.bzl%go_deps");
+        assert_eq!(
+            key.extension_id.as_ref(),
+            "@@rules_go//deps:go_deps.bzl%go_deps"
+        );
         // Verify the spec is shared (Arc)
         assert!(Arc::ptr_eq(&key.repo_spec, &repo_spec));
     }
@@ -644,10 +662,14 @@ mod tests {
     #[test]
     fn test_extension_repo_key_hash_stability() {
         // Same inputs should produce same hash
-        let spec1 = RepoSpec::new("@@tools//repo:http.bzl%http_archive".to_owned())
-            .with_attr("url".to_owned(), AttrValue::String("https://example.com".to_owned()));
-        let spec2 = RepoSpec::new("@@tools//repo:http.bzl%http_archive".to_owned())
-            .with_attr("url".to_owned(), AttrValue::String("https://example.com".to_owned()));
+        let spec1 = RepoSpec::new("@@tools//repo:http.bzl%http_archive".to_owned()).with_attr(
+            "url".to_owned(),
+            AttrValue::String("https://example.com".to_owned()),
+        );
+        let spec2 = RepoSpec::new("@@tools//repo:http.bzl%http_archive".to_owned()).with_attr(
+            "url".to_owned(),
+            AttrValue::String("https://example.com".to_owned()),
+        );
 
         let key1 = ExtensionRepoExecutionKey::new_with_cwd(
             "_main~ext~repo".to_owned(),
@@ -689,29 +711,51 @@ mod tests {
 
     #[test]
     fn test_repo_spec_to_invocation_basic() {
-        let repo_spec = RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned())
-            .with_attr("url".to_owned(), AttrValue::String("https://example.com/foo.tar.gz".to_owned()))
-            .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
+        let repo_spec =
+            RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned())
+                .with_attr(
+                    "url".to_owned(),
+                    AttrValue::String("https://example.com/foo.tar.gz".to_owned()),
+                )
+                .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
 
         let invocation = repo_spec_to_invocation("_main~pip~numpy", &repo_spec).unwrap();
 
         assert_eq!(invocation.name, "_main~pip~numpy");
         assert_eq!(invocation.rule_name, "http_archive");
-        assert_eq!(invocation.rule_source, Some("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned()));
+        assert_eq!(
+            invocation.rule_source,
+            Some("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned())
+        );
         assert_eq!(invocation.attrs.len(), 2);
-        assert_eq!(invocation.attrs.get("url"), Some(&AttrValue::String("https://example.com/foo.tar.gz".to_owned())));
-        assert_eq!(invocation.attrs.get("sha256"), Some(&AttrValue::String("abc123".to_owned())));
+        assert_eq!(
+            invocation.attrs.get("url"),
+            Some(&AttrValue::String(
+                "https://example.com/foo.tar.gz".to_owned()
+            ))
+        );
+        assert_eq!(
+            invocation.attrs.get("sha256"),
+            Some(&AttrValue::String("abc123".to_owned()))
+        );
     }
 
     #[test]
     fn test_repo_spec_to_invocation_with_complex_attrs() {
         let repo_spec = RepoSpec::new("@@rules_go//go:deps.bzl%go_repository".to_owned())
-            .with_attr("importpath".to_owned(), AttrValue::String("github.com/foo/bar".to_owned()))
+            .with_attr(
+                "importpath".to_owned(),
+                AttrValue::String("github.com/foo/bar".to_owned()),
+            )
             .with_attr("sum".to_owned(), AttrValue::String("h1:abc=".to_owned()))
             .with_attr("version".to_owned(), AttrValue::String("v1.2.3".to_owned()))
-            .with_attr("build_file_generation".to_owned(), AttrValue::String("auto".to_owned()));
+            .with_attr(
+                "build_file_generation".to_owned(),
+                AttrValue::String("auto".to_owned()),
+            );
 
-        let invocation = repo_spec_to_invocation("_main~go_deps~com_github_foo_bar", &repo_spec).unwrap();
+        let invocation =
+            repo_spec_to_invocation("_main~go_deps~com_github_foo_bar", &repo_spec).unwrap();
 
         assert_eq!(invocation.name, "_main~go_deps~com_github_foo_bar");
         assert_eq!(invocation.rule_name, "go_repository");
@@ -758,9 +802,6 @@ mod tests {
             Some("actual_rule".to_owned())
         );
         // Missing %
-        assert_eq!(
-            extract_rule_name_from_id("@@module//path:file.bzl"),
-            None
-        );
+        assert_eq!(extract_rule_name_from_id("@@module//path:file.bzl"), None);
     }
 }

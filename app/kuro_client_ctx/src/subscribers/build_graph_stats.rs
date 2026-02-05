@@ -12,12 +12,12 @@ use std::time::Duration;
 use std::time::SystemTime;
 
 use async_trait::async_trait;
+use dupe::Dupe;
+use fbinit::FacebookInit;
 use kuro_cli_proto::command_result;
 use kuro_events::sink::remote::ScribeConfig;
 use kuro_events::sink::remote::new_remote_event_sink_if_enabled;
 use kuro_wrapper_common::invocation_id::TraceId;
-use dupe::Dupe;
-use fbinit::FacebookInit;
 
 use crate::subscribers::subscriber::EventSubscriber;
 

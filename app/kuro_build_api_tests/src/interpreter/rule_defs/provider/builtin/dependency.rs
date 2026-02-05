@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use indoc::indoc;
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use kuro_build_api::interpreter::rule_defs::provider::dependency::Dependency;
 use kuro_core::configuration::data::ConfigurationData;
@@ -15,7 +16,6 @@ use kuro_core::pattern::pattern::ParsedPattern;
 use kuro_core::pattern::pattern_type::ProvidersPatternExtra;
 use kuro_interpreter_for_build::interpreter::build_context::BuildContext;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
-use indoc::indoc;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;

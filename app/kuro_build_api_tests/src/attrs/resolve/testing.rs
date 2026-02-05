@@ -10,6 +10,9 @@
 
 use std::sync::Arc;
 
+use dupe::Dupe;
+use dupe::OptionDupedExt;
+use indoc::indoc;
 use kuro_analysis::attrs::resolve::ctx::AnalysisQueryResult;
 use kuro_analysis::attrs::resolve::ctx::AttrResolutionContext;
 use kuro_build_api::interpreter::rule_defs::cmd_args::value::FrozenCommandLineArg;
@@ -27,9 +30,6 @@ use kuro_interpreter_for_build::attrs::coerce;
 use kuro_interpreter_for_build::attrs::coerce::testing;
 use kuro_node::attrs::coercion_context::AttrCoercionContext;
 use kuro_node::provider_id_set::ProviderIdSet;
-use dupe::Dupe;
-use dupe::OptionDupedExt;
-use indoc::indoc;
 use starlark::environment::FrozenModule;
 use starlark::environment::Globals;
 use starlark::environment::GlobalsBuilder;

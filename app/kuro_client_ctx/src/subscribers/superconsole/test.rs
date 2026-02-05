@@ -8,10 +8,10 @@
  * above-listed licenses.
  */
 
-use kuro_error::BuckErrorContext;
-use kuro_event_observer::test_state::TestState;
 use crossterm::style::Color;
 use crossterm::style::ContentStyle;
+use kuro_error::BuckErrorContext;
+use kuro_event_observer::test_state::TestState;
 use superconsole::Component;
 use superconsole::Dimensions;
 use superconsole::DrawMode;

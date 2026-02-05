@@ -502,8 +502,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_report_stable_info_not_available_due_to_some_targets() -> kuro_error::Result<()>
-    {
+    async fn test_report_stable_info_not_available_due_to_some_targets() -> kuro_error::Result<()> {
         let mut context = valid_health_check_context(STABLE_REVISION);
         context.parsed_target_patterns = Some(kuro_data::ParsedTargetPatterns {
             target_patterns: vec![

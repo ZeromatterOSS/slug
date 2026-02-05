@@ -9,6 +9,7 @@
  */
 
 use async_trait::async_trait;
+use gazebo::prelude::SliceExt;
 use kuro_cli_proto::new_generic::DebugEvalRequest;
 use kuro_cli_proto::new_generic::NewGenericRequest;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
@@ -23,7 +24,6 @@ use kuro_client_ctx::events_ctx::EventsCtx;
 use kuro_client_ctx::exit_result::ExitResult;
 use kuro_client_ctx::path_arg::PathArg;
 use kuro_client_ctx::streaming::StreamingCommand;
-use gazebo::prelude::SliceExt;
 
 /// Evaluate `bzl` or `bxl` file.
 ///

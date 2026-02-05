@@ -12,14 +12,14 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 use allocative::Allocative;
+use dupe::Dupe;
+use gazebo::variants::UnpackVariants;
 use kuro_core::bxl::BxlFilePath;
 use kuro_core::bzl::ImportPath;
 use kuro_core::cells::build_file_cell::BuildFileCell;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::cells::cell_path::CellPathRef;
 use kuro_core::cells::name::CellName;
-use dupe::Dupe;
-use gazebo::variants::UnpackVariants;
 use starlark::collections::Equivalent;
 
 use crate::paths::path::OwnedStarlarkPath;

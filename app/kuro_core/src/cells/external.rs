@@ -13,9 +13,9 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use allocative::Allocative;
-use kuro_error::kuro_error;
 use derive_more::Display;
 use dupe::Dupe;
+use kuro_error::kuro_error;
 
 use crate::cells::name::CellName;
 
@@ -156,7 +156,9 @@ impl fmt::Display for ExternalCellOrigin {
         match self {
             Self::Bundled(cell) => write!(f, "bundled({cell})"),
             Self::Git(git) => write!(f, "{git}"),
-            Self::LocalPath(local) => write!(f, "local_path({}, {})", local.module_name, local.path),
+            Self::LocalPath(local) => {
+                write!(f, "local_path({}, {})", local.module_name, local.path)
+            }
             Self::Bzlmod(bzlmod) => write!(f, "{bzlmod}"),
             Self::RepositoryRule(repo) => write!(f, "{repo}"),
             Self::ExtensionRepo(ext_repo) => write!(f, "{ext_repo}"),

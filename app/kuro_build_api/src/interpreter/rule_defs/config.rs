@@ -13,6 +13,9 @@
 //! In Bazel, the `config` module provides configuration transitions like
 //! config.exec() and config.target(). This is a stub to allow rules to load.
 
+use std::fmt;
+use std::fmt::Display;
+
 use allocative::Allocative;
 use starlark::environment::GlobalsBuilder;
 use starlark::starlark_module;
@@ -21,8 +24,6 @@ use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::starlark_value;
-use std::fmt;
-use std::fmt::Display;
 
 /// A configuration transition reference.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
@@ -84,9 +85,7 @@ fn config_module_methods(builder: &mut starlark::environment::MethodsBuilder) {
     }
 
     /// Returns a transition to the target configuration.
-    fn target(
-        #[starlark(this)] _this: &ConfigModule,
-    ) -> starlark::Result<ConfigTransition> {
+    fn target(#[starlark(this)] _this: &ConfigModule) -> starlark::Result<ConfigTransition> {
         Ok(ConfigTransition {
             kind: "target".to_owned(),
             exec_group: None,

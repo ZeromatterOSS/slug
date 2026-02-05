@@ -12,9 +12,9 @@
 
 use std::iter;
 
-use kuro_query_parser::spanned::Spanned;
 use gazebo::variants::VariantName;
 use itertools::Either;
+use kuro_query_parser::spanned::Spanned;
 
 use crate::query::environment::QueryTarget;
 use crate::query::syntax::simple::eval::error::QueryError;

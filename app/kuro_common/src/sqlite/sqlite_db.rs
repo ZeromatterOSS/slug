@@ -12,15 +12,15 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use chrono::Utc;
+use derive_more::Display;
+use derive_more::From;
+use dupe::Dupe;
 use kuro_error::BuckErrorContext;
 use kuro_fs::fs_util;
 use kuro_fs::paths::abs_norm_path::AbsNormPath;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
 use kuro_fs::paths::file_name::FileName;
-use chrono::Utc;
-use derive_more::Display;
-use derive_more::From;
-use dupe::Dupe;
 use parking_lot::Mutex;
 use rusqlite::Connection;
 
@@ -240,9 +240,9 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
+    use dupe::Dupe;
     use kuro_core::fs::project::ProjectRootTemp;
     use kuro_core::fs::project_rel_path::ProjectRelativePath;
-    use dupe::Dupe;
     use parking_lot::Mutex;
     use rusqlite::Connection;
 

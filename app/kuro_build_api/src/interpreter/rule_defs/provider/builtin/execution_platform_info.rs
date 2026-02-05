@@ -11,6 +11,7 @@
 use std::fmt::Debug;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_build_api_derive::internal_provider;
 use kuro_core::configuration::constraints::ConstraintKey;
 use kuro_core::configuration::constraints::ConstraintValue;
@@ -18,7 +19,6 @@ use kuro_core::configuration::data::ConfigurationData;
 use kuro_core::execution_types::execution::ExecutionPlatform;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_interpreter::types::target_label::StarlarkTargetLabel;
-use dupe::Dupe;
 use starlark::any::ProvidesStaticType;
 use starlark::coerce::Coerce;
 use starlark::environment::GlobalsBuilder;

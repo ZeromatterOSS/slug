@@ -10,15 +10,15 @@
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use dice::DiceComputations;
+use dice::Key;
+use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
 use kuro_core::cells::cell_path::CellPathRef;
 use kuro_core::package::PackageLabel;
 use kuro_events::dispatch::async_record_root_spans;
 use kuro_events::span::SpanId;
 use kuro_util::time_span::TimeSpan;
-use dice::DiceComputations;
-use dice::Key;
-use dice_futures::cancellation::CancellationContext;
-use dupe::Dupe;
 use smallvec::SmallVec;
 
 use crate::package_listing::interpreter::InterpreterPackageListingResolver;
@@ -106,8 +106,6 @@ impl DicePackageListingResolver<'_, '_> {
         &mut self,
         package: PackageLabel,
     ) -> kuro_error::Result<PackageListing> {
-        self.resolve(package)
-            .await
-            .map_err(kuro_error::Error::from)
+        self.resolve(package).await.map_err(kuro_error::Error::from)
     }
 }

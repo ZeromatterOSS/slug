@@ -10,14 +10,14 @@
 
 use std::sync::Arc;
 
+use futures::future::BoxFuture;
+use futures::future::FutureExt;
+use itertools::Itertools;
 use kuro_core::cells::name::CellName;
 use kuro_test_api::data::ConfiguredTarget;
 use kuro_test_api::data::ExternalRunnerSpec;
 use kuro_test_api::data::ExternalRunnerSpecValue;
 use kuro_test_api::protocol::TestExecutor;
-use futures::future::BoxFuture;
-use futures::future::FutureExt;
-use itertools::Itertools;
 
 use crate::interpreter::rule_defs::cmd_args::CommandLineArtifactVisitor;
 use crate::interpreter::rule_defs::provider::builtin::external_runner_test_info::FrozenExternalRunnerTestInfo;

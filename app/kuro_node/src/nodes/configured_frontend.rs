@@ -9,10 +9,10 @@
  */
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_core::configuration::compatibility::MaybeCompatible;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
 
 use crate::nodes::configured::ConfiguredTargetNode;
 

@@ -9,6 +9,8 @@
  */
 
 use async_trait::async_trait;
+use dupe::Dupe;
+use gazebo::prelude::*;
 use kuro_cli_proto::TargetsRequest;
 use kuro_cli_proto::targets_request;
 use kuro_cli_proto::targets_request::OutputFormat;
@@ -33,8 +35,6 @@ use kuro_client_ctx::path_arg::PathArg;
 use kuro_client_ctx::query_args::CommonAttributeArgs;
 use kuro_client_ctx::streaming::StreamingCommand;
 use kuro_fs::paths::abs_norm_path::AbsNormPath;
-use dupe::Dupe;
-use gazebo::prelude::*;
 
 use crate::print::PrintOutputs;
 

@@ -340,8 +340,7 @@ mod tests {
 
         // Malformed status (colon instead of space)
         assert!(
-            process_one_status_line("M:kuro/app/kuro_file_watcher/src/edenfs/sapling.rs")
-                .is_err()
+            process_one_status_line("M:kuro/app/kuro_file_watcher/src/edenfs/sapling.rs").is_err()
         );
 
         Ok(())

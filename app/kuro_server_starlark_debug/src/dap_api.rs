@@ -73,8 +73,7 @@ pub(crate) trait DebugServer {
     ) -> kuro_error::Result<dap::VariablesResponseBody>;
 
     /// See <https://microsoft.github.io/debug-adapter-protocol/specification#Requests_Continue>
-    fn continue_(&mut self, x: ContinueArguments)
-    -> kuro_error::Result<dap::ContinueResponseBody>;
+    fn continue_(&mut self, x: ContinueArguments) -> kuro_error::Result<dap::ContinueResponseBody>;
 
     /// See <https://microsoft.github.io/debug-adapter-protocol/specification#Requests_Next>
     fn next(&mut self, x: dap::NextArguments) -> kuro_error::Result<()>;
@@ -168,10 +167,7 @@ pub(crate) fn dispatch(
         ret(r, v.map(|v| Some(v)))
     }
 
-    fn ret_none(
-        r: &dap::Request,
-        v: kuro_error::Result<()>,
-    ) -> kuro_error::Result<dap::Response> {
+    fn ret_none(r: &dap::Request, v: kuro_error::Result<()>) -> kuro_error::Result<dap::Response> {
         ret::<()>(r, v.map(|_| None))
     }
 

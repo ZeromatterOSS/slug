@@ -10,8 +10,8 @@
 
 use std::time::Duration;
 
-use kuro_event_observer::debug_events::DebugEventsState;
 use gazebo::prelude::*;
+use kuro_event_observer::debug_events::DebugEventsState;
 use superconsole::Component;
 use superconsole::Lines;
 

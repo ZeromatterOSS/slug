@@ -11,6 +11,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use dice::UserComputationData;
+use dice::testing::DiceBuilder;
+use dupe::Dupe;
+use indoc::indoc;
 use kuro_analysis::analysis::calculation::AnalysisKey;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::source_artifact::SourceArtifact;
@@ -47,10 +51,6 @@ use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_execute::artifact_value::ArtifactValue;
 use kuro_execute::digest_config::DigestConfig;
 use kuro_execute::digest_config::SetDigestConfig;
-use dice::UserComputationData;
-use dice::testing::DiceBuilder;
-use dupe::Dupe;
-use indoc::indoc;
 use maplit::btreemap;
 use starlark::values::OwnedFrozenValue;
 use starlark::values::OwnedFrozenValueTyped;

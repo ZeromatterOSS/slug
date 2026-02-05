@@ -9,8 +9,8 @@
  */
 
 use allocative::Allocative;
-use kuro_util::hash::BuckHasher;
 use dupe::Dupe;
+use kuro_util::hash::BuckHasher;
 use once_cell::sync::Lazy;
 use pagable::Pagable;
 use static_interner::Intern;

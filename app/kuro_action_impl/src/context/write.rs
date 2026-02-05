@@ -8,6 +8,10 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
+use either::Either;
+use fxhash::FxHashMap;
+use indexmap::indexset;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::artifact_type::OutputArtifact;
 use kuro_build_api::actions::impls::json::JsonUnpack;
@@ -27,10 +31,6 @@ use kuro_build_api::interpreter::rule_defs::cmd_args::value::CommandLineArg;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
 use kuro_build_api::interpreter::rule_defs::resolved_macro::ResolvedMacro;
 use kuro_execute::execute::request::OutputType;
-use dupe::Dupe;
-use either::Either;
-use fxhash::FxHashMap;
-use indexmap::indexset;
 use relative_path::RelativePathBuf;
 use sha1::Digest;
 use sha1::Sha1;

@@ -9,9 +9,9 @@
  */
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_core::package::PackageLabel;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
 use starlark_map::small_map::SmallMap;
 
 use crate::metadata::key::MetadataKey;

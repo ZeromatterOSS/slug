@@ -9,6 +9,7 @@
  */
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_artifact::artifact::build_artifact::BuildArtifact;
 use kuro_build_api::analysis::registry::AnalysisValueStorage;
 use kuro_build_api::analysis::registry::FrozenAnalysisValueStorage;
@@ -21,7 +22,6 @@ use kuro_core::deferred::dynamic::DynamicLambdaResultsKey;
 use kuro_core::deferred::key::DeferredHolderKey;
 use kuro_error::BuckErrorContext;
 use kuro_error::internal_error;
-use dupe::Dupe;
 use starlark::any::AnyLifetime;
 use starlark::any::ProvidesStaticType;
 use starlark::values::DynStarlark;

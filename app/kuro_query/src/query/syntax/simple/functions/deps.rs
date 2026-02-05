@@ -13,8 +13,8 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use async_trait::async_trait;
-use kuro_query_derive::query_module;
 use gazebo::variants::VariantName;
+use kuro_query_derive::query_module;
 
 use crate::query::environment::QueryEnvironment;
 use crate::query::environment::QueryTarget;

@@ -12,15 +12,15 @@ use std::borrow::Cow;
 use std::hash::Hash;
 
 use allocative::Allocative;
+use derive_more::Display;
+use dupe::Dupe;
+use gazebo::variants::UnpackVariants;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::bxl::BxlFilePath;
 use kuro_core::bzl::ImportPath;
 use kuro_core::cells::build_file_cell::BuildFileCell;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::cells::name::CellName;
-use derive_more::Display;
-use dupe::Dupe;
-use gazebo::variants::UnpackVariants;
 
 use crate::file_type::StarlarkFileType;
 use crate::paths::module::StarlarkModulePath;

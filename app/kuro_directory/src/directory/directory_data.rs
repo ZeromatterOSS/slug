@@ -11,10 +11,10 @@
 use std::marker::PhantomData;
 
 use allocative::Allocative;
-use kuro_core::directory_digest::DirectoryDigest;
-use kuro_fs::paths::file_name::FileNameBuf;
 use derivative::Derivative;
 use derive_more::Display;
+use kuro_core::directory_digest::DirectoryDigest;
+use kuro_fs::paths::file_name::FileNameBuf;
 use sorted_vector_map::SortedVectorMap;
 
 use crate::directory::directory_hasher::DirectoryDigester;

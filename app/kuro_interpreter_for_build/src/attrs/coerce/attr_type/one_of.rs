@@ -8,11 +8,11 @@
  * above-listed licenses.
  */
 
+use gazebo::prelude::SliceExt;
 use kuro_node::attrs::attr_type::one_of::OneOfAttrType;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::coercion_context::AttrCoercionContext;
 use kuro_node::attrs::configurable::AttrIsConfigurable;
-use gazebo::prelude::SliceExt;
 use starlark::values::Value;
 
 use crate::attrs::coerce::AttrTypeCoerce;

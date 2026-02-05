@@ -11,8 +11,8 @@
 use std::marker::PhantomData;
 use std::sync::OnceLock;
 
-use kuro_interpreter::types::provider::callable::ProviderCallableLike;
 use dupe::Dupe;
+use kuro_interpreter::types::provider::callable::ProviderCallableLike;
 use starlark::environment::GlobalsBuilder;
 use starlark::typing::Ty;
 use starlark::typing::TyStarlarkValue;

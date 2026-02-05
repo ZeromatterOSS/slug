@@ -15,8 +15,8 @@ use std::hash::Hash;
 use std::str;
 
 use allocative::Allocative;
-use kuro_data::ToProtoMessage;
 use dupe::Dupe;
+use kuro_data::ToProtoMessage;
 use pagable::Pagable;
 use serde::Serialize;
 use serde::Serializer;

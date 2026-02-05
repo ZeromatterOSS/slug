@@ -14,6 +14,9 @@ use std::fmt::Write;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
+use gazebo::prelude::*;
+use itertools::Itertools;
 use kuro_common::starlark_profiler::StarlarkProfileDataAndStatsDyn;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::bzl::ImportPath;
@@ -23,9 +26,6 @@ use kuro_core::pattern::pattern_type::PatternType;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_core::target::name::TargetName;
 use kuro_core::target::name::TargetNameRef;
-use dupe::Dupe;
-use gazebo::prelude::*;
-use itertools::Itertools;
 
 use crate::attrs::coerced_attr::CoercedAttr;
 use crate::attrs::inspect_options::AttrInspectOptions;

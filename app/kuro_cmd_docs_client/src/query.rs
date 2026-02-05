@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
 use kuro_client_ctx::common::BuckArgMatches;
 use kuro_client_ctx::exit_result::ExitResult;
@@ -15,7 +16,6 @@ use kuro_query::query::syntax::simple::functions::description::QUERY_ENVIRONMENT
 use kuro_query::query::syntax::simple::functions::description::QueryType;
 use kuro_query::query::syntax::simple::functions::docs::MarkdownOptions;
 use kuro_query::query::syntax::simple::functions::docs::QueryEnvironmentDescription;
-use dupe::Dupe;
 
 #[derive(Debug, Clone, Dupe, clap::ValueEnum)]
 #[clap(rename_all = "snake_case")]

@@ -12,18 +12,18 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use allocative::Allocative;
-use kuro_core::kuro_env;
+use compact_str::CompactString;
+use derive_more::Display;
+use dupe::Dupe;
+use gazebo::variants::VariantName;
 use kuro_core::cells::cell_path::CellPath;
+use kuro_core::kuro_env;
 use kuro_fs::fs_util;
 use kuro_fs::paths::RelativePath;
 use kuro_fs::paths::RelativePathBuf;
 use kuro_fs::paths::abs_path::AbsPath;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::file_name::FileNameBuf;
-use compact_str::CompactString;
-use derive_more::Display;
-use dupe::Dupe;
-use gazebo::variants::VariantName;
 use pagable::Pagable;
 
 use crate::cas_digest::CasDigest;

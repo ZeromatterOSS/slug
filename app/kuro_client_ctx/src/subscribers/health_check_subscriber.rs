@@ -95,13 +95,11 @@ impl HealthCheckSubscriber {
             SpanStart(start) => match &start.data {
                 Some(kuro_data::span_start_event::Data::Command(command)) => {
                     Some(HealthCheckEvent::HealthCheckContextEvent(
-                        HealthCheckContextEvent::CommandStart(
-                            kuro_data::CommandStartWithTraceId {
-                                trace_id: trace_id.map(|id| id.to_string()).unwrap_or_default(),
-                                command_start: Some(command.clone()),
-                                timestamp: Some(event.timestamp().into()),
-                            },
-                        ),
+                        HealthCheckContextEvent::CommandStart(kuro_data::CommandStartWithTraceId {
+                            trace_id: trace_id.map(|id| id.to_string()).unwrap_or_default(),
+                            command_start: Some(command.clone()),
+                            timestamp: Some(event.timestamp().into()),
+                        }),
                     ))
                 }
                 _ => None,
@@ -159,10 +157,9 @@ impl HealthCheckSubscriber {
                     }
                     Snapshot(_snapshot) => {
                         // Create a new HealthCheckSnapshotData from the snapshot
-                        let snapshot_data =
-                            kuro_health_check::interface::HealthCheckSnapshotData {
-                                timestamp: event.timestamp(),
-                            };
+                        let snapshot_data = kuro_health_check::interface::HealthCheckSnapshotData {
+                            timestamp: event.timestamp(),
+                        };
                         Some(HealthCheckEvent::Snapshot(snapshot_data))
                     }
                     _ => None,

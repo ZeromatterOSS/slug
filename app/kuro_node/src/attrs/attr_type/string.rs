@@ -12,8 +12,8 @@ use std::fmt;
 use std::ops::Deref;
 
 use allocative::Allocative;
-use kuro_util::arc_str::ArcStr;
 use dupe::Dupe;
+use kuro_util::arc_str::ArcStr;
 use pagable::Pagable;
 use serde::Serialize;
 use strong_hash::StrongHash;

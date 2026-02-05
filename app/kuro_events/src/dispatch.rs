@@ -24,6 +24,8 @@ use std::time::Duration;
 use std::time::Instant;
 use std::time::SystemTime;
 
+use dupe::Dupe;
+use futures::Future;
 use kuro_core::event::EventDispatch;
 use kuro_data::SpanEndEvent;
 use kuro_data::SpanStartEvent;
@@ -31,8 +33,6 @@ use kuro_data::buck_event;
 use kuro_data::span_end_event;
 use kuro_data::span_start_event;
 use kuro_wrapper_common::invocation_id::TraceId;
-use dupe::Dupe;
-use futures::Future;
 use pin_project::pin_project;
 use smallvec::SmallVec;
 

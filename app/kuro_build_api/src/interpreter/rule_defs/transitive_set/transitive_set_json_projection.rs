@@ -13,11 +13,11 @@ use std::fmt::Display;
 use std::iter;
 
 use allocative::Allocative;
-use kuro_error::BuckErrorContext;
 use display_container::display_pair;
 use display_container::fmt_container;
 use display_container::iter_display_chain;
 use dupe::Dupe;
+use kuro_error::BuckErrorContext;
 use starlark::any::ProvidesStaticType;
 use starlark::coerce::Coerce;
 use starlark::environment::Methods;
@@ -107,9 +107,7 @@ impl<'v, V: ValueLike<'v>> TransitiveSetJsonProjectionGen<V> {
 }
 
 impl<'v, V: ValueLike<'v>> TransitiveSetJsonProjectionGen<V> {
-    pub fn iter_values<'a>(
-        &'a self,
-    ) -> kuro_error::Result<Box<dyn Iterator<Item = Value<'v>> + 'a>>
+    pub fn iter_values<'a>(&'a self) -> kuro_error::Result<Box<dyn Iterator<Item = Value<'v>> + 'a>>
     where
         'v: 'a,
     {

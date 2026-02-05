@@ -10,6 +10,8 @@
 
 use std::fmt;
 
+use derive_more::From;
+use dupe::Dupe;
 use kuro_event_observer::what_ran::CommandReproducer;
 use kuro_event_observer::what_ran::WhatRanOptions;
 use kuro_event_observer::what_ran::WhatRanOptionsRegex;
@@ -17,8 +19,6 @@ use kuro_event_observer::what_ran::WhatRanOutputWriter;
 use kuro_event_observer::what_ran::WhatRanState;
 use kuro_event_observer::what_ran::emit_what_ran_entry;
 use kuro_events::span::SpanId;
-use derive_more::From;
-use dupe::Dupe;
 
 /// Presented with an event and its containing span, emit it to the output if it's relevant. The
 /// state is used to associate the parent with something meaningful. This does not take the parent

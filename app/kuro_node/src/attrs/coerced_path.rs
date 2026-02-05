@@ -11,9 +11,9 @@
 use std::iter;
 
 use allocative::Allocative;
+use either::Either;
 use kuro_core::package::package_relative_path::PackageRelativePath;
 use kuro_util::arc_str::ArcS;
-use either::Either;
 use pagable::Pagable;
 use static_assertions::assert_eq_size;
 use strong_hash::StrongHash;

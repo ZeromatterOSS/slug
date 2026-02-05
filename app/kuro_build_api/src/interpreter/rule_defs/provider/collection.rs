@@ -15,6 +15,9 @@ use std::mem;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use display_container::fmt_container;
+use dupe::Dupe;
+use either::Either;
 use kuro_core::provider::id::ProviderId;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::NonDefaultProvidersName;
@@ -23,9 +26,6 @@ use kuro_core::provider::label::ProvidersName;
 use kuro_error::BuckErrorContext;
 use kuro_interpreter::starlark_promise::StarlarkPromise;
 use kuro_interpreter::types::provider::callable::ValueAsProviderCallableLike;
-use display_container::fmt_container;
-use dupe::Dupe;
-use either::Either;
 use serde::Serialize;
 use serde::Serializer;
 use starlark::any::ProvidesStaticType;
@@ -419,13 +419,13 @@ where
     fn at(&self, index: Value<'v>, _heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         match self.get_impl(index, GetOp::At)? {
             Either::Left(v) => Ok(v),
-            Either::Right(provider_id) => Err(kuro_error::Error::from(
-                ProviderCollectionError::AtNotFound(
+            Either::Right(provider_id) => {
+                Err(kuro_error::Error::from(ProviderCollectionError::AtNotFound(
                     provider_id.name.clone(),
                     self.providers.keys().map(|k| k.name.clone()).collect(),
-                ),
-            )
-            .into()),
+                ))
+                .into())
+            }
         }
     }
 
@@ -675,8 +675,8 @@ impl<'f> FrozenProviderCollectionValueRef<'f> {
 }
 
 pub mod tester {
-    use kuro_interpreter::types::provider::callable::ValueAsProviderCallableLike;
     use dupe::Dupe;
+    use kuro_interpreter::types::provider::callable::ValueAsProviderCallableLike;
     use starlark::environment::GlobalsBuilder;
     use starlark::values::Value;
     use starlark::values::ValueLike;

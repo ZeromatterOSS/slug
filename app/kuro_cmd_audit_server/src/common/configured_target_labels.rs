@@ -8,12 +8,12 @@
  * above-listed licenses.
  */
 
+use dice::DiceComputations;
 use kuro_client_ctx::common::target_cfg::TargetCfgWithUniverseOptions;
 use kuro_core::pattern::pattern_type::ConfiguredTargetPatternExtra;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
 use kuro_server_ctx::pattern_parse_and_resolve::parse_and_resolve_patterns_to_targets_from_cli_args;
-use dice::DiceComputations;
 
 use crate::common::target_resolution_config::audit_command_target_resolution_config;
 

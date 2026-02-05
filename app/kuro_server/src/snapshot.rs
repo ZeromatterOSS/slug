@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
+use dupe::Dupe;
 use kuro_core::io_counters::IoCounterKey;
 use kuro_error::BuckErrorContext;
 use kuro_events::EventSinkStats;
@@ -21,7 +22,6 @@ use kuro_fs::fs_util::disk_space_stats;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
 use kuro_util::process_stats::process_stats;
 use kuro_util::system_stats::UnixSystemStats;
-use dupe::Dupe;
 
 use crate::cpu_usage_collector::CpuUsageCollector;
 use crate::daemon::state::DaemonStateData;

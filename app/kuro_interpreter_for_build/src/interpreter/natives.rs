@@ -102,9 +102,7 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
     /// BCR modules that use this function.
     ///
     /// See: https://bazel.build/rules/lib/globals/bzl#visibility
-    fn visibility<'v>(
-        #[starlark(require = pos)] _value: Value<'v>,
-    ) -> starlark::Result<NoneType> {
+    fn visibility<'v>(#[starlark(require = pos)] _value: Value<'v>) -> starlark::Result<NoneType> {
         // TODO(bzlmod): Implement .bzl file visibility enforcement.
         // Currently a no-op - Kuro doesn't enforce .bzl file visibility yet.
         // The value can be:
@@ -338,8 +336,7 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
     /// Currently a no-op stub that allows parsing.
     fn cc_toolchain_suite<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = NoneOr::None)]
-        _toolchains: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] _toolchains: NoneOr<Value<'v>>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         _visibility: UnpackListOrTuple<String>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
@@ -361,12 +358,9 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
     /// Currently a no-op stub that allows parsing.
     fn cc_toolchain<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = NoneOr::None)]
-        _all_files: NoneOr<Value<'v>>,
-        #[starlark(require = named, default = NoneOr::None)]
-        _toolchain_config: NoneOr<Value<'v>>,
-        #[starlark(require = named, default = NoneOr::None)]
-        _toolchain_identifier: NoneOr<&str>,
+        #[starlark(require = named, default = NoneOr::None)] _all_files: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] _toolchain_config: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] _toolchain_identifier: NoneOr<&str>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         _visibility: UnpackListOrTuple<String>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
@@ -428,9 +422,7 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
     /// The keys are rule names, and the values are dicts containing basic rule info.
     /// Note: Currently returns minimal information (name and kind). Full attribute
     /// introspection may be added in a future version.
-    fn existing_rules<'v>(
-        eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<Value<'v>> {
+    fn existing_rules<'v>(eval: &mut Evaluator<'v, '_, '_>) -> starlark::Result<Value<'v>> {
         let internals = ModuleInternals::from_context(eval, "native.existing_rules")?;
         let target_names = internals.get_target_names();
 
@@ -499,7 +491,6 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
 
         Ok(eval.heap().alloc_str(&resolved))
     }
-
 }
 
 /// Kuro's reported Bazel version for compatibility with modern rules.

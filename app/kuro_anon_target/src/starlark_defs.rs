@@ -13,6 +13,8 @@ use std::fmt::Debug;
 use std::fmt::Display;
 
 use allocative::Allocative;
+use dupe::Dupe;
+use gazebo::prelude::VecExt;
 use kuro_build_api::artifact_groups::promise::PromiseArtifact;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_promise_artifact::StarlarkPromiseArtifact;
 use kuro_build_api::interpreter::rule_defs::context::ANALYSIS_ACTIONS_METHODS_ANON_TARGET;
@@ -22,8 +24,6 @@ use kuro_interpreter::downstream_crate_starlark_defs::REGISTER_BUCK2_ANON_TARGET
 use kuro_interpreter::starlark_promise::StarlarkPromise;
 use kuro_interpreter_for_build::rule::FrozenArtifactPromiseMappings;
 use kuro_interpreter_for_build::rule::FrozenStarlarkRuleCallable;
-use dupe::Dupe;
-use gazebo::prelude::VecExt;
 use starlark::any::ProvidesStaticType;
 use starlark::codemap::FileSpan;
 use starlark::environment::GlobalsBuilder;

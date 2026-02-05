@@ -11,8 +11,8 @@
 use std::fmt::Display;
 
 use allocative::Allocative;
-use kuro_core::provider::label::ConfiguredProvidersLabel;
 use gazebo::variants::UnpackVariants;
+use kuro_core::provider::label::ConfiguredProvidersLabel;
 
 use crate::build::ConfiguredBuildTargetResult;
 #[derive(Clone, Debug, UnpackVariants, Allocative)]

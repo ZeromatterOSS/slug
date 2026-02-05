@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use dice::DiceTransaction;
 use kuro_cli_proto::new_generic::ExplainRequest;
 use kuro_cli_proto::new_generic::ExplainResponse;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
@@ -15,7 +16,6 @@ use kuro_server_ctx::partial_result_dispatcher::NoPartialResult;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use kuro_server_ctx::template::ServerCommandTemplate;
 use kuro_server_ctx::template::run_server_command;
-use dice::DiceTransaction;
 use tonic::async_trait;
 
 #[cfg(fbcode_build)]

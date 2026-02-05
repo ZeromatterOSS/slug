@@ -12,11 +12,11 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 use allocative::Allocative;
-use kuro_error::BuckErrorSerde;
-use kuro_util::hash::BuckHasher;
 use derive_more::Display;
 use dupe::Dupe;
 use equivalent::Equivalent;
+use kuro_error::BuckErrorSerde;
+use kuro_util::hash::BuckHasher;
 use pagable::Pagable;
 use serde::Deserialize;
 use serde::Serialize;

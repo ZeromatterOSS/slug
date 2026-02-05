@@ -178,11 +178,7 @@ pub(crate) async fn hard_kill_until(
     hard_kill_impl(pid, now, deadline.saturating_duration_since(now)).await
 }
 
-async fn hard_kill_impl(
-    pid: Pid,
-    start_at: Instant,
-    deadline: Duration,
-) -> kuro_error::Result<()> {
+async fn hard_kill_impl(pid: Pid, start_at: Instant, deadline: Duration) -> kuro_error::Result<()> {
     tracing::info!(
         "Killing PID {} with status {}",
         pid,

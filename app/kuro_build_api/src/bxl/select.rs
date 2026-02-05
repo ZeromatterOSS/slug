@@ -9,6 +9,10 @@
  */
 
 use allocative::Allocative;
+use derivative::Derivative;
+use derive_more::Display;
+use dupe::Dupe;
+use either::Either;
 use kuro_core::package::PackageLabel;
 use kuro_interpreter::types::configured_providers_label::StarlarkProvidersLabel;
 use kuro_node::attrs::coerced_attr::CoercedConcat;
@@ -18,10 +22,6 @@ use kuro_node::attrs::display::AttrDisplayWithContext;
 use kuro_node::attrs::fmt_context::AttrFmtContext;
 use kuro_node::attrs::serialize::AttrSerializeWithContext;
 use kuro_node::configuration::resolved::ConfigurationSettingKey;
-use derivative::Derivative;
-use derive_more::Display;
-use dupe::Dupe;
-use either::Either;
 use serde::Serialize;
 use starlark::__derive_refs::serde::Serializer;
 use starlark::any::ProvidesStaticType;

@@ -8,10 +8,10 @@
  * above-listed licenses.
  */
 
+use gazebo::prelude::*;
 use kuro_core::io_counters::IoCounterKey;
 use kuro_event_observer::humanized::HumanizedBytes;
 use kuro_event_observer::two_snapshots::TwoSnapshots;
-use gazebo::prelude::*;
 use superconsole::Component;
 use superconsole::Dimensions;
 use superconsole::DrawMode;

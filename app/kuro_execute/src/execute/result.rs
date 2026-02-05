@@ -16,15 +16,15 @@ use std::time::Duration;
 use std::time::SystemTime;
 
 use allocative::Allocative;
+use derivative::Derivative;
+use dupe::Dupe;
+use indexmap::IndexMap;
 use kuro_action_metadata_proto::RemoteDepFile;
 use kuro_build_signals::env::WaitingData;
 use kuro_core::content_hash::ContentBasedPathHash;
 use kuro_core::fs::artifact_path_resolver::ArtifactFs;
 use kuro_data::SchedulingMode;
 use kuro_util::time_span::TimeSpan;
-use derivative::Derivative;
-use dupe::Dupe;
-use indexmap::IndexMap;
 use remote_execution::TActionResult2;
 
 use crate::artifact_value::ArtifactValue;
@@ -316,9 +316,8 @@ impl CommandExecutionResult {
     pub fn resolve_outputs<'a>(
         &'a self,
         fs: &'a ArtifactFs,
-    ) -> impl Iterator<
-        Item = kuro_error::Result<(ResolvedCommandExecutionOutput, &'a ArtifactValue)>,
-    > + 'a {
+    ) -> impl Iterator<Item = kuro_error::Result<(ResolvedCommandExecutionOutput, &'a ArtifactValue)>> + 'a
+    {
         self.outputs.iter().map(|(output, value)| {
             Ok((
                 output.as_ref().resolve(

@@ -8,12 +8,12 @@
  * above-listed licenses.
  */
 
+use derive_more::Display;
+use dupe::Dupe;
 use kuro_common::file_ops::metadata::TrackedFileDigest;
 use kuro_directory::directory::entry::DirectoryEntry;
 use kuro_execute::directory::ActionSharedDirectory;
 use kuro_execute::output_size::OutputSize;
-use derive_more::Display;
-use dupe::Dupe;
 
 /// Fingerprint used to identify `ActionSharedDirectory`. We give it an explicit
 /// alias because `TrackedFileDigest` can look confusing.

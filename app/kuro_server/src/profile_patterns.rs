@@ -11,14 +11,14 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use dupe::Dupe;
+use itertools::Itertools;
 use kuro_error::internal_error;
 use kuro_fs::fs_util;
 use kuro_fs::paths::abs_path::AbsPathBuf;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use kuro_interpreter::factory::ProfileEventListener;
-use dupe::Dupe;
-use itertools::Itertools;
 
 pub(crate) struct FileWritingProfileEventListener {
     base_path: AbsPathBuf,

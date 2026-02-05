@@ -12,11 +12,11 @@ use std::iter;
 use std::sync::Arc;
 
 use allocative::Allocative;
-use kuro_core::bzl::ImportPath;
-use kuro_error::conversion::from_any_with_tag;
 use derivative::Derivative;
 use dupe::Dupe;
 use either::Either;
+use kuro_core::bzl::ImportPath;
+use kuro_error::conversion::from_any_with_tag;
 use starlark::codemap::FileSpan;
 use starlark::environment::FrozenModule;
 use starlark::eval::FileLoader;

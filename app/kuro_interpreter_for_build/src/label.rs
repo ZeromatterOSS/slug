@@ -48,10 +48,10 @@ pub mod testing {
                     providers.into_providers_label(package, target_name.as_ref())
                 }
                 _ => {
-                    return Err(
-                        kuro_error::Error::from(LabelCreatorError::ExpectedProvider(s.to_owned()))
-                            .into(),
-                    );
+                    return Err(kuro_error::Error::from(LabelCreatorError::ExpectedProvider(
+                        s.to_owned(),
+                    ))
+                    .into());
                 }
             };
             Ok(StarlarkConfiguredProvidersLabel::new(

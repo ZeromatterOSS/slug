@@ -14,6 +14,16 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use derive_more::Display;
+use dice::DiceComputations;
+use dice::DiceTrackedInvalidationPath;
+use dice::Key;
+use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
+use futures::FutureExt;
+use futures::future::BoxFuture;
+use futures::future::{self};
+use indexmap::IndexMap;
 use kuro_artifact::actions::key::ActionKey;
 use kuro_artifact::artifact::build_artifact::BuildArtifact;
 use kuro_build_signals::env::NodeDuration;
@@ -39,16 +49,6 @@ use kuro_interpreter::print_handler::EventDispatcherPrintHandler;
 use kuro_interpreter::soft_error::KuroStarlarkSoftErrorHandler;
 use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
 use kuro_util::time_span::TimeSpan;
-use derive_more::Display;
-use dice::DiceComputations;
-use dice::DiceTrackedInvalidationPath;
-use dice::Key;
-use dice_futures::cancellation::CancellationContext;
-use dupe::Dupe;
-use futures::FutureExt;
-use futures::future::BoxFuture;
-use futures::future::{self};
-use indexmap::IndexMap;
 use ref_cast::RefCast;
 use smallvec::SmallVec;
 use starlark::environment::Module;
@@ -703,13 +703,11 @@ async fn command_execution_report_to_proto(
             }
             .into()
         }
-        CommandExecutionStatus::Error { stage, error, .. } => {
-            kuro_data::command_execution::Error {
-                stage: (*stage).to_owned(),
-                error: format!("{error:#}"),
-            }
-            .into()
+        CommandExecutionStatus::Error { stage, error, .. } => kuro_data::command_execution::Error {
+            stage: (*stage).to_owned(),
+            error: format!("{error:#}"),
         }
+        .into(),
     };
 
     kuro_data::CommandExecution {

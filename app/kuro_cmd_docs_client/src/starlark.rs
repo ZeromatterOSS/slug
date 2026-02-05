@@ -9,6 +9,7 @@
  */
 
 use async_trait::async_trait;
+use dupe::Dupe;
 use kuro_cli_proto::new_generic::DocsOutputFormat;
 use kuro_cli_proto::new_generic::DocsRequest;
 use kuro_cli_proto::new_generic::DocsStarlarkRequest;
@@ -27,7 +28,6 @@ use kuro_client_ctx::streaming::StreamingCommand;
 use kuro_error::BuckErrorContext;
 use kuro_error::ErrorTag;
 use kuro_error::kuro_error;
-use dupe::Dupe;
 
 #[derive(Debug, Clone, Dupe, clap::ValueEnum)]
 #[clap(rename_all = "snake_case")]

@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::io::Write;
 
 use async_trait::async_trait;
+use gazebo::prelude::*;
 use kuro_cli_proto::ClientContext;
 use kuro_cmd_audit_client::config::AuditConfigCommand;
 use kuro_cmd_audit_client::config::LocationStyle;
@@ -29,7 +30,6 @@ use kuro_server_ctx::ctx::ServerCommandContextTrait;
 use kuro_server_ctx::ctx::ServerCommandDiceContext;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use kuro_server_ctx::stdout_partial_output::StdoutPartialOutput;
-use gazebo::prelude::*;
 use serde_json::json;
 
 use crate::ServerAuditSubcommand;

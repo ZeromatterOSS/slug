@@ -11,15 +11,15 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
+use dice::Key;
+use either::Either;
 use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
 use kuro_build_api::transition::TRANSITION_ATTRS_PROVIDER;
 use kuro_build_api::transition::TransitionAttrProvider;
 use kuro_core::configuration::transition::id::TransitionId;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_interpreter::load_module::InterpreterCalculation;
-use dice::DiceComputations;
-use dice::Key;
-use either::Either;
 use ref_cast::RefCast;
 use starlark::values::FrozenStringValue;
 use starlark::values::OwnedFrozenValueTyped;

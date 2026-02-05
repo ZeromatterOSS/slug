@@ -11,9 +11,9 @@
 use std::ffi::OsString;
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_error::kuro_error;
 use kuro_util::process::async_background_command;
-use dupe::Dupe;
 use tokio::sync::Mutex;
 
 use crate::certs;

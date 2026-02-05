@@ -8,14 +8,14 @@
  * above-listed licenses.
  */
 
+use dupe::OptionDupedExt;
+use indexmap::indexset;
 use kuro_build_api::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
 use kuro_build_api::interpreter::rule_defs::artifact::output_artifact_like::OutputArtifactArg;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::ValueAsInputArtifactLike;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
 use kuro_execute::execute::request::OutputType;
-use dupe::OptionDupedExt;
-use indexmap::indexset;
 use starlark::environment::MethodsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;

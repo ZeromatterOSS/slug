@@ -8,10 +8,10 @@
  * above-listed licenses.
  */
 
+use indoc::indoc;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
 use kuro_interpreter_for_build::interpreter::testing::expect_error;
 use kuro_interpreter_for_build::label::testing::label_creator;
-use indoc::indoc;
 
 #[test]
 fn labels_are_usable() -> kuro_error::Result<()> {

@@ -13,10 +13,10 @@ use std::sync::Arc;
 use std::sync::OnceLock;
 
 use allocative::Allocative;
-use kuro_build_api::artifact_groups::promise::PromiseArtifact;
-use kuro_build_api::artifact_groups::promise::PromiseArtifactId;
 use dupe::Dupe;
 use gazebo::prelude::SliceExt;
+use kuro_build_api::artifact_groups::promise::PromiseArtifact;
+use kuro_build_api::artifact_groups::promise::PromiseArtifactId;
 use starlark::codemap::FileSpan;
 use starlark::values::Trace;
 

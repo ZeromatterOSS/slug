@@ -9,10 +9,10 @@
  */
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_error::BuckErrorContext;
 use kuro_fs::paths::file_name::FileName;
 use kuro_util::arc_str::ArcS;
-use dupe::Dupe;
 
 /// The unique identifier for this action within dynamic actions.
 #[derive(

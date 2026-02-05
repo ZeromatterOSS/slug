@@ -11,9 +11,9 @@
 use std::hash::Hash;
 use std::hash::Hasher;
 
+use cmp_any::PartialEqAny;
 use kuro_node::call_stack::StarlarkCallStackImpl;
 use kuro_node::call_stack::StarlarkTargetCallStackRoot;
-use cmp_any::PartialEqAny;
 use starlark::eval::CallStack;
 
 // I can't implement a trait for a type that is not of this crate, so I wrap type here

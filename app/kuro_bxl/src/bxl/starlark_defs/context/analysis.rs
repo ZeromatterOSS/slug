@@ -8,14 +8,14 @@
  * above-listed licenses.
  */
 
-use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
-use kuro_core::configuration::compatibility::IncompatiblePlatformReason;
-use kuro_core::configuration::compatibility::MaybeCompatible;
-use kuro_core::provider::label::ConfiguredProvidersLabel;
 use dice::DiceComputations;
 use either::Either;
 use futures::FutureExt;
 use gazebo::prelude::*;
+use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
+use kuro_core::configuration::compatibility::IncompatiblePlatformReason;
+use kuro_core::configuration::compatibility::MaybeCompatible;
+use kuro_core::provider::label::ConfiguredProvidersLabel;
 
 use crate::bxl::starlark_defs::analysis_result::StarlarkAnalysisResult;
 use crate::bxl::starlark_defs::context::BxlContext;

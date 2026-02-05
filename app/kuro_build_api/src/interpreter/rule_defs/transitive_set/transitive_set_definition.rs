@@ -13,12 +13,12 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use derive_more::Display;
+use dupe::Dupe;
 use kuro_core::bzl::ImportPath;
 use kuro_error::BuckErrorContext;
 use kuro_interpreter::build_context::starlark_path_from_build_context;
 use kuro_interpreter::paths::path::StarlarkPath;
-use derive_more::Display;
-use dupe::Dupe;
 use serde::Serialize;
 use serde::Serializer;
 use starlark::any::ProvidesStaticType;

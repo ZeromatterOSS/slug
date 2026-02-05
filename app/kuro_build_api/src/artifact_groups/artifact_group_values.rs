@@ -13,6 +13,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_core::fs::artifact_path_resolver::ArtifactFs;
 use kuro_error::BuckErrorContext;
@@ -24,7 +25,6 @@ use kuro_execute::directory::ActionSharedDirectory;
 use kuro_execute::directory::INTERNER;
 use kuro_execute::directory::LazyActionDirectoryBuilder;
 use kuro_execute::directory::insert_artifact_lazy;
-use dupe::Dupe;
 use smallvec::SmallVec;
 use smallvec::smallvec;
 

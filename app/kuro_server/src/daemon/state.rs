@@ -16,6 +16,10 @@ use std::time::Duration;
 use std::time::Instant;
 
 use allocative::Allocative;
+use dupe::Dupe;
+use fbinit::FacebookInit;
+use gazebo::prelude::*;
+use gazebo::variants::VariantName;
 use kuro_build_api::spawner::BuckSpawner;
 use kuro_cli_proto::unstable_dice_dump_request::DiceDumpFormat;
 use kuro_common::cas_digest::DigestAlgorithm;
@@ -30,12 +34,12 @@ use kuro_common::legacy_configs::cells::BuckConfigBasedCells;
 use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_common::sqlite::sqlite_db::SqliteDb;
 use kuro_common::sqlite::sqlite_db::SqliteIdentity;
-use kuro_core::kuro_env;
 use kuro_core::cells::name::CellName;
 use kuro_core::facebook_only;
 use kuro_core::fs::project::ProjectRoot;
 use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
 use kuro_core::is_open_source;
+use kuro_core::kuro_env;
 use kuro_core::rollout_percentage::RolloutPercentage;
 use kuro_core::tag_result;
 use kuro_error::BuckErrorContext;
@@ -76,10 +80,6 @@ use kuro_resource_control::memory_tracker::MemoryTrackerHandle;
 use kuro_server_ctx::concurrency::ConcurrencyHandler;
 use kuro_server_ctx::ctx::LockedPreviousCommandData;
 use kuro_wrapper_common::invocation_id::TraceId;
-use dupe::Dupe;
-use fbinit::FacebookInit;
-use gazebo::prelude::*;
-use gazebo::variants::VariantName;
 use remote::ScribeConfig;
 use tokio::runtime::Handle;
 use tokio::sync::Mutex;
@@ -972,8 +972,8 @@ async fn http_client_from_startup_config(
 #[cfg(test)]
 mod tests {
 
-    use kuro_common::legacy_configs::configs::testing::parse;
     use indoc::indoc;
+    use kuro_common::legacy_configs::configs::testing::parse;
 
     use super::*;
 

@@ -11,8 +11,8 @@
 use std::fmt;
 use std::fmt::Display;
 
-use kuro_error::conversion::rusqlite::KuroErrorAsRusqliteError;
 use dupe::Dupe;
+use kuro_error::conversion::rusqlite::KuroErrorAsRusqliteError;
 use rusqlite::ToSql;
 use rusqlite::types::FromSql;
 use rusqlite::types::FromSqlError;

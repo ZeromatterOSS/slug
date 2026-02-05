@@ -8,13 +8,13 @@
  * above-listed licenses.
  */
 
+use dice::DiceComputations;
 use kuro_cli_proto::TargetCfg;
 use kuro_common::dice::cells::HasCellResolver;
 use kuro_core::cells::CellResolver;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
 use kuro_core::global_cfg_options::GlobalCfgOptions;
 use kuro_core::pattern::pattern::ParsedPattern;
-use dice::DiceComputations;
 
 use crate::ctx::ServerCommandContextTrait;
 

@@ -8,9 +8,9 @@
  * above-listed licenses.
  */
 
-use kuro_events::dispatch::EventDispatcher;
 use dice::DiceComputations;
 use dice::UserComputationData;
+use kuro_events::dispatch::EventDispatcher;
 
 pub trait HasEvents {
     fn get_dispatcher(&self) -> &EventDispatcher;

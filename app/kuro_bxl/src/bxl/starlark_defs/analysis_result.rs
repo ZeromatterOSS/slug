@@ -11,11 +11,11 @@
 use std::fmt;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_build_api::analysis::AnalysisResult;
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use kuro_build_api::interpreter::rule_defs::provider::dependency::Dependency;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
-use dupe::Dupe;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;

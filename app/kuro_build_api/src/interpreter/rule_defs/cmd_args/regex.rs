@@ -9,8 +9,8 @@
  */
 
 use allocative::Allocative;
-use kuro_interpreter::types::regex::StarlarkBuckRegex;
 use dupe::Dupe;
+use kuro_interpreter::types::regex::StarlarkBuckRegex;
 use regex::Regex;
 use serde::Serialize;
 use serde::Serializer;

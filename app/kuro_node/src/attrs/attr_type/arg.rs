@@ -11,15 +11,15 @@
 pub mod parser;
 
 use allocative::Allocative;
+use derive_more::Display;
+use dupe::Dupe;
+use gazebo::prelude::SliceExt;
 use kuro_core::package::PackageLabel;
 use kuro_core::package::source_path::SourcePathRef;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::provider::label::ProvidersLabelMaybeConfigured;
 use kuro_util::arc_str::ArcStr;
-use derive_more::Display;
-use dupe::Dupe;
-use gazebo::prelude::SliceExt;
 use pagable::Pagable;
 use static_assertions::assert_eq_size;
 use strong_hash::StrongHash;

@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use allocative::Allocative;
+use derive_more::Display;
 use kuro_core::execution_types::executor_config::CacheUploadBehavior;
 use kuro_core::execution_types::executor_config::CommandExecutorConfig;
 use kuro_core::execution_types::executor_config::CommandGenerationOptions;
@@ -31,7 +32,6 @@ use kuro_core::execution_types::executor_config::RemoteExecutorDependency;
 use kuro_core::execution_types::executor_config::RemoteExecutorOptions;
 use kuro_core::execution_types::executor_config::RemoteExecutorUseCase;
 use kuro_error::BuckErrorContext;
-use derive_more::Display;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::SmallMap;
 use starlark::environment::GlobalsBuilder;
@@ -352,10 +352,7 @@ pub fn parse_custom_re_image(
         return Ok(None);
     }
 
-    fn dict_ref<'v>(
-        field_name: &'static str,
-        value: Value<'v>,
-    ) -> kuro_error::Result<DictRef<'v>> {
+    fn dict_ref<'v>(field_name: &'static str, value: Value<'v>) -> kuro_error::Result<DictRef<'v>> {
         match DictRef::from_value(value) {
             Some(dict_ref) => Ok(dict_ref),
             None => Err(CommandExecutorConfigErrors::InvalidField(field_name).into()),

@@ -17,6 +17,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use cmp_any::PartialEqAny;
+use compact_str::CompactString;
+use dice::DiceComputations;
+use dupe::Dupe;
 use kuro_common::dice::data::HasIoProvider;
 use kuro_common::external_symlink::ExternalSymlink;
 use kuro_common::file_ops::delegate::FileOpsDelegate;
@@ -36,10 +40,6 @@ use kuro_core::fs::project::ProjectRoot;
 use kuro_execute::digest_config::DigestConfig;
 use kuro_execute::digest_config::HasDigestConfig;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use cmp_any::PartialEqAny;
-use compact_str::CompactString;
-use dice::DiceComputations;
-use dupe::Dupe;
 
 /// File operations delegate for local path cells.
 ///
@@ -96,18 +96,21 @@ impl FileOpsDelegate for LocalPathFileOpsDelegate {
         path: &'async_trait CellRelativePath,
     ) -> kuro_error::Result<ReadFileProxy> {
         let abs_path = self.resolve_path(path);
-        Ok(ReadFileProxy::new_with_captures(abs_path, |abs_path| async move {
-            match tokio::fs::read_to_string(&abs_path).await {
-                Ok(contents) => Ok(Some(contents)),
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-                Err(e) => Err(kuro_error::kuro_error!(
-                    kuro_error::ErrorTag::Environment,
-                    "Failed to read file {:?}: {}",
-                    abs_path,
-                    e
-                )),
-            }
-        }))
+        Ok(ReadFileProxy::new_with_captures(
+            abs_path,
+            |abs_path| async move {
+                match tokio::fs::read_to_string(&abs_path).await {
+                    Ok(contents) => Ok(Some(contents)),
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+                    Err(e) => Err(kuro_error::kuro_error!(
+                        kuro_error::ErrorTag::Environment,
+                        "Failed to read file {:?}: {}",
+                        abs_path,
+                        e
+                    )),
+                }
+            },
+        ))
     }
 
     async fn read_dir(
@@ -184,7 +187,7 @@ impl FileOpsDelegate for LocalPathFileOpsDelegate {
                     "Failed to get metadata for {:?}: {}",
                     abs_path,
                     e
-                ))
+                ));
             }
         };
 
@@ -221,10 +224,7 @@ impl FileOpsDelegate for LocalPathFileOpsDelegate {
                 )
             })?;
 
-            let source_config = self
-                .digest_config
-                .cas_digest_config()
-                .source_files_config();
+            let source_config = self.digest_config.cas_digest_config().source_files_config();
             let digest = TrackedFileDigest::from_content(&contents, source_config);
 
             #[cfg(unix)]
@@ -272,7 +272,9 @@ pub(crate) async fn materialize_all(
     setup: LocalPathCellSetup,
 ) -> kuro_error::Result<kuro_core::fs::project_rel_path::ProjectRelativePathBuf> {
     // Local path cells are already on the filesystem, so just return the path
-    Ok(kuro_core::fs::project_rel_path::ProjectRelativePathBuf::unchecked_new(
-        setup.path.to_string(),
-    ))
+    Ok(
+        kuro_core::fs::project_rel_path::ProjectRelativePathBuf::unchecked_new(
+            setup.path.to_string(),
+        ),
+    )
 }

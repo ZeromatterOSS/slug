@@ -12,11 +12,11 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::configuration::config_setting::ConfigSettingData;
 use kuro_core::configuration::pair::ConfigurationNoExec;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::label::label::TargetLabel;
-use dupe::Dupe;
 use pagable::Pagable;
 use starlark_map::unordered_map::UnorderedMap;
 

@@ -12,10 +12,6 @@
 
 use allocative::Allocative;
 use async_trait::async_trait;
-use kuro_core::cells::CellAliasResolver;
-use kuro_core::cells::CellResolver;
-use kuro_core::cells::name::CellName;
-use kuro_core::fs::project_rel_path::ProjectRelativePath;
 use derive_more::Display;
 use dice::CancellationContext;
 use dice::DiceComputations;
@@ -24,6 +20,10 @@ use dice::InjectedKey;
 use dice::InvalidationSourcePriority;
 use dice::Key;
 use dupe::Dupe;
+use kuro_core::cells::CellAliasResolver;
+use kuro_core::cells::CellResolver;
+use kuro_core::cells::name::CellName;
+use kuro_core::fs::project_rel_path::ProjectRelativePath;
 
 use crate::legacy_configs::cells::BuckConfigBasedCells;
 use crate::legacy_configs::dice::HasLegacyConfigs;

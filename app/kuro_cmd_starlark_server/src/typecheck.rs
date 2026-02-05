@@ -13,6 +13,8 @@ use std::io::Write;
 
 use async_recursion::async_recursion;
 use async_trait::async_trait;
+use dice::DiceTransaction;
+use dupe::Dupe;
 use kuro_cli_proto::ClientContext;
 use kuro_cmd_starlark_client::typecheck::StarlarkTypecheckCommand;
 use kuro_common::dice::cells::HasCellResolver;
@@ -30,8 +32,6 @@ use kuro_interpreter_for_build::interpreter::interpreter_for_dir::ParseData;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
 use kuro_server_ctx::ctx::ServerCommandDiceContext;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
-use dice::DiceTransaction;
-use dupe::Dupe;
 use starlark::environment::Globals;
 use starlark::typing::AstModuleTypecheck;
 use starlark::typing::Interface;

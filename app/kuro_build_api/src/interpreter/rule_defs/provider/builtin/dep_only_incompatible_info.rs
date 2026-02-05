@@ -9,6 +9,7 @@
  */
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_build_api_derive::internal_provider;
 use kuro_core::cells::CellAliasResolver;
 use kuro_core::cells::CellResolver;
@@ -18,7 +19,6 @@ use kuro_core::pattern::pattern::ParsedPattern;
 use kuro_core::pattern::pattern_type::TargetPatternExtra;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_util::arc_str::ArcStr;
-use dupe::Dupe;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::SmallMap;
 use starlark::environment::GlobalsBuilder;

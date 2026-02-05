@@ -11,9 +11,9 @@
 use std::collections::BTreeMap;
 
 use allocative::Allocative;
-use kuro_util::hash::BuckHasher;
 use derive_more::Display;
 use dupe::Dupe;
+use kuro_util::hash::BuckHasher;
 use pagable::Pagable;
 use pagable::PagableDeserialize;
 use pagable::PagableDeserializer;

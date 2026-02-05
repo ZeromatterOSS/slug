@@ -11,12 +11,12 @@
 use std::sync::Arc;
 use std::time::Instant;
 
+use dupe::Dupe;
+use fxhash::FxHashSet;
 use kuro_artifact::actions::key::ActionKey;
 use kuro_core::deferred::key::DeferredHolderKey;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_error::internal_error;
-use dupe::Dupe;
-use fxhash::FxHashSet;
 
 use crate::build::detailed_aggregated_metrics::FxMultiMap;
 use crate::build::detailed_aggregated_metrics::events::DetailedAggregatedMetricsEvent;

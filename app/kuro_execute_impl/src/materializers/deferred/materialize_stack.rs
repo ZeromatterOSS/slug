@@ -11,9 +11,9 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
 
-use kuro_core::fs::project_rel_path::ProjectRelativePath;
 use dupe::Dupe;
 use itertools::Itertools;
+use kuro_core::fs::project_rel_path::ProjectRelativePath;
 
 #[derive(Copy, Clone, Dupe)]
 pub(crate) enum MaterializeStack<'a> {

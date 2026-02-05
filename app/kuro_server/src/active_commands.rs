@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_event_observer::dice_state::DiceState;
 use kuro_event_observer::pending_estimate::pending_estimate;
 use kuro_event_observer::span_tracker;
@@ -21,7 +22,6 @@ use kuro_events::BuckEvent;
 use kuro_events::dispatch::EventDispatcher;
 use kuro_events::span::SpanId;
 use kuro_wrapper_common::invocation_id::TraceId;
-use dupe::Dupe;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use parking_lot::MutexGuard;
@@ -41,9 +41,7 @@ pub fn active_commands() -> MutexGuard<'static, HashMap<TraceId, ActiveCommandHa
 }
 
 /// Broadcasts an instant event, returns whether any subscribers were connected.
-pub fn broadcast_instant_event<E: Into<kuro_data::instant_event::Data> + Clone>(
-    event: &E,
-) -> bool {
+pub fn broadcast_instant_event<E: Into<kuro_data::instant_event::Data> + Clone>(event: &E) -> bool {
     let mut has_subscribers = false;
 
     for cmd in ACTIVE_COMMANDS.lock().values() {
@@ -258,10 +256,9 @@ impl ActiveCommand {
 
             // Notify other commands that they are concurrent with ours.
             for cmd in commands.values() {
-                cmd.dispatcher
-                    .instant_event(kuro_data::ConcurrentCommands {
-                        trace_ids: vec![trace_id.to_string()],
-                    });
+                cmd.dispatcher.instant_event(kuro_data::ConcurrentCommands {
+                    trace_ids: vec![trace_id.to_string()],
+                });
             }
         }
 

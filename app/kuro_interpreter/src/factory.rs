@@ -10,12 +10,12 @@
 
 use std::sync::Arc;
 
-use kuro_common::legacy_configs::dice::HasLegacyConfigs;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
-use kuro_error::conversion::from_any_with_tag;
 use dice::DiceComputations;
 use dice::UserComputationData;
 use dupe::Dupe;
+use kuro_common::legacy_configs::dice::HasLegacyConfigs;
+use kuro_common::legacy_configs::key::BuckconfigKeyRef;
+use kuro_error::conversion::from_any_with_tag;
 use starlark::environment::FrozenModule;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;

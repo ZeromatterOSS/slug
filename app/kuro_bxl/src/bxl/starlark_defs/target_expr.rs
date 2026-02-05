@@ -10,11 +10,11 @@
 
 use std::borrow::Cow;
 
+use dice::DiceComputations;
+use dupe::Dupe;
 use kuro_node::nodes::frontend::TargetGraphCalculation;
 use kuro_node::nodes::unconfigured::TargetNode;
 use kuro_query::query::environment::QueryTarget;
-use dice::DiceComputations;
-use dupe::Dupe;
 
 #[derive(Clone)]
 pub(crate) enum TargetExpr<'v, Node: QueryTarget> {

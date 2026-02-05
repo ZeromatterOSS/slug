@@ -161,8 +161,7 @@ pub(crate) async fn maybe_initialize_incremental_sqlite_db(
         // prevent futures invocations from potentially using stale entries
         io_executor
             .execute_io_inline(|| {
-                fs_util::remove_all(paths.incremental_state_path())
-                    .map_err(kuro_error::Error::from)
+                fs_util::remove_all(paths.incremental_state_path()).map_err(kuro_error::Error::from)
             })
             .await?;
         return Ok(IncrementalDbState::db_disabled());

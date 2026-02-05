@@ -8,10 +8,10 @@
  * above-listed licenses.
  */
 
+use indoc::indoc;
 use kuro_build_api::interpreter::rule_defs::provider::collection::tester::collection_creator;
 use kuro_build_api::interpreter::rule_defs::register_rule_defs;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
-use indoc::indoc;
 
 use crate::interpreter::rule_defs::artifact::testing::artifactory;
 use crate::interpreter::rule_defs::cmd_args::testing::command_line_stringifier;

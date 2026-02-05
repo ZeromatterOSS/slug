@@ -11,6 +11,7 @@
 use std::sync::Arc;
 use std::time::SystemTime;
 
+use fbinit::FacebookInit;
 use kuro_core::kuro_env;
 use kuro_data::ActionExecutionEnd;
 use kuro_data::InstantEvent;
@@ -19,7 +20,6 @@ use kuro_data::StructuredError;
 use kuro_error::ErrorTag;
 use kuro_error::conversion::from_any_with_tag;
 use kuro_util::truncate::truncate;
-use fbinit::FacebookInit;
 use prost::Message;
 pub use scribe_client::ScribeConfig;
 

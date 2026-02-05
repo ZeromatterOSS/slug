@@ -19,7 +19,8 @@ use kuro_interpreter_for_build::interpreter::testing::Tester;
 #[test]
 fn test_attr_display() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
-    tester.run_starlark_bzl_test(r#"
+    tester.run_starlark_bzl_test(
+        r#"
 def assert_eq(a, b):
     if a != b:
         fail(a + " != " + b)
@@ -33,7 +34,8 @@ assert_eq(repr(attr.string_list()), "attrs.list(attrs.string())")
 assert_eq(repr(attr.string_dict()), "attrs.dict(attrs.string(), attrs.string(), sorted=False)")
 
 def test(): pass
-"#)?;
+"#,
+    )?;
     Ok(())
 }
 
@@ -41,7 +43,8 @@ def test(): pass
 #[test]
 fn test_attr_module_registered() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
-    tester.run_starlark_bzl_test(r#"
+    tester.run_starlark_bzl_test(
+        r#"
 def test():
     # Verify the attr module (Bazel-style, singular) exists
     assert_eq(True, getattr(attr, "string") != None)
@@ -56,7 +59,8 @@ def test():
     assert_eq(True, getattr(attr, "label_keyed_string_dict") != None)
     assert_eq(True, getattr(attr, "output") != None)
     assert_eq(True, getattr(attr, "output_list") != None)
-"#)?;
+"#,
+    )?;
     Ok(())
 }
 
@@ -64,7 +68,8 @@ def test():
 #[test]
 fn test_attr_string() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
-    tester.run_starlark_bzl_test(r#"
+    tester.run_starlark_bzl_test(
+        r#"
 def test():
     # attr.string() should create a string attribute (shows as attrs.string internally)
     s = attr.string()
@@ -77,7 +82,8 @@ def test():
     # mandatory parameter is accepted but unused (Bazel compat)
     s3 = attr.string(mandatory = True)
     assert_eq("attrs.string()", repr(s3))
-"#)?;
+"#,
+    )?;
     Ok(())
 }
 
@@ -85,14 +91,16 @@ def test():
 #[test]
 fn test_attr_int() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
-    tester.run_starlark_bzl_test(r#"
+    tester.run_starlark_bzl_test(
+        r#"
 def test():
     i = attr.int()
     assert_eq("attrs.int()", repr(i))
 
     i2 = attr.int(default = 42)
     assert_eq("attrs.int(default=42)", repr(i2))
-"#)?;
+"#,
+    )?;
     Ok(())
 }
 
@@ -100,7 +108,8 @@ def test():
 #[test]
 fn test_attr_bool() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
-    tester.run_starlark_bzl_test(r#"
+    tester.run_starlark_bzl_test(
+        r#"
 def test():
     b = attr.bool()
     assert_eq("attrs.bool()", repr(b))
@@ -110,7 +119,8 @@ def test():
 
     b3 = attr.bool(default = False)
     assert_eq("attrs.bool(default=False)", repr(b3))
-"#)?;
+"#,
+    )?;
     Ok(())
 }
 
@@ -118,7 +128,8 @@ def test():
 #[test]
 fn test_attr_label() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
-    tester.run_starlark_bzl_test(r#"
+    tester.run_starlark_bzl_test(
+        r#"
 def test():
     # attr.label() creates a dependency attribute (shows as attrs.dep internally)
     l = attr.label()
@@ -127,7 +138,8 @@ def test():
     # With default (absolute target required)
     l2 = attr.label(default = "//foo:bar")
     assert_eq('attrs.dep(default="root//foo:bar")', repr(l2))
-"#)?;
+"#,
+    )?;
     Ok(())
 }
 
@@ -135,14 +147,16 @@ def test():
 #[test]
 fn test_attr_label_list() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
-    tester.run_starlark_bzl_test(r#"
+    tester.run_starlark_bzl_test(
+        r#"
 def test():
     ll = attr.label_list()
     assert_eq("attrs.list(attrs.dep())", repr(ll))
 
     ll2 = attr.label_list(default = [])
     assert_eq("attrs.list(attrs.dep(), default=[])", repr(ll2))
-"#)?;
+"#,
+    )?;
     Ok(())
 }
 
@@ -150,14 +164,16 @@ def test():
 #[test]
 fn test_attr_string_list() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
-    tester.run_starlark_bzl_test(r#"
+    tester.run_starlark_bzl_test(
+        r#"
 def test():
     sl = attr.string_list()
     assert_eq("attrs.list(attrs.string())", repr(sl))
 
     sl2 = attr.string_list(default = ["a", "b"])
     assert_eq('attrs.list(attrs.string(), default=["a", "b"])', repr(sl2))
-"#)?;
+"#,
+    )?;
     Ok(())
 }
 
@@ -165,14 +181,16 @@ def test():
 #[test]
 fn test_attr_int_list() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
-    tester.run_starlark_bzl_test(r#"
+    tester.run_starlark_bzl_test(
+        r#"
 def test():
     il = attr.int_list()
     assert_eq("attrs.list(attrs.int())", repr(il))
 
     il2 = attr.int_list(default = [1, 2, 3])
     assert_eq("attrs.list(attrs.int(), default=[1, 2, 3])", repr(il2))
-"#)?;
+"#,
+    )?;
     Ok(())
 }
 
@@ -195,11 +213,13 @@ def test():
 #[test]
 fn test_attr_string_list_dict() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
-    tester.run_starlark_bzl_test(r#"
+    tester.run_starlark_bzl_test(
+        r#"
 def test():
     sld = attr.string_list_dict()
     assert_eq("attrs.dict(attrs.string(), attrs.list(attrs.string()), sorted=False)", repr(sld))
-"#)?;
+"#,
+    )?;
     Ok(())
 }
 
@@ -207,12 +227,14 @@ def test():
 #[test]
 fn test_attr_output() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
-    tester.run_starlark_bzl_test(r#"
+    tester.run_starlark_bzl_test(
+        r#"
 def test():
     o = attr.output()
     # Output is implemented as string attr internally
     assert_eq("attrs.string()", repr(o))
-"#)?;
+"#,
+    )?;
     Ok(())
 }
 
@@ -220,11 +242,13 @@ def test():
 #[test]
 fn test_attr_output_list() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
-    tester.run_starlark_bzl_test(r#"
+    tester.run_starlark_bzl_test(
+        r#"
 def test():
     ol = attr.output_list()
     # Output list is implemented as list of strings internally
     assert_eq("attrs.list(attrs.string())", repr(ol))
-"#)?;
+"#,
+    )?;
     Ok(())
 }

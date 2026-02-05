@@ -11,10 +11,10 @@
 use std::borrow::Borrow;
 
 use allocative::Allocative;
-use kuro_core::plugins::PluginKind;
-use kuro_interpreter::plugins::PLUGIN_KIND_FROM_VALUE;
 use derive_more::Display;
 use dupe::Dupe;
+use kuro_core::plugins::PluginKind;
+use kuro_interpreter::plugins::PLUGIN_KIND_FROM_VALUE;
 use starlark::coerce::CoerceKey;
 use starlark::coerce::coerce;
 use starlark::starlark_complex_value;

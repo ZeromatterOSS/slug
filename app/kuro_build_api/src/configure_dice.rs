@@ -10,6 +10,8 @@
 
 use std::sync::Arc;
 
+use dice::DetectCycles;
+use dice::Dice;
 use kuro_common::dice::cells::SetCellResolver;
 use kuro_common::dice::data::SetIoProvider;
 use kuro_common::io::IoProvider;
@@ -19,8 +21,6 @@ use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_core::rollout_percentage::RolloutPercentage;
 use kuro_execute::digest_config::DigestConfig;
 use kuro_execute::digest_config::SetDigestConfig;
-use dice::DetectCycles;
-use dice::Dice;
 
 use crate::actions::execute::dice_data::SetInvalidationTrackingConfig;
 use crate::build::detailed_aggregated_metrics::dice::SetDetailedAggregatedMetricsEventHandler;

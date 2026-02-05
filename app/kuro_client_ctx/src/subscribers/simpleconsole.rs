@@ -19,6 +19,7 @@ use std::time::Instant;
 use std::time::SystemTime;
 
 use async_trait::async_trait;
+use dupe::Dupe;
 use kuro_error::conversion::from_any_with_tag;
 use kuro_event_observer::display;
 use kuro_event_observer::display::TargetDisplayOptions;
@@ -36,7 +37,6 @@ use kuro_events::BuckEvent;
 use kuro_health_check::interface::HealthCheckType;
 use kuro_health_check::report::DisplayReport;
 use kuro_wrapper_common::invocation_id::TraceId;
-use dupe::Dupe;
 use once_cell::sync::Lazy;
 use superconsole::DrawMode;
 use superconsole::SuperConsole;
@@ -97,10 +97,7 @@ macro_rules! echo {
 }
 
 // Report only if at least double time has passed since reporting interval
-fn echo_system_warning_exponential(
-    warning: &HealthCheckType,
-    msg: &str,
-) -> kuro_error::Result<()> {
+fn echo_system_warning_exponential(warning: &HealthCheckType, msg: &str) -> kuro_error::Result<()> {
     if let Some((last_reported, every_x)) =
         ELAPSED_HEALTH_CHECK_MAP.lock().unwrap().get_mut(warning)
     {
@@ -351,61 +348,59 @@ where
                     _ => Ok(()),
                 }
             }
-            kuro_event_observer::unpack_event::UnpackedBuckEvent::SpanEnd(_, _, data) => {
-                match data {
-                    kuro_data::span_end_event::Data::Command(command) => {
-                        self.handle_command_end(command, event).await
-                    }
-                    kuro_data::span_end_event::Data::ActionExecution(action) => {
-                        self.handle_action_execution_end(action, event).await
-                    }
-                    kuro_data::span_end_event::Data::FileWatcher(file_watcher) => {
-                        self.handle_file_watcher_end(file_watcher, event).await
-                    }
-                    _ => Ok(()),
+            kuro_event_observer::unpack_event::UnpackedBuckEvent::SpanEnd(_, _, data) => match data
+            {
+                kuro_data::span_end_event::Data::Command(command) => {
+                    self.handle_command_end(command, event).await
                 }
-            }
-            kuro_event_observer::unpack_event::UnpackedBuckEvent::Instant(_, _, data) => {
-                match data {
-                    kuro_data::instant_event::Data::ConsoleMessage(message) => {
-                        self.handle_stderr(&message.message).await
+                kuro_data::span_end_event::Data::ActionExecution(action) => {
+                    self.handle_action_execution_end(action, event).await
+                }
+                kuro_data::span_end_event::Data::FileWatcher(file_watcher) => {
+                    self.handle_file_watcher_end(file_watcher, event).await
+                }
+                _ => Ok(()),
+            },
+            kuro_event_observer::unpack_event::UnpackedBuckEvent::Instant(_, _, data) => match data
+            {
+                kuro_data::instant_event::Data::ConsoleMessage(message) => {
+                    self.handle_stderr(&message.message).await
+                }
+                kuro_data::instant_event::Data::ConsoleWarning(message) => {
+                    self.handle_stderr(&message.message).await
+                }
+                kuro_data::instant_event::Data::ReSession(session) => {
+                    let message = format!("RE Session: {}", session.session_id);
+                    self.handle_stderr(&message).await
+                }
+                kuro_data::instant_event::Data::StructuredError(err) => {
+                    self.handle_structured_error(err, event).await
+                }
+                kuro_data::instant_event::Data::TestDiscovery(discovery) => {
+                    self.handle_test_discovery(discovery, event).await
+                }
+                kuro_data::instant_event::Data::TestResult(result) => {
+                    self.handle_test_result(result, event).await
+                }
+                kuro_data::instant_event::Data::TagEvent(tags) => {
+                    if tags.tags.contains(&"which-dice:Legacy".to_owned()) {
+                        self.handle_stderr("Note: using deprecated legacy dice.")
+                            .await?;
                     }
-                    kuro_data::instant_event::Data::ConsoleWarning(message) => {
-                        self.handle_stderr(&message.message).await
-                    }
-                    kuro_data::instant_event::Data::ReSession(session) => {
-                        let message = format!("RE Session: {}", session.session_id);
-                        self.handle_stderr(&message).await
-                    }
-                    kuro_data::instant_event::Data::StructuredError(err) => {
-                        self.handle_structured_error(err, event).await
-                    }
-                    kuro_data::instant_event::Data::TestDiscovery(discovery) => {
-                        self.handle_test_discovery(discovery, event).await
-                    }
-                    kuro_data::instant_event::Data::TestResult(result) => {
-                        self.handle_test_result(result, event).await
-                    }
-                    kuro_data::instant_event::Data::TagEvent(tags) => {
-                        if tags.tags.contains(&"which-dice:Legacy".to_owned()) {
-                            self.handle_stderr("Note: using deprecated legacy dice.")
-                                .await?;
-                        }
 
-                        Ok(())
-                    }
-                    kuro_data::instant_event::Data::ActionError(error) => {
-                        self.handle_action_error(error).await
-                    }
-                    kuro_data::instant_event::Data::StreamingOutput(message) => {
-                        crate::stdio::print_bytes(message.message.as_bytes())?;
-                        crate::stdio::flush()?;
-                        self.notify_printed();
-                        Ok(())
-                    }
-                    _ => Ok(()),
+                    Ok(())
                 }
-            }
+                kuro_data::instant_event::Data::ActionError(error) => {
+                    self.handle_action_error(error).await
+                }
+                kuro_data::instant_event::Data::StreamingOutput(message) => {
+                    crate::stdio::print_bytes(message.message.as_bytes())?;
+                    crate::stdio::flush()?;
+                    self.notify_printed();
+                    Ok(())
+                }
+                _ => Ok(()),
+            },
             kuro_event_observer::unpack_event::UnpackedBuckEvent::UnrecognizedSpanStart(_, _)
             | kuro_event_observer::unpack_event::UnpackedBuckEvent::UnrecognizedSpanEnd(_, _)
             | kuro_event_observer::unpack_event::UnpackedBuckEvent::UnrecognizedInstant(_, _) => {

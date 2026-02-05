@@ -8,6 +8,10 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
+use fxhash::FxHashMap;
+use gazebo::prelude::*;
+use indoc::indoc;
 use kuro_analysis::attrs::resolve::configured_attr::ConfiguredAttrExt;
 use kuro_build_api::interpreter::rule_defs::cmd_args::DefaultCommandLineContext;
 use kuro_build_api::interpreter::rule_defs::cmd_args::value_as::ValueAsCommandLineLike;
@@ -41,10 +45,6 @@ use kuro_node::attrs::display::AttrDisplayWithContextExt;
 use kuro_node::attrs::fmt_context::AttrFmtContext;
 use kuro_node::attrs::testing::configuration_ctx;
 use kuro_node::provider_id_set::ProviderIdSet;
-use dupe::Dupe;
-use fxhash::FxHashMap;
-use gazebo::prelude::*;
-use indoc::indoc;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Module;
 use starlark::values::Heap;

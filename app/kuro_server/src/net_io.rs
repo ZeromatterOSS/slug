@@ -28,9 +28,9 @@ mod collector {
     use std::sync::Arc;
     use std::sync::Mutex;
 
+    use dupe::Dupe;
     use kuro_error::BuckErrorContext;
     use kuro_error::conversion::from_any_with_tag;
-    use dupe::Dupe;
     use psutil::network::NetIoCountersCollector;
 
     use super::*;
@@ -110,8 +110,8 @@ mod collector {
 mod collector {
     use std::collections::HashMap;
 
-    use kuro_util::os::win::network_interface_table::NetworkInterfaceTable;
     use dupe::Dupe;
+    use kuro_util::os::win::network_interface_table::NetworkInterfaceTable;
 
     use super::*;
 

@@ -8,13 +8,13 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
+use indoc::indoc;
 use kuro_core::configuration::data::ConfigurationData;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_interpreter::types::target_label::StarlarkConfiguredTargetLabel;
 use kuro_interpreter::types::target_label::StarlarkTargetLabel;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
-use dupe::Dupe;
-use indoc::indoc;
 
 #[test]
 fn test_with_sub_target() -> kuro_error::Result<()> {

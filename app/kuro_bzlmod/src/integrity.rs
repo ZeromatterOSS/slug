@@ -200,7 +200,10 @@ mod tests {
     fn test_parse_sha256() {
         let integrity = Integrity::parse(TEST_SHA256).unwrap();
         assert_eq!(integrity.algorithm, HashAlgorithm::Sha256);
-        assert_eq!(integrity.hash, "3/1gIbsr1bCvZ2KQgJ7DpTGR3YHH9wpLKGiKNiGCmG8=");
+        assert_eq!(
+            integrity.hash,
+            "3/1gIbsr1bCvZ2KQgJ7DpTGR3YHH9wpLKGiKNiGCmG8="
+        );
     }
 
     #[test]
@@ -229,7 +232,10 @@ mod tests {
     fn test_compute_sha256() {
         let integrity = Integrity::compute(HashAlgorithm::Sha256, TEST_DATA);
         assert_eq!(integrity.algorithm, HashAlgorithm::Sha256);
-        assert_eq!(integrity.hash, "3/1gIbsr1bCvZ2KQgJ7DpTGR3YHH9wpLKGiKNiGCmG8=");
+        assert_eq!(
+            integrity.hash,
+            "3/1gIbsr1bCvZ2KQgJ7DpTGR3YHH9wpLKGiKNiGCmG8="
+        );
     }
 
     #[test]

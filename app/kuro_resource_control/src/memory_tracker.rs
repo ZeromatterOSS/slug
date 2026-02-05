@@ -12,13 +12,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_common::init::ResourceControlConfig;
 use kuro_error::BuckErrorContext;
 use kuro_error::internal_error;
 use kuro_events::daemon_id::DaemonId;
 use kuro_events::dispatch::EventDispatcher;
 use kuro_util::threads::thread_spawn;
-use dupe::Dupe;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncSeekExt;
@@ -269,11 +269,10 @@ mod tests {
         assert_eq!(events[0].daemon_memory_current, 0);
         assert_eq!(events[0].daemon_swap_current, 0);
 
-        let assert_max_over =
-            |f: fn(&kuro_data::ResourceControlEvents) -> u64, val, name: &str| {
-                let max = events.iter().map(f).max().unwrap();
-                assert!(max > val, "{}: {} is not greater than {}", name, max, val);
-            };
+        let assert_max_over = |f: fn(&kuro_data::ResourceControlEvents) -> u64, val, name: &str| {
+            let max = events.iter().map(f).max().unwrap();
+            assert!(max > val, "{}: {} is not greater than {}", name, max, val);
+        };
 
         assert_max_over(
             |e| e.allprocs_memory_current,

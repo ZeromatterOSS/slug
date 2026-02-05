@@ -163,8 +163,11 @@ impl SourceFetcher {
                     }
 
                     // Extract
-                    return self
-                        .extract_archive(&data, dest_dir, source_info.strip_prefix.as_deref());
+                    return self.extract_archive(
+                        &data,
+                        dest_dir,
+                        source_info.strip_prefix.as_deref(),
+                    );
                 }
                 Err(e) => {
                     tracing::warn!("Failed to download from {}: {}", url, e);
@@ -266,9 +269,11 @@ impl SourceFetcher {
         })?;
 
         for i in 0..archive.len() {
-            let mut file = archive.by_index(i).map_err(|e| FetchError::ExtractionFailed {
-                reason: format!("Failed to read zip entry: {}", e),
-            })?;
+            let mut file = archive
+                .by_index(i)
+                .map_err(|e| FetchError::ExtractionFailed {
+                    reason: format!("Failed to read zip entry: {}", e),
+                })?;
 
             let file_path = match file.enclosed_name() {
                 Some(path) => path.to_owned(),
@@ -518,13 +523,15 @@ fn extract_tar_gz_impl(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::io::Write;
+
     use tempfile::TempDir;
 
+    use super::*;
+
     fn create_test_tar_gz(strip_prefix: Option<&str>) -> Vec<u8> {
-        use flate2::write::GzEncoder;
         use flate2::Compression;
+        use flate2::write::GzEncoder;
 
         let mut builder = tar::Builder::new(Vec::new());
 

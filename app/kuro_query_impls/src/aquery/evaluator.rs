@@ -11,13 +11,13 @@
 //! Implementation of the cli and query_* attr query language.
 use std::sync::Arc;
 
+use dice::LinearRecomputeDiceComputations;
+use dupe::Dupe;
 use kuro_build_api::actions::query::ActionQueryNode;
 use kuro_common::events::HasEvents;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
 use kuro_core::global_cfg_options::GlobalCfgOptions;
 use kuro_query::query::syntax::simple::eval::values::QueryEvaluationResult;
-use dice::LinearRecomputeDiceComputations;
-use dupe::Dupe;
 
 use crate::analysis::evaluator::eval_query;
 use crate::aquery::environment::AqueryDelegate;

@@ -12,6 +12,8 @@ use std::borrow::Cow;
 use std::fmt;
 use std::hash::Hash;
 
+use either::Either;
+use gazebo::cell::ARef;
 use kuro_core::content_hash::ContentBasedPathHash;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::fs::artifact_path_resolver::ArtifactFs;
@@ -23,8 +25,6 @@ use kuro_error::kuro_error;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use either::Either;
-use gazebo::cell::ARef;
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub struct ArtifactPath<'a> {

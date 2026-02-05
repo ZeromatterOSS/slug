@@ -10,16 +10,16 @@
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use dice::DiceComputations;
+use dice::Key;
+use dice_futures::cancellation::CancellationContext;
+use indoc::indoc;
 use kuro_error::BuckErrorContext;
 use kuro_error::starlark_error::from_starlark_with_options;
 use kuro_interpreter::dice::starlark_provider::StarlarkEvalKind;
 use kuro_interpreter::factory::BuckStarlarkModule;
 use kuro_interpreter::factory::StarlarkEvaluatorProvider;
 use kuro_interpreter::file_type::StarlarkFileType;
-use dice::DiceComputations;
-use dice::Key;
-use dice_futures::cancellation::CancellationContext;
-use indoc::indoc;
 use starlark::environment::Globals;
 use starlark::syntax::AstModule;
 

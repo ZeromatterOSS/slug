@@ -10,10 +10,10 @@
 
 #![cfg(test)]
 
+use indoc::indoc;
 use kuro_build_api::interpreter::rule_defs::provider::registration::register_builtin_providers;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
 use kuro_interpreter_for_build::label::testing::label_creator;
-use indoc::indoc;
 
 /// Test `equals` in generated code for providers.
 #[test]

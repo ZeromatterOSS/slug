@@ -11,6 +11,7 @@
 use std::borrow::Cow;
 use std::io::Write;
 
+use dice::DiceTransaction;
 use kuro_build_api::actions::artifact::get_artifact_fs::GetArtifactFs;
 use kuro_build_api::audit_dep_files::AUDIT_DEP_FILES;
 use kuro_core::category::Category;
@@ -22,7 +23,6 @@ use kuro_error::BuckErrorContext;
 use kuro_error::kuro_error;
 use kuro_execute::digest_config::HasDigestConfig;
 use kuro_execute::materialize::materializer::HasMaterializer;
-use dice::DiceTransaction;
 
 use crate::actions::impls::run::RunActionKey;
 use crate::actions::impls::run::dep_files::StoredFingerprints;

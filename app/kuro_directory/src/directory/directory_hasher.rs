@@ -12,10 +12,10 @@ use std::fmt::Debug;
 use std::hash::Hash;
 
 use allocative::Allocative;
-use kuro_core::directory_digest::DirectoryDigest;
-use kuro_fs::paths::file_name::FileName;
 use derive_more::Display;
 use dupe::Dupe;
+use kuro_core::directory_digest::DirectoryDigest;
+use kuro_fs::paths::file_name::FileName;
 
 use crate::directory::directory_ref::FingerprintedDirectoryRef;
 use crate::directory::entry::DirectoryEntry;

@@ -11,6 +11,7 @@
 #![feature(error_generic_member_access)]
 
 use async_trait::async_trait;
+use dice::DiceTransaction;
 use kuro_cli_proto::new_generic::DocsRequest;
 use kuro_cli_proto::new_generic::DocsResponse;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
@@ -20,7 +21,6 @@ use kuro_server_ctx::partial_result_dispatcher::NoPartialResult;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use kuro_server_ctx::template::ServerCommandTemplate;
 use kuro_server_ctx::template::run_server_command;
-use dice::DiceTransaction;
 
 use crate::builtins::docs_starlark_builtins;
 use crate::starlark_::docs_starlark;

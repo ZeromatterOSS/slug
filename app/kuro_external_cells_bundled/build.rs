@@ -42,7 +42,9 @@ fn imp() -> io::Result<()> {
     // Generate bazel_tools bundled files
     let bazel_tools_path = project_root.join("bazel_tools");
     assert!(
-        bazel_tools_path.join("tools/build_defs/repo/http.bzl").exists(),
+        bazel_tools_path
+            .join("tools/build_defs/repo/http.bzl")
+            .exists(),
         "bazel_tools/tools/build_defs/repo/http.bzl not found"
     );
     println!("cargo:rerun-if-changed={}", bazel_tools_path.display());

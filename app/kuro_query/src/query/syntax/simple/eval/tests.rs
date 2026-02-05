@@ -15,12 +15,12 @@
 use std::borrow::Cow;
 
 use async_trait::async_trait;
+use derive_more::Display;
+use dupe::Dupe;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::configuration::compatibility::MaybeCompatible;
 use kuro_query_parser::parse_expr;
-use derive_more::Display;
-use dupe::Dupe;
 
 use crate::query::environment::QueryEnvironment;
 use crate::query::environment::QueryTarget;

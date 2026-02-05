@@ -10,6 +10,8 @@
 
 use std::sync::Arc;
 
+use dupe::Dupe;
+use dupe::OptionDupedExt;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_node::attrs::coerced_deps_collector::CoercedDeps;
 use kuro_node::attrs::coerced_deps_collector::CoercedDepsCollector;
@@ -18,8 +20,6 @@ use kuro_node::call_stack::StarlarkCallStack;
 use kuro_node::nodes::unconfigured::TargetNode;
 use kuro_node::package::Package;
 use kuro_node::rule::Rule;
-use dupe::Dupe;
-use dupe::OptionDupedExt;
 use starlark::eval::CallStack;
 use starlark::eval::ParametersParser;
 use starlark::values::Value;

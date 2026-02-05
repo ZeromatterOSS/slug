@@ -8,9 +8,9 @@
  * above-listed licenses.
  */
 
+use indoc::indoc;
 use kuro_build_api::interpreter::rule_defs::provider::callable::register_provider;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
-use indoc::indoc;
 
 #[test]
 fn test_provider() -> kuro_error::Result<()> {

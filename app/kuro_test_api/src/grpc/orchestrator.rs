@@ -13,6 +13,11 @@ use std::task::Context;
 use std::task::Poll;
 use std::time::Duration;
 
+use dupe::Dupe;
+use futures::future::BoxFuture;
+use futures::future::FutureExt;
+use gazebo::prelude::VecExt;
+use host_sharing::HostSharingRequirements;
 use kuro_downward_api::DownwardApi;
 use kuro_downward_api_proto::ConsoleRequest;
 use kuro_downward_api_proto::ExternalEventRequest;
@@ -37,11 +42,6 @@ use kuro_test_proto::ReportTestsDiscoveredRequest;
 use kuro_test_proto::Testing;
 use kuro_test_proto::test_orchestrator_client;
 use kuro_test_proto::test_orchestrator_server;
-use dupe::Dupe;
-use futures::future::BoxFuture;
-use futures::future::FutureExt;
-use gazebo::prelude::VecExt;
-use host_sharing::HostSharingRequirements;
 use sorted_vector_map::SortedVectorMap;
 use tokio::io::AsyncRead;
 use tokio::io::AsyncWrite;
@@ -347,12 +347,10 @@ where
                 .buck_error_context("Execution failed")?;
 
             let response = match response {
-                ExecuteResponse::Result(r) => {
-                    kuro_test_proto::execute_response2::Response::Result(
-                        r.try_into()
-                            .buck_error_context("Failed to serialize result")?,
-                    )
-                }
+                ExecuteResponse::Result(r) => kuro_test_proto::execute_response2::Response::Result(
+                    r.try_into()
+                        .buck_error_context("Failed to serialize result")?,
+                ),
                 ExecuteResponse::Cancelled(reason) => {
                     let reason = if let Some(reason) = reason {
                         match reason {

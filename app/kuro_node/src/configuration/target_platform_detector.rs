@@ -80,9 +80,7 @@ impl TargetPlatformDetector {
                                 cell_resolver,
                                 cell_alias_resolver,
                             )? {
-                                kuro_core::pattern::pattern::ParsedPattern::Recursive(root) => {
-                                    root
-                                }
+                                kuro_core::pattern::pattern::ParsedPattern::Recursive(root) => root,
                                 _ => {
                                     return Err(
                                         DetectorSpecParseError::TargetKindRequiresRecursivePattern(

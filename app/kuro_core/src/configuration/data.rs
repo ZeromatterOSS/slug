@@ -13,11 +13,11 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 use allocative::Allocative;
+use dupe::Dupe;
+use equivalent::Equivalent;
 use kuro_data::ToProtoMessage;
 use kuro_util::hash::BuckHasher;
 use kuro_util::strong_hasher::Blake3StrongHasher;
-use dupe::Dupe;
-use equivalent::Equivalent;
 use once_cell::sync::Lazy;
 use pagable::Pagable;
 use serde::Serialize;

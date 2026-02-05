@@ -120,19 +120,19 @@ impl ExtensionCellDefinitions {
 ///
 /// # Returns
 /// Cell definitions ready to be passed to `CellsAggregator`.
-pub fn build_extension_cells(result: &ModuleExtensionResult) -> kuro_error::Result<ExtensionCellDefinitions> {
+pub fn build_extension_cells(
+    result: &ModuleExtensionResult,
+) -> kuro_error::Result<ExtensionCellDefinitions> {
     let mut defs = ExtensionCellDefinitions::new();
 
     for (internal_name, repo_spec) in &result.generated_repo_specs {
-        let canonical = result
-            .canonical_name(internal_name)
-            .ok_or_else(|| {
-                kuro_error::kuro_error!(
-                    kuro_error::ErrorTag::Input,
-                    "Missing canonical name for repo '{}'",
-                    internal_name
-                )
-            })?;
+        let canonical = result.canonical_name(internal_name).ok_or_else(|| {
+            kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "Missing canonical name for repo '{}'",
+                internal_name
+            )
+        })?;
 
         // Path: bazel-external/{canonical_name}
         let path = format!("bazel-external/{}", canonical);
@@ -333,8 +333,9 @@ pub fn parse_canonical_name(canonical: &str) -> Option<(&str, &str, &str)> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::sync::Arc;
+
+    use super::*;
     use crate::repo_spec::RepoSpec;
     use crate::repository_invocations::AttrValue;
 
@@ -367,7 +368,11 @@ mod tests {
         assert_eq!(defs.alias_count(), 0); // No aliases from this function
 
         // Check cell names are canonical
-        let cell_names: Vec<_> = defs.cells.iter().map(|c| c.canonical_name.as_str()).collect();
+        let cell_names: Vec<_> = defs
+            .cells
+            .iter()
+            .map(|c| c.canonical_name.as_str())
+            .collect();
         assert!(cell_names.contains(&"_main~pip~numpy"));
         assert!(cell_names.contains(&"_main~pip~requests"));
 
@@ -387,9 +392,11 @@ mod tests {
         let result = make_test_result();
 
         // use_repo(pip, "numpy", "requests")
-        let use_repos = vec![UseRepo::new()
-            .add_repo("numpy".to_owned())
-            .add_repo("requests".to_owned())];
+        let use_repos = vec![
+            UseRepo::new()
+                .add_repo("numpy".to_owned())
+                .add_repo("requests".to_owned()),
+        ];
 
         let aliases = build_use_repo_aliases(&result, &use_repos).unwrap();
 
@@ -435,9 +442,11 @@ mod tests {
     #[test]
     fn test_build_extension_cell_definitions() {
         let result = make_test_result();
-        let use_repos = vec![UseRepo::new()
-            .add_repo("numpy".to_owned())
-            .add_mapping("req".to_owned(), "requests".to_owned())];
+        let use_repos = vec![
+            UseRepo::new()
+                .add_repo("numpy".to_owned())
+                .add_mapping("req".to_owned(), "requests".to_owned()),
+        ];
 
         let defs = build_extension_cell_definitions(&result, &use_repos).unwrap();
 
@@ -492,17 +501,15 @@ mod tests {
 
     #[test]
     fn test_extract_use_repos_for_extension() {
-        let mut usage1 = ExtensionUsage::new(
-            "@rules_python//pip.bzl".to_owned(),
-            "pip".to_owned(),
-        );
-        usage1.imports.push(UseRepo::new().add_repo("numpy".to_owned()));
+        let mut usage1 = ExtensionUsage::new("@rules_python//pip.bzl".to_owned(), "pip".to_owned());
+        usage1
+            .imports
+            .push(UseRepo::new().add_repo("numpy".to_owned()));
 
-        let mut usage2 = ExtensionUsage::new(
-            "@rules_go//go.bzl".to_owned(),
-            "go_deps".to_owned(),
-        );
-        usage2.imports.push(UseRepo::new().add_repo("gazelle".to_owned()));
+        let mut usage2 = ExtensionUsage::new("@rules_go//go.bzl".to_owned(), "go_deps".to_owned());
+        usage2
+            .imports
+            .push(UseRepo::new().add_repo("gazelle".to_owned()));
 
         let usages = vec![usage1, usage2];
 
@@ -521,7 +528,11 @@ mod tests {
         let defs = build_extension_cells(&result).unwrap();
 
         // Find numpy cell
-        let numpy_cell = defs.cells.iter().find(|c| c.internal_name == "numpy").unwrap();
+        let numpy_cell = defs
+            .cells
+            .iter()
+            .find(|c| c.internal_name == "numpy")
+            .unwrap();
         assert_eq!(numpy_cell.canonical_name, "_main~pip~numpy");
         assert_eq!(numpy_cell.extension_id, "@@rules_python//pip:pip.bzl%pip");
         assert_eq!(numpy_cell.internal_name, "numpy");
@@ -530,7 +541,10 @@ mod tests {
 
         // Verify repo_spec_json is valid JSON and can be deserialized
         let deserialized: RepoSpec = serde_json::from_str(&numpy_cell.repo_spec_json).unwrap();
-        assert_eq!(deserialized.repo_rule_id, "@@rules_python//pip:pip.bzl%pip_install");
+        assert_eq!(
+            deserialized.repo_rule_id,
+            "@@rules_python//pip:pip.bzl%pip_install"
+        );
         assert!(deserialized.attributes.contains_key("version"));
     }
 }

@@ -12,8 +12,8 @@ use std::slice;
 use std::sync::Arc;
 
 use allocative::Allocative;
-use kuro_core::provider::id::ProviderId;
 use dupe::Dupe;
+use kuro_core::provider::id::ProviderId;
 use pagable::Pagable;
 use strong_hash::StrongHash;
 

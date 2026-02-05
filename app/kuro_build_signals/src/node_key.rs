@@ -14,9 +14,9 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
 
-use kuro_util::hash::BuckHasher;
 use cmp_any::PartialEqAny;
 use dupe::Dupe;
+use kuro_util::hash::BuckHasher;
 
 /// `Display` should not include type name (like `dice::Key`).
 pub trait BuildSignalsNodeKeyImpl:

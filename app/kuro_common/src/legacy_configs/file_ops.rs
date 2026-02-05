@@ -11,6 +11,10 @@
 use std::io::BufRead;
 
 use allocative::Allocative;
+use dice::DiceComputations;
+use dupe::Dupe;
+use futures::FutureExt;
+use futures::future::BoxFuture;
 use kuro_core::cells::CellResolver;
 use kuro_core::fs::project::ProjectRoot;
 use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
@@ -21,10 +25,6 @@ use kuro_fs::paths::RelativePath;
 use kuro_fs::paths::abs_path::AbsPathBuf;
 use kuro_fs::paths::file_name::FileNameBuf;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
-use dice::DiceComputations;
-use dupe::Dupe;
-use futures::FutureExt;
-use futures::future::BoxFuture;
 
 use crate::file_ops::dice::DiceFileComputations;
 use crate::file_ops::metadata::FileType;
@@ -46,10 +46,7 @@ impl ConfigPath {
         }
     }
 
-    pub(crate) fn join_to_parent_normalized(
-        &self,
-        rel: &RelativePath,
-    ) -> kuro_error::Result<Self> {
+    pub(crate) fn join_to_parent_normalized(&self, rel: &RelativePath) -> kuro_error::Result<Self> {
         match self {
             ConfigPath::Project(path) => Ok(path
                 .parent()

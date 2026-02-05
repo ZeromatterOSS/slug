@@ -10,13 +10,13 @@
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use derive_more::Display;
+use dice::DiceComputations;
+use dupe::Dupe;
 use kuro_core::cells::name::CellName;
 use kuro_core::configuration::data::ConfigurationData;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_util::late_binding::LateBinding;
-use derive_more::Display;
-use dice::DiceComputations;
-use dupe::Dupe;
 
 #[async_trait]
 pub trait ConfigurationCalculationDyn: Send + Sync + 'static {

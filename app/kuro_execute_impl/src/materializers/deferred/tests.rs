@@ -96,6 +96,9 @@ mod state_machine {
     use std::thread;
 
     use assert_matches::assert_matches;
+    use futures::StreamExt;
+    use futures::future::BoxFuture;
+    use futures::future::FutureExt;
     use kuro_common::file_ops::metadata::Symlink;
     use kuro_core::fs::project::ProjectRootTemp;
     use kuro_error::BuckErrorContext;
@@ -113,9 +116,6 @@ mod state_machine {
     use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
     use kuro_util::threads::ignore_stack_overflow_checks_for_future;
     use kuro_wrapper_common::invocation_id::TraceId;
-    use futures::StreamExt;
-    use futures::future::BoxFuture;
-    use futures::future::FutureExt;
     use tokio::time::Duration as TokioDuration;
     use tokio::time::sleep;
 

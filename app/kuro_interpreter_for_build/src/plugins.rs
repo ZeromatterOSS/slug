@@ -11,12 +11,12 @@
 use std::cell::RefCell;
 
 use allocative::Allocative;
-use kuro_core::cells::cell_path::CellPath;
-use kuro_core::plugins::PluginKind;
-use kuro_interpreter::plugins::PLUGIN_KIND_FROM_VALUE;
 use derive_more::Display;
 use dupe::Dupe;
 use either::Either;
+use kuro_core::cells::cell_path::CellPath;
+use kuro_core::plugins::PluginKind;
+use kuro_interpreter::plugins::PLUGIN_KIND_FROM_VALUE;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;

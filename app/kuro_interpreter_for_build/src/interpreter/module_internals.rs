@@ -15,6 +15,7 @@ use std::fmt::Debug;
 use std::mem;
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_common::package_listing::listing::PackageListing;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::bzl::ImportPath;
@@ -30,7 +31,6 @@ use kuro_node::oncall::Oncall;
 use kuro_node::package::Package;
 use kuro_node::super_package::SuperPackage;
 use kuro_node::visibility::VisibilitySpecification;
-use dupe::Dupe;
 use starlark::environment::FrozenModule;
 use starlark::values::OwnedFrozenValue;
 

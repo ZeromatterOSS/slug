@@ -12,10 +12,10 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
-use kuro_core::fs::artifact_path_resolver::ArtifactFs;
-use kuro_util::time_span::TimeSpan;
 use dice_futures::cancellation::CancellationContext;
 use indexmap::IndexMap;
+use kuro_core::fs::artifact_path_resolver::ArtifactFs;
+use kuro_util::time_span::TimeSpan;
 use sorted_vector_map::SortedVectorMap;
 
 use crate::artifact_value::ArtifactValue;

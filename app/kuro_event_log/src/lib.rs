@@ -15,8 +15,8 @@ use std::io;
 use std::process;
 use std::time::Duration;
 
-use kuro_core::kuro_env;
 use kuro_core::ci::is_ci;
+use kuro_core::kuro_env;
 use kuro_error::BuckErrorContext;
 use tokio::process::Child;
 use tokio::task::JoinHandle;

@@ -11,6 +11,8 @@
 use std::borrow::Cow;
 use std::fmt::Debug;
 
+use fxhash::FxHashMap;
+use indexmap::IndexSet;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::artifact_type::DeclaredArtifact;
 use kuro_artifact::artifact::artifact_type::OutputArtifact;
@@ -28,8 +30,6 @@ use kuro_interpreter::types::cell_root::CellRoot;
 use kuro_interpreter::types::configured_providers_label::StarlarkConfiguredProvidersLabel;
 use kuro_interpreter::types::project_root::StarlarkProjectRoot;
 use kuro_interpreter::types::target_label::StarlarkTargetLabel;
-use fxhash::FxHashMap;
-use indexmap::IndexSet;
 use starlark::any::ProvidesStaticType;
 use starlark::typing::Ty;
 use starlark::values::string::StarlarkStr;

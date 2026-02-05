@@ -11,6 +11,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::configuration::compatibility::MaybeCompatible;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
@@ -34,7 +35,6 @@ use kuro_query::query::syntax::simple::functions::HasModuleDescription;
 use kuro_query::query::syntax::simple::functions::docs::QueryEnvironmentDescription;
 use kuro_query::query::traversal::async_depth_first_postorder_traversal;
 use kuro_query::query::traversal::async_depth_limited_traversal;
-use dice::DiceComputations;
 use tracing::warn;
 
 use crate::uquery::environment::QueryLiterals;
@@ -121,10 +121,7 @@ impl<'c> CqueryEnvironment<'c> {
 impl QueryEnvironment for CqueryEnvironment<'_> {
     type Target = ConfiguredTargetNode;
 
-    async fn get_node(
-        &self,
-        node_ref: &ConfiguredTargetLabel,
-    ) -> kuro_error::Result<Self::Target> {
+    async fn get_node(&self, node_ref: &ConfiguredTargetLabel) -> kuro_error::Result<Self::Target> {
         CqueryEnvironment::get_node(self, node_ref).await
     }
 

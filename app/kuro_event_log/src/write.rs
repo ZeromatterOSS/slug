@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 use std::time::SystemTime;
 
+use futures::future::Future;
 use kuro_cli_proto::*;
 use kuro_common::argv::SanitizedArgv;
 use kuro_error::BuckErrorContext;
@@ -22,7 +23,6 @@ use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
 use kuro_fs::paths::abs_path::AbsPathBuf;
 use kuro_fs::working_dir::AbsWorkingDir;
 use kuro_wrapper_common::invocation_id::TraceId;
-use futures::future::Future;
 use prost::Message;
 use serde::Serialize;
 use tokio::fs::OpenOptions;
@@ -452,12 +452,12 @@ impl SerializeForLog for StreamValueForWrite<'_> {
 mod tests {
     use std::time::SystemTime;
 
+    use futures::TryStreamExt;
     use kuro_common::argv::Argv;
     use kuro_common::argv::ExpandedArgv;
     use kuro_data::LoadBuildFileStart;
     use kuro_data::SpanStartEvent;
     use kuro_events::span::SpanId;
-    use futures::TryStreamExt;
     use tempfile::TempDir;
 
     use super::*;

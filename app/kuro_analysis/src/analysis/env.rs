@@ -11,6 +11,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use dice::CancellationContext;
+use dice::DiceComputations;
+use dupe::Dupe;
+use futures::Future;
 use kuro_build_api::analysis::AnalysisResult;
 use kuro_build_api::analysis::anon_promises_dyn::RunAnonPromisesAccessorPair;
 use kuro_build_api::analysis::registry::AnalysisRegistry;
@@ -42,10 +46,6 @@ use kuro_interpreter::types::rule::FROZEN_PROMISE_ARTIFACT_MAPPINGS_GET_IMPL;
 use kuro_interpreter::types::rule::FROZEN_RULE_GET_IMPL;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
 use kuro_node::rule_type::StarlarkRuleType;
-use dice::CancellationContext;
-use dice::DiceComputations;
-use dupe::Dupe;
-use futures::Future;
 use starlark::environment::FrozenModule;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;

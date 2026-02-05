@@ -10,6 +10,7 @@
 
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_artifact::actions::key::ActionKey;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::artifact_type::OutputArtifact;
@@ -17,7 +18,6 @@ use kuro_core::deferred::key::DeferredHolderKey;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_error::internal_error;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
-use dupe::Dupe;
 use starlark::values::FrozenValueTyped;
 use starlark::values::OwnedFrozenValueTyped;
 

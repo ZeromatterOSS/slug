@@ -16,14 +16,14 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dice_futures::cancellation::CancellationContext;
+use dice_futures::cancellation::CancellationObserver;
+use dupe::Dupe;
 use kuro_core::configuration::transition::id::TransitionId;
 use kuro_core::package::PackageLabel;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use kuro_util::arc_str::ThinArcStr;
-use dice_futures::cancellation::CancellationContext;
-use dice_futures::cancellation::CancellationObserver;
-use dupe::Dupe;
 
 use crate::paths::module::OwnedStarlarkModulePath;
 

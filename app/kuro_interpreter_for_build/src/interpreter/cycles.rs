@@ -10,12 +10,12 @@
 
 use std::sync::Arc;
 
-use kuro_common::dice::cycles::CycleAdapterDescriptor;
-use kuro_interpreter::paths::module::OwnedStarlarkModulePath;
-use kuro_util::cycle_detector::CycleDescriptor;
 use derive_more::Display;
 use dice::DynKey;
 use gazebo::prelude::VecExt;
+use kuro_common::dice::cycles::CycleAdapterDescriptor;
+use kuro_interpreter::paths::module::OwnedStarlarkModulePath;
+use kuro_util::cycle_detector::CycleDescriptor;
 
 use crate::interpreter::dice_calculation_delegate::testing::EvalImportKey;
 

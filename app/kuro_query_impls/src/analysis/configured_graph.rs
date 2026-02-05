@@ -14,12 +14,6 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
-use kuro_artifact::artifact::artifact_type::Artifact;
-use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
-use kuro_node::nodes::configured::ConfiguredTargetNode;
-use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
-use kuro_node::nodes::configured_ref::ConfiguredGraphNodeRef;
-use kuro_query::query::syntax::simple::eval::set::TargetSet;
 use derive_more::Display;
 use dice::DiceComputations;
 use dice::Key;
@@ -30,6 +24,12 @@ use dupe::IterDupedExt;
 use dupe::OptionDupedExt;
 use futures::FutureExt;
 use indexmap::IndexMap;
+use kuro_artifact::artifact::artifact_type::Artifact;
+use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
+use kuro_node::nodes::configured::ConfiguredTargetNode;
+use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
+use kuro_node::nodes::configured_ref::ConfiguredGraphNodeRef;
+use kuro_query::query::syntax::simple::eval::set::TargetSet;
 
 use crate::analysis::environment::ConfiguredGraphQueryEnvironmentDelegate;
 use crate::analysis::environment::get_from_template_placeholder_info;

@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
 use kuro_core::cells::name::CellName;
 use kuro_core::cells::paths::CellRelativePath;
 use kuro_core::package::PackageLabel;
@@ -18,7 +19,6 @@ use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::hacks;
 use kuro_util::arc_str::ArcSlice;
 use kuro_util::arc_str::ArcStr;
-use dupe::Dupe;
 
 #[test]
 fn stringifies_correctly() -> kuro_error::Result<()> {

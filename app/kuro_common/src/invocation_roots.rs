@@ -9,9 +9,9 @@
  */
 
 use allocative::Allocative;
-use kuro_core::kuro_env;
 use kuro_core::fs::project::ProjectRoot;
 use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
+use kuro_core::kuro_env;
 use kuro_error::BuckErrorContext;
 use kuro_fs::fs_util;
 use kuro_fs::paths::abs_norm_path::AbsNormPath;

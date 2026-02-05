@@ -11,6 +11,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
+use instance::CellInstance;
 use kuro_core::cells::CellAliasResolver;
 use kuro_core::cells::CellResolver;
 use kuro_core::cells::alias::NonEmptyCellAlias;
@@ -22,7 +23,6 @@ use kuro_core::cells::name::CellName;
 use kuro_core::cells::nested::NestedCells;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
 use kuro_error::BuckErrorContext;
-use instance::CellInstance;
 
 /// Errors from cell creation
 #[derive(kuro_error::Error, Debug)]

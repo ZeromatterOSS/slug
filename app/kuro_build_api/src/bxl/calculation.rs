@@ -15,10 +15,10 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
-use kuro_core::deferred::base_deferred_key::BaseDeferredKeyBxl;
-use kuro_util::late_binding::LateBinding;
 use dice::DiceComputations;
 use dupe::Dupe;
+use kuro_core::deferred::base_deferred_key::BaseDeferredKeyBxl;
+use kuro_util::late_binding::LateBinding;
 
 use crate::bxl::result::BxlResult;
 

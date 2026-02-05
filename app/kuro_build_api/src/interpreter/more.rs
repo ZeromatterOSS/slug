@@ -14,13 +14,6 @@ use starlark::environment::GlobalsBuilder;
 
 use crate::actions::error_handler::register_action_error_handler_for_testing;
 use crate::actions::error_handler::register_action_error_types;
-use crate::interpreter::rule_defs::artifact::artifact_type::register_artifact;
-use crate::interpreter::rule_defs::artifact::starlark_artifact_value::register_artifact_value;
-use crate::interpreter::rule_defs::artifact::starlark_output_artifact::register_output_artifact;
-use crate::interpreter::rule_defs::artifact::starlark_promise_artifact::register_promise_artifact;
-use crate::interpreter::rule_defs::artifact_tagging::artifact_tag::register_artifact_tag;
-use crate::interpreter::rule_defs::artifact_tagging::register_tagged_command_line;
-use crate::interpreter::rule_defs::artifact_tagging::register_tagged_value;
 // NOTE: Bazel compatibility modules (apple_common, config_common, etc.) MUST be
 // registered here via REGISTER_BUCK2_BUILD_API_GLOBALS for architectural reasons:
 //
@@ -44,19 +37,26 @@ use crate::interpreter::rule_defs::artifact_tagging::register_tagged_value;
 //
 // See: thoughts/shared/plans/kuro-bazel-subplans/06-prelude-architecture.md
 use crate::interpreter::rule_defs::apple_common::register_apple_common;
+use crate::interpreter::rule_defs::artifact::artifact_type::register_artifact;
+use crate::interpreter::rule_defs::artifact::starlark_artifact_value::register_artifact_value;
+use crate::interpreter::rule_defs::artifact::starlark_output_artifact::register_output_artifact;
+use crate::interpreter::rule_defs::artifact::starlark_promise_artifact::register_promise_artifact;
+use crate::interpreter::rule_defs::artifact_tagging::artifact_tag::register_artifact_tag;
+use crate::interpreter::rule_defs::artifact_tagging::register_tagged_command_line;
+use crate::interpreter::rule_defs::artifact_tagging::register_tagged_value;
 use crate::interpreter::rule_defs::cc_common::register_cc_common;
 use crate::interpreter::rule_defs::cmd_args::register_cmd_args;
-use crate::interpreter::rule_defs::config_common::register_config_common;
-use crate::interpreter::rule_defs::coverage_common::register_coverage_common;
-use crate::interpreter::rule_defs::platform_common::register_platform_common;
-use crate::interpreter::rule_defs::proto_common::register_proto_common;
-use crate::interpreter::rule_defs::config::register_config;
-use crate::interpreter::rule_defs::configuration_field::register_configuration_field;
-use crate::interpreter::rule_defs::depset::register_depset;
 use crate::interpreter::rule_defs::cmd_args::register_command_line_inputs;
 use crate::interpreter::rule_defs::command_executor_config::register_command_executor_config;
+use crate::interpreter::rule_defs::config::register_config;
+use crate::interpreter::rule_defs::config_common::register_config_common;
+use crate::interpreter::rule_defs::configuration_field::register_configuration_field;
 use crate::interpreter::rule_defs::context::register_analysis_context;
+use crate::interpreter::rule_defs::coverage_common::register_coverage_common;
+use crate::interpreter::rule_defs::depset::register_depset;
 use crate::interpreter::rule_defs::digest_config::register_digest_config_type;
+use crate::interpreter::rule_defs::platform_common::register_platform_common;
+use crate::interpreter::rule_defs::proto_common::register_proto_common;
 use crate::interpreter::rule_defs::provider::callable::register_provider;
 use crate::interpreter::rule_defs::provider::collection::register_provider_collection;
 use crate::interpreter::rule_defs::provider::dependency::register_dependency;

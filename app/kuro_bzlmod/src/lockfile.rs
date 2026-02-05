@@ -305,9 +305,11 @@ pub fn attr_value_to_json(value: &AttrValue) -> serde_json::Value {
         AttrValue::Int(i) => serde_json::Value::Number((*i).into()),
         AttrValue::Bool(b) => serde_json::Value::Bool(*b),
         AttrValue::None => serde_json::Value::Null,
-        AttrValue::StringList(list) => {
-            serde_json::Value::Array(list.iter().map(|s| serde_json::Value::String(s.clone())).collect())
-        }
+        AttrValue::StringList(list) => serde_json::Value::Array(
+            list.iter()
+                .map(|s| serde_json::Value::String(s.clone()))
+                .collect(),
+        ),
         AttrValue::Label(s) => {
             // Labels are stored as objects with a special marker
             serde_json::json!({ "__label__": s })
@@ -419,7 +421,12 @@ impl RepositoryRuleLockEntry {
     }
 
     /// Add a downloaded file entry.
-    pub fn with_downloaded_file(mut self, url: String, integrity: String, output_path: String) -> Self {
+    pub fn with_downloaded_file(
+        mut self,
+        url: String,
+        integrity: String,
+        output_path: String,
+    ) -> Self {
         self.downloaded_files.push(DownloadedFileLockEntry {
             url,
             integrity,
@@ -598,22 +605,21 @@ impl Lockfile {
         repo_name: &str,
         attrs_hash: &str,
     ) -> Option<&RepositoryRuleLockEntry> {
-        self.repository_rules.get(repo_name).filter(|entry| {
-            entry.attrs_hash == attrs_hash
-        })
+        self.repository_rules
+            .get(repo_name)
+            .filter(|entry| entry.attrs_hash == attrs_hash)
     }
 
     /// Add or update a repository rule cache entry.
-    pub fn set_repository_rule_cache(
-        &mut self,
-        repo_name: String,
-        entry: RepositoryRuleLockEntry,
-    ) {
+    pub fn set_repository_rule_cache(&mut self, repo_name: String, entry: RepositoryRuleLockEntry) {
         self.repository_rules.insert(repo_name, entry);
     }
 
     /// Remove a repository rule cache entry.
-    pub fn remove_repository_rule_cache(&mut self, repo_name: &str) -> Option<RepositoryRuleLockEntry> {
+    pub fn remove_repository_rule_cache(
+        &mut self,
+        repo_name: &str,
+    ) -> Option<RepositoryRuleLockEntry> {
         self.repository_rules.remove(repo_name)
     }
 
@@ -702,11 +708,8 @@ impl Lockfile {
             .map(|(name, spec)| (name.clone(), LockfileRepoSpec::from_repo_spec(spec)))
             .collect();
 
-        let ext_data = LockfileExtensionData::new(
-            bzl_transitive_digest,
-            usages_digest,
-            lockfile_specs,
-        );
+        let ext_data =
+            LockfileExtensionData::new(bzl_transitive_digest, usages_digest, lockfile_specs);
 
         tracing::debug!(
             "Caching extension '{}' with {} repo specs",
@@ -801,9 +804,7 @@ impl LockfileModuleNode {
             },
             _ => {
                 // Default to registry with empty URL
-                ModuleSource::Registry {
-                    url: String::new(),
-                }
+                ModuleSource::Registry { url: String::new() }
             }
         }
     }
@@ -865,9 +866,11 @@ pub fn lockfile_path(workspace_root: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::fs;
+
     use tempfile::TempDir;
+
+    use super::*;
 
     #[test]
     fn test_lockfile_roundtrip() {
@@ -927,7 +930,10 @@ mod tests {
         let mut lockfile = Lockfile::new();
         lockfile.module_file_hash = compute_file_hash(&module_path).unwrap();
 
-        let module = Module::new("test".to_string(), crate::version::Version::parse("1.0.0").unwrap());
+        let module = Module::new(
+            "test".to_string(),
+            crate::version::Version::parse("1.0.0").unwrap(),
+        );
 
         assert!(lockfile.is_valid_for(&module, &module_path));
 
@@ -971,7 +977,10 @@ mod tests {
     #[test]
     fn test_lockfile_mode_parsing() {
         assert_eq!(LockfileMode::from_str("update"), Some(LockfileMode::Update));
-        assert_eq!(LockfileMode::from_str("refresh"), Some(LockfileMode::Refresh));
+        assert_eq!(
+            LockfileMode::from_str("refresh"),
+            Some(LockfileMode::Refresh)
+        );
         assert_eq!(LockfileMode::from_str("error"), Some(LockfileMode::Error));
         assert_eq!(LockfileMode::from_str("off"), Some(LockfileMode::Off));
         assert_eq!(LockfileMode::from_str("invalid"), None);
@@ -979,22 +988,23 @@ mod tests {
 
     #[test]
     fn test_repository_rule_lock_entry() {
-        let entry = RepositoryRuleLockEntry::new(
-            "http_archive".to_string(),
-            "sha256-abc123".to_string(),
-        )
-        .with_content_hash("sha256-def456".to_string())
-        .with_downloaded_file(
-            "https://example.com/archive.tar.gz".to_string(),
-            "sha256-xyz789".to_string(),
-            "archive.tar.gz".to_string(),
-        );
+        let entry =
+            RepositoryRuleLockEntry::new("http_archive".to_string(), "sha256-abc123".to_string())
+                .with_content_hash("sha256-def456".to_string())
+                .with_downloaded_file(
+                    "https://example.com/archive.tar.gz".to_string(),
+                    "sha256-xyz789".to_string(),
+                    "archive.tar.gz".to_string(),
+                );
 
         assert_eq!(entry.rule_name, "http_archive");
         assert_eq!(entry.attrs_hash, "sha256-abc123");
         assert_eq!(entry.content_hash, Some("sha256-def456".to_string()));
         assert_eq!(entry.downloaded_files.len(), 1);
-        assert_eq!(entry.downloaded_files[0].url, "https://example.com/archive.tar.gz");
+        assert_eq!(
+            entry.downloaded_files[0].url,
+            "https://example.com/archive.tar.gz"
+        );
     }
 
     #[test]
@@ -1006,10 +1016,7 @@ mod tests {
         assert!(lockfile.get_repository_rule_cache("foo", "hash1").is_none());
 
         // Add an entry
-        let entry = RepositoryRuleLockEntry::new(
-            "http_archive".to_string(),
-            "hash1".to_string(),
-        );
+        let entry = RepositoryRuleLockEntry::new("http_archive".to_string(), "hash1".to_string());
         lockfile.set_repository_rule_cache("foo".to_string(), entry);
 
         // Now it should exist
@@ -1036,16 +1043,13 @@ mod tests {
         let mut lockfile = Lockfile::new();
         lockfile.set_repository_rule_cache(
             "rules_cc".to_string(),
-            RepositoryRuleLockEntry::new(
-                "http_archive".to_string(),
-                "sha256-abc".to_string(),
-            )
-            .with_content_hash("sha256-def".to_string())
-            .with_downloaded_file(
-                "https://github.com/rules_cc/archive.tar.gz".to_string(),
-                "sha256-ghi".to_string(),
-                "rules_cc.tar.gz".to_string(),
-            ),
+            RepositoryRuleLockEntry::new("http_archive".to_string(), "sha256-abc".to_string())
+                .with_content_hash("sha256-def".to_string())
+                .with_downloaded_file(
+                    "https://github.com/rules_cc/archive.tar.gz".to_string(),
+                    "sha256-ghi".to_string(),
+                    "rules_cc.tar.gz".to_string(),
+                ),
         );
 
         lockfile.write(&path).unwrap();
@@ -1053,7 +1057,9 @@ mod tests {
         let loaded = Lockfile::read(&path).unwrap();
         assert!(loaded.has_repository_rules());
 
-        let entry = loaded.get_repository_rule_cache("rules_cc", "sha256-abc").unwrap();
+        let entry = loaded
+            .get_repository_rule_cache("rules_cc", "sha256-abc")
+            .unwrap();
         assert_eq!(entry.rule_name, "http_archive");
         assert_eq!(entry.content_hash, Some("sha256-def".to_string()));
         assert_eq!(entry.downloaded_files.len(), 1);
@@ -1095,11 +1101,8 @@ mod tests {
     #[test]
     fn test_lockfile_extension_data_validation() {
         let specs = HashMap::new();
-        let ext_data = LockfileExtensionData::new(
-            "digest1".to_string(),
-            "digest2".to_string(),
-            specs,
-        );
+        let ext_data =
+            LockfileExtensionData::new("digest1".to_string(), "digest2".to_string(), specs);
 
         // Both digests must match
         assert!(ext_data.is_valid("digest1", "digest2"));
@@ -1113,14 +1116,27 @@ mod tests {
         use crate::repository_invocations::AttrValue;
 
         // Create a RepoSpec
-        let repo_spec = RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_string())
-            .with_attr("url".to_string(), AttrValue::String("https://example.com/archive.tar.gz".to_string()))
-            .with_attr("sha256".to_string(), AttrValue::String("abc123def456".to_string()))
-            .with_attr("strip_prefix".to_string(), AttrValue::String("mylib-1.0".to_string()));
+        let repo_spec =
+            RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_string())
+                .with_attr(
+                    "url".to_string(),
+                    AttrValue::String("https://example.com/archive.tar.gz".to_string()),
+                )
+                .with_attr(
+                    "sha256".to_string(),
+                    AttrValue::String("abc123def456".to_string()),
+                )
+                .with_attr(
+                    "strip_prefix".to_string(),
+                    AttrValue::String("mylib-1.0".to_string()),
+                );
 
         // Convert to lockfile format
         let lockfile_spec = LockfileRepoSpec::from_repo_spec(&repo_spec);
-        assert_eq!(lockfile_spec.repo_rule_id, "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive");
+        assert_eq!(
+            lockfile_spec.repo_rule_id,
+            "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive"
+        );
         assert_eq!(lockfile_spec.attributes.len(), 3);
 
         // Convert back to RepoSpec
@@ -1131,7 +1147,9 @@ mod tests {
         // Check values roundtrip correctly
         assert_eq!(
             roundtrip_spec.attributes.get("url"),
-            Some(&AttrValue::String("https://example.com/archive.tar.gz".to_string()))
+            Some(&AttrValue::String(
+                "https://example.com/archive.tar.gz".to_string()
+            ))
         );
     }
 
@@ -1143,7 +1161,10 @@ mod tests {
         let val = AttrValue::String("hello".to_string());
         let json = attr_value_to_json(&val);
         assert_eq!(json, serde_json::json!("hello"));
-        assert_eq!(json_to_attr_value(&json), AttrValue::String("hello".to_string()));
+        assert_eq!(
+            json_to_attr_value(&json),
+            AttrValue::String("hello".to_string())
+        );
 
         // Test int
         let val = AttrValue::Int(42);
@@ -1167,13 +1188,19 @@ mod tests {
         let val = AttrValue::StringList(vec!["a".to_string(), "b".to_string()]);
         let json = attr_value_to_json(&val);
         assert_eq!(json, serde_json::json!(["a", "b"]));
-        assert_eq!(json_to_attr_value(&json), AttrValue::StringList(vec!["a".to_string(), "b".to_string()]));
+        assert_eq!(
+            json_to_attr_value(&json),
+            AttrValue::StringList(vec!["a".to_string(), "b".to_string()])
+        );
 
         // Test label (special format)
         let val = AttrValue::Label("//foo:bar".to_string());
         let json = attr_value_to_json(&val);
         assert_eq!(json, serde_json::json!({"__label__": "//foo:bar"}));
-        assert_eq!(json_to_attr_value(&json), AttrValue::Label("//foo:bar".to_string()));
+        assert_eq!(
+            json_to_attr_value(&json),
+            AttrValue::Label("//foo:bar".to_string())
+        );
     }
 
     #[test]
@@ -1184,14 +1211,20 @@ mod tests {
 
         // Initially empty
         assert!(!lockfile.has_extension_cache());
-        assert!(lockfile.get_extension_cache("@@pip//pip:pip.bzl%pip", "bzl-digest", "usages-digest").is_none());
+        assert!(
+            lockfile
+                .get_extension_cache("@@pip//pip:pip.bzl%pip", "bzl-digest", "usages-digest")
+                .is_none()
+        );
 
         // Create and cache an extension result
         let mut repo_specs = HashMap::new();
         repo_specs.insert(
             "numpy".to_string(),
-            RepoSpec::new("@@rules_python//pip:pip.bzl%pip_install".to_string())
-                .with_attr("version".to_string(), AttrValue::String("1.24.0".to_string())),
+            RepoSpec::new("@@rules_python//pip:pip.bzl%pip_install".to_string()).with_attr(
+                "version".to_string(),
+                AttrValue::String("1.24.0".to_string()),
+            ),
         );
 
         lockfile.set_extension_cache(
@@ -1205,7 +1238,8 @@ mod tests {
         assert!(lockfile.has_extension_cache());
 
         // Cache hit with matching digests
-        let cached = lockfile.get_extension_cache("@@pip//pip:pip.bzl%pip", "bzl-digest", "usages-digest");
+        let cached =
+            lockfile.get_extension_cache("@@pip//pip:pip.bzl%pip", "bzl-digest", "usages-digest");
         assert!(cached.is_some());
         let cached_specs = cached.unwrap();
         assert_eq!(cached_specs.len(), 1);
@@ -1213,7 +1247,10 @@ mod tests {
 
         // Verify the spec data
         let numpy_spec = cached_specs.get("numpy").unwrap();
-        assert_eq!(numpy_spec.repo_rule_id, "@@rules_python//pip:pip.bzl%pip_install");
+        assert_eq!(
+            numpy_spec.repo_rule_id,
+            "@@rules_python//pip:pip.bzl%pip_install"
+        );
     }
 
     #[test]
@@ -1237,7 +1274,15 @@ mod tests {
         );
 
         // Cache miss when bzl_transitive_digest differs
-        assert!(lockfile.get_extension_cache("@@ext//ext.bzl%ext", "different-bzl-digest", "usages-digest").is_none());
+        assert!(
+            lockfile
+                .get_extension_cache(
+                    "@@ext//ext.bzl%ext",
+                    "different-bzl-digest",
+                    "usages-digest"
+                )
+                .is_none()
+        );
     }
 
     #[test]
@@ -1261,7 +1306,15 @@ mod tests {
         );
 
         // Cache miss when usages_digest differs
-        assert!(lockfile.get_extension_cache("@@ext//ext.bzl%ext", "bzl-digest", "different-usages-digest").is_none());
+        assert!(
+            lockfile
+                .get_extension_cache(
+                    "@@ext//ext.bzl%ext",
+                    "bzl-digest",
+                    "different-usages-digest"
+                )
+                .is_none()
+        );
     }
 
     #[test]
@@ -1285,7 +1338,11 @@ mod tests {
         );
 
         // Cache miss when extension ID differs
-        assert!(lockfile.get_extension_cache("@@other//other.bzl%other", "bzl-digest", "usages-digest").is_none());
+        assert!(
+            lockfile
+                .get_extension_cache("@@other//other.bzl%other", "bzl-digest", "usages-digest")
+                .is_none()
+        );
     }
 
     #[test]
@@ -1302,8 +1359,14 @@ mod tests {
         repo_specs.insert(
             "numpy".to_string(),
             RepoSpec::new("@@rules_python//pip:pip.bzl%pip_install".to_string())
-                .with_attr("version".to_string(), AttrValue::String("1.24.0".to_string()))
-                .with_attr("extras".to_string(), AttrValue::StringList(vec!["all".to_string()]))
+                .with_attr(
+                    "version".to_string(),
+                    AttrValue::String("1.24.0".to_string()),
+                )
+                .with_attr(
+                    "extras".to_string(),
+                    AttrValue::StringList(vec!["all".to_string()]),
+                )
                 .with_attr("timeout".to_string(), AttrValue::Int(300)),
         );
 
@@ -1333,9 +1396,18 @@ mod tests {
         assert_eq!(cached_specs.len(), 1);
 
         let numpy = cached_specs.get("numpy").unwrap();
-        assert_eq!(numpy.repo_rule_id, "@@rules_python//pip:pip.bzl%pip_install");
-        assert_eq!(numpy.attributes.get("version"), Some(&AttrValue::String("1.24.0".to_string())));
-        assert_eq!(numpy.attributes.get("extras"), Some(&AttrValue::StringList(vec!["all".to_string()])));
+        assert_eq!(
+            numpy.repo_rule_id,
+            "@@rules_python//pip:pip.bzl%pip_install"
+        );
+        assert_eq!(
+            numpy.attributes.get("version"),
+            Some(&AttrValue::String("1.24.0".to_string()))
+        );
+        assert_eq!(
+            numpy.attributes.get("extras"),
+            Some(&AttrValue::StringList(vec!["all".to_string()]))
+        );
         assert_eq!(numpy.attributes.get("timeout"), Some(&AttrValue::Int(300)));
     }
 
@@ -1356,7 +1428,9 @@ mod tests {
         );
 
         // Verify initial state
-        let cached1 = lockfile.get_extension_cache(&ext_id, "digest1", "usages1").unwrap();
+        let cached1 = lockfile
+            .get_extension_cache(&ext_id, "digest1", "usages1")
+            .unwrap();
         assert!(cached1.contains_key("v1_repo"));
         assert!(!cached1.contains_key("v2_repo"));
 
@@ -1372,10 +1446,16 @@ mod tests {
         );
 
         // Old cache should be invalidated
-        assert!(lockfile.get_extension_cache(&ext_id, "digest1", "usages1").is_none());
+        assert!(
+            lockfile
+                .get_extension_cache(&ext_id, "digest1", "usages1")
+                .is_none()
+        );
 
         // New cache should work
-        let cached2 = lockfile.get_extension_cache(&ext_id, "digest2", "usages2").unwrap();
+        let cached2 = lockfile
+            .get_extension_cache(&ext_id, "digest2", "usages2")
+            .unwrap();
         assert!(!cached2.contains_key("v1_repo"));
         assert!(cached2.contains_key("v2_repo"));
     }
@@ -1400,7 +1480,11 @@ mod tests {
         let removed = lockfile.remove_extension_cache(ext_id);
         assert!(removed.is_some());
         assert!(!lockfile.has_extension_cache());
-        assert!(lockfile.get_extension_cache(ext_id, "digest", "usages").is_none());
+        assert!(
+            lockfile
+                .get_extension_cache(ext_id, "digest", "usages")
+                .is_none()
+        );
     }
 
     #[test]

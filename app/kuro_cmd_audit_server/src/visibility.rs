@@ -9,6 +9,8 @@
  */
 
 use async_trait::async_trait;
+use dice::DiceTransaction;
+use dupe::Dupe;
 use kuro_cli_proto::ClientContext;
 use kuro_cmd_audit_client::visibility::AuditVisibilityCommand;
 use kuro_common::pattern::parse_from_cli::parse_patterns_from_cli_args;
@@ -24,8 +26,6 @@ use kuro_query::query::traversal::async_depth_first_postorder_traversal;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
 use kuro_server_ctx::ctx::ServerCommandDiceContext;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
-use dice::DiceTransaction;
-use dupe::Dupe;
 
 use crate::ServerAuditSubcommand;
 

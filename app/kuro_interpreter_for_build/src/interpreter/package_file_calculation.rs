@@ -9,11 +9,11 @@
  */
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_core::package::PackageLabel;
 use kuro_interpreter::paths::package::PackageFilePath;
 use kuro_interpreter::paths::path::OwnedStarlarkPath;
 use kuro_node::super_package::SuperPackage;
-use dice::DiceComputations;
 
 use crate::interpreter::dice_calculation_delegate::HasCalculationDelegate;
 

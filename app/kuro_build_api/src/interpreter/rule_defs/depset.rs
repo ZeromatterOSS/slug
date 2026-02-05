@@ -14,6 +14,9 @@
 //! union operations. This is similar to Kuro's transitive_set but with
 //! a different API.
 
+use std::fmt;
+use std::fmt::Display;
+
 use allocative::Allocative;
 use starlark::coerce::Coerce;
 use starlark::environment::GlobalsBuilder;
@@ -31,14 +34,12 @@ use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
-use starlark::values::ValueLike;
 use starlark::values::ValueLifetimeless;
+use starlark::values::ValueLike;
 use starlark::values::list::AllocList;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::starlark_value;
 use starlark::values::starlark_value_as_type::StarlarkValueAsType;
-use std::fmt;
-use std::fmt::Display;
 
 // ============================================================================
 // FrozenDepset - Immutable depset for frozen modules
@@ -109,16 +110,17 @@ impl Depset {
 
     /// Check if the depset is empty.
     pub fn is_empty(&self) -> bool {
-        self.direct.is_empty() && self.children.iter().all(|c| {
-            c.downcast_ref::<Depset>().is_some_and(|d| d.is_empty())
-        })
+        self.direct.is_empty()
+            && self
+                .children
+                .iter()
+                .all(|c| c.downcast_ref::<Depset>().is_some_and(|d| d.is_empty()))
     }
 
     /// Get the number of elements (including transitive).
     pub fn len(&self) -> usize {
         self.collect_all_frozen().len()
     }
-
 }
 
 impl Display for Depset {
@@ -161,10 +163,7 @@ impl<'v> StarlarkValue<'v> for Depset {
 #[starlark_module]
 fn frozen_depset_methods(builder: &mut MethodsBuilder) {
     /// Return a list of all elements in the depset.
-    fn to_list<'v>(
-        #[starlark(this)] this: &Depset,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn to_list<'v>(#[starlark(this)] this: &Depset, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let elements: Vec<Value<'v>> = this
             .collect_all_frozen()
             .into_iter()
@@ -182,13 +181,21 @@ fn frozen_depset_methods(builder: &mut MethodsBuilder) {
 ///
 /// This handles the case where values haven't been frozen yet.
 /// When the module is frozen, this converts to a regular Depset.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
 #[repr(C)]
 pub struct LiveDepsetGen<V: ValueLifetimeless> {
     /// Direct elements (stored as Values that freeze to FrozenValues)
-    pub(crate) direct: V,  // Actually a list value
+    pub(crate) direct: V, // Actually a list value
     /// Transitive children (depsets)
-    pub(crate) transitive: V,  // Actually a list value
+    pub(crate) transitive: V, // Actually a list value
     /// Iteration order
     #[freeze(identity)]
     order: String,
@@ -234,11 +241,7 @@ where
 }
 
 /// Helper function to recursively collect elements from any depset type.
-fn collect_depset_elements<'v>(
-    value: Value<'v>,
-    elements: &mut Vec<Value<'v>>,
-    heap: Heap<'v>,
-) {
+fn collect_depset_elements<'v>(value: Value<'v>, elements: &mut Vec<Value<'v>>, heap: Heap<'v>) {
     // Try unfrozen live depset first
     if let Some(live) = value.downcast_ref::<LiveDepsetGen<Value>>() {
         // Collect direct elements

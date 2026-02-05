@@ -14,6 +14,13 @@ use std::future::Future;
 use std::path::Path;
 use std::thread;
 
+use dice::DiceEquality;
+use dice::DiceTransaction;
+use dupe::Dupe;
+use futures::FutureExt;
+use futures::SinkExt;
+use futures::StreamExt;
+use futures::channel::mpsc::UnboundedSender;
 use kuro_build_api::actions::artifact::get_artifact_fs::GetArtifactFs;
 use kuro_cli_proto::*;
 use kuro_common::dice::cells::HasCellResolver;
@@ -52,13 +59,6 @@ use kuro_server_ctx::ctx::ServerCommandContextTrait;
 use kuro_server_ctx::ctx::ServerCommandDiceContext;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use kuro_server_ctx::streaming_request_handler::StreamingRequestHandler;
-use dice::DiceEquality;
-use dice::DiceTransaction;
-use dupe::Dupe;
-use futures::FutureExt;
-use futures::SinkExt;
-use futures::StreamExt;
-use futures::channel::mpsc::UnboundedSender;
 use lsp_server::Connection;
 use lsp_server::Message;
 use lsp_types::Url;
@@ -147,9 +147,7 @@ impl DocsCacheManager {
     }
 }
 
-async fn get_builtin_globals_docs(
-    dice_ctx: &mut DiceTransaction,
-) -> kuro_error::Result<DocModule> {
+async fn get_builtin_globals_docs(dice_ctx: &mut DiceTransaction) -> kuro_error::Result<DocModule> {
     Ok(dice_ctx
         .get_global_interpreter_state()
         .await?

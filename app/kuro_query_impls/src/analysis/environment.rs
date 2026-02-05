@@ -16,6 +16,11 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
+use dupe::Dupe;
+use dupe::IterDupedExt;
+use futures::FutureExt;
+use indexmap::IndexMap;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::artifact_type::OutputArtifact;
 use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
@@ -56,11 +61,6 @@ use kuro_query::query::traversal::async_depth_limited_traversal;
 use kuro_query::query::traversal::async_fast_depth_first_postorder_traversal;
 use kuro_query::query_module;
 use kuro_query_parser::BinaryOp;
-use dice::DiceComputations;
-use dupe::Dupe;
-use dupe::IterDupedExt;
-use futures::FutureExt;
-use indexmap::IndexMap;
 use starlark::values::UnpackValue;
 
 #[derive(Debug, kuro_error::Error)]
@@ -205,10 +205,7 @@ impl QueryEnvironment for ConfiguredGraphQueryEnvironment<'_> {
         .into())
     }
 
-    async fn eval_literals(
-        &self,
-        literal: &[&str],
-    ) -> kuro_error::Result<TargetSet<Self::Target>> {
+    async fn eval_literals(&self, literal: &[&str]) -> kuro_error::Result<TargetSet<Self::Target>> {
         let mut result = TargetSet::new();
         for lit in literal {
             result.insert(ConfiguredGraphNodeRef::new(

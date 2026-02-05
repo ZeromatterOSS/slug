@@ -10,6 +10,7 @@
 
 use std::collections::HashSet;
 
+use dice::DiceTransaction;
 use kuro_core::bzl::ImportPath;
 use kuro_core::cells::build_file_cell::BuildFileCell;
 use kuro_core::cells::name::CellName;
@@ -18,7 +19,6 @@ use kuro_interpreter::import_paths::HasImportPaths;
 use kuro_interpreter::load_module::INTERPRETER_CALCULATION_IMPL;
 use kuro_interpreter::load_module::InterpreterCalculation;
 use kuro_interpreter::prelude_path::PreludePath;
-use dice::DiceTransaction;
 use starlark::environment::Globals;
 
 /// The environment in which a Starlark file is evaluated.

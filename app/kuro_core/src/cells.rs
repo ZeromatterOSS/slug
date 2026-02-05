@@ -95,13 +95,13 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use allocative::Allocative;
-use kuro_fs::paths::abs_path::AbsPath;
-use kuro_fs::paths::file_name::FileNameBuf;
 use dupe::Dupe;
 use dupe::OptionDupedExt;
 use gazebo::prelude::*;
 use instance::CellInstance;
 use itertools::Itertools;
+use kuro_fs::paths::abs_path::AbsPath;
+use kuro_fs::paths::file_name::FileNameBuf;
 use sequence_trie::SequenceTrie;
 
 use crate::cells::alias::CellAlias;

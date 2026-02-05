@@ -14,6 +14,7 @@ use std::time::Duration;
 use std::time::SystemTime;
 use std::time::SystemTimeError;
 
+use dupe::Dupe;
 use kuro_client_ctx::client_ctx::BuckSubcommand;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
 use kuro_client_ctx::common::BuckArgMatches;
@@ -33,7 +34,6 @@ use kuro_event_log::stream_value::StreamValue;
 use kuro_event_observer::span_tracker::EventTimestamp;
 use kuro_event_observer::verbosity::Verbosity;
 use kuro_events::BuckEvent;
-use dupe::Dupe;
 use superconsole::Component;
 use superconsole::Dimensions;
 use superconsole::DrawMode;
@@ -178,10 +178,7 @@ impl WhatUpCommand {
 struct WhatupClock(Arc<Mutex<EventTimestamp>>);
 
 impl Clock for WhatupClock {
-    fn event_timestamp_for_tick(
-        &mut self,
-        _tick: kuro_client_ctx::ticker::Tick,
-    ) -> EventTimestamp {
+    fn event_timestamp_for_tick(&mut self, _tick: kuro_client_ctx::ticker::Tick) -> EventTimestamp {
         // We always report the most recently seen event as the current timestamp. That way, when we
         // finish rendering superconsole, the timestamp we report here will correspond to something
         // that makes sense at that time

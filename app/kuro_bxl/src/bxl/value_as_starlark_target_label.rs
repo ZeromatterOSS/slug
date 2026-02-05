@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
 use kuro_common::target_aliases::BuckConfigTargetAliasResolver;
 use kuro_core::cells::CellAliasResolver;
 use kuro_core::cells::CellResolver;
@@ -18,7 +19,6 @@ use kuro_core::pattern::pattern::ParsedPattern;
 use kuro_core::pattern::pattern_type::TargetPatternExtra;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_interpreter::types::target_label::StarlarkTargetLabel;
-use dupe::Dupe;
 use starlark::values::UnpackValue;
 use starlark::values::none::NoneType;
 use starlark::values::type_repr::StarlarkTypeRepr;

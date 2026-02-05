@@ -21,12 +21,12 @@ impl SandcastleScheduleType {
 
     pub fn new() -> kuro_error::Result<Self> {
         // Same as RE does https://fburl.com/code/sj13r130
-        let schedule_type =
-            if let Some(env) = kuro_env!("SCHEDULE_TYPE", applicability = internal)? {
-                Some(env)
-            } else {
-                kuro_env!("SANDCASTLE_SCHEDULE_TYPE", applicability = internal)?
-            };
+        let schedule_type = if let Some(env) = kuro_env!("SCHEDULE_TYPE", applicability = internal)?
+        {
+            Some(env)
+        } else {
+            kuro_env!("SANDCASTLE_SCHEDULE_TYPE", applicability = internal)?
+        };
         Ok(Self { schedule_type })
     }
 

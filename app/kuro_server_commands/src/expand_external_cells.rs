@@ -10,6 +10,8 @@
 
 use std::collections::BTreeMap;
 
+use dice::DiceTransaction;
+use dupe::Dupe;
 use kuro_cli_proto::new_generic::ExpandExternalCellsRequest;
 use kuro_cli_proto::new_generic::ExpandExternalCellsResponse;
 use kuro_common::dice::cells::HasCellResolver;
@@ -20,8 +22,6 @@ use kuro_server_ctx::partial_result_dispatcher::NoPartialResult;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use kuro_server_ctx::template::ServerCommandTemplate;
 use kuro_server_ctx::template::run_server_command;
-use dice::DiceTransaction;
-use dupe::Dupe;
 
 pub(crate) async fn expand_external_cells_command(
     ctx: &dyn ServerCommandContextTrait,

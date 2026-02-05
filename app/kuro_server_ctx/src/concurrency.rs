@@ -21,6 +21,22 @@ use std::sync::Arc;
 use allocative::Allocative;
 use async_condvar_fair::Condvar;
 use async_trait::async_trait;
+use derive_more::Display;
+use dice::Dice;
+use dice::DiceEquality;
+use dice::DiceTransaction;
+use dice::DiceTransactionUpdater;
+use dice::UserComputationData;
+use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
+use futures::future;
+use futures::future::BoxFuture;
+use futures::future::Either;
+use futures::future::Future;
+use futures::future::FutureExt;
+use futures::future::Shared;
+use futures::pin_mut;
+use itertools::Itertools;
 use kuro_build_signals::env::EXCLUSIVE_COMMAND_WAIT;
 use kuro_build_signals::env::EarlyCommandTimingBuilder;
 use kuro_cli_proto::client_context::ExitWhen;
@@ -41,22 +57,6 @@ use kuro_error::internal_error;
 use kuro_events::dispatch::EventDispatcher;
 use kuro_util::truncate::truncate;
 use kuro_wrapper_common::invocation_id::TraceId;
-use derive_more::Display;
-use dice::Dice;
-use dice::DiceEquality;
-use dice::DiceTransaction;
-use dice::DiceTransactionUpdater;
-use dice::UserComputationData;
-use dice_futures::cancellation::CancellationContext;
-use dupe::Dupe;
-use futures::future;
-use futures::future::BoxFuture;
-use futures::future::Either;
-use futures::future::Future;
-use futures::future::FutureExt;
-use futures::future::Shared;
-use futures::pin_mut;
-use itertools::Itertools;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 use tokio::sync::Mutex;
@@ -816,6 +816,15 @@ mod tests {
     use allocative::Allocative;
     use assert_matches::assert_matches;
     use async_trait::async_trait;
+    use derivative::Derivative;
+    use dice::DetectCycles;
+    use dice::DiceComputations;
+    use dice::InjectedKey;
+    use dice::Key;
+    use dice_futures::cancellation::CancellationContext;
+    use dupe::Dupe;
+    use futures::pin_mut;
+    use futures::poll;
     use kuro_build_signals::env::EXCLUSIVE_COMMAND_WAIT;
     use kuro_build_signals::env::FILE_WATCHER_WAIT;
     use kuro_common::legacy_configs::dice::SetLegacyConfigs;
@@ -827,15 +836,6 @@ mod tests {
     use kuro_events::sink::null::NullEventSink;
     use kuro_events::source::ChannelEventSource;
     use kuro_events::span::SpanId;
-    use derivative::Derivative;
-    use dice::DetectCycles;
-    use dice::DiceComputations;
-    use dice::InjectedKey;
-    use dice::Key;
-    use dice_futures::cancellation::CancellationContext;
-    use dupe::Dupe;
-    use futures::pin_mut;
-    use futures::poll;
     use parking_lot::Mutex;
     use tokio::sync::Barrier;
     use tokio::sync::RwLock;
@@ -2101,8 +2101,7 @@ mod tests {
     // This test was moved to the top of the file
 
     #[tokio::test]
-    async fn test_multiple_exit_when_not_idle_commands_with_same_state() -> kuro_error::Result<()>
-    {
+    async fn test_multiple_exit_when_not_idle_commands_with_same_state() -> kuro_error::Result<()> {
         let dice = make_default_dice().await;
         let concurrency = ConcurrencyHandler::new(dice.dupe());
 

@@ -16,6 +16,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
 
+use dupe::Dupe;
 use kuro::exec;
 use kuro::panic;
 use kuro::process_context::ClientRuntime;
@@ -35,7 +36,6 @@ use kuro_core::logging::init_tracing_for_writer;
 use kuro_core::logging::log_file::TracingLogFile;
 use kuro_fs::working_dir::AbsWorkingDir;
 use kuro_wrapper_common::invocation_id::TraceId;
-use dupe::Dupe;
 
 // fbcode likes to set its own allocator in fbcode.default_allocator
 // So when we set our own allocator, buck build kuro or kuro build kuro often breaks.

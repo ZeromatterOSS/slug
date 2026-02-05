@@ -10,6 +10,11 @@
 
 use std::time::Duration;
 
+use clap::Parser;
+use futures::StreamExt;
+use futures::TryStreamExt;
+use futures::channel::mpsc::UnboundedReceiver;
+use host_sharing::HostSharingRequirements;
 use kuro_error::BuckErrorContext;
 use kuro_test_api::data::ArgValue;
 use kuro_test_api::data::ArgValueContent;
@@ -24,11 +29,6 @@ use kuro_test_api::data::TestResult;
 use kuro_test_api::data::TestStage;
 use kuro_test_api::data::TestStatus;
 use kuro_test_api::grpc::TestOrchestratorClient;
-use clap::Parser;
-use futures::StreamExt;
-use futures::TryStreamExt;
-use futures::channel::mpsc::UnboundedReceiver;
-use host_sharing::HostSharingRequirements;
 use parking_lot::Mutex;
 
 use crate::config::Config;

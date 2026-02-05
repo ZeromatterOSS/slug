@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use fxhash::FxHashMap;
 use kuro_build_api::interpreter::rule_defs::cmd_args::DefaultCommandLineContext;
 use kuro_build_api::interpreter::rule_defs::cmd_args::value_as::ValueAsCommandLineLike;
 use kuro_core::execution_types::executor_config::PathSeparatorKind;
@@ -18,7 +19,6 @@ use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
 use kuro_execute::artifact::fs::ExecutorFs;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
 use kuro_interpreter_for_build::interpreter::testing::cells;
-use fxhash::FxHashMap;
 use starlark::environment::GlobalsBuilder;
 use starlark::starlark_module;
 use starlark::values::UnpackValue;

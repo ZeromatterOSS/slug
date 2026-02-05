@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
 use kuro_core::package::PackageLabel;
 use kuro_core::package::source_path::SourcePathRef;
 use kuro_core::provider::label::ProvidersLabel;
@@ -19,7 +20,6 @@ use kuro_node::attrs::traversal::CoercedAttrTraversal;
 use kuro_node::visibility::VisibilityPattern;
 use kuro_node::visibility::VisibilityPatternList;
 use kuro_node::visibility::WithinViewSpecification;
-use dupe::Dupe;
 
 fn indented_within_view(spec: &WithinViewSpecification) -> String {
     match &spec.0 {

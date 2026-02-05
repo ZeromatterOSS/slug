@@ -15,6 +15,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::configuration::transition::id::TransitionId;
@@ -24,7 +25,6 @@ use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_error::internal_error;
 use kuro_util::arc_str::ArcStr;
-use dupe::Dupe;
 use pagable::Pagable;
 use strong_hash::StrongHash;
 

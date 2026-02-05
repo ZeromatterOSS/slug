@@ -8,10 +8,10 @@
  * above-listed licenses.
  */
 
-use kuro_build_api::interpreter::rule_defs::artifact_tagging::ArtifactTag;
-use kuro_interpreter_for_build::interpreter::testing::Tester;
 use dupe::Dupe;
 use indoc::indoc;
+use kuro_build_api::interpreter::rule_defs::artifact_tagging::ArtifactTag;
+use kuro_interpreter_for_build::interpreter::testing::Tester;
 
 use crate::interpreter::rule_defs::artifact_tagging::testing::artifact_tag_factory;
 

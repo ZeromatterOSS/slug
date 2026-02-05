@@ -16,6 +16,14 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use dice::DiceTransactionUpdater;
+use edenfs::ChangeNotification;
+use edenfs::ChangesSinceV2Params;
+use edenfs::Dtype;
+use edenfs::JournalPosition;
+use edenfs::LargeChangeNotification;
+use edenfs::SmallChangeNotification;
+use fbinit::FacebookInit;
 use kuro_common::file_ops::dice::FileChangeTracker;
 use kuro_common::ignores::ignore_set::IgnoreSet;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
@@ -35,14 +43,6 @@ use kuro_fs::paths::abs_norm_path::AbsNormPath;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use dice::DiceTransactionUpdater;
-use edenfs::ChangeNotification;
-use edenfs::ChangesSinceV2Params;
-use edenfs::Dtype;
-use edenfs::JournalPosition;
-use edenfs::LargeChangeNotification;
-use edenfs::SmallChangeNotification;
-use fbinit::FacebookInit;
 use tokio::sync::RwLock;
 use tracing::debug;
 use tracing::info;
@@ -110,18 +110,14 @@ impl EdenFsFileWatcher {
         cells: CellResolver,
         ignore_specs: HashMap<CellName, IgnoreSet>,
     ) -> Result<Self, EdenFsWatcherError> {
-        let manager = EdenConnectionManager::new(
-            fb,
-            project_root,
-            Some(semaphore::kuro_default()),
-        )
-        .map_err(EdenFsWatcherError::EdenConnectionError)?
-        .ok_or(EdenFsWatcherError::EdenConnectionError(
-            kuro_error::kuro_error!(
-                kuro_error::ErrorTag::Environment,
-                "Couldn't initiate connection to Eden. This is usually due to .eden dir missing"
-            ),
-        ))?;
+        let manager = EdenConnectionManager::new(fb, project_root, Some(semaphore::kuro_default()))
+            .map_err(EdenFsWatcherError::EdenConnectionError)?
+            .ok_or(EdenFsWatcherError::EdenConnectionError(
+                kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Environment,
+                    "Couldn't initiate connection to Eden. This is usually due to .eden dir missing"
+                ),
+            ))?;
 
         let mount_point = manager.get_mount_point();
         let eden_root = AbsNormPath::new(manager.get_mount_point_path())

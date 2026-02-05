@@ -10,6 +10,7 @@
 
 use std::fmt::Debug;
 
+use dupe::Dupe;
 use kuro_client_ctx::client_ctx::BuckSubcommand;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
 use kuro_client_ctx::common::BuckArgMatches;
@@ -17,7 +18,6 @@ use kuro_client_ctx::events_ctx::EventsCtx;
 use kuro_client_ctx::exit_result::ExitResult;
 use kuro_common::argv::Argv;
 use kuro_common::argv::SanitizedArgv;
-use dupe::Dupe;
 
 mod critical_path;
 mod diff;

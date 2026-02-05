@@ -13,6 +13,9 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
+    use dupe::Dupe;
+    use dupe::IterDupedExt;
+    use indexmap::indexset;
     use kuro_artifact::actions::key::ActionIndex;
     use kuro_artifact::actions::key::ActionKey;
     use kuro_artifact::artifact::build_artifact::BuildArtifact;
@@ -39,9 +42,6 @@ mod tests {
     use kuro_core::package::source_path::SourcePath;
     use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
     use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-    use dupe::Dupe;
-    use dupe::IterDupedExt;
-    use indexmap::indexset;
     use starlark::values::OwnedFrozenValueTyped;
 
     use crate::actions::testings::SimpleAction;

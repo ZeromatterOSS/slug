@@ -15,11 +15,11 @@ use std::hash::Hasher;
 use std::marker;
 use std::sync::Arc;
 
+use dupe::Dupe;
+use hashbrown::HashTable;
 use kuro_util::arc_str::ArcSlice;
 use kuro_util::arc_str::ArcStr;
 use kuro_util::hash::BuckHasher;
-use dupe::Dupe;
-use hashbrown::HashTable;
 
 /// An interner specific to our AttrCoercionContext used for interning different kinds of attributes.
 /// Things specific about this interner:

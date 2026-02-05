@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use dice::DiceTransaction;
 use kuro_cli_proto::new_generic::CompleteRequest;
 use kuro_cli_proto::new_generic::CompleteResponse;
 use kuro_common::pattern::parse_from_cli::parse_patterns_from_cli_args;
@@ -20,7 +21,6 @@ use kuro_server_ctx::partial_result_dispatcher::NoPartialResult;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use kuro_server_ctx::template::ServerCommandTemplate;
 use kuro_server_ctx::template::run_server_command;
-use dice::DiceTransaction;
 
 pub(crate) async fn complete_command(
     ctx: &dyn ServerCommandContextTrait,

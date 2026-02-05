@@ -12,6 +12,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
+use dice::LinearRecomputeDiceComputations;
+use futures::FutureExt;
+use gazebo::prelude::*;
+use indexmap::indexset;
 use kuro_build_api::configure_targets::load_compatible_patterns_with_modifiers;
 use kuro_common::dice::cells::HasCellResolver;
 use kuro_common::dice::data::HasIoProvider;
@@ -54,11 +59,6 @@ use kuro_node::target_calculation::ConfiguredTargetCalculation;
 use kuro_query::query::syntax::simple::eval::file_set::FileNode;
 use kuro_query::query::syntax::simple::eval::file_set::FileSet;
 use kuro_query::query::syntax::simple::eval::set::TargetSet;
-use dice::DiceComputations;
-use dice::LinearRecomputeDiceComputations;
-use futures::FutureExt;
-use gazebo::prelude::*;
-use indexmap::indexset;
 
 use crate::cquery::environment::CqueryDelegate;
 use crate::uquery::environment::QueryLiterals;

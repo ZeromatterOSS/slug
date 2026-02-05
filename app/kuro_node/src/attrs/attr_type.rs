@@ -13,10 +13,10 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::configuration::transition::id::TransitionId;
 use kuro_core::plugins::PluginKind;
 use kuro_core::plugins::PluginKindSet;
-use dupe::Dupe;
 use once_cell::sync::Lazy;
 use pagable::Pagable;
 
@@ -588,10 +588,7 @@ mod tests {
 
     #[test]
     fn test_is_label_type_tuple_without_deps() {
-        let attr_type = AttrType::tuple(vec![
-            AttrType::string(),
-            AttrType::int(),
-        ]);
+        let attr_type = AttrType::tuple(vec![AttrType::string(), AttrType::int()]);
         assert!(!attr_type.is_label_type());
     }
 
@@ -606,10 +603,7 @@ mod tests {
 
     #[test]
     fn test_is_label_type_one_of_without_deps() {
-        let attr_type = AttrType::one_of(vec![
-            AttrType::string(),
-            AttrType::int(),
-        ]);
+        let attr_type = AttrType::one_of(vec![AttrType::string(), AttrType::int()]);
         assert!(!attr_type.is_label_type());
     }
 }

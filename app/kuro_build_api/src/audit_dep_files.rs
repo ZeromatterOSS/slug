@@ -12,10 +12,10 @@ use std::future::Future;
 use std::io::Write;
 use std::pin::Pin;
 
+use dice::DiceTransaction;
 use kuro_core::category::Category;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceTransaction;
 
 /// Implementation of `audit dep-files`.
 pub static AUDIT_DEP_FILES: LateBinding<

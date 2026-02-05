@@ -14,6 +14,10 @@ use std::future::Future;
 use std::pin::Pin;
 
 use allocative::Allocative;
+use dice::DiceComputations;
+use dupe::Dupe;
+use either::Either;
+use itertools::Itertools;
 use kuro_common::pattern::resolve::ResolvedPattern;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
@@ -32,10 +36,6 @@ use kuro_query::query::syntax::simple::eval::set::TargetSet;
 use kuro_util::late_binding::LateBinding;
 use kuro_util::self_ref::RefData;
 use kuro_util::self_ref::SelfRef;
-use dice::DiceComputations;
-use dupe::Dupe;
-use either::Either;
-use itertools::Itertools;
 
 use crate::nodes::configured::ConfiguredTargetNode;
 use crate::nodes::configured::ConfiguredTargetNodeRef;
@@ -131,9 +131,7 @@ impl CqueryUniverse {
             .flat_map(|map| map.values().flat_map(|set| set.iter().map(|node| node.0)))
     }
 
-    pub fn build(
-        universe: &TargetSet<ConfiguredTargetNode>,
-    ) -> kuro_error::Result<CqueryUniverse> {
+    pub fn build(universe: &TargetSet<ConfiguredTargetNode>) -> kuro_error::Result<CqueryUniverse> {
         span(kuro_data::CqueryUniverseBuildStart {}, || {
             let r = SelfRef::try_new(universe.clone(), |universe| {
                 CqueryUniverseInner::build_inner(universe)
@@ -207,10 +205,12 @@ impl CqueryUniverse {
                 self.get_from_package(package_with_modifiers.package, spec)
                     .filter_map(|(node, extra)| match node.rule_type() {
                         RuleType::Forward => None,
-                        RuleType::Starlark(..) | RuleType::Native(..) => Some(ConfiguredProvidersLabel::new(
-                            node.label().dupe(),
-                            extra.into_providers(),
-                        )),
+                        RuleType::Starlark(..) | RuleType::Native(..) => {
+                            Some(ConfiguredProvidersLabel::new(
+                                node.label().dupe(),
+                                extra.into_providers(),
+                            ))
+                        }
                     }),
             );
         }
@@ -283,6 +283,7 @@ impl CqueryUniverse {
 
 #[cfg(test)]
 mod tests {
+    use dupe::Dupe;
     use kuro_common::pattern::resolve::ResolvedPattern;
     use kuro_core::configuration::bound_label::BoundConfigurationLabel;
     use kuro_core::configuration::data::ConfigurationData;
@@ -302,7 +303,6 @@ mod tests {
     use kuro_core::target::name::TargetName;
     use kuro_query::__derive_refs::indexmap::IndexMap;
     use kuro_query::query::syntax::simple::eval::set::TargetSet;
-    use dupe::Dupe;
 
     use crate::configured_universe::CqueryUniverse;
     use crate::nodes::configured::ConfiguredTargetNode;

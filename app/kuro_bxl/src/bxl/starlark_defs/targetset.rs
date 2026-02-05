@@ -12,10 +12,10 @@ use std::convert::Infallible;
 use std::ops::Deref;
 
 use allocative::Allocative;
-use kuro_query::query::environment::QueryTarget;
-use kuro_query::query::syntax::simple::eval::set::TargetSet;
 use derive_more::Display;
 use dupe::Dupe;
+use kuro_query::query::environment::QueryTarget;
+use kuro_query::query::syntax::simple::eval::set::TargetSet;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;

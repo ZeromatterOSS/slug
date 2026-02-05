@@ -482,13 +482,20 @@ pub fn register_module_extension_function(builder: &mut GlobalsBuilder) {
         // Verify we're in a .bzl file
         match &build_context.additional {
             PerFileTypeContext::Bzl(_) => {}
-            _ => return Err(kuro_error::Error::from(ModuleExtensionError::TagClassNotInBzl).into()),
+            _ => {
+                return Err(kuro_error::Error::from(ModuleExtensionError::TagClassNotInBzl).into());
+            }
         }
 
         let attrs_vec: Vec<(String, StarlarkAttribute)> = attrs
             .entries
             .into_iter()
-            .map(|(name, attr)| (name.to_owned(), StarlarkAttribute::new(attr.clone_attribute())))
+            .map(|(name, attr)| {
+                (
+                    name.to_owned(),
+                    StarlarkAttribute::new(attr.clone_attribute()),
+                )
+            })
             .collect();
 
         Ok(StarlarkTagClass {

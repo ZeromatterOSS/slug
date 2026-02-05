@@ -10,6 +10,10 @@
 
 use std::borrow::Cow;
 
+use dice::DiceComputations;
+use dupe::Dupe;
+use dupe::IterDupedExt;
+use either::Either;
 use kuro_artifact::actions::key::ActionKey;
 use kuro_artifact::artifact::build_artifact::BuildArtifact;
 use kuro_build_api::actions::query::ActionQueryNode;
@@ -18,10 +22,6 @@ use kuro_build_api::analysis::AnalysisResult;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
 use kuro_core::global_cfg_options::GlobalCfgOptions;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use dice::DiceComputations;
-use dupe::Dupe;
-use dupe::IterDupedExt;
-use either::Either;
 use tracing::debug;
 
 use crate::aquery::evaluator::get_dice_aquery_delegate;

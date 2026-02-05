@@ -8,6 +8,10 @@
  * above-listed licenses.
  */
 
+use chrono::DateTime;
+use chrono::Utc;
+use futures::StreamExt;
+use gazebo::prelude::VecExt;
 use kuro_common::invocation_paths::InvocationPaths;
 use kuro_error::BuckErrorContext;
 use kuro_events::BuckEvent;
@@ -16,10 +20,6 @@ use kuro_fs::paths::abs_norm_path::AbsNormPath;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
 use kuro_fs::paths::file_name::FileNameBuf;
 use kuro_wrapper_common::invocation_id::TraceId;
-use chrono::DateTime;
-use chrono::Utc;
-use futures::StreamExt;
-use gazebo::prelude::VecExt;
 
 use crate::read::EventLogPathBuf;
 use crate::utils::Encoding;

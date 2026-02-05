@@ -8,6 +8,9 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
+use indexmap::indexset;
+use itertools::Itertools;
 use kuro_artifact::actions::key::ActionIndex;
 use kuro_artifact::artifact::artifact_type::testing::ArtifactTestingExt;
 use kuro_artifact::artifact::artifact_type::testing::BuildArtifactTestingExt;
@@ -30,9 +33,6 @@ use kuro_core::fs::buck_out_path::BuildArtifactPath;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_execute::execute::request::OutputType;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use dupe::Dupe;
-use indexmap::indexset;
-use itertools::Itertools;
 use starlark::values::Heap;
 
 use crate::actions::testings::SimpleUnregisteredAction;

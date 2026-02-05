@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
+use indoc::indoc;
 use kuro_build_api::analysis::registry::AnalysisRegistry;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisContext;
 use kuro_build_api::interpreter::rule_defs::plugins::AnalysisPlugins;
@@ -19,8 +21,6 @@ use kuro_core::target::label::label::TargetLabel;
 use kuro_execute::digest_config::DigestConfig;
 use kuro_interpreter::file_type::StarlarkFileType;
 use kuro_interpreter::from_freeze::from_freeze_error;
-use dupe::Dupe;
-use indoc::indoc;
 use maplit::hashmap;
 use starlark::collections::SmallMap;
 use starlark::environment::GlobalsBuilder;

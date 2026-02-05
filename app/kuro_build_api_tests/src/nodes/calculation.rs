@@ -10,6 +10,9 @@
 
 use std::sync::Arc;
 
+use dice::UserComputationData;
+use dice::testing::DiceBuilder;
+use dupe::Dupe;
 use kuro_build_api::actions::execute::dice_data::set_fallback_executor_config;
 use kuro_configured::execution::ExecutionPlatformsKey;
 use kuro_core::build_file_path::BuildFilePath;
@@ -50,9 +53,6 @@ use kuro_node::rule_type::RuleType;
 use kuro_node::rule_type::StarlarkRuleType;
 use kuro_node::super_package::SuperPackage;
 use kuro_util::arc_str::ArcSlice;
-use dice::UserComputationData;
-use dice::testing::DiceBuilder;
-use dupe::Dupe;
 use starlark::collections::SmallMap;
 use starlark_map::smallmap;
 

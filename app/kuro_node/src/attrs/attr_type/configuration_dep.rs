@@ -9,8 +9,8 @@
  */
 
 use allocative::Allocative;
-use kuro_core::provider::label::ProvidersLabel;
 use dupe::Dupe;
+use kuro_core::provider::label::ProvidersLabel;
 use pagable::Pagable;
 
 use crate::attrs::configuration_context::AttrConfigurationContext;

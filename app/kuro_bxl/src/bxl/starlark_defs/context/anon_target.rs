@@ -10,6 +10,10 @@
 
 use std::sync::Arc;
 
+use dice::DiceComputations;
+use dice_futures::cancellation::CancellationObserver;
+use dupe::Dupe;
+use itertools::Itertools;
 use kuro_analysis::analysis::calculation::get_loaded_module;
 use kuro_analysis::analysis::env::get_rule_impl;
 use kuro_analysis::analysis::env::promise_artifact_mappings;
@@ -38,10 +42,6 @@ use kuro_interpreter::soft_error::KuroStarlarkSoftErrorHandler;
 use kuro_interpreter_for_build::attrs::StarlarkAttribute;
 use kuro_interpreter_for_build::rule::StarlarkRuleCallable;
 use kuro_node::bzl_or_bxl_path::BzlOrBxlPath;
-use dice::DiceComputations;
-use dice_futures::cancellation::CancellationObserver;
-use dupe::Dupe;
-use itertools::Itertools;
 use starlark::collections::SmallMap;
 use starlark::environment::FrozenModule;
 use starlark::environment::GlobalsBuilder;

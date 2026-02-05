@@ -10,15 +10,15 @@
 
 use std::collections::BTreeMap;
 
+use derive_more::Display;
+use futures::Stream;
+use futures::TryStreamExt;
 use kuro_client_ctx::client_ctx::BuckSubcommand;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
 use kuro_client_ctx::common::BuckArgMatches;
 use kuro_client_ctx::events_ctx::EventsCtx;
 use kuro_client_ctx::exit_result::ExitResult;
 use kuro_event_log::stream_value::StreamValue;
-use derive_more::Display;
-use futures::Stream;
-use futures::TryStreamExt;
 use serde::Serialize;
 
 use crate::diff::diff_options::DiffEventLogOptions;

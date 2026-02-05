@@ -12,10 +12,10 @@ use std::collections::BTreeMap;
 use std::fmt::Display;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::provider::label::ProvidersLabelMaybeConfigured;
-use dupe::Dupe;
 use pagable::Pagable;
 use strong_hash::StrongHash;
 

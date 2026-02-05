@@ -9,9 +9,9 @@
  */
 
 use allocative::Allocative;
-use kuro_util::arc_str::ArcS;
 use derive_more::Display;
 use dupe::Dupe;
+use kuro_util::arc_str::ArcS;
 
 use crate::cells::cell_path::CellPath;
 use crate::package::PackageLabel;

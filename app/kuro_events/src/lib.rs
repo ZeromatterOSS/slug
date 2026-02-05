@@ -39,11 +39,11 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::SystemTime;
 
+use derive_more::From;
+use gazebo::variants::UnpackVariants;
 use kuro_cli_proto::CommandResult;
 use kuro_cli_proto::PartialResult;
 use kuro_wrapper_common::invocation_id::TraceId;
-use derive_more::From;
-use gazebo::variants::UnpackVariants;
 use serde::Serialize;
 
 use crate::sink::channel::ChannelEventSink;

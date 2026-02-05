@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
+use gazebo::prelude::SliceExt;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::source_artifact::SourceArtifact;
 use kuro_build_api::actions::query::CONFIGURED_ATTR_TO_VALUE;
@@ -30,8 +32,6 @@ use kuro_node::visibility::VisibilityPatternList;
 use kuro_node::visibility::VisibilitySpecification;
 use kuro_node::visibility::WithinViewSpecification;
 use kuro_util::arc_str::ArcS;
-use dupe::Dupe;
-use gazebo::prelude::SliceExt;
 use starlark::values::Heap;
 use starlark::values::Value;
 use starlark::values::dict::Dict;

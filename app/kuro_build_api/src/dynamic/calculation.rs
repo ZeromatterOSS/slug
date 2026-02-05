@@ -12,9 +12,9 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_core::deferred::dynamic::DynamicLambdaResultsKey;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
 
 use crate::analysis::registry::RecordedAnalysisValues;
 

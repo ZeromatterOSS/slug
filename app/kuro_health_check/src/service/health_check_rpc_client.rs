@@ -13,6 +13,8 @@
 use std::net::Ipv4Addr;
 use std::time::Duration;
 
+use dupe::Dupe;
+use futures::FutureExt;
 use kuro_common::client_utils::get_channel_tcp;
 use kuro_common::client_utils::retrying;
 use kuro_core::async_once_cell::AsyncOnceCell;
@@ -27,8 +29,6 @@ use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_health_check_proto::health_check_client::HealthCheckClient;
 use kuro_util::properly_reaped_child::ProperlyReapedChild;
 use kuro_util::properly_reaped_child::reap_on_drop_command;
-use dupe::Dupe;
-use futures::FutureExt;
 use tonic::transport::Channel;
 
 use crate::interface::HealthCheckContextEvent;

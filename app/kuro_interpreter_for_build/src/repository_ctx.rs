@@ -39,7 +39,6 @@
 //!     ctx.file("BUILD", "filegroup(name='all', srcs=glob(['**/*']))")
 //! ```
 
-use anyhow::anyhow;
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::Path;
@@ -48,6 +47,7 @@ use std::process::Command;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use anyhow::anyhow;
 use base64::Engine;
 use derive_more::Display;
 use flate2::read::GzDecoder;
@@ -249,7 +249,11 @@ fn repository_path_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Get a child path.
-    fn get_child<'v>(this: &RepositoryPath, child: &str, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+    fn get_child<'v>(
+        this: &RepositoryPath,
+        child: &str,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
         let new_path = if this.path.is_empty() {
             child.to_owned()
         } else {
@@ -267,7 +271,9 @@ fn repository_path_methods(builder: &mut MethodsBuilder) {
         let abs_path = this.absolute_path();
         if abs_path.is_dir() {
             let entries: Vec<String> = std::fs::read_dir(&abs_path)
-                .map_err(|e| starlark::Error::new_other(anyhow!("Failed to read directory: {}", e)))?
+                .map_err(|e| {
+                    starlark::Error::new_other(anyhow!("Failed to read directory: {}", e))
+                })?
                 .filter_map(|entry| entry.ok())
                 .map(|entry| entry.file_name().to_string_lossy().to_string())
                 .collect();
@@ -344,7 +350,11 @@ impl<'v> StarlarkValue<'v> for DownloadInfo {
     }
 
     fn dir_attr(&self) -> Vec<String> {
-        vec!["success".to_owned(), "integrity".to_owned(), "sha256".to_owned()]
+        vec![
+            "success".to_owned(),
+            "integrity".to_owned(),
+            "sha256".to_owned(),
+        ]
     }
 
     fn get_type_starlark_repr() -> Ty {
@@ -404,7 +414,11 @@ impl<'v> StarlarkValue<'v> for ExecutionResult {
     }
 
     fn dir_attr(&self) -> Vec<String> {
-        vec!["return_code".to_owned(), "stdout".to_owned(), "stderr".to_owned()]
+        vec![
+            "return_code".to_owned(),
+            "stdout".to_owned(),
+            "stderr".to_owned(),
+        ]
     }
 
     fn get_type_starlark_repr() -> Ty {
@@ -653,7 +667,8 @@ fn extract_tar_gz(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> R
             {
                 use std::os::unix::fs::PermissionsExt;
                 if let Ok(mode) = entry.header().mode() {
-                    let _ = std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(mode));
+                    let _ =
+                        std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(mode));
                 }
             }
         } else if entry_type.is_symlink() {
@@ -709,7 +724,8 @@ fn extract_zip(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> Resu
             {
                 use std::os::unix::fs::PermissionsExt;
                 if let Some(mode) = file.unix_mode() {
-                    let _ = std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(mode));
+                    let _ =
+                        std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(mode));
                 }
             }
         }
@@ -738,7 +754,9 @@ fn get_urls_from_value<'v>(url_value: Value<'v>) -> Vec<String> {
     if let Some(s) = url_value.unpack_str() {
         vec![s.to_owned()]
     } else if let Some(list) = starlark::values::list::ListRef::from_value(url_value) {
-        list.iter().filter_map(|v| v.unpack_str().map(|s| s.to_owned())).collect()
+        list.iter()
+            .filter_map(|v| v.unpack_str().map(|s| s.to_owned()))
+            .collect()
     } else {
         vec![]
     }
@@ -748,7 +766,11 @@ fn get_urls_from_value<'v>(url_value: Value<'v>) -> Vec<String> {
 #[starlark_module]
 fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     /// Create a path object for a path within the repository.
-    fn path<'v>(this: &RepositoryContext, path_arg: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+    fn path<'v>(
+        this: &RepositoryContext,
+        path_arg: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
         let path_str = if let Some(s) = path_arg.unpack_str() {
             s.to_owned()
         } else if let Some(repo_path) = path_arg.downcast_ref::<RepositoryPath>() {
@@ -785,7 +807,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                     sha256: String::new(),
                 }));
             }
-            return Err(starlark::Error::new_other(anyhow!("No URL provided for download")));
+            return Err(starlark::Error::new_other(anyhow!(
+                "No URL provided for download"
+            )));
         }
 
         // Determine output path
@@ -830,13 +854,15 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
 
                     // Create parent directories
                     if let Some(parent) = output_path.parent() {
-                        std::fs::create_dir_all(parent)
-                            .map_err(|e| starlark::Error::new_other(anyhow!("Failed to create directory: {}", e)))?;
+                        std::fs::create_dir_all(parent).map_err(|e| {
+                            starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
+                        })?;
                     }
 
                     // Write the file
-                    std::fs::write(&output_path, &data)
-                        .map_err(|e| starlark::Error::new_other(anyhow!("Failed to write file: {}", e)))?;
+                    std::fs::write(&output_path, &data).map_err(|e| {
+                        starlark::Error::new_other(anyhow!("Failed to write file: {}", e))
+                    })?;
 
                     // Set executable if requested
                     if executable {
@@ -899,7 +925,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                     sha256: String::new(),
                 }));
             }
-            return Err(starlark::Error::new_other(anyhow!("No URL provided for download_and_extract")));
+            return Err(starlark::Error::new_other(anyhow!(
+                "No URL provided for download_and_extract"
+            )));
         }
 
         // Determine output directory
@@ -941,8 +969,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                     }
 
                     // Create output directory
-                    std::fs::create_dir_all(&output_dir)
-                        .map_err(|e| starlark::Error::new_other(anyhow!("Failed to create directory: {}", e)))?;
+                    std::fs::create_dir_all(&output_dir).map_err(|e| {
+                        starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
+                    })?;
 
                     // Extract the archive
                     let strip = if strip_prefix.is_empty() {
@@ -995,8 +1024,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
 
         // Create parent directories
         if let Some(parent) = file_path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| starlark::Error::new_other(anyhow!("Failed to create directory: {}", e)))?;
+            std::fs::create_dir_all(parent).map_err(|e| {
+                starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
+            })?;
         }
 
         // Write the file
@@ -1031,14 +1061,21 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         // Get arguments as list of strings
-        let args: Vec<String> = if let Some(list) = starlark::values::list::ListRef::from_value(arguments) {
-            list.iter().filter_map(|v| v.unpack_str().map(|s| s.to_owned())).collect()
-        } else {
-            return Err(starlark::Error::new_other(anyhow!("arguments must be a list")));
-        };
+        let args: Vec<String> =
+            if let Some(list) = starlark::values::list::ListRef::from_value(arguments) {
+                list.iter()
+                    .filter_map(|v| v.unpack_str().map(|s| s.to_owned()))
+                    .collect()
+            } else {
+                return Err(starlark::Error::new_other(anyhow!(
+                    "arguments must be a list"
+                )));
+            };
 
         if args.is_empty() {
-            return Err(starlark::Error::new_other(anyhow!("arguments cannot be empty")));
+            return Err(starlark::Error::new_other(anyhow!(
+                "arguments cannot be empty"
+            )));
         }
 
         let program = &args[0];
@@ -1113,15 +1150,17 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
 
         // Create parent directories
         if let Some(parent) = link_path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| starlark::Error::new_other(anyhow!("Failed to create directory: {}", e)))?;
+            std::fs::create_dir_all(parent).map_err(|e| {
+                starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
+            })?;
         }
 
         // Create symlink
         #[cfg(unix)]
         {
-            std::os::unix::fs::symlink(&target_str, &link_path)
-                .map_err(|e| starlark::Error::new_other(anyhow!("Failed to create symlink: {}", e)))?;
+            std::os::unix::fs::symlink(&target_str, &link_path).map_err(|e| {
+                starlark::Error::new_other(anyhow!("Failed to create symlink: {}", e))
+            })?;
         }
 
         #[cfg(not(unix))]
@@ -1155,8 +1194,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         } else if let Some(repo_path) = template.downcast_ref::<RepositoryPath>() {
             // Read template file content
             let template_path = repo_path.absolute_path();
-            std::fs::read_to_string(&template_path)
-                .map_err(|e| starlark::Error::new_other(anyhow!("Failed to read template: {}", e)))?
+            std::fs::read_to_string(&template_path).map_err(|e| {
+                starlark::Error::new_other(anyhow!("Failed to read template: {}", e))
+            })?
         } else {
             template.to_repr()
         };
@@ -1177,8 +1217,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
 
         // Create parent directories
         if let Some(parent) = file_path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| starlark::Error::new_other(anyhow!("Failed to create directory: {}", e)))?;
+            std::fs::create_dir_all(parent).map_err(|e| {
+                starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
+            })?;
         }
 
         // Write the file
@@ -1229,8 +1270,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         let file_path = this.resolve_path(&path_str);
 
         if file_path.is_dir() {
-            std::fs::remove_dir_all(&file_path)
-                .map_err(|e| starlark::Error::new_other(anyhow!("Failed to delete directory: {}", e)))?;
+            std::fs::remove_dir_all(&file_path).map_err(|e| {
+                starlark::Error::new_other(anyhow!("Failed to delete directory: {}", e))
+            })?;
         } else if file_path.exists() {
             std::fs::remove_file(&file_path)
                 .map_err(|e| starlark::Error::new_other(anyhow!("Failed to delete file: {}", e)))?;
@@ -1265,7 +1307,10 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(starlark::Error::new_other(anyhow!("Patch failed: {}", stderr)));
+            return Err(starlark::Error::new_other(anyhow!(
+                "Patch failed: {}",
+                stderr
+            )));
         }
 
         Ok(Value::new_none())
@@ -1305,8 +1350,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             Some(strip_prefix)
         };
 
-        std::fs::create_dir_all(&output_dir)
-            .map_err(|e| starlark::Error::new_other(anyhow!("Failed to create directory: {}", e)))?;
+        std::fs::create_dir_all(&output_dir).map_err(|e| {
+            starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
+        })?;
 
         extract_archive(&data, &output_dir, strip)
             .map_err(|e| starlark::Error::new_other(anyhow!("{}", e)))?;
@@ -1349,9 +1395,8 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                     }
                     #[cfg(not(unix))]
                     {
-                        return Ok(heap.alloc(RepositoryPath::new(
-                            full_path.to_string_lossy().to_string(),
-                        )));
+                        return Ok(heap
+                            .alloc(RepositoryPath::new(full_path.to_string_lossy().to_string())));
                     }
                 }
             }
@@ -1446,8 +1491,9 @@ pub fn register_repository_ctx_types(builder: &mut GlobalsBuilder) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::TempDir;
+
+    use super::*;
 
     #[test]
     fn test_file_creation() {
@@ -1499,9 +1545,10 @@ mod tests {
 
     #[test]
     fn test_extract_tar_gz() {
-        use flate2::write::GzEncoder;
-        use flate2::Compression;
         use std::io::Write;
+
+        use flate2::Compression;
+        use flate2::write::GzEncoder;
 
         let temp_dir = TempDir::new().unwrap();
 
@@ -1528,7 +1575,10 @@ mod tests {
         // Verify
         let extracted_file = dest.join("test.txt");
         assert!(extracted_file.exists());
-        assert_eq!(std::fs::read_to_string(&extracted_file).unwrap(), "Hello, World!");
+        assert_eq!(
+            std::fs::read_to_string(&extracted_file).unwrap(),
+            "Hello, World!"
+        );
     }
 
     #[test]

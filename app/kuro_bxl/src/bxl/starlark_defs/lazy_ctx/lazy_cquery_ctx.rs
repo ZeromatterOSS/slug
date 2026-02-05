@@ -9,10 +9,10 @@
  */
 
 use allocative::Allocative;
-use kuro_core::global_cfg_options::GlobalCfgOptions;
 use derivative::Derivative;
 use derive_more::Display;
 use dupe::Dupe;
+use kuro_core::global_cfg_options::GlobalCfgOptions;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;

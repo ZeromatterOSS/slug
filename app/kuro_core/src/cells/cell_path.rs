@@ -9,10 +9,10 @@
  */
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_error::BuckErrorContext;
 use kuro_error::BuckErrorSerde;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
-use dupe::Dupe;
 use pagable::PagableDeserialize;
 use pagable::PagableDeserializer;
 use pagable::PagableSerialize;
@@ -255,10 +255,7 @@ impl CellPath {
     ///
     /// # kuro_error::Ok(())
     /// ```
-    pub fn join_normalized<P: AsRef<RelativePath>>(
-        &self,
-        path: P,
-    ) -> kuro_error::Result<CellPath> {
+    pub fn join_normalized<P: AsRef<RelativePath>>(&self, path: P) -> kuro_error::Result<CellPath> {
         Ok(CellPath::new(self.cell, self.path.join_normalized(path)?))
     }
 

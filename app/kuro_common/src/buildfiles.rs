@@ -11,13 +11,13 @@
 use std::future::Future;
 use std::sync::Arc;
 
-use kuro_core::cells::name::CellName;
-use kuro_fs::paths::file_name::FileNameBuf;
 use dice::CancellationContext;
 use dice::DiceComputations;
 use dice::Key;
 use gazebo::prelude::SliceExt as _;
 use gazebo::prelude::VecExt as _;
+use kuro_core::cells::name::CellName;
+use kuro_fs::paths::file_name::FileNameBuf;
 
 use crate::legacy_configs::dice::HasLegacyConfigs;
 use crate::legacy_configs::key::BuckconfigKeyRef;
@@ -102,9 +102,9 @@ impl HasBuildfiles for DiceComputations<'_> {
 
 #[cfg(test)]
 mod tests {
-    use kuro_core::cells::name::CellName;
     use gazebo::prelude::SliceExt;
     use indoc::indoc;
+    use kuro_core::cells::name::CellName;
 
     use crate::buildfiles::parse_buildfile_name;
     use crate::legacy_configs::cells::BuckConfigBasedCells;

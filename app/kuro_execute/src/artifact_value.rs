@@ -12,12 +12,12 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_common::external_symlink::ExternalSymlink;
 use kuro_common::file_ops::metadata::FileDigest;
 use kuro_common::file_ops::metadata::FileMetadata;
 use kuro_core::content_hash::ContentBasedPathHash;
 use kuro_util::strong_hasher::Blake3StrongHasher;
-use dupe::Dupe;
 
 use crate::directory::ActionDirectoryEntry;
 use crate::directory::ActionDirectoryMember;

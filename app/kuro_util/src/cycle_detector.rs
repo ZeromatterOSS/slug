@@ -18,8 +18,8 @@ use std::hash::Hash;
 use std::mem::ManuallyDrop;
 use std::time::Duration;
 
-use kuro_error::kuro_error;
 use futures::lock::Mutex;
+use kuro_error::kuro_error;
 use starlark_map::small_set::SmallSet;
 use tokio::select;
 use tokio::sync::mpsc;

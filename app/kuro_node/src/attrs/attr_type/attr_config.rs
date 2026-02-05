@@ -10,9 +10,9 @@
 
 use std::fmt::Display;
 
-use kuro_core::package::source_path::SourcePathRef;
 use dupe::Dupe;
 use either::Either;
+use kuro_core::package::source_path::SourcePathRef;
 use serde_json::to_value;
 
 use crate::attrs::attr_type::any_matches::AnyMatches;

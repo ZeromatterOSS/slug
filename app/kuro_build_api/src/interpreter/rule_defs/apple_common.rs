@@ -15,6 +15,9 @@
 //!
 //! Reference: https://bazel.build/rules/lib/apple_common
 
+use std::fmt;
+use std::fmt::Display;
+
 use allocative::Allocative;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
@@ -29,8 +32,6 @@ use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
 use starlark::values::starlark_value;
-use std::fmt;
-use std::fmt::Display;
 
 // ============================================================================
 // AppleCommonModule - The main apple_common namespace
@@ -108,19 +109,14 @@ fn apple_common_module_methods(builder: &mut MethodsBuilder) {
 
     /// The Objc provider.
     #[starlark(attribute)]
-    fn Objc(
-        this: &AppleCommonModule,
-    ) -> starlark::Result<ObjcProvider> {
+    fn Objc(this: &AppleCommonModule) -> starlark::Result<ObjcProvider> {
         let _ = this;
         Ok(ObjcProvider)
     }
 
     /// Apple platform type enum.
     #[starlark(attribute)]
-    fn platform_type<'v>(
-        this: &AppleCommonModule,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn platform_type<'v>(this: &AppleCommonModule, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         // Return a struct with platform type constants
         Ok(heap.alloc(PlatformType))

@@ -11,6 +11,8 @@
 use std::fmt::Display;
 
 use allocative::Allocative;
+use dupe::Dupe;
+use dupe::OptionDupedExt;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::artifact_type::BaseArtifactKind;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
@@ -18,8 +20,6 @@ use kuro_execute::path::artifact_path::ArtifactPath;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_interpreter::types::provider::callable::ValueAsProviderCallableLike;
-use dupe::Dupe;
-use dupe::OptionDupedExt;
 use serde::Serialize;
 use serde::Serializer;
 use starlark::any::ProvidesStaticType;
@@ -68,9 +68,7 @@ enum ArtifactProviderError {
          Artifacts only support DefaultInfo provider access."
     )]
     IndexTypeNotProvider(&'static str),
-    #[error(
-        "artifact does not have provider `{provider}`. Artifacts only have DefaultInfo."
-    )]
+    #[error("artifact does not have provider `{provider}`. Artifacts only have DefaultInfo.")]
     ProviderNotFound { provider: String },
 }
 
@@ -346,16 +344,20 @@ impl<'v> StarlarkValue<'v> for StarlarkArtifact {
                     let default_info = DefaultInfo::from_artifact_value(heap, artifact_value);
                     Ok(heap.alloc(default_info))
                 } else {
-                    Err(kuro_error::Error::from(ArtifactProviderError::ProviderNotFound {
-                        provider: provider_id.name.clone(),
-                    })
-                    .into())
+                    Err(
+                        kuro_error::Error::from(ArtifactProviderError::ProviderNotFound {
+                            provider: provider_id.name.clone(),
+                        })
+                        .into(),
+                    )
                 }
             }
-            None => Err(kuro_error::Error::from(ArtifactProviderError::IndexTypeNotProvider(
-                index.get_type(),
-            ))
-            .into()),
+            None => Err(
+                kuro_error::Error::from(ArtifactProviderError::IndexTypeNotProvider(
+                    index.get_type(),
+                ))
+                .into(),
+            ),
         }
     }
 
@@ -373,10 +375,12 @@ impl<'v> StarlarkValue<'v> for StarlarkArtifact {
             None => {
                 // Not a provider type - this isn't an error in Bazel, just returns false
                 // However, to match Bazel behavior we should error for non-provider types
-                Err(kuro_error::Error::from(ArtifactProviderError::IndexTypeNotProvider(
-                    other.get_type(),
-                ))
-                .into())
+                Err(
+                    kuro_error::Error::from(ArtifactProviderError::IndexTypeNotProvider(
+                        other.get_type(),
+                    ))
+                    .into(),
+                )
             }
         }
     }

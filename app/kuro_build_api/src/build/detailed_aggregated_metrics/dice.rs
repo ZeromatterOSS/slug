@@ -10,14 +10,14 @@
 
 use std::future::Future;
 
+use dice::DiceComputations;
+use dice::DiceDataBuilder;
+use dice::UserComputationData;
 use kuro_core::deferred::key::DeferredHolderKey;
 use kuro_data::ComputeDetailedAggregatedMetricsEnd;
 use kuro_data::ComputeDetailedAggregatedMetricsStart;
 use kuro_error::internal_error;
 use kuro_events::dispatch::span_async_simple;
-use dice::DiceComputations;
-use dice::DiceDataBuilder;
-use dice::UserComputationData;
 
 use crate::build::detailed_aggregated_metrics::events::DetailedAggregatedMetricsEventHandler;
 use crate::build::detailed_aggregated_metrics::events::DetailedAggregatedMetricsPerBuildEventsHolder;

@@ -11,16 +11,16 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use kuro_core::cells::name::CellName;
-use kuro_core::cells::paths::CellRelativePath;
-use kuro_core::cells::unchecked_cell_rel_path::UncheckedCellRelativePath;
-use kuro_events::dispatch::console_message;
-use kuro_fs::paths::file_name::FileNameBuf;
 use cmp_any::PartialEqAny;
 use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use kuro_core::cells::name::CellName;
+use kuro_core::cells::paths::CellRelativePath;
+use kuro_core::cells::unchecked_cell_rel_path::UncheckedCellRelativePath;
+use kuro_events::dispatch::console_message;
+use kuro_fs::paths::file_name::FileNameBuf;
 
 use crate::dice::cells::HasCellResolver;
 use crate::external_cells::EXTERNAL_CELLS_IMPL;
@@ -41,9 +41,9 @@ use crate::ignores::file_ignores::FileIgnoreResult;
 /// in unittests
 mod keys {
     use allocative::Allocative;
-    use kuro_core::cells::name::CellName;
     use derive_more::Display;
     use dupe::Dupe;
+    use kuro_core::cells::name::CellName;
 
     use crate::file_ops::delegate::FileOpsDelegateWithIgnores;
     use crate::file_ops::dice::CheckIgnores;

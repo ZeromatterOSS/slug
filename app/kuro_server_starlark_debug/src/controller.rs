@@ -10,8 +10,8 @@
 
 use std::sync::Arc;
 
-use kuro_interpreter::starlark_debug::StarlarkDebugController;
 use dupe::Dupe;
+use kuro_interpreter::starlark_debug::StarlarkDebugController;
 use starlark::debug::DapAdapterEvalHook;
 use tokio::sync::OwnedSemaphorePermit;
 use tracing::debug;

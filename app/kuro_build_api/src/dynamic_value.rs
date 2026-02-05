@@ -9,8 +9,8 @@
  */
 
 use allocative::Allocative;
-use kuro_core::deferred::dynamic::DynamicLambdaResultsKey;
 use dupe::Dupe;
+use kuro_core::deferred::dynamic::DynamicLambdaResultsKey;
 
 #[derive(
     Clone,

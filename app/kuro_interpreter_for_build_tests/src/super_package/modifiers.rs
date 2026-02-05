@@ -8,10 +8,10 @@
  * above-listed licenses.
  */
 
+use indoc::indoc;
 use kuro_core::fs::project::ProjectRootTemp;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_node::nodes::frontend::TargetGraphCalculation;
-use indoc::indoc;
 
 use crate::tests::calculation;
 

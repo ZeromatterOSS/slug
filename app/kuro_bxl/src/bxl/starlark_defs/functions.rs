@@ -10,6 +10,8 @@
 
 use std::time::Instant;
 
+use dupe::Dupe;
+use futures::FutureExt;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::ValueAsInputArtifactLikeUnpack;
 use kuro_build_api::interpreter::rule_defs::cmd_args::value_as::ValueAsCommandLineLike;
 use kuro_core::cells::CellAliasResolver;
@@ -21,8 +23,6 @@ use kuro_interpreter_for_build::super_package::package_value::SuperPackageValues
 use kuro_node::metadata::key::MetadataKeyRef;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_node::nodes::unconfigured::TargetNode;
-use dupe::Dupe;
-use futures::FutureExt;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;

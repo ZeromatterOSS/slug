@@ -8,8 +8,8 @@
  * above-listed licenses.
  */
 
-use kuro_event_observer::starlark_debug::StarlarkDebuggerState;
 use gazebo::prelude::*;
+use kuro_event_observer::starlark_debug::StarlarkDebuggerState;
 use superconsole::Component;
 use superconsole::Lines;
 

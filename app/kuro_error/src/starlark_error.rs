@@ -226,8 +226,8 @@ mod tests {
     use allocative::Allocative;
 
     use crate as kuro_error;
-    use crate::kuro_error;
     use crate::context_value::StarlarkContext;
+    use crate::kuro_error;
     use crate::starlark_error::error_with_starlark_context;
 
     #[derive(kuro_error::Error, Debug, Allocative)]

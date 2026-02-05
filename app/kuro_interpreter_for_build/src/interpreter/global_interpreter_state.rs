@@ -12,13 +12,13 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
-use kuro_common::dice::cells::HasCellResolver;
-use kuro_core::cells::CellResolver;
-use kuro_interpreter::dice::starlark_types::GetStarlarkTypes;
 use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use kuro_common::dice::cells::HasCellResolver;
+use kuro_core::cells::CellResolver;
+use kuro_interpreter::dice::starlark_types::GetStarlarkTypes;
 use starlark::environment::Globals;
 
 use crate::interpreter::configuror::BuildInterpreterConfiguror;

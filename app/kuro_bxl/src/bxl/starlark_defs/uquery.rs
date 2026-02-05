@@ -11,18 +11,18 @@
 use std::borrow::Cow;
 
 use allocative::Allocative;
-use kuro_build_api::query::bxl::BxlUqueryFunctions;
-use kuro_build_api::query::bxl::NEW_BXL_UQUERY_FUNCTIONS;
-use kuro_build_api::query::oneshot::QUERY_FRONTEND;
-use kuro_node::nodes::unconfigured::TargetNode;
-use kuro_query::query::syntax::simple::eval::set::TargetSet;
-use kuro_query::query::syntax::simple::functions::helpers::CapturedExpr;
 use derivative::Derivative;
 use derive_more::Display;
 use dice::DiceComputations;
 use dupe::Dupe;
 use futures::FutureExt;
 use gazebo::prelude::OptionExt;
+use kuro_build_api::query::bxl::BxlUqueryFunctions;
+use kuro_build_api::query::bxl::NEW_BXL_UQUERY_FUNCTIONS;
+use kuro_build_api::query::oneshot::QUERY_FRONTEND;
+use kuro_node::nodes::unconfigured::TargetNode;
+use kuro_query::query::syntax::simple::eval::set::TargetSet;
+use kuro_query::query::syntax::simple::functions::helpers::CapturedExpr;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;

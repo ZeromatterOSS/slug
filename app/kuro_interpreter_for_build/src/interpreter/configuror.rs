@@ -12,6 +12,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_common::package_listing::listing::PackageListing;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::cells::cell_path_with_allowed_relative_dir::CellPathWithAllowedRelativeDir;
@@ -24,7 +25,6 @@ use kuro_interpreter::package_imports::ImplicitImport;
 use kuro_interpreter::paths::module::StarlarkModulePath;
 use kuro_interpreter::prelude_path::PreludePath;
 use kuro_node::super_package::SuperPackage;
-use dupe::Dupe;
 use starlark::environment::GlobalsBuilder;
 
 use crate::attrs::coerce::ctx::BuildAttrCoercionContext;

@@ -12,8 +12,8 @@ use std::borrow::Borrow;
 use std::ops::Deref;
 
 use allocative::Allocative;
-use kuro_util::arc_str::ThinArcStr;
 use dupe::Dupe;
+use kuro_util::arc_str::ThinArcStr;
 use pagable::Pagable;
 use serde::Deserialize;
 use serde::Serialize;

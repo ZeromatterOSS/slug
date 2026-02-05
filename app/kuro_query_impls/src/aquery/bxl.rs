@@ -12,6 +12,12 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
+use dice::LinearRecomputeDiceComputations;
+use dupe::Dupe;
+use futures::FutureExt;
+use futures::future::BoxFuture;
+use itertools::Either;
 use kuro_build_api::actions::query::ActionQueryNode;
 use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
 use kuro_build_api::query::bxl::BxlAqueryFunctions;
@@ -30,12 +36,6 @@ use kuro_query::query::syntax::simple::eval::values::QueryValue;
 use kuro_query::query::syntax::simple::functions::DefaultQueryFunctions;
 use kuro_query::query::syntax::simple::functions::DefaultQueryFunctionsModule;
 use kuro_query::query::syntax::simple::functions::helpers::CapturedExpr;
-use dice::DiceComputations;
-use dice::LinearRecomputeDiceComputations;
-use dupe::Dupe;
-use futures::FutureExt;
-use futures::future::BoxFuture;
-use itertools::Either;
 
 use crate::aquery::environment::AqueryDelegate;
 use crate::aquery::environment::AqueryEnvironment;

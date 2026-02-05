@@ -11,6 +11,7 @@
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::cells::cell_path::CellPathRef;
 use kuro_core::cells::paths::CellRelativePath;
 use kuro_interpreter::downstream_crate_starlark_defs::REGISTER_BUCK2_CFG_CONSTRUCTOR_GLOBALS;
@@ -20,7 +21,6 @@ use kuro_interpreter_for_build::interpreter::package_file_extra::MAKE_CFG_CONSTR
 use kuro_interpreter_for_build::interpreter::package_file_extra::PackageFileExtra;
 use kuro_node::cfg_constructor::CfgConstructorImpl;
 use kuro_node::metadata::key::MetadataKeyRef;
-use dupe::Dupe;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;

@@ -12,6 +12,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_core::cells::CellResolver;
 use kuro_core::cells::name::CellName;
 use kuro_core::configuration::compatibility::MaybeCompatible;
@@ -25,7 +26,6 @@ use kuro_query::query::syntax::simple::eval::file_set::FileSet;
 use kuro_query::query::syntax::simple::eval::set::TargetSet;
 use kuro_query::query::syntax::simple::functions::helpers::CapturedExpr;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
 
 use crate::actions::query::ActionQueryNode;
 

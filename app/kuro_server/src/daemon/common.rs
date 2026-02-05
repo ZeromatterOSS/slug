@@ -11,11 +11,12 @@
 use std::sync::Arc;
 use std::sync::OnceLock;
 
+use dupe::Dupe;
+use host_sharing::HostSharingBroker;
 use kuro_build_api::actions::execute::dice_data::CommandExecutorResponse;
 use kuro_build_api::actions::execute::dice_data::HasCommandExecutor;
 use kuro_cli_proto::client_context::HostPlatformOverride;
 use kuro_cli_proto::common_build_options::ExecutionStrategy;
-use kuro_core::kuro_env;
 use kuro_core::execution_types::executor_config::CacheUploadBehavior;
 use kuro_core::execution_types::executor_config::CommandExecutorConfig;
 use kuro_core::execution_types::executor_config::CommandGenerationOptions;
@@ -32,6 +33,7 @@ use kuro_core::execution_types::executor_config::RemoteExecutorOptions;
 use kuro_core::execution_types::executor_config::RemoteExecutorUseCase;
 use kuro_core::fs::artifact_path_resolver::ArtifactFs;
 use kuro_core::fs::project::ProjectRoot;
+use kuro_core::kuro_env;
 use kuro_error::BuckErrorContext;
 use kuro_events::daemon_id::DaemonId;
 use kuro_execute::execute::blocking::BlockingExecutor;
@@ -62,8 +64,6 @@ use kuro_execute_impl::low_pass_filter::LowPassFilter;
 use kuro_execute_impl::re::paranoid_download::ParanoidDownloader;
 use kuro_execute_impl::sqlite::incremental_state_db::IncrementalDbState;
 use kuro_resource_control::memory_tracker::MemoryTrackerHandle;
-use dupe::Dupe;
-use host_sharing::HostSharingBroker;
 
 /// For each buck invocations, we'll have a single CommandExecutorFactory. This contains shared
 /// state used by all command executor strategies.

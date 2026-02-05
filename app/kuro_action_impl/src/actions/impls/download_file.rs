@@ -13,6 +13,8 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use dupe::Dupe;
+use indexmap::IndexSet;
 use kuro_artifact::artifact::build_artifact::BuildArtifact;
 use kuro_build_api::actions::Action;
 use kuro_build_api::actions::ActionExecutionCtx;
@@ -42,8 +44,6 @@ use kuro_execute::materialize::http::http_head;
 use kuro_execute::materialize::materializer::DeclareArtifactPayload;
 use kuro_execute::materialize::materializer::HttpDownloadInfo;
 use kuro_http::HttpClient;
-use dupe::Dupe;
-use indexmap::IndexSet;
 use starlark::values::OwnedFrozenValue;
 
 use crate::actions::impls::offline;

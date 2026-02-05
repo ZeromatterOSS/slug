@@ -10,7 +10,6 @@
 
 use std::future::Future;
 
-use kuro_error::BuckErrorContext;
 use bytes::Bytes;
 use http::HeaderMap;
 use http::Method;
@@ -18,6 +17,7 @@ use http::Uri;
 use hyper::Request;
 use hyper::Response;
 use hyper::StatusCode;
+use kuro_error::BuckErrorContext;
 
 use crate::HttpError;
 

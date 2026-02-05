@@ -12,6 +12,9 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Write;
 
+use futures::TryStreamExt;
+use futures::stream::Stream;
+use indexmap::IndexMap;
 use kuro_client_ctx::client_ctx::BuckSubcommand;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
 use kuro_client_ctx::common::BuckArgMatches;
@@ -33,9 +36,6 @@ use kuro_event_observer::what_ran::WhatRanOutputWriter;
 use kuro_event_observer::what_ran::WhatRanRelevantAction;
 use kuro_event_observer::what_ran::WhatRanState;
 use kuro_events::span::SpanId;
-use futures::TryStreamExt;
-use futures::stream::Stream;
-use indexmap::IndexMap;
 
 use crate::LogCommandOutputFormat;
 use crate::LogCommandOutputFormatWithWriter;

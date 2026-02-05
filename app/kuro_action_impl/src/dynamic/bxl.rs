@@ -11,6 +11,10 @@
 use std::collections::HashMap;
 use std::pin::Pin;
 
+use dice::DiceComputations;
+use dice_futures::cancellation::CancellationObserver;
+use futures::Future;
+use indexmap::IndexMap;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_build_api::analysis::registry::RecordedAnalysisValues;
 use kuro_build_api::dynamic_value::DynamicValue;
@@ -20,10 +24,6 @@ use kuro_core::deferred::dynamic::DynamicLambdaResultsKey;
 use kuro_execute::artifact_value::ArtifactValue;
 use kuro_execute::digest_config::DigestConfig;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
-use dice_futures::cancellation::CancellationObserver;
-use futures::Future;
-use indexmap::IndexMap;
 use starlark::values::OwnedRefFrozenRef;
 
 use crate::dynamic::deferred::InputArtifactsMaterialized;

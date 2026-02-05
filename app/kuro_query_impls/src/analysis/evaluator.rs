@@ -10,6 +10,7 @@
 
 //! Implementation of common cquery/uquery pieces.
 
+use futures::Future;
 use kuro_common::scope::scope_and_collect_with_dispatcher;
 use kuro_error::BuckErrorContext;
 use kuro_events::dispatch::EventDispatcher;
@@ -22,7 +23,6 @@ use kuro_query::query::syntax::simple::eval::values::QueryEvaluationValue;
 use kuro_query::query::syntax::simple::functions::QueryFunctions;
 use kuro_query_parser::multi_query::MaybeMultiQuery;
 use kuro_query_parser::multi_query::MultiQueryItem;
-use futures::Future;
 
 pub(crate) async fn eval_query<
     F: QueryFunctions<Env = Env>,

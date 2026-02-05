@@ -11,6 +11,10 @@
 use core::iter::Iterator;
 use std::collections::HashMap;
 
+use dice::DiceTransaction;
+use dupe::Dupe;
+use dupe::IterDupedExt;
+use futures::TryStreamExt;
 use kuro_build_api::query::oneshot::QUERY_FRONTEND;
 use kuro_cli_proto::new_generic::ExplainRequest;
 use kuro_data::CommandInvalidationInfo;
@@ -32,10 +36,6 @@ use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_query::query::syntax::simple::eval::label_indexed::LabelIndexedSet;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
 use kuro_server_ctx::global_cfg_options::global_cfg_options_from_client_context;
-use dice::DiceTransaction;
-use dupe::Dupe;
-use dupe::IterDupedExt;
-use futures::TryStreamExt;
 
 #[allow(clippy::vec_box)]
 #[cfg(fbcode_build)]

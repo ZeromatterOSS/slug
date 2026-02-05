@@ -90,11 +90,12 @@ pub fn tag_value_to_serialized(tag_value: &TagValue) -> SerializedTagValue {
         TagValue::List(items) => {
             SerializedTagValue::List(items.iter().map(tag_value_to_serialized).collect())
         }
-        TagValue::Dict(entries) => {
-            SerializedTagValue::Dict(
-                entries.iter().map(|(k, v)| (k.clone(), tag_value_to_serialized(v))).collect()
-            )
-        }
+        TagValue::Dict(entries) => SerializedTagValue::Dict(
+            entries
+                .iter()
+                .map(|(k, v)| (k.clone(), tag_value_to_serialized(v)))
+                .collect(),
+        ),
     }
 }
 
@@ -105,7 +106,8 @@ pub fn tag_value_to_starlark<'v>(tag_value: &TagValue, heap: Heap<'v>) -> Value<
 
 /// Convert ExtensionTag to SerializedTag.
 pub fn extension_tag_to_serialized(tag: &ExtensionTag) -> SerializedTag {
-    let kwargs: Vec<(String, SerializedTagValue)> = tag.kwargs
+    let kwargs: Vec<(String, SerializedTagValue)> = tag
+        .kwargs
         .iter()
         .map(|(k, v)| (k.clone(), tag_value_to_serialized(v)))
         .collect();
@@ -119,13 +121,12 @@ pub fn extension_tag_to_struct<'v>(tag: &ExtensionTag, heap: Heap<'v>) -> Value<
 
 /// Build a BazelModule from ModuleInfo with full tag data.
 pub fn module_info_to_bazel_module(info: &ModuleInfo) -> BazelModule {
-    let tags_by_class: HashMap<String, Vec<SerializedTag>> = info.tags
+    let tags_by_class: HashMap<String, Vec<SerializedTag>> = info
+        .tags
         .iter()
         .map(|(class_name, tags)| {
-            let serialized_tags: Vec<SerializedTag> = tags
-                .iter()
-                .map(extension_tag_to_serialized)
-                .collect();
+            let serialized_tags: Vec<SerializedTag> =
+                tags.iter().map(extension_tag_to_serialized).collect();
             (class_name.clone(), serialized_tags)
         })
         .collect();
@@ -140,13 +141,12 @@ pub fn module_info_to_bazel_module(info: &ModuleInfo) -> BazelModule {
 
 /// Build a SerializedModule from ModuleInfo.
 pub fn module_info_to_serialized(info: &ModuleInfo) -> SerializedModule {
-    let tags_by_class: HashMap<String, Vec<SerializedTag>> = info.tags
+    let tags_by_class: HashMap<String, Vec<SerializedTag>> = info
+        .tags
         .iter()
         .map(|(class_name, tags)| {
-            let serialized_tags: Vec<SerializedTag> = tags
-                .iter()
-                .map(extension_tag_to_serialized)
-                .collect();
+            let serialized_tags: Vec<SerializedTag> =
+                tags.iter().map(extension_tag_to_serialized).collect();
             (class_name.clone(), serialized_tags)
         })
         .collect();
@@ -185,12 +185,10 @@ pub fn build_module_infos(
         .collect();
 
     // Sort so root module comes first
-    infos.sort_by(|a, b| {
-        match (a.is_root, b.is_root) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.cmp(&b.name),
-        }
+    infos.sort_by(|a, b| match (a.is_root, b.is_root) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.cmp(&b.name),
     });
 
     infos
@@ -207,10 +205,8 @@ pub fn build_module_context(
     let infos = build_module_infos(aggregated, root_module_name);
 
     // Convert to serialized modules with full tag data
-    let serialized_modules: Vec<SerializedModule> = infos
-        .iter()
-        .map(module_info_to_serialized)
-        .collect();
+    let serialized_modules: Vec<SerializedModule> =
+        infos.iter().map(module_info_to_serialized).collect();
 
     // Check if root module has a non-dev dependency (for now, assume true if root is present)
     let root_has_non_dev = infos.iter().any(|i| i.is_root);
@@ -237,16 +233,13 @@ pub fn build_module_context_with_versions(
     }
 
     // Convert to serialized modules
-    let serialized_modules: Vec<SerializedModule> = infos
-        .iter()
-        .map(module_info_to_serialized)
-        .collect();
+    let serialized_modules: Vec<SerializedModule> =
+        infos.iter().map(module_info_to_serialized).collect();
 
     let root_has_non_dev = infos.iter().any(|i| i.is_root);
 
     ModuleContext::from_serialized(serialized_modules, root_has_non_dev)
 }
-
 
 /// Extension execution context.
 ///
@@ -266,13 +259,21 @@ impl ExtensionExecutionContext {
     }
 
     /// Register a generated repository.
-    pub fn register_repo(&mut self, name: String, rule_class: String, attributes: HashMap<String, serde_json::Value>) {
-        self.generated_repos.insert(name.clone(), GeneratedRepo {
-            name,
-            rule_class,
-            attributes,
-            path: None,
-        });
+    pub fn register_repo(
+        &mut self,
+        name: String,
+        rule_class: String,
+        attributes: HashMap<String, serde_json::Value>,
+    ) {
+        self.generated_repos.insert(
+            name.clone(),
+            GeneratedRepo {
+                name,
+                rule_class,
+                attributes,
+                path: None,
+            },
+        );
     }
 
     /// Get the execution result.
@@ -329,8 +330,9 @@ impl ExtensionExecutor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use kuro_bzlmod::types::TagValue;
+
+    use super::*;
 
     #[test]
     fn test_tag_value_serialization() {
@@ -351,10 +353,7 @@ mod tests {
         assert!(matches!(serialized, SerializedTagValue::None));
 
         // Test list
-        let list = TagValue::List(vec![
-            TagValue::String("a".to_string()),
-            TagValue::Int(1),
-        ]);
+        let list = TagValue::List(vec![TagValue::String("a".to_string()), TagValue::Int(1)]);
         let serialized = tag_value_to_serialized(&list);
         assert!(matches!(serialized, SerializedTagValue::List(_)));
     }
@@ -386,12 +385,16 @@ mod tests {
     #[test]
     fn test_extension_tag_serialization() {
         let mut tag = ExtensionTag::new("install".to_string());
-        tag.kwargs.push(("name".to_string(), TagValue::String("foo".to_string())));
-        tag.kwargs.push(("version".to_string(), TagValue::String("1.0".to_string())));
+        tag.kwargs
+            .push(("name".to_string(), TagValue::String("foo".to_string())));
+        tag.kwargs
+            .push(("version".to_string(), TagValue::String("1.0".to_string())));
 
         let serialized = extension_tag_to_serialized(&tag);
         assert_eq!(serialized.kwargs.len(), 2);
-        assert!(matches!(&serialized.kwargs[0], (k, SerializedTagValue::String(v)) if k == "name" && v == "foo"));
+        assert!(
+            matches!(&serialized.kwargs[0], (k, SerializedTagValue::String(v)) if k == "name" && v == "foo")
+        );
     }
 
     #[test]
@@ -418,7 +421,8 @@ mod tests {
         let mut aggregated = AggregatedExtension::new("test.bzl", "ext");
 
         let mut tag = ExtensionTag::new("install".to_string());
-        tag.kwargs.push(("name".to_string(), TagValue::String("mylib".to_string())));
+        tag.kwargs
+            .push(("name".to_string(), TagValue::String("mylib".to_string())));
 
         aggregated.add_module_tags("root", vec![tag]);
 

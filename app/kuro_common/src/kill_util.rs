@@ -77,14 +77,12 @@ mod unix {
             Ok(_) => ControlFlow::Continue(()),
             // There is no such process, our desired outcome.
             Err(nix::errno::Errno::ESRCH) => ControlFlow::Break(StoppedWaiting::Success),
-            Err(e) => {
-                ControlFlow::Break(StoppedWaiting::UnexpectedError(kuro_error::kuro_error!(
-                    kuro_error::ErrorTag::Tier0,
-                    "Unexpected error while waiting for process `{}` to terminate (`{}`)",
-                    pid,
-                    e
-                )))
-            }
+            Err(e) => ControlFlow::Break(StoppedWaiting::UnexpectedError(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Tier0,
+                "Unexpected error while waiting for process `{}` to terminate (`{}`)",
+                pid,
+                e
+            ))),
         }
     }
 

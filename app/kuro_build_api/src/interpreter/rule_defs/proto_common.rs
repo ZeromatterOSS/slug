@@ -38,6 +38,9 @@
 //!
 //! Reference: https://bazel.build/rules/lib/ProtoInfo
 
+use std::fmt;
+use std::fmt::Display;
+
 use allocative::Allocative;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
@@ -46,16 +49,14 @@ use starlark::environment::MethodsStatic;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
-use starlark::values::none::NoneOr;
-use starlark::values::none::NoneType;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
+use starlark::values::none::NoneOr;
+use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
-use std::fmt;
-use std::fmt::Display;
 
 // ============================================================================
 // ProtoInfo Provider - Encapsulates information provided by proto_library
@@ -164,7 +165,9 @@ fn proto_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] _this: &ProtoCommonModule,
         #[starlark(require = named)] _actions: Value<'v>,
         #[starlark(require = named)] _proto_info: Value<'v>,
-        #[starlark(require = named, default = NoneOr::None)] _proto_lang_toolchain_info: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] _proto_lang_toolchain_info: NoneOr<
+            Value<'v>,
+        >,
         #[starlark(require = named, default = NoneOr::None)] _generated_files: NoneOr<Value<'v>>,
         #[starlark(require = named, default = NoneOr::None)] _plugin_output: NoneOr<Value<'v>>,
         #[starlark(require = named, default = NoneOr::None)] _additional_args: NoneOr<Value<'v>>,

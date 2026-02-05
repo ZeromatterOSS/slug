@@ -31,17 +31,17 @@ use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
+use starlark::values::Heap;
+use starlark::values::NoSerialize;
+use starlark::values::StarlarkValue;
+use starlark::values::Value;
+use starlark::values::ValueLike;
 use starlark::values::dict::DictRef;
 use starlark::values::list::ListRef;
 use starlark::values::list::UnpackList;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark::values::tuple::UnpackTuple;
-use starlark::values::Heap;
-use starlark::values::NoSerialize;
-use starlark::values::StarlarkValue;
-use starlark::values::Value;
-use starlark::values::ValueLike;
 
 use crate::types::ArchiveOverride;
 use crate::types::BazelDep;
@@ -622,10 +622,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         let mut ctx = ctx.borrow_mut();
 
         // Create the extension usage record
-        let mut ext = ExtensionUsage::new(
-            extension_bzl_file.to_owned(),
-            extension_name.to_owned(),
-        );
+        let mut ext = ExtensionUsage::new(extension_bzl_file.to_owned(), extension_name.to_owned());
         ext.dev_dependency = dev_dependency;
         ext.isolate = isolate;
 
@@ -663,13 +660,11 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         let mut ctx = ctx.borrow_mut();
 
         // Get the extension proxy
-        let proxy = extension
-            .downcast_ref::<ExtensionProxy>()
-            .ok_or_else(|| {
-                starlark::Error::new_other(anyhow::anyhow!(
-                    "use_repo() first argument must be an extension from use_extension()"
-                ))
-            })?;
+        let proxy = extension.downcast_ref::<ExtensionProxy>().ok_or_else(|| {
+            starlark::Error::new_other(anyhow::anyhow!(
+                "use_repo() first argument must be an extension from use_extension()"
+            ))
+        })?;
 
         // Create UseRepo record
         let mut use_repo = UseRepo::new();

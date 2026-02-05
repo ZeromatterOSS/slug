@@ -8,6 +8,9 @@
  * above-listed licenses.
  */
 
+use dice::DiceComputations;
+use dupe::Dupe;
+use gazebo::prelude::VecExt;
 use kuro_common::pattern::parse_from_cli;
 use kuro_common::pattern::resolve::ResolvedPattern;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
@@ -19,9 +22,6 @@ use kuro_core::pattern::pattern_type::ProvidersPatternExtra;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_node::nodes::frontend::TargetGraphCalculation;
-use dice::DiceComputations;
-use dupe::Dupe;
-use gazebo::prelude::VecExt;
 
 async fn resolve_patterns_to_targets<T: PatternType>(
     ctx: &mut DiceComputations<'_>,

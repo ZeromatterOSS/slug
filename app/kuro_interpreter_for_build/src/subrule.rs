@@ -179,7 +179,12 @@ impl<'v> StarlarkSubruleCallable<'v> {
         let attrs_vec: Vec<(String, StarlarkAttribute)> = attrs
             .entries
             .into_iter()
-            .map(|(name, attr)| (name.to_owned(), StarlarkAttribute::new(attr.clone_attribute())))
+            .map(|(name, attr)| {
+                (
+                    name.to_owned(),
+                    StarlarkAttribute::new(attr.clone_attribute()),
+                )
+            })
             .collect();
 
         Ok(StarlarkSubruleCallable {
@@ -266,7 +271,9 @@ impl<'v> Freeze for StarlarkSubruleCallable<'v> {
         let name = match self.name.into_inner() {
             Some(name) => name,
             None => {
-                return Err(FreezeError::new(SubruleError::SubruleNotAssigned.to_string()));
+                return Err(FreezeError::new(
+                    SubruleError::SubruleNotAssigned.to_string(),
+                ));
             }
         };
 
@@ -384,11 +391,7 @@ pub fn register_subrule_function(builder: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkSubruleCallable<'v>> {
         // Convert toolchains to strings (they're typically labels but we store as strings for now)
-        let toolchains_strings: Vec<String> = toolchains
-            .items
-            .iter()
-            .map(|v| v.to_str())
-            .collect();
+        let toolchains_strings: Vec<String> = toolchains.items.iter().map(|v| v.to_str()).collect();
 
         Ok(StarlarkSubruleCallable::new(
             implementation,

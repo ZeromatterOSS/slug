@@ -8,12 +8,12 @@
  * above-listed licenses.
  */
 
-use kuro_core::directory_digest::DirectoryDigest;
-use kuro_fs::paths::file_name::FileName;
-use kuro_fs::paths::file_name::FileNameBuf;
 use derivative::Derivative;
 use dupe::Clone_;
 use dupe::Copy_;
+use kuro_core::directory_digest::DirectoryDigest;
+use kuro_fs::paths::file_name::FileName;
+use kuro_fs::paths::file_name::FileNameBuf;
 
 use crate::directory::directory::Directory;
 use crate::directory::directory_ref::DirectoryRef;

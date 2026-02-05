@@ -10,9 +10,9 @@
 
 use std::fmt::Formatter;
 
+use dupe::Dupe;
 use kuro_query::query::environment::AttrFmtOptions;
 use kuro_query::query::environment::QueryTarget;
-use dupe::Dupe;
 
 /// Extensions of `QueryTarget` needed in query commands.
 pub(crate) trait QueryCommandTarget: QueryTarget {

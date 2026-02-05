@@ -10,6 +10,9 @@
 
 use std::sync::Arc;
 
+use dice::ActivationTracker;
+use dice::UserComputationData;
+use dupe::Dupe;
 use kuro_artifact::actions::key::ActionKey;
 use kuro_artifact::artifact::build_artifact::BuildArtifact;
 use kuro_build_signals::env::DeferredBuildSignals;
@@ -18,9 +21,6 @@ use kuro_build_signals::env::WaitingData;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_events::span::SpanId;
 use kuro_util::late_binding::LateBinding;
-use dice::ActivationTracker;
-use dice::UserComputationData;
-use dupe::Dupe;
 
 use crate::artifact_groups::ResolvedArtifactGroupBuildSignalsKey;
 

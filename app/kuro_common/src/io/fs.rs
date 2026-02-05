@@ -14,6 +14,8 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use compact_str::CompactString;
+use dupe::Dupe;
 use kuro_core::fs::project::ProjectRoot;
 use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
 use kuro_error::BuckErrorContext;
@@ -25,8 +27,6 @@ use kuro_fs::paths::abs_path::AbsPathBuf;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use compact_str::CompactString;
-use dupe::Dupe;
 use once_cell::sync::Lazy;
 use tokio::sync::Semaphore;
 

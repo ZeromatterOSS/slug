@@ -16,6 +16,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use dupe::Dupe;
+use futures::future::Future;
 use kuro_certs::validate::validate_certs;
 use kuro_common::manifold::Bucket;
 use kuro_common::manifold::ManifoldClient;
@@ -24,8 +26,6 @@ use kuro_core::kuro_env;
 use kuro_error::BuckErrorContext;
 use kuro_error::ErrorTag;
 use kuro_error::internal_error;
-use dupe::Dupe;
-use futures::future::Future;
 use serde::Deserialize;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::sync::mpsc::UnboundedSender;

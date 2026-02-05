@@ -15,6 +15,8 @@ use std::sync::Mutex;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use dice::DiceTransactionUpdater;
+use dupe::Dupe;
 use kuro_common::file_ops::dice::FileChangeTracker;
 use kuro_common::ignores::ignore_set::IgnoreSet;
 use kuro_common::invocation_paths::InvocationPaths;
@@ -27,8 +29,6 @@ use kuro_data::FileWatcherKind;
 use kuro_error::conversion::from_any_with_tag;
 use kuro_events::dispatch::span_async;
 use kuro_fs::paths::abs_norm_path::AbsNormPath;
-use dice::DiceTransactionUpdater;
-use dupe::Dupe;
 use notify::EventKind;
 use notify::RecommendedWatcher;
 use notify::Watcher;
@@ -81,8 +81,7 @@ impl NotifyFileData {
         cells: &CellResolver,
         ignore_specs: &HashMap<CellName, IgnoreSet>,
     ) -> kuro_error::Result<()> {
-        let event =
-            event.map_err(|e| from_any_with_tag(e, kuro_error::ErrorTag::NotifyWatcher))?;
+        let event = event.map_err(|e| from_any_with_tag(e, kuro_error::ErrorTag::NotifyWatcher))?;
 
         for path in &event.paths {
             // Testing shows that we get absolute paths back from the `notify` library.

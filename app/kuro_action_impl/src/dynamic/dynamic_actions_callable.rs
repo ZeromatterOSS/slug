@@ -13,10 +13,10 @@ use std::cell::RefCell;
 use std::sync::LazyLock;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
 use kuro_build_api::interpreter::rule_defs::provider::ty::abstract_provider::AbstractProvider;
 use kuro_error::BuckErrorContext;
-use dupe::Dupe;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;

@@ -11,9 +11,9 @@
 use std::os::fd::OwnedFd;
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_error::BuckErrorContext;
 use kuro_fs::paths::file_name::FileNameBuf;
-use dupe::Dupe;
 use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
 
@@ -32,11 +32,7 @@ enum CgroupFileError {
 pub(crate) struct CgroupFile(Arc<OwnedFd>, FileNameBuf);
 
 impl CgroupFile {
-    pub async fn open(
-        d: Arc<OwnedFd>,
-        name: FileNameBuf,
-        write: bool,
-    ) -> kuro_error::Result<Self> {
+    pub async fn open(d: Arc<OwnedFd>, name: FileNameBuf, write: bool) -> kuro_error::Result<Self> {
         tokio::task::spawn_blocking(move || Self::sync_open(&d, name, write)).await?
     }
 

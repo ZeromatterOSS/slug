@@ -12,8 +12,8 @@ use std::iter;
 use std::marker::PhantomData;
 use std::vec;
 
-use kuro_fs::paths::file_name::FileName;
 use either::Either;
+use kuro_fs::paths::file_name::FileName;
 
 use crate::directory::directory_iterator::DirectoryIterator;
 use crate::directory::directory_iterator::DirectoryIteratorPathAccessor;

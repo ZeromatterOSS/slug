@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use dice::DiceTransactionUpdater;
 use kuro_common::ignores::ignore_set::IgnoreSet;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
 use kuro_common::legacy_configs::key::BuckconfigKeyRef;
@@ -23,7 +24,6 @@ use kuro_core::fs::project::ProjectRoot;
 use kuro_core::soft_error;
 use kuro_error::BuckErrorContext;
 use kuro_error::kuro_error;
-use dice::DiceTransactionUpdater;
 
 #[cfg(fbcode_build)]
 use crate::edenfs::interface::EdenFsFileWatcher;

@@ -16,8 +16,8 @@
 use std::panic;
 use std::panic::PanicHookInfo;
 
-use kuro_error::BuckErrorContext;
 use fbinit::FacebookInit;
+use kuro_error::BuckErrorContext;
 
 /// Initializes the panic hook.
 pub fn initialize() -> kuro_error::Result<()> {
@@ -59,6 +59,7 @@ mod imp {
     use std::panic::PanicHookInfo;
 
     use backtrace::Backtrace;
+    use fbinit::FacebookInit;
     use kuro_core::error::StructuredErrorOptions;
     use kuro_data::Location;
     use kuro_events::BuckEvent;
@@ -67,7 +68,6 @@ mod imp {
     use kuro_events::sink::remote::ScribeConfig;
     use kuro_events::sink::remote::new_remote_event_sink_if_enabled;
     use kuro_util::threads::thread_spawn;
-    use fbinit::FacebookInit;
     use tokio::runtime::Builder;
 
     fn get_stack() -> Vec<kuro_data::structured_error::StackFrame> {

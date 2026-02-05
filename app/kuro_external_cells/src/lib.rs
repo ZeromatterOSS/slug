@@ -15,6 +15,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_common::dice::data::HasIoProvider;
 use kuro_common::file_ops::delegate::FileOpsDelegate;
 use kuro_common::file_ops::metadata::RawPathMetadata;
@@ -22,7 +23,6 @@ use kuro_core::cells::cell_root_path::CellRootPath;
 use kuro_core::cells::external::ExternalCellOrigin;
 use kuro_core::cells::name::CellName;
 use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
-use dice::DiceComputations;
 
 mod bundled;
 mod bzlmod;
@@ -133,7 +133,8 @@ impl kuro_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
                 // Extension repo cells are at bazel-external/{canonical_name}, copy from there
                 let abs_dest = io.project_root().resolve(&dest_path);
                 let project_root = io.project_root().root();
-                extension_repo::copy_to_destination(&setup, project_root, abs_dest.as_path()).await?;
+                extension_repo::copy_to_destination(&setup, project_root, abs_dest.as_path())
+                    .await?;
             }
         }
 

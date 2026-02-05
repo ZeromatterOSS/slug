@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use futures::Stream;
+use futures::TryStreamExt;
 use kuro_client_ctx::client_ctx::BuckSubcommand;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
 use kuro_client_ctx::common::BuckArgMatches;
@@ -19,8 +21,6 @@ use kuro_data::get_action_digest;
 use kuro_event_log::stream_value::StreamValue;
 use kuro_event_observer::display::TargetDisplayOptions;
 use kuro_event_observer::display::display_action_identity;
-use futures::Stream;
-use futures::TryStreamExt;
 use linked_hash_map::LinkedHashMap;
 
 use crate::diff::diff_options::DiffEventLogOptions;

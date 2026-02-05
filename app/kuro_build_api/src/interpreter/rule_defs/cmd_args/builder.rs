@@ -10,13 +10,13 @@
 
 use std::fmt::Debug;
 
+use indexmap::IndexSet;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_core::content_hash::ContentBasedPathHash;
 use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
 use kuro_execute::artifact::artifact_dyn::ArtifactDyn;
 use kuro_execute::artifact::fs::ExecutorFs;
 use kuro_fs::paths::RelativePathBuf;
-use indexmap::IndexSet;
 
 use crate::interpreter::rule_defs::cmd_args::traits::CommandLineContext;
 use crate::interpreter::rule_defs::cmd_args::traits::CommandLineLocation;
@@ -134,9 +134,8 @@ impl CommandLineContext for AbsCommandLineContext<'_> {
         let executor_fs = self.0.fs();
         let mut path = executor_fs.fs().fs().root().to_path_buf();
         path.extend(self.0.next_macro_file_path()?.iter());
-        RelativePathBuf::from_path(path).map_err(|e| {
-            kuro_error::kuro_error!(kuro_error::ErrorTag::Tier0, "{}", e.to_string())
-        })
+        RelativePathBuf::from_path(path)
+            .map_err(|e| kuro_error::kuro_error!(kuro_error::ErrorTag::Tier0, "{}", e.to_string()))
     }
 }
 
@@ -144,6 +143,7 @@ impl CommandLineContext for AbsCommandLineContext<'_> {
 mod tests {
     use std::path::PathBuf;
 
+    use fxhash::FxHashMap;
     use kuro_core::cells::CellResolver;
     use kuro_core::cells::cell_root_path::CellRootPathBuf;
     use kuro_core::cells::name::CellName;
@@ -153,7 +153,6 @@ mod tests {
     use kuro_core::fs::project::ProjectRoot;
     use kuro_core::fs::project_rel_path::ProjectRelativePath;
     use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
-    use fxhash::FxHashMap;
 
     use super::*;
     use crate::interpreter::rule_defs::cmd_args::traits::CommandLineArgLike;

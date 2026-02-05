@@ -315,12 +315,12 @@ fn resolve_flagfile(
 
 #[cfg(test)]
 mod tests {
+    use indoc::indoc;
     use kuro_common::argv::ExpandedArgSource;
     use kuro_common::argv::FlagfileArgSource;
     use kuro_fs::paths::abs_path::AbsPath;
     use kuro_fs::paths::abs_path::AbsPathBuf;
     use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
-    use indoc::indoc;
 
     use super::*;
 

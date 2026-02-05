@@ -11,10 +11,10 @@
 use std::fmt::Write;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::deferred::key::DeferredHolderKey;
 use kuro_data::ToProtoMessage;
-use dupe::Dupe;
 use static_assertions::assert_eq_size;
 
 /// A key to look up an 'Action' from the 'ActionAnalysisResult'.

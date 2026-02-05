@@ -9,6 +9,8 @@
  */
 
 use async_trait::async_trait;
+use futures::future::BoxFuture;
+use futures::future::Shared;
 use kuro_cli_proto::ClientContext;
 use kuro_client_ctx::command_outcome::CommandOutcome;
 use kuro_client_ctx::daemon::client::connect::BootstrapBuckdClient;
@@ -21,8 +23,6 @@ use kuro_cmd_audit_client::deferred_materializer::DeferredMaterializerCommand;
 use kuro_cmd_audit_client::deferred_materializer::DeferredMaterializerSubcommand;
 use kuro_common::manifold::ManifoldClient;
 use kuro_error::kuro_error;
-use futures::future::BoxFuture;
-use futures::future::Shared;
 
 use crate::manifold::buf_to_manifold;
 use crate::rage::MaterializerRageUploadData;

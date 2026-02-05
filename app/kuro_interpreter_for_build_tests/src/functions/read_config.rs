@@ -8,8 +8,8 @@
  * above-listed licenses.
  */
 
-use kuro_interpreter_for_build::interpreter::testing::Tester;
 use indoc::indoc;
+use kuro_interpreter_for_build::interpreter::testing::Tester;
 
 #[test]
 fn test_read_config() -> kuro_error::Result<()> {

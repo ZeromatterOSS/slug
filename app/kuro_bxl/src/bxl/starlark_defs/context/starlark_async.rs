@@ -8,10 +8,6 @@
  * above-listed licenses.
  */
 
-use kuro_common::events::HasEvents;
-use kuro_data::BxlDiceInvocationEnd;
-use kuro_data::BxlDiceInvocationStart;
-use kuro_events::dispatch::with_dispatcher_async;
 use dice::DiceComputations;
 use dice::DiceData;
 use dice::UserComputationData;
@@ -20,6 +16,10 @@ use dupe::Dupe;
 use futures::future::Either;
 use futures::future::LocalBoxFuture;
 use futures::future::select;
+use kuro_common::events::HasEvents;
+use kuro_data::BxlDiceInvocationEnd;
+use kuro_data::BxlDiceInvocationStart;
+use kuro_events::dispatch::with_dispatcher_async;
 
 use crate::bxl::starlark_defs::context::lifetime_erase::LifetimeErased;
 use crate::bxl::starlark_defs::context::lifetime_erase::LifetimeErasedTypeClass;

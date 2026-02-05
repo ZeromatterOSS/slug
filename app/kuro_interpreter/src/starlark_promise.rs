@@ -393,10 +393,7 @@ mod tests {
                 if x.unpack_str() == Some("ok") {
                     Ok(())
                 } else {
-                    Err(kuro_error!(
-                        kuro_error::ErrorTag::Tier0,
-                        "VALIDATE_FAILED"
-                    ))
+                    Err(kuro_error!(kuro_error::ErrorTag::Tier0, "VALIDATE_FAILED"))
                 }
             })?;
             Ok(NoneType)

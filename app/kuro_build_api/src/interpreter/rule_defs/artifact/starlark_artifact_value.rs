@@ -14,13 +14,13 @@ use std::fs::File;
 use std::io::BufReader;
 
 use allocative::Allocative;
+use gazebo::prelude::*;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_core::fs::project::ProjectRoot;
 use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
 use kuro_error::BuckErrorContext;
 use kuro_error::ErrorTag;
 use kuro_fs::fs_util;
-use gazebo::prelude::*;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::SmallMap;
 use starlark::environment::GlobalsBuilder;

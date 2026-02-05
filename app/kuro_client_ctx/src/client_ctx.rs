@@ -11,6 +11,7 @@
 use std::future::Future;
 use std::time::SystemTime;
 
+use dupe::Dupe;
 use kuro_cli_proto::ClientContext;
 use kuro_cli_proto::client_context::ExitWhen as GrpcExitWhen;
 use kuro_cli_proto::client_context::HostArchOverride as GrpcHostArchOverride;
@@ -26,7 +27,6 @@ use kuro_event_observer::verbosity::Verbosity;
 use kuro_fs::paths::file_name::FileNameBuf;
 use kuro_fs::working_dir::AbsWorkingDir;
 use kuro_wrapper_common::invocation_id::TraceId;
-use dupe::Dupe;
 use tokio::runtime::Runtime;
 
 use crate::client_metadata::ClientMetadata;

@@ -12,13 +12,15 @@ use std::path::Path;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceTransaction;
+use futures::FutureExt;
 use kuro_cli_proto::ProfileRequest;
 use kuro_cli_proto::ProfileResponse;
 use kuro_cli_proto::profile_request::ProfileOpts;
 use kuro_common::dice::cells::HasCellResolver;
 use kuro_error::BuckErrorContext;
-use kuro_error::kuro_error;
 use kuro_error::internal_error;
+use kuro_error::kuro_error;
 use kuro_fs::paths::abs_path::AbsPath;
 use kuro_interpreter::starlark_profiler::config::GetStarlarkProfilerInstrumentation;
 use kuro_interpreter::starlark_profiler::mode::StarlarkProfileMode;
@@ -29,8 +31,6 @@ use kuro_server_ctx::partial_result_dispatcher::NoPartialResult;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use kuro_server_ctx::template::ServerCommandTemplate;
 use kuro_server_ctx::template::run_server_command;
-use dice::DiceTransaction;
-use futures::FutureExt;
 
 use crate::bxl::eval::BxlResolvedCliArgs;
 use crate::bxl::eval::eval;

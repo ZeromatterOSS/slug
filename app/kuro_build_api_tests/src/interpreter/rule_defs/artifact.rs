@@ -8,9 +8,9 @@
  * above-listed licenses.
  */
 
+use indoc::indoc;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
 use kuro_interpreter_for_build::interpreter::testing::expect_error;
-use indoc::indoc;
 
 use crate::interpreter::rule_defs::artifact::testing::artifactory;
 

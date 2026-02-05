@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use futures::FutureExt;
 use kuro_analysis::analysis::calculation::get_dep_analysis;
 use kuro_analysis::analysis::calculation::resolve_queries;
 use kuro_analysis::analysis::env::get_dep;
@@ -28,7 +29,6 @@ use kuro_core::execution_types::execution::ExecutionPlatformResolution;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
-use futures::FutureExt;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::values::FrozenValueTyped;

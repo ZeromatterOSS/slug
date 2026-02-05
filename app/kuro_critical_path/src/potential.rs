@@ -10,8 +10,8 @@
 
 use std::collections::BinaryHeap;
 
-use kuro_error::BuckErrorContext;
 use crossbeam::thread;
+use kuro_error::BuckErrorContext;
 
 use crate::critical_path_accessor::CriticalPathAccessor;
 use crate::graph::Graph;

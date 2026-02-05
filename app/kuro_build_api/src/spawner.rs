@@ -11,11 +11,11 @@
 use std::any::Any;
 
 use allocative::Allocative;
-use kuro_common::events::HasEvents;
-use kuro_events::dispatch::with_dispatcher_async;
 use dice_futures::spawner::Spawner;
 use dupe::Dupe;
 use futures::future::BoxFuture;
+use kuro_common::events::HasEvents;
+use kuro_events::dispatch::with_dispatcher_async;
 use tokio::runtime::Handle;
 use tokio::task::JoinHandle;
 
@@ -53,6 +53,10 @@ impl<T: HasEvents> Spawner<T> for BuckSpawner {
 mod tests {
     use std::sync::Arc;
 
+    use dice::DiceData;
+    use dice::UserComputationData;
+    use dice_futures::spawn::spawn_dropcancel;
+    use futures::future::FutureExt;
     use kuro_data::CommandEnd;
     use kuro_data::CommandStart;
     use kuro_events::BuckEvent;
@@ -62,10 +66,6 @@ mod tests {
     use kuro_events::dispatch::span;
     use kuro_events::source::ChannelEventSource;
     use kuro_wrapper_common::invocation_id::TraceId;
-    use dice::DiceData;
-    use dice::UserComputationData;
-    use dice_futures::spawn::spawn_dropcancel;
-    use futures::future::FutureExt;
 
     use super::*;
 

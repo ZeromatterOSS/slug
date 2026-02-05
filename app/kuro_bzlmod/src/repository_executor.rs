@@ -106,10 +106,11 @@ fn is_repo_complete(working_dir: &Path) -> bool {
 
 /// Mark a repository as complete.
 fn mark_repo_complete(working_dir: &Path) -> kuro_error::Result<()> {
-    std::fs::write(working_dir.join(".kuro_repo_complete"), "complete")
-        .map_err(|e| RepositoryExecutionError::WorkingDirFailed {
+    std::fs::write(working_dir.join(".kuro_repo_complete"), "complete").map_err(|e| {
+        RepositoryExecutionError::WorkingDirFailed {
             reason: format!("Failed to write completion marker: {}", e),
-        })?;
+        }
+    })?;
     Ok(())
 }
 
@@ -178,9 +179,11 @@ fn execute_http_archive(
                         working_dir.join("WORKSPACE.bazel"),
                         format!("workspace(name = \"{}\")\n", invocation.name),
                     )
-                    .map_err(|e| RepositoryExecutionError::ExecutionFailed {
-                        name: invocation.name.clone(),
-                        reason: format!("Failed to write WORKSPACE.bazel: {}", e),
+                    .map_err(|e| {
+                        RepositoryExecutionError::ExecutionFailed {
+                            name: invocation.name.clone(),
+                            reason: format!("Failed to write WORKSPACE.bazel: {}", e),
+                        }
                     })?;
                 }
 
@@ -305,12 +308,13 @@ fn verify_sha256(data: &[u8], expected: &str) -> kuro_error::Result<()> {
 fn verify_integrity(data: &[u8], expected: &str) -> kuro_error::Result<()> {
     use base64::Engine;
 
-    let (algo, hash) = expected
-        .split_once('-')
-        .ok_or_else(|| RepositoryExecutionError::ExecutionFailed {
-            name: "integrity".to_owned(),
-            reason: format!("Invalid integrity format: {}", expected),
-        })?;
+    let (algo, hash) =
+        expected
+            .split_once('-')
+            .ok_or_else(|| RepositoryExecutionError::ExecutionFailed {
+                name: "integrity".to_owned(),
+                reason: format!("Invalid integrity format: {}", expected),
+            })?;
 
     if algo != "sha256" {
         return Err(RepositoryExecutionError::ExecutionFailed {
@@ -371,21 +375,25 @@ fn extract_tar_gz(
     let decoder = GzDecoder::new(data);
     let mut archive = Archive::new(decoder);
 
-    for entry_result in archive.entries().map_err(|e| {
-        RepositoryExecutionError::ExecutionFailed {
-            name: "extract".to_owned(),
-            reason: e.to_string(),
-        }
-    })? {
+    for entry_result in
+        archive
+            .entries()
+            .map_err(|e| RepositoryExecutionError::ExecutionFailed {
+                name: "extract".to_owned(),
+                reason: e.to_string(),
+            })?
+    {
         let mut entry = entry_result.map_err(|e| RepositoryExecutionError::ExecutionFailed {
             name: "extract".to_owned(),
             reason: e.to_string(),
         })?;
 
-        let path = entry.path().map_err(|e| RepositoryExecutionError::ExecutionFailed {
-            name: "extract".to_owned(),
-            reason: e.to_string(),
-        })?;
+        let path = entry
+            .path()
+            .map_err(|e| RepositoryExecutionError::ExecutionFailed {
+                name: "extract".to_owned(),
+                reason: e.to_string(),
+            })?;
 
         // Apply strip_prefix
         let dest_path = if let Some(prefix) = strip_prefix {
@@ -436,7 +444,8 @@ fn extract_tar_gz(
             {
                 use std::os::unix::fs::PermissionsExt;
                 if let Ok(mode) = entry.header().mode() {
-                    let _ = std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(mode));
+                    let _ =
+                        std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(mode));
                 }
             }
         } else if entry_type.is_symlink() {
@@ -453,26 +462,22 @@ fn extract_tar_gz(
 }
 
 /// Extract zip archive.
-fn extract_zip(
-    data: &[u8],
-    dest_dir: &Path,
-    strip_prefix: Option<&str>,
-) -> kuro_error::Result<()> {
+fn extract_zip(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> kuro_error::Result<()> {
     let cursor = Cursor::new(data);
-    let mut archive = ZipArchive::new(cursor).map_err(|e| {
-        RepositoryExecutionError::ExecutionFailed {
+    let mut archive =
+        ZipArchive::new(cursor).map_err(|e| RepositoryExecutionError::ExecutionFailed {
             name: "extract".to_owned(),
             reason: e.to_string(),
-        }
-    })?;
+        })?;
 
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i).map_err(|e| {
-            RepositoryExecutionError::ExecutionFailed {
-                name: "extract".to_owned(),
-                reason: e.to_string(),
-            }
-        })?;
+        let mut file =
+            archive
+                .by_index(i)
+                .map_err(|e| RepositoryExecutionError::ExecutionFailed {
+                    name: "extract".to_owned(),
+                    reason: e.to_string(),
+                })?;
 
         let file_path = match file.enclosed_name() {
             Some(path) => path.to_owned(),
@@ -510,7 +515,8 @@ fn extract_zip(
             {
                 use std::os::unix::fs::PermissionsExt;
                 if let Some(mode) = file.unix_mode() {
-                    let _ = std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(mode));
+                    let _ =
+                        std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(mode));
                 }
             }
         }
@@ -531,10 +537,7 @@ fn execute_git_repository(
     let branch = attrs.get_optional_string("branch");
 
     // Determine what to checkout
-    let checkout_ref = commit
-        .or(tag)
-        .or(branch)
-        .unwrap_or("HEAD");
+    let checkout_ref = commit.or(tag).or(branch).unwrap_or("HEAD");
 
     tracing::info!("Cloning git repository {} at {}", remote, checkout_ref);
 
@@ -565,9 +568,7 @@ fn execute_git_repository(
     }
 
     // Create WORKSPACE if not present
-    if !working_dir.join("WORKSPACE").exists()
-        && !working_dir.join("WORKSPACE.bazel").exists()
-    {
+    if !working_dir.join("WORKSPACE").exists() && !working_dir.join("WORKSPACE.bazel").exists() {
         std::fs::write(
             working_dir.join("WORKSPACE.bazel"),
             format!("workspace(name = \"{}\")\n", invocation.name),
@@ -584,10 +585,12 @@ fn run_git(cwd: &Path, configure: impl FnOnce(&mut Command)) -> kuro_error::Resu
     configure(&mut cmd);
     cmd.current_dir(cwd);
 
-    let output = cmd.output().map_err(|e| RepositoryExecutionError::ExecutionFailed {
-        name: "git".to_owned(),
-        reason: format!("Failed to run git: {}", e),
-    })?;
+    let output = cmd
+        .output()
+        .map_err(|e| RepositoryExecutionError::ExecutionFailed {
+            name: "git".to_owned(),
+            reason: format!("Failed to run git: {}", e),
+        })?;
 
     if output.status.success() {
         Ok(())
@@ -696,8 +699,9 @@ fn create_stub_repository(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::TempDir;
+
+    use super::*;
 
     #[test]
     fn test_prepare_working_dir() {
@@ -728,7 +732,9 @@ mod tests {
         // Single url
         inv.attrs.insert(
             "url".to_owned(),
-            crate::repository_invocations::AttrValue::String("https://example.com/a.tar.gz".to_owned()),
+            crate::repository_invocations::AttrValue::String(
+                "https://example.com/a.tar.gz".to_owned(),
+            ),
         );
 
         let attrs = InvocationAttrs::new(&inv);

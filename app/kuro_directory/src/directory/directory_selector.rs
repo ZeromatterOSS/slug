@@ -10,11 +10,11 @@
 
 use std::iter;
 
+use either::Either;
 use kuro_core::directory_digest::DirectoryDigest;
 use kuro_fs::paths::IntoFileNameBufIterator;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::file_name::FileNameBuf;
-use either::Either;
 use starlark_map::small_map::SmallMap;
 
 use crate::directory::builder::DirectoryBuilder;

@@ -10,8 +10,8 @@
 
 use std::collections::HashMap;
 
-use kuro_common::file_ops::metadata::TrackedFileDigest;
 use dupe::Dupe;
+use kuro_common::file_ops::metadata::TrackedFileDigest;
 use remote_execution::InlinedBlobWithDigest;
 
 use crate::digest::CasDigestToReExt;

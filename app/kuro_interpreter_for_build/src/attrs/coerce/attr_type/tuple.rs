@@ -10,13 +10,13 @@
 
 use std::iter;
 
+use dupe::IterDupedExt;
+use gazebo::prelude::SliceExt;
 use kuro_node::attrs::attr_type::tuple::TupleAttrType;
 use kuro_node::attrs::attr_type::tuple::TupleLiteral;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::coercion_context::AttrCoercionContext;
 use kuro_node::attrs::configurable::AttrIsConfigurable;
-use dupe::IterDupedExt;
-use gazebo::prelude::SliceExt;
 use starlark::values::UnpackValue;
 use starlark::values::Value;
 use starlark::values::list::ListRef;

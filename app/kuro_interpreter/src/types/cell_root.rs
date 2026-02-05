@@ -9,11 +9,11 @@
  */
 
 use allocative::Allocative;
+use derive_more::Display;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::cells::cell_path::CellPathRef;
 use kuro_core::cells::name::CellName;
 use kuro_core::cells::paths::CellRelativePathBuf;
-use derive_more::Display;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;

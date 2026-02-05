@@ -54,11 +54,11 @@ use starlark::environment::MethodsStatic;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
 use starlark::typing::Ty;
-use starlark::values::dict::Dict;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
+use starlark::values::dict::Dict;
 use starlark::values::starlark_value;
 use starlark::values::starlark_value_as_type::StarlarkValueAsType;
 use starlark::values::structs::AllocStruct;
@@ -162,17 +162,16 @@ impl SerializedTagValue {
             SerializedTagValue::None => Value::new_none(),
             SerializedTagValue::Label(s) => heap.alloc(s.as_str()),
             SerializedTagValue::List(items) => {
-                let values: Vec<Value<'v>> = items
-                    .iter()
-                    .map(|v| v.to_starlark(heap))
-                    .collect();
+                let values: Vec<Value<'v>> = items.iter().map(|v| v.to_starlark(heap)).collect();
                 heap.alloc(values)
             }
             SerializedTagValue::Dict(entries) => {
                 let mut map = SmallMap::new();
                 for (k, v) in entries {
                     map.insert_hashed(
-                        heap.alloc(k.as_str()).get_hashed().expect("string is hashable"),
+                        heap.alloc(k.as_str())
+                            .get_hashed()
+                            .expect("string is hashable"),
                         v.to_starlark(heap),
                     );
                 }
@@ -197,7 +196,8 @@ impl SerializedTag {
 
     /// Convert to a Starlark struct value.
     pub fn to_starlark_struct<'v>(&self, heap: Heap<'v>) -> Value<'v> {
-        let fields: SmallMap<&str, Value<'v>> = self.kwargs
+        let fields: SmallMap<&str, Value<'v>> = self
+            .kwargs
             .iter()
             .map(|(k, v)| (k.as_str(), v.to_starlark(heap)))
             .collect();
@@ -240,15 +240,14 @@ impl BazelModuleTags {
 
     /// Create an empty tags collection.
     pub fn empty() -> Self {
-        Self { tags_by_class: HashMap::new() }
+        Self {
+            tags_by_class: HashMap::new(),
+        }
     }
 
     /// Add a tag to a tag class.
     pub fn add_tag(&mut self, tag_class: String, tag: SerializedTag) {
-        self.tags_by_class
-            .entry(tag_class)
-            .or_default()
-            .push(tag);
+        self.tags_by_class.entry(tag_class).or_default().push(tag);
     }
 }
 
@@ -299,12 +298,7 @@ starlark_simple_value!(BazelModule);
 
 impl BazelModule {
     /// Create from tag class names only (backward compatibility, empty tags).
-    pub fn new(
-        name: String,
-        version: String,
-        is_root: bool,
-        tag_classes: Vec<String>,
-    ) -> Self {
+    pub fn new(name: String, version: String, is_root: bool, tag_classes: Vec<String>) -> Self {
         let mut tags_by_class = HashMap::new();
         for class in tag_classes {
             tags_by_class.insert(class, Vec::new());
@@ -432,10 +426,7 @@ starlark_simple_value!(ModuleContext);
 
 impl ModuleContext {
     /// Create a new module context from BazelModule objects (backward compatible).
-    pub fn new(
-        modules: Vec<BazelModule>,
-        root_module_has_non_dev_dependency: bool,
-    ) -> Self {
+    pub fn new(modules: Vec<BazelModule>, root_module_has_non_dev_dependency: bool) -> Self {
         let serialized_modules = modules
             .into_iter()
             .map(|m| SerializedModule {
@@ -535,13 +526,17 @@ impl ModuleContext {
 #[starlark_value(type = "module_ctx")]
 impl<'v> StarlarkValue<'v> for ModuleContext {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "modules" | "os" | "root_module_has_non_dev_dependency")
+        matches!(
+            attribute,
+            "modules" | "os" | "root_module_has_non_dev_dependency"
+        )
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "modules" => {
-                let modules: Vec<Value<'v>> = self.modules
+                let modules: Vec<Value<'v>> = self
+                    .modules
                     .iter()
                     .map(|m| {
                         heap.alloc(BazelModule::with_tags(
@@ -555,7 +550,9 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
                 Some(heap.alloc(modules))
             }
             "os" => Some(heap.alloc(RepositoryOs::new())),
-            "root_module_has_non_dev_dependency" => Some(Value::new_bool(self.root_module_has_non_dev_dependency)),
+            "root_module_has_non_dev_dependency" => {
+                Some(Value::new_bool(self.root_module_has_non_dev_dependency))
+            }
             _ => None,
         }
     }
@@ -791,8 +788,9 @@ pub fn register_module_ctx_types(builder: &mut GlobalsBuilder) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::TempDir;
+
+    use super::*;
 
     #[test]
     fn test_module_context_empty() {
@@ -809,8 +807,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path().to_path_buf();
 
-        let ctx = ModuleContext::empty()
-            .with_temp_working_dir(temp_path.clone());
+        let ctx = ModuleContext::empty().with_temp_working_dir(temp_path.clone());
 
         assert!(ctx.has_working_dir());
         assert_eq!(ctx.working_dir().unwrap(), temp_path.as_path());
@@ -823,8 +820,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path().to_path_buf();
 
-        let ctx = ModuleContext::empty()
-            .with_temp_working_dir(temp_path.clone());
+        let ctx = ModuleContext::empty().with_temp_working_dir(temp_path.clone());
 
         let resolved = ctx.resolve_path("subdir/file.txt").unwrap();
         assert_eq!(resolved, temp_path.join("subdir/file.txt"));
@@ -835,8 +831,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path().to_path_buf();
 
-        let ctx = ModuleContext::empty()
-            .with_temp_working_dir(temp_path);
+        let ctx = ModuleContext::empty().with_temp_working_dir(temp_path);
 
         let absolute = "/absolute/path/to/file.txt";
         let resolved = ctx.resolve_path(absolute).unwrap();
@@ -890,8 +885,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path().to_path_buf();
 
-        let ctx = ModuleContext::empty()
-            .with_temp_working_dir(temp_path);
+        let ctx = ModuleContext::empty().with_temp_working_dir(temp_path);
 
         // Key difference: module_ctx always deletes working dir
         assert!(ctx.should_delete_working_dir());
@@ -919,8 +913,14 @@ mod tests {
         tags_by_class.insert(
             "install".to_owned(),
             vec![SerializedTag::new(vec![
-                ("name".to_owned(), SerializedTagValue::String("numpy".to_owned())),
-                ("version".to_owned(), SerializedTagValue::String("1.24.0".to_owned())),
+                (
+                    "name".to_owned(),
+                    SerializedTagValue::String("numpy".to_owned()),
+                ),
+                (
+                    "version".to_owned(),
+                    SerializedTagValue::String("1.24.0".to_owned()),
+                ),
             ])],
         );
 

@@ -9,9 +9,9 @@
  */
 
 use allocative::Allocative;
-use kuro_execute::digest_config::DigestConfig;
 use derive_more::Display;
 use dupe::Dupe;
+use kuro_execute::digest_config::DigestConfig;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;

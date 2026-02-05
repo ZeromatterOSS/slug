@@ -11,8 +11,8 @@
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use kuro_util::os::host_cpu_usage::HostCpuUsage;
 use dupe::Dupe;
+use kuro_util::os::host_cpu_usage::HostCpuUsage;
 
 /// Host CPU usage since a kuro command was started.
 pub(crate) struct HostCpuUsageSinceCmdStart {

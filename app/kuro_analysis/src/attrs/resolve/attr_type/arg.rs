@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
+use either::Either;
 use kuro_artifact::artifact::source_artifact::SourceArtifact;
 use kuro_build_api::interpreter::rule_defs::cmd_args::value::FrozenCommandLineArg;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::run_info::RunInfoCallable;
@@ -24,8 +26,6 @@ use kuro_node::attrs::attr_type::arg::ConfiguredStringWithMacros;
 use kuro_node::attrs::attr_type::arg::ConfiguredStringWithMacrosPart;
 use kuro_node::attrs::attr_type::arg::StringWithMacros;
 use kuro_node::attrs::attr_type::arg::UnrecognizedMacro;
-use dupe::Dupe;
-use either::Either;
 use starlark::values::Value;
 
 use crate::attrs::resolve::attr_type::arg::query::ConfiguredQueryMacroBaseExt;

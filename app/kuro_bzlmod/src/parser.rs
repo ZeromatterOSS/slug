@@ -329,7 +329,10 @@ pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
         assert_eq!(parsed.extension_usages.len(), 1);
 
         let ext = &parsed.extension_usages[0];
-        assert_eq!(ext.extension_bzl_file, "@rules_python//python/extensions:pip.bzl");
+        assert_eq!(
+            ext.extension_bzl_file,
+            "@rules_python//python/extensions:pip.bzl"
+        );
         assert_eq!(ext.extension_name, "pip");
         assert!(!ext.dev_dependency);
         assert!(!ext.isolate);
@@ -426,7 +429,11 @@ maven.install(artifacts = ["guava", "protobuf"])
         let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
         let tag = &parsed.extension_usages[0].tags[0];
 
-        let artifacts = tag.kwargs.iter().find(|(k, _)| k == "artifacts").map(|(_, v)| v);
+        let artifacts = tag
+            .kwargs
+            .iter()
+            .find(|(k, _)| k == "artifacts")
+            .map(|(_, v)| v);
         assert!(matches!(artifacts, Some(crate::types::TagValue::List(items)) if items.len() == 2));
     }
 
@@ -440,7 +447,11 @@ pip.parse(quiet = False)
         let parsed = parse_module_bazel_content(content, "MODULE.bazel").unwrap();
         let tag = &parsed.extension_usages[0].tags[0];
 
-        let quiet = tag.kwargs.iter().find(|(k, _)| k == "quiet").map(|(_, v)| v);
+        let quiet = tag
+            .kwargs
+            .iter()
+            .find(|(k, _)| k == "quiet")
+            .map(|(_, v)| v);
         assert!(matches!(quiet, Some(crate::types::TagValue::Bool(false))));
     }
 

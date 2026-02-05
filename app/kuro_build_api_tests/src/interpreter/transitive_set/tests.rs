@@ -8,13 +8,13 @@
  * above-listed licenses.
  */
 
+use indoc::indoc;
 use kuro_build_api::interpreter::rule_defs::register_rule_defs;
 use kuro_build_api::interpreter::rule_defs::transitive_set::globals::register_transitive_set_types;
 use kuro_build_api::interpreter::rule_defs::transitive_set::transitive_set_definition::register_transitive_set;
 use kuro_core::bzl::ImportPath;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
 use kuro_interpreter_for_build::interpreter::testing::expect_error;
-use indoc::indoc;
 
 use crate::interpreter::rule_defs::artifact::testing::artifactory;
 use crate::interpreter::rule_defs::cmd_args::testing::command_line_stringifier;

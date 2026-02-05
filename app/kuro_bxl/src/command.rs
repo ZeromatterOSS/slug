@@ -14,6 +14,14 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
+use dice::DiceTransaction;
+use dupe::Dupe;
+use dupe::IterDupedExt;
+use futures::FutureExt;
+use futures::StreamExt;
+use futures::stream::FuturesUnordered;
+use itertools::Itertools;
 use kuro_build_api::actions::artifact::get_artifact_fs::GetArtifactFs;
 use kuro_build_api::artifact_groups::ArtifactGroup;
 use kuro_build_api::build::build_report::BuildReportOpts;
@@ -54,14 +62,6 @@ use kuro_server_ctx::global_cfg_options::global_cfg_options_from_client_context;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use kuro_server_ctx::template::ServerCommandTemplate;
 use kuro_server_ctx::template::run_server_command;
-use dice::DiceComputations;
-use dice::DiceTransaction;
-use dupe::Dupe;
-use dupe::IterDupedExt;
-use futures::FutureExt;
-use futures::StreamExt;
-use futures::stream::FuturesUnordered;
-use itertools::Itertools;
 use starlark_map::ordered_map::OrderedMap;
 
 use crate::bxl;
@@ -628,13 +628,13 @@ impl PendingStreaming {
 
 #[cfg(test)]
 mod tests {
+    use indexmap::IndexSet;
     use kuro_artifact::actions::key::ActionIndex;
     use kuro_artifact::artifact::artifact_type::Artifact;
     use kuro_artifact::artifact::artifact_type::testing::BuildArtifactTestingExt;
     use kuro_artifact::artifact::build_artifact::BuildArtifact;
     use kuro_core::configuration::data::ConfigurationData;
     use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
-    use indexmap::IndexSet;
 
     use super::*;
 

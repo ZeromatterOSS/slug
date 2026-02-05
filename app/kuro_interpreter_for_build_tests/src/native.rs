@@ -17,12 +17,12 @@
 //! Note: Most native.* functions require a BUILD file context, so they are
 //! tested via integration tests that create actual BUILD files.
 
+use dupe::Dupe;
 use indoc::indoc;
 use kuro_core::fs::project::ProjectRootTemp;
 use kuro_core::package::PackageLabel;
-use kuro_node::nodes::frontend::TargetGraphCalculation;
-use dupe::Dupe;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
+use kuro_node::nodes::frontend::TargetGraphCalculation;
 
 use crate::tests::calculation;
 
@@ -304,11 +304,7 @@ async fn test_native_existing_rules() {
 
     let package = PackageLabel::testing_parse("root//pkg");
     let eval_result = ctx.get_interpreter_results(package.dupe()).await.unwrap();
-    let target_names: Vec<_> = eval_result
-        .targets()
-        .keys()
-        .map(|t| t.as_str())
-        .collect();
+    let target_names: Vec<_> = eval_result.targets().keys().map(|t| t.as_str()).collect();
 
     // Should have all 3 targets
     assert!(target_names.contains(&"first"));
@@ -376,11 +372,7 @@ async fn test_native_existing_rule() {
 
     let package = PackageLabel::testing_parse("root//pkg");
     let eval_result = ctx.get_interpreter_results(package.dupe()).await.unwrap();
-    let target_names: Vec<_> = eval_result
-        .targets()
-        .keys()
-        .map(|t| t.as_str())
-        .collect();
+    let target_names: Vec<_> = eval_result.targets().keys().map(|t| t.as_str()).collect();
 
     assert!(target_names.contains(&"target_a"));
     assert!(target_names.contains(&"checker_found"));
@@ -449,11 +441,7 @@ async fn test_native_package_relative_label() {
 
     let package = PackageLabel::testing_parse("root//foo/bar");
     let eval_result = ctx.get_interpreter_results(package.dupe()).await.unwrap();
-    let target_names: Vec<_> = eval_result
-        .targets()
-        .keys()
-        .map(|t| t.as_str())
-        .collect();
+    let target_names: Vec<_> = eval_result.targets().keys().map(|t| t.as_str()).collect();
 
     assert!(target_names.contains(&"label_test_colon"));
     assert!(target_names.contains(&"label_test_no_colon"));

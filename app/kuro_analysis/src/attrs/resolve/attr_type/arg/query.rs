@@ -10,12 +10,12 @@
 
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_build_api::interpreter::rule_defs::resolve_query_macro::ResolvedQueryMacro;
 use kuro_build_api::interpreter::rule_defs::resolve_query_macro::ResolvedQueryMacroTargetAndOutputs;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_node::attrs::attr_type::arg::QueryExpansion;
 use kuro_node::attrs::attr_type::query::QueryMacroBase;
-use dupe::Dupe;
 
 use crate::attrs::resolve::ctx::AnalysisQueryResult;
 use crate::attrs::resolve::ctx::AttrResolutionContext;

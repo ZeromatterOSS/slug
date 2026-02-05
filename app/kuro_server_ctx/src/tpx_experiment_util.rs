@@ -10,9 +10,9 @@
 
 use std::collections::HashSet;
 
+use dice::DiceTransaction;
 use kuro_common::legacy_configs::dice::HasInjectedLegacyConfigs;
 use kuro_core::fs::project::ProjectRoot;
-use dice::DiceTransaction;
 
 use crate::experiment_util::get_experiment_tags;
 

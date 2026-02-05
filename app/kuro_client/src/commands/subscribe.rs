@@ -9,6 +9,8 @@
  */
 
 use async_trait::async_trait;
+use futures::stream::StreamExt;
+use futures::stream::TryStreamExt;
 use kuro_cli_proto::protobuf_util::ProtobufSplitter;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
 use kuro_client_ctx::common::BuckArgMatches;
@@ -26,8 +28,6 @@ use kuro_client_ctx::stream_util::reborrow_stream_for_static;
 use kuro_client_ctx::streaming::StreamingCommand;
 use kuro_error::BuckErrorContext;
 use kuro_subscription_proto::SubscriptionRequest;
-use futures::stream::StreamExt;
-use futures::stream::TryStreamExt;
 use once_cell::sync::Lazy;
 use prost::Message;
 use tokio_util::codec::FramedRead;
@@ -155,8 +155,7 @@ impl StreamingCommand for SubscribeCommand {
         } else {
             // FIXME(JakobDegen): This command should propagate some error information back from the
             // server so that we can do error handling here.
-            kuro_error::kuro_error!(kuro_error::ErrorTag::Tier0, "Subscribe command failed")
-                .into()
+            kuro_error::kuro_error!(kuro_error::ErrorTag::Tier0, "Subscribe command failed").into()
         }
     }
 

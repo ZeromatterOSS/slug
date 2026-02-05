@@ -12,16 +12,16 @@ use std::fmt;
 use std::time::Duration;
 use std::time::SystemTime;
 
+use chrono::DateTime;
+use chrono::Local;
+use futures::TryStreamExt;
+use humantime::format_duration;
 use kuro_event_log::read::EventLogPathBuf;
 use kuro_event_log::stream_value::StreamValue;
 use kuro_event_log::utils::Invocation;
 use kuro_events::BuckEvent;
 use kuro_util::truncate::truncate;
 use kuro_wrapper_common::invocation_id::TraceId;
-use chrono::DateTime;
-use chrono::Local;
-use futures::TryStreamExt;
-use humantime::format_duration;
 
 #[derive(Debug, kuro_error::Error)]
 #[kuro(tag = Tier0)]

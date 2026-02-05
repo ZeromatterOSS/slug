@@ -18,9 +18,9 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_interpreter::types::provider::callable::ValueAsProviderCallableLike;
-use dupe::Dupe;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -45,13 +45,9 @@ use crate::interpreter::rule_defs::provider::collection::FrozenProviderCollectio
 #[derive(Debug, kuro_error::Error)]
 #[kuro(tag = Input)]
 enum AspectTargetError {
-    #[error(
-        "target[<provider>] operation requires a provider type, got `{0}`"
-    )]
+    #[error("target[<provider>] operation requires a provider type, got `{0}`")]
     IndexTypeNotProvider(&'static str),
-    #[error(
-        "target does not have provider `{provider}`. Available providers: {available:?}"
-    )]
+    #[error("target does not have provider `{provider}`. Available providers: {available:?}")]
     ProviderNotFound {
         provider: String,
         available: Vec<String>,
@@ -175,10 +171,12 @@ fn aspect_target_methods(builder: &mut MethodsBuilder) {
                     None => Ok(NoneOr::None),
                 }
             }
-            None => Err(kuro_error::Error::from(AspectTargetError::IndexTypeNotProvider(
-                provider.get_type(),
-            ))
-            .into()),
+            None => Err(
+                kuro_error::Error::from(AspectTargetError::IndexTypeNotProvider(
+                    provider.get_type(),
+                ))
+                .into(),
+            ),
         }
     }
 }
@@ -197,17 +195,19 @@ impl<'v> StarlarkValue<'v> for AspectTargetProviders<'v> {
                 let provider_id = callable.id()?.dupe();
                 match self.provider_collection().get_provider_raw(&provider_id) {
                     Some(v) => Ok(v.to_value()),
-                    None => Err(kuro_error::Error::from(AspectTargetError::ProviderNotFound {
-                        provider: provider_id.name.clone(),
-                        available: self.provider_collection().provider_names(),
-                    })
-                    .into()),
+                    None => Err(
+                        kuro_error::Error::from(AspectTargetError::ProviderNotFound {
+                            provider: provider_id.name.clone(),
+                            available: self.provider_collection().provider_names(),
+                        })
+                        .into(),
+                    ),
                 }
             }
-            None => Err(kuro_error::Error::from(AspectTargetError::IndexTypeNotProvider(
-                index.get_type(),
-            ))
-            .into()),
+            None => Err(
+                kuro_error::Error::from(AspectTargetError::IndexTypeNotProvider(index.get_type()))
+                    .into(),
+            ),
         }
     }
 
@@ -218,10 +218,10 @@ impl<'v> StarlarkValue<'v> for AspectTargetProviders<'v> {
                 let provider_id = callable.id()?.dupe();
                 Ok(self.provider_collection().contains_provider(&provider_id))
             }
-            None => Err(kuro_error::Error::from(AspectTargetError::IndexTypeNotProvider(
-                other.get_type(),
-            ))
-            .into()),
+            None => Err(
+                kuro_error::Error::from(AspectTargetError::IndexTypeNotProvider(other.get_type()))
+                    .into(),
+            ),
         }
     }
 }

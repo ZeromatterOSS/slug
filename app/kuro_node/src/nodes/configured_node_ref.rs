@@ -11,8 +11,8 @@
 use std::hash::Hash;
 use std::hash::Hasher;
 
-use kuro_query::query::graph::successors::GraphSuccessors;
 use dupe::Dupe;
+use kuro_query::query::graph::successors::GraphSuccessors;
 use starlark_map::StarlarkHashValue;
 
 use crate::nodes::configured::ConfiguredTargetNode;

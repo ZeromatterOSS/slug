@@ -11,6 +11,8 @@
 use std::fmt::Debug;
 
 use allocative::Allocative;
+use dupe::Dupe;
+use gazebo::prelude::SliceExt;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_build_api::artifact_groups::promise::PromiseArtifactAttr;
 use kuro_core::package::PackageLabel;
@@ -31,8 +33,6 @@ use kuro_node::attrs::display::AttrDisplayWithContext;
 use kuro_node::attrs::fmt_context::AttrFmtContext;
 use kuro_node::attrs::json::ToJsonWithContext;
 use kuro_node::attrs::serialize::AttrSerializeWithContext;
-use dupe::Dupe;
-use gazebo::prelude::SliceExt;
 use serde::Serialize;
 use serde::Serializer;
 use serde_json::to_value;

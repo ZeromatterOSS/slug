@@ -14,16 +14,16 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
-use kuro_core::cells::cell_path::CellPath;
-use kuro_core::cells::cell_path::CellPathRef;
-use kuro_core::cells::name::CellName;
-use kuro_core::cells::paths::CellRelativePath;
-use kuro_fs::paths::file_name::FileNameBuf;
 use cmp_any::PartialEqAny;
 use dice::DiceComputations;
 use dice::testing::DiceBuilder;
 use dupe::Dupe;
 use itertools::Itertools;
+use kuro_core::cells::cell_path::CellPath;
+use kuro_core::cells::cell_path::CellPathRef;
+use kuro_core::cells::name::CellName;
+use kuro_core::cells::paths::CellRelativePath;
+use kuro_fs::paths::file_name::FileNameBuf;
 
 use crate::cas_digest::CasDigestConfig;
 use crate::external_symlink::ExternalSymlink;
@@ -179,10 +179,7 @@ impl FileOps for TestFileOps {
         }))
     }
 
-    async fn read_dir(
-        &self,
-        path: CellPathRef<'async_trait>,
-    ) -> kuro_error::Result<ReadDirOutput> {
+    async fn read_dir(&self, path: CellPathRef<'async_trait>) -> kuro_error::Result<ReadDirOutput> {
         let included = self
             .entries
             .get(&path.to_owned())

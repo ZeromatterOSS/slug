@@ -10,14 +10,14 @@
 
 use std::sync::Arc;
 
+use dice::DiceComputations;
+use dice_futures::cancellation::CancellationObserver;
 use kuro_build_api::analysis::AnalysisResult;
 use kuro_build_api::anon_target::AnonTargetDependentAnalysisResults;
 use kuro_build_api::anon_target::AnonTargetDyn;
 use kuro_build_api::bxl::anon_target::EVAL_BXL_FOR_ANON_TARGET;
 use kuro_core::execution_types::execution::ExecutionPlatformResolution;
 use kuro_core::global_cfg_options::GlobalCfgOptions;
-use dice::DiceComputations;
-use dice_futures::cancellation::CancellationObserver;
 
 pub(crate) async fn eval_bxl_for_anon_target(
     dice: &mut DiceComputations<'_>,

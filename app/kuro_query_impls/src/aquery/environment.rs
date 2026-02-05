@@ -11,6 +11,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_artifact::actions::key::ActionKey;
 use kuro_build_api::actions::query::ActionQueryNode;
 use kuro_build_api::actions::query::ActionQueryNodeRef;
@@ -29,7 +30,6 @@ use kuro_query::query::syntax::simple::functions::docs::QueryEnvironmentDescript
 use kuro_query::query::traversal::AsyncNodeLookup;
 use kuro_query::query::traversal::async_depth_first_postorder_traversal;
 use kuro_query::query::traversal::async_depth_limited_traversal;
-use dice::DiceComputations;
 
 use crate::aquery::functions::AqueryFunctions;
 use crate::cquery::environment::CqueryDelegate;

@@ -8,11 +8,11 @@
  * above-listed licenses.
  */
 
+use indoc::indoc;
 use kuro_build_api::interpreter::rule_defs::register_rule_defs;
 use kuro_build_api::interpreter::rule_defs::validation_spec;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
 use kuro_interpreter_for_build::interpreter::testing::expect_error;
-use indoc::indoc;
 
 use crate::interpreter::rule_defs::artifact::testing::artifactory;
 

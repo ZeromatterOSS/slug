@@ -13,6 +13,11 @@ use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
 
+use bumpalo::Bump;
+use dupe::Dupe;
+use dupe::IterDupedExt;
+use hashbrown::HashTable;
+use hashbrown::hash_table;
 use kuro_common::package_listing::listing::PackageListing;
 use kuro_core::cells::CellAliasResolver;
 use kuro_core::cells::CellResolver;
@@ -43,11 +48,6 @@ use kuro_query_parser::Expr;
 use kuro_query_parser::spanned::Spanned;
 use kuro_util::arc_str::ArcSlice;
 use kuro_util::arc_str::ArcStr;
-use bumpalo::Bump;
-use dupe::Dupe;
-use dupe::IterDupedExt;
-use hashbrown::HashTable;
-use hashbrown::hash_table;
 use tracing::info;
 
 use super::interner::AttrCoercionInterner;

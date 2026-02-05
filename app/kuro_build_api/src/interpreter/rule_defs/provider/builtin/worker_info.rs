@@ -15,11 +15,11 @@ use std::sync::atomic;
 use std::sync::atomic::AtomicU64;
 
 use allocative::Allocative;
+use either::Either;
+use itertools::Itertools;
 use kuro_build_api_derive::internal_provider;
 use kuro_error::BuckErrorContext;
 use kuro_error::kuro_error;
-use either::Either;
-use itertools::Itertools;
 use starlark::any::ProvidesStaticType;
 use starlark::coerce::Coerce;
 use starlark::environment::GlobalsBuilder;

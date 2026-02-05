@@ -13,6 +13,9 @@ use std::fmt::Display;
 use std::io::Write;
 
 use async_trait::async_trait;
+use dice::DiceTransaction;
+use futures::StreamExt;
+use futures::stream::FuturesOrdered;
 use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use kuro_cli_proto::ClientContext;
@@ -25,9 +28,6 @@ use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use kuro_server_ctx::pattern_parse_and_resolve::parse_and_resolve_provider_labels_with_modifiers_from_cli_args;
 use kuro_server_ctx::stdout_partial_output::StdoutPartialOutput;
 use kuro_util::indent::indent;
-use dice::DiceTransaction;
-use futures::StreamExt;
-use futures::stream::FuturesOrdered;
 
 use crate::ServerAuditSubcommand;
 use crate::common::target_resolution_config::audit_command_target_resolution_config;

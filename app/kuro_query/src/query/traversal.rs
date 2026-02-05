@@ -219,12 +219,12 @@ pub async fn async_depth_first_postorder_traversal<
 mod tests {
     use std::borrow::Cow;
 
-    use kuro_core::build_file_path::BuildFilePath;
-    use kuro_core::cells::cell_path::CellPath;
     use derive_more::Display;
     use dupe::Dupe;
     use dupe::IterDupedExt;
     use gazebo::prelude::*;
+    use kuro_core::build_file_path::BuildFilePath;
+    use kuro_core::cells::cell_path::CellPath;
 
     use super::*;
     use crate::query::environment::QueryTarget;
@@ -386,9 +386,7 @@ mod tests {
         fn get(&self, label: &Ref) -> kuro_error::Result<Node> {
             self.0
                 .get(label)
-                .ok_or_else(|| {
-                    kuro_error::kuro_error!(kuro_error::ErrorTag::Tier0, "missing node")
-                })
+                .ok_or_else(|| kuro_error::kuro_error!(kuro_error::ErrorTag::Tier0, "missing node"))
                 .map(|v| v.dupe())
         }
     }

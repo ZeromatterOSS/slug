@@ -12,6 +12,12 @@
 use std::sync::Arc;
 
 use allocative::Allocative;
+use derivative::Derivative;
+use derive_more::Display;
+use dice::DiceComputations;
+use dupe::Dupe;
+use futures::FutureExt;
+use gazebo::prelude::SliceExt;
 use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
 use kuro_build_api::analysis::registry::AnalysisRegistry;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
@@ -32,12 +38,6 @@ use kuro_node::configuration::calculation::CONFIGURATION_CALCULATION;
 use kuro_node::configuration::calculation::CellNameForConfigurationResolution;
 use kuro_node::configuration::resolved::ConfigurationSettingKey;
 use kuro_node::execution::GET_EXECUTION_PLATFORMS;
-use derivative::Derivative;
-use derive_more::Display;
-use dice::DiceComputations;
-use dupe::Dupe;
-use futures::FutureExt;
-use gazebo::prelude::SliceExt;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;

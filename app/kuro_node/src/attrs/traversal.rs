@@ -10,12 +10,12 @@
 
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_core::configuration::transition::id::TransitionId;
 use kuro_core::package::source_path::SourcePathRef;
 use kuro_core::plugins::PluginKind;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::label::label::TargetLabel;
-use dupe::Dupe;
 
 use crate::attrs::attr_type::configuration_dep::ConfigurationDepKind;
 

@@ -14,8 +14,10 @@
 //! without full DICE integration. Phase 8c will add shadow graph propagation
 //! and caching.
 
-use kuro_error::BuckErrorContext;
 use dupe::Dupe;
+use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
+use kuro_error::BuckErrorContext;
+use kuro_execute::digest_config::DigestConfig;
 use starlark::eval::Evaluator;
 use starlark::values::FrozenValue;
 use starlark::values::Heap;
@@ -23,14 +25,12 @@ use starlark::values::ValueOfUnchecked;
 use starlark::values::structs::AllocStruct;
 use starlark::values::structs::StructRef;
 
+use crate::analysis::registry::AnalysisRegistry;
 use crate::interpreter::rule_defs::aspect::AspectContext;
 use crate::interpreter::rule_defs::aspect::AspectRuleInfo;
 use crate::interpreter::rule_defs::aspect::AspectTargetProviders;
 use crate::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValueRef;
 use crate::interpreter::rule_defs::provider::collection::ProviderCollection;
-use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
-use kuro_execute::digest_config::DigestConfig;
-use crate::analysis::registry::AnalysisRegistry;
 
 /// Run an aspect on a single target (Phase 8b - basic execution, no propagation).
 ///
@@ -105,18 +105,11 @@ pub fn run_aspect_basic<'v>(
     );
 
     // 4. Wrap target providers for `target[SomeInfo]` syntax
-    let target = heap.alloc(AspectTargetProviders::new(
-        target_providers,
-        target_label,
-    ));
+    let target = heap.alloc(AspectTargetProviders::new(target_providers, target_label));
 
     // 5. Invoke implementation: impl(target, ctx)
     let result = eval
-        .eval_function(
-            aspect_impl.to_value(),
-            &[target, ctx.to_value()],
-            &[],
-        )
+        .eval_function(aspect_impl.to_value(), &[target, ctx.to_value()], &[])
         .buck_error_context("Aspect implementation failed")?;
 
     // 6. Validate and return providers (aspects cannot return DefaultInfo)

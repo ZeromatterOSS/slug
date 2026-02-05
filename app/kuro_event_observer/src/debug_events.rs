@@ -13,9 +13,9 @@ use std::collections::VecDeque;
 use std::time::Duration;
 use std::time::SystemTime;
 
+use gazebo::variants::VariantName;
 use kuro_data::SpanEndEvent;
 use kuro_events::BuckEvent;
-use gazebo::variants::VariantName;
 
 use crate::unpack_event::UnpackedBuckEvent;
 use crate::unpack_event::unpack_event;

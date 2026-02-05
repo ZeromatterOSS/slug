@@ -11,10 +11,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::LinearRecomputeDiceComputations;
 use kuro_core::cells::cell_path::CellPathRef;
 use kuro_core::cells::name::CellName;
 use kuro_fs::paths::file_name::FileNameBuf;
-use dice::LinearRecomputeDiceComputations;
 
 use crate::file_ops::dice::DiceFileComputations;
 use crate::file_ops::metadata::RawPathMetadata;
@@ -29,8 +29,7 @@ pub trait FileOps: Send + Sync {
     ) -> kuro_error::Result<Option<String>>;
 
     /// Return the list of file outputs, sorted.
-    async fn read_dir(&self, path: CellPathRef<'async_trait>)
-    -> kuro_error::Result<ReadDirOutput>;
+    async fn read_dir(&self, path: CellPathRef<'async_trait>) -> kuro_error::Result<ReadDirOutput>;
 
     async fn is_ignored(
         &self,
@@ -59,10 +58,7 @@ impl FileOps for DiceFileOps<'_, '_> {
         DiceFileComputations::read_file_if_exists(&mut self.0.get(), path).await
     }
 
-    async fn read_dir(
-        &self,
-        path: CellPathRef<'async_trait>,
-    ) -> kuro_error::Result<ReadDirOutput> {
+    async fn read_dir(&self, path: CellPathRef<'async_trait>) -> kuro_error::Result<ReadDirOutput> {
         DiceFileComputations::read_dir(&mut self.0.get(), path).await
     }
 

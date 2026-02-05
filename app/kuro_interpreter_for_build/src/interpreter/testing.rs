@@ -10,6 +10,9 @@
 
 use std::sync::Arc;
 
+use dice::CancellationContext;
+use dupe::Dupe;
+use indoc::indoc;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
 use kuro_common::legacy_configs::configs::testing::parse_with_config_args;
 use kuro_common::package_listing::listing::PackageListing;
@@ -39,9 +42,6 @@ use kuro_interpreter::prelude_path::PreludePath;
 use kuro_node::nodes::eval_result::EvaluationResult;
 use kuro_node::nodes::targets_map::TargetsMap;
 use kuro_node::super_package::SuperPackage;
-use dice::CancellationContext;
-use dupe::Dupe;
-use indoc::indoc;
 use starlark::environment::GlobalsBuilder;
 
 use crate::interpreter::buckconfig::LegacyConfigsViewForStarlark;

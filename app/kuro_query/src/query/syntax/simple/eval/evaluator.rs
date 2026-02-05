@@ -10,12 +10,12 @@
 
 //! Implementation of the cli and query_* attr query language.
 
-use kuro_query_parser::Expr;
-use kuro_query_parser::parse_expr;
-use kuro_query_parser::spanned::Spanned;
 use futures::FutureExt;
 use gazebo::prelude::*;
 use gazebo::variants::VariantName;
+use kuro_query_parser::Expr;
+use kuro_query_parser::parse_expr;
+use kuro_query_parser::spanned::Spanned;
 
 use crate::__derive_refs::indexmap::IndexSet;
 use crate::query::environment::QueryEnvironment;

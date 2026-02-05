@@ -10,7 +10,6 @@
 
 use allocative::Allocative;
 use async_trait::async_trait;
-use kuro_core::target_aliases::TargetAliasResolver;
 use derive_more::Display;
 use dice::DiceComputations;
 use dice::Key;
@@ -18,6 +17,7 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use indexmap::IndexSet;
 use itertools::Itertools;
+use kuro_core::target_aliases::TargetAliasResolver;
 
 use crate::dice::cells::HasCellResolver;
 use crate::legacy_configs::configs::LegacyBuckConfig;
@@ -66,9 +66,7 @@ impl TargetAliasResolver for BuckConfigTargetAliasResolver {
             Err(
                 e @ AliasResolutionError::AliasChainBroken(..)
                 | e @ AliasResolutionError::AliasCycle(..),
-            ) => {
-                Err(kuro_error::Error::from(e).context(format!("Error resolving alias `{name}`")))
-            }
+            ) => Err(kuro_error::Error::from(e).context(format!("Error resolving alias `{name}`"))),
         }
     }
 }
@@ -129,8 +127,7 @@ impl BuckConfigTargetAliasResolver {
 
 #[async_trait]
 pub trait HasTargetAliasResolver {
-    async fn target_alias_resolver(&mut self)
-    -> kuro_error::Result<BuckConfigTargetAliasResolver>;
+    async fn target_alias_resolver(&mut self) -> kuro_error::Result<BuckConfigTargetAliasResolver>;
 }
 
 #[derive(Debug, Display, Hash, PartialEq, Eq, Clone, Allocative)]
@@ -160,9 +157,7 @@ impl Key for TargetAliasResolverKey {
 
 #[async_trait]
 impl HasTargetAliasResolver for DiceComputations<'_> {
-    async fn target_alias_resolver(
-        &mut self,
-    ) -> kuro_error::Result<BuckConfigTargetAliasResolver> {
+    async fn target_alias_resolver(&mut self) -> kuro_error::Result<BuckConfigTargetAliasResolver> {
         Ok(self.compute(&TargetAliasResolverKey()).await??)
     }
 }

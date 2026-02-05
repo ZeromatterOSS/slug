@@ -25,6 +25,24 @@ use std::time::Duration;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use derive_more::From;
+use dice::DiceComputations;
+use dice::DiceTransaction;
+use dice::Key;
+use dice_futures::cancellation::CancellationContext;
+use display_container::fmt_container;
+use display_container::fmt_keyed_container;
+use dupe::Dupe;
+use futures::FutureExt;
+use futures::channel::mpsc::UnboundedSender;
+use futures::stream::FuturesUnordered;
+use futures::stream::StreamExt;
+use fxhash::FxHashMap;
+use host_sharing::HostSharingRequirements;
+use indexmap::IndexMap;
+use indexmap::IndexSet;
+use indexmap::indexset;
+use itertools::Itertools;
 use kuro_build_api::actions::artifact::get_artifact_fs::GetArtifactFs;
 use kuro_build_api::actions::execute::dice_data::CommandExecutorResponse;
 use kuro_build_api::actions::execute::dice_data::DiceHasCommandExecutor;
@@ -141,24 +159,6 @@ use kuro_test_api::data::TestResult;
 use kuro_test_api::data::TestStage;
 use kuro_test_api::data::convert::host_sharing_requirements_to_grpc;
 use kuro_test_api::protocol::TestOrchestrator;
-use derive_more::From;
-use dice::DiceComputations;
-use dice::DiceTransaction;
-use dice::Key;
-use dice_futures::cancellation::CancellationContext;
-use display_container::fmt_container;
-use display_container::fmt_keyed_container;
-use dupe::Dupe;
-use futures::FutureExt;
-use futures::channel::mpsc::UnboundedSender;
-use futures::stream::FuturesUnordered;
-use futures::stream::StreamExt;
-use fxhash::FxHashMap;
-use host_sharing::HostSharingRequirements;
-use indexmap::IndexMap;
-use indexmap::IndexSet;
-use indexmap::indexset;
-use itertools::Itertools;
 use sorted_vector_map::SortedVectorMap;
 use starlark::values::OwnedFrozenValueTyped;
 use uuid::Uuid;
@@ -2265,6 +2265,12 @@ impl TestExecutor {
 
 #[cfg(test)]
 mod tests {
+    use dice::UserComputationData;
+    use dice::testing::DiceBuilder;
+    use futures::channel::mpsc;
+    use futures::channel::mpsc::UnboundedReceiver;
+    use futures::future;
+    use futures::stream::TryStreamExt;
     use kuro_build_api::context::SetBuildContextData;
     use kuro_common::dice::cells::SetCellResolver;
     use kuro_common::dice::data::testing::SetTestingIoProvider;
@@ -2276,12 +2282,6 @@ mod tests {
     use kuro_execute::re::manager::UnconfiguredRemoteExecutionClient;
     use kuro_test_api::data::TestStage;
     use kuro_test_api::data::TestStatus;
-    use dice::UserComputationData;
-    use dice::testing::DiceBuilder;
-    use futures::channel::mpsc;
-    use futures::channel::mpsc::UnboundedReceiver;
-    use futures::future;
-    use futures::stream::TryStreamExt;
 
     use super::*;
 

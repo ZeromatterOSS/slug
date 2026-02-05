@@ -16,10 +16,10 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use allocative::Allocative;
-use kuro_core::provider::id::ProviderId;
 use display_container::fmt_keyed_container;
 use dupe::Dupe;
 use indexmap::map::RawEntryApiV1;
+use kuro_core::provider::id::ProviderId;
 use serde::Serializer;
 use starlark::any::ProvidesStaticType;
 use starlark::coerce::Coerce;
@@ -223,7 +223,10 @@ pub(crate) fn user_provider_creator_schemaless<'v>(
     let names_map = args.names_map()?;
 
     // Convert to a vector of (name, value) pairs, sorted by key for determinism
-    let mut pairs: Vec<_> = names_map.iter().map(|(k, v)| (k.as_str().to_owned(), *v)).collect();
+    let mut pairs: Vec<_> = names_map
+        .iter()
+        .map(|(k, v)| (k.as_str().to_owned(), *v))
+        .collect();
     pairs.sort_by(|a, b| a.0.cmp(&b.0));
 
     // Build a SchemalessUserProvider with the sorted fields

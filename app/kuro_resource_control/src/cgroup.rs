@@ -17,9 +17,9 @@ use std::sync::Arc;
 #[cfg(test)]
 use std::time::Duration;
 
+use dupe::Dupe;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::file_name::FileNameBuf;
-use dupe::Dupe;
 use nix::fcntl::OFlag;
 use nix::sys::stat::Mode;
 
@@ -239,9 +239,7 @@ impl Cgroup<NoMemoryMonitoring, CgroupKindUndecided> {
     }
 
     /// Treat this cgroup as a leaf cgroup
-    pub async fn into_leaf(
-        self,
-    ) -> kuro_error::Result<Cgroup<NoMemoryMonitoring, CgroupKindLeaf>> {
+    pub async fn into_leaf(self) -> kuro_error::Result<Cgroup<NoMemoryMonitoring, CgroupKindLeaf>> {
         Ok(Cgroup {
             kind: CgroupKindLeaf {
                 procs: Arc::new(
@@ -406,10 +404,7 @@ impl<M: MemoryMonitoring> Cgroup<M, CgroupKindInternal> {
     /// Make a child cgroup
     ///
     /// Unlike above, not discouraged because we know this to be an internal cgroup
-    pub(crate) async fn make_child(
-        &self,
-        child: FileNameBuf,
-    ) -> kuro_error::Result<CgroupMinimal> {
+    pub(crate) async fn make_child(&self, child: FileNameBuf) -> kuro_error::Result<CgroupMinimal> {
         self.discouraged_make_child(child).await
     }
 
@@ -628,10 +623,10 @@ impl Cgroup<NoMemoryMonitoring, CgroupKindInternal> {
 mod tests {
     use std::time::Duration;
 
+    use dupe::Dupe;
     use kuro_fs::fs_util;
     use kuro_fs::paths::file_name::FileNameBuf;
     use kuro_util::process::background_command;
-    use dupe::Dupe;
 
     use crate::cgroup::Cgroup;
     use crate::cgroup_files::CgroupFile;

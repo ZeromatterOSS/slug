@@ -14,12 +14,12 @@ use std::marker::PhantomData;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use gazebo::variants::VariantName;
 use kuro_core::configuration::compatibility::MaybeCompatible;
 use kuro_query_derive::query_module;
 use kuro_query_parser::BinaryOp;
 use kuro_query_parser::Expr;
 use kuro_query_parser::spanned::Spanned;
-use gazebo::variants::VariantName;
 
 use crate::query::environment::QueryEnvironment;
 use crate::query::syntax::simple::eval::error::QueryError;

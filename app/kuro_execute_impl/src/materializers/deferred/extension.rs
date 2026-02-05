@@ -16,14 +16,6 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
-use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
-use kuro_error::BuckErrorContext;
-use kuro_events::dispatch::get_dispatcher;
-use kuro_execute::materialize::materializer::DeferredMaterializerEntry;
-use kuro_execute::materialize::materializer::DeferredMaterializerExtensions;
-use kuro_execute::materialize::materializer::DeferredMaterializerIterItem;
-use kuro_execute::materialize::materializer::DeferredMaterializerSubscription;
-use kuro_fs::fs_util;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::TimeZone;
@@ -32,6 +24,14 @@ use derivative::Derivative;
 use dupe::Dupe;
 use futures::stream::BoxStream;
 use futures::stream::StreamExt;
+use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
+use kuro_error::BuckErrorContext;
+use kuro_events::dispatch::get_dispatcher;
+use kuro_execute::materialize::materializer::DeferredMaterializerEntry;
+use kuro_execute::materialize::materializer::DeferredMaterializerExtensions;
+use kuro_execute::materialize::materializer::DeferredMaterializerIterItem;
+use kuro_execute::materialize::materializer::DeferredMaterializerSubscription;
+use kuro_fs::fs_util;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
@@ -358,9 +358,7 @@ impl<T: IoHandler> DeferredMaterializerExtensions for DeferredMaterializerAccess
         Ok(UnboundedReceiverStream::new(receiver).boxed())
     }
 
-    fn list_subscriptions(
-        &self,
-    ) -> kuro_error::Result<BoxStream<'static, ProjectRelativePathBuf>> {
+    fn list_subscriptions(&self) -> kuro_error::Result<BoxStream<'static, ProjectRelativePathBuf>> {
         let (sender, receiver) = mpsc::unbounded_channel();
         self.command_sender
             .send(MaterializerCommand::Extension(

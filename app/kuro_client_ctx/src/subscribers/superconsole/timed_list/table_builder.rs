@@ -10,11 +10,11 @@
 
 use std::time::Duration;
 
+use derive_more::From;
 use kuro_event_observer::display;
 use kuro_event_observer::display::TargetDisplayOptions;
 use kuro_event_observer::fmt_duration;
 use kuro_event_observer::span_tracker::BuckEventSpanInfo;
-use derive_more::From;
 use superconsole::Component;
 use superconsole::Dimensions;
 use superconsole::DrawMode;

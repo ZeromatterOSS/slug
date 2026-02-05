@@ -12,11 +12,11 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use dice::DiceComputations;
+use dice_futures::cancellation::CancellationObserver;
 use kuro_core::execution_types::execution::ExecutionPlatformResolution;
 use kuro_core::global_cfg_options::GlobalCfgOptions;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
-use dice_futures::cancellation::CancellationObserver;
 
 use crate::analysis::AnalysisResult;
 use crate::anon_target::AnonTargetDependentAnalysisResults;

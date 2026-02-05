@@ -11,6 +11,8 @@
 use std::io::Write;
 
 use async_trait::async_trait;
+use dice::DiceTransaction;
+use dupe::Dupe;
 use kuro_build_api::query::oneshot::QUERY_FRONTEND;
 use kuro_cli_proto::HasClientContext as _;
 use kuro_cli_proto::UqueryRequest;
@@ -29,8 +31,6 @@ use kuro_server_ctx::ctx::ServerCommandContextTrait;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use kuro_server_ctx::template::ServerCommandTemplate;
 use kuro_server_ctx::template::run_server_command;
-use dice::DiceTransaction;
-use dupe::Dupe;
 
 use crate::query::printer::QueryResultPrinter;
 use crate::query::printer::ShouldPrintProviders;

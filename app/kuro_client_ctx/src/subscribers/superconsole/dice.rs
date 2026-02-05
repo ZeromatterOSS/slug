@@ -8,9 +8,9 @@
  * above-listed licenses.
  */
 
+use gazebo::prelude::*;
 use kuro_event_observer::dice_state::DiceState;
 use kuro_event_observer::humanized::HumanizedCount;
-use gazebo::prelude::*;
 use superconsole::Component;
 use superconsole::Lines;
 

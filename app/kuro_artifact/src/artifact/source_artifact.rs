@@ -12,10 +12,10 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use allocative::Allocative;
-use kuro_core::package::source_path::SourcePath;
-use kuro_core::package::source_path::SourcePathRef;
 use derive_more::Display;
 use dupe::Dupe;
+use kuro_core::package::source_path::SourcePath;
+use kuro_core::package::source_path::SourcePathRef;
 
 /// An artifact in the source tree
 #[derive(

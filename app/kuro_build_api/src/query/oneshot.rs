@@ -11,6 +11,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
 use kuro_core::global_cfg_options::GlobalCfgOptions;
 use kuro_node::configured_universe::CqueryUniverse;
@@ -18,7 +19,6 @@ use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_node::nodes::unconfigured::TargetNode;
 use kuro_query::query::syntax::simple::eval::values::QueryEvaluationResult;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
 
 use crate::actions::query::ActionQueryNode;
 

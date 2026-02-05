@@ -31,6 +31,8 @@ pub mod ui;
 
 use std::path::Path;
 
+use dupe::Dupe;
+use gazebo::prelude::*;
 use kuro_cli_proto::ConfigOverride;
 use kuro_cli_proto::RepresentativeConfigFlag;
 use kuro_cli_proto::config_override::ConfigType;
@@ -42,8 +44,6 @@ use kuro_common::argv::ExpandedArgv;
 use kuro_common::argv::FlagfileArgSource;
 use kuro_fs::paths::abs_path::AbsPath;
 use kuro_fs::working_dir::AbsWorkingDir;
-use dupe::Dupe;
-use gazebo::prelude::*;
 
 use crate::common::profiling::BuckProfileMode;
 use crate::common::ui::CommonConsoleOptions;

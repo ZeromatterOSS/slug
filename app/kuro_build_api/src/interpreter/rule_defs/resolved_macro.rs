@@ -15,10 +15,10 @@ use std::fmt::Debug;
 use std::fmt::Display;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_node::attrs::attr_type::arg::ConfiguredStringWithMacros;
 use kuro_util::arc_str::ArcStr;
-use dupe::Dupe;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::GlobalsBuilder;
 use starlark::values::Demand;

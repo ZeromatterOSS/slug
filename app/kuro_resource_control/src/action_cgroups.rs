@@ -13,12 +13,12 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 
+use dupe::Dupe;
 use kuro_common::init::ActionSuspendStrategy;
 use kuro_common::init::ResourceControlConfig;
 use kuro_error::BuckErrorContext;
 use kuro_error::internal_error;
 use kuro_events::daemon_id::DaemonId;
-use dupe::Dupe;
 use tokio::fs::File;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;

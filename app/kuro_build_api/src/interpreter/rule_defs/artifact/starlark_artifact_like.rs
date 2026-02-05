@@ -13,12 +13,12 @@ use std::fmt::Display;
 use std::hash::Hash;
 use std::hash::Hasher;
 
+use either::Either;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_execute::path::artifact_path::ArtifactPath;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
-use either::Either;
 use starlark::collections::StarlarkHasher;
 use starlark::typing::Ty;
 use starlark::values::StringValue;

@@ -18,6 +18,12 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use derivative::Derivative;
+use derive_more::Display;
+use derive_more::From;
+use dupe::Dupe;
+use either::Either;
+use gazebo::cell::ARef;
 use kuro_core::content_hash::ContentBasedPathHash;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::fs::artifact_path_resolver::ArtifactFs;
@@ -29,12 +35,6 @@ use kuro_execute::execute::request::OutputType;
 use kuro_execute::path::artifact_path::ArtifactPath;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_util::arc_str::ThinArcS;
-use derivative::Derivative;
-use derive_more::Display;
-use derive_more::From;
-use dupe::Dupe;
-use either::Either;
-use gazebo::cell::ARef;
 use starlark::values::Heap;
 use starlark::values::ProvidesStaticType;
 use starlark::values::Trace;
@@ -605,6 +605,7 @@ impl UnboundArtifact {
 }
 
 pub mod testing {
+    use dupe::Dupe;
     use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
     use kuro_core::deferred::key::DeferredHolderKey;
     use kuro_core::fs::buck_out_path::BuckOutPathKind;
@@ -612,7 +613,6 @@ pub mod testing {
     use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
     use kuro_execute::execute::request::OutputType;
     use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
-    use dupe::Dupe;
 
     use crate::actions::key::ActionIndex;
     use crate::actions::key::ActionKey;
@@ -683,6 +683,7 @@ pub mod testing {
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
+    use dupe::Dupe;
     use kuro_core::cells::CellResolver;
     use kuro_core::cells::cell_root_path::CellRootPathBuf;
     use kuro_core::cells::name::CellName;
@@ -705,7 +706,6 @@ mod tests {
     use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
     use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
     use kuro_util::arc_str::ThinArcS;
-    use dupe::Dupe;
     use starlark::values::Heap;
 
     use crate::actions::key::ActionIndex;

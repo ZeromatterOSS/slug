@@ -8,17 +8,17 @@
  * above-listed licenses.
  */
 
-use kuro_error::kuro_error;
 use http::HeaderMap;
 use http::HeaderValue;
 use http::Uri;
 use hyper_http_proxy::Proxy;
+use kuro_error::kuro_error;
 
 #[cfg(fbcode_build)]
 mod imp {
-    use kuro_error::BuckErrorContext;
     use http::Uri;
     use hyper_http_proxy::Intercept;
+    use kuro_error::BuckErrorContext;
 
     use super::*;
 

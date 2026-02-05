@@ -11,9 +11,9 @@
 use std::fmt;
 use std::fmt::Debug;
 
+use futures::future;
 use kuro_common::file_ops::metadata::FileDigest;
 use kuro_error::BuckErrorContext;
-use futures::future;
 use remote_execution::InlinedBlobWithDigest;
 use remote_execution::TDigest;
 

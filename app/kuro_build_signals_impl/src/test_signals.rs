@@ -10,10 +10,10 @@
 
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_artifact::actions::key::ActionKey;
 use kuro_build_signals::env::NodeDuration;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
-use dupe::Dupe;
 
 #[derive(Hash, Eq, PartialEq, Clone, Dupe, Debug)]
 /// A key to uniquely identify a test execution.

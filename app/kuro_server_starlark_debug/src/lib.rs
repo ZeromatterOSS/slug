@@ -52,12 +52,12 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
+use derive_more::Display;
+use dupe::Dupe;
 use kuro_core::fs::project::ProjectRoot;
 use kuro_events::dispatch::EventDispatcher;
 use kuro_interpreter::starlark_debug::StarlarkDebugController;
 use kuro_interpreter::starlark_debug::StarlarkDebuggerHandle;
-use derive_more::Display;
-use dupe::Dupe;
 use tokio::sync::mpsc;
 
 use crate::error::StarlarkDebuggerError;

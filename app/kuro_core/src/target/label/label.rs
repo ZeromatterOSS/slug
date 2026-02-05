@@ -17,10 +17,10 @@ use std::ptr;
 use std::str;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_data::ToProtoMessage;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_util::hash::BuckHasher;
-use dupe::Dupe;
 use lock_free_hashtable::atomic_value::AtomicValue;
 use pagable::Pagable;
 use ref_cast::RefCastCustom;

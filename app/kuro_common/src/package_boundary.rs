@@ -13,6 +13,11 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use derive_more::Display;
+use dice::DiceComputations;
+use dice::Key;
+use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::cells::cell_path::CellPathRef;
 use kuro_core::cells::name::CellName;
@@ -21,11 +26,6 @@ use kuro_core::cells::paths::CellRelativePathBuf;
 use kuro_fs::paths::file_name::FileNameBuf;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use derive_more::Display;
-use dice::DiceComputations;
-use dice::Key;
-use dice_futures::cancellation::CancellationContext;
-use dupe::Dupe;
 use ref_cast::RefCast;
 
 use crate::legacy_configs::dice::HasLegacyConfigs;

@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use dupe::Dupe;
 use kuro_error::Ok;
 use kuro_execute::artifact_value::ArtifactValue;
 use kuro_execute::digest::CasDigestToReExt;
@@ -20,7 +21,6 @@ use kuro_execute::directory::ActionDirectoryMember;
 use kuro_execute::directory::ActionSharedDirectory;
 use kuro_execute::re::manager::UnconfiguredRemoteExecutionClient;
 use kuro_test_api::data::RemoteStorageConfig;
-use dupe::Dupe;
 use remote_execution::TDigest;
 
 type CacheKey = TDigest;

@@ -15,6 +15,14 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use derive_more::Display;
+use dice::Demand;
+use dice::DiceComputations;
+use dice::Key;
+use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
+use futures::FutureExt;
+use itertools::Itertools;
 use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::dep_only_incompatible_info::DepOnlyIncompatibleCustomSoftErrors;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::dep_only_incompatible_info::FrozenDepOnlyIncompatibleInfo;
@@ -76,14 +84,6 @@ use kuro_node::nodes::unconfigured::TargetNodeRef;
 use kuro_node::rule::RuleIncomingTransition;
 use kuro_node::visibility::VisibilityError;
 use kuro_util::arc_str::ArcStr;
-use derive_more::Display;
-use dice::Demand;
-use dice::DiceComputations;
-use dice::Key;
-use dice_futures::cancellation::CancellationContext;
-use dupe::Dupe;
-use futures::FutureExt;
-use itertools::Itertools;
 use starlark_map::ordered_map::OrderedMap;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
@@ -435,7 +435,13 @@ pub(crate) struct GatheredDeps {
     pub(crate) toolchain_deps: SmallSet<TargetConfiguredTargetLabel>,
     pub(crate) plugin_lists: PluginLists,
     /// Aspect results for dependencies with aspects attached (Phase 8c)
-    pub(crate) aspect_results: std::collections::HashMap<(ConfiguredTargetLabel, std::sync::Arc<kuro_node::aspect_type::StarlarkAspectType>), kuro_analysis::analysis::aspect_key::AspectValue>,
+    pub(crate) aspect_results: std::collections::HashMap<
+        (
+            ConfiguredTargetLabel,
+            std::sync::Arc<kuro_node::aspect_type::StarlarkAspectType>,
+        ),
+        kuro_analysis::analysis::aspect_key::AspectValue,
+    >,
 }
 
 pub(crate) async fn gather_deps(
@@ -530,11 +536,18 @@ pub(crate) async fn gather_deps(
                     Ok(())
                 }
 
-                fn toolchain_dep(&mut self, _dep: &ConfiguredProvidersLabel) -> kuro_error::Result<()> {
+                fn toolchain_dep(
+                    &mut self,
+                    _dep: &ConfiguredProvidersLabel,
+                ) -> kuro_error::Result<()> {
                     Ok(())
                 }
 
-                fn plugin_dep(&mut self, _dep: &TargetLabel, _kind: &PluginKind) -> kuro_error::Result<()> {
+                fn plugin_dep(
+                    &mut self,
+                    _dep: &TargetLabel,
+                    _kind: &PluginKind,
+                ) -> kuro_error::Result<()> {
                     Ok(())
                 }
             }
@@ -560,7 +573,8 @@ pub(crate) async fn gather_deps(
             async move {
                 // Returns Result<AspectValue>
                 ctx.compute(key).await
-            }.boxed()
+            }
+            .boxed()
         })
         .await
     } else {
@@ -626,10 +640,8 @@ pub(crate) async fn gather_deps(
     for (key, result) in aspect_results_with_keys {
         match result {
             Ok(Ok(aspect_value)) => {
-                aspect_results_map.insert(
-                    (key.target.dupe(), key.aspect_type.dupe()),
-                    aspect_value,
-                );
+                aspect_results_map
+                    .insert((key.target.dupe(), key.aspect_type.dupe()), aspect_value);
             }
             Ok(Err(e)) => {
                 // Add to errors following existing error handling pattern

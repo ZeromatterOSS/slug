@@ -11,6 +11,9 @@
 use std::hash::Hash;
 
 use allocative::Allocative;
+use derive_more::Display;
+use derive_more::From;
+use dupe::Dupe;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::NonDefaultProvidersName;
 use kuro_core::provider::label::ProviderName;
@@ -19,9 +22,6 @@ use kuro_core::provider::label::ProvidersName;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_error::BuckErrorContext;
-use derive_more::Display;
-use derive_more::From;
-use dupe::Dupe;
 use serde::Serialize;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::StarlarkHasher;

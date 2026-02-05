@@ -16,24 +16,26 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use dice::{CancellationContext, DiceComputations, Key};
+use dice::CancellationContext;
+use dice::DiceComputations;
+use dice::Key;
 use dupe::Dupe;
 use futures::FutureExt;
-
 use kuro_build_api::analysis::AnalysisResult;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_error::BuckErrorContext;
 use kuro_error::conversion::from_any_with_tag;
+use kuro_interpreter::file_loader::LoadedModule;
 use kuro_interpreter::load_module::InterpreterCalculation;
 use kuro_interpreter::paths::module::StarlarkModulePath;
-use kuro_interpreter::file_loader::LoadedModule;
 use kuro_interpreter::types::provider::callable::ValueAsProviderCallableLike;
 use kuro_interpreter_for_build::aspect::FrozenStarlarkAspectCallable;
-use kuro_node::bzl_or_bxl_path::BzlOrBxlPath;
 use kuro_node::aspect_type::StarlarkAspectType;
+use kuro_node::bzl_or_bxl_path::BzlOrBxlPath;
 use starlark::values::OwnedFrozenValueTyped;
 
-use super::aspect_key::{AspectKey, AspectValue};
+use super::aspect_key::AspectKey;
+use super::aspect_key::AspectValue;
 use super::calculation::AnalysisKey;
 
 #[async_trait]
@@ -68,7 +70,8 @@ impl Key for AspectKey {
         }
 
         // 4. Compute aspects on dependencies (shadow graph propagation)
-        let dep_aspects = compute_dep_aspects(ctx, &self.target, &aspect, &self.aspect_type).await?;
+        let dep_aspects =
+            compute_dep_aspects(ctx, &self.target, &aspect, &self.aspect_type).await?;
 
         // 5. Execute aspect implementation function with shadow graph
         let providers = execute_aspect(
@@ -78,7 +81,8 @@ impl Key for AspectKey {
             &target_result,
             dep_aspects,
             cancellations,
-        ).await?;
+        )
+        .await?;
 
         Ok(AspectValue { providers })
     }
@@ -124,10 +128,12 @@ fn get_aspect_from_module(
 
     aspect_value
         .downcast::<FrozenStarlarkAspectCallable>()
-        .map_err(|v| kuro_error::Error::from(kuro_error::internal_error!(
-            "Expected aspect callable, got: {}",
-            v.value().to_repr()
-        )))
+        .map_err(|v| {
+            kuro_error::Error::from(kuro_error::internal_error!(
+                "Expected aspect callable, got: {}",
+                v.value().to_repr()
+            ))
+        })
 }
 
 /// Check if an aspect should be applied to a target based on required_providers
@@ -227,13 +233,13 @@ async fn compute_dep_aspects(
     aspect: &OwnedFrozenValueTyped<FrozenStarlarkAspectCallable>,
     aspect_type: &Arc<StarlarkAspectType>,
 ) -> kuro_error::Result<HashMap<ConfiguredTargetLabel, AspectValue>> {
-    use kuro_node::attrs::configured_traversal::ConfiguredAttrTraversal;
-    use kuro_node::attrs::inspect_options::AttrInspectOptions;
-    use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
     use kuro_core::plugins::PluginKind;
     use kuro_core::plugins::PluginKindSet;
     use kuro_core::provider::label::ConfiguredProvidersLabel;
     use kuro_core::target::label::label::TargetLabel;
+    use kuro_node::attrs::configured_traversal::ConfiguredAttrTraversal;
+    use kuro_node::attrs::inspect_options::AttrInspectOptions;
+    use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
 
     // 1. Get the configured target node
     let node = ctx
@@ -319,10 +325,7 @@ async fn compute_dep_aspects(
 
     let dep_aspect_results = ctx
         .compute_join(aspect_keys.iter(), |ctx, key| {
-            async move {
-                ctx.compute(key).await
-            }
-            .boxed()
+            async move { ctx.compute(key).await }.boxed()
         })
         .await;
 
@@ -363,7 +366,9 @@ async fn execute_aspect(
     target_result: &AnalysisResult,
     dep_aspects: HashMap<ConfiguredTargetLabel, AspectValue>,
     cancellations: &CancellationContext,
-) -> kuro_error::Result<kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue> {
+) -> kuro_error::Result<
+    kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue,
+> {
     use kuro_build_api::analysis::registry::AnalysisRegistry;
     use kuro_build_api::interpreter::rule_defs::aspect::AspectContext;
     use kuro_build_api::interpreter::rule_defs::aspect::AspectRuleInfo;
@@ -380,8 +385,8 @@ async fn execute_aspect(
     use kuro_interpreter::soft_error::KuroStarlarkSoftErrorHandler;
     use kuro_node::attrs::inspect_options::AttrInspectOptions;
     use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
-    use starlark::values::structs::AllocStruct;
     use starlark::values::ValueOfUnchecked;
+    use starlark::values::structs::AllocStruct;
 
     use crate::attrs::resolve::configured_attr::ConfiguredAttrExt;
     use crate::attrs::resolve::ctx::AttrResolutionContext;
@@ -409,7 +414,10 @@ async fn execute_aspect(
 
     // Build dep_analysis_results: aspect results take precedence (shadow graph)
     // Only fetch regular analysis for deps that don't have aspect results
-    let dep_analysis_results: std::collections::HashMap<ConfiguredTargetLabel, kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue> = {
+    let dep_analysis_results: std::collections::HashMap<
+        ConfiguredTargetLabel,
+        kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue,
+    > = {
         // Determine which deps need regular analysis (no aspect result available)
         let deps_needing_analysis: Vec<_> = dep_labels
             .iter()

@@ -11,13 +11,13 @@
 use std::io::Write;
 
 use async_trait::async_trait;
+use itertools::Itertools;
 use kuro_cli_proto::ClientContext;
 use kuro_cmd_audit_client::configurations::AuditConfigurationsCommand;
 use kuro_core::configuration::bound_id::BoundConfigurationId;
 use kuro_core::configuration::data::ConfigurationData;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
-use itertools::Itertools;
 
 use crate::ServerAuditSubcommand;
 

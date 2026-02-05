@@ -11,14 +11,14 @@
 use std::time::Duration;
 use std::time::SystemTime;
 
-use kuro_core::cells::name::CellName;
-use kuro_core::execution_types::executor_config::RemoteExecutorUseCase;
-use kuro_error::BuckErrorContext;
-use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use gazebo::prelude::*;
 use host_sharing::HostSharingRequirements;
 use host_sharing::WeightClass;
 use host_sharing::WeightPercentage;
+use kuro_core::cells::name::CellName;
+use kuro_core::execution_types::executor_config::RemoteExecutorUseCase;
+use kuro_error::BuckErrorContext;
+use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 
 use super::LocalExecutionCommand;
 use super::LocalResourceType;
@@ -1056,9 +1056,7 @@ impl TryInto<kuro_test_proto::TestExecutable> for TestExecutable {
     }
 }
 
-impl TryInto<kuro_test_proto::PrepareForLocalExecutionResponse>
-    for PrepareForLocalExecutionResult
-{
+impl TryInto<kuro_test_proto::PrepareForLocalExecutionResponse> for PrepareForLocalExecutionResult {
     type Error = kuro_error::Error;
 
     fn try_into(self) -> Result<kuro_test_proto::PrepareForLocalExecutionResponse, Self::Error> {
@@ -1077,9 +1075,7 @@ impl TryInto<kuro_test_proto::PrepareForLocalExecutionResponse>
                     .command
                     .env
                     .into_iter()
-                    .map(
-                        |(key, value)| kuro_test_proto::VerbatimEnvironmentVariable { key, value },
-                    )
+                    .map(|(key, value)| kuro_test_proto::VerbatimEnvironmentVariable { key, value })
                     .collect(),
             }),
             setup_local_resource_commands: self
@@ -1151,14 +1147,10 @@ impl TryFrom<kuro_test_proto::SetupLocalResourceLocalExecutionCommand> for Local
     }
 }
 
-impl TryFrom<kuro_test_proto::PrepareForLocalExecutionResponse>
-    for PrepareForLocalExecutionResult
-{
+impl TryFrom<kuro_test_proto::PrepareForLocalExecutionResponse> for PrepareForLocalExecutionResult {
     type Error = kuro_error::Error;
 
-    fn try_from(
-        s: kuro_test_proto::PrepareForLocalExecutionResponse,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(s: kuro_test_proto::PrepareForLocalExecutionResponse) -> Result<Self, Self::Error> {
         let result = s.result.buck_error_context("Missing `result`")?;
         Ok(Self {
             command: LocalExecutionCommand::try_from(result)?,

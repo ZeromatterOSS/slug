@@ -16,6 +16,10 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use derivative::Derivative;
+use dupe::Dupe;
+use indexmap::IndexSet;
+use itertools::Itertools;
 use kuro_artifact::actions::key::ActionIndex;
 use kuro_artifact::actions::key::ActionKey;
 use kuro_artifact::artifact::artifact_type::DeclaredArtifact;
@@ -30,10 +34,6 @@ use kuro_error::internal_error;
 use kuro_execute::execute::request::OutputType;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use derivative::Derivative;
-use dupe::Dupe;
-use indexmap::IndexSet;
-use itertools::Itertools;
 use starlark::any::ProvidesStaticType;
 use starlark::codemap::FileSpan;
 use starlark::environment::FrozenModule;
@@ -644,7 +644,9 @@ impl RecordedAnalysisValues {
     /// Used when creating analysis results from Rust code rather than Starlark.
     pub fn new_native(
         self_key: DeferredHolderKey,
-        analysis_storage: Option<OwnedFrozenValueTyped<StarlarkAnyComplex<FrozenAnalysisValueStorage>>>,
+        analysis_storage: Option<
+            OwnedFrozenValueTyped<StarlarkAnyComplex<FrozenAnalysisValueStorage>>,
+        >,
         actions: RecordedActions,
     ) -> Self {
         Self {

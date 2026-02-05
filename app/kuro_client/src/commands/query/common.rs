@@ -8,10 +8,10 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
 use kuro_cli_proto::QueryOutputFormat;
 use kuro_client_ctx::query_args::CommonAttributeArgs;
 use kuro_query_parser::placeholder::QUERY_PERCENT_SS_PLACEHOLDER;
-use dupe::Dupe;
 
 #[derive(
     Debug,

@@ -12,6 +12,11 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use dice::CancellationContext;
+use dice::Demand;
+use dice::DiceComputations;
+use dice::Key;
+use dupe::Dupe;
 use kuro_build_api::build::detailed_aggregated_metrics::dice::HasDetailedAggregatedMetrics;
 use kuro_build_api::deferred::calculation::DeferredHolder;
 use kuro_build_api::deferred::calculation::lookup_deferred_holder;
@@ -24,11 +29,6 @@ use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::deferred::dynamic::DynamicLambdaResultsKey;
 use kuro_core::deferred::key::DeferredHolderKey;
 use kuro_data::ToProtoMessage;
-use dice::CancellationContext;
-use dice::Demand;
-use dice::DiceComputations;
-use dice::Key;
-use dupe::Dupe;
 
 use crate::dynamic::deferred::prepare_and_execute_lambda;
 use crate::dynamic::storage::FrozenDynamicLambdaParamsStorageImpl;

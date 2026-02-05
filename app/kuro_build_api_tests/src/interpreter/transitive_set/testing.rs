@@ -12,6 +12,7 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
 
+use indoc::indoc;
 use kuro_build_api::artifact_groups::deferred::TransitiveSetIndex;
 use kuro_build_api::artifact_groups::deferred::TransitiveSetKey;
 use kuro_build_api::interpreter::rule_defs::transitive_set::FrozenTransitiveSet;
@@ -22,7 +23,6 @@ use kuro_build_api::interpreter::rule_defs::transitive_set::transitive_set_defin
 use kuro_core::deferred::key::DeferredHolderKey;
 use kuro_error::BuckErrorContext as _;
 use kuro_interpreter::from_freeze::from_freeze_error;
-use indoc::indoc;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;

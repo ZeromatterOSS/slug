@@ -12,13 +12,13 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 
 use async_trait::async_trait;
+use dupe::Dupe;
 use kuro_common::argv::Argv;
 use kuro_common::argv::SanitizedArgv;
 use kuro_common::init::DEFAULT_RETAINED_EVENT_LOGS;
 use kuro_common::invocation_paths::InvocationPaths;
 use kuro_error::ExitCode;
 use kuro_event_observer::span_tracker::EventTimestamp;
-use dupe::Dupe;
 
 use crate::client_ctx::BuckSubcommand;
 use crate::client_ctx::ClientCommandContext;

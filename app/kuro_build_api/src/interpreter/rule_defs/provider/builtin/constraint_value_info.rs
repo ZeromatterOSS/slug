@@ -13,12 +13,12 @@
 use std::fmt::Debug;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_build_api_derive::internal_provider;
 use kuro_core::configuration::constraints::ConstraintKey;
 use kuro_core::configuration::constraints::ConstraintValue;
 use kuro_interpreter::types::configured_providers_label::StarlarkProvidersLabel;
 use kuro_interpreter::types::target_label::LabelArg;
-use dupe::Dupe;
 use starlark::any::ProvidesStaticType;
 use starlark::coerce::Coerce;
 use starlark::environment::GlobalsBuilder;

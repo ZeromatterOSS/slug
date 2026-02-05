@@ -11,12 +11,12 @@
 use std::future::Future;
 use std::pin::Pin;
 
+use dice::DiceComputations;
 use kuro_core::cells::CellResolver;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
 use kuro_core::global_cfg_options::GlobalCfgOptions;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
 
 use crate::actions::query::ActionQueryNode;
 
@@ -39,9 +39,8 @@ pub static AUDIT_OUTPUT: LateBinding<
         &'v CellResolver,
         &'v mut DiceComputations,
         &'v GlobalCfgOptions,
-    ) -> Pin<
-        Box<dyn Future<Output = kuro_error::Result<Option<AuditOutputResult>>> + 'v>,
-    >,
+    )
+        -> Pin<Box<dyn Future<Output = kuro_error::Result<Option<AuditOutputResult>>> + 'v>>,
 > = LateBinding::new("AUDIT_OUTPUT");
 
 pub async fn audit_output<'v>(

@@ -11,8 +11,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use kuro_core::cells::name::CellName;
 use dice::DiceComputations;
+use kuro_core::cells::name::CellName;
 
 use crate::dice::cells::HasCellResolver;
 use crate::ignores::file_ignores::CellFileIgnores;

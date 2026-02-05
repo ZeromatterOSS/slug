@@ -12,9 +12,9 @@ use std::os::unix::io::FromRawFd;
 use std::os::unix::io::RawFd;
 use std::os::unix::net::UnixStream as StdUnixStream;
 
+use clap::Parser;
 use kuro_error::BuckErrorContext;
 use kuro_grpc::DuplexChannel;
-use clap::Parser;
 use tokio::net::UnixStream;
 
 #[derive(Debug, Parser)]

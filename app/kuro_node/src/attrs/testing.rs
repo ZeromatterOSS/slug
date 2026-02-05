@@ -11,6 +11,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_core::configuration::config_setting::ConfigSettingData;
 use kuro_core::configuration::data::ConfigurationData;
 use kuro_core::configuration::data::ConfigurationDataData;
@@ -19,7 +20,6 @@ use kuro_core::configuration::pair::ConfigurationWithExec;
 use kuro_core::configuration::transition::applied::TransitionApplied;
 use kuro_core::configuration::transition::id::TransitionId;
 use kuro_core::target::label::label::TargetLabel;
-use dupe::Dupe;
 use starlark_map::ordered_map::OrderedMap;
 use starlark_map::unordered_map::UnorderedMap;
 

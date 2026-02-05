@@ -12,13 +12,13 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_build_api_derive::internal_provider;
 use kuro_common::legacy_configs::configs::parse_config_section_and_key;
 use kuro_core::configuration::config_setting::ConfigSettingData;
 use kuro_core::configuration::data::ConfigurationDataData;
 use kuro_interpreter::types::configured_providers_label::StarlarkProvidersLabel;
 use kuro_interpreter::types::target_label::StarlarkTargetLabel;
-use dupe::Dupe;
 use starlark::any::ProvidesStaticType;
 use starlark::coerce::Coerce;
 use starlark::collections::SmallMap;

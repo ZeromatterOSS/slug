@@ -10,9 +10,9 @@
 
 use std::fmt::Write;
 
-use kuro_client_ctx::exit_result::ExitResult;
 use clap::Command;
 use clap::builder::PossibleValue;
+use kuro_client_ctx::exit_result::ExitResult;
 use regex::Regex;
 
 /// Common option headings that appear across multiple kuro commands

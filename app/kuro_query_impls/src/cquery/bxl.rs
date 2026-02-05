@@ -11,6 +11,9 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
+use dice::LinearRecomputeDiceComputations;
+use dupe::Dupe;
 use kuro_build_api::query::bxl::BxlCqueryFunctions;
 use kuro_build_api::query::bxl::NEW_BXL_CQUERY_FUNCTIONS;
 use kuro_common::dice::cells::HasCellResolver;
@@ -26,9 +29,6 @@ use kuro_query::query::syntax::simple::eval::set::TargetSet;
 use kuro_query::query::syntax::simple::functions::DefaultQueryFunctions;
 use kuro_query::query::syntax::simple::functions::DefaultQueryFunctionsModule;
 use kuro_query::query::syntax::simple::functions::helpers::CapturedExpr;
-use dice::DiceComputations;
-use dice::LinearRecomputeDiceComputations;
-use dupe::Dupe;
 
 use crate::cquery::environment::CqueryEnvironment;
 use crate::dice::DiceQueryData;

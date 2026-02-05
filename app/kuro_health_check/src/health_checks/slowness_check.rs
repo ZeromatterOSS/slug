@@ -79,8 +79,7 @@ impl SlownessCheck {
 
         if !matches!(
             command_data,
-            kuro_data::command_start::Data::Build(..)
-                | kuro_data::command_start::Data::Install(..)
+            kuro_data::command_start::Data::Build(..) | kuro_data::command_start::Data::Install(..)
         ) {
             self.state = SlownessCheckState::Disabled;
             return;

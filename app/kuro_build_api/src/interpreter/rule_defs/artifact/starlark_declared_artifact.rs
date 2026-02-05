@@ -13,6 +13,7 @@ use std::fmt::Debug;
 use std::fmt::Display;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::artifact_type::DeclaredArtifact;
 use kuro_artifact::artifact::artifact_type::OutputArtifact;
@@ -22,7 +23,6 @@ use kuro_error::kuro_error;
 use kuro_execute::path::artifact_path::ArtifactPath;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
-use dupe::Dupe;
 use starlark::any::ProvidesStaticType;
 use starlark::codemap::FileSpan;
 use starlark::collections::StarlarkHasher;

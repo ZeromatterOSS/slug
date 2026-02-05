@@ -10,12 +10,12 @@
 
 use std::sync::Arc;
 
-use kuro_common::dice::cycles::CycleAdapterDescriptor;
-use kuro_util::cycle_detector::CycleDescriptor;
 use derive_more::Display;
 use dice::DynKey;
 use dupe::Dupe;
 use gazebo::prelude::*;
+use kuro_common::dice::cycles::CycleAdapterDescriptor;
+use kuro_util::cycle_detector::CycleDescriptor;
 
 use crate::execution::ExecutionPlatformResolutionKey;
 use crate::execution::ToolchainExecutionPlatformCompatibilityKey;

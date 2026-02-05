@@ -10,6 +10,9 @@
 
 use std::sync::Arc;
 
+use dice::DiceComputations;
+use dupe::Dupe;
+use futures::FutureExt;
 use kuro_core::configuration::compatibility::IncompatiblePlatformReason;
 use kuro_core::configuration::compatibility::MaybeCompatible;
 use kuro_core::global_cfg_options::GlobalCfgOptions;
@@ -27,9 +30,6 @@ use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
 use kuro_node::nodes::unconfigured::TargetNode;
 use kuro_node::target_calculation::ConfiguredTargetCalculation;
 use kuro_query::query::syntax::simple::eval::set::TargetSet;
-use dice::DiceComputations;
-use dupe::Dupe;
-use futures::FutureExt;
 
 // Returns a tuple of compatible targets, incompatible targets, and target-level errors.
 // NOTE: This function returns Result<(..., Vec<Error>)> to support keep-going:

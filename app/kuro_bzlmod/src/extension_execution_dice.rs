@@ -54,10 +54,18 @@ use crate::repo_spec::RepoSpec;
 #[kuro(tag = Input)]
 pub enum ModuleExtensionError {
     #[error("Module extension execution failed for '{extension_id}': {reason}")]
-    ExecutionFailed { extension_id: String, reason: String },
+    ExecutionFailed {
+        extension_id: String,
+        reason: String,
+    },
 
-    #[error("Failed to create temporary working directory for extension '{extension_id}': {reason}")]
-    TempDirFailed { extension_id: String, reason: String },
+    #[error(
+        "Failed to create temporary working directory for extension '{extension_id}': {reason}"
+    )]
+    TempDirFailed {
+        extension_id: String,
+        reason: String,
+    },
 
     #[error("Extension '{extension_id}' not found")]
     ExtensionNotFound { extension_id: String },
@@ -356,10 +364,7 @@ impl Key for ModuleExtensionExecutionKey {
                         }
                     }
                     Err(e) => {
-                        tracing::debug!(
-                            "Could not read lockfile for cache check: {}",
-                            e
-                        );
+                        tracing::debug!("Could not read lockfile for cache check: {}", e);
                     }
                 }
             }
@@ -367,7 +372,12 @@ impl Key for ModuleExtensionExecutionKey {
 
         // Log the modules that use this extension
         let module_count = self.aggregated.tags_by_module.len();
-        let tag_count: usize = self.aggregated.tags_by_module.values().map(|v| v.len()).sum();
+        let tag_count: usize = self
+            .aggregated
+            .tags_by_module
+            .values()
+            .map(|v| v.len())
+            .sum();
         tracing::debug!(
             "Extension '{}' used by {} module(s) with {} total tag(s)",
             self.extension_id,
@@ -389,12 +399,7 @@ impl Key for ModuleExtensionExecutionKey {
         let execution_result = match MODULE_EXTENSION_EXECUTOR_IMPL.get() {
             Ok(executor) => {
                 executor
-                    .execute_extension(
-                        ctx,
-                        &self.aggregated,
-                        &self.root_module_name,
-                        &temp_dir,
-                    )
+                    .execute_extension(ctx, &self.aggregated, &self.root_module_name, &temp_dir)
                     .await
             }
             Err(e) => {
@@ -508,11 +513,9 @@ fn create_temp_extension_dir(extension_id: &str) -> kuro_error::Result<PathBuf> 
     let sanitized = sanitize_extension_id_for_path(extension_id);
 
     let temp_base = std::env::temp_dir().join("kuro-extension");
-    std::fs::create_dir_all(&temp_base).map_err(|e| {
-        ModuleExtensionError::TempDirFailed {
-            extension_id: extension_id.to_owned(),
-            reason: format!("failed to create temp base: {}", e),
-        }
+    std::fs::create_dir_all(&temp_base).map_err(|e| ModuleExtensionError::TempDirFailed {
+        extension_id: extension_id.to_owned(),
+        reason: format!("failed to create temp base: {}", e),
     })?;
 
     let temp_dir = temp_base.join(&sanitized);
@@ -522,11 +525,9 @@ fn create_temp_extension_dir(extension_id: &str) -> kuro_error::Result<PathBuf> 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }
 
-    std::fs::create_dir_all(&temp_dir).map_err(|e| {
-        ModuleExtensionError::TempDirFailed {
-            extension_id: extension_id.to_owned(),
-            reason: format!("failed to create temp dir: {}", e),
-        }
+    std::fs::create_dir_all(&temp_dir).map_err(|e| ModuleExtensionError::TempDirFailed {
+        extension_id: extension_id.to_owned(),
+        reason: format!("failed to create temp dir: {}", e),
     })?;
 
     Ok(temp_dir)
@@ -681,7 +682,10 @@ mod tests {
             specs,
         );
 
-        assert_eq!(result.extension_id.as_ref(), "@@rules_python//python/pip:pip.bzl%pip");
+        assert_eq!(
+            result.extension_id.as_ref(),
+            "@@rules_python//python/pip:pip.bzl%pip"
+        );
         assert_eq!(result.input_hash, "sha256-abc123");
         assert_eq!(result.repo_count(), 2);
         assert!(result.contains_repo("numpy"));
@@ -721,7 +725,10 @@ mod tests {
             result.internal_name_from_canonical("_main~pip~numpy"),
             Some("numpy")
         );
-        assert_eq!(result.internal_name_from_canonical("_main~pip~pandas"), None);
+        assert_eq!(
+            result.internal_name_from_canonical("_main~pip~pandas"),
+            None
+        );
     }
 
     #[test]
@@ -739,14 +746,8 @@ mod tests {
             "my_ext"
         );
         // Fallback cases
-        assert_eq!(
-            extract_extension_name("//:extension.bzl"),
-            "extension"
-        );
-        assert_eq!(
-            extract_extension_name("simple_name"),
-            "simple_name"
-        );
+        assert_eq!(extract_extension_name("//:extension.bzl"), "extension");
+        assert_eq!(extract_extension_name("simple_name"), "simple_name");
     }
 
     #[test]
@@ -767,10 +768,7 @@ mod tests {
             sanitize_extension_id_for_path("@@module//path:file.bzl%ext"),
             "__module__path_file.bzl_ext"
         );
-        assert_eq!(
-            sanitize_extension_id_for_path("simple_name"),
-            "simple_name"
-        );
+        assert_eq!(sanitize_extension_id_for_path("simple_name"), "simple_name");
         assert_eq!(
             sanitize_extension_id_for_path("name with spaces"),
             "name_with_spaces"
@@ -784,10 +782,7 @@ mod tests {
         let mut aggregated = AggregatedExtension::new("@@module//ext.bzl", "test");
         aggregated.add_module_tags("root", vec![]);
 
-        let key = ModuleExtensionExecutionKey::new(
-            aggregated,
-            "_main".to_owned(),
-        );
+        let key = ModuleExtensionExecutionKey::new(aggregated, "_main".to_owned());
 
         assert_eq!(key.extension_id.as_ref(), "@@module//ext.bzl%test");
         assert!(key.input_hash.starts_with("sha256-"));
@@ -826,18 +821,19 @@ mod tests {
         let mut aggregated = AggregatedExtension::new("@@rules_python//pip:pip.bzl", "pip");
 
         let mut parse_tag = ExtensionTag::new("parse".to_owned());
-        parse_tag.kwargs.push(("hub_name".to_owned(), TagValue::String("pip".to_owned())));
+        parse_tag
+            .kwargs
+            .push(("hub_name".to_owned(), TagValue::String("pip".to_owned())));
 
         let mut install_tag = ExtensionTag::new("install".to_owned());
-        install_tag.kwargs.push(("name".to_owned(), TagValue::String("numpy".to_owned())));
+        install_tag
+            .kwargs
+            .push(("name".to_owned(), TagValue::String("numpy".to_owned())));
 
         aggregated.add_module_tags("root", vec![parse_tag]);
         aggregated.add_module_tags("dep_a", vec![install_tag]);
 
-        let key = ModuleExtensionExecutionKey::new(
-            aggregated,
-            "root".to_owned(),
-        );
+        let key = ModuleExtensionExecutionKey::new(aggregated, "root".to_owned());
 
         assert_eq!(key.extension_id.as_ref(), "@@rules_python//pip:pip.bzl%pip");
         assert_eq!(key.root_module_name.as_ref(), "root");
@@ -846,10 +842,11 @@ mod tests {
 
     #[test]
     fn test_module_extension_key_hash_eq() {
-        use crate::extensions::AggregatedExtension;
         use std::collections::hash_map::DefaultHasher;
         use std::hash::Hash;
         use std::hash::Hasher;
+
+        use crate::extensions::AggregatedExtension;
 
         let aggregated1 = AggregatedExtension::new("@@mod//ext.bzl", "ext");
         let aggregated2 = AggregatedExtension::new("@@mod//ext.bzl", "ext");
@@ -873,18 +870,20 @@ mod tests {
         let mut specs = HashMap::new();
         specs.insert(
             "test_repo".to_owned(),
-            RepoSpec::new("@@bazel_tools//repo:http.bzl%http_archive".to_owned())
-                .with_attr("url".to_owned(), AttrValue::String("https://example.com".to_owned())),
+            RepoSpec::new("@@bazel_tools//repo:http.bzl%http_archive".to_owned()).with_attr(
+                "url".to_owned(),
+                AttrValue::String("https://example.com".to_owned()),
+            ),
         );
 
-        let result = ModuleExtensionResult::new(
-            Arc::from("@@//ext.bzl%test"),
-            "hash".to_owned(),
-            specs,
-        );
+        let result =
+            ModuleExtensionResult::new(Arc::from("@@//ext.bzl%test"), "hash".to_owned(), specs);
 
         let spec = result.get_repo_spec("test_repo").unwrap();
-        assert_eq!(spec.repo_rule_id, "@@bazel_tools//repo:http.bzl%http_archive");
+        assert_eq!(
+            spec.repo_rule_id,
+            "@@bazel_tools//repo:http.bzl%http_archive"
+        );
         assert!(result.get_repo_spec("nonexistent").is_none());
     }
 
@@ -895,11 +894,8 @@ mod tests {
         specs.insert("b".to_owned(), RepoSpec::new("rule".to_owned()));
         specs.insert("c".to_owned(), RepoSpec::new("rule".to_owned()));
 
-        let result = ModuleExtensionResult::new(
-            Arc::from("@@//ext.bzl%test"),
-            "hash".to_owned(),
-            specs,
-        );
+        let result =
+            ModuleExtensionResult::new(Arc::from("@@//ext.bzl%test"), "hash".to_owned(), specs);
 
         let mut names: Vec<_> = result.repo_names().collect();
         names.sort();
@@ -978,14 +974,8 @@ mod tests {
 
         // Update with extension cache
         let specs = HashMap::new();
-        update_lockfile_extension_cache(
-            &lock_path,
-            "@@ext//ext.bzl%ext",
-            "bzl",
-            "usages",
-            &specs,
-        )
-        .unwrap();
+        update_lockfile_extension_cache(&lock_path, "@@ext//ext.bzl%ext", "bzl", "usages", &specs)
+            .unwrap();
 
         // Verify existing data is preserved
         let lockfile = Lockfile::read(&lock_path).unwrap();
@@ -1006,18 +996,16 @@ mod tests {
 
         assert_eq!(key.extension_id.as_ref(), "@@module//ext.bzl%test");
         assert!(key.project_root.is_some());
-        assert_eq!(
-            key.project_root().unwrap(),
-            &PathBuf::from("/tmp/project")
-        );
+        assert_eq!(key.project_root().unwrap(), &PathBuf::from("/tmp/project"));
     }
 
     #[test]
     fn test_project_root_not_in_hash_or_eq() {
-        use crate::extensions::AggregatedExtension;
         use std::collections::hash_map::DefaultHasher;
         use std::hash::Hash;
         use std::hash::Hasher;
+
+        use crate::extensions::AggregatedExtension;
 
         let aggregated1 = AggregatedExtension::new("@@mod//ext.bzl", "ext");
         let aggregated2 = AggregatedExtension::new("@@mod//ext.bzl", "ext");
@@ -1064,10 +1052,7 @@ mod tests {
         );
 
         assert!(key.project_root.is_some());
-        assert_eq!(
-            key.project_root().unwrap(),
-            &PathBuf::from("/tmp/test")
-        );
+        assert_eq!(key.project_root().unwrap(), &PathBuf::from("/tmp/test"));
     }
 
     #[test]

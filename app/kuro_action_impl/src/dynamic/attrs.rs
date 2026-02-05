@@ -9,6 +9,8 @@
  */
 
 use allocative::Allocative;
+use dupe::Dupe;
+use indexmap::IndexSet;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_build_api::dynamic_value::DynamicValue;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_value::StarlarkArtifactValue;
@@ -17,8 +19,6 @@ use kuro_build_api::interpreter::rule_defs::artifact::starlark_output_artifact::
 use kuro_build_api::interpreter::rule_defs::artifact::unpack_artifact::UnpackNonPromiseInputArtifact;
 use kuro_core::deferred::dynamic::DynamicLambdaResultsKey;
 use kuro_error::kuro_error;
-use dupe::Dupe;
-use indexmap::IndexSet;
 use starlark::collections::SmallSet;
 use starlark::typing::Ty;
 use starlark::values::Freeze;

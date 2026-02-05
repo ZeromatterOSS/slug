@@ -12,10 +12,10 @@ use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use kuro_core::execution_types::executor_config::ReGangWorker;
-use kuro_core::execution_types::executor_config::RemoteExecutorDependency;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use kuro_core::execution_types::executor_config::ReGangWorker;
+use kuro_core::execution_types::executor_config::RemoteExecutorDependency;
 use remote_execution as RE;
 
 use crate::digest_config::DigestConfig;

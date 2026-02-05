@@ -16,6 +16,8 @@ use std::iter;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
+use either::Either;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::bzl::ImportPath;
 use kuro_core::cells::cell_path::CellPath;
@@ -35,8 +37,6 @@ use kuro_core::provider::label::ProvidersName;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_util::arc_str::ArcStr;
-use dupe::Dupe;
-use either::Either;
 use once_cell::sync::Lazy;
 use starlark_map::Hashed;
 use starlark_map::ordered_map::OrderedMap;

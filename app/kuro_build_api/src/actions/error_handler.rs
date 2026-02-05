@@ -11,10 +11,10 @@
 use std::cell::RefCell;
 
 use allocative::Allocative;
-use kuro_data::ActionSubError;
-use kuro_data::CommandExecution;
 use console::strip_ansi_codes;
 use derive_more::Display;
+use kuro_data::ActionSubError;
+use kuro_data::CommandExecution;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -374,10 +374,7 @@ impl PartialEq for StarlarkActionSubError {
 impl Eq for StarlarkActionSubError {}
 
 impl StarlarkActionSubError {
-    pub(crate) fn from_errorformat_entry(
-        entry: kuro_errorformat::Entry,
-        category: String,
-    ) -> Self {
+    pub(crate) fn from_errorformat_entry(entry: kuro_errorformat::Entry, category: String) -> Self {
         StarlarkActionSubError {
             category: RefCell::new(category),
             message: entry.message,

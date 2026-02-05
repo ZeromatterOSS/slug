@@ -11,13 +11,13 @@
 use std::convert::Infallible;
 
 use allocative::Allocative;
+use derive_more::Display;
+use dupe::Dupe;
 use kuro_build_api::bxl::unconfigured_attribute::StarlarkCoercedAttr;
 use kuro_interpreter::types::cell_path::StarlarkCellPath;
 use kuro_interpreter::types::target_label::StarlarkTargetLabel;
 use kuro_node::attrs::inspect_options::AttrInspectOptions;
 use kuro_node::nodes::unconfigured::TargetNode;
-use derive_more::Display;
-use dupe::Dupe;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::SmallMap;
 use starlark::environment::Methods;

@@ -10,6 +10,8 @@
 
 use std::sync::Arc;
 
+use futures::FutureExt;
+use futures::future::BoxFuture;
 use kuro_cli_proto::ClientContext;
 use kuro_cli_proto::new_generic::CompleteRequest;
 use kuro_cli_proto::new_generic::NewGenericRequest;
@@ -30,8 +32,6 @@ use kuro_client_ctx::streaming::StreamingCommand;
 use kuro_common::invocation_roots::InvocationRoots;
 use kuro_common::legacy_configs::cells::BuckConfigBasedCells;
 use kuro_fs::working_dir::AbsWorkingDir;
-use futures::FutureExt;
-use futures::future::BoxFuture;
 
 use super::path_sanitizer::PathSanitizer;
 use super::results::CompletionResults;

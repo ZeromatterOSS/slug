@@ -10,6 +10,8 @@
 
 //! Tests for `PACKAGE` files.
 
+use dice::CancellationContext;
+use indoc::indoc;
 use kuro_core::fs::project::ProjectRootTemp;
 use kuro_core::package::PackageLabel;
 use kuro_interpreter::paths::package::PackageFilePath;
@@ -18,8 +20,6 @@ use kuro_interpreter_for_build::interpreter::dice_calculation_delegate::HasCalcu
 use kuro_node::attrs::display::AttrDisplayWithContextExt;
 use kuro_node::attrs::inspect_options::AttrInspectOptions;
 use kuro_node::nodes::frontend::TargetGraphCalculation;
-use dice::CancellationContext;
-use indoc::indoc;
 
 use crate::tests::calculation;
 

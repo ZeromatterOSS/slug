@@ -10,8 +10,8 @@
 
 use std::sync::Arc;
 
-use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use derivative::Derivative;
+use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedReceiver;

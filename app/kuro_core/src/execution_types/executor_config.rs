@@ -16,10 +16,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use allocative::Allocative;
-use kuro_util::hash::BuckHasher;
 use derive_more::Display;
 use dupe::Dupe;
 use itertools::Itertools;
+use kuro_util::hash::BuckHasher;
 use once_cell::sync::Lazy;
 use pagable::Pagable;
 use starlark_map::small_map::SmallMap;

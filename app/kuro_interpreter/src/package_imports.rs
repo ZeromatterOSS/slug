@@ -138,9 +138,9 @@ impl PackageImplicitImports {
 #[cfg(test)]
 mod tests {
 
+    use dupe::Dupe;
     use kuro_core::cells::alias::NonEmptyCellAlias;
     use kuro_core::cells::name::CellName;
-    use dupe::Dupe;
 
     use super::*;
 

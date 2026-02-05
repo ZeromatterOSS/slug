@@ -11,6 +11,8 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
+use dice::DiceTransaction;
+use futures::FutureExt;
 use kuro_cli_proto::new_generic::DocsOutputFormat;
 use kuro_cli_proto::new_generic::DocsResponse;
 use kuro_cli_proto::new_generic::DocsStarlarkRequest;
@@ -28,8 +30,6 @@ use kuro_interpreter::parse_import::RelativeImports;
 use kuro_interpreter::parse_import::parse_import_with_config;
 use kuro_interpreter::paths::module::StarlarkModulePath;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
-use dice::DiceTransaction;
-use futures::FutureExt;
 use starlark::docs::multipage::DocModuleInfo;
 
 use crate::builtins::write_docs_to_subdir;

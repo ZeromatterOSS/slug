@@ -23,6 +23,22 @@ use std::time::SystemTime;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use dice::DetectCycles;
+use dice::Dice;
+use dice_futures::cancellation::CancellationContext;
+use dice_futures::drop::DropTogether;
+use dice_futures::spawn::spawn_dropcancel;
+use dupe::Dupe;
+use futures::Future;
+use futures::FutureExt;
+use futures::Stream;
+use futures::StreamExt;
+use futures::TryFutureExt;
+use futures::channel::mpsc;
+use futures::channel::mpsc::UnboundedReceiver;
+use futures::channel::mpsc::UnboundedSender;
+use futures::future::BoxFuture;
+use futures::stream;
 use kuro_build_api::configure_dice::configure_dice_for_buck;
 use kuro_build_api::spawner::BuckSpawner;
 use kuro_certs::validate::CertState;
@@ -39,10 +55,10 @@ use kuro_common::io::trace::TracingIoProvider;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
 use kuro_common::memory;
 use kuro_common::sqlite::sqlite_db::SqliteIdentity;
-use kuro_core::kuro_env;
 use kuro_core::error::reload_hard_error_config;
 use kuro_core::error::reset_soft_error_counters;
 use kuro_core::fs::project::ProjectRoot;
+use kuro_core::kuro_env;
 use kuro_core::logging::LogConfigurationReloadHandle;
 use kuro_core::pattern::unparsed::UnparsedPatternPredicate;
 use kuro_error::BuckErrorContext;
@@ -77,22 +93,6 @@ use kuro_server_starlark_debug::run::run_dap_server_command;
 use kuro_test::executor_launcher::get_all_test_executors;
 use kuro_util::system_stats::system_memory_stats;
 use kuro_util::threads::thread_spawn;
-use dice::DetectCycles;
-use dice::Dice;
-use dice_futures::cancellation::CancellationContext;
-use dice_futures::drop::DropTogether;
-use dice_futures::spawn::spawn_dropcancel;
-use dupe::Dupe;
-use futures::Future;
-use futures::FutureExt;
-use futures::Stream;
-use futures::StreamExt;
-use futures::TryFutureExt;
-use futures::channel::mpsc;
-use futures::channel::mpsc::UnboundedReceiver;
-use futures::channel::mpsc::UnboundedSender;
-use futures::future::BoxFuture;
-use futures::stream;
 use rand::RngCore;
 use rand::SeedableRng;
 use tokio::runtime::Handle;
@@ -633,9 +633,9 @@ fn convert_positive_duration(proto_duration: &prost_types::Duration) -> Result<D
 
 fn error_to_command_result(e: kuro_error::Error) -> CommandResult {
     CommandResult {
-        result: Some(command_result::Result::Error(
-            kuro_data::ErrorReport::from(&e),
-        )),
+        result: Some(command_result::Result::Error(kuro_data::ErrorReport::from(
+            &e,
+        ))),
     }
 }
 

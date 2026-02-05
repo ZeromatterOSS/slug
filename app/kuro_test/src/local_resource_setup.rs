@@ -8,6 +8,9 @@
  * above-listed licenses.
  */
 
+use dice::DiceComputations;
+use futures::FutureExt;
+use itertools::Itertools;
 use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::external_runner_test_info::FrozenExternalRunnerTestInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::local_resource_info::FrozenLocalResourceInfo;
@@ -18,9 +21,6 @@ use kuro_error::BuckErrorContext;
 use kuro_error::ErrorTag;
 use kuro_test_api::data::RequiredLocalResources;
 use kuro_test_api::data::TestStage;
-use dice::DiceComputations;
-use futures::FutureExt;
-use itertools::Itertools;
 use starlark::values::OwnedFrozenValueTyped;
 
 pub(crate) enum TestStageSimple {

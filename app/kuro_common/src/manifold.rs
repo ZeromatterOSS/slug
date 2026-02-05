@@ -13,6 +13,11 @@ use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
+use bytes::Bytes;
+use dupe::Dupe;
+use futures::stream::BoxStream;
+use futures::stream::StreamExt;
+use hyper::Response;
 use kuro_fs::paths::abs_path::AbsPath;
 use kuro_http::HttpClient;
 use kuro_http::HttpClientBuilder;
@@ -20,11 +25,6 @@ use kuro_http::retries::AsKuroError;
 use kuro_http::retries::HttpError;
 use kuro_http::retries::HttpErrorForRetry;
 use kuro_http::retries::http_retry;
-use bytes::Bytes;
-use dupe::Dupe;
-use futures::stream::BoxStream;
-use futures::stream::StreamExt;
-use hyper::Response;
 use tokio::fs::File;
 use tokio::io::AsyncRead;
 

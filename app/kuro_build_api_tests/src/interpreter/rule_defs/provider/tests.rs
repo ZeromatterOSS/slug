@@ -8,11 +8,11 @@
  * above-listed licenses.
  */
 
+use indoc::indoc;
 use kuro_build_api::interpreter::rule_defs::provider::callable::register_provider;
 use kuro_build_api::interpreter::rule_defs::register_rule_defs;
 use kuro_core::bzl::ImportPath;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
-use indoc::indoc;
 
 fn provider_tester() -> Tester {
     let mut tester = Tester::new().unwrap();

@@ -11,8 +11,8 @@
 use std::hash::Hash;
 
 use allocative::Allocative;
-use kuro_core::cells::cell_path::CellPath;
 use derive_more::Display;
+use kuro_core::cells::cell_path::CellPath;
 use serde::Serialize;
 use serde::Serializer;
 use starlark::any::ProvidesStaticType;

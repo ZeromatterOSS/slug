@@ -8,9 +8,9 @@
  * above-listed licenses.
  */
 
-use kuro_http::HttpClient;
 use dice::UserComputationData;
 use dupe::Dupe;
+use kuro_http::HttpClient;
 
 /// Dice implementations so we can pass along the HttpClient to various subsystems
 /// that need to use it (Materializer, RunActions, etc).

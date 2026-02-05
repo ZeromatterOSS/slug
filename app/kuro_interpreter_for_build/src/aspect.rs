@@ -118,13 +118,13 @@ use crate::interpreter::build_context::PerFileTypeContext;
 #[derive(Debug, kuro_error::Error)]
 #[kuro(tag = Input)]
 enum AspectError {
-    #[error(
-        "Aspect must be assigned to a variable before use, e.g. `my_aspect = aspect(...)`"
-    )]
+    #[error("Aspect must be assigned to a variable before use, e.g. `my_aspect = aspect(...)`")]
     AspectNotAssigned,
     #[error("`aspect` can only be declared in .bzl files")]
     AspectNotInBzl,
-    #[error("Aspect cannot be invoked directly - it must be attached to an attribute via `aspects = [...]`")]
+    #[error(
+        "Aspect cannot be invoked directly - it must be attached to an attribute via `aspects = [...]`"
+    )]
     AspectCannotBeInvokedDirectly,
 }
 
@@ -205,7 +205,12 @@ impl<'v> StarlarkAspectCallable<'v> {
         let attrs_vec: Vec<(String, StarlarkAttribute)> = attrs
             .entries
             .into_iter()
-            .map(|(name, attr)| (name.to_owned(), StarlarkAttribute::new(attr.clone_attribute())))
+            .map(|(name, attr)| {
+                (
+                    name.to_owned(),
+                    StarlarkAttribute::new(attr.clone_attribute()),
+                )
+            })
             .collect();
 
         Ok(StarlarkAspectCallable {
@@ -510,9 +515,7 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkAspectCallable {
 /// Bazel syntax:
 /// - `[FooInfo, BarInfo]` - flat list, all required
 /// - `[[FooInfo], [BarInfo]]` - nested list, any-of (OR)
-fn parse_required_providers<'v>(
-    providers: UnpackListOrTuple<Value<'v>>,
-) -> Vec<Vec<Value<'v>>> {
+fn parse_required_providers<'v>(providers: UnpackListOrTuple<Value<'v>>) -> Vec<Vec<Value<'v>>> {
     let mut result = Vec::new();
     for v in providers.items {
         // Check if this element is itself a list

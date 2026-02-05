@@ -12,6 +12,7 @@ use std::process::Stdio;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use futures::Future;
 use kuro_event_log::FutureChildOutput;
 use kuro_event_log::should_block_on_log_upload;
 use kuro_event_log::should_upload_log;
@@ -20,7 +21,6 @@ use kuro_event_observer::unpack_event::UnpackedBuckEvent;
 use kuro_event_observer::unpack_event::unpack_event;
 use kuro_events::BuckEvent;
 use kuro_fs::paths::file_name::FileNameBuf;
-use futures::Future;
 
 use crate::subscribers::subscriber::EventSubscriber;
 
@@ -80,10 +80,7 @@ impl EventSubscriber for ReLog {
     }
 }
 
-async fn log_upload_impl(
-    session_id: String,
-    isolation_dir: FileNameBuf,
-) -> kuro_error::Result<()> {
+async fn log_upload_impl(session_id: String, isolation_dir: FileNameBuf) -> kuro_error::Result<()> {
     if !should_upload_log()? {
         return Ok(());
     }

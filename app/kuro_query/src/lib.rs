@@ -26,7 +26,7 @@ extern crate self as kuro_query;
 #[doc(hidden)]
 pub mod __derive_refs {
     pub use async_trait;
-    pub use kuro_query_parser;
     pub use indexmap;
+    pub use kuro_query_parser;
     pub use ref_cast;
 }

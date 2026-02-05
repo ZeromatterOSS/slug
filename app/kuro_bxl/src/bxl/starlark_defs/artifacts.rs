@@ -16,6 +16,12 @@ use std::hash::Hasher;
 use std::iter;
 
 use allocative::Allocative;
+use derive_more::Display;
+use dice::DiceComputations;
+use dupe::Dupe;
+use dupe::IterDupedExt;
+use futures::FutureExt;
+use indexmap::IndexSet;
 use kuro_artifact::artifact::artifact_type::BaseArtifactKind;
 use kuro_build_api::actions::calculation::ActionCalculation;
 use kuro_build_api::actions::execute::action_executor::ActionOutputs;
@@ -26,12 +32,6 @@ use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact::Starlar
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use kuro_execute::path::artifact_path::ArtifactPath;
-use derive_more::Display;
-use dice::DiceComputations;
-use dupe::Dupe;
-use dupe::IterDupedExt;
-use futures::FutureExt;
-use indexmap::IndexSet;
 use serde::Serialize;
 use serde::Serializer;
 use starlark::any::ProvidesStaticType;

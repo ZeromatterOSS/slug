@@ -11,9 +11,9 @@
 use std::cell::OnceCell;
 
 use allocative::Allocative;
+use gazebo::prelude::OptionExt;
 use kuro_error::BuckErrorContext;
 use kuro_error::conversion::from_any_with_tag;
-use gazebo::prelude::OptionExt;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::FrozenModule;
 use starlark::environment::Module;

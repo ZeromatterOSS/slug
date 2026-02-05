@@ -10,6 +10,7 @@
 
 use std::collections::BTreeMap;
 
+use dice::DiceTransaction;
 use kuro_cli_proto::new_generic::DocsResponse;
 use kuro_cli_proto::new_generic::DocsStarlarkBuiltinsRequest;
 use kuro_error::BuckErrorContext;
@@ -22,7 +23,6 @@ use kuro_interpreter_for_build::interpreter::globals::register_bxl_natives;
 use kuro_interpreter_for_build::interpreter::globals::register_load_natives;
 use kuro_interpreter_for_build::interpreter::globals::starlark_library_extensions_for_kuro;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
-use dice::DiceTransaction;
 use starlark::docs::DocItem;
 use starlark::docs::multipage::DocModuleInfo;
 use starlark::docs::multipage::render_markdown_multipage;

@@ -10,6 +10,7 @@
 
 use std::time::Duration;
 
+use dupe::Dupe;
 use kuro_analysis::analysis::calculation::AnalysisKey;
 use kuro_build_signals::env::CriticalPathBackendName;
 use kuro_build_signals::env::NodeDuration;
@@ -25,7 +26,6 @@ use kuro_critical_path::VertexKeys;
 use kuro_critical_path::compute_critical_path_potentials;
 use kuro_error::BuckErrorContext;
 use kuro_events::span::SpanId;
-use dupe::Dupe;
 use smallvec::SmallVec;
 
 use crate::BuildInfo;

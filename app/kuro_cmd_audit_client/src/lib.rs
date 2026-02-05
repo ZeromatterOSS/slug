@@ -12,6 +12,7 @@
 #![feature(try_blocks)]
 
 use async_trait::async_trait;
+use classpath::AuditClasspathCommand;
 use kuro_cli_proto::GenericRequest;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
 use kuro_client_ctx::common::BuckArgMatches;
@@ -25,7 +26,6 @@ use kuro_client_ctx::daemon::client::StdoutPartialResultHandler;
 use kuro_client_ctx::events_ctx::EventsCtx;
 use kuro_client_ctx::exit_result::ExitResult;
 use kuro_client_ctx::streaming::StreamingCommand;
-use classpath::AuditClasspathCommand;
 
 use crate::analysis_queries::AuditAnalysisQueriesCommand;
 use crate::cell::AuditCellCommand;

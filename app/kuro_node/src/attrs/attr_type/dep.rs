@@ -11,11 +11,11 @@
 use std::fmt::Display;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::plugins::PluginKindSet;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::provider::label::ProvidersLabelMaybeConfigured;
-use dupe::Dupe;
 use pagable::Pagable;
 use static_assertions::assert_eq_size;
 use strong_hash::StrongHash;

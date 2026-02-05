@@ -376,9 +376,7 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRepositoryRule {
         let name = kwargs
             .get("name")
             .and_then(|v| v.unpack_str())
-            .ok_or_else(|| {
-                kuro_error::Error::from(RepositoryRuleError::NameAttributeRequired)
-            })?;
+            .ok_or_else(|| kuro_error::Error::from(RepositoryRuleError::NameAttributeRequired))?;
 
         tracing::debug!(
             "Repository rule '{}' invoked with name '{}'",
@@ -413,10 +411,7 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRepositoryRule {
             );
         } else {
             // Build the invocation record for MODULE.bazel/WORKSPACE context
-            let mut invocation = RepositoryInvocation::new(
-                name.to_owned(),
-                self.name.clone(),
-            );
+            let mut invocation = RepositoryInvocation::new(name.to_owned(), self.name.clone());
 
             // Convert all kwargs to RepoAttrValue
             for (key, value) in kwargs.iter() {
@@ -498,7 +493,12 @@ pub fn register_repository_rule_function(builder: &mut GlobalsBuilder) {
         let attrs_vec: Vec<(String, StarlarkAttribute)> = attrs
             .entries
             .into_iter()
-            .map(|(name, attr)| (name.to_owned(), StarlarkAttribute::new(attr.clone_attribute())))
+            .map(|(name, attr)| {
+                (
+                    name.to_owned(),
+                    StarlarkAttribute::new(attr.clone_attribute()),
+                )
+            })
             .collect();
 
         Ok(StarlarkRepositoryRule::new(

@@ -9,14 +9,14 @@
  */
 
 use allocative::Allocative;
-use kuro_node::configured_universe::CqueryUniverse;
-use kuro_node::nodes::configured::ConfiguredTargetNode;
-use kuro_node::nodes::unconfigured::TargetNode;
-use kuro_query::query::syntax::simple::eval::set::TargetSet;
 use derivative::Derivative;
 use derive_more::Display;
 use dupe::Dupe;
 use futures::FutureExt;
+use kuro_node::configured_universe::CqueryUniverse;
+use kuro_node::nodes::configured::ConfiguredTargetNode;
+use kuro_node::nodes::unconfigured::TargetNode;
+use kuro_query::query::syntax::simple::eval::set::TargetSet;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;

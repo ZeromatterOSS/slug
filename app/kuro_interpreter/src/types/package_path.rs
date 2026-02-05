@@ -11,10 +11,10 @@
 use std::hash::Hash;
 
 use allocative::Allocative;
-use kuro_core::package::PackageLabel;
 use derive_more::Display;
 use derive_more::From;
 use dupe::Dupe;
+use kuro_core::package::PackageLabel;
 use serde::Serialize;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::StarlarkHasher;

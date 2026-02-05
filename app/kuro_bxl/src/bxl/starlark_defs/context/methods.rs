@@ -11,6 +11,9 @@
 use std::iter;
 use std::sync::Arc;
 
+use dupe::Dupe;
+use either::Either;
+use futures::FutureExt;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
 use kuro_cli_proto::build_request::Materializations;
 use kuro_cli_proto::build_request::Uploads;
@@ -33,9 +36,6 @@ use kuro_node::configuration::resolved::ConfigurationSettingKey;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_node::nodes::frontend::TargetGraphCalculation;
 use kuro_node::nodes::unconfigured::TargetNode;
-use dupe::Dupe;
-use either::Either;
-use futures::FutureExt;
 use starlark::collections::SmallMap;
 use starlark::environment::MethodsBuilder;
 use starlark::eval::Evaluator;

@@ -26,11 +26,7 @@ pub struct SessionInfoComponent<'s> {
 impl Component for SessionInfoComponent<'_> {
     type Error = kuro_error::Error;
 
-    fn draw_unchecked(
-        &self,
-        dimensions: Dimensions,
-        _mode: DrawMode,
-    ) -> kuro_error::Result<Lines> {
+    fn draw_unchecked(&self, dimensions: Dimensions, _mode: DrawMode) -> kuro_error::Result<Lines> {
         let mut headers = Lines::new();
         let mut ids = vec![];
         if cfg!(fbcode_build) {

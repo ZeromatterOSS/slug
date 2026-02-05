@@ -8,9 +8,9 @@
  * above-listed licenses.
  */
 
+use indoc::indoc;
 use kuro_build_api::interpreter::rule_defs::register_rule_defs;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
-use indoc::indoc;
 
 #[test]
 fn configuration_info_validates_buckconfigs() -> kuro_error::Result<()> {

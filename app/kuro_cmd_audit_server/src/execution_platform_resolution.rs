@@ -11,6 +11,7 @@
 use std::io::Write;
 
 use async_trait::async_trait;
+use indent_write::io::IndentWriter;
 use kuro_cli_proto::ClientContext;
 use kuro_cmd_audit_client::execution_platform_resolution::AuditExecutionPlatformResolutionCommand;
 use kuro_node::execution::EXECUTION_PLATFORMS_BUCKCONFIG;
@@ -19,7 +20,6 @@ use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
 use kuro_server_ctx::ctx::ServerCommandDiceContext;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
-use indent_write::io::IndentWriter;
 
 use crate::ServerAuditSubcommand;
 use crate::common::configured_target_labels::audit_command_configured_target_labels;

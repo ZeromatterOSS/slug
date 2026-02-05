@@ -8,6 +8,10 @@
  * above-listed licenses.
  */
 
+use dice::DiceComputations;
+use dupe::Dupe;
+use futures::FutureExt;
+use itertools::Either;
 use kuro_core::cells::cell_path::CellPathRef;
 use kuro_core::cells::paths::CellRelativePath;
 use kuro_core::global_cfg_options::GlobalCfgOptions;
@@ -24,10 +28,6 @@ use kuro_interpreter::types::target_label::StarlarkTargetLabel;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_node::nodes::unconfigured::TargetNode;
 use kuro_node::target_calculation::ConfiguredTargetCalculation;
-use dice::DiceComputations;
-use dupe::Dupe;
-use futures::FutureExt;
-use itertools::Either;
 use starlark::values::UnpackValue;
 use starlark::values::list::UnpackList;
 use starlark::values::type_repr::StarlarkTypeRepr;

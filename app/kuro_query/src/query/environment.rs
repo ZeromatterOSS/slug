@@ -13,15 +13,15 @@ use std::fmt::Debug;
 use std::iter;
 
 use async_trait::async_trait;
+use dupe::Dupe;
+use dupe::OptionDupedExt;
+use futures::stream::FuturesUnordered;
+use futures::stream::TryStreamExt;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::configuration::compatibility::MaybeCompatible;
 use kuro_core::package::PackageLabel;
 use kuro_error::BuckErrorContext;
-use dupe::Dupe;
-use dupe::OptionDupedExt;
-use futures::stream::FuturesUnordered;
-use futures::stream::TryStreamExt;
 
 use crate::query::graph::async_bfs::async_bfs_find_path;
 use crate::query::graph::graph::Graph;
@@ -162,8 +162,7 @@ pub trait QueryEnvironment: Send + Sync {
     ) -> kuro_error::Result<MaybeCompatible<Self::Target>>;
 
     /// Evaluates a literal target pattern. See kuro_common::pattern
-    async fn eval_literals(&self, literal: &[&str])
-    -> kuro_error::Result<TargetSet<Self::Target>>;
+    async fn eval_literals(&self, literal: &[&str]) -> kuro_error::Result<TargetSet<Self::Target>>;
 
     /// Evaluates a file literal
     async fn eval_file_literal(&self, literal: &str) -> kuro_error::Result<FileSet>;

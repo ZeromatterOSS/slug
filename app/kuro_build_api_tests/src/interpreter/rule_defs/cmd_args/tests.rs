@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use indoc::indoc;
 use kuro_build_api::interpreter::rule_defs::cmd_args::SimpleCommandLineArtifactVisitor;
 use kuro_build_api::interpreter::rule_defs::cmd_args::StarlarkCommandLineInputs;
 use kuro_build_api::interpreter::rule_defs::cmd_args::value_as::ValueAsCommandLineLike;
@@ -17,7 +18,6 @@ use kuro_interpreter::types::regex::register_buck_regex;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
 use kuro_interpreter_for_build::interpreter::testing::expect_error;
 use kuro_interpreter_for_build::label::testing::label_creator;
-use indoc::indoc;
 use starlark::environment::GlobalsBuilder;
 use starlark::starlark_module;
 use starlark::values::UnpackValue;

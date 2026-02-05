@@ -10,11 +10,11 @@
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use either::Either;
+use futures::FutureExt;
 use kuro_build_api::analysis::anon_promises_dyn::AnonPromisesDyn;
 use kuro_build_api::analysis::anon_promises_dyn::RunAnonPromisesAccessor;
 use kuro_interpreter::starlark_promise::StarlarkPromise;
-use either::Either;
-use futures::FutureExt;
 use starlark::eval::Evaluator;
 use starlark::values::Trace;
 use starlark::values::ValueTyped;

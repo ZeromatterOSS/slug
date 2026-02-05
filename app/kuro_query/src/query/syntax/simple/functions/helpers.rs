@@ -15,11 +15,11 @@
 use std::borrow::Cow;
 
 use async_trait::async_trait;
+use enum_iterator::Sequence;
+use gazebo::variants::VariantName;
 use kuro_query_parser::Expr;
 use kuro_query_parser::SpannedExpr;
 use kuro_query_parser::spanned::Spanned;
-use enum_iterator::Sequence;
-use gazebo::variants::VariantName;
 
 use crate::query::environment::QueryEnvironment;
 use crate::query::syntax::simple::eval::error::QueryError;

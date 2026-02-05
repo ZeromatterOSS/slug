@@ -10,12 +10,12 @@
 
 use std::collections::BTreeMap;
 
+use indexmap::IndexMap;
 use kuro_common::local_resource_state::EnvironmentVariable;
 use kuro_common::local_resource_state::LocalResource;
 use kuro_common::local_resource_state::LocalResourceState;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_error::ErrorTag;
-use indexmap::IndexMap;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -70,11 +70,11 @@ impl LocalResourcesSetupResult {
 
 #[cfg(test)]
 mod tests {
+    use indexmap::indexmap;
     use kuro_common::local_resource_state::EnvironmentVariable;
     use kuro_common::local_resource_state::LocalResource;
     use kuro_core::configuration::data::ConfigurationData;
     use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
-    use indexmap::indexmap;
     use maplit::btreemap;
 
     use crate::local_resource_api::LocalResourcesSetupResult;

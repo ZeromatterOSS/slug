@@ -8,12 +8,12 @@
  * above-listed licenses.
  */
 
+use futures::stream::Stream;
+use futures::stream::StreamExt;
 use kuro_common::convert::ProstDurationExt;
 use kuro_error::BuckErrorContext;
 use kuro_execute_local::CommandEvent;
 use kuro_execute_local::GatherOutputStatus;
-use futures::stream::Stream;
-use futures::stream::StreamExt;
 
 pub(crate) fn encode_event_stream<S>(
     s: S,

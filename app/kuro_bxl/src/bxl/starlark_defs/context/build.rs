@@ -12,6 +12,10 @@
 //! Implements the ability for bxl to build targets
 
 use allocative::Allocative;
+use derive_more::Display;
+use dupe::Dupe;
+use futures::FutureExt;
+use itertools::Itertools;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_build_api::build::AsyncBuildTargetResultBuilder;
 use kuro_build_api::build::BuildConfiguredLabelOptions;
@@ -23,10 +27,6 @@ use kuro_cli_proto::build_request::Materializations;
 use kuro_cli_proto::build_request::Uploads;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_interpreter::types::configured_providers_label::StarlarkConfiguredProvidersLabel;
-use derive_more::Display;
-use dupe::Dupe;
-use futures::FutureExt;
-use itertools::Itertools;
 use starlark::any::ProvidesStaticType;
 use starlark::coerce::Coerce;
 use starlark::eval::Evaluator;

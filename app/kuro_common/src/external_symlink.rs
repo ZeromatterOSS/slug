@@ -14,9 +14,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use dupe::Dupe;
 use pagable::Pagable;
 
 type Utf8Path = String;

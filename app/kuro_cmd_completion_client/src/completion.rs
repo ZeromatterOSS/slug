@@ -8,12 +8,12 @@
  * above-listed licenses.
  */
 
-use kuro_client_ctx::client_ctx::ClientCommandContext;
-use kuro_client_ctx::common::BuckArgMatches;
-use kuro_client_ctx::exit_result::ExitResult;
 use clap::Command;
 use clap::ValueEnum;
 use clap_complete::generate;
+use kuro_client_ctx::client_ctx::ClientCommandContext;
+use kuro_client_ctx::common::BuckArgMatches;
+use kuro_client_ctx::exit_result::ExitResult;
 
 // This file is the entry point for the target-completing delegate for kuro
 // command line completions. Its completion commands are called from shell

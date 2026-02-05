@@ -134,11 +134,9 @@ pub fn aggregate_extensions(
         for usage in usages {
             let ext_id = usage.extension_id();
 
-            let agg = aggregated
-                .entry(ext_id.clone())
-                .or_insert_with(|| {
-                    AggregatedExtension::new(&usage.extension_bzl_file, &usage.extension_name)
-                });
+            let agg = aggregated.entry(ext_id.clone()).or_insert_with(|| {
+                AggregatedExtension::new(&usage.extension_bzl_file, &usage.extension_name)
+            });
 
             // Add tags from this module
             agg.add_module_tags(module_name, usage.tags.clone());
@@ -146,7 +144,9 @@ pub fn aggregate_extensions(
             // Add imported repos
             for import in &usage.imports {
                 agg.add_imported_repos(import.repos.iter().cloned());
-                agg.add_imported_repos(import.repo_mapping.iter().map(|(_, actual)| actual.clone()));
+                agg.add_imported_repos(
+                    import.repo_mapping.iter().map(|(_, actual)| actual.clone()),
+                );
             }
         }
     }
@@ -213,10 +213,7 @@ impl ModuleInfo {
 
     /// Add a tag to this module.
     pub fn add_tag(&mut self, tag: ExtensionTag) {
-        self.tags
-            .entry(tag.tag_name.clone())
-            .or_default()
-            .push(tag);
+        self.tags.entry(tag.tag_name.clone()).or_default().push(tag);
     }
 }
 
@@ -248,10 +245,10 @@ pub fn compute_extension_input_hash(extension: &AggregatedExtension) -> String {
     }
 
     let hash = hasher.finalize();
-    format!("sha256-{}", base64::Engine::encode(
-        &base64::engine::general_purpose::STANDARD,
-        hash
-    ))
+    format!(
+        "sha256-{}",
+        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, hash)
+    )
 }
 
 #[cfg(test)]
@@ -261,12 +258,12 @@ mod tests {
 
     #[test]
     fn test_aggregated_extension_new() {
-        let agg = AggregatedExtension::new(
-            "@rules_python//python/extensions:pip.bzl",
-            "pip",
-        );
+        let agg = AggregatedExtension::new("@rules_python//python/extensions:pip.bzl", "pip");
         assert_eq!(agg.extension_name, "pip");
-        assert_eq!(agg.extension_id, "@rules_python//python/extensions:pip.bzl%pip");
+        assert_eq!(
+            agg.extension_id,
+            "@rules_python//python/extensions:pip.bzl%pip"
+        );
     }
 
     #[test]
@@ -285,17 +282,12 @@ mod tests {
 
     #[test]
     fn test_aggregate_extensions() {
-        let mut ext1 = ExtensionUsage::new(
-            "@rules_python//pip.bzl".to_string(),
-            "pip".to_string(),
-        );
+        let mut ext1 = ExtensionUsage::new("@rules_python//pip.bzl".to_string(), "pip".to_string());
         ext1.tags.push(ExtensionTag::new("parse".to_string()));
-        ext1.imports.push(UseRepo::new().add_repo("pip".to_string()));
+        ext1.imports
+            .push(UseRepo::new().add_repo("pip".to_string()));
 
-        let mut ext2 = ExtensionUsage::new(
-            "@rules_python//pip.bzl".to_string(),
-            "pip".to_string(),
-        );
+        let mut ext2 = ExtensionUsage::new("@rules_python//pip.bzl".to_string(), "pip".to_string());
         ext2.tags.push(ExtensionTag::new("install".to_string()));
 
         let mut module_extensions = HashMap::new();

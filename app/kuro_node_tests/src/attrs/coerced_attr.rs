@@ -10,6 +10,7 @@
 
 use std::collections::BTreeMap;
 
+use dupe::Dupe;
 use kuro_core::configuration::config_setting::ConfigSettingData;
 use kuro_core::configuration::constraints::ConstraintKey;
 use kuro_core::configuration::constraints::ConstraintValue;
@@ -22,7 +23,6 @@ use kuro_node::attrs::fmt_context::AttrFmtContext;
 use kuro_node::configuration::resolved::ConfigurationSettingKey;
 use kuro_util::arc_str::ArcSlice;
 use kuro_util::arc_str::ArcStr;
-use dupe::Dupe;
 
 #[test]
 fn selector_equals_accounts_for_ordering() {

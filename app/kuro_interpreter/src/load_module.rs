@@ -9,10 +9,10 @@
  */
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_core::bzl::ImportPath;
 use kuro_core::package::PackageLabel;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
 use starlark::environment::Globals;
 
 use crate::file_loader::LoadedModule;

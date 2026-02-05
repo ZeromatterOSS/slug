@@ -15,6 +15,10 @@ use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
+use debugserver_types as dap;
+use dupe::Dupe;
+use futures::StreamExt;
+use itertools::Itertools;
 use kuro_core::fs::project::ProjectRoot;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
 use kuro_error::BuckErrorContext;
@@ -23,10 +27,6 @@ use kuro_events::dispatch::EventDispatcher;
 use kuro_fs::fs_util;
 use kuro_fs::paths::abs_norm_path::AbsNormPath;
 use kuro_interpreter::starlark_debug::StarlarkDebugController;
-use debugserver_types as dap;
-use dupe::Dupe;
-use futures::StreamExt;
-use itertools::Itertools;
 use starlark::debug::DapAdapter;
 use starlark::debug::DapAdapterClient;
 use starlark::debug::DapAdapterEvalHook;
@@ -562,10 +562,7 @@ impl DebugServer for ServerState {
         Err(StarlarkDebuggerError::Unimplemented.into())
     }
 
-    fn continue_(
-        &mut self,
-        x: ContinueArguments,
-    ) -> kuro_error::Result<dap::ContinueResponseBody> {
+    fn continue_(&mut self, x: ContinueArguments) -> kuro_error::Result<dap::ContinueResponseBody> {
         let hook = self.find_hook_by_pseudo_thread(x.thread_id)?;
         hook.adapter
             .continue_()
@@ -768,10 +765,7 @@ impl ServerState {
             } => {
                 let resp = self.new_hook(handle, description)?;
                 response_channel.send(resp).map_err(|_| {
-                    kuro_error::kuro_error!(
-                        kuro_error::ErrorTag::StarlarkServer,
-                        "channel closed"
-                    )
+                    kuro_error::kuro_error!(kuro_error::ErrorTag::StarlarkServer, "channel closed")
                 })?;
             }
             ServerMessage::NewHandle { id, events } => self.new_handle(id, events),

@@ -8,12 +8,12 @@
  * above-listed licenses.
  */
 
+use indoc::indoc;
 use kuro_build_api::interpreter::rule_defs::register_rule_defs;
 use kuro_core::bzl::ImportPath;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
 use kuro_interpreter_for_build::interpreter::testing::expect_error;
 use kuro_interpreter_for_build::label::testing::label_creator;
-use indoc::indoc;
 
 fn new_tester() -> Tester {
     let mut tester = Tester::new().unwrap();

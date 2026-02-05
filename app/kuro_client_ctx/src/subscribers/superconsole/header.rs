@@ -136,11 +136,7 @@ struct CountComponent<'s> {
 impl Component for CountComponent<'_> {
     type Error = kuro_error::Error;
 
-    fn draw_unchecked(
-        &self,
-        _dimensions: Dimensions,
-        mode: DrawMode,
-    ) -> kuro_error::Result<Lines> {
+    fn draw_unchecked(&self, _dimensions: Dimensions, mode: DrawMode) -> kuro_error::Result<Lines> {
         match mode {
             DrawMode::Normal => {
                 let remaining = HumanizedCount::new(self.data.remaining);
@@ -557,9 +553,9 @@ impl Component for ProgressHeader<'_> {
 mod tests {
     use std::fmt::Write;
 
+    use itertools::Itertools;
     use kuro_error::conversion::from_any_with_tag;
     use kuro_event_observer::progress::BuildProgressPhaseStatsItem;
-    use itertools::Itertools;
 
     use super::*;
 

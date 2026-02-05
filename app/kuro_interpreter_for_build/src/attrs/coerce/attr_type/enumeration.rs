@@ -8,12 +8,12 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
 use kuro_node::attrs::attr_type::enumeration::EnumAttrType;
 use kuro_node::attrs::attr_type::string::StringLiteral;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::coercion_context::AttrCoercionContext;
 use kuro_node::attrs::configurable::AttrIsConfigurable;
-use dupe::Dupe;
 use starlark::typing::Ty;
 use starlark::values::Value;
 

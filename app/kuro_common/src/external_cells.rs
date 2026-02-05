@@ -11,11 +11,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_core::cells::cell_root_path::CellRootPath;
 use kuro_core::cells::external::ExternalCellOrigin;
 use kuro_core::cells::name::CellName;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
 
 use crate::file_ops::delegate::FileOpsDelegate;
 

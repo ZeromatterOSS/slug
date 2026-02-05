@@ -16,6 +16,9 @@ use std::net::Ipv4Addr;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use dupe::Dupe;
+use futures::FutureExt;
+use futures::future::try_join3;
 use kuro_cli_proto::DaemonProcessInfo;
 use kuro_cli_proto::daemon_api_client::DaemonApiClient;
 use kuro_common::buckd_connection::BUCK_AUTH_TOKEN_HEADER;
@@ -31,8 +34,8 @@ use kuro_core::kuro_env;
 use kuro_data::DaemonWasStartedReason;
 use kuro_error::BuckErrorContext;
 use kuro_error::ErrorTag;
-use kuro_error::kuro_error;
 use kuro_error::conversion::from_any_with_tag;
+use kuro_error::kuro_error;
 use kuro_events::daemon_id::DaemonId;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
 use kuro_resource_control::spawn_daemon::ResourceControlRunner;
@@ -41,9 +44,6 @@ use kuro_util::process::async_background_command;
 use kuro_util::truncate::truncate;
 use kuro_wrapper_common::kill::process_exists;
 use kuro_wrapper_common::pid::Pid;
-use dupe::Dupe;
-use futures::FutureExt;
-use futures::future::try_join3;
 use serde::Deserialize;
 use tokio::io::AsyncReadExt;
 use tokio::time::timeout;
@@ -248,8 +248,7 @@ impl Interceptor for BuckAddAuthTokenInterceptor {
 pub async fn new_daemon_api_client(
     endpoint: ConnectionType,
     auth_token: String,
-) -> kuro_error::Result<DaemonApiClient<InterceptedService<Channel, BuckAddAuthTokenInterceptor>>>
-{
+) -> kuro_error::Result<DaemonApiClient<InterceptedService<Channel, BuckAddAuthTokenInterceptor>>> {
     let channel = get_channel(endpoint, true).await?;
     Ok(DaemonApiClient::with_interceptor(
         channel,
@@ -872,9 +871,7 @@ async fn start_new_buckd_and_connect(
 
     events_ctx.handle_daemon_started(daemon_was_started_reason);
 
-    events_ctx
-        .eprintln("Connected to new kuro daemon.")
-        .await?;
+    events_ctx.eprintln("Connected to new kuro daemon.").await?;
 
     Ok(client)
 }

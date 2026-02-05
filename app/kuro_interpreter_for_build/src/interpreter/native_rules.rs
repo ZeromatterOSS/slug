@@ -25,14 +25,11 @@ use kuro_node::attrs::attr_type::AttrType;
 use kuro_node::attrs::attr_type::string::StringLiteral;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::coerced_deps_collector::CoercedDeps;
+use kuro_node::attrs::coerced_deps_collector::CoercedDepsCollector;
 use kuro_node::attrs::coercion_context::AttrCoercionContext;
+use kuro_node::attrs::spec::AttributeSpec;
 use kuro_node::attrs::spec::internal::NAME_ATTRIBUTE;
 use kuro_node::attrs::spec::internal::VISIBILITY_ATTRIBUTE;
-use kuro_util::arc_str::ArcStr;
-use kuro_node::attrs::coerced_deps_collector::CoercedDepsCollector;
-use kuro_node::visibility::VisibilityPatternList;
-use kuro_node::visibility::VisibilitySpecification;
-use kuro_node::attrs::spec::AttributeSpec;
 use kuro_node::attrs::values::AttrValues;
 use kuro_node::nodes::unconfigured::RuleKind;
 use kuro_node::nodes::unconfigured::TargetNode;
@@ -42,6 +39,9 @@ use kuro_node::rule::Rule;
 use kuro_node::rule::RuleIncomingTransition;
 use kuro_node::rule_type::NativeRuleKind;
 use kuro_node::rule_type::RuleType;
+use kuro_node::visibility::VisibilityPatternList;
+use kuro_node::visibility::VisibilitySpecification;
+use kuro_util::arc_str::ArcStr;
 use once_cell::sync::Lazy;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
@@ -133,7 +133,7 @@ mod rule_defs {
         Arc::new(Rule {
             attributes: alias_attributes(),
             rule_type: RuleType::Native(NativeRuleKind::Alias),
-            rule_kind: RuleKind::Normal,  // Aliases can be used anywhere
+            rule_kind: RuleKind::Normal, // Aliases can be used anywhere
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
         })
@@ -185,14 +185,19 @@ fn create_native_target_node(
 
     // Add visibility attribute (AttributeId(5))
     // Use explicit visibility if provided, otherwise fall back to package default
-    let visibility_spec = parse_explicit_visibility(visibility)
-        .unwrap_or_else(|| default_visibility.dupe());
-    attr_values.push_sorted(VISIBILITY_ATTRIBUTE.id, CoercedAttr::Visibility(visibility_spec));
+    let visibility_spec =
+        parse_explicit_visibility(visibility).unwrap_or_else(|| default_visibility.dupe());
+    attr_values.push_sorted(
+        VISIBILITY_ATTRIBUTE.id,
+        CoercedAttr::Visibility(visibility_spec),
+    );
 
     // Get the attribute IDs from the spec and add user-provided attrs
     for (attr_name, coerced_value) in attrs {
-        if let Some((_, attr_id, _)) =
-            rule.attributes.attr_specs().find(|(name, _, _)| *name == attr_name)
+        if let Some((_, attr_id, _)) = rule
+            .attributes
+            .attr_specs()
+            .find(|(name, _, _)| *name == attr_name)
         {
             attr_values.push_sorted(attr_id, coerced_value);
         }
@@ -217,8 +222,8 @@ fn create_native_target_node(
         target_label,
         attr_values,
         deps_cache,
-        None, // No call stack for native rules
-        None, // No package cfg modifiers
+        None,  // No call stack for native rules
+        None,  // No package cfg modifiers
         false, // test_config_unification_rollout
     ))
 }

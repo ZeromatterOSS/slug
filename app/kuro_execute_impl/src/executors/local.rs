@@ -19,6 +19,21 @@ use std::time::SystemTime;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use derive_more::From;
+use dice_futures::cancellation::CancellationContext;
+use dice_futures::cancellation::CancellationObserver;
+use dupe::Dupe;
+use futures::future;
+use futures::future::Either;
+use futures::future::FutureExt;
+use futures::future::Shared;
+use futures::future::join_all;
+use futures::stream::StreamExt;
+use gazebo::prelude::*;
+use host_sharing::HostSharingBroker;
+use host_sharing::HostSharingRequirements;
+use host_sharing::host_sharing::HostSharingGuard;
+use indexmap::IndexMap;
 use kuro_build_signals::env::WaitingCategory;
 use kuro_common::file_ops::metadata::FileDigestConfig;
 use kuro_common::liveliness_observer::LivelinessObserver;
@@ -89,21 +104,6 @@ use kuro_resource_control::memory_tracker::MemoryTrackerHandle;
 use kuro_resource_control::path::CgroupPathBuf;
 use kuro_util::process::background_command;
 use kuro_util::time_span::TimeSpan;
-use derive_more::From;
-use dice_futures::cancellation::CancellationContext;
-use dice_futures::cancellation::CancellationObserver;
-use dupe::Dupe;
-use futures::future;
-use futures::future::Either;
-use futures::future::FutureExt;
-use futures::future::Shared;
-use futures::future::join_all;
-use futures::stream::StreamExt;
-use gazebo::prelude::*;
-use host_sharing::HostSharingBroker;
-use host_sharing::HostSharingRequirements;
-use host_sharing::host_sharing::HostSharingGuard;
-use indexmap::IndexMap;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::info;
 
@@ -1721,6 +1721,7 @@ mod tests {
     use std::str;
 
     use assert_matches::assert_matches;
+    use host_sharing::HostSharingStrategy;
     use kuro_common::liveliness_observer::NoopLivelinessObserver;
     use kuro_core::cells::CellResolver;
     use kuro_core::cells::cell_root_path::CellRootPathBuf;
@@ -1730,7 +1731,6 @@ mod tests {
     use kuro_core::fs::project::ProjectRootTemp;
     use kuro_execute::execute::blocking::testing::DummyBlockingExecutor;
     use kuro_execute::materialize::nodisk::NoDiskMaterializer;
-    use host_sharing::HostSharingStrategy;
 
     use super::*;
 

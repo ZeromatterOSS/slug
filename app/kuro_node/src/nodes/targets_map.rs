@@ -13,10 +13,10 @@ use std::hash::Hash;
 use std::hash::Hasher;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_core::target::name::TargetNameRef;
 use kuro_util::indent::indent;
-use dupe::Dupe;
 use starlark_map::ordered_set;
 use starlark_map::ordered_set::OrderedSet;
 

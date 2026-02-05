@@ -10,8 +10,8 @@
 
 use std::ops::Range;
 
-use kuro_util::truncate::truncate;
 use derive_more::Display;
+use kuro_util::truncate::truncate;
 
 /// Pairs some output value with a span covering where the value came from. Unlike nom_locate, we drop
 /// the references into the input so that this has a 'static lifetime. To be useful, it'll need to be

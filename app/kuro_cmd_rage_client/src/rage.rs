@@ -15,6 +15,12 @@ use std::process::Stdio;
 use std::time::Duration;
 use std::time::SystemTime;
 
+use chrono::DateTime;
+use chrono::offset::Local;
+use derive_more::Display;
+use dupe::Dupe;
+use futures::future::FutureExt;
+use futures::future::LocalBoxFuture;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
 use kuro_client_ctx::common::BuckArgMatches;
 use kuro_client_ctx::daemon::client::connect::BuckdProcessInfo;
@@ -42,12 +48,6 @@ use kuro_fs::paths::abs_norm_path::AbsNormPath;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
 use kuro_util::process::async_background_command;
 use kuro_wrapper_common::invocation_id::TraceId;
-use chrono::DateTime;
-use chrono::offset::Local;
-use derive_more::Display;
-use dupe::Dupe;
-use futures::future::FutureExt;
-use futures::future::LocalBoxFuture;
 use serde::Serialize;
 use tokio::io::AsyncBufRead;
 use tokio::io::AsyncBufReadExt;
@@ -774,9 +774,7 @@ async fn upload_thread_dump(
     }
 }
 
-async fn get_trace_id(
-    invocation: &Option<EventLogPathBuf>,
-) -> kuro_error::Result<Option<TraceId>> {
+async fn get_trace_id(invocation: &Option<EventLogPathBuf>) -> kuro_error::Result<Option<TraceId>> {
     let invocation_id = match invocation {
         None => None,
         Some(invocation) => Some(invocation.uuid_from_filename()?),

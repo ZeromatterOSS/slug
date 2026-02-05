@@ -11,12 +11,12 @@
 use std::hash::Hash;
 
 use allocative::Allocative;
+use derive_more::Display;
+use dupe::Dupe;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::NonDefaultProvidersName;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::provider::label::ProvidersName;
-use derive_more::Display;
-use dupe::Dupe;
 use pagable::Pagable;
 use serde::Serialize;
 use serde::Serializer;

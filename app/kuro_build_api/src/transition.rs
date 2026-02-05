@@ -11,12 +11,12 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_core::configuration::data::ConfigurationData;
 use kuro_core::configuration::transition::applied::TransitionApplied;
 use kuro_core::configuration::transition::id::TransitionId;
 use kuro_node::attrs::configured_attr::ConfiguredAttr;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
 use starlark_map::ordered_map::OrderedMap;
 
 #[async_trait]

@@ -11,6 +11,7 @@
 use std::io::Write;
 
 use async_trait::async_trait;
+use dice::DiceTransaction;
 use kuro_build_api::configure_targets::load_compatible_patterns_with_modifiers;
 use kuro_cli_proto::ConfiguredTargetsRequest;
 use kuro_cli_proto::ConfiguredTargetsResponse;
@@ -24,7 +25,6 @@ use kuro_server_ctx::partial_result_dispatcher::NoPartialResult;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use kuro_server_ctx::template::ServerCommandTemplate;
 use kuro_server_ctx::template::run_server_command;
-use dice::DiceTransaction;
 
 use crate::targets::fmt::ConfiguredOutputHandler;
 use crate::targets::fmt::create_configured_formatter;

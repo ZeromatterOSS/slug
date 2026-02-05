@@ -12,6 +12,8 @@ use std::convert::Infallible;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use derive_more::Display;
+use dupe::Dupe;
 use kuro_build_api::actions::RegisteredAction;
 use kuro_build_api::actions::query::ActionQueryNode;
 use kuro_build_api::actions::query::OwnedActionAttr;
@@ -19,8 +21,6 @@ use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_error::kuro_error;
 use kuro_interpreter::types::target_label::StarlarkConfiguredTargetLabel;
 use kuro_query::query::environment::QueryTarget;
-use derive_more::Display;
-use dupe::Dupe;
 use serde::Serialize;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;

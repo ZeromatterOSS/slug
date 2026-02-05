@@ -9,8 +9,8 @@
  */
 
 use allocative::Allocative;
-use kuro_core::configuration::data::ConfigurationData;
 use derive_more::Display;
+use kuro_core::configuration::data::ConfigurationData;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;

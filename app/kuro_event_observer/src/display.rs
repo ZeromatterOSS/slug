@@ -15,6 +15,7 @@ use std::fmt::Write;
 use std::sync::Arc;
 use std::time::Duration;
 
+use dupe::Dupe;
 use kuro_common::convert::ProstDurationExt;
 use kuro_data::ActionKey;
 use kuro_data::ActionName;
@@ -31,7 +32,6 @@ use kuro_events::BuckEvent;
 use kuro_test_api::data::TestStatus;
 use kuro_util::commas::commas;
 use kuro_util::truncate::truncate;
-use dupe::Dupe;
 use starlark_map::ordered_set::OrderedSet;
 use superconsole::Line;
 use superconsole::Lines;

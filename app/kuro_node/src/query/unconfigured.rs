@@ -10,12 +10,12 @@
 
 use std::borrow::Cow;
 
+use dupe::Dupe;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_query::query::environment::QueryTarget;
 use kuro_query::query::graph::node::LabeledNode;
-use dupe::Dupe;
 
 use crate::attrs::coerced_attr::CoercedAttr;
 use crate::attrs::inspect_options::AttrInspectOptions;

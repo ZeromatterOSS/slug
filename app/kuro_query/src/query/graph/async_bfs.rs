@@ -10,11 +10,11 @@
 
 use std::future;
 
-use kuro_error::BuckErrorContext;
-use kuro_error::internal_error;
 use futures::StreamExt;
 use futures::future::Either;
 use futures::stream::FuturesOrdered;
+use kuro_error::BuckErrorContext;
+use kuro_error::internal_error;
 use starlark_map::Hashed;
 use starlark_map::unordered_map;
 use starlark_map::unordered_map::UnorderedMap;
@@ -173,9 +173,9 @@ mod tests {
     use std::collections::HashSet;
 
     use async_trait::async_trait;
-    use kuro_query::query::traversal::ChildVisitor;
     use dupe::Dupe;
     use gazebo::prelude::VecExt;
+    use kuro_query::query::traversal::ChildVisitor;
 
     use crate::query::graph::async_bfs::async_bfs_find_path;
     use crate::query::graph::node::LabeledNode;

@@ -20,8 +20,8 @@ use std::fmt;
 use std::fs::File;
 use std::os::unix::io::AsRawFd;
 
-use kuro_error::conversion::from_any_with_tag;
 use dupe::Dupe;
+use kuro_error::conversion::from_any_with_tag;
 
 #[derive(Debug)]
 enum StdioImpl {

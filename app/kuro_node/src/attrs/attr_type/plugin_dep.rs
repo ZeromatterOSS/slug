@@ -9,8 +9,8 @@
  */
 
 use allocative::Allocative;
-use kuro_core::plugins::PluginKind;
 use dupe::Dupe;
+use kuro_core::plugins::PluginKind;
 use pagable::Pagable;
 
 #[derive(Debug, Eq, PartialEq, Hash, Pagable, Allocative, Clone, Dupe)]

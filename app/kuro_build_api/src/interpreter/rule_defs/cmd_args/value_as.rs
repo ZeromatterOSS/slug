@@ -10,12 +10,12 @@
 
 use std::convert::Infallible;
 
+use dupe::Dupe;
 use kuro_interpreter::types::cell_path::StarlarkCellPath;
 use kuro_interpreter::types::cell_root::CellRoot;
 use kuro_interpreter::types::configured_providers_label::StarlarkConfiguredProvidersLabel;
 use kuro_interpreter::types::project_root::StarlarkProjectRoot;
 use kuro_interpreter::types::target_label::StarlarkTargetLabel;
-use dupe::Dupe;
 use starlark::typing::Ty;
 use starlark::values::UnpackValue;
 use starlark::values::Value;

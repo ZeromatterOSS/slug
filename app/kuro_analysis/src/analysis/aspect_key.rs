@@ -17,11 +17,10 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use derive_more::Display;
+use dupe::Dupe;
+use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_node::aspect_type::StarlarkAspectType;
-use dupe::Dupe;
-
-use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 
 /// DICE key for caching aspect computation results (Phase 8c).
 ///
@@ -80,7 +79,9 @@ mod tests {
         ))
     }
 
-    fn make_configured_label(label: &str) -> kuro_core::target::configured_target_label::ConfiguredTargetLabel {
+    fn make_configured_label(
+        label: &str,
+    ) -> kuro_core::target::configured_target_label::ConfiguredTargetLabel {
         TargetLabel::testing_parse(label).configure(ConfigurationData::testing_new())
     }
 

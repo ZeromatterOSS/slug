@@ -11,6 +11,7 @@
 use std::io::Write;
 
 use async_trait::async_trait;
+use dice::DiceTransaction;
 use kuro_build_api::actions::query::ActionQueryNode;
 use kuro_build_api::query::oneshot::QUERY_FRONTEND;
 use kuro_cli_proto::HasClientContext;
@@ -23,7 +24,6 @@ use kuro_server_ctx::global_cfg_options::global_cfg_options_from_client_context;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use kuro_server_ctx::template::ServerCommandTemplate;
 use kuro_server_ctx::template::run_server_command;
-use dice::DiceTransaction;
 
 use crate::query::printer::QueryResultPrinter;
 use crate::query::printer::ShouldPrintProviders;

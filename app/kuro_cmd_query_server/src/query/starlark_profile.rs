@@ -10,6 +10,8 @@
 
 use std::path::Path;
 
+use dice::DiceComputations;
+use futures::FutureExt;
 use kuro_core::package::PackageLabel;
 use kuro_error::BuckErrorContext;
 use kuro_events::dispatch::console_message;
@@ -17,8 +19,6 @@ use kuro_fs::paths::abs_path::AbsPath;
 use kuro_interpreter::starlark_profiler::data::StarlarkProfileDataAndStats;
 use kuro_node::nodes::frontend::TargetGraphCalculation;
 use kuro_profile::write_starlark_profile;
-use dice::DiceComputations;
-use futures::FutureExt;
 
 pub(crate) async fn write_query_profile_for_targets(
     ctx: &mut DiceComputations<'_>,

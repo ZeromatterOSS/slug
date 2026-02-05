@@ -27,6 +27,7 @@ use kuro_util::late_binding::LateBinding;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::LibraryExtension;
 
+use crate::aspect::register_aspect_function;
 use crate::attrs::attrs_global::register_attrs;
 use crate::interpreter::functions::dedupe::register_dedupe;
 use crate::interpreter::functions::host_info::register_host_info;
@@ -46,9 +47,8 @@ use crate::interpreter::natives::register_bzl_module_globals;
 use crate::interpreter::natives::register_module_natives;
 use crate::interpreter::selector::register_select;
 use crate::interpreter::selector::register_select_internal;
-use crate::plugins::register_plugins;
-use crate::aspect::register_aspect_function;
 use crate::module_extension::register_module_extension_function;
+use crate::plugins::register_plugins;
 use crate::repository_rule::register_repository_rule_function;
 use crate::rule::register_rule_function;
 use crate::subrule::register_subrule_function;

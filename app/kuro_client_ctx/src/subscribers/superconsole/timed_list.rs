@@ -197,11 +197,7 @@ struct TimedListHeader;
 impl Component for TimedListHeader {
     type Error = kuro_error::Error;
 
-    fn draw_unchecked(
-        &self,
-        dimensions: Dimensions,
-        _mode: DrawMode,
-    ) -> kuro_error::Result<Lines> {
+    fn draw_unchecked(&self, dimensions: Dimensions, _mode: DrawMode) -> kuro_error::Result<Lines> {
         Ok(Lines(vec![Line::unstyled(&"-".repeat(dimensions.width))?]))
     }
 }
@@ -249,6 +245,8 @@ mod tests {
     use std::sync::Arc;
     use std::time::SystemTime;
 
+    use dupe::Dupe;
+    use itertools::Itertools;
     use kuro_data::FakeStart;
     use kuro_data::SpanStartEvent;
     use kuro_event_observer::action_stats::ActionStats;
@@ -257,8 +255,6 @@ mod tests {
     use kuro_events::BuckEvent;
     use kuro_events::span::SpanId;
     use kuro_wrapper_common::invocation_id::TraceId;
-    use dupe::Dupe;
-    use itertools::Itertools;
 
     use super::*;
     use crate::subscribers::superconsole::SuperConsoleConfig;

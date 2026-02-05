@@ -8,10 +8,10 @@
  * above-listed licenses.
  */
 
-use kuro_core::execution_types::executor_config::RemoteExecutorUseCase;
 use derivative::Derivative;
 use dupe::Dupe;
 use futures::future;
+use kuro_core::execution_types::executor_config::RemoteExecutorUseCase;
 use remote_execution::TActionResult2;
 
 use crate::digest_config::DigestConfig;

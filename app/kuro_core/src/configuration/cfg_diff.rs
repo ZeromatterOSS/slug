@@ -55,11 +55,7 @@ pub fn cfg_diff(a: &ConfigurationData, b: &ConfigurationData) -> Result<(), Stri
             }
         }
 
-        fn diff_label_result(
-            &mut self,
-            a: kuro_error::Result<&str>,
-            b: kuro_error::Result<&str>,
-        ) {
+        fn diff_label_result(&mut self, a: kuro_error::Result<&str>, b: kuro_error::Result<&str>) {
             match (a, b) {
                 (Ok(a), Ok(b)) => {
                     if a != b {

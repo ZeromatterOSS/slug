@@ -15,10 +15,10 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
-use kuro_core::configuration::data::ConfigurationData;
-use kuro_util::late_binding::LateBinding;
 use dice::DiceComputations;
 use dice_futures::cancellation::CancellationContext;
+use kuro_core::configuration::data::ConfigurationData;
+use kuro_util::late_binding::LateBinding;
 
 use crate::metadata::key::MetadataKeyRef;
 use crate::metadata::value::MetadataValue;

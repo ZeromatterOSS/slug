@@ -15,6 +15,8 @@
 
 use std::sync::Arc;
 
+use dupe::Dupe;
+use indoc::indoc;
 use kuro_common::package_listing::listing::PackageListing;
 use kuro_common::package_listing::listing::testing::PackageListingExt;
 use kuro_core::cells::cell_path_with_allowed_relative_dir::CellPathWithAllowedRelativeDir;
@@ -33,8 +35,6 @@ use kuro_node::attrs::coercion_context::AttrCoercionContext;
 use kuro_node::attrs::configurable::AttrIsConfigurable;
 use kuro_node::attrs::hacks::value_to_string;
 use kuro_node::provider_id_set::ProviderIdSet;
-use dupe::Dupe;
-use indoc::indoc;
 use starlark::values::Heap;
 
 // =============================================================================

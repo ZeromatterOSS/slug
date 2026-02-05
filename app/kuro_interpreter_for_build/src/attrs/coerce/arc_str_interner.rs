@@ -10,9 +10,9 @@
 
 use std::cell::RefCell;
 
-use kuro_util::arc_str::ArcStr;
 use dupe::Dupe;
 use hashbrown::HashTable;
+use kuro_util::arc_str::ArcStr;
 
 use crate::attrs::coerce::str_hash::str_hash;
 

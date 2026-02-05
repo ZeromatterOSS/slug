@@ -16,6 +16,9 @@
 //!
 //! Reference: thoughts/shared/plans/kuro-bazel-subplans/03-rule-primitives.md
 
+use std::fmt;
+use std::fmt::Display;
+
 use allocative::Allocative;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -29,8 +32,6 @@ use starlark::values::StarlarkValue;
 use starlark::values::Value;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
-use std::fmt;
-use std::fmt::Display;
 
 // ============================================================================
 // CppFragment - C++ configuration fragment
@@ -94,7 +95,9 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Returns whether to generate .d dependency files.
-    fn should_generate_dotd_files(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+    fn should_generate_dotd_files(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
         Ok(true)
     }
 
@@ -104,7 +107,9 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Returns whether to process headers in dependencies.
-    fn process_headers_in_dependencies(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+    fn process_headers_in_dependencies(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
         Ok(false)
     }
 
@@ -114,12 +119,16 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Returns whether binaries should be stripped.
-    fn should_strip_binaries(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+    fn should_strip_binaries(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
         Ok(false)
     }
 
     /// Returns whether to use specific tool files (incompatible flag).
-    fn incompatible_use_specific_tool_files(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+    fn incompatible_use_specific_tool_files(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
         Ok(true)
     }
 
@@ -150,7 +159,9 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
 
     /// Whether to generate linkmaps for Objective-C.
     #[starlark(attribute)]
-    fn objc_generate_linkmap(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+    fn objc_generate_linkmap(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
         Ok(false)
     }
 
@@ -173,7 +184,9 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
 
     /// Whether to disable host/nonhost feature distinction.
     #[starlark(attribute)]
-    fn _dont_enable_host_nonhost(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+    fn _dont_enable_host_nonhost(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
         // Return true to skip host/nonhost feature enabling
         Ok(true)
     }
@@ -224,55 +237,73 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
 
     /// FDO prefetch hints label, or None.
     #[starlark(attribute)]
-    fn _fdo_prefetch_hints_label(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+    fn _fdo_prefetch_hints_label(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<NoneType> {
         Ok(NoneType)
     }
 
     /// Propeller optimize label, or None.
     #[starlark(attribute)]
-    fn _propeller_optimize_label(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+    fn _propeller_optimize_label(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<NoneType> {
         Ok(NoneType)
     }
 
     /// Memprof profile label, or None.
     #[starlark(attribute)]
-    fn _memprof_profile_label(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+    fn _memprof_profile_label(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<NoneType> {
         Ok(NoneType)
     }
 
     /// FDO optimize label, or None.
     #[starlark(attribute)]
-    fn _fdo_optimize_label(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+    fn _fdo_optimize_label(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<NoneType> {
         Ok(NoneType)
     }
 
     /// CS-FDO profile label, or None.
     #[starlark(attribute)]
-    fn _cs_fdo_profile_label(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+    fn _cs_fdo_profile_label(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<NoneType> {
         Ok(NoneType)
     }
 
     /// FDO profile label, or None.
     #[starlark(attribute)]
-    fn _fdo_profile_label(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+    fn _fdo_profile_label(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<NoneType> {
         Ok(NoneType)
     }
 
     /// XFDO profile label, or None.
     #[starlark(attribute)]
-    fn _xfdo_profile_label(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+    fn _xfdo_profile_label(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<NoneType> {
         Ok(NoneType)
     }
 
     /// Whether FDO is active.
     #[starlark(attribute)]
-    fn is_fdo_optimization(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+    fn is_fdo_optimization(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
         Ok(false)
     }
 
     /// Whether to use minimal debug info.
     #[starlark(attribute)]
-    fn _use_minimal_debug_info(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+    fn _use_minimal_debug_info(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
         Ok(false)
     }
 
@@ -294,7 +325,7 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     fn incompatible_remove_legacy_whole_archive(
         #[allow(unused_variables)] this: &CppFragment,
     ) -> starlark::Result<bool> {
-        Ok(true)  // Use the modern behavior
+        Ok(true) // Use the modern behavior
     }
 
     /// Returns the dynamic linking mode: "FULLY", "OFF", or "DEFAULT".

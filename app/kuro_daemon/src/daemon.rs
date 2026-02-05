@@ -16,6 +16,14 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use allocative::Allocative;
+use dice::DetectCycles;
+use dupe::Dupe;
+use futures::FutureExt;
+use futures::StreamExt;
+use futures::channel::mpsc;
+use futures::channel::mpsc::UnboundedSender;
+use futures::pin_mut;
+use futures::select;
 use kuro_cli_proto::DaemonProcessInfo;
 use kuro_client_ctx::daemon_constraints::gen_daemon_constraints;
 use kuro_client_ctx::version::BuckVersion;
@@ -39,14 +47,6 @@ use kuro_server::daemon::server::BuckdServerDelegate;
 use kuro_server::daemon::server::BuckdServerInitPreferences;
 use kuro_util::threads::thread_spawn;
 use kuro_util::tokio_runtime::new_tokio_runtime;
-use dice::DetectCycles;
-use dupe::Dupe;
-use futures::FutureExt;
-use futures::StreamExt;
-use futures::channel::mpsc;
-use futures::channel::mpsc::UnboundedSender;
-use futures::pin_mut;
-use futures::select;
 use rand::Rng;
 use tokio::runtime::Builder;
 
@@ -571,6 +571,7 @@ mod tests {
     use std::time::Duration;
 
     use allocative::Allocative;
+    use dupe::Dupe;
     use kuro_cli_proto::DaemonProcessInfo;
     use kuro_cli_proto::KillRequest;
     use kuro_cli_proto::PingRequest;
@@ -589,7 +590,6 @@ mod tests {
     use kuro_server::daemon::server::BuckdServer;
     use kuro_server::daemon::server::BuckdServerDelegate;
     use kuro_server::daemon::server::BuckdServerInitPreferences;
-    use dupe::Dupe;
     use rand::RngCore;
     use rand::SeedableRng;
     use tokio::runtime::Handle;

@@ -8,21 +8,19 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::ProvidersName;
 use kuro_node::attrs::attr_type::dep::DepAttrType;
 use kuro_node::attrs::attr_type::query::QueryAttr;
-use dupe::Dupe;
 use starlark::values::Value;
 
 use crate::attrs::resolve::attr_type::dep::DepAttrTypeExt;
 use crate::attrs::resolve::ctx::AttrResolutionContext;
 
 pub(crate) trait ConfiguredQueryAttrExt {
-    fn resolve<'v>(
-        &self,
-        ctx: &mut dyn AttrResolutionContext<'v>,
-    ) -> kuro_error::Result<Value<'v>>;
+    fn resolve<'v>(&self, ctx: &mut dyn AttrResolutionContext<'v>)
+    -> kuro_error::Result<Value<'v>>;
 }
 
 impl ConfiguredQueryAttrExt for QueryAttr<ConfiguredProvidersLabel> {

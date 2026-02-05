@@ -12,13 +12,13 @@ use std::iter::empty;
 use std::iter::once;
 
 use allocative::Allocative;
+use either::Either;
+use indexmap::IndexMap;
 use kuro_build_api_derive::internal_provider;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_error::BuckErrorContext;
 use kuro_error::kuro_error;
 use kuro_interpreter::types::configured_providers_label::StarlarkConfiguredProvidersLabel;
-use either::Either;
-use indexmap::IndexMap;
 use starlark::any::ProvidesStaticType;
 use starlark::coerce::Coerce;
 use starlark::environment::GlobalsBuilder;

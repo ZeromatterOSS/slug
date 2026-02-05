@@ -211,22 +211,13 @@ pub struct DiscoveredModule {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ModuleSource {
     /// Module from a registry.
-    Registry {
-        url: String,
-    },
+    Registry { url: String },
     /// Module from a local path override.
-    LocalPath {
-        path: String,
-    },
+    LocalPath { path: String },
     /// Module from a git override.
-    Git {
-        remote: String,
-        commit: String,
-    },
+    Git { remote: String, commit: String },
     /// Module from an archive override.
-    Archive {
-        urls: Vec<String>,
-    },
+    Archive { urls: Vec<String> },
 }
 
 /// Result of MVS resolution - the final resolved dependency graph.
@@ -463,12 +454,10 @@ impl MvsResolver {
             .registry_client
             .fetch_module_bazel(&dep.name, version_str)
             .await
-            .map_err(|e| {
-                MvsResolutionError::DependencyResolutionFailed {
-                    name: dep.name.clone(),
-                    version: version_str.to_string(),
-                    reason: format!("Failed to fetch MODULE.bazel: {}", e),
-                }
+            .map_err(|e| MvsResolutionError::DependencyResolutionFailed {
+                name: dep.name.clone(),
+                version: version_str.to_string(),
+                reason: format!("Failed to fetch MODULE.bazel: {}", e),
             })?;
 
         // Parse MODULE.bazel
@@ -606,7 +595,8 @@ impl MvsResolver {
 
         // Add overridden modules (they always "win")
         for (name, discovered) in &self.overridden_modules {
-            let version = Version::parse(&discovered.key.version).unwrap_or_else(|_| Version::empty());
+            let version =
+                Version::parse(&discovered.key.version).unwrap_or_else(|_| Version::empty());
             selected.insert(name.clone(), version);
         }
 
@@ -653,10 +643,7 @@ impl MvsResolver {
         // Group by module name to check for compat conflicts
         let mut by_name: HashMap<&str, Vec<&SelectionGroup>> = HashMap::new();
         for group in groups.keys() {
-            by_name
-                .entry(&group.module_name)
-                .or_default()
-                .push(group);
+            by_name.entry(&group.module_name).or_default().push(group);
         }
 
         for (name, name_groups) in by_name {
@@ -666,10 +653,8 @@ impl MvsResolver {
             }
 
             // Check if all groups have the same compatibility level
-            let compat_levels: HashSet<_> = name_groups
-                .iter()
-                .map(|g| g.compatibility_level)
-                .collect();
+            let compat_levels: HashSet<_> =
+                name_groups.iter().map(|g| g.compatibility_level).collect();
 
             if compat_levels.len() > 1 {
                 // Find two conflicting versions for the error message
@@ -822,10 +807,7 @@ impl MvsResolver {
     /// Fetch sources for all resolved modules.
     ///
     /// This downloads and extracts sources for modules that don't have local overrides.
-    pub async fn fetch_sources(
-        &self,
-        graph: &mut ResolvedGraph,
-    ) -> kuro_error::Result<()> {
+    pub async fn fetch_sources(&self, graph: &mut ResolvedGraph) -> kuro_error::Result<()> {
         for (name, info) in &mut graph.modules {
             match &info.source {
                 ModuleSource::Registry { url: _ } => {
@@ -853,7 +835,10 @@ impl MvsResolver {
                 }
                 ModuleSource::Git { .. } | ModuleSource::Archive { .. } => {
                     // TODO: Implement git/archive fetching in fetch_sources
-                    tracing::warn!("Git/Archive source fetching not yet implemented for {}", name);
+                    tracing::warn!(
+                        "Git/Archive source fetching not yet implemented for {}",
+                        name
+                    );
                 }
             }
         }
@@ -1035,10 +1020,7 @@ pub fn resolve_local_override(
 
     // Verify the path exists
     if !module_path.exists() {
-        return Err(LocalResolutionError::PathNotFound(
-            override_info.path.clone(),
-        )
-        .into());
+        return Err(LocalResolutionError::PathNotFound(override_info.path.clone()).into());
     }
 
     // Look for MODULE.bazel in the local module
@@ -1148,8 +1130,7 @@ pub fn resolve_local_modules(
             for override_info in &resolved.module.overrides {
                 if let Override::LocalPath(local) = override_info {
                     // Resolve path relative to the local module's directory
-                    let nested_resolved =
-                        resolve_local_override(local, &resolved.absolute_path)?;
+                    let nested_resolved = resolve_local_override(local, &resolved.absolute_path)?;
                     let nested_name = nested_resolved.name.clone();
 
                     if !modules.contains_key(&nested_name) {
@@ -1289,10 +1270,7 @@ impl RemoteModuleResolver {
     }
 
     /// Create a resolver with a custom registry URL.
-    pub async fn with_registry(
-        registry_url: &str,
-        cache: ModuleCache,
-    ) -> kuro_error::Result<Self> {
+    pub async fn with_registry(registry_url: &str, cache: ModuleCache) -> kuro_error::Result<Self> {
         let registry_client = RegistryClient::new(registry_url, cache.clone()).await?;
         let source_fetcher = SourceFetcher::new(cache).await?;
 
@@ -1319,7 +1297,12 @@ impl RemoteModuleResolver {
             .fetch_module_bazel(name, version_str)
             .await
             .map_err(|e| {
-                tracing::error!("Failed to fetch MODULE.bazel for {}@{}: {}", name, version_str, e);
+                tracing::error!(
+                    "Failed to fetch MODULE.bazel for {}@{}: {}",
+                    name,
+                    version_str,
+                    e
+                );
                 RemoteResolutionError::FetchFailed {
                     name: name.clone(),
                     version: version_str.to_string(),
@@ -1328,14 +1311,18 @@ impl RemoteModuleResolver {
 
         // Parse the MODULE.bazel
         let filename = format!("{}@{}/MODULE.bazel", name, version_str);
-        let parsed = parse_module_bazel_content(&module_bazel_content, &filename)
-            .map_err(|e| {
-                tracing::error!("Failed to parse MODULE.bazel for {}@{}: {}", name, version_str, e);
-                RemoteResolutionError::FetchFailed {
-                    name: name.clone(),
-                    version: version_str.to_string(),
-                }
-            })?;
+        let parsed = parse_module_bazel_content(&module_bazel_content, &filename).map_err(|e| {
+            tracing::error!(
+                "Failed to parse MODULE.bazel for {}@{}: {}",
+                name,
+                version_str,
+                e
+            );
+            RemoteResolutionError::FetchFailed {
+                name: name.clone(),
+                version: version_str.to_string(),
+            }
+        })?;
 
         // Fetch source.json
         let source_info = self
@@ -1343,7 +1330,12 @@ impl RemoteModuleResolver {
             .fetch_source_info(name, version_str)
             .await
             .map_err(|e| {
-                tracing::error!("Failed to fetch source.json for {}@{}: {}", name, version_str, e);
+                tracing::error!(
+                    "Failed to fetch source.json for {}@{}: {}",
+                    name,
+                    version_str,
+                    e
+                );
                 RemoteResolutionError::FetchFailed {
                     name: name.clone(),
                     version: version_str.to_string(),
@@ -1353,7 +1345,12 @@ impl RemoteModuleResolver {
         // Download and extract source
         let source_path = self
             .source_fetcher
-            .fetch_source(self.registry_client.base_url(), name, version_str, &source_info)
+            .fetch_source(
+                self.registry_client.base_url(),
+                name,
+                version_str,
+                &source_info,
+            )
             .await
             .map_err(|e| RemoteResolutionError::ExtractionFailed {
                 name: name.clone(),
@@ -1456,9 +1453,11 @@ pub async fn resolve_all_dependencies(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::fs;
+
     use tempfile::TempDir;
+
+    use super::*;
 
     fn create_test_workspace() -> TempDir {
         let dir = TempDir::new().unwrap();
@@ -1485,11 +1484,7 @@ module(name = "local_lib", version = "2.0.0")
         fs::write(local_lib_dir.join("MODULE.bazel"), local_module).unwrap();
 
         // Create a BUILD.bazel for the local module
-        fs::write(
-            local_lib_dir.join("BUILD.bazel"),
-            "# Build targets here",
-        )
-        .unwrap();
+        fs::write(local_lib_dir.join("BUILD.bazel"), "# Build targets here").unwrap();
 
         dir
     }
@@ -1712,7 +1707,10 @@ module(name = "local_lib", version = "2.0.0")
         assert_eq!(info.name, "rules_cc");
         assert_eq!(info.version, "0.0.9");
         assert_eq!(info.dependencies.len(), 1);
-        assert_eq!(info.dependencies.get("bazel_skylib"), Some(&"1.5.0".to_string()));
+        assert_eq!(
+            info.dependencies.get("bazel_skylib"),
+            Some(&"1.5.0".to_string())
+        );
     }
 
     #[test]

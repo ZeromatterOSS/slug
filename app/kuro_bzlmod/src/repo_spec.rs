@@ -138,12 +138,8 @@ pub fn with_repo_spec_registry<R>(f: impl FnOnce() -> R) -> (R, HashMap<String, 
 
     let result = f();
 
-    let specs = REPO_SPEC_REGISTRY.with(|cell| {
-        cell.borrow()
-            .as_ref()
-            .map(|r| r.take())
-            .unwrap_or_default()
-    });
+    let specs = REPO_SPEC_REGISTRY
+        .with(|cell| cell.borrow().as_ref().map(|r| r.take()).unwrap_or_default());
 
     REPO_SPEC_REGISTRY.with(|cell| {
         *cell.borrow_mut() = None;
@@ -180,28 +176,46 @@ mod tests {
 
     #[test]
     fn test_repo_spec_creation() {
-        let spec = RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned())
-            .with_attr("url".to_owned(), AttrValue::String("https://example.com/foo.tar.gz".to_owned()))
-            .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
+        let spec =
+            RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive".to_owned())
+                .with_attr(
+                    "url".to_owned(),
+                    AttrValue::String("https://example.com/foo.tar.gz".to_owned()),
+                )
+                .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
 
-        assert_eq!(spec.repo_rule_id, "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive");
+        assert_eq!(
+            spec.repo_rule_id,
+            "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive"
+        );
         assert_eq!(spec.attributes.len(), 2);
-        assert_eq!(spec.attributes.get("url"), Some(&AttrValue::String("https://example.com/foo.tar.gz".to_owned())));
+        assert_eq!(
+            spec.attributes.get("url"),
+            Some(&AttrValue::String(
+                "https://example.com/foo.tar.gz".to_owned()
+            ))
+        );
     }
 
     #[test]
     fn test_repo_spec_hash() {
-        let spec1 = RepoSpec::new("@@bazel_tools//...%http_archive".to_owned())
-            .with_attr("url".to_owned(), AttrValue::String("https://example.com/foo.tar.gz".to_owned()));
+        let spec1 = RepoSpec::new("@@bazel_tools//...%http_archive".to_owned()).with_attr(
+            "url".to_owned(),
+            AttrValue::String("https://example.com/foo.tar.gz".to_owned()),
+        );
 
-        let spec2 = RepoSpec::new("@@bazel_tools//...%http_archive".to_owned())
-            .with_attr("url".to_owned(), AttrValue::String("https://example.com/foo.tar.gz".to_owned()));
+        let spec2 = RepoSpec::new("@@bazel_tools//...%http_archive".to_owned()).with_attr(
+            "url".to_owned(),
+            AttrValue::String("https://example.com/foo.tar.gz".to_owned()),
+        );
 
         // Same specs should have same hash
         assert_eq!(spec1.compute_hash(), spec2.compute_hash());
 
-        let spec3 = RepoSpec::new("@@bazel_tools//...%http_archive".to_owned())
-            .with_attr("url".to_owned(), AttrValue::String("https://example.com/bar.tar.gz".to_owned()));
+        let spec3 = RepoSpec::new("@@bazel_tools//...%http_archive".to_owned()).with_attr(
+            "url".to_owned(),
+            AttrValue::String("https://example.com/bar.tar.gz".to_owned()),
+        );
 
         // Different specs should have different hash
         assert_ne!(spec1.compute_hash(), spec3.compute_hash());
@@ -211,14 +225,8 @@ mod tests {
     fn test_registry_basic() {
         let registry = RepoSpecRegistry::new();
 
-        registry.record(
-            "foo".to_owned(),
-            RepoSpec::new("rule1".to_owned()),
-        );
-        registry.record(
-            "bar".to_owned(),
-            RepoSpec::new("rule2".to_owned()),
-        );
+        registry.record("foo".to_owned(), RepoSpec::new("rule1".to_owned()));
+        registry.record("bar".to_owned(), RepoSpec::new("rule2".to_owned()));
 
         let specs = registry.take();
         assert_eq!(specs.len(), 2);
@@ -240,8 +248,14 @@ mod tests {
             assert!(in_extension_context());
 
             // Record some specs
-            assert!(record_repo_spec("foo".to_owned(), RepoSpec::new("rule1".to_owned())));
-            assert!(record_repo_spec("bar".to_owned(), RepoSpec::new("rule2".to_owned())));
+            assert!(record_repo_spec(
+                "foo".to_owned(),
+                RepoSpec::new("rule1".to_owned())
+            ));
+            assert!(record_repo_spec(
+                "bar".to_owned(),
+                RepoSpec::new("rule2".to_owned())
+            ));
 
             42
         });
@@ -262,7 +276,10 @@ mod tests {
     fn test_record_outside_context() {
         // Outside extension context, record should return false
         assert!(!in_extension_context());
-        assert!(!record_repo_spec("foo".to_owned(), RepoSpec::new("rule".to_owned())));
+        assert!(!record_repo_spec(
+            "foo".to_owned(),
+            RepoSpec::new("rule".to_owned())
+        ));
     }
 
     #[test]

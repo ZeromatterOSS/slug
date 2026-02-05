@@ -11,7 +11,6 @@
 use std::sync::Arc;
 
 use allocative::Allocative;
-use kuro_error::BuckErrorContext;
 use bytes::Bytes;
 use dupe::Dupe;
 use futures::StreamExt;
@@ -27,6 +26,7 @@ use hyper::Request;
 use hyper::Response;
 use hyper_util::client::legacy::ResponseFuture;
 use hyper_util::client::legacy::connect::Connect;
+use kuro_error::BuckErrorContext;
 use tokio::io::AsyncReadExt;
 use tokio::sync::Semaphore;
 use tokio_util::io::StreamReader;
@@ -878,7 +878,6 @@ mod proxy_tests {
     use std::net::ToSocketAddrs;
     use std::time::Duration;
 
-    use kuro_error::BuckErrorContext;
     use bytes::Bytes;
     use http::Method;
     use httptest::Expectation;
@@ -891,6 +890,7 @@ mod proxy_tests {
     use hyper_util::client::legacy::Client;
     use hyper_util::rt::TokioExecutor;
     use hyper_util::rt::TokioIo;
+    use kuro_error::BuckErrorContext;
     use tokio::net::TcpListener;
     use tokio::task::JoinHandle;
 

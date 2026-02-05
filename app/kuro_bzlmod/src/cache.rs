@@ -215,7 +215,8 @@ impl ModuleCache {
                 path: parent.display().to_string(),
             })?;
         }
-        std::fs::write(&path, content).buck_error_context("Failed to write source.json to cache")?;
+        std::fs::write(&path, content)
+            .buck_error_context("Failed to write source.json to cache")?;
         Ok(())
     }
 
@@ -287,8 +288,9 @@ impl Default for ModuleCache {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use tempfile::TempDir;
+
+    use super::*;
 
     fn create_test_cache() -> (TempDir, ModuleCache) {
         let dir = TempDir::new().unwrap();

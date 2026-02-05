@@ -11,6 +11,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_core::target::label::label::TargetLabelRef;
 use kuro_core::target::name::TargetNameRef;
 use kuro_error::BuckErrorContext;
@@ -29,7 +30,6 @@ use kuro_node::attrs::spec::internal::WITHIN_VIEW_ATTRIBUTE;
 use kuro_node::attrs::spec::internal::attr_is_configurable;
 use kuro_node::attrs::values::AttrValues;
 use kuro_util::arc_str::ArcStr;
-use dupe::Dupe;
 use starlark::docs::DocString;
 use starlark::eval::ParametersParser;
 use starlark::eval::ParametersSpec;

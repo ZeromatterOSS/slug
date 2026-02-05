@@ -83,9 +83,7 @@ impl TryFrom<i32> for HealthCheckType {
             kuro_health_check_proto::HealthCheckType::MemoryPressure => {
                 HealthCheckType::MemoryPressure
             }
-            kuro_health_check_proto::HealthCheckType::LowDiskSpace => {
-                HealthCheckType::LowDiskSpace
-            }
+            kuro_health_check_proto::HealthCheckType::LowDiskSpace => HealthCheckType::LowDiskSpace,
             kuro_health_check_proto::HealthCheckType::SlowDownloadSpeed => {
                 HealthCheckType::SlowDownloadSpeed
             }
@@ -106,9 +104,7 @@ impl TryInto<i32> for HealthCheckType {
             HealthCheckType::MemoryPressure => {
                 kuro_health_check_proto::HealthCheckType::MemoryPressure
             }
-            HealthCheckType::LowDiskSpace => {
-                kuro_health_check_proto::HealthCheckType::LowDiskSpace
-            }
+            HealthCheckType::LowDiskSpace => kuro_health_check_proto::HealthCheckType::LowDiskSpace,
             HealthCheckType::SlowDownloadSpeed => {
                 kuro_health_check_proto::HealthCheckType::SlowDownloadSpeed
             }
@@ -146,13 +142,13 @@ impl TryInto<kuro_health_check_proto::Message> for Message {
                 header,
                 body,
                 footer,
-            } => kuro_health_check_proto::message::Data::Rich(
-                kuro_health_check_proto::RichMessage {
+            } => {
+                kuro_health_check_proto::message::Data::Rich(kuro_health_check_proto::RichMessage {
                     header,
                     body,
                     footer,
-                },
-            ),
+                })
+            }
         };
         Ok(kuro_health_check_proto::Message { data: Some(data) })
     }

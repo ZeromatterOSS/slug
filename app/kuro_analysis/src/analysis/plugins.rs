@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use dupe::IterDupedExt;
 use kuro_build_api::interpreter::rule_defs::plugins::AnalysisPlugins;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_node::attrs::attr_type::dep::DepAttr;
@@ -15,7 +16,6 @@ use kuro_node::attrs::attr_type::dep::DepAttrTransition;
 use kuro_node::attrs::attr_type::dep::DepAttrType;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
 use kuro_node::provider_id_set::ProviderIdSet;
-use dupe::IterDupedExt;
 use starlark::values::Value;
 use starlark::values::ValueTyped;
 use starlark_map::small_map::SmallMap;

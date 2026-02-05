@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use dice::DiceTransactionUpdater;
 use kuro_common::file_ops::dice::FileChangeTracker;
 use kuro_common::ignores::ignore_set::IgnoreSet;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
@@ -25,7 +26,6 @@ use kuro_error::BuckErrorContext;
 use kuro_events::dispatch::span_async;
 use kuro_fs::paths::abs_norm_path::AbsNormPath;
 use kuro_util::process::async_background_command;
-use dice::DiceTransactionUpdater;
 use tracing::debug;
 use tracing::info;
 use watchman_client::expr::Expr;

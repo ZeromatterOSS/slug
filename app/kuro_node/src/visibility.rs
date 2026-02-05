@@ -13,12 +13,12 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 
 use allocative::Allocative;
+use dupe::Dupe;
+use gazebo::prelude::SliceExt;
 use kuro_core::pattern::pattern::ParsedPattern;
 use kuro_core::pattern::pattern_type::TargetPatternExtra;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_util::arc_str::ThinArcSlice;
-use dupe::Dupe;
-use gazebo::prelude::SliceExt;
 use pagable::Pagable;
 
 use crate::attrs::attr_type::any_matches::AnyMatches;

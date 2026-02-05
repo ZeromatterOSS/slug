@@ -160,7 +160,11 @@ mod tests {
 
         // Should have at least 50 .bzl files
         assert!(
-            c.files.iter().filter(|file| file.path.ends_with(".bzl")).count() > 50,
+            c.files
+                .iter()
+                .filter(|file| file.path.ends_with(".bzl"))
+                .count()
+                > 50,
             "Expected at least 50 .bzl files in bazel_tools"
         );
     }

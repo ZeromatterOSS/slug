@@ -8,13 +8,13 @@
  * above-listed licenses.
  */
 
+use dice::DiceComputations;
+use futures::future::BoxFuture;
+use indexmap::IndexMap;
 use kuro_core::fs::project::ProjectRoot;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
-use futures::future::BoxFuture;
-use indexmap::IndexMap;
 
 pub static AUDIT_CELL: LateBinding<
     for<'v> fn(

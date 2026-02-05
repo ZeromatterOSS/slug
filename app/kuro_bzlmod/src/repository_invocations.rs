@@ -252,12 +252,7 @@ pub fn has_active_registry() -> bool {
 
 /// Take all invocations from the current thread's registry.
 pub fn take_invocations() -> Vec<RepositoryInvocation> {
-    CURRENT_REGISTRY.with(|cell| {
-        cell.borrow()
-            .as_ref()
-            .map(|r| r.take())
-            .unwrap_or_default()
-    })
+    CURRENT_REGISTRY.with(|cell| cell.borrow().as_ref().map(|r| r.take()).unwrap_or_default())
 }
 
 /// Clear the current thread's registry.
@@ -304,7 +299,10 @@ mod tests {
     #[test]
     fn test_invocation_creation() {
         let inv = RepositoryInvocation::new("foo".to_owned(), "http_archive".to_owned())
-            .with_attr("url".to_owned(), AttrValue::String("https://example.com/foo.tar.gz".to_owned()))
+            .with_attr(
+                "url".to_owned(),
+                AttrValue::String("https://example.com/foo.tar.gz".to_owned()),
+            )
             .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
 
         assert_eq!(inv.name, "foo");
@@ -315,16 +313,25 @@ mod tests {
     #[test]
     fn test_invocation_hash() {
         let inv1 = RepositoryInvocation::new("foo".to_owned(), "http_archive".to_owned())
-            .with_attr("url".to_owned(), AttrValue::String("https://example.com/foo.tar.gz".to_owned()));
+            .with_attr(
+                "url".to_owned(),
+                AttrValue::String("https://example.com/foo.tar.gz".to_owned()),
+            );
 
         let inv2 = RepositoryInvocation::new("foo".to_owned(), "http_archive".to_owned())
-            .with_attr("url".to_owned(), AttrValue::String("https://example.com/foo.tar.gz".to_owned()));
+            .with_attr(
+                "url".to_owned(),
+                AttrValue::String("https://example.com/foo.tar.gz".to_owned()),
+            );
 
         // Same invocations should have same hash
         assert_eq!(inv1.compute_hash(), inv2.compute_hash());
 
         let inv3 = RepositoryInvocation::new("bar".to_owned(), "http_archive".to_owned())
-            .with_attr("url".to_owned(), AttrValue::String("https://example.com/bar.tar.gz".to_owned()));
+            .with_attr(
+                "url".to_owned(),
+                AttrValue::String("https://example.com/bar.tar.gz".to_owned()),
+            );
 
         // Different invocations should have different hash
         assert_ne!(inv1.compute_hash(), inv3.compute_hash());
@@ -334,8 +341,14 @@ mod tests {
     fn test_registry() {
         let registry = RepositoryInvocationRegistry::new();
 
-        registry.record(RepositoryInvocation::new("foo".to_owned(), "http_archive".to_owned()));
-        registry.record(RepositoryInvocation::new("bar".to_owned(), "git_repository".to_owned()));
+        registry.record(RepositoryInvocation::new(
+            "foo".to_owned(),
+            "http_archive".to_owned(),
+        ));
+        registry.record(RepositoryInvocation::new(
+            "bar".to_owned(),
+            "git_repository".to_owned(),
+        ));
 
         let invocations = registry.invocations();
         assert_eq!(invocations.len(), 2);
@@ -348,7 +361,10 @@ mod tests {
         {
             let guard = RegistryGuard::new();
 
-            record_invocation(RepositoryInvocation::new("test".to_owned(), "local_repository".to_owned()));
+            record_invocation(RepositoryInvocation::new(
+                "test".to_owned(),
+                "local_repository".to_owned(),
+            ));
 
             let invocations = guard.take();
             assert_eq!(invocations.len(), 1);
@@ -361,10 +377,19 @@ mod tests {
 
     #[test]
     fn test_attr_value_types() {
-        assert_eq!(AttrValue::String("hello".to_owned()).as_string(), Some("hello"));
-        assert_eq!(AttrValue::Label("//foo:bar".to_owned()).as_string(), Some("//foo:bar"));
+        assert_eq!(
+            AttrValue::String("hello".to_owned()).as_string(),
+            Some("hello")
+        );
+        assert_eq!(
+            AttrValue::Label("//foo:bar".to_owned()).as_string(),
+            Some("//foo:bar")
+        );
         assert_eq!(AttrValue::Int(42).as_int(), Some(42));
         assert_eq!(AttrValue::Bool(true).as_bool(), Some(true));
-        assert_eq!(AttrValue::StringList(vec!["a".to_owned(), "b".to_owned()]).as_string_list(), Some(&["a".to_owned(), "b".to_owned()][..]));
+        assert_eq!(
+            AttrValue::StringList(vec!["a".to_owned(), "b".to_owned()]).as_string_list(),
+            Some(&["a".to_owned(), "b".to_owned()][..])
+        );
     }
 }

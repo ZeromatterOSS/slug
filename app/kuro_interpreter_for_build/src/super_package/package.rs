@@ -150,7 +150,9 @@ pub(crate) fn register_package_function(globals: &mut GlobalsBuilder) {
                 )?;
 
                 match &mut *package_file_eval_ctx.visibility.borrow_mut() {
-                    Some(_) => return Err(kuro_error::Error::from(PackageFileError::AtMostOnce).into()),
+                    Some(_) => {
+                        return Err(kuro_error::Error::from(PackageFileError::AtMostOnce).into());
+                    }
                     x => {
                         *x = Some(PackageFileVisibilityFields {
                             visibility,
@@ -171,13 +173,22 @@ pub(crate) fn register_package_function(globals: &mut GlobalsBuilder) {
                         build_context.cell_info().cell_alias_resolver(),
                     )?;
                     // Get the ModuleInternals to set the BUILD file's default visibility
-                    if let Ok(internals) = crate::interpreter::module_internals::ModuleInternals::from_context(eval, "package") {
+                    if let Ok(internals) =
+                        crate::interpreter::module_internals::ModuleInternals::from_context(
+                            eval, "package",
+                        )
+                    {
                         internals.set_build_file_default_visibility(visibility);
                     }
                 }
                 // Other parameters are currently no-ops (could be implemented later)
-                let _ = (default_testonly, default_deprecation,
-                         features, default_applicable_licenses, default_package_metadata);
+                let _ = (
+                    default_testonly,
+                    default_deprecation,
+                    features,
+                    default_applicable_licenses,
+                    default_package_metadata,
+                );
             }
         }
 

@@ -11,11 +11,11 @@
 use std::str::FromStr;
 use std::time::SystemTime;
 
+use dupe::Dupe;
+use itertools::Itertools;
 use kuro_error::BuckErrorContext;
 use kuro_fs::paths::abs_path::AbsPathBuf;
 use kuro_wrapper_common::invocation_id::TraceId;
-use dupe::Dupe;
-use itertools::Itertools;
 
 #[derive(Debug, kuro_error::Error)]
 pub(crate) enum EventLogErrors {

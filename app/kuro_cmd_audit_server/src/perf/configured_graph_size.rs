@@ -11,6 +11,7 @@
 use std::io::Write;
 use std::time::Instant;
 
+use indexmap::IndexMap;
 use kuro_build_api::build::graph_properties::debug_compute_configured_graph_properties_uncached;
 use kuro_cli_proto::ClientContext;
 use kuro_cmd_audit_client::perf::configured_graph_size::ConfiguredGraphSizeCommand;
@@ -19,7 +20,6 @@ use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
 use kuro_server_ctx::ctx::ServerCommandDiceContext;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
-use indexmap::IndexMap;
 use serde::Serialize;
 
 use crate::common::configured_target_labels::audit_command_configured_target_labels;

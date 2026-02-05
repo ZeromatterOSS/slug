@@ -11,6 +11,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_build_api::actions::query::ActionQueryNode;
 use kuro_build_api::query::oneshot::QUERY_FRONTEND;
 use kuro_build_api::query::oneshot::QueryFrontend;
@@ -21,7 +22,6 @@ use kuro_node::configured_universe::UNIVERSE_FROM_LITERALS;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_node::nodes::unconfigured::TargetNode;
 use kuro_query::query::syntax::simple::eval::values::QueryEvaluationResult;
-use dice::DiceComputations;
 
 use crate::aquery::evaluator::get_aquery_evaluator;
 use crate::cquery::evaluator::eval_cquery;

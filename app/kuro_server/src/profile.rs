@@ -12,6 +12,10 @@ use std::path::Path;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dice::DiceTransaction;
+use dice_futures::spawn::spawn_dropcancel;
+use dupe::Dupe;
+use futures::future::FutureExt;
 use kuro_analysis::analysis::calculation::profile_analysis;
 use kuro_cli_proto::TargetCfg;
 use kuro_cli_proto::profile_request::ProfileOpts;
@@ -39,10 +43,6 @@ use kuro_server_ctx::pattern_parse_and_resolve::parse_and_resolve_patterns_to_ta
 use kuro_server_ctx::target_resolution_config::TargetResolutionConfig;
 use kuro_server_ctx::template::ServerCommandTemplate;
 use kuro_server_ctx::template::run_server_command;
-use dice::DiceTransaction;
-use dice_futures::spawn::spawn_dropcancel;
-use dupe::Dupe;
-use futures::future::FutureExt;
 
 async fn generate_profile_analysis(
     mut ctx: DiceTransaction,

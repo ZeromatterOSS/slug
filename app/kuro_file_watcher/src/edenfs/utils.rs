@@ -11,9 +11,9 @@
 use std::path::Path;
 use std::str;
 
+use edenfs::Dtype;
 use kuro_data::FileWatcherKind;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
-use edenfs::Dtype;
 
 pub(crate) fn dtype_into_file_watcher_kind(dtype: Dtype) -> FileWatcherKind {
     match dtype {

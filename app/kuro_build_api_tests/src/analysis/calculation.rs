@@ -11,6 +11,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use dice::UserComputationData;
+use dice::testing::DiceBuilder;
+use dupe::Dupe;
+use indoc::indoc;
+use itertools::Itertools;
 use kuro_build_api::actions::execute::dice_data::set_fallback_executor_config;
 use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
 use kuro_build_api::build::detailed_aggregated_metrics::dice::SetDetailedAggregatedMetricsEventHandler;
@@ -54,11 +59,6 @@ use kuro_interpreter_for_build::interpreter::dice_calculation_delegate::testing:
 use kuro_interpreter_for_build::interpreter::interpreter_setup::setup_interpreter_basic;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
 use kuro_interpreter_for_build::rule::register_rule_function;
-use dice::UserComputationData;
-use dice::testing::DiceBuilder;
-use dupe::Dupe;
-use indoc::indoc;
-use itertools::Itertools;
 use starlark_map::ordered_map::OrderedMap;
 
 #[tokio::test]

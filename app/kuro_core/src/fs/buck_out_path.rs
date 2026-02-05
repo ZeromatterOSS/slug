@@ -14,11 +14,11 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use allocative::Allocative;
-use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
-use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use derive_more::Display;
 use dupe::Dupe;
 use itertools::Itertools;
+use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
+use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 
 use crate::category::CategoryRef;
 use crate::cells::external::ExternalCellOrigin;
@@ -340,8 +340,12 @@ impl BuckOutPathResolver {
                 ExternalCellOrigin::Git(_) => ForwardRelativePath::new("git").unwrap(),
                 ExternalCellOrigin::LocalPath(_) => ForwardRelativePath::new("local").unwrap(),
                 ExternalCellOrigin::Bzlmod(_) => ForwardRelativePath::new("bzlmod").unwrap(),
-                ExternalCellOrigin::RepositoryRule(_) => ForwardRelativePath::new("repository_rule").unwrap(),
-                ExternalCellOrigin::ExtensionRepo(_) => ForwardRelativePath::new("extension_repo").unwrap(),
+                ExternalCellOrigin::RepositoryRule(_) => {
+                    ForwardRelativePath::new("repository_rule").unwrap()
+                }
+                ExternalCellOrigin::ExtensionRepo(_) => {
+                    ForwardRelativePath::new("extension_repo").unwrap()
+                }
             },
             match &origin {
                 ExternalCellOrigin::Bundled(cell) => {
@@ -468,9 +472,9 @@ mod tests {
     use std::path::Path;
     use std::sync::Arc;
 
+    use dupe::Dupe;
     use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
     use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-    use dupe::Dupe;
     use regex::Regex;
 
     use crate::category::CategoryRef;

@@ -18,12 +18,12 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 pub use artifact_group_values::ArtifactGroupValues;
-use kuro_artifact::artifact::artifact_type::Artifact;
-use kuro_core::configuration::data::ConfigurationData;
 use derive_more::Display;
 use dice::DiceComputations;
 use dupe::Dupe;
 use gazebo::variants::UnpackVariants;
+use kuro_artifact::artifact::artifact_type::Artifact;
+use kuro_core::configuration::data::ConfigurationData;
 use static_assertions::assert_eq_size;
 
 use self::calculation::EnsureTransitiveSetProjectionKey;

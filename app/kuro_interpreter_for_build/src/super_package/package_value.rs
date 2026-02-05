@@ -13,13 +13,13 @@ use std::io;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_error::BuckErrorContext;
 use kuro_error::conversion::from_any_with_tag;
 use kuro_interpreter::file_type::StarlarkFileType;
 use kuro_node::metadata::key::MetadataKey;
 use kuro_node::metadata::key::MetadataKeyRef;
 use kuro_node::metadata::super_package_values::SuperPackageValues;
-use dupe::Dupe;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;

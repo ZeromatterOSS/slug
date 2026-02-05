@@ -12,6 +12,12 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use cmp_any::PartialEqAny;
+use dashmap::DashMap;
+use derivative::Derivative;
+use dice::DiceComputations;
+use dice::UserComputationData;
+use dupe::Dupe;
 use kuro_core::cells::CellResolver;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::cells::name::CellName;
@@ -19,12 +25,6 @@ use kuro_core::cells::paths::CellRelativePath;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
 use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
 use kuro_error::BuckErrorContext;
-use cmp_any::PartialEqAny;
-use dashmap::DashMap;
-use derivative::Derivative;
-use dice::DiceComputations;
-use dice::UserComputationData;
-use dupe::Dupe;
 
 use crate::dice::data::HasIoProvider;
 use crate::file_ops::delegate::FileOpsDelegate;

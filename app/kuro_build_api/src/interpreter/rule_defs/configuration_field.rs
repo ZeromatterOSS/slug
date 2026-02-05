@@ -13,6 +13,9 @@
 //! In Bazel, configuration_field() references values from configuration fragments.
 //! This is a stub that returns None to allow rules to load.
 
+use std::fmt;
+use std::fmt::Display;
+
 use allocative::Allocative;
 use starlark::environment::GlobalsBuilder;
 use starlark::starlark_module;
@@ -21,8 +24,6 @@ use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::starlark_value;
-use std::fmt;
-use std::fmt::Display;
 
 /// A reference to a configuration field value.
 ///

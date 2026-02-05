@@ -10,6 +10,12 @@
 
 use std::sync::Arc;
 
+use dice::DetectCycles;
+use dice::Dice;
+use dice::DiceTransaction;
+use dice::UserComputationData;
+use dupe::Dupe;
+use indoc::indoc;
 use kuro_common::dice::cells::SetCellResolver;
 use kuro_common::dice::data::testing::SetTestingIoProvider;
 use kuro_common::file_ops::io::initialize_read_dir_cache;
@@ -34,12 +40,6 @@ use kuro_interpreter::starlark_profiler::config::StarlarkProfilerConfiguration;
 use kuro_interpreter_for_build::interpreter::configuror::BuildInterpreterConfiguror;
 use kuro_interpreter_for_build::interpreter::context::SetInterpreterContext;
 use kuro_node::nodes::frontend::TargetGraphCalculation;
-use dice::DetectCycles;
-use dice::Dice;
-use dice::DiceTransaction;
-use dice::UserComputationData;
-use dupe::Dupe;
-use indoc::indoc;
 
 pub(crate) async fn calculation(fs: &ProjectRootTemp) -> DiceTransaction {
     let mut dice = Dice::builder();

@@ -17,8 +17,8 @@ use std::hash::Hasher;
 use std::str::FromStr;
 
 use allocative::Allocative;
-use kuro_error::BuckErrorContext;
 use dupe::Dupe;
+use kuro_error::BuckErrorContext;
 use uuid::Uuid;
 
 use crate::BUCK_WRAPPER_UUID_ENV_VAR;

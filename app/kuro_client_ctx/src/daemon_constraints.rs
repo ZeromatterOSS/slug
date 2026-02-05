@@ -9,8 +9,8 @@
  */
 
 use kuro_common::init::DaemonStartupConfig;
-use kuro_core::kuro_env;
 use kuro_core::ci::ci_identifiers;
+use kuro_core::kuro_env;
 use kuro_events::daemon_id::DaemonId;
 
 use crate::version::BuckVersion;

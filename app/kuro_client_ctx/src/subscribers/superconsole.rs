@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use gazebo::prelude::*;
 use kuro_data::CommandExecutionDetails;
 use kuro_error::BuckErrorContext;
 use kuro_event_observer::action_sub_error_display::ActionSubErrorDisplay;
@@ -30,7 +31,6 @@ use kuro_event_observer::what_ran::worker_command_as_fallback_to_string;
 use kuro_events::BuckEvent;
 use kuro_health_check::report::DisplayReport;
 use kuro_wrapper_common::invocation_id::TraceId;
-use gazebo::prelude::*;
 use strum::IntoEnumIterator;
 use superconsole::Component;
 use superconsole::Dimensions;
@@ -445,43 +445,41 @@ impl StatefulSuperConsoleImpl {
     async fn handle_inner_event(&mut self, event: &BuckEvent) -> kuro_error::Result<()> {
         match unpack_event(event)? {
             kuro_event_observer::unpack_event::UnpackedBuckEvent::SpanStart(_, _, _) => Ok(()),
-            kuro_event_observer::unpack_event::UnpackedBuckEvent::SpanEnd(_, _, data) => {
-                match data {
-                    kuro_data::span_end_event::Data::ActionExecution(action) => {
-                        self.handle_action_execution_end(action).await
-                    }
-                    kuro_data::span_end_event::Data::FileWatcher(file_watcher) => {
-                        self.handle_file_watcher_end(file_watcher).await
-                    }
-                    _ => Ok(()),
+            kuro_event_observer::unpack_event::UnpackedBuckEvent::SpanEnd(_, _, data) => match data
+            {
+                kuro_data::span_end_event::Data::ActionExecution(action) => {
+                    self.handle_action_execution_end(action).await
                 }
-            }
-            kuro_event_observer::unpack_event::UnpackedBuckEvent::Instant(_, _, data) => {
-                match data {
-                    kuro_data::instant_event::Data::ConsoleMessage(message) => {
-                        self.handle_console_message(message).await
-                    }
-                    kuro_data::instant_event::Data::ConsoleWarning(message) => {
-                        self.handle_console_warning(message).await
-                    }
-                    kuro_data::instant_event::Data::StructuredError(err) => {
-                        self.handle_structured_error(err).await
-                    }
-                    kuro_data::instant_event::Data::TestResult(result) => {
-                        self.handle_test_result(result).await
-                    }
-                    kuro_data::instant_event::Data::ConsolePreferences(preferences) => {
-                        self.handle_console_preferences(preferences).await
-                    }
-                    kuro_data::instant_event::Data::ActionError(error) => {
-                        self.handle_action_error(error).await
-                    }
-                    kuro_data::instant_event::Data::StreamingOutput(message) => {
-                        self.handle_streaming_output(message).await
-                    }
-                    _ => Ok(()),
+                kuro_data::span_end_event::Data::FileWatcher(file_watcher) => {
+                    self.handle_file_watcher_end(file_watcher).await
                 }
-            }
+                _ => Ok(()),
+            },
+            kuro_event_observer::unpack_event::UnpackedBuckEvent::Instant(_, _, data) => match data
+            {
+                kuro_data::instant_event::Data::ConsoleMessage(message) => {
+                    self.handle_console_message(message).await
+                }
+                kuro_data::instant_event::Data::ConsoleWarning(message) => {
+                    self.handle_console_warning(message).await
+                }
+                kuro_data::instant_event::Data::StructuredError(err) => {
+                    self.handle_structured_error(err).await
+                }
+                kuro_data::instant_event::Data::TestResult(result) => {
+                    self.handle_test_result(result).await
+                }
+                kuro_data::instant_event::Data::ConsolePreferences(preferences) => {
+                    self.handle_console_preferences(preferences).await
+                }
+                kuro_data::instant_event::Data::ActionError(error) => {
+                    self.handle_action_error(error).await
+                }
+                kuro_data::instant_event::Data::StreamingOutput(message) => {
+                    self.handle_streaming_output(message).await
+                }
+                _ => Ok(()),
+            },
             kuro_event_observer::unpack_event::UnpackedBuckEvent::UnrecognizedSpanStart(_, _)
             | kuro_event_observer::unpack_event::UnpackedBuckEvent::UnrecognizedSpanEnd(_, _)
             | kuro_event_observer::unpack_event::UnpackedBuckEvent::UnrecognizedInstant(_, _) => {
@@ -1016,6 +1014,7 @@ fn truncate(contents: &str) -> Option<String> {
 mod tests {
     use std::time::SystemTime;
 
+    use dupe::Dupe;
     use kuro_cli_proto::CommandResult;
     use kuro_cli_proto::GenericResponse;
     use kuro_data::LoadBuildFileEnd;
@@ -1024,7 +1023,6 @@ mod tests {
     use kuro_data::SpanStartEvent;
     use kuro_event_observer::span_tracker::EventTimestamp;
     use kuro_events::span::SpanId;
-    use dupe::Dupe;
     use superconsole::testing::SuperConsoleTestingExt;
     use superconsole::testing::assert_frame_contains;
     use superconsole::testing::test_console;

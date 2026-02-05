@@ -15,6 +15,20 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
+use dice::DiceTransaction;
+use dice::LinearRecomputeDiceComputations;
+use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
+use dupe::IterDupedExt;
+use futures::channel::mpsc;
+use futures::future;
+use futures::future::BoxFuture;
+use futures::future::FutureExt;
+use futures::stream::FuturesUnordered;
+use futures::stream::StreamExt;
+use futures::stream::TryStreamExt;
+use indexmap::IndexSet;
+use itertools::Itertools;
 use kuro_build_api::actions::artifact::get_artifact_fs::GetArtifactFs;
 use kuro_build_api::actions::calculation::get_target_rule_type_name;
 use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
@@ -88,20 +102,6 @@ use kuro_server_ctx::tpx_experiment_util::get_tpx_experiments;
 use kuro_test_api::data::TestResult;
 use kuro_test_api::data::TestStatus;
 use kuro_test_api::protocol::TestExecutor;
-use dice::DiceTransaction;
-use dice::LinearRecomputeDiceComputations;
-use dice_futures::cancellation::CancellationContext;
-use dupe::Dupe;
-use dupe::IterDupedExt;
-use futures::channel::mpsc;
-use futures::future;
-use futures::future::BoxFuture;
-use futures::future::FutureExt;
-use futures::stream::FuturesUnordered;
-use futures::stream::StreamExt;
-use futures::stream::TryStreamExt;
-use indexmap::IndexSet;
-use itertools::Itertools;
 
 use crate::downward_api::BuckTestDownwardApi;
 use crate::executor_launcher::ExecutorLaunch;
@@ -335,16 +335,12 @@ fn test_executor_errors(
     // this doesn't seem quite right, but for now just tag it with TestSkipped to track occurrence.
     if let Some(skipped) = &test_statuses.skipped {
         if skipped.count > 0 {
-            errors.push(kuro_data::ErrorReport::from(
-                &TestError::TestSkipped.into(),
-            ));
+            errors.push(kuro_data::ErrorReport::from(&TestError::TestSkipped.into()));
         }
     }
     if let Some(omitted) = &test_statuses.omitted {
         if omitted.count > 0 {
-            errors.push(kuro_data::ErrorReport::from(
-                &TestError::TestOmitted.into(),
-            ));
+            errors.push(kuro_data::ErrorReport::from(&TestError::TestOmitted.into()));
         }
     }
     if errors.is_empty() {

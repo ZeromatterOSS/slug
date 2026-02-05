@@ -12,8 +12,8 @@ use std::cell::OnceCell;
 use std::rc::Rc;
 
 use async_trait::async_trait;
-use kuro_interpreter::factory::ReentrantStarlarkEvaluator;
 use dice::DiceComputations;
+use kuro_interpreter::factory::ReentrantStarlarkEvaluator;
 use starlark::eval::Evaluator;
 
 #[async_trait(?Send)]

@@ -12,13 +12,13 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::execution_types::execution::ExecutionPlatformResolution;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_interpreter::dice::starlark_provider::StarlarkEvalKind;
 use kuro_node::rule_type::StarlarkRuleType;
-use dupe::Dupe;
 use starlark::collections::SmallMap;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;

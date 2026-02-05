@@ -98,7 +98,8 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
     fn declare_file<'v>(
         this: &AnalysisActions<'v>,
         #[starlark(require = pos)] filename: &str,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] sibling: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        sibling: starlark::values::Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkDeclaredArtifact<'v>> {
         // Ignore sibling for now - Bazel uses it to declare files relative to another file
@@ -127,7 +128,8 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
     fn declare_directory<'v>(
         this: &AnalysisActions<'v>,
         #[starlark(require = pos)] filename: &str,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] sibling: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        sibling: starlark::values::Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkDeclaredArtifact<'v>> {
         // Ignore sibling for now - Bazel uses it to declare files relative to another file
@@ -313,20 +315,33 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
     fn run_shell<'v>(
         this: &AnalysisActions<'v>,
         #[starlark(require = named)] outputs: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] inputs: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] tools: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        inputs: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        tools: starlark::values::Value<'v>,
         #[starlark(require = named)] command: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] arguments: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] env: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] mnemonic: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] progress_message: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] use_default_shell_env: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] execution_requirements: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] input_manifests: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] exec_group: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] shadowed_action: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] resource_set: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] toolchain: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        arguments: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        env: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        mnemonic: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        progress_message: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        use_default_shell_env: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        execution_requirements: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        input_manifests: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        exec_group: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        shadowed_action: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        resource_set: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        toolchain: starlark::values::Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<starlark::values::none::NoneType> {
         // TODO(run_shell): Implement proper shell action registration

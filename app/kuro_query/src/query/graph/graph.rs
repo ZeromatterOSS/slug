@@ -366,8 +366,8 @@ impl<'a, N: LabeledNode> GraphSuccessors<u32> for GraphSuccessorsImpl<'a, N> {
 #[cfg(test)]
 mod tests {
     use async_trait::async_trait;
-    use kuro_query::query::traversal::ChildVisitor;
     use dupe::Dupe;
+    use kuro_query::query::traversal::ChildVisitor;
 
     use crate::query::graph::bfs::bfs_preorder;
     use crate::query::graph::graph::Graph;

@@ -13,14 +13,6 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
-use kuro_common::file_ops::metadata::FileMetadata;
-use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
-use kuro_core::execution_types::executor_config::RemoteExecutorUseCase;
-use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
-use kuro_directory::directory::directory_iterator::DirectoryIterator;
-use kuro_directory::directory::entry::DirectoryEntry;
-use kuro_directory::directory::walk::ordered_entry_walk;
-use kuro_events::dispatch::EventDispatcher;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
@@ -29,6 +21,14 @@ use dice::UserComputationData;
 use dupe::Dupe;
 use futures::stream::BoxStream;
 use futures::stream::TryStreamExt;
+use kuro_common::file_ops::metadata::FileMetadata;
+use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
+use kuro_core::execution_types::executor_config::RemoteExecutorUseCase;
+use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
+use kuro_directory::directory::directory_iterator::DirectoryIterator;
+use kuro_directory::directory::entry::DirectoryEntry;
+use kuro_directory::directory::walk::ordered_entry_walk;
+use kuro_events::dispatch::EventDispatcher;
 
 use crate::artifact_value::ArtifactValue;
 use crate::directory::ActionDirectoryEntry;
@@ -701,8 +701,7 @@ pub trait DeferredMaterializerSubscription: Send + Sync {
 pub trait DeferredMaterializerExtensions: Send + Sync {
     fn iterate(&self) -> kuro_error::Result<BoxStream<'static, DeferredMaterializerIterItem>>;
 
-    fn list_subscriptions(&self)
-    -> kuro_error::Result<BoxStream<'static, ProjectRelativePathBuf>>;
+    fn list_subscriptions(&self) -> kuro_error::Result<BoxStream<'static, ProjectRelativePathBuf>>;
 
     /// Obtain a list of files that don't match their in-memory representation. This may not catch
     /// all discrepancies.

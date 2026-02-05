@@ -10,6 +10,8 @@
 
 use std::iter::Peekable;
 
+use dupe::Dupe;
+use itertools::Itertools;
 use kuro_build_api::bxl::types::BxlFunctionLabel;
 use kuro_core::bxl::BxlFilePath;
 use kuro_core::cells::CellResolver;
@@ -25,8 +27,6 @@ use kuro_error::kuro_error;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-use dupe::Dupe;
-use itertools::Itertools;
 
 #[derive(Debug, kuro_error::Error)]
 #[kuro(tag = InvalidBuckOutPath)]
@@ -476,6 +476,7 @@ impl BuckOutPathParser {
 mod tests {
     use std::collections::BTreeMap;
 
+    use dupe::Dupe;
     use kuro_build_api::bxl::types::BxlFunctionLabel;
     use kuro_core::bxl::BxlFilePath;
     use kuro_core::cells::CellResolver;
@@ -490,7 +491,6 @@ mod tests {
     use kuro_core::target::label::label::TargetLabel;
     use kuro_core::target::name::TargetNameRef;
     use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
-    use dupe::Dupe;
 
     use crate::output::buck_out_path_parser::BuckOutPathParser;
     use crate::output::buck_out_path_parser::BuckOutPathType;

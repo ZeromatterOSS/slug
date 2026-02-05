@@ -113,11 +113,10 @@ mod tests {
 
     use kuro_core::bzl::ImportPath;
 
+    use super::*;
     use crate::aspect_type::StarlarkAspectType;
     use crate::attrs::attr_type::AttrType;
     use crate::bzl_or_bxl_path::BzlOrBxlPath;
-
-    use super::*;
 
     fn make_aspect_type(name: &str) -> Arc<StarlarkAspectType> {
         Arc::new(StarlarkAspectType::new(
@@ -168,12 +167,12 @@ mod tests {
         let aspect1 = make_aspect_type("aspect1");
         let aspect2 = make_aspect_type("aspect2");
 
-        let attr1 = Attribute::new(None, "test", AttrType::string())
-            .with_aspects(vec![aspect1.clone()]);
-        let attr2 = Attribute::new(None, "test", AttrType::string())
-            .with_aspects(vec![aspect1.clone()]);
-        let attr3 = Attribute::new(None, "test", AttrType::string())
-            .with_aspects(vec![aspect2.clone()]);
+        let attr1 =
+            Attribute::new(None, "test", AttrType::string()).with_aspects(vec![aspect1.clone()]);
+        let attr2 =
+            Attribute::new(None, "test", AttrType::string()).with_aspects(vec![aspect1.clone()]);
+        let attr3 =
+            Attribute::new(None, "test", AttrType::string()).with_aspects(vec![aspect2.clone()]);
 
         assert_eq!(attr1, attr2); // Same aspects
         assert_ne!(attr1, attr3); // Different aspects

@@ -13,6 +13,12 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use dice::CancellationContext;
+use dice::DiceComputations;
+use dice::Key;
+use dupe::Dupe;
+use dupe::IterDupedExt;
+use futures::FutureExt;
 use kuro_build_api::analysis::AnalysisResult;
 use kuro_build_api::analysis::calculation::EVAL_ANALYSIS_QUERY;
 use kuro_build_api::analysis::calculation::RULE_ANALYSIS_CALCULATION;
@@ -54,12 +60,6 @@ use kuro_node::rule_type::StarlarkRuleType;
 use kuro_query::query::syntax::simple::eval::label_indexed::LabelIndexedSet;
 use kuro_query::query::syntax::simple::eval::set::TargetSet;
 use kuro_util::time_span::TimeSpan;
-use dice::CancellationContext;
-use dice::DiceComputations;
-use dice::Key;
-use dupe::Dupe;
-use dupe::IterDupedExt;
-use futures::FutureExt;
 use smallvec::SmallVec;
 
 use crate::analysis::env::RuleSpec;

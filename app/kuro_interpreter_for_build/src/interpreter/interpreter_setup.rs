@@ -10,6 +10,7 @@
 
 use std::sync::Arc;
 
+use dice::DiceTransactionUpdater;
 use kuro_common::dice::cells::SetCellResolver;
 use kuro_common::legacy_configs::cells::ExternalBuckconfigData;
 use kuro_common::legacy_configs::dice::SetLegacyConfigs;
@@ -17,7 +18,6 @@ use kuro_core::cells::CellResolver;
 use kuro_interpreter::dice::starlark_types::SetStarlarkTypes;
 use kuro_interpreter::starlark_profiler::config::SetStarlarkProfilerInstrumentation;
 use kuro_interpreter::starlark_profiler::config::StarlarkProfilerConfiguration;
-use dice::DiceTransactionUpdater;
 
 use crate::interpreter::configuror::BuildInterpreterConfiguror;
 use crate::interpreter::context::SetInterpreterContext;

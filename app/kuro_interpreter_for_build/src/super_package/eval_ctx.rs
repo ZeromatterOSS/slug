@@ -11,12 +11,12 @@
 use std::cell::RefCell;
 use std::sync::Arc;
 
+use dupe::Dupe;
 use kuro_interpreter::paths::package::PackageFilePath;
 use kuro_node::cfg_constructor::CfgConstructorImpl;
 use kuro_node::super_package::SuperPackage;
 use kuro_node::visibility::VisibilitySpecification;
 use kuro_node::visibility::WithinViewSpecification;
-use dupe::Dupe;
 use starlark::values::OwnedFrozenRef;
 use starlark::values::OwnedFrozenValue;
 use starlark_map::small_map::SmallMap;

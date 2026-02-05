@@ -16,9 +16,6 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
-use kuro_core::cells::name::CellName;
-use kuro_error::BuckErrorContext;
-use kuro_events::dispatch::get_dispatcher;
 use derive_more::Display;
 use dice::DiceComputations;
 use dice::DiceProjectionComputations;
@@ -29,6 +26,9 @@ use dice::OpaqueValue;
 use dice::ProjectionKey;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use kuro_core::cells::name::CellName;
+use kuro_error::BuckErrorContext;
+use kuro_events::dispatch::get_dispatcher;
 use pagable::Pagable;
 
 use crate::dice::cells::HasCellResolver;

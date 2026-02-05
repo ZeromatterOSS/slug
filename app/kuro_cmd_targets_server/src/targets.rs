@@ -18,6 +18,8 @@ use std::io::BufWriter;
 use std::io::Write;
 
 use async_trait::async_trait;
+use dice::DiceTransaction;
+use flate2::write::GzEncoder;
 use kuro_cli_proto::TargetsRequest;
 use kuro_cli_proto::TargetsResponse;
 use kuro_cli_proto::targets_request;
@@ -33,8 +35,6 @@ use kuro_server_ctx::global_cfg_options::global_cfg_options_from_client_context;
 use kuro_server_ctx::partial_result_dispatcher::PartialResultDispatcher;
 use kuro_server_ctx::template::ServerCommandTemplate;
 use kuro_server_ctx::template::run_server_command;
-use dice::DiceTransaction;
-use flate2::write::GzEncoder;
 use zstd::stream::write as zstd;
 
 use crate::targets::default::TargetHashOptions;

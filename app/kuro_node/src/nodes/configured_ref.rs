@@ -12,13 +12,13 @@ use std::borrow::Cow;
 use std::ops::Deref;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_query::query::environment::QueryTarget;
 use kuro_query::query::graph::node::LabeledNode;
 use kuro_query::query::graph::node::NodeKey;
-use dupe::Dupe;
 use ref_cast::RefCast;
 
 use crate::attrs::attr_type::any_matches::AnyMatches;

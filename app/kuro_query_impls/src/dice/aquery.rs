@@ -13,6 +13,16 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use dashmap::DashMap;
+use dashmap::mapref::entry::Entry;
+use dice::DiceComputations;
+use dupe::Dupe;
+use futures::future::BoxFuture;
+use futures::future::FutureExt;
+use futures::future::Shared;
+use gazebo::prelude::*;
+use itertools::Either;
+use itertools::Itertools;
 use kuro_artifact::actions::key::ActionKey;
 use kuro_build_api::actions::artifact::get_artifact_fs::GetArtifactFs;
 use kuro_build_api::actions::calculation::ActionCalculation;
@@ -33,16 +43,6 @@ use kuro_core::pattern::pattern::ParsedPattern;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_node::target_calculation::ConfiguredTargetCalculation;
 use kuro_query::query::syntax::simple::eval::set::TargetSet;
-use dashmap::DashMap;
-use dashmap::mapref::entry::Entry;
-use dice::DiceComputations;
-use dupe::Dupe;
-use futures::future::BoxFuture;
-use futures::future::FutureExt;
-use futures::future::Shared;
-use gazebo::prelude::*;
-use itertools::Either;
-use itertools::Itertools;
 use tokio::sync::oneshot;
 
 use crate::aquery::environment::AqueryDelegate;
@@ -125,8 +125,7 @@ impl<K: Hash + Eq + PartialEq + Dupe, V: Dupe> NodeCache<K, V> {
 #[derive(Clone, Dupe)]
 struct DiceAqueryNodesCache {
     action_nodes: Arc<NodeCache<ActionKey, kuro_error::Result<ActionQueryNode>>>,
-    tset_nodes:
-        Arc<NodeCache<TransitiveSetProjectionKey, kuro_error::Result<SetProjectionInputs>>>,
+    tset_nodes: Arc<NodeCache<TransitiveSetProjectionKey, kuro_error::Result<SetProjectionInputs>>>,
 }
 
 impl DiceAqueryNodesCache {

@@ -11,8 +11,8 @@
 use std::sync::OnceLock;
 
 use allocative::Allocative;
-use kuro_interpreter::late_binding_ty::ProviderReprLate;
 use dupe::Dupe;
+use kuro_interpreter::late_binding_ty::ProviderReprLate;
 use starlark::typing::Ty;
 use starlark::typing::TyStarlarkValue;
 use starlark::typing::TyUser;

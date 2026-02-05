@@ -8,6 +8,10 @@
  * above-listed licenses.
  */
 
+use dice::DiceComputations;
+use dupe::Dupe;
+use gazebo::prelude::VecExt;
+use indexmap::IndexMap;
 use kuro_core::package::PackageLabel;
 use kuro_core::package::PackageLabelWithModifiers;
 use kuro_core::pattern::pattern::Modifiers;
@@ -19,10 +23,6 @@ use kuro_core::pattern::pattern_type::ConfiguredProvidersPatternExtra;
 use kuro_core::pattern::pattern_type::PatternType;
 use kuro_core::target::name::TargetName;
 use kuro_error::BuckErrorContext;
-use dice::DiceComputations;
-use dupe::Dupe;
-use gazebo::prelude::VecExt;
-use indexmap::IndexMap;
 
 use crate::file_ops::trait_::DiceFileOps;
 use crate::file_ops::trait_::FileOps;
@@ -202,6 +202,8 @@ mod tests {
     use std::marker::PhantomData;
     use std::sync::Arc;
 
+    use dupe::Dupe;
+    use gazebo::prelude::*;
     use kuro_core::cells::CellResolver;
     use kuro_core::cells::cell_root_path::CellRootPathBuf;
     use kuro_core::cells::name::CellName;
@@ -219,8 +221,6 @@ mod tests {
     use kuro_core::provider::label::ProviderName;
     use kuro_core::provider::label::ProvidersName;
     use kuro_core::target::name::TargetName;
-    use dupe::Dupe;
-    use gazebo::prelude::*;
     use test_case::test_case;
 
     use crate::file_ops::testing::TestFileOps;

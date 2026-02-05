@@ -12,6 +12,7 @@ use std::fmt;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
+use dupe::Dupe;
 use kuro_build_api::actions::query::ActionQueryNode;
 use kuro_build_api::actions::query::ActionQueryNodeData;
 use kuro_query::query::syntax::simple::eval::error::QueryError;
@@ -23,7 +24,6 @@ use kuro_query::query::syntax::simple::functions::helpers::QueryBinaryOp;
 use kuro_query::query::syntax::simple::functions::helpers::QueryFunction;
 use kuro_query::query_module;
 use kuro_query_parser::BinaryOp;
-use dupe::Dupe;
 
 use crate::aquery::environment::AqueryEnvironment;
 

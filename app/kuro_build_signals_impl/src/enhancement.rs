@@ -11,9 +11,9 @@
 use std::time::Duration;
 use std::time::Instant;
 
+use gazebo::variants::VariantName;
 use kuro_build_signals::env::WaitingCategory;
 use kuro_util::time_span::TimeSpan;
-use gazebo::variants::VariantName;
 
 use crate::DetailedCriticalPathEntry;
 
@@ -38,10 +38,7 @@ impl CriticalPathProtoEnhancer {
         }
     }
 
-    pub(crate) fn add_entry(
-        &mut self,
-        entry: DetailedCriticalPathEntry,
-    ) -> kuro_error::Result<()> {
+    pub(crate) fn add_entry(&mut self, entry: DetailedCriticalPathEntry) -> kuro_error::Result<()> {
         let DetailedCriticalPathEntry {
             key,
             mut data,

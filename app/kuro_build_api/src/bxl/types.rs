@@ -11,9 +11,9 @@
 use std::hash::Hash;
 
 use allocative::Allocative;
+use derive_more::Display;
 use kuro_core::bxl::BxlFilePath;
 use kuro_data::ToProtoMessage;
-use derive_more::Display;
 use serde::Serialize;
 use serde::Serializer;
 

@@ -21,6 +21,9 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fmt::Write;
 
+use dice::DiceTransaction;
+use dupe::Dupe;
+use futures::FutureExt;
 use kuro_cli_proto::TargetsRequest;
 use kuro_cli_proto::TargetsResponse;
 use kuro_cli_proto::targets_request::OutputFormat;
@@ -31,9 +34,6 @@ use kuro_error::BuckErrorContext;
 use kuro_error::internal_error;
 use kuro_node::nodes::attributes::PACKAGE;
 use kuro_node::nodes::frontend::TargetGraphCalculation;
-use dice::DiceTransaction;
-use dupe::Dupe;
-use futures::FutureExt;
 
 use crate::json::QuotedJson;
 use crate::targets::fmt::JsonWriter;

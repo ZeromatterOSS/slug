@@ -14,13 +14,13 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use allocative::Allocative;
+use gazebo::transmute;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathIter;
 use kuro_util::arc_str::ArcS;
 use kuro_util::arc_str::StringInside;
-use gazebo::transmute;
 use ref_cast::RefCast;
 use relative_path::RelativePath;
 use relative_path::RelativePathBuf;
@@ -283,10 +283,7 @@ impl PackageRelativePath {
     /// # kuro_error::Ok(())
     /// ```
     #[inline]
-    pub fn strip_prefix<'a, P>(
-        &'a self,
-        base: &'a P,
-    ) -> kuro_error::Result<&'a ForwardRelativePath>
+    pub fn strip_prefix<'a, P>(&'a self, base: &'a P) -> kuro_error::Result<&'a ForwardRelativePath>
     where
         P: ?Sized + AsRef<PackageRelativePath>,
     {

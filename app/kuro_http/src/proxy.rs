@@ -11,7 +11,6 @@
 use std::net::IpAddr;
 use std::str::FromStr;
 
-use kuro_error::BuckErrorContext;
 use http::Uri;
 use http::uri::InvalidUri;
 use http::uri::PathAndQuery;
@@ -19,6 +18,7 @@ use http::uri::Scheme;
 use hyper_http_proxy::Intercept;
 use hyper_http_proxy::Proxy;
 use ipnetwork::IpNetwork;
+use kuro_error::BuckErrorContext;
 
 /// Lookup environment variable and return string value. Checks first for uppercase
 /// and falls back to lowercase if unset.

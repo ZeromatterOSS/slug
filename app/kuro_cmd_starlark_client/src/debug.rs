@@ -11,6 +11,7 @@
 use std::io::Write;
 
 use async_trait::async_trait;
+use futures::StreamExt;
 use kuro_cli_proto::DapRequest;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
 use kuro_client_ctx::common::BuckArgMatches;
@@ -31,7 +32,6 @@ use kuro_client_ctx::subscribers::subscriber::EventSubscriber;
 use kuro_event_observer::unpack_event::UnpackedBuckEvent;
 use kuro_event_observer::unpack_event::unpack_event;
 use kuro_events::BuckEvent;
-use futures::StreamExt;
 use once_cell::sync::Lazy;
 
 /// Run the starlark debug adapter protocol server
@@ -217,10 +217,7 @@ impl StreamingCommand for StarlarkDebugAttachCommand {
                 Ok(())
             }
 
-            async fn handle_error(
-                &mut self,
-                error: &kuro_error::Error,
-            ) -> kuro_error::Result<()> {
+            async fn handle_error(&mut self, error: &kuro_error::Error) -> kuro_error::Result<()> {
                 Ok(self
                     .write_console(&format!("kuro starlark-attach debugserver error: {error}"))?)
             }

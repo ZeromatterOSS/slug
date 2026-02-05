@@ -14,6 +14,8 @@ use std::future::Future;
 use std::pin::Pin;
 
 use async_trait::async_trait;
+use dice::DiceComputations;
+use dupe::Dupe;
 use kuro_core::configuration::compatibility::MaybeCompatible;
 use kuro_core::configuration::pair::ConfigurationNoExec;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
@@ -23,8 +25,6 @@ use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_node::nodes::configured_ref::ConfiguredGraphNodeRef;
 use kuro_query::query::syntax::simple::eval::set::TargetSet;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
-use dupe::Dupe;
 
 use crate::analysis::AnalysisResult;
 use crate::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
@@ -36,9 +36,7 @@ pub static EVAL_ANALYSIS_QUERY: LateBinding<
         &'a str,
         HashMap<String, ConfiguredTargetNode>,
     ) -> Pin<
-        Box<
-            dyn Future<Output = kuro_error::Result<TargetSet<ConfiguredGraphNodeRef>>> + Send + 'a,
-        >,
+        Box<dyn Future<Output = kuro_error::Result<TargetSet<ConfiguredGraphNodeRef>>> + Send + 'a>,
     >,
 > = LateBinding::new("EVAL_ANALYSIS_QUERY");
 

@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use clap::Parser as _;
 use kuro_cli_proto::new_generic::ExplainRequest;
 use kuro_cli_proto::new_generic::NewGenericRequest;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
@@ -22,7 +23,6 @@ use kuro_client_ctx::exit_result::ExitResult;
 use kuro_client_ctx::path_arg::PathArg;
 use kuro_client_ctx::streaming::StreamingCommand;
 use kuro_event_log::file_names::get_local_logs;
-use clap::Parser as _;
 use tonic::async_trait;
 
 use crate::commands::build::BuildCommand;

@@ -13,10 +13,10 @@ use std::fmt::Formatter;
 use std::iter;
 
 use allocative::Allocative;
-use kuro_util::arc_str::ArcSlice;
-use kuro_util::arc_str::ArcStr;
 use derive_more::Display;
 use dupe::Dupe;
+use kuro_util::arc_str::ArcSlice;
+use kuro_util::arc_str::ArcStr;
 use pagable::Pagable;
 use serde::Deserialize;
 use serde::Serialize;

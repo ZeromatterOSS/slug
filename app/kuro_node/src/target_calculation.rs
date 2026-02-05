@@ -9,13 +9,13 @@
  */
 
 use async_trait::async_trait;
+use dice::DiceComputations;
 use kuro_core::global_cfg_options::GlobalCfgOptions;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_util::late_binding::LateBinding;
-use dice::DiceComputations;
 
 use crate::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
 

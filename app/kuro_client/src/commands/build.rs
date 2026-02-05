@@ -12,6 +12,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
+use dupe::Dupe;
 use kuro_cli_proto::BuildRequest;
 use kuro_cli_proto::BuildTarget;
 use kuro_cli_proto::TargetCfg;
@@ -42,7 +43,6 @@ use kuro_client_ctx::streaming::StreamingCommand;
 use kuro_core::kuro_env;
 use kuro_error::BuckErrorContext;
 use kuro_error::kuro_error;
-use dupe::Dupe;
 
 use crate::commands::build::out::copy_to_out;
 use crate::print::PrintOutputs;

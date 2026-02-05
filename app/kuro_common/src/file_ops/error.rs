@@ -8,11 +8,11 @@
  * above-listed licenses.
  */
 
-use kuro_core::cells::cell_path::CellPathRef;
 use dice::DiceComputations;
 use dupe::Dupe;
 use futures::FutureExt;
 use futures::future::BoxFuture;
+use kuro_core::cells::cell_path::CellPathRef;
 
 use crate::dice::cells::HasCellResolver;
 use crate::file_ops::dice::DiceFileComputations;

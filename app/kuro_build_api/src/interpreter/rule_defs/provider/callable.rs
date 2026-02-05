@@ -17,16 +17,16 @@ use std::hash::Hasher;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
+use either::Either;
+use indexmap::IndexMap;
+use itertools::Itertools;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::provider::id::ProviderId;
 use kuro_error::BuckErrorContext;
 use kuro_error::conversion::from_any_with_tag;
 use kuro_interpreter::build_context::starlark_path_from_build_context;
 use kuro_interpreter::types::provider::callable::ProviderCallableLike;
-use dupe::Dupe;
-use either::Either;
-use indexmap::IndexMap;
-use itertools::Itertools;
 use starlark::any::ProvidesStaticType;
 use starlark::docs::DocItem;
 use starlark::docs::DocMember;
@@ -791,10 +791,9 @@ pub fn register_provider(builder: &mut GlobalsBuilder) {
         // Bazel supports both: provider("doc", fields={...}) and provider(doc="doc", fields={...})
         #[starlark(default = "")] doc: &str,
         // Fields is optional in Bazel - when not specified, provider accepts any fields
-        #[starlark(require=named)] fields: Option<Either<
-            UnpackListOrTuple<String>,
-            SmallMap<String, Value<'v>>,
-        >>,
+        #[starlark(require=named)] fields: Option<
+            Either<UnpackListOrTuple<String>, SmallMap<String, Value<'v>>>,
+        >,
         // Bazel-compatible: init function for custom construction logic
         // When specified, provider() returns (ProviderType, constructor_fn)
         #[starlark(require=named)] init: Option<Value<'v>>,
@@ -806,49 +805,48 @@ pub fn register_provider(builder: &mut GlobalsBuilder) {
         // If fields not specified, the provider is schemaless (accepts any field names)
         let schemaless = fields.is_none();
 
-        let fields: IndexMap<String, UserProviderField, StarlarkHasherSmallPromoteBuilder> = match fields {
-            None => IndexMap::with_hasher(StarlarkHasherSmallPromoteBuilder::default()),
-            Some(Either::Left(fields)) => {
-                let new_fields: IndexMap<
-                    String,
-                    UserProviderField,
-                    StarlarkHasherSmallPromoteBuilder,
-                > = fields
-                    .items
-                    .iter()
-                    .map(|name| (name.clone(), UserProviderField::default()))
-                    .collect();
-                if new_fields.len() != fields.items.len() {
-                    return Err(
-                        kuro_error::Error::from(ProviderCallableError::NonUniqueFields(
-                            fields.items,
-                        ))
-                        .into(),
-                    );
-                }
-                new_fields
-            }
-            Some(Either::Right(fields)) => {
-                let mut new_fields = IndexMap::with_capacity_and_hasher(
-                    fields.len(),
-                    StarlarkHasherSmallPromoteBuilder::default(),
-                );
-                for (name, field) in fields {
-                    if let Some(field) = field.downcast_ref::<UserProviderField>() {
-                        new_fields.insert(name, field.dupe());
-                    } else if field.unpack_str().is_some() {
-                        // Bazel compatibility: field value can be a doc string
-                        // In this case, the field has no type constraint
-                        new_fields.insert(name, UserProviderField::default());
-                    } else {
-                        let ty = provider_field_parse_type(field, eval)
-                            .with_buck_error_context(|| format!("Field `{name}` type `{field}` is not created with `provider_field`, and cannot be evaluated as a type"))?;
-                        new_fields.insert(name, UserProviderField { ty, default: None });
+        let fields: IndexMap<String, UserProviderField, StarlarkHasherSmallPromoteBuilder> =
+            match fields {
+                None => IndexMap::with_hasher(StarlarkHasherSmallPromoteBuilder::default()),
+                Some(Either::Left(fields)) => {
+                    let new_fields: IndexMap<
+                        String,
+                        UserProviderField,
+                        StarlarkHasherSmallPromoteBuilder,
+                    > = fields
+                        .items
+                        .iter()
+                        .map(|name| (name.clone(), UserProviderField::default()))
+                        .collect();
+                    if new_fields.len() != fields.items.len() {
+                        return Err(kuro_error::Error::from(
+                            ProviderCallableError::NonUniqueFields(fields.items),
+                        )
+                        .into());
                     }
+                    new_fields
                 }
-                new_fields
-            }
-        };
+                Some(Either::Right(fields)) => {
+                    let mut new_fields = IndexMap::with_capacity_and_hasher(
+                        fields.len(),
+                        StarlarkHasherSmallPromoteBuilder::default(),
+                    );
+                    for (name, field) in fields {
+                        if let Some(field) = field.downcast_ref::<UserProviderField>() {
+                            new_fields.insert(name, field.dupe());
+                        } else if field.unpack_str().is_some() {
+                            // Bazel compatibility: field value can be a doc string
+                            // In this case, the field has no type constraint
+                            new_fields.insert(name, UserProviderField::default());
+                        } else {
+                            let ty = provider_field_parse_type(field, eval)
+                            .with_buck_error_context(|| format!("Field `{name}` type `{field}` is not created with `provider_field`, and cannot be evaluated as a type"))?;
+                            new_fields.insert(name, UserProviderField { ty, default: None });
+                        }
+                    }
+                    new_fields
+                }
+            };
         let provider = UserProviderCallable::new(path.into_owned(), docstring, fields, schemaless);
 
         // If init is provided, return (init_wrapped_provider, raw_provider) tuple

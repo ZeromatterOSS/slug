@@ -13,11 +13,11 @@ use std::iter;
 use std::ptr;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::artifact_type::OutputArtifact;
 use kuro_build_api_derive::internal_provider;
 use kuro_error::BuckErrorContext;
-use dupe::Dupe;
 use starlark::any::ProvidesStaticType;
 use starlark::coerce::Coerce;
 use starlark::collections::SmallMap;
@@ -210,9 +210,8 @@ impl<'v> DefaultInfo<'v> {
     /// artifact, so that frozen values stay frozen.
     pub fn from_artifact_value(heap: Heap<'v>, artifact_value: Value<'v>) -> Self {
         let sub_targets = ValueOfUnchecked::<DictType<_, _>>::new(heap.alloc(AllocDict::EMPTY));
-        let default_outputs = ValueOfUnchecked::<ListType<_>>::new(
-            heap.alloc(AllocList([artifact_value])),
-        );
+        let default_outputs =
+            ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList([artifact_value])));
         let other_outputs = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         let executable = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         DefaultInfo {
@@ -237,8 +236,7 @@ impl FrozenDefaultInfo {
             FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         let other_outputs =
             FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
-        let executable =
-            FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
+        let executable = FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         FrozenValueTyped::new_err(heap.alloc(FrozenDefaultInfo {
             sub_targets,
             default_outputs,
@@ -560,7 +558,7 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
     derive_more::Display,
     ProvidesStaticType,
     NoSerialize,
-    Allocative,
+    Allocative
 )]
 #[display("depset({list})")]
 #[repr(C)]
@@ -608,8 +606,8 @@ fn depset_with_list_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         // Try unfrozen first, then frozen
         if let Some(depset) = DepsetWithList::from_value(this) {
-            let elements: Vec<Value<'v>> = ListRef::from_value(depset.list)
-                .map_or_else(Vec::new, |l| l.iter().collect());
+            let elements: Vec<Value<'v>> =
+                ListRef::from_value(depset.list).map_or_else(Vec::new, |l| l.iter().collect());
             Ok(heap.alloc(AllocList(elements)))
         } else if let Some(depset) = this.downcast_ref::<FrozenDepsetWithList>() {
             let elements: Vec<Value<'v>> = ListRef::from_frozen_value(depset.list)
@@ -795,15 +793,22 @@ impl<'v> starlark::values::StarlarkValue<'v> for RunfilesStub {
     }
 
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "files" | "symlinks" | "root_symlinks" | "empty_filenames")
+        matches!(
+            attribute,
+            "files" | "symlinks" | "root_symlinks" | "empty_filenames"
+        )
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
             "symlinks" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "root_symlinks" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "empty_filenames" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
+            "root_symlinks" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "empty_filenames" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             _ => None,
         }
     }

@@ -14,6 +14,12 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use allocative::Allocative;
+use bytes::Bytes;
+use digest::DynDigest;
+use dupe::Dupe;
+use futures::StreamExt;
+use futures::stream::Stream;
+use hyper::Response;
 use kuro_common::cas_digest::CasDigestConfig;
 use kuro_common::cas_digest::DigestAlgorithmFamily;
 use kuro_common::cas_digest::SHA1_SIZE;
@@ -29,12 +35,6 @@ use kuro_http::retries::AsKuroError;
 use kuro_http::retries::HttpError;
 use kuro_http::retries::HttpErrorForRetry;
 use kuro_http::retries::http_retry;
-use bytes::Bytes;
-use digest::DynDigest;
-use dupe::Dupe;
-use futures::StreamExt;
-use futures::stream::Stream;
-use hyper::Response;
 use sha1::Digest;
 use sha1::Sha1;
 use sha2::Sha256;
@@ -510,8 +510,8 @@ impl fmt::Display for MaybeResponseDebugInfo {
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
-    use kuro_common::cas_digest::testing;
     use futures::stream;
+    use kuro_common::cas_digest::testing;
 
     use super::*;
 

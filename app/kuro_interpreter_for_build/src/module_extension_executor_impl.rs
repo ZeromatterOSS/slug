@@ -182,13 +182,9 @@ impl ConcreteModuleExtensionExecutor {
         let cell_resolver = ctx.get_cell_resolver().await?;
 
         // 2. Parse the bzl path
-        let import_path =
-            parse_bzlmod_bzl_path(&aggregated.extension_bzl_file, &cell_resolver)?;
+        let import_path = parse_bzlmod_bzl_path(&aggregated.extension_bzl_file, &cell_resolver)?;
 
-        tracing::debug!(
-            "Loading extension module from: {}",
-            import_path
-        );
+        tracing::debug!("Loading extension module from: {}", import_path);
 
         // 3. Load the module via DICE
         let loaded_module = ctx
@@ -207,18 +203,14 @@ impl ConcreteModuleExtensionExecutor {
             .0;
 
         // 5. Downcast to FrozenStarlarkModuleExtension
-        let frozen_extension: OwnedFrozenValueTyped<FrozenStarlarkModuleExtension> =
-            ext_value.downcast_starlark().map_err(|_| {
-                ExtensionExecutionError::NotAModuleExtension {
-                    name: aggregated.extension_name.clone(),
-                    path: aggregated.extension_bzl_file.clone(),
-                }
+        let frozen_extension: OwnedFrozenValueTyped<FrozenStarlarkModuleExtension> = ext_value
+            .downcast_starlark()
+            .map_err(|_| ExtensionExecutionError::NotAModuleExtension {
+                name: aggregated.extension_name.clone(),
+                path: aggregated.extension_bzl_file.clone(),
             })?;
 
-        tracing::debug!(
-            "Found extension '{}' in module",
-            frozen_extension.name()
-        );
+        tracing::debug!("Found extension '{}' in module", frozen_extension.name());
 
         // 6. Execute with RepoSpec capture registry active
         let (result, specs) = with_repo_spec_registry(|| {
@@ -240,8 +232,7 @@ impl ConcreteModuleExtensionExecutor {
             );
 
             // Invoke: implementation(module_ctx)
-            let invoke_result =
-                eval.eval_function(implementation.to_value(), &[ctx_value], &[]);
+            let invoke_result = eval.eval_function(implementation.to_value(), &[ctx_value], &[]);
 
             match invoke_result {
                 Ok(return_value) => {
@@ -298,10 +289,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         );
 
         // Log execution context
-        tracing::debug!(
-            "Extension '{}' execution context:",
-            aggregated.extension_id
-        );
+        tracing::debug!("Extension '{}' execution context:", aggregated.extension_id);
         tracing::debug!("  - BZL file: {}", aggregated.extension_bzl_file);
         tracing::debug!("  - Extension name: {}", aggregated.extension_name);
         tracing::debug!("  - Root module: {}", root_module_name);
@@ -321,10 +309,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         }
 
         // Try to load and execute the extension's Starlark implementation
-        let specs = match self
-            .try_execute_starlark(ctx, aggregated, module_ctx)
-            .await
-        {
+        let specs = match self.try_execute_starlark(ctx, aggregated, module_ctx).await {
             Ok(specs) => specs,
             Err(e) => {
                 // If we can't load/execute the extension (e.g., cell not registered yet),
@@ -365,11 +350,12 @@ pub fn init_module_extension_executor() {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use kuro_bzlmod::extensions::AggregatedExtension;
     use kuro_bzlmod::types::ExtensionTag;
     use kuro_bzlmod::types::TagValue;
     use tempfile::TempDir;
+
+    use super::*;
 
     #[test]
     fn test_concrete_executor_creation() {
@@ -383,10 +369,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let _working_dir = temp_dir.path().to_path_buf();
 
-        let _aggregated = AggregatedExtension::new(
-            "@@test_module//test:ext.bzl",
-            "test_ext",
-        );
+        let _aggregated = AggregatedExtension::new("@@test_module//test:ext.bzl", "test_ext");
 
         // We can't easily create a DiceComputations in a test, so we skip the
         // full execution test. The key point is that the infrastructure is in place.
@@ -395,13 +378,11 @@ mod tests {
 
     #[test]
     fn test_build_module_context_integration() {
-        let mut aggregated = AggregatedExtension::new(
-            "@@rules_python//pip:pip.bzl",
-            "pip",
-        );
+        let mut aggregated = AggregatedExtension::new("@@rules_python//pip:pip.bzl", "pip");
 
         let mut tag = ExtensionTag::new("parse".to_string());
-        tag.kwargs.push(("hub_name".to_string(), TagValue::String("pip".to_string())));
+        tag.kwargs
+            .push(("hub_name".to_string(), TagValue::String("pip".to_string())));
 
         aggregated.add_module_tags("_main", vec![tag]);
 

@@ -14,14 +14,14 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use allocative::Allocative;
-use kuro_common::file_ops::metadata::SimpleDirEntry;
-use kuro_core::cells::cell_path::CellPath;
-use kuro_query::query::syntax::simple::eval::file_set::FileNode;
-use kuro_query::query::syntax::simple::eval::file_set::FileSet;
 use derive_more::Display;
 use display_container::fmt_container;
 use gazebo::prelude::VecExt;
 use indexmap::IndexSet;
+use kuro_common::file_ops::metadata::SimpleDirEntry;
+use kuro_core::cells::cell_path::CellPath;
+use kuro_query::query::syntax::simple::eval::file_set::FileNode;
+use kuro_query::query::syntax::simple::eval::file_set::FileSet;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;

@@ -17,12 +17,12 @@ use kuro_common::init::DaemonStartupConfig;
 use kuro_common::invocation_roots::InvocationRoots;
 use kuro_common::invocation_roots::find_invocation_roots;
 use kuro_common::legacy_configs::cells::BuckConfigBasedCells;
-use kuro_core::kuro_env;
 use kuro_core::cells::CellAliasResolver;
 use kuro_core::cells::CellResolver;
 use kuro_core::cells::cell_path::CellPathRef;
 use kuro_core::cells::cell_root_path::CellRootPathBuf;
 use kuro_core::fs::project::ProjectRoot;
+use kuro_core::kuro_env;
 use kuro_error::BuckErrorContext;
 use kuro_fs::fs_util;
 use kuro_fs::paths::abs_norm_path::AbsNormPath;
@@ -131,10 +131,7 @@ impl<'a> ImmediateConfigContext<'a> {
             .resolve(data.cell_resolver.resolve_path(path)?))
     }
 
-    pub fn resolve_alias_to_path_in_cwd(
-        &self,
-        alias: &str,
-    ) -> kuro_error::Result<CellRootPathBuf> {
+    pub fn resolve_alias_to_path_in_cwd(&self, alias: &str) -> kuro_error::Result<CellRootPathBuf> {
         let data = self.data()?;
         let cell = data.cwd_cell_alias_resolver.resolve(alias)?;
         Ok(data.cell_resolver.get(cell)?.path().to_buf())

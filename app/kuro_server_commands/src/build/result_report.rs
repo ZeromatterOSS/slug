@@ -13,15 +13,17 @@
 use std::cell::Cell;
 use std::collections::BTreeSet;
 
+use dupe::Dupe;
+use fxhash::FxHashMap;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_build_api::build::BuildProviderType;
 use kuro_build_api::build::BuildTargetResult;
 use kuro_build_api::build::ConfiguredBuildTargetResult;
 use kuro_build_api::build::ProviderArtifacts;
+use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
 use kuro_build_api::interpreter::rule_defs::cmd_args::AbsCommandLineContext;
 use kuro_build_api::interpreter::rule_defs::cmd_args::ArtifactPathMapper;
 use kuro_build_api::interpreter::rule_defs::cmd_args::CommandLineArgLike;
-use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::FrozenDefaultInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::run_info::FrozenRunInfo;
 use kuro_certs::validate::CertState;
@@ -34,8 +36,6 @@ use kuro_core::pattern::pattern::Modifiers;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_execute::artifact::artifact_dyn::ArtifactDyn;
 use kuro_execute::artifact::fs::ExecutorFs;
-use dupe::Dupe;
-use fxhash::FxHashMap;
 use starlark_map::small_map::SmallMap;
 
 mod proto {

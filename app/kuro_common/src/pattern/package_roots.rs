@@ -10,8 +10,6 @@
 
 use std::collections::HashSet;
 
-use kuro_core::cells::cell_path::CellPath;
-use kuro_core::package::PackageLabel;
 use dice::DiceTransaction;
 use dice_futures::drop::DropTogether;
 use dice_futures::spawn::spawn_dropcancel;
@@ -22,6 +20,8 @@ use futures::channel::mpsc;
 use futures::future::FutureExt;
 use futures::stream::FuturesUnordered;
 use gazebo::prelude::*;
+use kuro_core::cells::cell_path::CellPath;
+use kuro_core::package::PackageLabel;
 use once_cell::sync::Lazy;
 use tokio::sync::Semaphore;
 

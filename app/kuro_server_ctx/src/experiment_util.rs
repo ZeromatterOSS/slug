@@ -8,9 +8,9 @@
  * above-listed licenses.
  */
 
+use const_format::concatcp;
 use kuro_wrapper_common::DOT_BUCKCONFIG_D;
 use kuro_wrapper_common::EXPERIMENTS_FILENAME;
-use const_format::concatcp;
 
 const EXPERIMENT_PATH_SUFFIX: &str = concatcp!("/", DOT_BUCKCONFIG_D, "/", EXPERIMENTS_FILENAME);
 

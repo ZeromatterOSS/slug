@@ -11,12 +11,12 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use dice::DiceComputations;
 use kuro_build_api::analysis::calculation::EVAL_ANALYSIS_QUERY;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_node::nodes::configured_ref::ConfiguredGraphNodeRef;
 use kuro_query::query::syntax::simple::eval::evaluator::QueryEvaluator;
 use kuro_query::query::syntax::simple::eval::set::TargetSet;
-use dice::DiceComputations;
 
 use crate::analysis::configured_graph::AnalysisConfiguredGraphQueryDelegate;
 use crate::analysis::configured_graph::AnalysisDiceQueryDelegate;

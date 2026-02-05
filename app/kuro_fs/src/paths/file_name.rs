@@ -17,9 +17,9 @@ use std::ops::Deref;
 use std::path::Path;
 
 use allocative::Allocative;
-use kuro_util::arc_str::StringInside;
 use compact_str::CompactString;
 use derive_more::Display;
+use kuro_util::arc_str::StringInside;
 use pagable::Pagable;
 use ref_cast::RefCast;
 use relative_path::RelativePath;

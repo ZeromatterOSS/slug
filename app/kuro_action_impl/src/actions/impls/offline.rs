@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
+use indexmap::IndexMap;
 use kuro_artifact::artifact::build_artifact::BuildArtifact;
 use kuro_build_api::actions::ActionExecutionCtx;
 use kuro_build_api::actions::execute::action_executor::ActionOutputs;
@@ -17,8 +19,6 @@ use kuro_execute::artifact_value::ArtifactValue;
 use kuro_execute::directory::INTERNER;
 use kuro_execute::entry::build_entry_from_disk;
 use kuro_execute::materialize::materializer::CopiedArtifact;
-use dupe::Dupe;
-use indexmap::IndexMap;
 
 /// Declares a copy materialization to copy the output BuildArtifact to the
 /// offline cache for use in an offline build. Returns the project-relative path

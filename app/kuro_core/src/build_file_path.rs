@@ -9,9 +9,9 @@
  */
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::file_name::FileNameBuf;
-use dupe::Dupe;
 use pagable::Pagable;
 
 use crate::cells::build_file_cell::BuildFileCell;

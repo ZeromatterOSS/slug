@@ -10,6 +10,7 @@
 
 use std::process::Stdio;
 
+use dupe::Dupe;
 use kuro_common::init::LogDownloadMethod;
 use kuro_common::temp_path::TempPath;
 use kuro_error::BuckErrorContext;
@@ -24,7 +25,6 @@ use kuro_fs::paths::file_name::FileNameBuf;
 use kuro_util::indent::indent;
 use kuro_util::process::async_background_command;
 use kuro_wrapper_common::invocation_id::TraceId;
-use dupe::Dupe;
 use rand::Rng;
 
 use crate::client_ctx::ClientCommandContext;
@@ -64,10 +64,7 @@ pub struct EventLogOptions {
 }
 
 impl EventLogOptions {
-    pub async fn get(
-        &self,
-        ctx: &ClientCommandContext<'_>,
-    ) -> kuro_error::Result<EventLogPathBuf> {
+    pub async fn get(&self, ctx: &ClientCommandContext<'_>) -> kuro_error::Result<EventLogPathBuf> {
         if let Some(path) = &self.path {
             EventLogPathBuf::infer(path.resolve(&ctx.working_dir))
         } else if let Some(id) = &self.trace_id {

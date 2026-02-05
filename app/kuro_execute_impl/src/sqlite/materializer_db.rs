@@ -11,6 +11,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use chrono::DateTime;
+use chrono::Utc;
+use derive_more::From;
+use dupe::Dupe;
 use kuro_common::sqlite::sqlite_db::SqliteDb;
 use kuro_common::sqlite::sqlite_db::SqliteIdentity;
 use kuro_common::sqlite::sqlite_db::SqliteTable;
@@ -22,10 +26,6 @@ use kuro_execute::digest_config::DigestConfig;
 use kuro_execute::execute::blocking::BlockingExecutor;
 use kuro_fs::paths::abs_norm_path::AbsNormPath;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
-use chrono::DateTime;
-use chrono::Utc;
-use derive_more::From;
-use dupe::Dupe;
 
 use crate::materializers::deferred::artifact_tree::ArtifactMetadata;
 use crate::sqlite::tables::materializer_state_table::MaterializerStateSqliteTable;
@@ -189,6 +189,8 @@ pub(crate) fn testing_materializer_state_sqlite_db(
 mod tests {
 
     use assert_matches::assert_matches;
+    use chrono::TimeZone;
+    use itertools::Itertools;
     use kuro_common::cas_digest::TrackedCasDigest;
     use kuro_common::file_ops::metadata::FileMetadata;
     use kuro_common::file_ops::metadata::Symlink;
@@ -201,8 +203,6 @@ mod tests {
     use kuro_execute::directory::ActionDirectoryMember;
     use kuro_execute::directory::new_symlink;
     use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
-    use chrono::TimeZone;
-    use itertools::Itertools;
     use parking_lot::Mutex;
     use rusqlite::Connection;
 

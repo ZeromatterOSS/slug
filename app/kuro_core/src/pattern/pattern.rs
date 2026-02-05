@@ -13,10 +13,10 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_error::BuckErrorContext;
 use kuro_error::kuro_error;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
-use dupe::Dupe;
 use once_cell::sync::Lazy;
 use pagable::Pagable;
 use regex::Regex;

@@ -13,11 +13,11 @@ use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
 
+use dupe::Dupe;
 use kuro_data::ActionName;
 use kuro_data::SchedulingMode;
 use kuro_data::re_platform::Property;
 use kuro_events::span::SpanId;
-use dupe::Dupe;
 use regex::Regex;
 use superconsole::Line;
 use superconsole::Lines;
@@ -284,9 +284,7 @@ impl CommandReproducer {
                         Some(kuro_data::executor_stage_start::Stage::Local(local_stage)) => {
                             if !options.skip_local_executions {
                                 match &local_stage.stage {
-                                    Some(kuro_data::local_stage::Stage::Execute(
-                                        local_execute,
-                                    )) => {
+                                    Some(kuro_data::local_stage::Stage::Execute(local_execute)) => {
                                         return Some(CommandReproducer::LocalExecute(
                                             local_execute.clone(),
                                         ));

@@ -8,6 +8,9 @@
  * above-listed licenses.
  */
 
+use dice::DiceComputations;
+use dupe::Dupe;
+use gazebo::prelude::VecExt;
 use kuro_cli_proto::TargetCfg;
 use kuro_core::configuration::bound_id::BoundConfigurationId;
 use kuro_core::configuration::data::ConfigurationData;
@@ -24,9 +27,6 @@ use kuro_core::target::label::label::TargetLabel;
 use kuro_node::configured_universe::CqueryUniverse;
 use kuro_node::configured_universe::UNIVERSE_FROM_LITERALS;
 use kuro_node::target_calculation::ConfiguredTargetCalculation;
-use dice::DiceComputations;
-use dupe::Dupe;
-use gazebo::prelude::VecExt;
 
 use crate::ctx::ServerCommandContextTrait;
 use crate::global_cfg_options::global_cfg_options_from_client_context;
