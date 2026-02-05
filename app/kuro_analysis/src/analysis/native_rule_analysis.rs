@@ -42,7 +42,7 @@ pub fn analyze_native_rule(
     target: &ConfiguredTargetLabel,
     configured_node: ConfiguredTargetNodeRef<'_>,
     kind: &NativeRuleKind,
-    _dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
 ) -> kuro_error::Result<AnalysisResult> {
     match kind {
         NativeRuleKind::ConstraintSetting => {
@@ -55,6 +55,9 @@ pub fn analyze_native_rule(
             Err(internal_error!(
                 "Native filegroup analysis not implemented. Use Starlark filegroup instead."
             ))
+        }
+        NativeRuleKind::Alias => {
+            analyze_alias(target, dep_analysis)
         }
     }
 }
@@ -77,6 +80,32 @@ fn analyze_constraint_value(
     _configured_node: ConfiguredTargetNodeRef<'_>,
 ) -> kuro_error::Result<AnalysisResult> {
     create_minimal_analysis_result(target)
+}
+
+/// Analyze an alias target.
+/// An alias forwards all providers from its `actual` target.
+fn analyze_alias(
+    target: &ConfiguredTargetLabel,
+    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+) -> kuro_error::Result<AnalysisResult> {
+    // The alias should have exactly one dependency - the `actual` target.
+    // Find it in the dep_analysis and return its providers.
+    if dep_analysis.len() == 1 {
+        // Clone the actual target's analysis result
+        let (_actual_label, actual_result) = dep_analysis.into_iter().next().unwrap();
+        Ok(actual_result)
+    } else if dep_analysis.is_empty() {
+        Err(internal_error!(
+            "Alias target {} has no dependencies. It should have exactly one 'actual' dependency.",
+            target
+        ))
+    } else {
+        Err(internal_error!(
+            "Alias target {} has {} dependencies. It should have exactly one 'actual' dependency.",
+            target,
+            dep_analysis.len()
+        ))
+    }
 }
 
 /// Create a minimal analysis result with just DefaultInfo.

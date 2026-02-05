@@ -27,8 +27,11 @@ use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::coerced_deps_collector::CoercedDeps;
 use kuro_node::attrs::coercion_context::AttrCoercionContext;
 use kuro_node::attrs::spec::internal::NAME_ATTRIBUTE;
+use kuro_node::attrs::spec::internal::VISIBILITY_ATTRIBUTE;
 use kuro_util::arc_str::ArcStr;
 use kuro_node::attrs::coerced_deps_collector::CoercedDepsCollector;
+use kuro_node::visibility::VisibilityPatternList;
+use kuro_node::visibility::VisibilitySpecification;
 use kuro_node::attrs::spec::AttributeSpec;
 use kuro_node::attrs::values::AttrValues;
 use kuro_node::nodes::unconfigured::RuleKind;
@@ -107,6 +110,54 @@ mod rule_defs {
             uses_plugins: vec![],
         })
     });
+
+    /// Creates the AttributeSpec for alias.
+    /// alias has a required `actual` attribute pointing to the target it aliases.
+    fn alias_attributes() -> AttributeSpec {
+        let actual_attr = Attribute::new(
+            None, // No default - required attribute
+            "The target that this alias points to",
+            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+        );
+
+        AttributeSpec::from(
+            vec![("actual".to_owned(), actual_attr)],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("alias attributes should be valid")
+    }
+
+    /// The Rule definition for alias.
+    pub static ALIAS_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: alias_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::Alias),
+            rule_kind: RuleKind::Normal,  // Aliases can be used anywhere
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+        })
+    });
+}
+
+/// Bazel-style visibility constants
+const BAZEL_VISIBILITY_PUBLIC: &str = "//visibility:public";
+
+/// Parses a visibility list and returns a VisibilitySpecification.
+/// Supports both Kuro-style ("PUBLIC") and Bazel-style ("//visibility:public").
+/// Returns None if no visibility was explicitly specified (to use default).
+fn parse_explicit_visibility(visibility: &[String]) -> Option<VisibilitySpecification> {
+    if visibility.is_empty() {
+        return None; // No explicit visibility, use default
+    }
+    for item in visibility {
+        // Check for public visibility patterns
+        if item == "PUBLIC" || item == BAZEL_VISIBILITY_PUBLIC {
+            return Some(VisibilitySpecification(VisibilityPatternList::Public));
+        }
+    }
+    // Explicit visibility but not public - default to private
+    Some(VisibilitySpecification::DEFAULT)
 }
 
 /// Creates a TargetNode for a native rule.
@@ -115,6 +166,8 @@ fn create_native_target_node(
     package: Arc<Package>,
     target_name: &str,
     attrs: Vec<(String, CoercedAttr)>,
+    visibility: &[String],
+    default_visibility: &VisibilitySpecification,
 ) -> kuro_error::Result<TargetNode> {
     let target_label = TargetLabel::new(
         package.buildfile_path.package().dupe(),
@@ -122,13 +175,19 @@ fn create_native_target_node(
     );
 
     // Build attribute values
-    let mut attr_values = AttrValues::with_capacity(attrs.len() + 1);
+    let mut attr_values = AttrValues::with_capacity(attrs.len() + 2);
 
     // Add the required name attribute first (it has AttributeId(0))
     attr_values.push_sorted(
         NAME_ATTRIBUTE.id,
         CoercedAttr::String(StringLiteral(ArcStr::from(target_name))),
     );
+
+    // Add visibility attribute (AttributeId(5))
+    // Use explicit visibility if provided, otherwise fall back to package default
+    let visibility_spec = parse_explicit_visibility(visibility)
+        .unwrap_or_else(|| default_visibility.dupe());
+    attr_values.push_sorted(VISIBILITY_ATTRIBUTE.id, CoercedAttr::Visibility(visibility_spec));
 
     // Get the attribute IDs from the spec and add user-provided attrs
     for (attr_name, coerced_value) in attrs {
@@ -188,7 +247,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
     fn constraint_setting<'v>(
         #[starlark(require = named)] name: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
-        _visibility: UnpackListOrTuple<String>,
+        visibility: UnpackListOrTuple<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let internals = ModuleInternals::from_context(eval, "constraint_setting")?;
@@ -198,6 +257,8 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             internals.package(),
             name,
             vec![], // No attributes beyond name
+            &visibility.items,
+            &internals.default_visibility(),
         )?;
 
         internals.record(target_node)?;
@@ -224,10 +285,10 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named)] name: &str,
         #[starlark(require = named)] constraint_setting: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
-        _visibility: UnpackListOrTuple<String>,
+        visibility: UnpackListOrTuple<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let internals = ModuleInternals::from_context(eval, "constraint_value")?;
+        let internals = ModuleInternals::from_context(eval, "constraint_setting")?;
         let coercion_ctx = internals.attr_coercion_context();
 
         // Coerce the constraint_setting label to a dep attribute
@@ -239,6 +300,50 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             internals.package(),
             name,
             vec![("constraint_setting".to_owned(), coerced_constraint_setting)],
+            &visibility.items,
+            &internals.default_visibility(),
+        )?;
+
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+
+    /// Creates an alias to another target.
+    ///
+    /// An alias is a target that forwards all requests to another target.
+    /// When you build an alias, you actually build its `actual` target.
+    /// When you depend on an alias, you depend on its `actual` target.
+    ///
+    /// Example:
+    /// ```python
+    /// alias(
+    ///     name = "macos",
+    ///     actual = ":osx",
+    /// )
+    /// ```
+    ///
+    /// See: https://bazel.build/reference/be/general#alias
+    fn alias<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named)] actual: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        visibility: UnpackListOrTuple<String>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let internals = ModuleInternals::from_context(eval, "alias")?;
+        let coercion_ctx = internals.attr_coercion_context();
+
+        // Coerce the actual target label to a dep attribute
+        let label = coercion_ctx.coerce_providers_label(actual)?;
+        let coerced_actual = CoercedAttr::Dep(label);
+
+        let target_node = create_native_target_node(
+            rule_defs::ALIAS_RULE.clone(),
+            internals.package(),
+            name,
+            vec![("actual".to_owned(), coerced_actual)],
+            &visibility.items,
+            &internals.default_visibility(),
         )?;
 
         internals.record(target_node)?;

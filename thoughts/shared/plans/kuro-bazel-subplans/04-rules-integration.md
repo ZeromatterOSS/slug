@@ -54,10 +54,22 @@ This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rus
   - Added `RuleType::Native(NativeRuleKind)` infrastructure for future native rule support
   - Files: `bazel_tools/tools/build_rules/filegroup.bzl`, `bazel_tools/tools/test/BUILD`, `app/kuro_node/src/rule_type.rs`
 
+**Completed (2026-02-05):**
+- [x] **Native constraint_setting/constraint_value rules** - Now properly register targets
+  - Added `RuleType::Native(NativeRuleKind::ConstraintSetting/ConstraintValue)` to rule_type.rs
+  - Implemented in `native_rules.rs` with proper visibility support
+  - Analysis implemented in `native_rule_analysis.rs`
+- [x] **package(default_visibility=...) support** - BUILD files can now set default visibility
+  - Added `build_file_default_visibility` field to `ModuleInternals`
+  - `package()` function now sets default visibility in BUILD file context
+  - Updated `parse_visibility()` to recognize Bazel-style `//visibility:public`
+- [x] **Native alias() rule** - Aliases now properly forward to their actual targets
+  - Added `NativeRuleKind::Alias` to rule_type.rs
+  - Implemented in `native_rules.rs` with proper target registration
+  - Analysis forwards providers from the actual target
+
 **Blocking for cc_test:**
-- [ ] `constraint_setting()` native rule needed - platforms package uses it
-  - cc_test depends on `platforms//os:watchos` which needs `constraint_setting()`
-  - Currently a stub in natives.rs that doesn't register targets
+- [ ] `ctx.exec_groups` attribute needed - rules_cc's cc_test.bzl accesses `ctx.exec_groups["test"].toolchains`
 
 **Files:**
 - `app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs` - cc_common implementation

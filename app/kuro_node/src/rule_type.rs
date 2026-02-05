@@ -56,6 +56,8 @@ pub enum NativeRuleKind {
     ConstraintSetting,
     #[display("constraint_value")]
     ConstraintValue,
+    #[display("alias")]
+    Alias,
 }
 
 impl NativeRuleKind {
@@ -64,6 +66,7 @@ impl NativeRuleKind {
             NativeRuleKind::Filegroup => "filegroup",
             NativeRuleKind::ConstraintSetting => "constraint_setting",
             NativeRuleKind::ConstraintValue => "constraint_value",
+            NativeRuleKind::Alias => "alias",
         }
     }
 }

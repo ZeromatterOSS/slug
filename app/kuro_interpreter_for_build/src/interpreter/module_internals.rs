@@ -29,6 +29,7 @@ use kuro_node::nodes::unconfigured::TargetNode;
 use kuro_node::oncall::Oncall;
 use kuro_node::package::Package;
 use kuro_node::super_package::SuperPackage;
+use kuro_node::visibility::VisibilitySpecification;
 use dupe::Dupe;
 use starlark::environment::FrozenModule;
 use starlark::values::OwnedFrozenValue;
@@ -92,6 +93,9 @@ pub struct ModuleInternals {
     /// The files owned by this directory. Is `None` for .bzl files.
     package_listing: PackageListing,
     pub(crate) super_package: SuperPackage,
+    /// Bazel-style BUILD file default visibility set via `package(default_visibility=...)`
+    /// This is None if no package() call was made with default_visibility.
+    pub(crate) build_file_default_visibility: RefCell<Option<VisibilitySpecification>>,
 }
 
 #[derive(Debug)]
@@ -145,11 +149,28 @@ impl ModuleInternals {
             skip_targets_with_duplicate_names,
             package_listing,
             super_package,
+            build_file_default_visibility: RefCell::new(None),
         }
     }
 
     pub(crate) fn attr_coercion_context(&self) -> &BuildAttrCoercionContext {
         &self.attr_coercion_context
+    }
+
+    /// Gets the effective default visibility for targets in this package.
+    /// First checks for a BUILD file's `package(default_visibility=...)` setting,
+    /// then falls back to the super_package visibility (from PACKAGE files).
+    pub fn default_visibility(&self) -> VisibilitySpecification {
+        if let Some(ref vis) = *self.build_file_default_visibility.borrow() {
+            vis.dupe()
+        } else {
+            self.super_package.visibility().dupe()
+        }
+    }
+
+    /// Sets the BUILD file's default visibility from `package(default_visibility=...)`.
+    pub fn set_build_file_default_visibility(&self, visibility: VisibilitySpecification) {
+        *self.build_file_default_visibility.borrow_mut() = Some(visibility);
     }
 
     pub fn record(&self, target_node: TargetNode) -> kuro_error::Result<()> {

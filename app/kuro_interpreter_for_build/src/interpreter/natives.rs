@@ -196,33 +196,7 @@ pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
-    /// Creates an alias target that points to another target.
-    ///
-    /// This is a Bazel built-in function that creates a symbolic link-like target.
-    /// In Kuro, this is currently a no-op stub.
-    ///
-    /// Example:
-    /// ```python
-    /// alias(
-    ///     name = "my_alias",
-    ///     actual = "//some/package:target",
-    /// )
-    /// ```
-    ///
-    /// See: https://bazel.build/reference/be/general#alias
-    fn alias<'v>(
-        #[starlark(require = named)] name: &str,
-        #[starlark(require = named)] actual: &str,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        _visibility: UnpackListOrTuple<String>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        _tags: UnpackListOrTuple<String>,
-    ) -> starlark::Result<NoneType> {
-        // TODO(alias): Implement alias target resolution.
-        // Currently a no-op - Kuro doesn't yet support alias targets.
-        let _unused = (name, actual);
-        Ok(NoneType)
-    }
+    // Note: alias() is implemented in native_rules.rs as a proper native rule
 
     /// Groups a set of files under a single name for convenience.
     ///

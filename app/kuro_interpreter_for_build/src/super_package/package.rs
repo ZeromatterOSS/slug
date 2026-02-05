@@ -32,6 +32,10 @@ enum PackageFileError {
     AtMostOnce,
 }
 
+/// Bazel-style visibility constants
+const BAZEL_VISIBILITY_PUBLIC: &str = "//visibility:public";
+const BAZEL_VISIBILITY_PRIVATE: &str = "//visibility:private";
+
 fn parse_visibility(
     patterns: &[String],
     cell_name: CellName,
@@ -40,8 +44,12 @@ fn parse_visibility(
 ) -> kuro_error::Result<VisibilitySpecification> {
     let mut builder = VisibilityWithinViewBuilder::with_capacity(patterns.len());
     for pattern in patterns {
-        if pattern == VisibilityPattern::PUBLIC {
+        // Support both Kuro-style ("PUBLIC") and Bazel-style ("//visibility:public")
+        if pattern == VisibilityPattern::PUBLIC || pattern == BAZEL_VISIBILITY_PUBLIC {
             builder.add_public();
+        } else if pattern == BAZEL_VISIBILITY_PRIVATE {
+            // //visibility:private means no visibility - skip this entry
+            continue;
         } else {
             builder.add(VisibilityPattern(ParsedPattern::parse_precise(
                 pattern,
@@ -153,10 +161,22 @@ pub(crate) fn register_package_function(globals: &mut GlobalsBuilder) {
                 };
             }
             Err(_) => {
-                // BUILD file context - use Bazel semantics (currently no-op)
-                // TODO(bazel-compat): Implement package-level defaults for BUILD files
-                // For now, just accept the parameters silently to allow parsing
-                let _ = (default_visibility, default_testonly, default_deprecation,
+                // BUILD file context - use Bazel semantics
+                // Set the default visibility if specified
+                if !default_visibility.items.is_empty() {
+                    let visibility = parse_visibility(
+                        &default_visibility.items,
+                        build_context.cell_info().name().name(),
+                        build_context.cell_info().cell_resolver(),
+                        build_context.cell_info().cell_alias_resolver(),
+                    )?;
+                    // Get the ModuleInternals to set the BUILD file's default visibility
+                    if let Ok(internals) = crate::interpreter::module_internals::ModuleInternals::from_context(eval, "package") {
+                        internals.set_build_file_default_visibility(visibility);
+                    }
+                }
+                // Other parameters are currently no-ops (could be implemented later)
+                let _ = (default_testonly, default_deprecation,
                          features, default_applicable_licenses, default_package_metadata);
             }
         }
