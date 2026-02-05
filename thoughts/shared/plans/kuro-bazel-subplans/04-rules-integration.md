@@ -47,13 +47,17 @@ This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rus
   - Modified `BuildAttrCoercionContext` to use Bazel-compatible parsing for label coercion
   - This fixes deps like `"@rules_cc//cc/runfiles"` which should mean `@rules_cc//cc/runfiles:runfiles`
   - Files: `app/kuro_core/src/pattern/pattern.rs`, `app/kuro_interpreter_for_build/src/attrs/coerce/ctx.rs`
+- [x] **Starlark filegroup rule for bazel_tools** - `@bazel_tools//tools/test:collect_cc_coverage` now works
+  - Created `bazel_tools/tools/build_rules/filegroup.bzl` with Starlark filegroup rule implementation
+  - Updated `bazel_tools/tools/test/BUILD` to load and use the Starlark filegroup
+  - Added `visibility = ["PUBLIC"]` to make targets accessible to all packages
+  - Added `RuleType::Native(NativeRuleKind)` infrastructure for future native rule support
+  - Files: `bazel_tools/tools/build_rules/filegroup.bzl`, `bazel_tools/tools/test/BUILD`, `app/kuro_node/src/rule_type.rs`
 
 **Blocking for cc_test:**
-- [ ] Native `filegroup()` and `exports_files()` don't register targets - they're stubs
-  - cc_test depends on `@bazel_tools//tools/test:collect_cc_coverage` (a filegroup target)
-  - The filegroup stub in `natives.rs` doesn't call `internals.record()` to register targets
-  - Fix: Implement proper `filegroup()` that creates TargetNode instances
-  - Workaround attempted: Simplified bazel_tools/tools/test/BUILD but filegroup still needed
+- [ ] `constraint_setting()` native rule needed - platforms package uses it
+  - cc_test depends on `platforms//os:watchos` which needs `constraint_setting()`
+  - Currently a stub in natives.rs that doesn't register targets
 
 **Files:**
 - `app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs` - cc_common implementation

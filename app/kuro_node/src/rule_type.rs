@@ -37,6 +37,31 @@ pub struct StarlarkRuleType {
     pub name: String,
 }
 
+/// The type of native rule (built into Kuro, not defined in Starlark).
+#[derive(
+    Debug,
+    Clone,
+    Dupe,
+    derive_more::Display,
+    Eq,
+    PartialEq,
+    Hash,
+    Pagable,
+    Allocative
+)]
+pub enum NativeRuleKind {
+    #[display("filegroup")]
+    Filegroup,
+}
+
+impl NativeRuleKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            NativeRuleKind::Filegroup => "filegroup",
+        }
+    }
+}
+
 #[derive(
     Debug,
     Clone,
@@ -52,6 +77,8 @@ pub enum RuleType {
     Starlark(Arc<StarlarkRuleType>),
     #[display("forward")]
     Forward,
+    #[display("native:{_0}")]
+    Native(NativeRuleKind),
 }
 
 impl RuleType {
@@ -59,6 +86,7 @@ impl RuleType {
         match self {
             RuleType::Starlark(rule_type) => rule_type.name.as_str(),
             RuleType::Forward => "forward",
+            RuleType::Native(kind) => kind.as_str(),
         }
     }
 }

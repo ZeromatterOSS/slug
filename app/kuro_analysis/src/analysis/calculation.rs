@@ -48,6 +48,7 @@ use kuro_node::bzl_or_bxl_path::BzlOrBxlPath;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
 use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
+use kuro_node::rule_type::NativeRuleKind;
 use kuro_node::rule_type::RuleType;
 use kuro_node::rule_type::StarlarkRuleType;
 use kuro_query::query::syntax::simple::eval::label_indexed::LabelIndexedSet;
@@ -356,6 +357,23 @@ async fn get_analysis_result_inner(
 
             ((res, now), spans)
         }
+        RuleType::Native(kind) => {
+            // Native rules are built-in rules like filegroup that don't have Starlark implementations.
+            // For now, native rules should use Starlark implementations loaded from bazel_tools.
+            // This match arm handles the case where a target was registered with RuleType::Native
+            // but analysis is attempted. In the current implementation, we use Starlark filegroup
+            // instead, so this path shouldn't be reached.
+            let now = TimeSpan::start_now();
+            let (res, spans) = record_root_spans(|| {
+                Err(internal_error!(
+                    "Native rule {:?} analysis not yet implemented. \
+                     Use Starlark implementation instead.",
+                    kind
+                ))
+            });
+
+            ((res, now), spans)
+        }
     };
 
     ctx.store_evaluation_data(AnalysisKeyActivationData {
@@ -391,6 +409,11 @@ fn all_deps(nodes: &[ConfiguredTargetNode]) -> LabelIndexedSet<ConfiguredTargetN
                 }
                 RuleType::Forward => {
                     // No starlark code ran on forward node.
+                }
+                RuleType::Native(_) => {
+                    // Native rules don't run starlark code for analysis.
+                    // They may still have deps that run starlark.
+                    result.insert(node.dupe());
                 }
             }
 
