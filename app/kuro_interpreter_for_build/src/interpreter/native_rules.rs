@@ -22,6 +22,7 @@ use kuro_core::target::label::label::TargetLabel;
 use kuro_core::target::name::TargetNameRef;
 use kuro_node::attrs::attr::Attribute;
 use kuro_node::attrs::attr_type::AttrType;
+use kuro_node::attrs::attr_type::list::ListLiteral;
 use kuro_node::attrs::attr_type::string::StringLiteral;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::coerced_deps_collector::CoercedDeps;
@@ -165,6 +166,53 @@ mod rule_defs {
             attributes: label_flag_attributes(),
             rule_type: RuleType::Native(NativeRuleKind::LabelFlag),
             rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+        })
+    });
+
+    /// Creates the AttributeSpec for config_setting.
+    /// config_setting has a `constraint_values` attribute (list of deps pointing to
+    /// constraint_value targets) and a `values` attribute (dict of buckconfig values).
+    fn config_setting_attributes() -> AttributeSpec {
+        use kuro_node::attrs::attr_type::dict::DictLiteral;
+        use kuro_node::attrs::attr_type::list::ListLiteral;
+        use kuro_util::arc_str::ArcSlice;
+
+        let constraint_values_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
+            "The set of constraint_values that must be satisfied for this config_setting to match",
+            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
+        );
+
+        let values_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::Dict(
+                DictLiteral(ArcSlice::default()),
+            ))),
+            "A dictionary of configuration values (section.key to value)",
+            AttrType::dict(AttrType::string(), AttrType::string(), false),
+        );
+
+        AttributeSpec::from(
+            vec![
+                ("constraint_values".to_owned(), constraint_values_attr),
+                ("values".to_owned(), values_attr),
+            ],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("config_setting attributes should be valid")
+    }
+
+    /// The Rule definition for config_setting.
+    pub static CONFIG_SETTING_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: config_setting_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::ConfigSetting),
+            rule_kind: RuleKind::Configuration,
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
@@ -421,6 +469,69 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             internals.package(),
             name,
             vec![("build_setting_default".to_owned(), coerced_default)],
+            &visibility.items,
+            &internals.default_visibility(),
+        )?;
+
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+
+    /// Defines a config_setting for use as a key in `select()` statements.
+    ///
+    /// A config_setting matches when all specified constraint values are present
+    /// in the current platform configuration.
+    ///
+    /// Example:
+    /// ```python
+    /// config_setting(
+    ///     name = "linux_x86_64",
+    ///     constraint_values = [
+    ///         "@platforms//os:linux",
+    ///         "@platforms//cpu:x86_64",
+    ///     ],
+    /// )
+    ///
+    /// cc_library(
+    ///     name = "mylib",
+    ///     srcs = select({
+    ///         ":linux_x86_64": ["linux_x86_64_impl.c"],
+    ///         "//conditions:default": ["generic_impl.c"],
+    ///     }),
+    /// )
+    /// ```
+    ///
+    /// See: https://bazel.build/reference/be/general#config_setting
+    fn config_setting<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        constraint_values: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        visibility: UnpackListOrTuple<String>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let internals = ModuleInternals::from_context(eval, "config_setting")?;
+        let coercion_ctx = internals.attr_coercion_context();
+
+        // Coerce each constraint_value label to a dep attribute
+        let coerced_cvs: Vec<CoercedAttr> = constraint_values
+            .items
+            .iter()
+            .map(|cv| {
+                let label = coercion_ctx.coerce_providers_label(cv)?;
+                Ok(CoercedAttr::Dep(label))
+            })
+            .collect::<kuro_error::Result<Vec<_>>>()?;
+
+        let coerced_list = CoercedAttr::List(ListLiteral(kuro_util::arc_str::ArcSlice::from_iter(
+            coerced_cvs,
+        )));
+
+        let target_node = create_native_target_node(
+            rule_defs::CONFIG_SETTING_RULE.clone(),
+            internals.package(),
+            name,
+            vec![("constraint_values".to_owned(), coerced_list)],
             &visibility.items,
             &internals.default_visibility(),
         )?;

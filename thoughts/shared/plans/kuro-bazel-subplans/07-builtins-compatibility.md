@@ -30,7 +30,7 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 | Rule | Description | Kuro Status | Location |
 |------|-------------|-------------|----------|
 | `alias` | Creates alternative name for target | ✓ Implemented (native + prelude) | `native_rules.rs`, `prelude/alias.bzl` |
-| `config_setting` | Matches configuration for `select()` | Needs verification | TBD |
+| `config_setting` | Matches configuration for `select()` | ✓ Implemented (native, with ConfigurationInfo) | `native_rules.rs`, `native_rule_analysis.rs` |
 | `label_flag` | Label-typed build setting | ✓ Implemented (native) | `native_rules.rs`, `native_rule_analysis.rs` |
 | `filegroup` | Groups files under single label | ✓ Exists | `prelude/filegroup.bzl` |
 | `genquery` | Runs query language, outputs results | Not implemented | TBD |
@@ -63,14 +63,14 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 - [ ] Update attribute names/semantics if different
 
 **Phase 7a.2: Platform Rules (Critical for Toolchains)**
-- [ ] Implement `constraint_setting` rule
-- [ ] Implement `constraint_value` rule
+- [x] Implement `constraint_setting` rule
+- [x] Implement `constraint_value` rule
 - [ ] Implement `platform` rule
 - [ ] Implement `toolchain` rule
 - [ ] Implement `toolchain_type` rule
 
 **Phase 7a.3: Missing Rules**
-- [ ] Implement `config_setting` rule (critical for `select()`)
+- [x] Implement `config_setting` rule (critical for `select()`)
 - [ ] Implement `genquery` rule
 - [ ] Implement `sh_library` rule
 - [ ] (Low priority) `starlark_doc_extract`

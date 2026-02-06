@@ -109,3 +109,27 @@ cc_test(
     linkstatic = False,
 )
 
+# =============================================================================
+# Phase 7a: config_setting + select() test
+# =============================================================================
+
+# Define constraint_setting and constraint_value for testing config_setting
+constraint_setting(name = "test_os")
+constraint_value(name = "test_linux", constraint_setting = ":test_os")
+constraint_value(name = "test_macos", constraint_setting = ":test_os")
+
+# Define a config_setting that matches when test_linux is active
+config_setting(
+    name = "is_linux",
+    constraint_values = [":test_linux"],
+)
+
+config_setting(
+    name = "is_macos",
+    constraint_values = [":test_macos"],
+)
+
+# Note: select() with config_setting requires a configured platform.
+# With <unspecified> platform, select() is unsupported.
+# To test select() end-to-end, add a platform() target and set it via --target-platforms.
+

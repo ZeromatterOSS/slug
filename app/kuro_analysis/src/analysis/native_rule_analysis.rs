@@ -24,11 +24,14 @@ use kuro_build_api::analysis::registry::RecordedAnalysisValues;
 use kuro_build_api::dynamic::storage::DYNAMIC_LAMBDA_PARAMS_STORAGES;
 use kuro_build_api::interpreter::rule_defs::platform_common::ConstraintValueInfoInstance;
 use kuro_build_api::interpreter::rule_defs::platform_common::ConstraintValueInfoProvider;
+use kuro_build_api::interpreter::rule_defs::provider::FrozenBuiltinProviderLike;
+use kuro_build_api::interpreter::rule_defs::provider::builtin::configuration_info::FrozenConfigurationInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::FrozenDefaultInfo;
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::deferred::key::DeferredHolderKey;
+use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_error::internal_error;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
@@ -48,12 +51,15 @@ pub fn analyze_native_rule(
 ) -> kuro_error::Result<AnalysisResult> {
     match kind {
         NativeRuleKind::ConstraintSetting => analyze_constraint_setting(target, configured_node),
-        NativeRuleKind::ConstraintValue => analyze_constraint_value(target, configured_node),
+        NativeRuleKind::ConstraintValue => {
+            analyze_constraint_value(target, configured_node, dep_analysis)
+        }
         NativeRuleKind::Filegroup => Err(internal_error!(
             "Native filegroup analysis not implemented. Use Starlark filegroup instead."
         )),
         NativeRuleKind::Alias => analyze_alias(target, dep_analysis),
         NativeRuleKind::LabelFlag => analyze_label_flag(target, dep_analysis),
+        NativeRuleKind::ConfigSetting => analyze_config_setting(target, dep_analysis),
     }
 }
 
@@ -68,25 +74,36 @@ fn analyze_constraint_setting(
 }
 
 /// Analyze a constraint_value target.
-/// Returns DefaultInfo and ConstraintValueInfo so that
-/// `target[platform_common.ConstraintValueInfo]` works.
+/// Returns DefaultInfo, ConstraintValueInfo, and ConfigurationInfo so that
+/// `target[platform_common.ConstraintValueInfo]` works and config_setting
+/// can extract constraint data from deps.
 fn analyze_constraint_value(
     target: &ConfiguredTargetLabel,
     _configured_node: ConfiguredTargetNodeRef<'_>,
+    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
 ) -> kuro_error::Result<AnalysisResult> {
     let heap = FrozenHeap::new();
 
     // Create DefaultInfo (empty)
     let default_info = FrozenDefaultInfo::testing_empty(&heap);
 
+    // Extract constraint_setting label from dep_analysis.
+    // constraint_value has exactly one dep: its constraint_setting.
+    let constraint_setting_label = if !dep_analysis.is_empty() {
+        dep_analysis[0].0.unconfigured().to_string()
+    } else {
+        String::new()
+    };
+
     // Create ConstraintValueInfo with the target's label
     let constraint_value_info = heap.alloc(ConstraintValueInfoInstance {
-        constraint_setting_label: String::new(), // TODO: resolve from constraint_setting attr
+        constraint_setting_label,
         label: target.unconfigured().to_string(),
     });
 
-    // Build provider collection with DefaultInfo and ConstraintValueInfo
-    let providers = SmallMap::from_iter([
+    // Create ConfigurationInfo with one constraint pair (cs→cv)
+    // so that config_setting can merge constraints from deps.
+    let mut providers = SmallMap::from_iter([
         (
             DefaultInfoCallable::provider_id().dupe(),
             default_info.to_frozen_value(),
@@ -96,6 +113,17 @@ fn analyze_constraint_value(
             constraint_value_info,
         ),
     ]);
+
+    if !dep_analysis.is_empty() {
+        let cs_label = dep_analysis[0].0.unconfigured().dupe();
+        let cv_label = ProvidersLabel::default_for(target.unconfigured().dupe());
+        let config_info =
+            FrozenConfigurationInfo::for_native_config_setting(&[(cs_label, cv_label)], &heap);
+        providers.insert(
+            FrozenConfigurationInfo::builtin_provider_id().dupe(),
+            config_info,
+        );
+    }
 
     let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
         heap.alloc(FrozenProviderCollection::new(providers)),
@@ -156,6 +184,85 @@ fn analyze_label_flag(
             dep_analysis.len()
         ))
     }
+}
+
+/// Analyze a config_setting target.
+/// Creates a ConfigurationInfo provider by merging constraint data from all
+/// constraint_value deps. This allows `select()` to match against the config_setting.
+fn analyze_config_setting(
+    target: &ConfiguredTargetLabel,
+    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+) -> kuro_error::Result<AnalysisResult> {
+    let heap = FrozenHeap::new();
+
+    // Create DefaultInfo (empty)
+    let default_info = FrozenDefaultInfo::testing_empty(&heap);
+
+    // Collect constraint pairs from each constraint_value dep's ConfigurationInfo.
+    let mut all_constraint_pairs = Vec::new();
+    for (_dep_label, dep_result) in &dep_analysis {
+        if let Ok(providers) = dep_result.providers() {
+            if let Some(config_info) = providers
+                .value()
+                .builtin_provider::<FrozenConfigurationInfo>()
+            {
+                let config_data = config_info.to_config_setting_data();
+                for (ck, cv) in config_data.constraints {
+                    all_constraint_pairs.push((ck.key.dupe(), cv.0.dupe()));
+                }
+            }
+        }
+    }
+
+    // Create merged ConfigurationInfo with all constraint pairs
+    let config_info =
+        FrozenConfigurationInfo::for_native_config_setting(&all_constraint_pairs, &heap);
+
+    let mut providers = SmallMap::from_iter([(
+        DefaultInfoCallable::provider_id().dupe(),
+        default_info.to_frozen_value(),
+    )]);
+    providers.insert(
+        FrozenConfigurationInfo::builtin_provider_id().dupe(),
+        config_info,
+    );
+
+    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+        heap.alloc(FrozenProviderCollection::new(providers)),
+    )?;
+
+    // Create analysis storage
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+
+    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+        value: FrozenAnalysisValueStorage::new_native(
+            self_key.dupe(),
+            DYNAMIC_LAMBDA_PARAMS_STORAGES
+                .get()
+                .unwrap()
+                .new_frozen_dynamic_lambda_params_storage(),
+            Some(provider_collection),
+        ),
+    });
+
+    let heap_ref = heap.into_ref();
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
+
+    let recorded_values = RecordedAnalysisValues::new_native(
+        self_key,
+        Some(analysis_storage),
+        RecordedActions::new(0),
+    );
+
+    Ok(AnalysisResult::new(
+        recorded_values,
+        None,
+        HashMap::new(),
+        0,
+        0,
+        None,
+    ))
 }
 
 /// Analyze an alias target.

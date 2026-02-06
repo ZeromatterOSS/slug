@@ -27,6 +27,9 @@ use starlark::environment::MethodsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::values::Freeze;
+use starlark::values::FrozenHeap;
+use starlark::values::FrozenValue;
+use starlark::values::FrozenValueOfUnchecked;
 use starlark::values::Heap;
 use starlark::values::Trace;
 use starlark::values::UnpackAndDiscard;
@@ -139,6 +142,54 @@ impl<'v> ConfigurationInfo<'v> {
             constraints: ValueOfUnchecked::new(heap.alloc(constraints)),
             values: heap.alloc_typed_unchecked(AllocDict([("", ""); 0])).cast(),
         }
+    }
+}
+
+impl FrozenConfigurationInfo {
+    /// Create a frozen ConfigurationInfo for a config_setting or constraint_value native rule.
+    ///
+    /// Takes pairs of (constraint_setting_label, constraint_value_providers_label) and creates
+    /// a ConfigurationInfo with the constraints dict populated.
+    pub fn for_native_config_setting(
+        constraint_pairs: &[(
+            kuro_core::target::label::label::TargetLabel,
+            kuro_core::provider::label::ProvidersLabel,
+        )],
+        heap: &FrozenHeap,
+    ) -> FrozenValue {
+        use crate::interpreter::rule_defs::provider::builtin::constraint_setting_info::FrozenConstraintSettingInfo;
+
+        let mut constraints_map = SmallMap::<FrozenValue, FrozenValue>::new();
+
+        for (cs_label, cv_label) in constraint_pairs {
+            // Create the constraint setting info
+            let cs_info_frozen =
+                FrozenConstraintSettingInfo::create_on_frozen_heap(cs_label.dupe(), heap);
+
+            // Get the StarlarkTargetLabel from the constraint setting info for use as dict key
+            let cs_starlark_label = heap.alloc(StarlarkTargetLabel::new(cs_label.dupe()));
+
+            // Create the constraint value info
+            let cv_info_frozen = FrozenConstraintValueInfo::create_on_frozen_heap(
+                cs_info_frozen,
+                cv_label.dupe(),
+                heap,
+            );
+
+            constraints_map.insert_hashed(cs_starlark_label.get_hashed().unwrap(), cv_info_frozen);
+        }
+
+        // Create the constraints dict
+        let constraints_dict = heap.alloc(constraints_map);
+
+        // Create empty values dict
+        let empty_values = heap.alloc(SmallMap::<FrozenValue, FrozenValue>::new());
+
+        // Create ConfigurationInfo
+        heap.alloc(ConfigurationInfoGen::<FrozenValue> {
+            constraints: FrozenValueOfUnchecked::new(constraints_dict),
+            values: FrozenValueOfUnchecked::new(empty_values),
+        })
     }
 }
 

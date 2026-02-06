@@ -23,6 +23,9 @@ use starlark::any::ProvidesStaticType;
 use starlark::coerce::Coerce;
 use starlark::environment::GlobalsBuilder;
 use starlark::values::Freeze;
+use starlark::values::FrozenHeap;
+use starlark::values::FrozenValue;
+use starlark::values::FrozenValueOfUnchecked;
 use starlark::values::Heap;
 use starlark::values::Trace;
 use starlark::values::UnpackValue;
@@ -94,6 +97,25 @@ impl<'v> ConstraintValueInfo<'v> {
             }
             None => None,
         }
+    }
+}
+
+impl FrozenConstraintValueInfo {
+    /// Create a frozen ConstraintValueInfo on the given frozen heap.
+    /// Used for native rule analysis (config_setting).
+    ///
+    /// `setting_frozen` should be a FrozenValue containing a FrozenConstraintSettingInfo.
+    /// `label` is the ProvidersLabel for this constraint value target.
+    pub(crate) fn create_on_frozen_heap(
+        setting_frozen: FrozenValue,
+        label: kuro_core::provider::label::ProvidersLabel,
+        heap: &FrozenHeap,
+    ) -> FrozenValue {
+        let label_val = heap.alloc(StarlarkProvidersLabel::new(label));
+        heap.alloc(ConstraintValueInfoGen::<FrozenValue> {
+            setting: FrozenValueOfUnchecked::new(setting_frozen),
+            label: FrozenValueOfUnchecked::new(label_val),
+        })
     }
 }
 
