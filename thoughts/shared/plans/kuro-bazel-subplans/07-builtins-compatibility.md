@@ -29,8 +29,9 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 
 | Rule | Description | Kuro Status | Location |
 |------|-------------|-------------|----------|
-| `alias` | Creates alternative name for target | ✓ Exists | `prelude/alias.bzl` |
+| `alias` | Creates alternative name for target | ✓ Implemented (native + prelude) | `native_rules.rs`, `prelude/alias.bzl` |
 | `config_setting` | Matches configuration for `select()` | Needs verification | TBD |
+| `label_flag` | Label-typed build setting | ✓ Implemented (native) | `native_rules.rs`, `native_rule_analysis.rs` |
 | `filegroup` | Groups files under single label | ✓ Exists | `prelude/filegroup.bzl` |
 | `genquery` | Runs query language, outputs results | Not implemented | TBD |
 | `genrule` | Generic build rule using shell | ✓ Exists | `prelude/genrule.bzl` |

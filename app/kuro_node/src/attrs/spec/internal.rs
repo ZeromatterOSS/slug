@@ -19,6 +19,7 @@ use starlark_map::ordered_set::OrderedSet;
 use crate::attrs::attr::Attribute;
 use crate::attrs::attr_type::AttrType;
 use crate::attrs::attr_type::any::AnyAttrType;
+use crate::attrs::attr_type::bool::BoolLiteral;
 use crate::attrs::attr_type::configuration_dep::ConfigurationDepKind;
 use crate::attrs::coerced_attr::CoercedAttr;
 use crate::attrs::configurable::AttrIsConfigurable;
@@ -175,7 +176,67 @@ pub(crate) const TARGET_MODIFIERS_ATTRIBUTE: InternalAttribute = InternalAttribu
     is_configurable: AttrIsConfigurable::No,
 };
 
-const INTERNAL_ATTRS: [InternalAttribute; 10] = [
+/// Bazel-compatible `tags` attribute.
+/// A list of strings used for filtering and grouping targets.
+pub const TAGS_ATTRIBUTE: InternalAttribute = InternalAttribute {
+    id: AttributeId(10),
+    name: "tags",
+    attr: || {
+        Attribute::new(
+            Some(Arc::new(AnyAttrType::empty_list())),
+            "a list of string tags for this target",
+            AttrType::list(AttrType::string()),
+        )
+    },
+    is_configurable: AttrIsConfigurable::No,
+};
+
+/// Bazel-compatible `testonly` attribute.
+/// If True, only testonly targets can depend on this target.
+pub const TESTONLY_ATTRIBUTE: InternalAttribute = InternalAttribute {
+    id: AttributeId(11),
+    name: "testonly",
+    attr: || {
+        Attribute::new(
+            Some(Arc::new(CoercedAttr::Bool(BoolLiteral(false)))),
+            "if True, only testonly targets can depend on this target",
+            AttrType::bool(),
+        )
+    },
+    is_configurable: AttrIsConfigurable::No,
+};
+
+/// Bazel-compatible `deprecation` attribute.
+/// A string warning message when other targets depend on this one.
+pub const DEPRECATION_ATTRIBUTE: InternalAttribute = InternalAttribute {
+    id: AttributeId(12),
+    name: "deprecation",
+    attr: || {
+        Attribute::new(
+            Some(Arc::new(CoercedAttr::None)),
+            "a deprecation warning message for this target",
+            AttrType::option(AttrType::string()),
+        )
+    },
+    is_configurable: AttrIsConfigurable::No,
+};
+
+/// Bazel-compatible `features` attribute.
+/// A list of feature strings to enable/disable for this target.
+pub const FEATURES_ATTRIBUTE: InternalAttribute = InternalAttribute {
+    id: AttributeId(13),
+    name: "features",
+    attr: || {
+        Attribute::new(
+            Some(Arc::new(AnyAttrType::empty_list())),
+            "a list of feature strings to enable/disable for this target",
+            AttrType::list(AttrType::string()),
+        )
+    },
+    is_configurable: AttrIsConfigurable::No,
+};
+
+const INTERNAL_ATTRS: [InternalAttribute; 14] = [
     NAME_ATTRIBUTE,
     DEFAULT_TARGET_PLATFORM_ATTRIBUTE,
     TARGET_COMPATIBLE_WITH_ATTRIBUTE,
@@ -186,6 +247,10 @@ const INTERNAL_ATTRS: [InternalAttribute; 10] = [
     METADATA_ATTRIBUTE,
     TESTS_ATTRIBUTE,
     TARGET_MODIFIERS_ATTRIBUTE,
+    TAGS_ATTRIBUTE,
+    TESTONLY_ATTRIBUTE,
+    DEPRECATION_ATTRIBUTE,
+    FEATURES_ATTRIBUTE,
 ];
 
 pub struct OptionalInternalAttribute {
@@ -217,7 +282,7 @@ const fn to_optional(attr: InternalAttribute) -> OptionalInternalAttribute {
 }
 
 /// Includes optional internal attrs
-const ALL_INTERNAL_ATTRS: [OptionalInternalAttribute; 11] = [
+const ALL_INTERNAL_ATTRS: [OptionalInternalAttribute; 15] = [
     to_optional(NAME_ATTRIBUTE),
     to_optional(DEFAULT_TARGET_PLATFORM_ATTRIBUTE),
     to_optional(TARGET_COMPATIBLE_WITH_ATTRIBUTE),
@@ -228,6 +293,10 @@ const ALL_INTERNAL_ATTRS: [OptionalInternalAttribute; 11] = [
     to_optional(METADATA_ATTRIBUTE),
     to_optional(TESTS_ATTRIBUTE),
     to_optional(TARGET_MODIFIERS_ATTRIBUTE),
+    to_optional(TAGS_ATTRIBUTE),
+    to_optional(TESTONLY_ATTRIBUTE),
+    to_optional(DEPRECATION_ATTRIBUTE),
+    to_optional(FEATURES_ATTRIBUTE),
     INCOMING_TRANSITION_ATTRIBUTE,
 ];
 

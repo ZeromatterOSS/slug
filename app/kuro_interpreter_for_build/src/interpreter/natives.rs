@@ -23,6 +23,7 @@ use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
 
 use crate::interpreter::build_context::BuildContext;
+use crate::interpreter::build_context::PerFileTypeContext;
 use crate::interpreter::globspec::GlobSpec;
 use crate::interpreter::module_internals::ModuleInternals;
 
@@ -48,40 +49,48 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(require = pos)] label_string: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StringValue<'v>> {
-        // Handle absolute labels (starting with @ or //)
-        // These don't need package context
+        // In Bazel, Label() resolves relative to the file where it appears:
+        // - In a .bzl file: // resolves to the .bzl file's repository
+        // - In a BUILD file: // resolves to the BUILD file's repository
+        // This is critical for rules packages (e.g., rules_cc) that use
+        // Label("//:target") to refer to their own repo's targets.
+        let build_ctx = BuildContext::from_context(eval)?;
+
+        // Use starlark_path().cell() which returns:
+        // - For .bzl files: the .bzl file's cell (e.g., "rules_cc")
+        // - For BUILD files: the BUILD file's cell (e.g., "manual_test")
+        let file_cell = build_ctx.starlark_path().cell();
+
         let resolved = if label_string.starts_with('@') {
             // Already fully qualified with repository
             label_string.to_owned()
         } else if label_string.starts_with("//") {
-            // Absolute path within some repo - in .bzl file context, assume main repo
-            // Get the cell/repo context if available
-            match BuildContext::from_context(eval) {
-                Ok(build_ctx) => {
-                    let cell_name = build_ctx.cell_info().name();
-                    format!("@{}{}", cell_name, label_string)
-                }
-                Err(_) => {
-                    // No build context available, return as-is
-                    label_string.to_owned()
-                }
-            }
-        } else if let Some(target) = label_string.strip_prefix(':') {
-            // Relative target in current package - requires build context
-            let build_ctx = BuildContext::from_context(eval)?;
-            let base_path = build_ctx.base_path()?;
-            let cell_name = build_ctx.cell_info().name();
-            format!("@{}//{}:{}", cell_name, base_path.path(), target)
+            // Absolute path within the current file's repository
+            format!("@{}{}", file_cell, label_string)
         } else {
-            // Treat as relative target in current package - requires build context
-            let build_ctx = BuildContext::from_context(eval)?;
-            let base_path = build_ctx.base_path()?;
-            let cell_name = build_ctx.cell_info().name();
-            format!("@{}//{}:{}", cell_name, base_path.path(), label_string)
+            // Relative label (:target or bare target)
+            // Get the package path based on the current file type
+            let pkg_path = match &build_ctx.additional {
+                PerFileTypeContext::Build(module) => module
+                    .buildfile_path()
+                    .package()
+                    .to_cell_path()
+                    .path()
+                    .as_str()
+                    .to_owned(),
+                PerFileTypeContext::Bzl(bzl_ctx) => {
+                    // For .bzl files, the "package" is the directory containing the .bzl file
+                    bzl_ctx.bzl_path.path_parent().path().as_str().to_owned()
+                }
+                _ => {
+                    // For other file types, try base_path as fallback
+                    build_ctx.base_path()?.path().as_str().to_owned()
+                }
+            };
+            let target = label_string.strip_prefix(':').unwrap_or(label_string);
+            format!("@{}//{}:{}", file_cell, pkg_path, target)
         };
 
-        // Return as a string for now - full Label type integration would require
-        // parsing and resolving the label through the cell resolver
         // TODO(label): Return actual StarlarkTargetLabel once label resolution is wired up
         Ok(eval.heap().alloc_str(&resolved))
     }

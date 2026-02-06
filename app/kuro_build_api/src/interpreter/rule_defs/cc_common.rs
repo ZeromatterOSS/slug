@@ -1398,9 +1398,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             for dir in iterate_value(dirs, eval) {
                 if let Some(dir_str) = dir.unpack_str() {
                     if !dir_str.is_empty() {
-                        args.push(
-                            heap.alloc_str(&format!("-L{}", dir_str)).to_value(),
-                        );
+                        args.push(heap.alloc_str(&format!("-L{}", dir_str)).to_value());
                         lib_search_dirs.push(dir_str.to_owned());
                     }
                 }
@@ -1550,7 +1548,10 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             let path_str = if let Some(s) = v.unpack_str() {
                 s.to_owned()
             } else if let Ok(Some(path_attr)) = v.get_attr("path", heap) {
-                path_attr.unpack_str().map(|s| s.to_owned()).unwrap_or_else(|| v.to_str())
+                path_attr
+                    .unpack_str()
+                    .map(|s| s.to_owned())
+                    .unwrap_or_else(|| v.to_str())
             } else {
                 v.to_str()
             };

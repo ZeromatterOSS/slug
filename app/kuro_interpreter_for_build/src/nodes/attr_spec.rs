@@ -143,7 +143,7 @@ impl AttributeSpecExt for AttributeSpec {
                 if attr_is_visibility {
                     if coerced == CoercedValue::Default {
                         coerced = CoercedValue::Custom(CoercedAttr::Visibility(
-                            internals.super_package.visibility().dupe(),
+                            internals.default_visibility(),
                         ));
                     }
                 } else if attr_is_within_view {
@@ -161,9 +161,11 @@ impl AttributeSpecExt for AttributeSpec {
                     CoercedValue::Default => {}
                 }
             } else if attr_is_visibility {
+                // Use default_visibility() which checks package(default_visibility) first,
+                // then falls back to super_package.visibility()
                 attr_values.push_sorted(
                     attr_idx,
-                    CoercedAttr::Visibility(internals.super_package.visibility().dupe()),
+                    CoercedAttr::Visibility(internals.default_visibility()),
                 );
             } else if attr_is_within_view {
                 attr_values.push_sorted(

@@ -303,6 +303,8 @@ Check Kuro's existing runfiles implementation and align API.
 - [x] `artifact[Provider]` indexing works (returns synthetic DefaultInfo)
 - [ ] Runfiles are collected correctly
 - [x] All documented ctx methods available (implemented 2026-02-02: ctx.file, ctx.files, ctx.executable, ctx.bin_dir, ctx.genfiles_dir, ctx.workspace_name, ctx.build_file_path, ctx.var)
+- [x] ctx.files.<attr> extracts File objects from dependencies (fixed 2026-02-05: CtxFiles/CtxFile now extract DefaultInfo.default_outputs from Dependency objects)
+- [x] Label() in .bzl files resolves relative to .bzl file's repository (fixed 2026-02-05: uses starlark_path().cell() instead of cell_info().name())
 
 #### Manual Verification:
 

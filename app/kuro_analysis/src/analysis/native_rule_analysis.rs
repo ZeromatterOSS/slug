@@ -53,6 +53,7 @@ pub fn analyze_native_rule(
             "Native filegroup analysis not implemented. Use Starlark filegroup instead."
         )),
         NativeRuleKind::Alias => analyze_alias(target, dep_analysis),
+        NativeRuleKind::LabelFlag => analyze_label_flag(target, dep_analysis),
     }
 }
 
@@ -132,6 +133,29 @@ fn analyze_constraint_value(
         0,
         None,
     ))
+}
+
+/// Analyze a label_flag target.
+/// A label_flag forwards all providers from its `build_setting_default` target.
+/// This is similar to alias - it acts as a configurable indirection.
+fn analyze_label_flag(
+    target: &ConfiguredTargetLabel,
+    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+) -> kuro_error::Result<AnalysisResult> {
+    // label_flag has exactly one dep (build_setting_default), forward its providers
+    if dep_analysis.len() == 1 {
+        let (_default_label, default_result) = dep_analysis.into_iter().next().unwrap();
+        Ok(default_result)
+    } else if dep_analysis.is_empty() {
+        // No deps resolved - return minimal DefaultInfo
+        create_minimal_analysis_result(target)
+    } else {
+        Err(internal_error!(
+            "label_flag target {} has {} dependencies. Expected exactly one 'build_setting_default' dependency.",
+            target,
+            dep_analysis.len()
+        ))
+    }
 }
 
 /// Analyze an alias target.

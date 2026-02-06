@@ -1386,27 +1386,53 @@ impl<'v> StarlarkValue<'v> for CtxFiles<'v> {
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        use crate::interpreter::rule_defs::provider::dependency::Dependency;
+        use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
+        use starlark::values::list::AllocList;
+        use starlark::values::list::ListRef;
+
         // Get the attribute value from attrs
-        // Value::get_attr returns Result<Option<Value>, Error>, we ignore errors
         let attr_value = self.attrs.get_attr(attribute, heap).ok().flatten()?;
 
-        // Extract files from the attribute value
-        // If it's a list, return it as-is (assuming list of artifacts/deps)
-        // If it's a single value, wrap it in a list
-        // If it's None, return empty list
         if attr_value.is_none() {
-            use starlark::values::list::AllocList;
             return Some(heap.alloc(AllocList::EMPTY));
         }
 
-        // Check if it's already a list
-        if starlark::values::list::ListRef::from_value(attr_value).is_some() {
-            // It's already a list, return as-is
-            // The list should contain artifacts/deps
-            Some(attr_value)
+        // Helper: extract default output files from a dependency value
+        let extract_files = |v: Value<'v>, files: &mut Vec<Value<'v>>| {
+            let pc = if let Some(dep) = v.downcast_ref::<Dependency>() {
+                Some(dep.provider_collection())
+            } else if let Some(dep) = v.downcast_ref::<FrozenDependency>() {
+                Some(dep.provider_collection())
+            } else {
+                None
+            };
+            if let Some(pc) = pc {
+                if let Ok(di) = pc.default_info() {
+                    let raw = di.default_outputs_raw();
+                    if let Some(list) = ListRef::from_frozen_value(raw) {
+                        for item in list.iter() {
+                            files.push(item);
+                        }
+                    }
+                }
+            } else {
+                // Not a dependency - include as-is (already an artifact)
+                files.push(v);
+            }
+        };
+
+        if let Some(list) = ListRef::from_value(attr_value) {
+            let mut files = Vec::new();
+            for item in list.iter() {
+                extract_files(item, &mut files);
+            }
+            Some(heap.alloc(files))
         } else {
-            // Single value - wrap in a list
-            Some(heap.alloc(vec![attr_value]))
+            // Single value (e.g. single label attribute)
+            let mut files = Vec::new();
+            extract_files(attr_value, &mut files);
+            Some(heap.alloc(files))
         }
     }
 }
@@ -1449,25 +1475,50 @@ impl<'v> StarlarkValue<'v> for CtxFile<'v> {
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        // Get the attribute value from attrs
-        // Value::get_attr returns Result<Option<Value>, Error>, we ignore errors
+        use crate::interpreter::rule_defs::provider::dependency::Dependency;
+        use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
+        use starlark::values::list::ListRef;
+
         let attr_value = self.attrs.get_attr(attribute, heap).ok().flatten()?;
 
-        // If it's None, return None
         if attr_value.is_none() {
             return Some(Value::new_none());
         }
 
-        // If it's a list, return the first element (or None if empty)
-        if let Some(list) = starlark::values::list::ListRef::from_value(attr_value) {
+        // Extract the first file from a dependency or artifact value
+        let extract_first_file = |v: Value<'v>| -> Value<'v> {
+            let pc = if let Some(dep) = v.downcast_ref::<Dependency>() {
+                Some(dep.provider_collection())
+            } else if let Some(dep) = v.downcast_ref::<FrozenDependency>() {
+                Some(dep.provider_collection())
+            } else {
+                None
+            };
+            if let Some(pc) = pc {
+                if let Ok(di) = pc.default_info() {
+                    let raw = di.default_outputs_raw();
+                    if let Some(list) = ListRef::from_frozen_value(raw) {
+                        if !list.is_empty() {
+                            return list.content()[0];
+                        }
+                    }
+                }
+                Value::new_none()
+            } else {
+                v
+            }
+        };
+
+        // If it's a list, get first element and extract file from it
+        if let Some(list) = ListRef::from_value(attr_value) {
             if list.is_empty() {
                 return Some(Value::new_none());
             }
-            return Some(list.content()[0]);
+            return Some(extract_first_file(list.content()[0]));
         }
 
-        // Single value - return as-is
-        Some(attr_value)
+        // Single value - extract file from it
+        Some(extract_first_file(attr_value))
     }
 }
 

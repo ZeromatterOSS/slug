@@ -141,6 +141,35 @@ mod rule_defs {
             is_test: false,
         })
     });
+
+    /// Creates the AttributeSpec for label_flag.
+    /// label_flag has a required `build_setting_default` attribute pointing to a target.
+    fn label_flag_attributes() -> AttributeSpec {
+        let default_attr = Attribute::new(
+            None, // No default - required attribute
+            "The default value for this label flag",
+            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+        );
+
+        AttributeSpec::from(
+            vec![("build_setting_default".to_owned(), default_attr)],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("label_flag attributes should be valid")
+    }
+
+    /// The Rule definition for label_flag.
+    pub static LABEL_FLAG_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: label_flag_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::LabelFlag),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+        })
+    });
 }
 
 /// Bazel-style visibility constants
@@ -350,6 +379,48 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             internals.package(),
             name,
             vec![("actual".to_owned(), coerced_actual)],
+            &visibility.items,
+            &internals.default_visibility(),
+        )?;
+
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+
+    /// Defines a label-typed build setting (label_flag).
+    ///
+    /// A label_flag is a build setting that holds a label value and can be
+    /// overridden on the command line. The target acts as a forwarding dependency
+    /// to its `build_setting_default` target.
+    ///
+    /// Example:
+    /// ```python
+    /// label_flag(
+    ///     name = "link_extra_libs",
+    ///     build_setting_default = ":empty_lib",
+    /// )
+    /// ```
+    ///
+    /// See: https://bazel.build/rules/lib/toplevel/label_flag
+    fn label_flag<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named)] build_setting_default: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        visibility: UnpackListOrTuple<String>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let internals = ModuleInternals::from_context(eval, "label_flag")?;
+        let coercion_ctx = internals.attr_coercion_context();
+
+        // Coerce the build_setting_default label to a dep attribute
+        let label = coercion_ctx.coerce_providers_label(build_setting_default)?;
+        let coerced_default = CoercedAttr::Dep(label);
+
+        let target_node = create_native_target_node(
+            rule_defs::LABEL_FLAG_RULE.clone(),
+            internals.package(),
+            name,
+            vec![("build_setting_default".to_owned(), coerced_default)],
             &visibility.items,
             &internals.default_visibility(),
         )?;

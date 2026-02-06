@@ -64,16 +64,6 @@ test_bazel_label_list(
 load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary")
 load(":debug_cc_library.bzl", "debug_cc_library")
 
-# WORKAROUND: rules_cc's cc_binary.bzl uses Label("//:link_extra_lib") which
-# should resolve to @rules_cc//:link_extra_lib, but due to Label resolution
-# currently using BUILD file context instead of .bzl file context, it resolves
-# to this package. Create an empty cc_library to unblock builds.
-# TODO(label): Fix Label() resolution to use .bzl file's repository context.
-cc_library(
-    name = "link_extra_lib",
-    visibility = ["//visibility:public"],
-)
-
 cc_library(
     name = "hello_lib",
     srcs = ["hello.c"],

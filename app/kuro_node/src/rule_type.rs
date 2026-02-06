@@ -58,6 +58,8 @@ pub enum NativeRuleKind {
     ConstraintValue,
     #[display("alias")]
     Alias,
+    #[display("label_flag")]
+    LabelFlag,
 }
 
 impl NativeRuleKind {
@@ -67,6 +69,7 @@ impl NativeRuleKind {
             NativeRuleKind::ConstraintSetting => "constraint_setting",
             NativeRuleKind::ConstraintValue => "constraint_value",
             NativeRuleKind::Alias => "alias",
+            NativeRuleKind::LabelFlag => "label_flag",
         }
     }
 }

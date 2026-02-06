@@ -89,6 +89,10 @@ impl<'v, V: ValueLike<'v>> DependencyGen<V> {
     pub fn label(&self) -> &'v StarlarkConfiguredProvidersLabel {
         StarlarkConfiguredProvidersLabel::from_value(self.label.get().to_value()).unwrap()
     }
+
+    pub fn provider_collection(&self) -> FrozenValueTyped<'static, FrozenProviderCollection> {
+        self.provider_collection
+    }
 }
 
 impl<'v> Dependency<'v> {
