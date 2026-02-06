@@ -771,12 +771,37 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         root_symlinks: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // Return an empty runfiles stub
-        Ok(
-            heap.alloc(
-                crate::interpreter::rule_defs::provider::builtin::default_info::RunfilesStub,
-            ),
-        )
+        let mut runfiles = crate::interpreter::rule_defs::provider::builtin::default_info::create_runfiles(
+            heap,
+            files,
+            transitive_files,
+            symlinks,
+            root_symlinks,
+        )?;
+
+        if collect_default || collect_data {
+            let Some(attrs) = this.0.attrs else {
+                return Ok(runfiles);
+            };
+            let attrs = attrs.get().to_value();
+
+            let mut collect_attr = |name: &str, want_data: bool| -> starlark::Result<()> {
+                if let Some(value) = attrs.get_attr(name, heap).ok().flatten() {
+                    collect_runfiles_from_value(value, want_data, heap, &mut runfiles)?;
+                }
+                Ok(())
+            };
+
+            if collect_default {
+                collect_attr("deps", false)?;
+                collect_attr("runtime_deps", false)?;
+            }
+            if collect_data {
+                collect_attr("data", true)?;
+            }
+        }
+
+        Ok(runfiles)
     }
 
     /// Whether the target platform has the given constraint value (Bazel-compatible).
@@ -793,6 +818,51 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         // No platform constraints configured yet - always return false
         Ok(false)
     }
+}
+
+fn collect_runfiles_from_value<'v>(
+    value: Value<'v>,
+    want_data: bool,
+    heap: Heap<'v>,
+    runfiles: &mut Value<'v>,
+) -> starlark::Result<()> {
+    use starlark::values::list::ListRef;
+
+    use crate::interpreter::rule_defs::provider::builtin::default_info::merge_runfiles_values;
+    use crate::interpreter::rule_defs::provider::dependency::Dependency;
+    use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
+
+    if value.is_none() {
+        return Ok(());
+    }
+
+    if let Some(list) = ListRef::from_value(value) {
+        for item in list.iter() {
+            collect_runfiles_from_value(item, want_data, heap, runfiles)?;
+        }
+        return Ok(());
+    }
+
+    let pc = if let Some(dep) = value.downcast_ref::<Dependency>() {
+        Some(dep.provider_collection())
+    } else if let Some(dep) = value.downcast_ref::<FrozenDependency>() {
+        Some(dep.provider_collection())
+    } else {
+        None
+    };
+
+    if let Some(pc) = pc {
+        if let Ok(di) = pc.default_info() {
+            let dep_runfiles = if want_data {
+                di.data_runfiles_raw().to_value()
+            } else {
+                di.default_runfiles_raw().to_value()
+            };
+            *runfiles = merge_runfiles_values(heap, *runfiles, dep_runfiles)?;
+        }
+    }
+
+    Ok(())
 }
 
 // ============================================================================

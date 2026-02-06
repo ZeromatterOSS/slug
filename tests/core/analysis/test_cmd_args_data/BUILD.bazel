@@ -1,0 +1,5 @@
+load(":defs.bzl", "args_builder")
+
+args_builder(
+    name = "args_builder",
+)

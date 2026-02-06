@@ -201,6 +201,16 @@ pub struct LiveDepsetGen<V: ValueLifetimeless> {
     order: String,
 }
 
+impl<V: ValueLifetimeless> LiveDepsetGen<V> {
+    pub(crate) fn new(direct: V, transitive: V, order: String) -> Self {
+        Self {
+            direct,
+            transitive,
+            order,
+        }
+    }
+}
+
 starlark::starlark_complex_value!(pub LiveDepset);
 
 impl<V: ValueLifetimeless> Display for LiveDepsetGen<V> {

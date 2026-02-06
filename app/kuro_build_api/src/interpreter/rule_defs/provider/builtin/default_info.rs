@@ -44,6 +44,7 @@ use starlark::values::ValueOf;
 use starlark::values::ValueOfUnchecked;
 use starlark::values::ValueOfUncheckedGeneric;
 use starlark::values::dict::AllocDict;
+use starlark::values::dict::DictRef;
 use starlark::values::dict::DictType;
 use starlark::values::dict::FrozenDictRef;
 use starlark::values::dict::UnpackDictEntries;
@@ -155,6 +156,10 @@ pub struct DefaultInfoGen<V: ValueLifetimeless> {
     /// `ArtifactTraversable` can be an `Artifact` (which yields itself), or
     /// `cmd_args`, which expand to all their inputs.
     other_outputs: ValueOfUncheckedGeneric<V, ListType<ValueAsCommandLineLike<'static>>>,
+    /// Default runfiles (Bazel compatibility).
+    default_runfiles: ValueOfUncheckedGeneric<V, FrozenValue>,
+    /// Data runfiles (Bazel compatibility).
+    data_runfiles: ValueOfUncheckedGeneric<V, FrozenValue>,
     /// The executable artifact (Bazel compatibility). When set, this target is runnable
     /// with `kuro run`. Stored as a list with 0 or 1 elements. When present and no
     /// explicit RunInfo is provided, a RunInfo will be synthesized from this executable.
@@ -190,11 +195,15 @@ impl<'v> DefaultInfo<'v> {
         let sub_targets = ValueOfUnchecked::<DictType<_, _>>::new(heap.alloc(AllocDict::EMPTY));
         let default_outputs = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         let other_outputs = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
+        let default_runfiles = ValueOfUnchecked::<FrozenValue>::new(empty_runfiles_value(heap));
+        let data_runfiles = ValueOfUnchecked::<FrozenValue>::new(empty_runfiles_value(heap));
         let executable = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         DefaultInfo {
             sub_targets,
             default_outputs,
             other_outputs,
+            default_runfiles,
+            data_runfiles,
             executable,
         }
     }
@@ -213,11 +222,15 @@ impl<'v> DefaultInfo<'v> {
         let default_outputs =
             ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList([artifact_value])));
         let other_outputs = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
+        let default_runfiles = ValueOfUnchecked::<FrozenValue>::new(empty_runfiles_value(heap));
+        let data_runfiles = ValueOfUnchecked::<FrozenValue>::new(empty_runfiles_value(heap));
         let executable = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         DefaultInfo {
             sub_targets,
             default_outputs,
             other_outputs,
+            default_runfiles,
+            data_runfiles,
             executable,
         }
     }
@@ -236,11 +249,17 @@ impl FrozenDefaultInfo {
             FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         let other_outputs =
             FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
+        let default_runfiles =
+            FrozenValueOfUnchecked::<FrozenValue>::new(empty_runfiles_frozen(heap));
+        let data_runfiles =
+            FrozenValueOfUnchecked::<FrozenValue>::new(empty_runfiles_frozen(heap));
         let executable = FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         FrozenValueTyped::new_err(heap.alloc(FrozenDefaultInfo {
             sub_targets,
             default_outputs,
             other_outputs,
+            default_runfiles,
+            data_runfiles,
             executable,
         }))
         .unwrap()
@@ -333,6 +352,14 @@ impl FrozenDefaultInfo {
 
     pub fn sub_targets_raw(&self) -> FrozenValue {
         self.sub_targets.get()
+    }
+
+    pub fn default_runfiles_raw(&self) -> FrozenValue {
+        self.default_runfiles.get()
+    }
+
+    pub fn data_runfiles_raw(&self) -> FrozenValue {
+        self.data_runfiles.get()
     }
 
     /// Returns the executable artifact if one was specified (Bazel compatibility).
@@ -525,11 +552,9 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
     /// Returns a runfiles object that contains the files needed at runtime.
     #[starlark(attribute)]
     fn default_runfiles<'v>(
-        #[allow(unused_variables)] this: &DefaultInfo<'v>,
-        heap: Heap<'v>,
+        this: &DefaultInfo<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // Return an empty runfiles stub for Bazel compatibility
-        Ok(heap.alloc(RunfilesStub))
+        Ok(this.default_runfiles.get().to_value())
     }
 
     /// Data runfiles for this target (Bazel-compatible).
@@ -537,11 +562,9 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
     /// Returns a runfiles object for when this target is used as a data dependency.
     #[starlark(attribute)]
     fn data_runfiles<'v>(
-        #[allow(unused_variables)] this: &DefaultInfo<'v>,
-        heap: Heap<'v>,
+        this: &DefaultInfo<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // Return an empty runfiles stub for Bazel compatibility
-        Ok(heap.alloc(RunfilesStub))
+        Ok(this.data_runfiles.get().to_value())
     }
 
     /// The executable artifact for this target (Bazel compatibility).
@@ -750,9 +773,28 @@ fn default_info_creator(builder: &mut GlobalsBuilder) {
             })
             .collect::<kuro_error::Result<Vec<(StringValue<'v>, _)>>>()?;
 
-        // Note: default_runfiles, data_runfiles, runfiles are accepted for Bazel compatibility
-        // but not currently used in the Buck2 DefaultInfo model.
-        let _ = (default_runfiles, data_runfiles, runfiles);
+        let mut default_runfiles_value = default_runfiles.into_option();
+        let mut data_runfiles_value = data_runfiles.into_option();
+        let runfiles_value = runfiles.into_option();
+
+        if let Some(runfiles_value) = runfiles_value {
+            if default_runfiles_value.is_none() {
+                default_runfiles_value = Some(runfiles_value);
+            }
+            if data_runfiles_value.is_none() {
+                data_runfiles_value = Some(runfiles_value);
+            }
+        }
+
+        let default_runfiles_value = match default_runfiles_value {
+            Some(value) => validate_runfiles_value(value)?,
+            None => empty_runfiles_value(heap),
+        };
+
+        let data_runfiles_value = match data_runfiles_value {
+            Some(value) => validate_runfiles_value(value)?,
+            None => empty_runfiles_value(heap),
+        };
 
         // Store executable as a list (empty if None, single element if Some)
         // This enables RunInfo synthesis for Bazel compatibility
@@ -770,36 +812,52 @@ fn default_info_creator(builder: &mut GlobalsBuilder) {
             sub_targets: heap
                 .alloc_typed_unchecked(AllocDict(valid_sub_targets))
                 .cast(),
+            default_runfiles: ValueOfUnchecked::<FrozenValue>::new(default_runfiles_value),
+            data_runfiles: ValueOfUnchecked::<FrozenValue>::new(data_runfiles_value),
             executable: valid_executable,
         })
     }
 }
 
 // ============================================================================
-// RunfilesStub - Bazel compatibility for runfiles
+// Runfiles - Bazel-compatible runfiles object
 // ============================================================================
 
-/// A stub for Bazel's runfiles object.
-///
-/// In Bazel, runfiles represent files that are needed at runtime.
-/// This is a minimal stub for compatibility with rules_cc.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct RunfilesStub;
+#[derive(
+    Debug,
+    Clone,
+    Trace,
+    Coerce,
+    Freeze,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative
+)]
+#[repr(C)]
+pub struct RunfilesGen<V: ValueLifetimeless> {
+    files: V,
+    symlinks: V,
+    root_symlinks: V,
+    empty_filenames: V,
+}
 
-impl std::fmt::Display for RunfilesStub {
+starlark::starlark_complex_value!(pub Runfiles);
+
+impl<V: ValueLifetimeless> std::fmt::Display for RunfilesGen<V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<runfiles>")
+        write!(f, "runfiles(...)")
     }
 }
 
-starlark::starlark_simple_value!(RunfilesStub);
-
 #[starlark::values::starlark_value(type = "runfiles")]
-impl<'v> starlark::values::StarlarkValue<'v> for RunfilesStub {
+impl<'v, V: ValueLike<'v>> starlark::values::StarlarkValue<'v> for RunfilesGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
     fn get_methods() -> Option<&'static starlark::environment::Methods> {
         static RES: starlark::environment::MethodsStatic =
             starlark::environment::MethodsStatic::new();
-        RES.methods(runfiles_stub_methods)
+        RES.methods(runfiles_methods)
     }
 
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
@@ -809,42 +867,337 @@ impl<'v> starlark::values::StarlarkValue<'v> for RunfilesStub {
         )
     }
 
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "symlinks" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "root_symlinks" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "empty_filenames" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
+            "files" => Some(self.files.to_value()),
+            "symlinks" => Some(self.symlinks.to_value()),
+            "root_symlinks" => Some(self.root_symlinks.to_value()),
+            "empty_filenames" => Some(self.empty_filenames.to_value()),
             _ => None,
         }
     }
 }
 
+#[derive(Debug, kuro_error::Error)]
+#[kuro(tag = Input)]
+enum RunfilesError {
+    #[error("expected runfiles, got `{0}` (type `{1}`)")]
+    ExpectedRunfiles(String, String),
+    #[error("expected a dict for `{0}`, got `{1}` (type `{2}`)")]
+    ExpectedDict(&'static str, String, String),
+    #[error("expected iterable for `{0}`, got `{1}` (type `{2}`)")]
+    ExpectedIterable(&'static str, String, String),
+}
+
+fn is_depset(value: Value) -> bool {
+    value.get_type() == "depset"
+}
+
+fn normalize_runfiles_files<'v>(
+    files: Value<'v>,
+    transitive_files: Value<'v>,
+    heap: Heap<'v>,
+) -> starlark::Result<Value<'v>> {
+    let files_is_depset = is_depset(files);
+    if files_is_depset && transitive_files.is_none() {
+        return Ok(files);
+    }
+
+    let mut direct_items = Vec::new();
+    if !files.is_none() && !files_is_depset {
+        if let Some(list) = ListRef::from_value(files) {
+            direct_items.extend(list.iter());
+        } else if let Ok(iter) = files.iterate(heap) {
+            direct_items.extend(iter);
+        } else {
+            return Err(
+                kuro_error::Error::from(RunfilesError::ExpectedIterable(
+                    "files",
+                    files.to_repr(),
+                    files.get_type().to_owned(),
+                ))
+                .into(),
+            );
+        }
+    }
+
+    let mut transitive_items = Vec::new();
+    if files_is_depset {
+        transitive_items.push(files);
+    }
+    if !transitive_files.is_none() {
+        if is_depset(transitive_files) {
+            transitive_items.push(transitive_files);
+        } else if let Some(list) = ListRef::from_value(transitive_files) {
+            transitive_items.extend(list.iter());
+        } else if let Ok(iter) = transitive_files.iterate(heap) {
+            transitive_items.extend(iter);
+        } else {
+            return Err(
+                kuro_error::Error::from(RunfilesError::ExpectedIterable(
+                    "transitive_files",
+                    transitive_files.to_repr(),
+                    transitive_files.get_type().to_owned(),
+                ))
+                .into(),
+            );
+        }
+    }
+
+    if direct_items.is_empty() && transitive_items.is_empty() {
+        return Ok(heap.alloc(Depset::empty()));
+    }
+
+    let direct_list = heap.alloc(AllocList(direct_items));
+    let transitive_list = heap.alloc(AllocList(transitive_items));
+    Ok(heap.alloc(LiveDepsetGen::new(
+        direct_list,
+        transitive_list,
+        "default".to_owned(),
+    )))
+}
+
+fn normalize_runfiles_dict<'v>(
+    field: &'static str,
+    value: Value<'v>,
+    heap: Heap<'v>,
+) -> starlark::Result<Value<'v>> {
+    if value.is_none() {
+        return Ok(heap.alloc(AllocDict::EMPTY));
+    }
+    if DictRef::from_value(value).is_some() {
+        Ok(value)
+    } else {
+        Err(
+            kuro_error::Error::from(RunfilesError::ExpectedDict(
+                field,
+                value.to_repr(),
+                value.get_type().to_owned(),
+            ))
+            .into(),
+        )
+    }
+}
+
+fn union_depsets<'v>(heap: Heap<'v>, depsets: Vec<Value<'v>>) -> Value<'v> {
+    if depsets.is_empty() {
+        return heap.alloc(Depset::empty());
+    }
+    if depsets.len() == 1 {
+        return depsets[0];
+    }
+    let transitive_list = heap.alloc(AllocList(depsets));
+    let direct_list = heap.alloc(AllocList::EMPTY);
+    heap.alloc(LiveDepsetGen::new(
+        direct_list,
+        transitive_list,
+        "default".to_owned(),
+    ))
+}
+
+fn merge_runfiles_dicts<'v>(
+    field: &'static str,
+    heap: Heap<'v>,
+    left: Value<'v>,
+    right: Value<'v>,
+) -> starlark::Result<Value<'v>> {
+    let left_dict = DictRef::from_value(left).ok_or_else(|| {
+        kuro_error::Error::from(RunfilesError::ExpectedDict(
+            field,
+            left.to_repr(),
+            left.get_type().to_owned(),
+        ))
+    })?;
+    let right_dict = DictRef::from_value(right).ok_or_else(|| {
+        kuro_error::Error::from(RunfilesError::ExpectedDict(
+            field,
+            right.to_repr(),
+            right.get_type().to_owned(),
+        ))
+    })?;
+
+    let mut entries = Vec::with_capacity(left_dict.len() + right_dict.len());
+    for (key, value) in left_dict.iter() {
+        entries.push((key, value));
+    }
+    for (key, value) in right_dict.iter() {
+        entries.push((key, value));
+    }
+
+    Ok(heap.alloc(AllocDict(entries)))
+}
+
+fn merge_runfiles<'v>(
+    heap: Heap<'v>,
+    left: &Runfiles<'v>,
+    right: &Runfiles<'v>,
+) -> starlark::Result<Value<'v>> {
+    let files = union_depsets(
+        heap,
+        vec![left.files.to_value(), right.files.to_value()],
+    );
+    let empty_filenames = union_depsets(
+        heap,
+        vec![left.empty_filenames.to_value(), right.empty_filenames.to_value()],
+    );
+    let symlinks = merge_runfiles_dicts(
+        "symlinks",
+        heap,
+        left.symlinks.to_value(),
+        right.symlinks.to_value(),
+    )?;
+    let root_symlinks = merge_runfiles_dicts(
+        "root_symlinks",
+        heap,
+        left.root_symlinks.to_value(),
+        right.root_symlinks.to_value(),
+    )?;
+
+    Ok(heap.alloc(RunfilesGen {
+        files,
+        symlinks,
+        root_symlinks,
+        empty_filenames,
+    }))
+}
+
+pub fn empty_runfiles_value<'v>(heap: Heap<'v>) -> Value<'v> {
+    let files = heap.alloc(Depset::empty());
+    let symlinks = heap.alloc(AllocDict::EMPTY);
+    let root_symlinks = heap.alloc(AllocDict::EMPTY);
+    let empty_filenames = heap.alloc(Depset::empty());
+    heap.alloc(RunfilesGen {
+        files,
+        symlinks,
+        root_symlinks,
+        empty_filenames,
+    })
+}
+
+fn empty_runfiles_frozen(heap: &FrozenHeap) -> FrozenValue {
+    let files = heap.alloc(Depset::empty());
+    let symlinks = heap.alloc(AllocDict::EMPTY);
+    let root_symlinks = heap.alloc(AllocDict::EMPTY);
+    let empty_filenames = heap.alloc(Depset::empty());
+    heap.alloc(RunfilesGen {
+        files,
+        symlinks,
+        root_symlinks,
+        empty_filenames,
+    })
+}
+
+pub fn create_runfiles<'v>(
+    heap: Heap<'v>,
+    files: Value<'v>,
+    transitive_files: Value<'v>,
+    symlinks: Value<'v>,
+    root_symlinks: Value<'v>,
+) -> starlark::Result<Value<'v>> {
+    let normalized_files = normalize_runfiles_files(files, transitive_files, heap)?;
+    let normalized_symlinks = normalize_runfiles_dict("symlinks", symlinks, heap)?;
+    let normalized_root_symlinks =
+        normalize_runfiles_dict("root_symlinks", root_symlinks, heap)?;
+    let empty_filenames = heap.alloc(Depset::empty());
+
+    Ok(heap.alloc(RunfilesGen {
+        files: normalized_files,
+        symlinks: normalized_symlinks,
+        root_symlinks: normalized_root_symlinks,
+        empty_filenames,
+    }))
+}
+
+pub fn merge_runfiles_values<'v>(
+    heap: Heap<'v>,
+    left: Value<'v>,
+    right: Value<'v>,
+) -> starlark::Result<Value<'v>> {
+    let left_runfiles = Runfiles::from_value(left).ok_or_else(|| {
+        kuro_error::Error::from(RunfilesError::ExpectedRunfiles(
+            left.to_repr(),
+            left.get_type().to_owned(),
+        ))
+    })?;
+    let right_runfiles = Runfiles::from_value(right).ok_or_else(|| {
+        kuro_error::Error::from(RunfilesError::ExpectedRunfiles(
+            right.to_repr(),
+            right.get_type().to_owned(),
+        ))
+    })?;
+
+    merge_runfiles(heap, left_runfiles, right_runfiles)
+}
+
+fn validate_runfiles_value<'v>(value: Value<'v>) -> starlark::Result<Value<'v>> {
+    if Runfiles::from_value(value).is_some() {
+        Ok(value)
+    } else {
+        Err(
+            kuro_error::Error::from(RunfilesError::ExpectedRunfiles(
+                value.to_repr(),
+                value.get_type().to_owned(),
+            ))
+            .into(),
+        )
+    }
+}
+
 #[starlark_module]
-fn runfiles_stub_methods(builder: &mut MethodsBuilder) {
-    /// Merge multiple runfiles objects.
+fn runfiles_methods(builder: &mut MethodsBuilder) {
+    /// Merge a runfiles object into this one.
     fn merge<'v>(
-        #[starlark(this)] this: &RunfilesStub,
-        #[starlark(require = pos, default = starlark::values::list::AllocList::EMPTY)]
-        _runfiles: Value<'v>,
+        #[starlark(this)] this: Value<'v>,
+        #[starlark(require = pos)] runfiles: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        // Return a new empty runfiles stub
-        Ok(heap.alloc(RunfilesStub))
+        let this_runfiles = Runfiles::from_value(this).ok_or_else(|| {
+            kuro_error::Error::from(RunfilesError::ExpectedRunfiles(
+                this.to_repr(),
+                this.get_type().to_owned(),
+            ))
+        })?;
+        let other_runfiles = Runfiles::from_value(runfiles).ok_or_else(|| {
+            kuro_error::Error::from(RunfilesError::ExpectedRunfiles(
+                runfiles.to_repr(),
+                runfiles.get_type().to_owned(),
+            ))
+        })?;
+
+        merge_runfiles(heap, this_runfiles, other_runfiles)
     }
 
     /// Merge all runfiles from a list.
     fn merge_all<'v>(
-        #[starlark(this)] this: &RunfilesStub,
-        #[starlark(require = pos)] _runfiles_list: Value<'v>,
+        #[starlark(this)] this: Value<'v>,
+        #[starlark(require = pos)] runfiles_list: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(RunfilesStub))
+        let mut merged_value = this;
+        let iter = runfiles_list.iterate(heap).map_err(|_| {
+            kuro_error::Error::from(RunfilesError::ExpectedIterable(
+                "runfiles_list",
+                runfiles_list.to_repr(),
+                runfiles_list.get_type().to_owned(),
+            ))
+        })?;
+
+        for value in iter {
+            let merged_runfiles = Runfiles::from_value(merged_value).ok_or_else(|| {
+                kuro_error::Error::from(RunfilesError::ExpectedRunfiles(
+                    merged_value.to_repr(),
+                    merged_value.get_type().to_owned(),
+                ))
+            })?;
+            let next = Runfiles::from_value(value).ok_or_else(|| {
+                kuro_error::Error::from(RunfilesError::ExpectedRunfiles(
+                    value.to_repr(),
+                    value.get_type().to_owned(),
+                ))
+            })?;
+            merged_value = merge_runfiles(heap, merged_runfiles, next)?;
+        }
+
+        Ok(merged_value)
     }
 }

@@ -61,6 +61,54 @@ After completing this plan, kuro will:
 
 The `bazel_features` module (https://github.com/bazel-contrib/bazel_features) provides feature detection that many rules depend on. Kuro must satisfy these version checks to be compatible with the modern rules\_\* ecosystem.
 
+### Depset ↔ TransitiveSet Bridge Strategy
+
+Kuro must support Bazel’s `depset` API **and** preserve Buck2’s `transitive_set` advantages for Kuro‑specific rules and internal optimizations. These types are not identical, so we need an explicit bridge with clearly defined semantics and performance constraints.
+
+#### Design Goals
+
+1. **Bazel compatibility at the API boundary**: rules_*, prelude shims, and Bazel semantics should consume and return `depset`.
+2. **Buck2 internals can still use `transitive_set`** where projections, reductions, and typed definitions provide value.
+3. **Explicit conversion** (not implicit coercion) to avoid silent semantic loss.
+4. **Cache conversions** to avoid repeated materialization in hot analysis paths.
+
+#### Conversion API (Proposed)
+
+Provide explicit native helpers (Starlark visible) for controlled conversion:
+
+```python
+# Native bridge helpers (names subject to bikeshed)
+native.transitive_set_from_depset(d, order = "default")
+native.depset_from_transitive_set(t, order = "default")
+```
+
+**Semantics:**
+- `depset -> transitive_set`:
+  - Use a single built‑in `transitive_set` definition (e.g. `BazelDepsetTset`) with one field (`items`).
+  - Preserve transitive structure when possible by wiring children as tset children.
+  - Ordering is **best‑effort**; store the `order` string for traversal hints.
+- `transitive_set -> depset`:
+  - Materialize via traversal (default preorder) and build a depset from values.
+  - Projections/reductions are not preserved; document this loss explicitly.
+
+#### Performance & Architectural Implications
+
+- **Conversion cost** is proportional to the transitive closure size if materialized. This can be expensive if done per target in analysis.
+- **Caching is required**:
+  - Cache on `FrozenTransitiveSet` for `depset` projection per order.
+  - Cache on `depset` objects for `transitive_set` projection per order.
+- **Hot‑path safety**: only convert at API boundaries, avoid repeated conversions in tight loops.
+- **Ordering fidelity**: Bazel `depset` order semantics do not perfectly match `transitive_set` traversal. The bridge must specify “best‑effort” mapping and document behavior.
+- **No implicit coercion**: attribute coercion should not silently convert between these types.
+
+#### Success Criteria (Bridge)
+
+- Explicit conversion APIs exist and are documented.
+- Conversion round‑trip is deterministic for basic cases:
+  - `depset -> transitive_set -> depset` preserves element sets.
+  - `transitive_set -> depset -> transitive_set` preserves element sets.
+- Conversion is cached and does not regress analysis time in representative rule graphs.
+
 ### Verification Criteria
 
 - [ ] `cargo build --release` works with stable Rust

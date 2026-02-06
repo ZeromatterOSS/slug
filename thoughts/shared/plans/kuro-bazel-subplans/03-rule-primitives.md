@@ -187,6 +187,38 @@ pub fn register_depset(builder: &mut GlobalsBuilder) {
 | `"preorder"` | `PreorderTransitiveSetIterator` (line 53) |
 | `"topological"` | `TopologicalTransitiveSetIterator` (line 189) |
 
+#### 3b. Depset ↔ TransitiveSet Bridge
+
+**Goal**: Provide explicit conversion helpers for Kuro‑specific rules that want to use `transitive_set` internally while exposing Bazel `depset` at API boundaries.
+
+**Proposed APIs** (native helpers, names subject to bikeshed):
+```python
+native.transitive_set_from_depset(d, order = "default")
+native.depset_from_transitive_set(t, order = "default")
+```
+
+**Implementation sketch**:
+
+- **Location**: `app/kuro_build_api/src/interpreter/rule_defs/depset.rs` (bridge helpers)
+- **Supporting types**:
+  - Add a built‑in `TransitiveSetDefinition` (e.g. `BazelDepsetTset`) with a single `items` field.
+  - Cache conversion results on frozen values:
+    - `FrozenTransitiveSet` → cached `depset` per order.
+    - `depset` → cached `transitive_set` per order.
+- **Semantics**:
+  - `depset -> transitive_set`: preserve structure by wiring depset children into tset children where possible; keep `order` metadata for traversal hints.
+  - `transitive_set -> depset`: materialize via traversal (default preorder) and build a depset; projections/reductions are dropped.
+  - Explicit conversion only (no implicit coercion in attr coercers).
+
+**Performance considerations**:
+- Avoid repeated materialization: add per‑order caches to prevent hot‑path regressions.
+- Conversion should be applied only at API boundaries (providers, native functions).
+
+**Tests**:
+- Round‑trip conversion preserves set membership.
+- Ordering behavior tested for `"default"`, `"preorder"`, `"postorder"`, `"topological"`.
+- Frozen/live conversion works in both directions.
+
 #### 4. Built-in Providers
 
 **Directory**: `app/kuro_build_api/src/interpreter/rule_defs/provider/builtin/`
@@ -301,7 +333,7 @@ Check Kuro's existing runfiles implementation and align API.
 - [x] `Provider in artifact` operator works (e.g., `DefaultInfo in src_file`)
 - [x] `target[Provider]` indexing works
 - [x] `artifact[Provider]` indexing works (returns synthetic DefaultInfo)
-- [ ] Runfiles are collected correctly
+- [x] Runfiles are collected correctly
 - [x] All documented ctx methods available (implemented 2026-02-02: ctx.file, ctx.files, ctx.executable, ctx.bin_dir, ctx.genfiles_dir, ctx.workspace_name, ctx.build_file_path, ctx.var)
 - [x] ctx.files.<attr> extracts File objects from dependencies (fixed 2026-02-05: CtxFiles/CtxFile now extract DefaultInfo.default_outputs from Dependency objects)
 - [x] Label() in .bzl files resolves relative to .bzl file's repository (fixed 2026-02-05: uses starlark_path().cell() instead of cell_info().name())
@@ -313,7 +345,7 @@ Check Kuro's existing runfiles implementation and align API.
 
 #### Test Migration (Phase 6):
 
-- [ ] UPDATE `tests/core/analysis/test_cmd_args.py` for `ctx.actions.args()` API
+- [x] UPDATE `tests/core/analysis/test_cmd_args.py` for `ctx.actions.args()` API
 - [ ] UPDATE `tests/core/transitive_sets/test_transitive_sets.py` → rename to `test_depset.py`
 - [ ] ADD `tests/core/analysis/test_ctx_attr.py` for ctx.attr access
 - [ ] ADD `tests/core/analysis/test_ctx_file.py` for ctx.file/ctx.files
@@ -322,9 +354,9 @@ Check Kuro's existing runfiles implementation and align API.
 - [ ] ADD `tests/core/analysis/test_ctx_actions_declare.py` for declare_file/directory
 - [ ] ADD `tests/core/analysis/test_default_info.py` for DefaultInfo provider
 - [ ] ADD `tests/core/analysis/test_provider_in_operator.py` for `Provider in target/artifact`
-- [ ] ADD `tests/core/analysis/test_runfiles.py` for runfiles collection
+- [x] ADD `tests/core/analysis/test_runfiles.py` for runfiles collection
 - [ ] ADD `tests/core/analysis/test_depset_ordering.py` for depset order parameter
+- [ ] ADD `tests/core/analysis/test_depset_transitive_set_bridge.py` for explicit conversion helpers
 - [ ] ADD `tests/core/analysis/test_provider_definition.py` for custom providers
 
 ---
-

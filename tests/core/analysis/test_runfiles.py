@@ -12,10 +12,10 @@ from buck2.tests.e2e_util.api.buck import Buck
 from buck2.tests.e2e_util.buck_workspace import buck_test
 
 
-@buck_test(data_dir="test_cmd_args_data")
-async def test_ctx_actions_args_builder(buck: Buck) -> None:
-    result = await buck.build("//:args_builder")
-    output = result.get_build_report().output_for_target("//:args_builder")
+@buck_test(data_dir="test_runfiles_data")
+async def test_runfiles_collect(buck: Buck) -> None:
+    result = await buck.build("//:collector")
+    output = result.get_build_report().output_for_target("//:collector")
 
     content = output.read_text().strip().splitlines()
-    assert content == ["one", "two", "three", "four,five"]
+    assert content == ["data.txt", "dep.txt", "own.txt", "runtime.txt"]

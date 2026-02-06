@@ -1,0 +1,24 @@
+load(":defs.bzl", "collector", "leaf")
+
+leaf(
+    name = "dep",
+    src = "dep.txt",
+)
+
+leaf(
+    name = "runtime_dep",
+    src = "runtime.txt",
+)
+
+leaf(
+    name = "data_dep",
+    src = "data.txt",
+)
+
+collector(
+    name = "collector",
+    deps = [":dep"],
+    runtime_deps = [":runtime_dep"],
+    data = [":data_dep"],
+    files = ["own.txt"],
+)
