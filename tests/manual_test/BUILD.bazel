@@ -133,3 +133,21 @@ config_setting(
 # With <unspecified> platform, select() is unsupported.
 # To test select() end-to-end, add a platform() target and set it via --target-platforms.
 
+# =============================================================================
+# Phase 10: rules_rust integration test
+# =============================================================================
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_binary")
+
+rust_library(
+    name = "hello_rust_lib",
+    srcs = ["lib.rs"],
+    edition = "2021",
+)
+
+rust_binary(
+    name = "hello_rust_bin",
+    srcs = ["main.rs"],
+    deps = [":hello_rust_lib"],
+    edition = "2021",
+)
+

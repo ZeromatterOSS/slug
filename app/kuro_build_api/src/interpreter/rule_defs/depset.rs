@@ -222,9 +222,28 @@ where
     }
 
     fn to_bool(&self) -> bool {
-        // Consider non-empty if direct has elements or transitive has elements
-        // For simplicity, assume non-empty - proper check would iterate
-        true
+        // A depset is truthy iff it is non-empty.
+        // Check direct elements first.
+        let direct_val = self.direct.to_value();
+        if direct_val.length().unwrap_or(0) > 0 {
+            return true;
+        }
+        // Check transitive children - if any transitive child is non-empty, we're non-empty.
+        let transitive_val = self.transitive.to_value();
+        let trans_len = transitive_val.length().unwrap_or(0);
+        if trans_len == 0 {
+            return false;
+        }
+        // We have transitive children. Check if any are non-empty.
+        // Use ListRef to iterate without needing a Heap.
+        if let Some(list) = starlark::values::list::ListRef::from_value(transitive_val) {
+            for child in list.iter() {
+                if child.to_bool() {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
@@ -241,7 +260,11 @@ where
 }
 
 /// Helper function to recursively collect elements from any depset type.
-fn collect_depset_elements<'v>(value: Value<'v>, elements: &mut Vec<Value<'v>>, heap: Heap<'v>) {
+pub(crate) fn collect_depset_elements<'v>(
+    value: Value<'v>,
+    elements: &mut Vec<Value<'v>>,
+    heap: Heap<'v>,
+) {
     // Try unfrozen live depset first
     if let Some(live) = value.downcast_ref::<LiveDepsetGen<Value>>() {
         // Collect direct elements

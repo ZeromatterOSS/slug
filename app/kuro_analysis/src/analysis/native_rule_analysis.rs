@@ -60,6 +60,8 @@ pub fn analyze_native_rule(
         NativeRuleKind::Alias => analyze_alias(target, dep_analysis),
         NativeRuleKind::LabelFlag => analyze_label_flag(target, dep_analysis),
         NativeRuleKind::ConfigSetting => analyze_config_setting(target, dep_analysis),
+        NativeRuleKind::ToolchainType => create_minimal_analysis_result(target),
+        NativeRuleKind::PackageGroup => create_minimal_analysis_result(target),
     }
 }
 

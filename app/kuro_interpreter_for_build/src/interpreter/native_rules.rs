@@ -28,6 +28,7 @@ use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::coerced_deps_collector::CoercedDeps;
 use kuro_node::attrs::coerced_deps_collector::CoercedDepsCollector;
 use kuro_node::attrs::coercion_context::AttrCoercionContext;
+use kuro_node::attrs::configurable::AttrIsConfigurable;
 use kuro_node::attrs::spec::AttributeSpec;
 use kuro_node::attrs::spec::internal::NAME_ATTRIBUTE;
 use kuro_node::attrs::spec::internal::VISIBILITY_ATTRIBUTE;
@@ -47,9 +48,12 @@ use once_cell::sync::Lazy;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
+use starlark::values::Value;
+use starlark::values::dict::UnpackDictEntries;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneType;
 
+use crate::attrs::coerce::attr_type::AttrTypeExt;
 use crate::interpreter::module_internals::ModuleInternals;
 
 /// Pre-built Rule definitions for native rules.
@@ -213,6 +217,32 @@ mod rule_defs {
             attributes: config_setting_attributes(),
             rule_type: RuleType::Native(NativeRuleKind::ConfigSetting),
             rule_kind: RuleKind::Configuration,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+        })
+    });
+
+    /// The Rule definition for package_group.
+    /// package_group defines a set of packages for visibility control.
+    pub static PACKAGE_GROUP_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: constraint_setting_attributes(), // Same as constraint_setting - just name + visibility
+            rule_type: RuleType::Native(NativeRuleKind::PackageGroup),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+        })
+    });
+
+    /// The Rule definition for toolchain_type.
+    /// toolchain_type is a simple marker target with no special attributes.
+    pub static TOOLCHAIN_TYPE_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: constraint_setting_attributes(), // Same as constraint_setting - just name + visibility
+            rule_type: RuleType::Native(NativeRuleKind::ToolchainType),
+            rule_kind: RuleKind::Normal,
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
@@ -410,7 +440,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
     /// See: https://bazel.build/reference/be/general#alias
     fn alias<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named)] actual: &str,
+        #[starlark(require = named)] actual: Value<'v>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         visibility: UnpackListOrTuple<String>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -418,9 +448,9 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let internals = ModuleInternals::from_context(eval, "alias")?;
         let coercion_ctx = internals.attr_coercion_context();
 
-        // Coerce the actual target label to a dep attribute
-        let label = coercion_ctx.coerce_providers_label(actual)?;
-        let coerced_actual = CoercedAttr::Dep(label);
+        // Coerce the actual target - supports both plain strings and select() expressions
+        let dep_attr_type = AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY);
+        let coerced_actual = dep_attr_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, actual)?;
 
         let target_node = create_native_target_node(
             rule_defs::ALIAS_RULE.clone(),
@@ -461,7 +491,16 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let coercion_ctx = internals.attr_coercion_context();
 
         // Coerce the build_setting_default label to a dep attribute
-        let label = coercion_ctx.coerce_providers_label(build_setting_default)?;
+        // Bazel allows bare names like "import_macro" as shorthand for ":import_macro"
+        let default_str = if !build_setting_default.contains('/')
+            && !build_setting_default.starts_with(':')
+            && !build_setting_default.starts_with('@')
+        {
+            format!(":{}", build_setting_default)
+        } else {
+            build_setting_default.to_owned()
+        };
+        let label = coercion_ctx.coerce_providers_label(&default_str)?;
         let coerced_default = CoercedAttr::Dep(label);
 
         let target_node = create_native_target_node(
@@ -506,10 +545,21 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named)] name: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         constraint_values: UnpackListOrTuple<String>,
+        // Bazel: dict of configuration values (e.g., {"compilation_mode": "opt"})
+        // TODO(bazel): Implement values-based config_setting matching
+        #[starlark(require = named, default = UnpackDictEntries::default())]
+        values: UnpackDictEntries<&str, &str>,
+        // Bazel: dict for --define flag values
+        #[starlark(require = named, default = UnpackDictEntries::default())]
+        define_values: UnpackDictEntries<&str, &str>,
+        // Bazel: dict mapping build setting labels to expected values
+        #[starlark(require = named, default = UnpackDictEntries::default())]
+        flag_values: UnpackDictEntries<&str, &str>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         visibility: UnpackListOrTuple<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
+        let _unused = (values, define_values, flag_values);
         let internals = ModuleInternals::from_context(eval, "config_setting")?;
         let coercion_ctx = internals.attr_coercion_context();
 
@@ -532,6 +582,68 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             internals.package(),
             name,
             vec![("constraint_values".to_owned(), coerced_list)],
+            &visibility.items,
+            &internals.default_visibility(),
+        )?;
+
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+
+    /// Defines a package group for visibility control.
+    ///
+    /// A package_group defines a set of packages that can be used in
+    /// visibility specifications.
+    ///
+    /// See: https://bazel.build/reference/be/functions#package_group
+    fn package_group<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        packages: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        includes: UnpackListOrTuple<String>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let _unused = (packages, includes);
+        let internals = ModuleInternals::from_context(eval, "package_group")?;
+
+        let target_node = create_native_target_node(
+            rule_defs::PACKAGE_GROUP_RULE.clone(),
+            internals.package(),
+            name,
+            vec![],
+            &["//visibility:public".to_owned()], // package_group is always public
+            &internals.default_visibility(),
+        )?;
+
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+
+    /// Defines a toolchain type (a marker for a category of toolchains).
+    ///
+    /// A toolchain_type is used by the toolchain resolution system to match
+    /// toolchain implementations to rules that need them.
+    ///
+    /// Example:
+    /// ```python
+    /// toolchain_type(name = "toolchain_type")
+    /// ```
+    ///
+    /// See: https://bazel.build/reference/be/platforms-and-toolchains#toolchain_type
+    fn toolchain_type<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        visibility: UnpackListOrTuple<String>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let internals = ModuleInternals::from_context(eval, "toolchain_type")?;
+
+        let target_node = create_native_target_node(
+            rule_defs::TOOLCHAIN_TYPE_RULE.clone(),
+            internals.package(),
+            name,
+            vec![],
             &visibility.items,
             &internals.default_visibility(),
         )?;

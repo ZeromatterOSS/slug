@@ -39,6 +39,7 @@ use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::eval::Arguments;
+use starlark::eval::Evaluator;
 use starlark::typing::Ty;
 use starlark::values::AllocStaticSimple;
 use starlark::values::AllocValue;
@@ -831,14 +832,222 @@ fn cmd_args<'v>(x: Value<'v>) -> FieldsRef<'v, impl Fields<'v>> {
 fn cmd_args_methods(builder: &mut MethodsBuilder) {
     /// A list of arguments to be added to the command line, which may including `cmd_args`, artifacts, strings, `RunInfo` or lists thereof.
     /// Note that this operation mutates the input `cmd_args`.
+    /// Bazel compatibility: supports `format` named parameter with `%s` placeholder.
     fn add<'v>(
         mut this: StarlarkCommandLineMut<'v>,
         heap: Heap<'v>,
         args: &Arguments<'v, '_>,
     ) -> starlark::Result<StarlarkCommandLineMut<'v>> {
-        args.no_named_args()?;
-        let values = args.positions(heap)?;
-        this.borrow.add_from_iterator(values)?;
+        // Extract optional 'format' named parameter (Bazel compatibility)
+        let named = args.names_map()?;
+        let format_str = named.get("format").and_then(|v| v.unpack_str());
+
+        let values: Vec<Value<'v>> = args.positions(heap)?.collect();
+        if let Some(fmt) = format_str {
+            for val in values {
+                // For artifacts, resolve to path instead of using Display format
+                let val_str = if let Ok(Some(path_val)) = val.get_attr("path", heap) {
+                    path_val.to_str()
+                } else {
+                    val.to_str()
+                };
+                let formatted = fmt.replace("%s", &val_str);
+                this.borrow
+                    .add_from_iterator(std::iter::once(heap.alloc_str(&formatted).to_value()))?;
+            }
+        } else {
+            this.borrow.add_from_iterator(values.into_iter())?;
+        }
+        Ok(this)
+    }
+
+    /// Bazel-compatible: add all values from a list or depset.
+    ///
+    /// Supports `before_each` to add a string before each element,
+    /// `format_each` to format each element, and `map_each` to transform elements.
+    fn add_all<'v>(
+        mut this: StarlarkCommandLineMut<'v>,
+        #[starlark(require = pos, default = starlark::values::none::NoneType)] values: Value<'v>,
+        #[starlark(require = named, default = "")] before_each: &str,
+        #[starlark(require = named, default = "")] format_each: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] map_each: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = false)] uniquify: bool,
+        #[starlark(require = named, default = false)] expand_directories: bool,
+        #[starlark(require = named, default = false)] terminate_with: Value<'v>,
+        #[starlark(require = named, default = false)] allow_closure: bool,
+        #[starlark(require = named, default = false)] omit_if_empty: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<StarlarkCommandLineMut<'v>> {
+        let _ = (expand_directories, terminate_with, allow_closure);
+        let heap = eval.heap();
+        // If values is None, nothing to add
+        if values.is_none() {
+            return Ok(this);
+        }
+
+        // Collect values from list or depset
+        let items: Vec<Value<'v>> = if let Some(list) = ListRef::from_value(values) {
+            list.iter().collect()
+        } else if values.get_type() == "depset" {
+            let mut elements = Vec::new();
+            crate::interpreter::rule_defs::depset::collect_depset_elements(
+                values,
+                &mut elements,
+                heap,
+            );
+            elements
+        } else if let Ok(iter) = values.iterate(heap) {
+            iter.collect()
+        } else {
+            vec![values]
+        };
+
+        // Apply map_each callback if provided
+        let has_map_each = !map_each.is_none();
+        let mapped_items: Vec<Value<'v>> = if has_map_each {
+            let mut result = Vec::new();
+            for item in &items {
+                let mapped = eval.eval_function(map_each, &[*item], &[])?;
+                // map_each can return a string, a list of strings, or None
+                if mapped.is_none() {
+                    continue;
+                } else if let Some(list) = ListRef::from_value(mapped) {
+                    for elem in list.iter() {
+                        result.push(elem);
+                    }
+                } else {
+                    result.push(mapped);
+                }
+            }
+            result
+        } else {
+            items
+        };
+
+        // Deduplicate if requested
+        let final_items = if uniquify {
+            let mut seen = std::collections::HashSet::new();
+            mapped_items
+                .into_iter()
+                .filter(|item| seen.insert(item.to_str().to_string()))
+                .collect::<Vec<_>>()
+        } else {
+            mapped_items
+        };
+
+        if omit_if_empty && final_items.is_empty() {
+            return Ok(this);
+        }
+
+        for item in final_items {
+            if !before_each.is_empty() {
+                let s = heap.alloc_str(before_each).to_value();
+                this.borrow.add_value(s)?;
+            }
+            if !format_each.is_empty() {
+                let val_str = if let Ok(Some(path_val)) = item.get_attr("path", heap) {
+                    path_val.to_str()
+                } else {
+                    item.to_str()
+                };
+                let formatted = format_each.replace("%s", &val_str);
+                let s = heap.alloc_str(&formatted).to_value();
+                this.borrow.add_value(s)?;
+            } else {
+                this.borrow.add_value(item)?;
+            }
+        }
+        Ok(this)
+    }
+
+    /// Bazel-compatible: add all values joined with a separator.
+    fn add_joined<'v>(
+        mut this: StarlarkCommandLineMut<'v>,
+        #[starlark(require = pos, default = starlark::values::none::NoneType)] values: Value<'v>,
+        #[starlark(require = named, default = ",")] join_with: &str,
+        #[starlark(require = named, default = "")] format_each: &str,
+        #[starlark(require = named, default = "")] format_joined: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] map_each: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = false)] omit_if_empty: bool,
+        #[starlark(require = named, default = false)] uniquify: bool,
+        #[starlark(require = named, default = false)] expand_directories: bool,
+        #[starlark(require = named, default = false)] allow_closure: bool,
+        heap: Heap<'v>,
+    ) -> starlark::Result<StarlarkCommandLineMut<'v>> {
+        let _ = (
+            map_each,
+            omit_if_empty,
+            uniquify,
+            expand_directories,
+            allow_closure,
+        );
+        if values.is_none() {
+            return Ok(this);
+        }
+
+        let raw_items: Vec<Value<'v>> = if let Some(list) = ListRef::from_value(values) {
+            list.iter().collect()
+        } else if values.get_type() == "depset" {
+            let mut elements = Vec::new();
+            crate::interpreter::rule_defs::depset::collect_depset_elements(
+                values,
+                &mut elements,
+                heap,
+            );
+            elements
+        } else if let Ok(iter) = values.iterate(heap) {
+            iter.collect()
+        } else {
+            vec![values]
+        };
+        let items: Vec<String> = raw_items
+            .iter()
+            .map(|v| {
+                let val_str = if let Ok(Some(path_val)) = v.get_attr("path", heap) {
+                    path_val.to_str()
+                } else {
+                    v.to_str()
+                };
+                if !format_each.is_empty() {
+                    format_each.replace("%s", &val_str)
+                } else {
+                    val_str
+                }
+            })
+            .collect();
+
+        let joined = items.join(join_with);
+        let result = if !format_joined.is_empty() {
+            format_joined.replace("%s", &joined)
+        } else {
+            joined
+        };
+        let s = heap.alloc_str(&result).to_value();
+        this.borrow.add_value(s)?;
+        Ok(this)
+    }
+
+    /// Bazel-compatible: set the param file format.
+    fn set_param_file_format<'v>(
+        this: StarlarkCommandLineMut<'v>,
+        #[starlark(require = pos)] _format: &str,
+    ) -> starlark::Result<StarlarkCommandLineMut<'v>> {
+        // Stub: param file format is not used in Kuro
+        Ok(this)
+    }
+
+    /// Bazel-compatible: use a param file for the arguments.
+    fn use_param_file<'v>(
+        this: StarlarkCommandLineMut<'v>,
+        #[starlark(require = pos)] _param_file_arg: &str,
+        #[starlark(require = named, default = false)] use_always: bool,
+    ) -> starlark::Result<StarlarkCommandLineMut<'v>> {
+        let _ = use_always;
+        // Stub: param files not yet supported
         Ok(this)
     }
 

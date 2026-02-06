@@ -2570,6 +2570,42 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // Return an empty list - no special execution requirements
         Ok(eval.heap().alloc(Vec::<String>::new()))
     }
+
+    /// Creates link variables for use with get_memory_inefficient_command_line.
+    ///
+    /// Used by rules_rust to get linker command line from cc toolchain.
+    #[allow(unused_variables)]
+    fn create_link_variables<'v>(
+        #[starlark(this)] _this: &CcCommonModule,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        #[starlark(require = named)] cc_toolchain: Value<'v>,
+        #[starlark(require = named, default = false)] is_linking_dynamic_library: bool,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        runtime_library_search_directories: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        user_link_flags: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        // Return a CcToolchainVariables stub - the actual link flags are
+        // computed by get_memory_inefficient_command_line
+        Ok(eval.heap().alloc(CcToolchainVariablesGen {
+            vars: Value::new_none(),
+        }))
+    }
+
+    /// Merges multiple CcInfo providers into a single CcInfo.
+    ///
+    /// Used to combine CcInfo from multiple dependencies.
+    #[allow(unused_variables)]
+    fn merge_cc_infos<'v>(
+        #[starlark(this)] _this: &CcCommonModule,
+        #[starlark(require = named, default = NoneType)] cc_infos: Value<'v>,
+        #[starlark(require = named, default = NoneType)] direct_cc_infos: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<CcInfoInstanceStub> {
+        // Return a stub CcInfo - merging is a no-op for now
+        Ok(CcInfoInstanceStub)
+    }
 }
 
 // ============================================================================
@@ -2772,13 +2808,29 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoProvider {}
 // CcInfo provider - C++ compilation/linking information
 // ============================================================================
 
-/// CcInfo provider stub - contains C++ compilation and linking information.
+/// CcInfo provider callable - contains C++ compilation and linking information.
 ///
 /// In Bazel 9.0+, CcInfo is actually defined in pure Starlark in rules_cc
 /// (cc/private/cc_info.bzl). This native stub exists for compatibility with
 /// code that references the native CcInfo before rules_cc is loaded.
+///
+/// Implements ProviderCallableLike so it can be used as `CcInfo in dep` and
+/// `dep[CcInfo]` for provider collection lookups.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct CcInfoProvider;
+
+impl CcInfoProvider {
+    /// Get the static provider ID for CcInfo.
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "CcInfo".to_owned(),
+            })
+        })
+    }
+}
 
 impl Display for CcInfoProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -2788,8 +2840,74 @@ impl Display for CcInfoProvider {
 
 starlark_simple_value!(CcInfoProvider);
 
+impl ProviderCallableLike for CcInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
 #[starlark_value(type = "CcInfo")]
-impl<'v> StarlarkValue<'v> for CcInfoProvider {}
+impl<'v> StarlarkValue<'v> for CcInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &starlark::eval::Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        // CcInfo(compilation_context=..., linking_context=...)
+        // Return a stub CcInfo instance
+        let _kwargs = args.names_map()?;
+        let heap = eval.heap();
+        Ok(heap.alloc(CcInfoInstanceStub))
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+/// A stub CcInfo instance (returned when CcInfo(...) is called).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct CcInfoInstanceStub;
+
+impl Display for CcInfoInstanceStub {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CcInfo(...)")
+    }
+}
+
+starlark_simple_value!(CcInfoInstanceStub);
+
+impl<'v> ProviderLike<'v> for CcInfoInstanceStub {
+    fn id(&self) -> &Arc<ProviderId> {
+        CcInfoProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        Vec::new()
+    }
+}
+
+#[starlark_value(type = "CcInfoInstance")]
+impl<'v> StarlarkValue<'v> for CcInfoInstanceStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "compilation_context" | "linking_context")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        use crate::interpreter::rule_defs::context::CompilationContextStub;
+        use crate::interpreter::rule_defs::context::LinkingContextStub;
+        match attribute {
+            "compilation_context" => Some(heap.alloc(CompilationContextStub)),
+            "linking_context" => Some(heap.alloc(LinkingContextStub)),
+            _ => None,
+        }
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
+    }
+}
 
 // ============================================================================
 // DebugPackageInfo - Debug information provider
@@ -3005,8 +3123,8 @@ pub fn register_cc_common(globals: &mut GlobalsBuilder) {
     /// The cc_common module provides C/C++ compilation support.
     const cc_common: CcCommonModule = CcCommonModule;
 
-    /// CcInfo - None placeholder. Actual provider defined in rules_cc Starlark.
-    const CcInfo: NoneType = NoneType;
+    /// CcInfo provider for C++ compilation/linking information.
+    const CcInfo: CcInfoProvider = CcInfoProvider;
 
     /// CcToolchainInfo provider for C++ toolchain information.
     const CcToolchainInfo: CcToolchainInfoProvider = CcToolchainInfoProvider;

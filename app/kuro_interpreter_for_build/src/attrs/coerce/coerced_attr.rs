@@ -76,7 +76,8 @@ impl CoercedAttrExr for CoercedAttr {
             match *selector {
                 StarlarkSelectorGen::Primary(v) => {
                     if let Some(dict) = DictRef::from_value(v.get()) {
-                        let has_default = dict.get_str("DEFAULT").is_some();
+                        let has_default = dict.get_str("DEFAULT").is_some()
+                            || dict.get_str("//conditions:default").is_some();
                         let mut entries =
                             Vec::with_capacity(dict.len().saturating_sub(has_default as usize));
 
@@ -89,7 +90,7 @@ impl CoercedAttrExr for CoercedAttr {
                                 Some(default_attr) if v.is_none() => default_attr.clone(),
                                 _ => CoercedAttr::coerce(attr, configurable, ctx, v, default_attr)?,
                             };
-                            if k == "DEFAULT" {
+                            if k == "DEFAULT" || k == "//conditions:default" {
                                 if default.is_some() {
                                     return Err(internal_error!(
                                         "duplicate `\"DEFAULT\"` key in `select()`"

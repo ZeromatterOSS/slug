@@ -237,6 +237,15 @@ impl<'v, V: ValueLike<'v>> ProviderCollectionGen<V> {
         let list = match ListRef::from_value(value) {
             Some(v) => v,
             None => {
+                // Bazel compatibility: if a rule returns a single provider (not a list),
+                // treat it as a single-element list. This happens with build setting rules
+                // like `return ErrorFormatInfo(error_format = "human")`.
+                if ValueAsProviderLike::unpack_value(value)?.is_some() {
+                    let mut providers = SmallMap::with_capacity(1);
+                    let provider = ValueAsProviderLike::unpack_value(value)?.unwrap();
+                    providers.insert(provider.0.id().dupe(), value);
+                    return Ok(providers);
+                }
                 return Err(ProviderCollectionError::CollectionNotAList {
                     repr: value.to_repr(),
                 }
@@ -359,7 +368,19 @@ impl<'v, V: ValueLike<'v>> ProviderCollectionGen<V> {
                 let provider_id = callable.id()?.dupe();
                 match self.providers.get(&provider_id) {
                     Some(v) => Ok(Either::Left(v.to_value())),
-                    None => Ok(Either::Right(provider_id)),
+                    None => {
+                        // For native providers (path: None), fall back to name-only matching.
+                        // This allows native provider stubs (e.g., CcInfo registered globally)
+                        // to match Starlark-defined providers with the same name from rulesets.
+                        if provider_id.path.is_none() {
+                            for (k, v) in self.providers.iter() {
+                                if k.name == provider_id.name {
+                                    return Ok(Either::Left(v.to_value()));
+                                }
+                            }
+                        }
+                        Ok(Either::Right(provider_id))
+                    }
                 }
             }
             None => Err(ProviderCollectionError::AtTypeNotProvider(op, index.get_type()).into()),
@@ -474,7 +495,17 @@ impl FrozenProviderCollection {
     }
 
     pub fn contains_provider(&self, provider_id: &ProviderId) -> bool {
-        self.providers.contains_key(provider_id)
+        if self.providers.contains_key(provider_id) {
+            return true;
+        }
+        // For native providers (path: None), fall back to name-only matching.
+        // This allows native provider stubs (e.g., CcInfo registered globally)
+        // to match Starlark-defined providers with the same name from rulesets.
+        if provider_id.path.is_none() {
+            self.providers.keys().any(|k| k.name == provider_id.name)
+        } else {
+            false
+        }
     }
 
     pub fn builtin_provider<'a, T: FrozenBuiltinProviderLike>(

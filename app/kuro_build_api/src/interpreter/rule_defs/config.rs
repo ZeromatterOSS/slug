@@ -20,9 +20,11 @@ use allocative::Allocative;
 use starlark::environment::GlobalsBuilder;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
+use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
+use starlark::values::Value;
 use starlark::values::starlark_value;
 
 /// A configuration transition reference.
@@ -45,6 +47,39 @@ starlark_simple_value!(ConfigTransition);
 
 #[starlark_value(type = "config_transition")]
 impl<'v> StarlarkValue<'v> for ConfigTransition {}
+
+/// A build setting descriptor returned by config.bool(), config.int(), config.string().
+/// Used with `rule(build_setting = config.bool(flag = True))`.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct ConfigBuildSetting {
+    pub setting_type: String,
+    pub flag: bool,
+    pub allow_multiple: bool,
+}
+
+impl Display for ConfigBuildSetting {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "config.{}(flag={})", self.setting_type, self.flag)
+    }
+}
+
+starlark_simple_value!(ConfigBuildSetting);
+
+#[starlark_value(type = "config_build_setting")]
+impl<'v> StarlarkValue<'v> for ConfigBuildSetting {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "allow_multiple" | "flag" | "setting_type")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "allow_multiple" => Some(Value::new_bool(self.allow_multiple)),
+            "flag" => Some(Value::new_bool(self.flag)),
+            "setting_type" => Some(heap.alloc(self.setting_type.as_str())),
+            _ => None,
+        }
+    }
+}
 
 /// The config module for configuration transitions.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
@@ -89,6 +124,61 @@ fn config_module_methods(builder: &mut starlark::environment::MethodsBuilder) {
         Ok(ConfigTransition {
             kind: "target".to_owned(),
             exec_group: None,
+        })
+    }
+
+    /// Returns a boolean build setting descriptor.
+    /// Used with `rule(build_setting = config.bool(flag = True))`.
+    fn bool(
+        #[starlark(this)] _this: &ConfigModule,
+        #[starlark(require = named, default = false)] flag: bool,
+        #[starlark(require = named, default = false)] allow_multiple: bool,
+    ) -> starlark::Result<ConfigBuildSetting> {
+        Ok(ConfigBuildSetting {
+            setting_type: "bool".to_owned(),
+            flag,
+            allow_multiple,
+        })
+    }
+
+    /// Returns an integer build setting descriptor.
+    fn int(
+        #[starlark(this)] _this: &ConfigModule,
+        #[starlark(require = named, default = false)] flag: bool,
+        #[starlark(require = named, default = false)] allow_multiple: bool,
+    ) -> starlark::Result<ConfigBuildSetting> {
+        Ok(ConfigBuildSetting {
+            setting_type: "int".to_owned(),
+            flag,
+            allow_multiple,
+        })
+    }
+
+    /// Returns a string build setting descriptor.
+    fn string(
+        #[starlark(this)] _this: &ConfigModule,
+        #[starlark(require = named, default = false)] flag: bool,
+        #[starlark(require = named, default = false)] allow_multiple: bool,
+    ) -> starlark::Result<ConfigBuildSetting> {
+        Ok(ConfigBuildSetting {
+            setting_type: "string".to_owned(),
+            flag,
+            allow_multiple,
+        })
+    }
+
+    /// Returns a string_list build setting descriptor.
+    fn string_list(
+        #[starlark(this)] _this: &ConfigModule,
+        #[starlark(require = named, default = false)] flag: bool,
+        #[starlark(require = named, default = false)] repeatable: bool,
+        #[starlark(require = named, default = false)] allow_multiple: bool,
+    ) -> starlark::Result<ConfigBuildSetting> {
+        let _ = repeatable;
+        Ok(ConfigBuildSetting {
+            setting_type: "string_list".to_owned(),
+            flag,
+            allow_multiple: allow_multiple || repeatable,
         })
     }
 }

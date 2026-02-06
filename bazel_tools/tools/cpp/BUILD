@@ -22,3 +22,16 @@ cc_library(
     name = "link_extra_lib",
     visibility = ["//visibility:public"],
 )
+
+# Stub current_cc_toolchain - Kuro hardcodes system CC toolchain
+# rather than going through Bazel's toolchain resolution
+cc_library(
+    name = "current_cc_toolchain",
+    visibility = ["//visibility:public"],
+)
+
+# The toolchain type used to distinguish cc toolchains.
+toolchain_type(
+    name = "toolchain_type",
+    visibility = ["//visibility:public"],
+)

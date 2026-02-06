@@ -205,6 +205,22 @@ impl Freeze for InitProviderConstructor<'_> {
 impl<'v> StarlarkValue<'v> for InitProviderConstructor<'v> {
     type Canonical = FrozenInitProviderConstructor;
 
+    fn export_as(
+        &self,
+        variable_name: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<()> {
+        // Propagate the export name to the underlying raw provider.
+        // When `CcInfo, _ = provider(init=fn)`, the InitProviderConstructor
+        // is bound to "CcInfo" and the raw provider to "_". By propagating
+        // the name here, the raw provider gets "CcInfo" first (OnceCell
+        // first-export-wins), so provider instances get the correct name.
+        if let Some(callable) = self.provider.downcast_ref::<UserProviderCallable>() {
+            <UserProviderCallable as StarlarkValue>::export_as(callable, variable_name, eval)?;
+        }
+        Ok(())
+    }
+
     fn invoke(
         &self,
         _me: Value<'v>,

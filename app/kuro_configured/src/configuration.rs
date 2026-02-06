@@ -68,7 +68,13 @@ async fn configuration_matches(
     constraints_and_configs: &ConfigSettingData,
 ) -> kuro_error::Result<bool> {
     for (key, value) in &constraints_and_configs.constraints {
-        match cfg.get_constraint_value(key)? {
+        // For builtin/unspecified platforms, no constraints match.
+        // This causes select() to use the default/fallback case.
+        let constraint_val = match cfg.get_constraint_value(key) {
+            Err(_) => return Ok(false),
+            Ok(v) => v,
+        };
+        match constraint_val {
             Some(v) if v == value => {
                 // Configuration explicitly sets this constraint and it matches
             }

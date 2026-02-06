@@ -62,6 +62,10 @@ pub enum NativeRuleKind {
     LabelFlag,
     #[display("config_setting")]
     ConfigSetting,
+    #[display("toolchain_type")]
+    ToolchainType,
+    #[display("package_group")]
+    PackageGroup,
 }
 
 impl NativeRuleKind {
@@ -73,6 +77,8 @@ impl NativeRuleKind {
             NativeRuleKind::Alias => "alias",
             NativeRuleKind::LabelFlag => "label_flag",
             NativeRuleKind::ConfigSetting => "config_setting",
+            NativeRuleKind::ToolchainType => "toolchain_type",
+            NativeRuleKind::PackageGroup => "package_group",
         }
     }
 }

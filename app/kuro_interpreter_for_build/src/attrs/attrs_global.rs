@@ -718,8 +718,13 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
+        // Bazel-compatible: restrict to specific values (e.g., ["expanded", "hir"])
+        // Currently accepted but not enforced
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        values: UnpackListOrTuple<&str>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
+        let _unused = values;
         // Bazel semantics: if mandatory = False (default) and no default, use empty string
         let effective_default = match (default, mandatory) {
             (Some(d), _) => Some(d),
@@ -943,6 +948,9 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // Currently accepted but ignored.
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         flags: UnpackListOrTuple<&str>,
+        // Bazel-compatible: configuration transition for dependencies
+        // Can be a string ("exec", "target") or a config_transition object
+        #[starlark(require = named)] cfg: Option<Value<'v>>,
         // Bazel-compatible: aspects to apply to targets of this attribute
         // Currently accepted but not executed (stub implementation - Phase 8a)
         #[starlark(require = named, default = UnpackListOrTuple::default())]
@@ -991,18 +999,34 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         }
 
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
+        // Handle cfg parameter: "exec" or config.exec(...) means use exec_dep
+        let is_exec = match cfg {
+            Some(v) => {
+                if let Some(s) = v.unpack_str() {
+                    s == "exec"
+                } else {
+                    v.to_repr().contains("exec")
+                }
+            }
+            None => false,
+        };
         // When allow_files = True, accept both source files and deps
         // This is critical for srcs attributes which can contain "file.c" or ":target"
         // IMPORTANT: Try dep first, then source. Both accept label strings like ":foo",
         // but deps (targets) should take precedence over source files. Source files
         // are typically specified as bare filenames like "file.c", not labels.
+        let dep_type = if is_exec {
+            AttrType::exec_dep(required_providers)
+        } else {
+            AttrType::dep(required_providers, PluginKindSet::EMPTY)
+        };
         let inner = if allow_files_bool {
             AttrType::one_of(vec![
-                AttrType::dep(required_providers, PluginKindSet::EMPTY),
+                dep_type,
                 AttrType::source(false), // allow_directory = false
             ])
         } else {
-            AttrType::dep(required_providers, PluginKindSet::EMPTY)
+            dep_type
         };
         let coercer = AttrType::list(inner);
 
@@ -1106,13 +1130,24 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
         #[starlark(require = named, default = false)] allow_files: bool,
+        // Bazel-compatible: configuration transition
+        #[starlark(require = named)] cfg: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = (mandatory, allow_files);
+        let _unused = (allow_files, cfg);
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         let label_type = AttrType::dep(required_providers, PluginKindSet::EMPTY);
         let coercer = AttrType::dict(label_type, AttrType::string(), false);
-        Ok(Attribute::attr(eval, default, doc, coercer)?)
+        // Bazel semantics: non-mandatory dicts default to empty dict
+        let effective_default = match (default, mandatory) {
+            (Some(d), _) => Some(d),
+            (None, false) => Some(
+                eval.heap()
+                    .alloc(starlark::collections::SmallMap::<Value, Value>::new()),
+            ),
+            (None, true) => None,
+        };
+        Ok(Attribute::attr(eval, effective_default, doc, coercer)?)
     }
 
     /// Takes a dict with string keys and label values.

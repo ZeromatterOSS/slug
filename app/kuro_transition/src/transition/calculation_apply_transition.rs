@@ -129,6 +129,13 @@ async fn do_apply_transition(
     transition_id: &TransitionId,
     cancellation: &CancellationContext,
 ) -> kuro_error::Result<TransitionApplied> {
+    // For unbound/unspecified platforms, transitions are no-ops.
+    // Bazel always has a bound platform, but in Kuro the platform may be
+    // unspecified when no default_target_platform is configured.
+    if !conf.is_bound() {
+        return Ok(TransitionApplied::Single(conf.dupe()));
+    }
+
     let transition = ctx.fetch_transition(transition_id).await?;
     let mut refs = Vec::new();
     let mut refs_refs = Vec::new();

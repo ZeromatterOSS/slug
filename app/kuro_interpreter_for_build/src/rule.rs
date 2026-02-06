@@ -27,6 +27,8 @@ use kuro_interpreter::types::rule::FROZEN_PROMISE_ARTIFACT_MAPPINGS_GET_IMPL;
 use kuro_interpreter::types::rule::FROZEN_RULE_GET_IMPL;
 use kuro_interpreter::types::transition::transition_id_from_value;
 use kuro_node::attrs::attr::Attribute;
+use kuro_node::attrs::attr_type::AttrType;
+use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::display::AttrDisplayWithContextExt;
 use kuro_node::attrs::spec::AttributeSpec;
 use kuro_node::bzl_or_bxl_path::BzlOrBxlPath;
@@ -62,6 +64,7 @@ use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::StringValue;
 use starlark::values::Trace;
+use starlark::values::UnpackValue;
 use starlark::values::Value;
 use starlark::values::ValueOfUnchecked;
 use starlark::values::dict::UnpackDictEntries;
@@ -692,7 +695,8 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
                 Either<ListType<ProviderReprLate>, StarlarkPromise<'v>>,
             >,
         >,
-        #[starlark(require = named)] attrs: UnpackDictEntries<&'v str, &'v StarlarkAttribute>,
+        #[starlark(require = named, default = UnpackDictEntries::default())]
+        attrs: UnpackDictEntries<&'v str, &'v StarlarkAttribute>,
         #[starlark(require = named)] cfg: Option<ValueOfUnchecked<'v, TransitionReprLate>>,
         #[starlark(require = named)] supports_incoming_transition: Option<bool>,
         #[starlark(require = named, default = "")] doc: &str,
@@ -722,6 +726,9 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] executable: bool,
         // Bazel-compatible: whether this rule is a test rule
         #[starlark(require = named, default = false)] test: bool,
+        // Bazel-compatible: build setting descriptor (e.g., config.bool(flag=True))
+        // TODO(bazel): Implement build setting value tracking via build_setting parameter
+        #[starlark(require = named)] build_setting: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkRuleCallable<'v>> {
         // TODO(bazel): Use the provides parameter to validate rule outputs
@@ -742,6 +749,43 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             outputs,
             executable,
         );
+
+        // When build_setting is specified, add build_setting_default as an implicit attribute.
+        // In Bazel, rules with build_setting automatically accept build_setting_default.
+        // Check if the build setting has allow_multiple by checking if it has that attribute
+        let build_setting_allows_multiple = build_setting
+            .and_then(|v| v.get_attr("allow_multiple", eval.heap()).ok().flatten())
+            .and_then(|v| v.unpack_bool())
+            .unwrap_or(false);
+        let mut attrs = attrs;
+        if build_setting.is_some() {
+            // Add build_setting_default as an any-typed, non-mandatory attribute
+            let bsd_attr = StarlarkAttribute::new(Attribute::new(
+                Some(Arc::new(CoercedAttr::None)),
+                "Default value for the build setting",
+                AttrType::any(),
+            ));
+            let bsd_value = eval.heap().alloc(bsd_attr);
+            let bsd_ref = <&StarlarkAttribute>::unpack_value_err(bsd_value).unwrap();
+            attrs.entries.push(("build_setting_default", bsd_ref));
+
+            // Add _build_setting_allows_multiple hidden attribute
+            if build_setting_allows_multiple {
+                let am_attr = StarlarkAttribute::new(Attribute::new(
+                    Some(Arc::new(CoercedAttr::Bool(
+                        kuro_node::attrs::attr_type::bool::BoolLiteral(true),
+                    ))),
+                    "Whether this build setting allows multiple values",
+                    AttrType::bool(),
+                ));
+                let am_value = eval.heap().alloc(am_attr);
+                let am_ref = <&StarlarkAttribute>::unpack_value_err(am_value).unwrap();
+                attrs
+                    .entries
+                    .push(("_build_setting_allows_multiple", am_ref));
+            }
+        }
+
         // Support both `implementation` (Bazel) and `impl` (Kuro) parameter names
         let impl_fn = match (implementation, r#impl) {
             (Some(implementation), None) => implementation,

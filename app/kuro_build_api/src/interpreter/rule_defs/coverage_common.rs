@@ -150,7 +150,7 @@ fn coverage_common_module_methods(builder: &mut MethodsBuilder) {
     #[allow(unused_variables)]
     fn instrumented_files_info<'v>(
         #[starlark(this)] _this: &CoverageCommonModule,
-        #[starlark(require = named)] ctx: Value<'v>,
+        ctx: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] source_attributes: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)]
         dependency_attributes: Value<'v>,

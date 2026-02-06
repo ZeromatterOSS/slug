@@ -144,6 +144,32 @@ pub(crate) fn analysis_actions_methods_copy(methods: &mut MethodsBuilder) {
         )?)
     }
 
+    /// Creates a symlink action (Bazel-compatible).
+    ///
+    /// This is the Bazel equivalent of Buck2's `symlink_file`. Creates a symlink
+    /// from `output` to `target_file`.
+    ///
+    /// See: https://bazel.build/rules/lib/actions#symlink
+    fn symlink<'v>(
+        this: &AnalysisActions<'v>,
+        #[starlark(require = named)] output: OutputArtifactArg<'v>,
+        #[starlark(require = named)] target_file: ValueAsInputArtifactLike<'v>,
+        #[starlark(require = named, default = false)] is_executable: bool,
+        #[starlark(require = named, default = NoneOr::None)] progress_message: NoneOr<&str>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<ValueTyped<'v, StarlarkDeclaredArtifact<'v>>> {
+        let _ = (is_executable, progress_message);
+        Ok(copy_file_impl(
+            eval,
+            this,
+            output,
+            target_file,
+            CopyMode::Symlink,
+            OutputType::FileOrDirectory,
+            None,
+        )?)
+    }
+
     /// Make a copy of a directory.
     fn copy_dir<'v>(
         this: &AnalysisActions<'v>,

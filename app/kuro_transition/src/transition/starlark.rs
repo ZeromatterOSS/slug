@@ -258,17 +258,49 @@ fn validate_transition_impl(
 #[starlark_module]
 fn register_transition_function(builder: &mut GlobalsBuilder) {
     fn transition<'v>(
-        #[starlark(require = named)] r#impl: StarlarkCallableChecked<
-            'v,
-            TransitionImplParams,
-            Either<ImplSingleReturnTy, ImplSplitReturnTy>,
+        // Buck2/Kuro-style parameter name
+        #[starlark(require = named)] r#impl: Option<
+            StarlarkCallableChecked<
+                'v,
+                TransitionImplParams,
+                Either<ImplSingleReturnTy, ImplSplitReturnTy>,
+            >,
         >,
-        #[starlark(require = named)] refs: UnpackDictEntries<StringValue<'v>, StringValue<'v>>,
+        // Bazel-style parameter name
+        #[starlark(require = named)] implementation: Option<Value<'v>>,
+        #[starlark(require = named, default = UnpackDictEntries::default())]
+        refs: UnpackDictEntries<StringValue<'v>, StringValue<'v>>,
         #[starlark(require = named)] attrs: Option<UnpackListOrTuple<StringValue<'v>>>,
         #[starlark(require = named, default = false)] split: bool,
+        // Bazel-compatible: inputs/outputs specify which settings the transition reads/writes
+        // TODO(bazel): Implement Bazel-style transition inputs/outputs
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        inputs: UnpackListOrTuple<&str>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        outputs: UnpackListOrTuple<&str>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Transition<'v>> {
-        let implementation = r#impl.0;
+        let _unused = (inputs, outputs);
+
+        // Support both `implementation` (Bazel) and `impl` (Kuro) parameter names
+        let impl_value = match (r#impl, implementation) {
+            (Some(checked), None) => checked.0,
+            (None, Some(bazel_impl)) => bazel_impl,
+            (Some(_), Some(_)) => {
+                return Err(starlark::Error::from(
+                    starlark::values::ValueError::IncorrectParameterTypeNamed(
+                        "Cannot specify both `impl` and `implementation`".to_owned(),
+                    ),
+                ));
+            }
+            (None, None) => {
+                return Err(starlark::Error::from(
+                    starlark::values::ValueError::IncorrectParameterTypeNamed(
+                        "Either `impl` or `implementation` is required".to_owned(),
+                    ),
+                ));
+            }
+        };
 
         let refs = refs
             .entries
@@ -293,12 +325,15 @@ fn register_transition_function(builder: &mut GlobalsBuilder) {
             }
         };
 
-        validate_transition_impl(implementation, attrs.is_some(), split)?;
+        // Skip validation for Bazel-style transitions (they have different signatures)
+        if r#impl.is_some() {
+            validate_transition_impl(impl_value, attrs.is_some(), split)?;
+        }
 
         Ok(Transition {
             id: RefCell::new(None),
             path,
-            implementation,
+            implementation: impl_value,
             refs,
             attrs: attrs.map(|a| a.items),
             split,

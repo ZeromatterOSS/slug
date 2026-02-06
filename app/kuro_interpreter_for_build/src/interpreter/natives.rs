@@ -27,6 +27,43 @@ use crate::interpreter::build_context::PerFileTypeContext;
 use crate::interpreter::globspec::GlobSpec;
 use crate::interpreter::module_internals::ModuleInternals;
 
+/// Extract cell name and package path from a project-relative filename.
+///
+/// During analysis, BuildContext is unavailable but we can determine the cell
+/// from the call stack filename. The filename is a project-relative path:
+/// - `bazel-external/{cell_name}/{version}/...` for external bzlmod modules
+/// - `bazel_tools/...` for bazel_tools cell
+/// - Other paths for root cell
+fn extract_cell_and_package_from_filename(filename: &str) -> (String, String) {
+    if let Some(rest) = filename.strip_prefix("bazel-external/") {
+        // bazel-external/{cell_name}/{version}/{cell_relative_path}
+        if let Some(cell_end) = rest.find('/') {
+            let cell_name = rest[..cell_end].to_owned();
+            let after_cell = &rest[cell_end + 1..];
+            // Skip the version component
+            if let Some(version_end) = after_cell.find('/') {
+                let cell_relative = &after_cell[version_end + 1..];
+                if let Some(last_slash) = cell_relative.rfind('/') {
+                    return (cell_name, cell_relative[..last_slash].to_owned());
+                }
+                return (cell_name, String::new());
+            }
+            return (cell_name, String::new());
+        }
+    }
+    if let Some(rest) = filename.strip_prefix("bazel_tools/") {
+        if let Some(last_slash) = rest.rfind('/') {
+            return ("bazel_tools".to_owned(), rest[..last_slash].to_owned());
+        }
+        return ("bazel_tools".to_owned(), String::new());
+    }
+    // Root cell or unknown - extract package from directory
+    if let Some(last_slash) = filename.rfind('/') {
+        return (String::new(), filename[..last_slash].to_owned());
+    }
+    (String::new(), String::new())
+}
+
 /// Register Bazel-specific module-level globals.
 ///
 /// These are functions that can be called at the top level of .bzl files.
@@ -54,12 +91,35 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
         // - In a BUILD file: // resolves to the BUILD file's repository
         // This is critical for rules packages (e.g., rules_cc) that use
         // Label("//:target") to refer to their own repo's targets.
-        let build_ctx = BuildContext::from_context(eval)?;
 
-        // Use starlark_path().cell() which returns:
-        // - For .bzl files: the .bzl file's cell (e.g., "rules_cc")
-        // - For BUILD files: the BUILD file's cell (e.g., "manual_test")
-        let file_cell = build_ctx.starlark_path().cell();
+        // Try BuildContext first (available during loading/interpretation).
+        // During analysis, BuildContext is unavailable - fall back to call stack parsing.
+        let (file_cell, pkg_path) = if let Ok(build_ctx) = BuildContext::from_context(eval) {
+            let cell = build_ctx.starlark_path().cell().to_string();
+            let pkg = match &build_ctx.additional {
+                PerFileTypeContext::Build(module) => module
+                    .buildfile_path()
+                    .package()
+                    .to_cell_path()
+                    .path()
+                    .as_str()
+                    .to_owned(),
+                PerFileTypeContext::Bzl(bzl_ctx) => {
+                    bzl_ctx.bzl_path.path_parent().path().as_str().to_owned()
+                }
+                _ => build_ctx.base_path()?.path().as_str().to_owned(),
+            };
+            (cell, pkg)
+        } else {
+            // During analysis: extract cell name and package from call stack filename.
+            // The filename is a project-relative path like:
+            //   "bazel-external/rules_rust/0.40.0/rust/private/utils.bzl"
+            //   "bazel_tools/tools/build_rules/filegroup.bzl"
+            //   "some/local/file.bzl"
+            let location = eval.call_stack_top_location();
+            let filename = location.as_ref().map(|l| l.filename().to_owned());
+            extract_cell_and_package_from_filename(filename.as_deref().unwrap_or(""))
+        };
 
         let resolved = if label_string.starts_with('@') {
             // Already fully qualified with repository
@@ -69,24 +129,6 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
             format!("@{}{}", file_cell, label_string)
         } else {
             // Relative label (:target or bare target)
-            // Get the package path based on the current file type
-            let pkg_path = match &build_ctx.additional {
-                PerFileTypeContext::Build(module) => module
-                    .buildfile_path()
-                    .package()
-                    .to_cell_path()
-                    .path()
-                    .as_str()
-                    .to_owned(),
-                PerFileTypeContext::Bzl(bzl_ctx) => {
-                    // For .bzl files, the "package" is the directory containing the .bzl file
-                    bzl_ctx.bzl_path.path_parent().path().as_str().to_owned()
-                }
-                _ => {
-                    // For other file types, try base_path as fallback
-                    build_ctx.base_path()?.path().as_str().to_owned()
-                }
-            };
             let target = label_string.strip_prefix(':').unwrap_or(label_string);
             format!("@{}//{}:{}", file_cell, pkg_path, target)
         };
@@ -518,6 +560,9 @@ pub const KURO_BAZEL_VERSION: &str = "9.0.0";
 pub(crate) fn register_bazel_native(globals: &mut GlobalsBuilder) {
     globals.namespace("native", |registry| {
         bazel_native_module(registry);
+        // Also include native rules (alias, config_setting, constraint_setting, etc.)
+        // so they can be called as native.alias(), native.config_setting(), etc. from .bzl files
+        crate::interpreter::native_rules::register_native_rules(registry);
         // Add bazel_version constant to the native module
         // This is accessed as `native.bazel_version` in Starlark
         registry.set("bazel_version", KURO_BAZEL_VERSION);

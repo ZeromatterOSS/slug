@@ -14,3 +14,6 @@ module(
 # rules_cc dependency - Phase 8f verified loading works
 # Requires manual symlinks: ln -sf ~/.cache/kuro/.../source bazel-external/{module}/{version}
 bazel_dep(name = "rules_cc", version = "0.2.16")
+
+# rules_rust dependency - Phase 10 integration
+bazel_dep(name = "rules_rust", version = "0.40.0")
