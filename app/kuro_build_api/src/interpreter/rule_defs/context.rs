@@ -1386,10 +1386,11 @@ impl<'v> StarlarkValue<'v> for CtxFiles<'v> {
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        use crate::interpreter::rule_defs::provider::dependency::Dependency;
-        use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
         use starlark::values::list::AllocList;
         use starlark::values::list::ListRef;
+
+        use crate::interpreter::rule_defs::provider::dependency::Dependency;
+        use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
 
         // Get the attribute value from attrs
         let attr_value = self.attrs.get_attr(attribute, heap).ok().flatten()?;
@@ -1475,9 +1476,10 @@ impl<'v> StarlarkValue<'v> for CtxFile<'v> {
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        use starlark::values::list::ListRef;
+
         use crate::interpreter::rule_defs::provider::dependency::Dependency;
         use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
-        use starlark::values::list::ListRef;
 
         let attr_value = self.attrs.get_attr(attribute, heap).ok().flatten()?;
 
