@@ -19,6 +19,11 @@ use std::fmt::Display;
 use std::sync::OnceLock;
 
 use allocative::Allocative;
+use kuro_core::bzl::ImportPath;
+use kuro_core::cells::build_file_cell::BuildFileCell;
+use kuro_core::cells::cell_path::CellPath;
+use kuro_core::cells::name::CellName;
+use kuro_core::cells::paths::CellRelativePathBuf;
 use starlark::coerce::Coerce;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
@@ -28,8 +33,9 @@ use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
 use starlark::values::Freeze;
-use starlark::values::FrozenValue;
 use starlark::values::FrozenHeap;
+use starlark::values::FrozenValue;
+use starlark::values::FrozenValueTyped;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::OwnedFrozenValueTyped;
@@ -43,13 +49,6 @@ use starlark::values::list::AllocList;
 use starlark::values::list::ListRef;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::starlark_value;
-use starlark::values::FrozenValueTyped;
-
-use kuro_core::bzl::ImportPath;
-use kuro_core::cells::build_file_cell::BuildFileCell;
-use kuro_core::cells::cell_path::CellPath;
-use kuro_core::cells::name::CellName;
-use kuro_core::cells::paths::CellRelativePathBuf;
 
 use crate::interpreter::rule_defs::transitive_set::FrozenTransitiveSetDefinition;
 use crate::interpreter::rule_defs::transitive_set::transitive_set_definition::builtin_definition;
@@ -63,17 +62,21 @@ enum DepsetError {
     InvalidOrder { order: String },
     #[error("depset transitive elements must be depsets")]
     TransitiveNotDepset,
-    #[error("depset transitive elements must all have the same order, got `{first}` and `{second}`")]
+    #[error(
+        "depset transitive elements must all have the same order, got `{first}` and `{second}`"
+    )]
     TransitiveOrderMismatch { first: String, second: String },
-    #[error("depset order `{order}` is incompatible with transitive depset order `{transitive_order}`")]
+    #[error(
+        "depset order `{order}` is incompatible with transitive depset order `{transitive_order}`"
+    )]
     OrderIncompatible {
         order: String,
         transitive_order: String,
     },
 }
 
-pub fn bazel_depset_tset_definition(
-) -> kuro_error::Result<&'static OwnedFrozenValueTyped<FrozenTransitiveSetDefinition>> {
+pub fn bazel_depset_tset_definition()
+-> kuro_error::Result<&'static OwnedFrozenValueTyped<FrozenTransitiveSetDefinition>> {
     static DEF: OnceLock<OwnedFrozenValueTyped<FrozenTransitiveSetDefinition>> = OnceLock::new();
     DEF.get_or_try_init(|| {
         let cell = CellName::unchecked_new("kuro_builtin")?;
@@ -105,7 +108,6 @@ pub struct Depset {
     /// Child depsets whose elements are transitively included.
     children: Vec<FrozenValue>,
     /// Iteration order: "default", "preorder", "postorder", "topological".
-    #[allow(dead_code)]
     order: String,
 }
 
@@ -152,20 +154,39 @@ impl Depset {
     /// Collect all elements from this depset and its transitive children.
     /// Uses preorder traversal (direct elements first, then transitive).
     pub fn collect_all_frozen(&self) -> Vec<FrozenValue> {
+        self.collect_all_frozen_ordered(&self.order)
+    }
+
+    /// Collect all elements with a specific traversal order.
+    pub fn collect_all_frozen_ordered(&self, order: &str) -> Vec<FrozenValue> {
         let mut result = Vec::new();
-        self.collect_frozen_recursive(&mut result);
+        self.collect_frozen_recursive_ordered(&mut result, order);
         result
     }
 
-    fn collect_frozen_recursive(&self, result: &mut Vec<FrozenValue>) {
-        // Add direct elements first
-        for elem in &self.direct {
-            result.push(*elem);
-        }
-        // Then recurse into transitive children
-        for child in &self.children {
-            if let Some(child_depset) = child.downcast_ref::<Depset>() {
-                child_depset.collect_frozen_recursive(result);
+    fn collect_frozen_recursive_ordered(&self, result: &mut Vec<FrozenValue>, order: &str) {
+        match order {
+            "postorder" | "topological" => {
+                // Transitive children first, then direct
+                for child in &self.children {
+                    if let Some(child_depset) = child.downcast_ref::<Depset>() {
+                        child_depset.collect_frozen_recursive_ordered(result, order);
+                    }
+                }
+                for elem in &self.direct {
+                    result.push(*elem);
+                }
+            }
+            _ => {
+                // "preorder" / "default" — direct first, then transitive
+                for elem in &self.direct {
+                    result.push(*elem);
+                }
+                for child in &self.children {
+                    if let Some(child_depset) = child.downcast_ref::<Depset>() {
+                        child_depset.collect_frozen_recursive_ordered(result, order);
+                    }
+                }
             }
         }
     }
@@ -454,6 +475,83 @@ pub fn depset_direct_and_transitive<'v>(
 
 // Removed live_depset_methods - using generic_live_depset_methods for all cases
 
+/// Recursively collect elements from any depset type, respecting traversal order.
+fn collect_depset_elements_ordered<'v>(
+    value: Value<'v>,
+    elements: &mut Vec<Value<'v>>,
+    heap: Heap<'v>,
+    order: &str,
+) {
+    let is_postorder = matches!(order, "postorder" | "topological");
+
+    // Try unfrozen live depset first
+    if let Some(live) = value.downcast_ref::<LiveDepsetGen<Value>>() {
+        if is_postorder {
+            if let Ok(trans_iter) = live.transitive.iterate(heap) {
+                for child in trans_iter {
+                    collect_depset_elements_ordered(child, elements, heap, order);
+                }
+            }
+            if let Ok(direct_iter) = live.direct.iterate(heap) {
+                for elem in direct_iter {
+                    elements.push(elem);
+                }
+            }
+        } else {
+            if let Ok(direct_iter) = live.direct.iterate(heap) {
+                for elem in direct_iter {
+                    elements.push(elem);
+                }
+            }
+            if let Ok(trans_iter) = live.transitive.iterate(heap) {
+                for child in trans_iter {
+                    collect_depset_elements_ordered(child, elements, heap, order);
+                }
+            }
+        }
+    }
+    // Try regular frozen depset
+    else if let Some(frozen_depset) = value.downcast_ref::<Depset>() {
+        for elem in frozen_depset.collect_all_frozen_ordered(order) {
+            elements.push(elem.to_value());
+        }
+    }
+    // If type is "depset", try to access via attributes (handles frozen LiveDepset)
+    else if value.get_type() == "depset" {
+        if is_postorder {
+            if let Some(trans_attr) = value.get_attr("transitive", heap).ok().flatten() {
+                if let Ok(trans_iter) = trans_attr.iterate(heap) {
+                    for child in trans_iter {
+                        collect_depset_elements_ordered(child, elements, heap, order);
+                    }
+                }
+            }
+            if let Some(direct_attr) = value.get_attr("direct", heap).ok().flatten() {
+                if let Ok(direct_iter) = direct_attr.iterate(heap) {
+                    for elem in direct_iter {
+                        elements.push(elem);
+                    }
+                }
+            }
+        } else {
+            if let Some(direct_attr) = value.get_attr("direct", heap).ok().flatten() {
+                if let Ok(direct_iter) = direct_attr.iterate(heap) {
+                    for elem in direct_iter {
+                        elements.push(elem);
+                    }
+                }
+            }
+            if let Some(trans_attr) = value.get_attr("transitive", heap).ok().flatten() {
+                if let Ok(trans_iter) = trans_attr.iterate(heap) {
+                    for child in trans_iter {
+                        collect_depset_elements_ordered(child, elements, heap, order);
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Generic methods for depsets that use Value and handle any depset variant.
 /// This handles both LiveDepset and FrozenLiveDepset via the Value interface.
 #[starlark_module]
@@ -463,9 +561,9 @@ fn generic_live_depset_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] this: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
+        let order = depset_order_from_value(this).unwrap_or("default");
         let mut elements: Vec<Value<'v>> = Vec::new();
-        // Use the generic collector which handles all depset variants
-        collect_depset_elements(this, &mut elements, heap);
+        collect_depset_elements_ordered(this, &mut elements, heap, order);
         Ok(heap.alloc(AllocList(elements)))
     }
 }
@@ -483,20 +581,15 @@ fn depset_order_from_value<'v>(value: Value<'v>) -> Option<&'v str> {
     None
 }
 
-fn validate_depset_order<'v>(
-    order: &str,
-    transitive: &[Value<'v>],
-) -> starlark::Result<String> {
+fn validate_depset_order<'v>(order: &str, transitive: &[Value<'v>]) -> starlark::Result<String> {
     let mut effective_order = order.to_owned();
     match effective_order.as_str() {
         "default" | "preorder" | "postorder" | "topological" => {}
         _ => {
-            return Err(
-                kuro_error::Error::from(DepsetError::InvalidOrder {
-                    order: order.to_owned(),
-                })
-                .into(),
-            );
+            return Err(kuro_error::Error::from(DepsetError::InvalidOrder {
+                order: order.to_owned(),
+            })
+            .into());
         }
     }
 
@@ -530,13 +623,11 @@ fn validate_depset_order<'v>(
         }
     } else if let Some(non_default) = transitive_order {
         if non_default != effective_order {
-            return Err(
-                kuro_error::Error::from(DepsetError::OrderIncompatible {
-                    order: order.to_owned(),
-                    transitive_order: non_default,
-                })
-                .into(),
-            );
+            return Err(kuro_error::Error::from(DepsetError::OrderIncompatible {
+                order: order.to_owned(),
+                transitive_order: non_default,
+            })
+            .into());
         }
     }
 

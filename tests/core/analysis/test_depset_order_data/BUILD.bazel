@@ -1,0 +1,31 @@
+load(":defs.bzl", "depset_default_infer_rule", "depset_mismatch_rule", "depset_order_rule")
+
+package(default_visibility = ["//visibility:public"])
+
+depset_order_rule(
+    name = "preorder",
+    order = "preorder",
+)
+
+depset_order_rule(
+    name = "postorder",
+    order = "postorder",
+)
+
+depset_order_rule(
+    name = "topological",
+    order = "topological",
+)
+
+depset_order_rule(
+    name = "default",
+    order = "default",
+)
+
+depset_default_infer_rule(
+    name = "default_infer",
+)
+
+depset_mismatch_rule(
+    name = "mismatch",
+)
