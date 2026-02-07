@@ -8,34 +8,33 @@
  * above-listed licenses.
  */
 
+use anyhow::anyhow;
+use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
+use kuro_build_api::interpreter::rule_defs::depset::Depset;
+use kuro_build_api::interpreter::rule_defs::depset::bazel_depset_tset_definition;
+use kuro_build_api::interpreter::rule_defs::depset::depset_direct_and_transitive;
+use kuro_build_api::interpreter::rule_defs::depset::make_depset_from_lists;
+use kuro_build_api::interpreter::rule_defs::transitive_set::FrozenTransitiveSet;
+use kuro_build_api::interpreter::rule_defs::transitive_set::FrozenTransitiveSetDefinition;
+use kuro_build_api::interpreter::rule_defs::transitive_set::TransitiveSet;
+use kuro_build_api::interpreter::rule_defs::transitive_set::TransitiveSetLike;
+use kuro_build_api::interpreter::rule_defs::transitive_set::TransitiveSetOrdering;
 use starlark::collections::SmallMap;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
+use starlark::values::FrozenValueTyped;
 use starlark::values::StringValue;
 use starlark::values::Value;
+use starlark::values::ValueLike;
 use starlark::values::ValueOfUnchecked;
+use starlark::values::ValueTyped;
 use starlark::values::dict::AllocDict;
 use starlark::values::list::AllocList;
 use starlark::values::list::UnpackList;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
-use starlark::values::FrozenValueTyped;
-use starlark::values::ValueLike;
-use starlark::values::ValueTyped;
-
-use anyhow::anyhow;
-use kuro_build_api::interpreter::rule_defs::depset::Depset;
-use kuro_build_api::interpreter::rule_defs::depset::bazel_depset_tset_definition;
-use kuro_build_api::interpreter::rule_defs::depset::depset_direct_and_transitive;
-use kuro_build_api::interpreter::rule_defs::depset::make_depset_from_lists;
-use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
-use kuro_build_api::interpreter::rule_defs::transitive_set::FrozenTransitiveSet;
-use kuro_build_api::interpreter::rule_defs::transitive_set::FrozenTransitiveSetDefinition;
-use kuro_build_api::interpreter::rule_defs::transitive_set::TransitiveSet;
-use kuro_build_api::interpreter::rule_defs::transitive_set::TransitiveSetLike;
-use kuro_build_api::interpreter::rule_defs::transitive_set::TransitiveSetOrdering;
 
 use crate::interpreter::build_context::BuildContext;
 use crate::interpreter::build_context::PerFileTypeContext;

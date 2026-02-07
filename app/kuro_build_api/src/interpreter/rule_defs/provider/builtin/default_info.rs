@@ -251,8 +251,7 @@ impl FrozenDefaultInfo {
             FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         let default_runfiles =
             FrozenValueOfUnchecked::<FrozenValue>::new(empty_runfiles_frozen(heap));
-        let data_runfiles =
-            FrozenValueOfUnchecked::<FrozenValue>::new(empty_runfiles_frozen(heap));
+        let data_runfiles = FrozenValueOfUnchecked::<FrozenValue>::new(empty_runfiles_frozen(heap));
         let executable = FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
         FrozenValueTyped::new_err(heap.alloc(FrozenDefaultInfo {
             sub_targets,
@@ -551,9 +550,7 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
     ///
     /// Returns a runfiles object that contains the files needed at runtime.
     #[starlark(attribute)]
-    fn default_runfiles<'v>(
-        this: &DefaultInfo<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn default_runfiles<'v>(this: &DefaultInfo<'v>) -> starlark::Result<Value<'v>> {
         Ok(this.default_runfiles.get().to_value())
     }
 
@@ -561,9 +558,7 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
     ///
     /// Returns a runfiles object for when this target is used as a data dependency.
     #[starlark(attribute)]
-    fn data_runfiles<'v>(
-        this: &DefaultInfo<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn data_runfiles<'v>(this: &DefaultInfo<'v>) -> starlark::Result<Value<'v>> {
         Ok(this.data_runfiles.get().to_value())
     }
 
@@ -910,14 +905,12 @@ fn normalize_runfiles_files<'v>(
         } else if let Ok(iter) = files.iterate(heap) {
             direct_items.extend(iter);
         } else {
-            return Err(
-                kuro_error::Error::from(RunfilesError::ExpectedIterable(
-                    "files",
-                    files.to_repr(),
-                    files.get_type().to_owned(),
-                ))
-                .into(),
-            );
+            return Err(kuro_error::Error::from(RunfilesError::ExpectedIterable(
+                "files",
+                files.to_repr(),
+                files.get_type().to_owned(),
+            ))
+            .into());
         }
     }
 
@@ -933,14 +926,12 @@ fn normalize_runfiles_files<'v>(
         } else if let Ok(iter) = transitive_files.iterate(heap) {
             transitive_items.extend(iter);
         } else {
-            return Err(
-                kuro_error::Error::from(RunfilesError::ExpectedIterable(
-                    "transitive_files",
-                    transitive_files.to_repr(),
-                    transitive_files.get_type().to_owned(),
-                ))
-                .into(),
-            );
+            return Err(kuro_error::Error::from(RunfilesError::ExpectedIterable(
+                "transitive_files",
+                transitive_files.to_repr(),
+                transitive_files.get_type().to_owned(),
+            ))
+            .into());
         }
     }
 
@@ -968,14 +959,12 @@ fn normalize_runfiles_dict<'v>(
     if DictRef::from_value(value).is_some() {
         Ok(value)
     } else {
-        Err(
-            kuro_error::Error::from(RunfilesError::ExpectedDict(
-                field,
-                value.to_repr(),
-                value.get_type().to_owned(),
-            ))
-            .into(),
-        )
+        Err(kuro_error::Error::from(RunfilesError::ExpectedDict(
+            field,
+            value.to_repr(),
+            value.get_type().to_owned(),
+        ))
+        .into())
     }
 }
 
@@ -1032,13 +1021,13 @@ fn merge_runfiles<'v>(
     left: &Runfiles<'v>,
     right: &Runfiles<'v>,
 ) -> starlark::Result<Value<'v>> {
-    let files = union_depsets(
-        heap,
-        vec![left.files.to_value(), right.files.to_value()],
-    );
+    let files = union_depsets(heap, vec![left.files.to_value(), right.files.to_value()]);
     let empty_filenames = union_depsets(
         heap,
-        vec![left.empty_filenames.to_value(), right.empty_filenames.to_value()],
+        vec![
+            left.empty_filenames.to_value(),
+            right.empty_filenames.to_value(),
+        ],
     );
     let symlinks = merge_runfiles_dicts(
         "symlinks",
@@ -1096,8 +1085,7 @@ pub fn create_runfiles<'v>(
 ) -> starlark::Result<Value<'v>> {
     let normalized_files = normalize_runfiles_files(files, transitive_files, heap)?;
     let normalized_symlinks = normalize_runfiles_dict("symlinks", symlinks, heap)?;
-    let normalized_root_symlinks =
-        normalize_runfiles_dict("root_symlinks", root_symlinks, heap)?;
+    let normalized_root_symlinks = normalize_runfiles_dict("root_symlinks", root_symlinks, heap)?;
     let empty_filenames = heap.alloc(Depset::empty());
 
     Ok(heap.alloc(RunfilesGen {
@@ -1133,13 +1121,11 @@ fn validate_runfiles_value<'v>(value: Value<'v>) -> starlark::Result<Value<'v>> 
     if Runfiles::from_value(value).is_some() {
         Ok(value)
     } else {
-        Err(
-            kuro_error::Error::from(RunfilesError::ExpectedRunfiles(
-                value.to_repr(),
-                value.get_type().to_owned(),
-            ))
-            .into(),
-        )
+        Err(kuro_error::Error::from(RunfilesError::ExpectedRunfiles(
+            value.to_repr(),
+            value.get_type().to_owned(),
+        ))
+        .into())
     }
 }
 

@@ -651,10 +651,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// In Bazel, `ctx.info_file` provides access to the stable-status.txt file
     /// which contains stamping info like BUILD_EMBED_LABEL. Returns a path string stub.
     #[starlark(attribute)]
-    fn info_file<'v>(
-        this: RefAnalysisContext<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn info_file<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         Ok(heap.alloc_str("bazel-out/stable-status.txt").to_value())
     }
@@ -771,13 +768,14 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         root_symlinks: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let mut runfiles = crate::interpreter::rule_defs::provider::builtin::default_info::create_runfiles(
-            heap,
-            files,
-            transitive_files,
-            symlinks,
-            root_symlinks,
-        )?;
+        let mut runfiles =
+            crate::interpreter::rule_defs::provider::builtin::default_info::create_runfiles(
+                heap,
+                files,
+                transitive_files,
+                symlinks,
+                root_symlinks,
+            )?;
 
         if collect_default || collect_data {
             let Some(attrs) = this.0.attrs else {
@@ -2620,10 +2618,7 @@ pub struct RustToolStub(&'static str);
 /// Detect the path to a Rust tool by checking common locations.
 fn detect_rust_tool_path(tool_name: &str) -> String {
     // Try `which` first via PATH lookup
-    if let Ok(output) = std::process::Command::new("which")
-        .arg(tool_name)
-        .output()
-    {
+    if let Ok(output) = std::process::Command::new("which").arg(tool_name).output() {
         if output.status.success() {
             let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if !path.is_empty() {
