@@ -16,6 +16,7 @@
 
 use std::fmt;
 use std::fmt::Display;
+use std::sync::OnceLock;
 
 use allocative::Allocative;
 use starlark::coerce::Coerce;
@@ -28,8 +29,10 @@ use starlark::starlark_module;
 use starlark::starlark_simple_value;
 use starlark::values::Freeze;
 use starlark::values::FrozenValue;
+use starlark::values::FrozenHeap;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
+use starlark::values::OwnedFrozenValueTyped;
 use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
@@ -37,9 +40,56 @@ use starlark::values::Value;
 use starlark::values::ValueLifetimeless;
 use starlark::values::ValueLike;
 use starlark::values::list::AllocList;
+use starlark::values::list::ListRef;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::starlark_value;
-use starlark::values::starlark_value_as_type::StarlarkValueAsType;
+use starlark::values::FrozenValueTyped;
+
+use kuro_core::bzl::ImportPath;
+use kuro_core::cells::build_file_cell::BuildFileCell;
+use kuro_core::cells::cell_path::CellPath;
+use kuro_core::cells::name::CellName;
+use kuro_core::cells::paths::CellRelativePathBuf;
+
+use crate::interpreter::rule_defs::transitive_set::FrozenTransitiveSetDefinition;
+use crate::interpreter::rule_defs::transitive_set::transitive_set_definition::builtin_definition;
+
+#[derive(Debug, kuro_error::Error)]
+#[kuro(tag = Input)]
+enum DepsetError {
+    #[error(
+        "depset order must be one of `default`, `preorder`, `postorder`, `topological`, got `{order}`"
+    )]
+    InvalidOrder { order: String },
+    #[error("depset transitive elements must be depsets")]
+    TransitiveNotDepset,
+    #[error("depset transitive elements must all have the same order, got `{first}` and `{second}`")]
+    TransitiveOrderMismatch { first: String, second: String },
+    #[error("depset order `{order}` is incompatible with transitive depset order `{transitive_order}`")]
+    OrderIncompatible {
+        order: String,
+        transitive_order: String,
+    },
+}
+
+pub fn bazel_depset_tset_definition(
+) -> kuro_error::Result<&'static OwnedFrozenValueTyped<FrozenTransitiveSetDefinition>> {
+    static DEF: OnceLock<OwnedFrozenValueTyped<FrozenTransitiveSetDefinition>> = OnceLock::new();
+    DEF.get_or_try_init(|| {
+        let cell = CellName::unchecked_new("kuro_builtin")?;
+        let cell_path = CellPath::new(
+            cell,
+            CellRelativePathBuf::unchecked_new("builtin/depset.bzl".to_owned()),
+        );
+        let import_path =
+            ImportPath::new_with_build_file_cells(cell_path, BuildFileCell::new(cell))?;
+        let definition = builtin_definition("BazelDepsetTset", import_path)?;
+        let heap = FrozenHeap::new();
+        let value = FrozenValueTyped::new(heap.alloc_simple(definition))
+            .expect("frozen depset tset definition");
+        Ok(unsafe { OwnedFrozenValueTyped::new(heap.into_ref(), value) })
+    })
+}
 
 // ============================================================================
 // FrozenDepset - Immutable depset for frozen modules
@@ -85,6 +135,18 @@ impl Depset {
             children,
             order,
         }
+    }
+
+    pub fn direct_values(&self) -> &[FrozenValue] {
+        &self.direct
+    }
+
+    pub fn children_values(&self) -> &[FrozenValue] {
+        &self.children
+    }
+
+    pub fn order_str(&self) -> &str {
+        &self.order
     }
 
     /// Collect all elements from this depset and its transitive children.
@@ -317,6 +379,79 @@ pub(crate) fn collect_depset_elements<'v>(
     // Else: not a depset, ignore
 }
 
+pub fn depset_direct_and_transitive<'v>(
+    value: Value<'v>,
+    heap: Heap<'v>,
+) -> starlark::Result<(Vec<Value<'v>>, Vec<Value<'v>>)> {
+    if let Some(live) = value.downcast_ref::<LiveDepsetGen<Value<'v>>>() {
+        let mut direct = Vec::new();
+        if let Ok(iter) = live.direct.iterate(heap) {
+            for item in iter {
+                direct.push(item);
+            }
+        }
+        let mut transitive = Vec::new();
+        if let Ok(iter) = live.transitive.iterate(heap) {
+            for item in iter {
+                transitive.push(item);
+            }
+        }
+        return Ok((direct, transitive));
+    }
+
+    if let Some(live) = value.downcast_ref::<LiveDepsetGen<FrozenValue>>() {
+        let mut direct = Vec::new();
+        if let Some(list) = ListRef::from_value(live.direct.to_value()) {
+            for item in list.iter() {
+                direct.push(item);
+            }
+        }
+        let mut transitive = Vec::new();
+        if let Some(list) = ListRef::from_value(live.transitive.to_value()) {
+            for item in list.iter() {
+                transitive.push(item);
+            }
+        }
+        return Ok((direct, transitive));
+    }
+
+    if let Some(depset) = value.downcast_ref::<Depset>() {
+        let direct = depset
+            .direct_values()
+            .iter()
+            .map(|v| v.to_value())
+            .collect::<Vec<_>>();
+        let transitive = depset
+            .children_values()
+            .iter()
+            .map(|v| v.to_value())
+            .collect::<Vec<_>>();
+        return Ok((direct, transitive));
+    }
+
+    if value.get_type() == "depset" {
+        let mut direct = Vec::new();
+        if let Some(direct_attr) = value.get_attr("direct", heap).ok().flatten() {
+            if let Ok(iter) = direct_attr.iterate(heap) {
+                for item in iter {
+                    direct.push(item);
+                }
+            }
+        }
+        let mut transitive = Vec::new();
+        if let Some(trans_attr) = value.get_attr("transitive", heap).ok().flatten() {
+            if let Ok(iter) = trans_attr.iterate(heap) {
+                for item in iter {
+                    transitive.push(item);
+                }
+            }
+        }
+        return Ok((direct, transitive));
+    }
+
+    Err(kuro_error::Error::from(DepsetError::TransitiveNotDepset).into())
+}
+
 // Removed live_depset_methods - using generic_live_depset_methods for all cases
 
 /// Generic methods for depsets that use Value and handle any depset variant.
@@ -333,6 +468,95 @@ fn generic_live_depset_methods(builder: &mut MethodsBuilder) {
         collect_depset_elements(this, &mut elements, heap);
         Ok(heap.alloc(AllocList(elements)))
     }
+}
+
+fn depset_order_from_value<'v>(value: Value<'v>) -> Option<&'v str> {
+    if let Some(live) = value.downcast_ref::<LiveDepsetGen<Value<'v>>>() {
+        return Some(live.order.as_str());
+    }
+    if let Some(live) = value.downcast_ref::<LiveDepsetGen<FrozenValue>>() {
+        return Some(live.order.as_str());
+    }
+    if let Some(depset) = value.downcast_ref::<Depset>() {
+        return Some(depset.order_str());
+    }
+    None
+}
+
+fn validate_depset_order<'v>(
+    order: &str,
+    transitive: &[Value<'v>],
+) -> starlark::Result<String> {
+    let mut effective_order = order.to_owned();
+    match effective_order.as_str() {
+        "default" | "preorder" | "postorder" | "topological" => {}
+        _ => {
+            return Err(
+                kuro_error::Error::from(DepsetError::InvalidOrder {
+                    order: order.to_owned(),
+                })
+                .into(),
+            );
+        }
+    }
+
+    let mut transitive_order: Option<String> = None;
+    for item in transitive {
+        let Some(item_order) = depset_order_from_value(*item) else {
+            return Err(kuro_error::Error::from(DepsetError::TransitiveNotDepset).into());
+        };
+        if item_order == "default" {
+            continue;
+        }
+        match &transitive_order {
+            None => transitive_order = Some(item_order.to_owned()),
+            Some(existing) => {
+                if existing != item_order {
+                    return Err(
+                        kuro_error::Error::from(DepsetError::TransitiveOrderMismatch {
+                            first: existing.clone(),
+                            second: item_order.to_owned(),
+                        })
+                        .into(),
+                    );
+                }
+            }
+        }
+    }
+
+    if effective_order == "default" {
+        if let Some(non_default) = transitive_order {
+            effective_order = non_default;
+        }
+    } else if let Some(non_default) = transitive_order {
+        if non_default != effective_order {
+            return Err(
+                kuro_error::Error::from(DepsetError::OrderIncompatible {
+                    order: order.to_owned(),
+                    transitive_order: non_default,
+                })
+                .into(),
+            );
+        }
+    }
+
+    Ok(effective_order)
+}
+
+pub fn make_depset_from_lists<'v>(
+    heap: Heap<'v>,
+    direct: Vec<Value<'v>>,
+    transitive: Vec<Value<'v>>,
+    order: &str,
+) -> starlark::Result<Value<'v>> {
+    let effective_order = validate_depset_order(order, &transitive)?;
+    let direct_list = heap.alloc(AllocList(direct));
+    let transitive_list = heap.alloc(AllocList(transitive));
+    Ok(heap.alloc(LiveDepsetGen {
+        direct: direct_list,
+        transitive: transitive_list,
+        order: effective_order,
+    }))
 }
 
 // ============================================================================
@@ -359,18 +583,6 @@ pub fn register_depset(globals: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let heap = eval.heap();
-
-        // Store direct elements as a list
-        let direct_list = heap.alloc(AllocList(direct.items));
-
-        // Store transitive depsets as a list
-        let transitive_list = heap.alloc(AllocList(transitive.items));
-
-        // Create the live depset
-        Ok(heap.alloc(LiveDepsetGen {
-            direct: direct_list,
-            transitive: transitive_list,
-            order: order.to_owned(),
-        }))
+        make_depset_from_lists(heap, direct.items, transitive.items, order)
     }
 }

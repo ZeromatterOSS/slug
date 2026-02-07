@@ -357,6 +357,8 @@ Check Kuro's existing runfiles implementation and align API.
 - [x] ADD `tests/core/analysis/test_runfiles.py` for runfiles collection
 - [ ] ADD `tests/core/analysis/test_depset_ordering.py` for depset order parameter
 - [ ] ADD `tests/core/analysis/test_depset_transitive_set_bridge.py` for explicit conversion helpers
+- [ ] ADD depset ordering coverage: `default`, `preorder`, `postorder`, `topological`
+- [ ] ADD depset merge-rule coverage (only same order or `default` allowed)
 - [ ] ADD `tests/core/analysis/test_provider_definition.py` for custom providers
 
 ---

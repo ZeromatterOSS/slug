@@ -200,8 +200,8 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
     /// newline separated unless another delimiter is explicitly specified.
     fn write<'v>(
         this: &AnalysisActions<'v>,
-        #[starlark(require = pos)] output: OutputArtifactArg<'v>,
-        #[starlark(require = pos)] content: WriteContentArg<'v>,
+        output: OutputArtifactArg<'v>,
+        content: WriteContentArg<'v>,
         // Bazel allows is_executable as positional: ctx.actions.write(output, content, is_executable)
         #[starlark(default = false)] is_executable: bool,
         #[starlark(require = named, default = false)] allow_args: bool,

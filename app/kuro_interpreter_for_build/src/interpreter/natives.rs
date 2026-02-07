@@ -21,11 +21,62 @@ use starlark::values::list::UnpackList;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
+use starlark::values::FrozenValueTyped;
+use starlark::values::ValueLike;
+use starlark::values::ValueTyped;
+
+use anyhow::anyhow;
+use kuro_build_api::interpreter::rule_defs::depset::Depset;
+use kuro_build_api::interpreter::rule_defs::depset::bazel_depset_tset_definition;
+use kuro_build_api::interpreter::rule_defs::depset::depset_direct_and_transitive;
+use kuro_build_api::interpreter::rule_defs::depset::make_depset_from_lists;
+use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
+use kuro_build_api::interpreter::rule_defs::transitive_set::FrozenTransitiveSet;
+use kuro_build_api::interpreter::rule_defs::transitive_set::FrozenTransitiveSetDefinition;
+use kuro_build_api::interpreter::rule_defs::transitive_set::TransitiveSet;
+use kuro_build_api::interpreter::rule_defs::transitive_set::TransitiveSetLike;
+use kuro_build_api::interpreter::rule_defs::transitive_set::TransitiveSetOrdering;
 
 use crate::interpreter::build_context::BuildContext;
 use crate::interpreter::build_context::PerFileTypeContext;
 use crate::interpreter::globspec::GlobSpec;
 use crate::interpreter::module_internals::ModuleInternals;
+
+fn depset_to_transitive_set<'v>(
+    depset: Value<'v>,
+    actions: &AnalysisActions<'v>,
+    definition: FrozenValueTyped<'v, FrozenTransitiveSetDefinition>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> starlark::Result<ValueTyped<'v, TransitiveSet<'v>>> {
+    let heap = eval.heap();
+    let (direct, transitive) = depset_direct_and_transitive(depset, heap)?;
+    let mut child_sets = Vec::new();
+
+    for item in direct {
+        let tset = {
+            let mut state = actions.state()?;
+            state.create_transitive_set(definition, Some(item), None, eval)?
+        };
+        child_sets.push(tset.to_value());
+    }
+
+    for child in transitive {
+        let tset = depset_to_transitive_set(child, actions, definition, eval)?;
+        child_sets.push(tset.to_value());
+    }
+
+    let children_value = if child_sets.is_empty() {
+        None
+    } else {
+        Some(heap.alloc(AllocList(child_sets)).to_value())
+    };
+
+    let root = {
+        let mut state = actions.state()?;
+        state.create_transitive_set(definition, None, children_value, eval)?
+    };
+    Ok(root)
+}
 
 /// Extract cell name and package path from a project-relative filename.
 ///
@@ -454,6 +505,84 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
             .base_path()?
             .path()
             .to_string())
+    }
+
+    /// Convert a depset to a transitive_set.
+    ///
+    /// This is a Kuro-specific bridge to preserve transitive_set performance internally
+    /// while exposing Bazel-compatible depset APIs to rules.
+    fn transitive_set_from_depset<'v>(
+        depset: Value<'v>,
+        #[starlark(require = named, default = "default")] order: &str,
+        #[starlark(require = named, default = NoneOr::None)] actions: NoneOr<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        match order {
+            "default" | "preorder" | "postorder" | "topological" => {}
+            _ => {
+                return Err(starlark::Error::new_other(anyhow!(
+                    "expected order to be one of `default`, `preorder`, `postorder`, `topological`, got `{order}`"
+                )));
+            }
+        }
+        let actions = match actions {
+            NoneOr::None => {
+                return Err(starlark::Error::new_other(anyhow!(
+                    "native.transitive_set_from_depset requires actions=ctx.actions"
+                )));
+            }
+            NoneOr::Other(value) => value,
+        };
+        let Some(actions) = actions.downcast_ref::<AnalysisActions>() else {
+            return Err(starlark::Error::new_other(anyhow!(
+                "actions must be an AnalysisActions instance"
+            )));
+        };
+
+        let definition = bazel_depset_tset_definition()?;
+        let definition = definition.owned_frozen_value_typed(eval.frozen_heap());
+        let tset = depset_to_transitive_set(depset, actions, definition, eval)?;
+        Ok(tset.to_value())
+    }
+
+    /// Convert a transitive_set to a depset by materializing its traversal.
+    fn depset_from_transitive_set<'v>(
+        tset: Value<'v>,
+        #[starlark(require = named, default = "default")] order: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let ordering = match order {
+            "default" => TransitiveSetOrdering::Bfs,
+            "preorder" => TransitiveSetOrdering::Preorder,
+            "postorder" => TransitiveSetOrdering::Postorder,
+            "topological" => TransitiveSetOrdering::Topological,
+            _ => {
+                return Err(starlark::Error::new_other(anyhow!(
+                    "expected order to be one of `default`, `preorder`, `postorder`, `topological`, got `{order}`"
+                )));
+            }
+        };
+
+        let mut values = Vec::new();
+        if let Some(transitive) = TransitiveSet::from_value(tset) {
+            for value in transitive.iter_values(ordering)? {
+                values.push(value);
+            }
+        } else if let Some(transitive) = FrozenTransitiveSet::from_value(tset) {
+            for value in transitive.iter_values(ordering)? {
+                values.push(value);
+            }
+        } else if tset.downcast_ref::<Depset>().is_some() {
+            // Already a depset; return it directly.
+            return Ok(tset);
+        } else {
+            return Err(starlark::Error::new_other(anyhow!(
+                "depset_from_transitive_set expects a transitive_set"
+            )));
+        }
+
+        let heap = eval.heap();
+        make_depset_from_lists(heap, values, Vec::new(), order)
     }
 
     /// Returns the name of the repository the rule or build extension is called from.

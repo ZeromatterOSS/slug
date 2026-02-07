@@ -55,6 +55,40 @@ use crate::interpreter::rule_defs::transitive_set::TransitiveSet;
 use crate::interpreter::rule_defs::transitive_set::TransitiveSetError;
 use crate::interpreter::rule_defs::transitive_set::transitive_set::TransitiveSetMatcher;
 
+pub(crate) fn builtin_definition(
+    name: &str,
+    module_id: ImportPath,
+) -> kuro_error::Result<FrozenTransitiveSetDefinition> {
+    let set_type_instance_id = TypeInstanceId::r#gen();
+    let set_ty = Ty::custom(TyUser::new(
+        name.to_owned(),
+        TyStarlarkValue::new::<TransitiveSet>(),
+        set_type_instance_id,
+        TyUserParams {
+            matcher: Some(TypeMatcherFactory::new(TransitiveSetMatcher {
+                type_instance_id: set_type_instance_id,
+            })),
+            ..TyUserParams::default()
+        },
+    )?);
+    let exported = TransitiveSetDefinitionExported {
+        id: Arc::new(TransitiveSetId {
+            module_id,
+            name: name.to_owned(),
+        }),
+        set_ty,
+        set_type_instance_id,
+    };
+
+    Ok(FrozenTransitiveSetDefinition {
+        exported,
+        operations: TransitiveSetOperationsGen {
+            projections: SmallMap::new(),
+            reductions: SmallMap::new(),
+        },
+    })
+}
+
 #[derive(Debug, kuro_error::Error)]
 #[kuro(tag = Input)]
 enum TransitiveSetDefinitionError {
