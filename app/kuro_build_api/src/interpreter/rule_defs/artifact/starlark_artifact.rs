@@ -167,6 +167,15 @@ impl<'v> StarlarkArtifactLike<'v> for StarlarkArtifact {
         Ok(self.artifact.get_path().with_full_path(f))
     }
 
+    fn source_path_info(&self) -> Option<(kuro_core::package::PackageLabel, String)> {
+        let source = self.artifact.get_source()?;
+        let source_path = source.get_path();
+        Some((
+            source_path.package(),
+            source_path.path().as_str().to_owned(),
+        ))
+    }
+
     fn fingerprint<'s>(&'s self) -> ArtifactFingerprint<'s>
     where
         'v: 's,

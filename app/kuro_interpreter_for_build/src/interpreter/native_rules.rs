@@ -43,6 +43,7 @@ use kuro_node::rule_type::NativeRuleKind;
 use kuro_node::rule_type::RuleType;
 use kuro_node::visibility::VisibilityPatternList;
 use kuro_node::visibility::VisibilitySpecification;
+use kuro_util::arc_str::ArcSlice;
 use kuro_util::arc_str::ArcStr;
 use once_cell::sync::Lazy;
 use starlark::environment::GlobalsBuilder;
@@ -141,6 +142,54 @@ mod rule_defs {
             attributes: alias_attributes(),
             rule_type: RuleType::Native(NativeRuleKind::Alias),
             rule_kind: RuleKind::Normal, // Aliases can be used anywhere
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+        })
+    });
+
+    /// Creates the AttributeSpec for filegroup.
+    /// filegroup has optional `srcs` (list of sources/deps) and `data` attributes.
+    fn filegroup_attributes() -> AttributeSpec {
+        let srcs_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
+            "The list of files or targets in this filegroup",
+            AttrType::list(AttrType::one_of(vec![
+                AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+                AttrType::source(false),
+            ])),
+        );
+
+        let data_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
+            "The list of data files for this filegroup",
+            AttrType::list(AttrType::one_of(vec![
+                AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+                AttrType::source(false),
+            ])),
+        );
+
+        AttributeSpec::from(
+            vec![
+                ("srcs".to_owned(), srcs_attr),
+                ("data".to_owned(), data_attr),
+            ],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("filegroup attributes should be valid")
+    }
+
+    /// The Rule definition for filegroup.
+    pub static FILEGROUP_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: filegroup_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::Filegroup),
+            rule_kind: RuleKind::Normal,
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
@@ -363,8 +412,17 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named)] name: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         visibility: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        tags: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] testonly: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = "")] deprecation: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        features: UnpackListOrTuple<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
+        let _ = (tags, testonly, deprecation, features);
         let internals = ModuleInternals::from_context(eval, "constraint_setting")?;
 
         let target_node = create_native_target_node(
@@ -401,8 +459,17 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named)] constraint_setting: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         visibility: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        tags: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] testonly: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = "")] deprecation: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        features: UnpackListOrTuple<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
+        let _ = (tags, testonly, deprecation, features);
         let internals = ModuleInternals::from_context(eval, "constraint_setting")?;
         let coercion_ctx = internals.attr_coercion_context();
 
@@ -443,8 +510,17 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named)] actual: Value<'v>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         visibility: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        tags: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] testonly: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = "")] deprecation: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        features: UnpackListOrTuple<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
+        let _ = (tags, testonly, deprecation, features);
         let internals = ModuleInternals::from_context(eval, "alias")?;
         let coercion_ctx = internals.attr_coercion_context();
 
@@ -457,6 +533,65 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             internals.package(),
             name,
             vec![("actual".to_owned(), coerced_actual)],
+            &visibility.items,
+            &internals.default_visibility(),
+        )?;
+
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+
+    /// Groups a set of files under a single name for convenience.
+    ///
+    /// This is a Bazel built-in rule that creates a named reference to a set of files.
+    /// Other rules can depend on a filegroup instead of listing individual files.
+    ///
+    /// See: https://bazel.build/reference/be/general#filegroup
+    fn filegroup<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        srcs: UnpackListOrTuple<Value<'v>>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        data: UnpackListOrTuple<Value<'v>>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        visibility: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        tags: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] testonly: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = "")] deprecation: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        features: UnpackListOrTuple<String>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let _ = (tags, testonly, deprecation, features);
+        let internals = ModuleInternals::from_context(eval, "filegroup")?;
+        let coercion_ctx = internals.attr_coercion_context();
+
+        // Coerce srcs and data
+        let srcs_attr_type = AttrType::list(AttrType::one_of(vec![
+            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+            AttrType::source(false),
+        ]));
+        let data_attr_type = srcs_attr_type.clone();
+
+        let srcs_value = eval.heap().alloc(srcs.items);
+        let coerced_srcs =
+            srcs_attr_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, srcs_value)?;
+
+        let data_value = eval.heap().alloc(data.items);
+        let coerced_data =
+            data_attr_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, data_value)?;
+
+        let target_node = create_native_target_node(
+            rule_defs::FILEGROUP_RULE.clone(),
+            internals.package(),
+            name,
+            vec![
+                ("srcs".to_owned(), coerced_srcs),
+                ("data".to_owned(), coerced_data),
+            ],
             &visibility.items,
             &internals.default_visibility(),
         )?;
@@ -485,8 +620,17 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named)] build_setting_default: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         visibility: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        tags: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] testonly: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = "")] deprecation: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        features: UnpackListOrTuple<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
+        let _ = (tags, testonly, deprecation, features);
         let internals = ModuleInternals::from_context(eval, "label_flag")?;
         let coercion_ctx = internals.attr_coercion_context();
 
@@ -557,9 +701,25 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         flag_values: UnpackDictEntries<&str, &str>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         visibility: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        tags: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] testonly: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = "")] deprecation: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        features: UnpackListOrTuple<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _unused = (values, define_values, flag_values);
+        let _unused = (
+            values,
+            define_values,
+            flag_values,
+            tags,
+            testonly,
+            deprecation,
+            features,
+        );
         let internals = ModuleInternals::from_context(eval, "config_setting")?;
         let coercion_ctx = internals.attr_coercion_context();
 
@@ -602,9 +762,17 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         packages: UnpackListOrTuple<String>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         includes: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        tags: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] testonly: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = "")] deprecation: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        features: UnpackListOrTuple<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _unused = (packages, includes);
+        let _unused = (packages, includes, tags, testonly, deprecation, features);
         let internals = ModuleInternals::from_context(eval, "package_group")?;
 
         let target_node = create_native_target_node(
@@ -635,8 +803,17 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named)] name: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         visibility: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        tags: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] testonly: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = "")] deprecation: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        features: UnpackListOrTuple<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
+        let _ = (tags, testonly, deprecation, features);
         let internals = ModuleInternals::from_context(eval, "toolchain_type")?;
 
         let target_node = create_native_target_node(

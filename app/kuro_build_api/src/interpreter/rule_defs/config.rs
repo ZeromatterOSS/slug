@@ -105,17 +105,26 @@ impl<'v> StarlarkValue<'v> for ConfigModule {
 #[starlark_module]
 fn config_module_methods(builder: &mut starlark::environment::MethodsBuilder) {
     /// Returns a transition to the exec configuration.
-    fn exec(
+    /// Accepts None or a string for exec_group (rules_python passes None).
+    fn exec<'v>(
         #[starlark(this)] _this: &ConfigModule,
-        #[starlark(require = named, default = "")] exec_group: &str,
+        #[starlark(default = starlark::values::none::NoneType)] exec_group: Value<'v>,
     ) -> starlark::Result<ConfigTransition> {
+        let group = exec_group
+            .unpack_str()
+            .map(|s| s.to_owned())
+            .filter(|s| !s.is_empty());
         Ok(ConfigTransition {
             kind: "exec".to_owned(),
-            exec_group: if exec_group.is_empty() {
-                None
-            } else {
-                Some(exec_group.to_owned())
-            },
+            exec_group: group,
+        })
+    }
+
+    /// Returns a no-transition marker (identity transition).
+    fn none(#[starlark(this)] _this: &ConfigModule) -> starlark::Result<ConfigTransition> {
+        Ok(ConfigTransition {
+            kind: "none".to_owned(),
+            exec_group: None,
         })
     }
 

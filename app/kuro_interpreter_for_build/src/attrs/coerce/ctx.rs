@@ -227,11 +227,51 @@ impl BuildAttrCoercionContext {
 
     fn coerce_label_no_cache(&self, value: &str) -> kuro_error::Result<ProvidersLabel> {
         // Use Bazel-compatible parsing which allows `@repo//pkg` to mean `@repo//pkg:pkg`
-        match self.parse_pattern_bazel_compat::<ProvidersPatternExtra>(value)? {
-            ParsedPattern::Target(package, target_name, providers) => {
-                Ok(providers.into_providers_label(package, target_name.as_ref()))
+        match self.parse_pattern_bazel_compat::<ProvidersPatternExtra>(value) {
+            Ok(result) => match result {
+                ParsedPattern::Target(package, target_name, providers) => {
+                    return Ok(providers.into_providers_label(package, target_name.as_ref()));
+                }
+                _ => {
+                    return Err(
+                        BuildAttrCoercionContextError::RequiredLabel(value.to_owned()).into(),
+                    );
+                }
+            },
+            Err(_first_err) => {
+                // Bazel-compatible: bare target names (e.g., "foo_bar") resolve relative to
+                // the current package. Try prepending ":" if the original parse failed.
+                // But skip this for bare names that are known source files in the package,
+                // so that one_of(dep, source) coercion falls through to source coercion.
+                let is_bare_name = !value.is_empty()
+                    && !value.starts_with("//")
+                    && !value.starts_with('@')
+                    && !value.starts_with(':');
+                let is_source_file = if is_bare_name {
+                    if let Some((_, listing)) = &self.enclosing_package {
+                        <&PackageRelativePath>::try_from(value)
+                            .map(|p| listing.get_file(p).is_some())
+                            .unwrap_or(false)
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+                if is_bare_name && !is_source_file && self.enclosing_package.is_some() {
+                    let adjusted = format!(":{}", value);
+                    match self.parse_pattern_bazel_compat::<ProvidersPatternExtra>(&adjusted)? {
+                        ParsedPattern::Target(package, target_name, providers) => {
+                            Ok(providers.into_providers_label(package, target_name.as_ref()))
+                        }
+                        _ => Err(
+                            BuildAttrCoercionContextError::RequiredLabel(value.to_owned()).into(),
+                        ),
+                    }
+                } else {
+                    Err(BuildAttrCoercionContextError::RequiredLabel(value.to_owned()).into())
+                }
             }
-            _ => Err(BuildAttrCoercionContextError::RequiredLabel(value.to_owned()).into()),
         }
     }
 

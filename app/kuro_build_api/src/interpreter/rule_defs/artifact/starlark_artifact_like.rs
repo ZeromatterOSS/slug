@@ -16,6 +16,7 @@ use std::hash::Hasher;
 use either::Either;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
+use kuro_core::package::PackageLabel;
 use kuro_execute::path::artifact_path::ArtifactPath;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
@@ -58,6 +59,10 @@ pub trait StarlarkArtifactLike<'v>: Display {
         &self,
         f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
     ) -> kuro_error::Result<StringValue<'v>>;
+
+    /// For source artifacts, returns the source path information needed to construct a label.
+    /// Returns (package, relative_path_str) where relative_path_str can be used as a target name.
+    fn source_path_info(&self) -> Option<(PackageLabel, String)>;
 
     /// It's very important that the Hash/Eq of the StarlarkArtifactLike things doesn't change
     /// during freezing, otherwise Starlark invariants are broken. Use the fingerprint

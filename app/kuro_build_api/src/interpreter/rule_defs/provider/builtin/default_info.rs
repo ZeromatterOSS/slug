@@ -264,6 +264,36 @@ impl FrozenDefaultInfo {
         .unwrap()
     }
 
+    /// Create a FrozenDefaultInfo with specific default_outputs on the given heap.
+    /// Used for merging outputs from multiple dependencies (e.g., filegroup).
+    pub fn with_outputs(
+        heap: &FrozenHeap,
+        output_values: Vec<FrozenValue>,
+    ) -> FrozenValueTyped<'static, FrozenDefaultInfo> {
+        let sub_targets = heap
+            .alloc_typed_unchecked(AllocDict(
+                iter::empty::<(String, FrozenProviderCollection)>(),
+            ))
+            .cast();
+        let default_outputs =
+            FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList(output_values)));
+        let other_outputs =
+            FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
+        let default_runfiles =
+            FrozenValueOfUnchecked::<FrozenValue>::new(empty_runfiles_frozen(heap));
+        let data_runfiles = FrozenValueOfUnchecked::<FrozenValue>::new(empty_runfiles_frozen(heap));
+        let executable = FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
+        FrozenValueTyped::new_err(heap.alloc(FrozenDefaultInfo {
+            sub_targets,
+            default_outputs,
+            other_outputs,
+            default_runfiles,
+            data_runfiles,
+            executable,
+        }))
+        .unwrap()
+    }
+
     fn get_sub_target_providers_impl(
         &self,
         name: &str,

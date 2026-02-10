@@ -79,7 +79,18 @@ fn maybe_inject_test_info<'v>(
     heap: Heap<'v>,
     list_res: Value<'v>,
 ) -> kuro_error::Result<Value<'v>> {
-    let list = match ListRef::from_value(list_res) {
+    // Handle struct(providers=[...]) pattern from legacy Bazel rules
+    let (actual_list_res, is_struct) = if ListRef::from_value(list_res).is_none() {
+        if let Some(pv) = kuro_build_api::interpreter::rule_defs::provider::collection::extract_providers_from_struct(list_res) {
+            (pv, true)
+        } else {
+            return Ok(list_res);
+        }
+    } else {
+        (list_res, false)
+    };
+
+    let list = match ListRef::from_value(actual_list_res) {
         Some(v) => v,
         None => return Ok(list_res),
     };
@@ -127,7 +138,15 @@ fn maybe_inject_test_info<'v>(
                     // Create new list with test_info appended
                     let mut new_list: Vec<Value<'v>> = list.iter().collect();
                     new_list.push(test_info_value);
-                    return Ok(heap.alloc(new_list));
+                    let new_list_val = heap.alloc(new_list);
+                    if is_struct {
+                        // Re-wrap in struct(providers=[...]) to maintain pattern
+                        return Ok(heap.alloc(starlark::values::structs::AllocStruct([(
+                            "providers",
+                            new_list_val,
+                        )])));
+                    }
+                    return Ok(new_list_val);
                 }
             }
         }

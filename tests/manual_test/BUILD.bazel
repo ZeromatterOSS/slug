@@ -151,3 +151,44 @@ rust_binary(
     edition = "2021",
 )
 
+# =============================================================================
+# Phase 11: rules_python integration test
+# =============================================================================
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+
+py_library(
+    name = "hello_py_lib",
+    srcs = ["hello_py.py"],
+)
+
+py_binary(
+    name = "hello_py_bin",
+    srcs = ["hello_py_main.py"],
+    main = "hello_py_main.py",
+    deps = [":hello_py_lib"],
+)
+
+py_test(
+    name = "hello_py_test",
+    srcs = ["hello_py_test.py"],
+    deps = [":hello_py_lib"],
+)
+
+# =============================================================================
+# Phase 12: protobuf integration test
+# DISABLED: protobuf MODULE.bazel uses use_repo() repo-mapping syntax not yet supported
+# =============================================================================
+# load("@protobuf//bazel:proto_library.bzl", "proto_library")
+#
+# proto_library(
+#     name = "hello_proto",
+#     srcs = ["hello.proto"],
+# )
+#
+# TODO: cc_proto_library once proto_library works
+# load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+# cc_proto_library(
+#     name = "hello_cc_proto",
+#     deps = [":hello_proto"],
+# )
+

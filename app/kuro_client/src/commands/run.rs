@@ -219,6 +219,59 @@ impl StreamingCommand for RunCommand {
 
         let chdir = self.chdir.map(|chdir| chdir.resolve(&ctx.working_dir));
 
+        // Bazel compatibility: Create a runfiles tree for Python and other Bazel rules.
+        // The runfiles directory is expected at <executable>.runfiles/<workspace_name>/
+        // and contains symlinks to source files from the project root.
+        if let Some(exe_path) = run_args.first() {
+            let runfiles_dir = format!("{}.runfiles", exe_path);
+            // Extract workspace name from the exe path: __<target>__/<target>
+            // Path pattern: buck-out/v2/gen/<cell>/<hash>/__<target>__/<target>
+            let exe_path_obj = std::path::Path::new(exe_path);
+            if let Some(parent) = exe_path_obj.parent() {
+                if let Some(dir_name) = parent.file_name().and_then(|n| n.to_str()) {
+                    // Extract target name from __<target>__ directory name
+                    if dir_name.starts_with("__") && dir_name.ends_with("__") {
+                        // Get cell name from path: buck-out/v2/gen/<cell>/...
+                        let parts: Vec<&str> = exe_path.split('/').collect();
+                        let workspace_name = if parts.len() >= 4
+                            && parts[0] == "buck-out"
+                            && parts[1] == "v2"
+                            && parts[2] == "gen"
+                        {
+                            parts[3]
+                        } else {
+                            "_main"
+                        };
+                        let ws_dir = format!("{}/{}", runfiles_dir, workspace_name);
+                        // Create runfiles dir and symlink project root into it
+                        if !std::path::Path::new(&ws_dir).exists() {
+                            let _ = std::fs::create_dir_all(&ws_dir);
+                            // Symlink source files from project root
+                            let project_root = ctx.working_dir.resolve(std::path::Path::new("."));
+                            // Read project directory and create symlinks for source files
+                            if let Ok(entries) = std::fs::read_dir(project_root.as_path()) {
+                                for entry in entries.flatten() {
+                                    let name = entry.file_name();
+                                    let name_str = name.to_string_lossy();
+                                    // Skip build outputs and hidden dirs
+                                    if name_str.starts_with('.')
+                                        || name_str == "buck-out"
+                                        || name_str == "bazel-external"
+                                    {
+                                        continue;
+                                    }
+                                    let target = format!("{}/{}", ws_dir, name_str);
+                                    if !std::path::Path::new(&target).exists() {
+                                        let _ = std::os::unix::fs::symlink(entry.path(), &target);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         ExitResult::exec(
             run_args[0].clone().into(),
             run_args.into_iter().map(|arg| arg.into()).collect(),

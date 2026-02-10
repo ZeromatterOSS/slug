@@ -3203,6 +3203,15 @@ fn testing_methods(builder: &mut MethodsBuilder) {
         let _unused = (this, environment, inherited_environment);
         Ok(NoneType)
     }
+
+    /// ExecutionInfo provider for specifying execution requirements.
+    /// This is a stub that returns a sentinel value so version checks
+    /// like `testing.ExecutionInfo == testing.ExecutionInfo` evaluate to True.
+    #[starlark(attribute)]
+    fn ExecutionInfo<'v>(this: &TestingModule) -> starlark::Result<&'static str> {
+        let _unused = this;
+        Ok("ExecutionInfo")
+    }
 }
 
 // ============================================================================

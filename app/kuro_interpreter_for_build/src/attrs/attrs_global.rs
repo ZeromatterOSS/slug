@@ -162,15 +162,12 @@ fn dep_like_attr_handle_providers_arg(providers: Vec<Value>) -> kuro_error::Resu
 
         // Check if this element is a nested list (for any-of provider constraints)
         // Bazel syntax: providers = [[ProviderA], [ProviderB]] means any-of
-        if let Some(list_ref) = starlark::values::list::ListRef::from_value(v) {
-            // This is a nested list - recursively process its contents
-            // For now, we flatten nested lists (treating any-of as collecting all providers)
-            // TODO(bazel): Properly implement any-of provider constraint semantics
-            let inner_providers: Vec<Value> = list_ref.iter().collect();
-            let inner_result = dep_like_attr_handle_providers_arg(inner_providers)?;
-            for id in &inner_result {
-                result.push(id.dupe());
-            }
+        // (dep must satisfy at least ONE group, not all).
+        // Since ProviderIdSet doesn't support OR semantics, we skip nested lists
+        // to be permissive rather than overly restrictive (requiring ALL groups).
+        // TODO(bazel): Properly implement any-of provider constraint semantics
+        if starlark::values::list::ListRef::from_value(v).is_some() {
+            // OR group detected - skip to avoid requiring ALL groups
             continue;
         }
 
@@ -822,9 +819,8 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // Can be a string ("exec", "target") or a config_transition object (config.exec(...))
         #[starlark(require = named)] cfg: Option<Value<'v>>,
         // Bazel-compatible: allow_rules restricts which rule types can be used
-        // Currently accepted but not enforced
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        allow_rules: UnpackListOrTuple<&str>,
+        // Currently accepted but not enforced. Accepts None or list of strings.
+        #[starlark(require = named)] allow_rules: Option<Value<'v>>,
         // Bazel's `flags` parameter for internal attribute metadata (e.g., DIRECT_COMPILE_TIME_INPUT).
         // Currently accepted but ignored.
         #[starlark(require = named, default = UnpackListOrTuple::default())]
@@ -941,9 +937,8 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // Currently accepted but not enforced
         #[starlark(require = named, default = true)] allow_empty: bool,
         // Bazel-compatible: allow_rules restricts which rule types can be used
-        // Currently accepted but not enforced
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        allow_rules: UnpackListOrTuple<&str>,
+        // Currently accepted but not enforced. Accepts None or list of strings.
+        #[starlark(require = named)] allow_rules: Option<Value<'v>>,
         // Bazel's `flags` parameter for internal attribute metadata (e.g., DIRECT_COMPILE_TIME_INPUT).
         // Currently accepted but ignored.
         #[starlark(require = named, default = UnpackListOrTuple::default())]
@@ -1089,8 +1084,10 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
+        #[starlark(require = named, default = true)] allow_empty: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
+        let _unused = allow_empty;
         // Bazel semantics: if mandatory = False (default) and no default, use empty dict
         let effective_default = match (default, mandatory) {
             (Some(d), _) => Some(d),
@@ -1110,9 +1107,10 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
+        #[starlark(require = named, default = true)] allow_empty: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = mandatory;
+        let _unused = (mandatory, allow_empty);
         let coercer = AttrType::dict(
             AttrType::string(),
             AttrType::list(AttrType::string()),
@@ -1130,11 +1128,15 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
         #[starlark(require = named, default = false)] allow_files: bool,
+        #[starlark(require = named, default = false)] allow_empty: bool,
         // Bazel-compatible: configuration transition
         #[starlark(require = named)] cfg: Option<Value<'v>>,
+        // Bazel-compatible: aspects to apply to dependencies
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        aspects: UnpackListOrTuple<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = (allow_files, cfg);
+        let _unused = (allow_files, allow_empty, cfg, aspects);
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         let label_type = AttrType::dep(required_providers, PluginKindSet::EMPTY);
         let coercer = AttrType::dict(label_type, AttrType::string(), false);
@@ -1161,9 +1163,10 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] mandatory: bool,
         #[starlark(require = named, default = false)] allow_files: bool,
         #[starlark(require = named, default = false)] allow_single_file: bool,
+        #[starlark(require = named, default = true)] allow_empty: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = (mandatory, allow_files, allow_single_file);
+        let _unused = (mandatory, allow_files, allow_single_file, allow_empty);
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         let label_type = AttrType::dep(required_providers, PluginKindSet::EMPTY);
         // Note: string keys, label values (inverse of label_keyed_string_dict)
@@ -1192,9 +1195,10 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
+        #[starlark(require = named, default = true)] allow_empty: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = mandatory;
+        let _unused = (mandatory, allow_empty);
         let coercer = AttrType::list(AttrType::string());
         Ok(Attribute::attr(eval, default, doc, coercer)?)
     }

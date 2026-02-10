@@ -956,10 +956,25 @@ impl BuckConfigBasedCells {
             // Parse the transitive module's MODULE.bazel
             match parse_module_bazel(&module_bazel_path) {
                 Ok(dep_parsed) => {
-                    // Extract repo_name aliases from this module's dependencies
+                    // Extract repo_name aliases from this module's dependencies.
+                    // Skip dev_dependency deps and deps not in the resolved graph -
+                    // they won't have a corresponding cell.
                     for dep in &dep_parsed.module.bazel_deps {
+                        if dep.dev_dependency {
+                            continue;
+                        }
                         if let Some(repo_name) = &dep.repo_name {
                             if repo_name != &dep.name {
+                                // Only create alias if the target module is in the resolved graph
+                                if !resolved_graph.modules.contains_key(&dep.name) {
+                                    tracing::debug!(
+                                        "Skipping transitive repo_name alias: {} -> {} (from {}): target not in resolved graph",
+                                        repo_name,
+                                        dep.name,
+                                        module_name
+                                    );
+                                    continue;
+                                }
                                 // Create alias: repo_name -> dep.name
                                 match (
                                     NonEmptyCellAlias::new(repo_name.clone()),

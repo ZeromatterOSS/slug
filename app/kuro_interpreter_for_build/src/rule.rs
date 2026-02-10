@@ -28,6 +28,7 @@ use kuro_interpreter::types::rule::FROZEN_RULE_GET_IMPL;
 use kuro_interpreter::types::transition::transition_id_from_value;
 use kuro_node::attrs::attr::Attribute;
 use kuro_node::attrs::attr_type::AttrType;
+use kuro_node::attrs::attr_type::string::StringLiteral;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::display::AttrDisplayWithContextExt;
 use kuro_node::attrs::spec::AttributeSpec;
@@ -38,6 +39,7 @@ use kuro_node::rule::Rule;
 use kuro_node::rule::RuleIncomingTransition;
 use kuro_node::rule_type::RuleType;
 use kuro_node::rule_type::StarlarkRuleType;
+use kuro_util::arc_str::ArcStr;
 use starlark::any::ProvidesStaticType;
 use starlark::docs::DocFunction;
 use starlark::docs::DocItem;
@@ -237,6 +239,12 @@ impl<'v> StarlarkRuleCallable<'v> {
                 // Handle the case where cfg is passed but is None (e.g., from a stub transition)
                 // In Bazel compat mode, some transitions are stubbed as None
                 if cfg.is_none() {
+                    RuleIncomingTransition::None
+                } else if cfg.get_type() == "config_transition" || cfg.get_type() == "Transition" {
+                    // Bazel config.target() / config.exec() / transition() are no-ops in Kuro.
+                    // config.target() = use target configuration (the default).
+                    // config.exec() = use exec configuration (not yet implemented).
+                    // transition() = custom configuration transition (not yet implemented).
                     RuleIncomingTransition::None
                 } else {
                     RuleIncomingTransition::Fixed(transition_id_from_value(cfg)?)
@@ -768,6 +776,18 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             let bsd_value = eval.heap().alloc(bsd_attr);
             let bsd_ref = <&StarlarkAttribute>::unpack_value_err(bsd_value).unwrap();
             attrs.entries.push(("build_setting_default", bsd_ref));
+
+            // Add help as an optional string attribute for build settings
+            let help_attr = StarlarkAttribute::new(Attribute::new(
+                Some(Arc::new(CoercedAttr::String(StringLiteral(ArcStr::from(
+                    "",
+                ))))),
+                "Help text for the build setting",
+                AttrType::string(),
+            ));
+            let help_value = eval.heap().alloc(help_attr);
+            let help_ref = <&StarlarkAttribute>::unpack_value_err(help_value).unwrap();
+            attrs.entries.push(("help", help_ref));
 
             // Add _build_setting_allows_multiple hidden attribute
             if build_setting_allows_multiple {

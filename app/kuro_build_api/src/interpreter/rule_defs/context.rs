@@ -596,10 +596,15 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // TODO: Get actual workspace name from MODULE.bazel or cell configuration
-        // For now, return empty string (matches Bazel behavior when repo is unnamed)
-        let _ = this;
-        Ok(heap.alloc_str("").to_value())
+        // Return the cell name as the workspace name.
+        // In Bazel, workspace_name comes from module(name=...) in MODULE.bazel.
+        // In Kuro, this corresponds to the cell name.
+        if let Some(label) = this.0.label {
+            let cell_name = label.label().target().pkg().cell_name().as_str();
+            Ok(heap.alloc_str(cell_name).to_value())
+        } else {
+            Ok(heap.alloc_str("").to_value())
+        }
     }
 
     /// Output directory for binary artifacts (Bazel-compatible).
@@ -756,7 +761,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     #[allow(unused_variables)]
     fn runfiles<'v>(
         this: RefAnalysisContext<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] files: Value<'v>,
+        #[starlark(default = starlark::values::none::NoneType)] files: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)]
         transitive_files: Value<'v>,
         #[starlark(require = named, default = false)] collect_default: bool,
@@ -952,12 +957,29 @@ impl<'v> StarlarkValue<'v> for ToolchainsStub {
 
     /// Returns a toolchain stub when indexed.
     /// Checks the key to determine which kind of toolchain to return.
+    /// Returns None for unrecognized toolchain types.
     fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let key_str = index.unpack_str().unwrap_or("");
-        if key_str.contains("rust") {
+        // Extract target name (after :) and package path (before :) for matching
+        let (pkg_path, target_name) = key_str.rsplit_once(':').unwrap_or(("", key_str));
+        // Extract the last package segment (e.g., "cpp" from "//tools/cpp")
+        let pkg_segment = pkg_path
+            .rsplit_once('/')
+            .map(|(_, seg)| seg)
+            .unwrap_or(pkg_path);
+        if target_name == "rust_toolchain" || target_name == "rustfmt_toolchain" {
             Ok(heap.alloc(RustToolchainInfoStub))
-        } else {
+        } else if target_name == "toolchain_type" && (pkg_segment == "cc" || pkg_segment == "cpp") {
             Ok(heap.alloc(CcToolchainInfoStub))
+        } else if target_name == "toolchain_type"
+            && key_str.contains("python")
+            && !key_str.contains("exec_tools")
+        {
+            // Python target toolchain - provide a stub with py3_runtime
+            Ok(heap.alloc(PyToolchainInfoStub))
+        } else {
+            // Return None for unknown toolchain types (exec_tools, launcher, etc.)
+            Ok(Value::new_none())
         }
     }
 }
@@ -1068,9 +1090,15 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
             "_abi" => Some(heap.alloc_str("local").to_value()),
             "_crosstool_top_path" => Some(heap.alloc_str("external/local_config_cc").to_value()),
             "_legacy_cc_flags_make_variable" => Some(heap.alloc_str("").to_value()),
-            "_build_variables" => Some(heap.alloc(DepsetStub)),
-            "_coverage_files" => Some(heap.alloc(DepsetStub)),
-            "_strip_files" => Some(heap.alloc(DepsetStub)),
+            "_build_variables" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_coverage_files" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_strip_files" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             "_cpp_configuration" => Some(heap.alloc(CppFragment::default())),
             "_if_so_builder" => Some(Value::new_none()),
             "_solib_dir" => Some(heap.alloc_str("_solib_k8").to_value()),
@@ -2022,13 +2050,14 @@ impl<'v> StarlarkValue<'v> for BuildConfigurationStub {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
-            "coverage_enabled" | "host_path_separator" | "default_shell_env"
+            "coverage_enabled" | "host_path_separator" | "default_shell_env" | "stamp_binaries"
         )
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "coverage_enabled" => Some(Value::new_bool(false)),
+            "stamp_binaries" => Some(Value::new_bool(false)),
             "host_path_separator" => Some(heap.alloc_str(":").to_value()),
             "default_shell_env" => {
                 // Return empty dict - Bazel populates with env vars from --action_env
@@ -2163,35 +2192,6 @@ impl<'v> StarlarkValue<'v> for ExecGroupToolchains {
 }
 
 // ============================================================================
-
-/// A stub for empty depset values.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct DepsetStub;
-
-impl std::fmt::Display for DepsetStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "depset([])")
-    }
-}
-
-starlark::starlark_simple_value!(DepsetStub);
-
-#[starlark::values::starlark_value(type = "depset")]
-impl<'v> StarlarkValue<'v> for DepsetStub {
-    fn get_methods() -> Option<&'static Methods> {
-        static RES: MethodsStatic = MethodsStatic::new();
-        RES.methods(depset_stub_methods)
-    }
-}
-
-#[starlark_module]
-fn depset_stub_methods(builder: &mut MethodsBuilder) {
-    /// Convert to list (returns empty list).
-    fn to_list<'v>(this: &DepsetStub, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(Vec::<Value>::new()))
-    }
-}
 
 /// A stub for _toolchain_features that provides feature configuration.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
@@ -2682,6 +2682,95 @@ impl<'v> StarlarkValue<'v> for RustToolStub {
             "is_source" => Some(Value::new_bool(false)),
             "root" => Some(Value::new_none()),
             "owner" => Some(Value::new_none()),
+            _ => None,
+        }
+    }
+}
+
+// ============================================================================
+// PyToolchainInfoStub - Stub for Python toolchain info
+// ============================================================================
+
+/// A stub for the Python toolchain info returned by ctx.toolchains for Python rules.
+///
+/// Provides py3_runtime attribute that rules_python expects.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct PyToolchainInfoStub;
+
+impl std::fmt::Display for PyToolchainInfoStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<PyToolchainInfo>")
+    }
+}
+
+starlark::starlark_simple_value!(PyToolchainInfoStub);
+
+#[starlark::values::starlark_value(type = "PyToolchainInfo")]
+impl<'v> StarlarkValue<'v> for PyToolchainInfoStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(
+            attribute,
+            "py3_runtime" | "py2_runtime" | "exec_compatible_with"
+        )
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "py3_runtime" => Some(heap.alloc(PyRuntimeInfoStub)),
+            "py2_runtime" => Some(Value::new_none()),
+            "exec_compatible_with" => Some(heap.alloc(starlark::values::list::AllocList::EMPTY)),
+            _ => None,
+        }
+    }
+}
+
+/// A stub for PyRuntimeInfo that provides the Python interpreter path.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct PyRuntimeInfoStub;
+
+impl std::fmt::Display for PyRuntimeInfoStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<PyRuntimeInfo>")
+    }
+}
+
+starlark::starlark_simple_value!(PyRuntimeInfoStub);
+
+#[starlark::values::starlark_value(type = "PyRuntimeInfo")]
+impl<'v> StarlarkValue<'v> for PyRuntimeInfoStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(
+            attribute,
+            "interpreter_path"
+                | "interpreter"
+                | "files"
+                | "coverage_tool"
+                | "coverage_files"
+                | "python_version"
+                | "stub_shebang"
+                | "bootstrap_template"
+                | "implementation_name"
+                | "flag_values"
+                | "site_init_template"
+        )
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "interpreter_path" => {
+                // Use system python3 path
+                Some(heap.alloc_str("/usr/bin/python3").to_value())
+            }
+            "interpreter" => Some(Value::new_none()),
+            "files" => Some(Value::new_none()),
+            "coverage_tool" => Some(Value::new_none()),
+            "coverage_files" => Some(Value::new_none()),
+            "python_version" => Some(heap.alloc_str("PY3").to_value()),
+            "stub_shebang" => Some(heap.alloc_str("#!/usr/bin/env python3").to_value()),
+            "bootstrap_template" => Some(Value::new_none()),
+            "implementation_name" => Some(heap.alloc_str("cpython").to_value()),
+            "flag_values" => Some(heap.alloc(starlark::values::dict::Dict::default())),
+            "site_init_template" => Some(Value::new_none()),
             _ => None,
         }
     }

@@ -10,9 +10,12 @@
 
 use allocative::Allocative;
 use dupe::Dupe;
+use kuro_core::configuration::data::ConfigurationData;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::ProvidersName;
+use kuro_core::target::label::label::TargetLabel;
+use kuro_core::target::name::TargetNameRef;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_interpreter::types::configured_providers_label::StarlarkConfiguredProvidersLabel;
 use starlark::any::ProvidesStaticType;
@@ -152,10 +155,20 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
                 )))
             }
             Some(BaseDeferredKey::AnonTarget(_) | BaseDeferredKey::BxlLabel(_)) | None => {
-                // For source files, construct a label-like string from the short path
-                // Format: //<package>:<filename> based on the artifact's short path
+                // For source files, construct a proper label from the source path
+                if let Some((package, name_str)) = this.source_path_info() {
+                    if let Ok(target_name) = TargetNameRef::new(&name_str) {
+                        let target_label = TargetLabel::new(package, target_name);
+                        let configured = target_label.configure(ConfigurationData::unbound());
+                        let providers_label =
+                            ConfiguredProvidersLabel::new(configured, ProvidersName::Default);
+                        return Ok(
+                            heap.alloc(StarlarkConfiguredProvidersLabel::new(providers_label))
+                        );
+                    }
+                }
+                // Fallback: return path string
                 let path_str = this.with_short_path(&|p| heap.alloc_str(p.as_str()))?;
-                // Return the path string - it will be used in error messages
                 Ok(path_str.to_value())
             }
         }

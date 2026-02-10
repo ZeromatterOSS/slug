@@ -32,6 +32,7 @@ pub mod platform_common;
 pub mod plugins;
 pub mod proto_common;
 pub mod provider;
+pub mod py_common;
 pub mod required_test_local_resource;
 pub mod resolve_query_macro;
 pub mod resolved_macro;

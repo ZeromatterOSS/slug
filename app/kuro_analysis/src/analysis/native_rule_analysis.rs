@@ -37,6 +37,7 @@ use kuro_error::internal_error;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
 use kuro_node::rule_type::NativeRuleKind;
 use starlark::values::FrozenHeap;
+use starlark::values::FrozenValue;
 use starlark::values::FrozenValueTyped;
 use starlark::values::OwnedFrozenValue;
 use starlark::values::any_complex::StarlarkAnyComplex;
@@ -54,9 +55,7 @@ pub fn analyze_native_rule(
         NativeRuleKind::ConstraintValue => {
             analyze_constraint_value(target, configured_node, dep_analysis)
         }
-        NativeRuleKind::Filegroup => Err(internal_error!(
-            "Native filegroup analysis not implemented. Use Starlark filegroup instead."
-        )),
+        NativeRuleKind::Filegroup => analyze_filegroup(target, dep_analysis),
         NativeRuleKind::Alias => analyze_alias(target, dep_analysis),
         NativeRuleKind::LabelFlag => analyze_label_flag(target, dep_analysis),
         NativeRuleKind::ConfigSetting => analyze_config_setting(target, dep_analysis),
@@ -291,6 +290,86 @@ fn analyze_alias(
             dep_analysis.len()
         ))
     }
+}
+
+/// Analyze a filegroup target.
+/// Filegroups collect files from their srcs and data deps.
+/// For filegroups with no srcs (like empty sentinel targets), returns empty DefaultInfo.
+/// For filegroups with deps, merges DefaultInfo.default_outputs from all deps.
+fn analyze_filegroup(
+    target: &ConfiguredTargetLabel,
+    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+) -> kuro_error::Result<AnalysisResult> {
+    if dep_analysis.is_empty() {
+        // Empty filegroup - return minimal DefaultInfo
+        return create_minimal_analysis_result(target);
+    }
+
+    // Fast path: single dep, just forward its result directly
+    if dep_analysis.len() == 1 {
+        let (_label, result) = dep_analysis.into_iter().next().unwrap();
+        return Ok(result);
+    }
+
+    let heap = FrozenHeap::new();
+
+    // Collect default_outputs from all deps into a single merged list.
+    // We alloc each StarlarkArtifact on our heap so they live long enough.
+    let mut all_outputs: Vec<FrozenValue> = Vec::new();
+    for (_dep_label, dep_result) in &dep_analysis {
+        if let Ok(providers_ref) = dep_result.providers() {
+            let collection: &FrozenProviderCollection = providers_ref.value().as_ref();
+            if let Some(default_info) = collection.builtin_provider::<FrozenDefaultInfo>() {
+                for artifact in default_info.default_outputs() {
+                    all_outputs.push(heap.alloc(artifact));
+                }
+            }
+        }
+    }
+
+    let default_info = FrozenDefaultInfo::with_outputs(&heap, all_outputs);
+
+    // Build provider collection with merged DefaultInfo
+    let providers = SmallMap::from_iter([(
+        DefaultInfoCallable::provider_id().dupe(),
+        default_info.to_frozen_value(),
+    )]);
+
+    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+        heap.alloc(FrozenProviderCollection::new(providers)),
+    )?;
+
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+
+    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+        value: FrozenAnalysisValueStorage::new_native(
+            self_key.dupe(),
+            DYNAMIC_LAMBDA_PARAMS_STORAGES
+                .get()
+                .unwrap()
+                .new_frozen_dynamic_lambda_params_storage(),
+            Some(provider_collection),
+        ),
+    });
+
+    let heap_ref = heap.into_ref();
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
+
+    let recorded_values = RecordedAnalysisValues::new_native(
+        self_key,
+        Some(analysis_storage),
+        RecordedActions::new(0),
+    );
+
+    Ok(AnalysisResult::new(
+        recorded_values,
+        None,
+        HashMap::new(),
+        0,
+        0,
+        None,
+    ))
 }
 
 /// Create a minimal analysis result with just DefaultInfo.

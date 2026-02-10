@@ -17,3 +17,10 @@ bazel_dep(name = "rules_cc", version = "0.2.16")
 
 # rules_rust dependency - Phase 10 integration
 bazel_dep(name = "rules_rust", version = "0.40.0")
+
+# rules_python dependency - Phase 11 integration
+bazel_dep(name = "rules_python", version = "1.8.0")
+
+# protobuf dependency - Phase 12 integration
+# DISABLED: protobuf MODULE.bazel uses use_repo() repo-mapping syntax not yet supported
+# bazel_dep(name = "protobuf", version = "33.3.bcr.1")

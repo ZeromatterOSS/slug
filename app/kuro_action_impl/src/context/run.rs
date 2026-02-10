@@ -17,6 +17,7 @@ use host_sharing::WeightClass;
 use host_sharing::WeightPercentage;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::artifact_type::ArtifactErrors;
+use kuro_artifact::artifact::artifact_type::DeclaredArtifact;
 use kuro_artifact::artifact::artifact_type::OutputArtifact;
 use kuro_build_api::artifact_groups::ArtifactGroup;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
@@ -389,6 +390,31 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
 
             fn visit_frozen_output(&mut self, artifact: Artifact, tags: Vec<&ArtifactTag>) {
                 self.inner.visit_frozen_output(artifact, tags)
+            }
+
+            /// Bazel compatibility: handle unbound declared artifacts in command line args.
+            ///
+            /// In Bazel, the same artifact can appear in both `arguments` and `outputs`:
+            ///   ctx.actions.run(arguments=[output], outputs=[output], ...)
+            /// The default implementation calls `ensure_bound()` which fails for unbound artifacts.
+            /// When an artifact is not yet bound, treat it as a declared output rather than an input.
+            fn visit_declared_artifact(
+                &mut self,
+                declared_artifact: DeclaredArtifact<'v>,
+                tags: Vec<&ArtifactTag>,
+            ) -> kuro_error::Result<()> {
+                if declared_artifact.is_bound() {
+                    // Bound artifact: treat as input (normal Buck2 behavior)
+                    self.visit_input(
+                        ArtifactGroup::Artifact(declared_artifact.ensure_bound()?.into_artifact()),
+                        tags,
+                    );
+                } else {
+                    // Unbound artifact: treat as declared output (Bazel compatibility)
+                    let output: OutputArtifact<'v> = declared_artifact.into();
+                    self.visit_declared_output(output, tags);
+                }
+                Ok(())
             }
 
             fn push_frame(&mut self) -> kuro_error::Result<()> {

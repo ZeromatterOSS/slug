@@ -654,6 +654,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
     fn use_repo<'v>(
         #[starlark(require = pos)] extension: Value<'v>,
         #[starlark(args)] repos: UnpackTuple<&str>,
+        #[starlark(kwargs)] kwargs: starlark::collections::SmallMap<String, Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let ctx = get_module_context(eval)?;
@@ -672,6 +673,15 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         // Add positional repo names
         for repo in repos.items {
             use_repo.repos.push(repo.to_string());
+        }
+
+        // Add keyword repo-mapping: apparent_name = "actual_name"
+        for (apparent_name, actual_value) in kwargs.iter() {
+            if let Some(actual_name) = actual_value.unpack_str() {
+                use_repo
+                    .repo_mapping
+                    .push((apparent_name.clone(), actual_name.to_owned()));
+            }
         }
 
         // Add to the appropriate extension
@@ -703,6 +713,33 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
+    /// Returns a repo rule callable for use in MODULE.bazel.
+    ///
+    /// This is a Bazel 7.1+ feature that allows creating repository rules
+    /// inline in MODULE.bazel without using extensions.
+    ///
+    /// # Example
+    ///
+    /// ```starlark
+    /// local_runtime_repo = use_repo_rule("//python:local_runtime_repo.bzl", "local_runtime_repo")
+    /// local_runtime_repo(name = "system_python", ...)
+    /// ```
+    fn use_repo_rule<'v>(
+        #[starlark(require = pos)] rule_bzl_file: &str,
+        #[starlark(require = pos)] rule_name: &str,
+        #[starlark(require = named, default = false)] dev_dependency: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = dev_dependency;
+
+        let proxy = RepoRuleProxy {
+            rule_bzl_file: rule_bzl_file.to_owned(),
+            rule_name: rule_name.to_owned(),
+        };
+
+        Ok(eval.heap().alloc(proxy))
+    }
+
     /// Registers execution platforms for use in the module.
     ///
     /// This is recorded but platform resolution is handled separately.
@@ -722,6 +759,48 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         let _ = dev_dependency;
         let _ = eval;
         Ok(NoneType)
+    }
+}
+
+// ============================================================================
+// RepoRuleProxy - Starlark value for use_repo_rule() return value
+// ============================================================================
+
+/// A proxy object returned by `use_repo_rule()` that accepts calls to create repos.
+///
+/// When called (e.g., `local_runtime_repo(name = "system_python", ...)`), it records
+/// the invocation as a no-op since Kuro uses synthetic repos for these.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct RepoRuleProxy {
+    /// The bzl file containing the repo rule.
+    rule_bzl_file: String,
+    /// The repo rule name.
+    rule_name: String,
+}
+
+impl Display for RepoRuleProxy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "<repo_rule_proxy {}%{}>",
+            self.rule_bzl_file, self.rule_name
+        )
+    }
+}
+
+starlark_simple_value!(RepoRuleProxy);
+
+#[starlark_value(type = "repo_rule_proxy")]
+impl<'v> StarlarkValue<'v> for RepoRuleProxy {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        _args: &starlark::eval::Arguments<'v, '_>,
+        _eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        // No-op: repo rule invocations in MODULE.bazel are handled by
+        // synthetic repos in Kuro, not by executing the actual repo rule.
+        Ok(Value::new_none())
     }
 }
 

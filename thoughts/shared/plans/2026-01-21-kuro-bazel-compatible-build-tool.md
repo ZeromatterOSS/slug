@@ -114,7 +114,7 @@ native.depset_from_transitive_set(t, order = "default")
 - [ ] `cargo build --release` works with stable Rust
 - [ ] `kuro build //...` works on a project using rules_cc
 - [ ] `kuro build //...` works on a project using rules_rust
-- [ ] `kuro build //...` works on a project using rules_python
+- [x] `kuro build //...` works on a project using rules_python
 - [ ] `kuro build //...` works on a project using rules_oci
 - [ ] `kuro run //:target` executes binaries
 - [ ] `kuro query //...` returns dependency information
@@ -132,7 +132,73 @@ native.depset_from_transitive_set(t, order = "default")
 5. **Remote execution initially** - Local execution first, RE later
 6. **GUI/IDE integration** - CLI only initially
 7. **Removing type annotations** - Keep starlark-rust's type support (Bazel is adding this)
-8. **Built-in language rules** - In Bazel 9.0, language rules (cc_*, java_*, py_*, proto_*) require `load()` from external repos (rules_cc, rules_java, etc.). We follow this pattern.
+8. **Native language rule implementations** - In Bazel 9.0, language rules (cc_*, py_*, proto_*) are pure Starlark in their respective rules_* repos. Kuro does NOT implement `native.py_library`, `native.proto_library`, etc. See [Native → Starlark Migration Architecture](#native--starlark-migration-architecture).
+
+## Native → Starlark Migration Architecture
+
+A critical Bazel 9.0 design principle: **all language rules are pure Starlark**. The native (C++/Java) implementations that existed in Bazel's core have been completely removed. Each rules_* repo independently detects the Bazel version and switches to its own Starlark implementations. Kuro must understand and support each repo's switching mechanism.
+
+### Migration Pattern Summary
+
+| Rules Repo | Detection Mechanism | Switch Point | Starlark Path |
+|---|---|---|---|
+| **rules_cc 0.2.16** | Version string comparison | `_bazel_version_ge("9.0.0-pre.20250911")` | `@cc_compatibility_proxy` synthetic repo selects Starlark impls |
+| **rules_python 1.8.0+** | Config flag + feature detection | `enable_pystar` + `hasattr(native, "starlark_doc_extract")` | `@rules_python_internal` config repo enables Starlark impls |
+| **protobuf 33.4+** | Feature detection | `hasattr(native, "proto_library")` → False | Rules in `@protobuf//bazel/*.bzl` (self-contained) |
+| **rules_rust 0.40.0** | Pure Starlark always | N/A (no native fallback) | Rules in `@rules_rust//rust/` |
+
+### rules_cc: Version-Based Proxy Repository
+
+rules_cc 0.2.16 uses `@bazel_features` to compare `native.bazel_version` against `"9.0.0-pre.20250911"`:
+
+```starlark
+# cc/extensions.bzl:31
+if _bazel_version_ge("9.0.0-pre.20250911"):
+    # Bazel 9.0+: Load Starlark implementations from cc/private/rules_impl/
+    # CcInfo, cc_common, etc. are all pure Starlark
+else:
+    # Pre-9.0: Delegate to native.cc_library, native.cc_binary, etc.
+```
+
+**Kuro approach**: Generate synthetic `@cc_compatibility_proxy` repo matching the Bazel 9.0+ path. Only the `cc_common` module needs native implementation.
+
+### rules_python: Config-Based Switching
+
+rules_python uses a two-stage mechanism:
+
+1. **Repository rule** (`internal_config_repo.bzl`): Checks `hasattr(native, "starlark_doc_extract")` (Bazel 7+ feature) AND `RULES_PYTHON_ENABLE_PYSTAR` env var (default `"1"`). Generates `@rules_python_internal//:rules_python_config.bzl`.
+
+2. **Rule files** (`py_library.bzl`, `py_binary.bzl`, `py_test.bzl`):
+```starlark
+load("@rules_python_internal//:rules_python_config.bzl", "config")
+_py_library_impl = _starlark_py_library if config.enable_pystar else native.py_library
+```
+
+**Kuro approach**: Generate synthetic `@rules_python_internal` with `enable_pystar = True`. Provide `py_internal` stubs for the Starlark implementations. Do NOT implement `native.py_library` (removed in Bazel 9.0).
+
+### protobuf: Feature Detection
+
+protobuf 33.4+ checks whether native proto rules exist:
+
+```starlark
+# bazel/proto_library.bzl
+if not hasattr(native, "proto_library"):
+    _proto_library(**kwattrs)  # Starlark implementation
+else:
+    native.proto_library(**kwattrs)  # Native (Bazel 6-7 only)
+```
+
+**Note**: protobuf 27.0 (older BCR version) uses `proto_library = native.proto_library` directly — this is incompatible with Bazel 9.0. Must use protobuf 33.4+.
+
+**Kuro approach**: Ensure `hasattr(native, "proto_library")` returns False (don't register native proto rules). protobuf's Starlark implementation handles everything. Need `ProtoInfo` provider and `proto_common` module stubs.
+
+### Implications for Kuro
+
+1. **Do NOT implement native language rules** (`native.py_library`, `native.proto_library`, etc.) — these are removed in Bazel 9.0. At most, stub them as `= None` on the `native` module to avoid crashes when code checks `hasattr(native, "py_library")`, but never provide a real implementation.
+2. **DO implement native modules** (`cc_common`, `proto_common`) that Starlark implementations call into
+3. **DO provide synthetic repos** that configure each rules_* repo to use its Starlark path
+4. **DO provide provider stubs** (`PyInfo`, `ProtoInfo`) that Starlark implementations reference
+5. **Version matters**: Use recent rules_* versions that support Bazel 9.0 (rules_cc 0.2.16, rules_python 1.8.0+, protobuf 33.4+)
 
 ## BXL Preservation Strategy
 
@@ -209,8 +275,8 @@ The detailed implementation is split into focused sub-plans:
 | [06-prelude-architecture.md](./kuro-bazel-subplans/06-prelude-architecture.md) | 6b | Prelude preservation, Bazel shim migration, cleanup          | Not Started     |
 | [07-builtins-compatibility.md](./kuro-bazel-subplans/07-builtins-compatibility.md) | 7a-7d | Bazel native rules, global functions, modules, Buck2 removal | Not Started     |
 | [08-aspects.md](./kuro-bazel-subplans/08-aspects.md)                     | 8a-8d  | Bazel aspects implementation (blocks rules_cc)                | **8a Complete** |
-| [04-rules-integration.md](./kuro-bazel-subplans/04-rules-integration.md) | 9-12   | rules_cc, rules_rust, rules_python, rules_oci                 | Not Started     |
-| [05-infrastructure.md](./kuro-bazel-subplans/05-infrastructure.md)       | 13-16  | Stable Rust, sandboxing, platform support, query              | Not Started     |
+| [04-rules-integration.md](./kuro-bazel-subplans/04-rules-integration.md) | 9-13   | rules_cc, rules_rust, rules_python, protobuf, rules_oci       | Not Started     |
+| [05-infrastructure.md](./kuro-bazel-subplans/05-infrastructure.md)       | 14-17  | Stable Rust, sandboxing, platform support, query              | Not Started     |
 
 ### Related Research Documents
 
@@ -218,6 +284,7 @@ The detailed implementation is split into focused sub-plans:
 - [Test Infrastructure Mapping](../research/2026-01-22-test-infrastructure-mapping.md) - Test migration strategy
 - [BXL vs AXL Comparison](../research/bxl-vs-axl-comparison.md) - Compare Buck2's BXL with Aspect's AXL for build introspection
 - [rules_cc Native Requirements](../research/2026-01-26-rules-cc-native-requirements.md) - What Kuro must provide for rules_cc (Bazel 9.0+)
+- Native → Starlark Migration: Each rules_* repo's version detection is documented inline in [04-rules-integration.md](./kuro-bazel-subplans/04-rules-integration.md#bazel-90-native--starlark-migration-architecture)
 
 ---
 
@@ -278,23 +345,24 @@ Quick reference to all phases and their locations:
 | 8c    | Shadow Graph Propagation           | [x] Complete    |
 | 8d    | Advanced Features                  | [ ] In Progress |
 
-### Rules Integration (Phases 9-12) - [Sub-plan](./kuro-bazel-subplans/04-rules-integration.md)
+### Rules Integration (Phases 9-13) - [Sub-plan](./kuro-bazel-subplans/04-rules-integration.md)
 
-| Phase | Title                    | Status          |
-| ----- | ------------------------ | --------------- |
-| 9     | rules_cc Integration     | [x] In Progress (cc_library, cc_binary, cc_test build work) |
-| 10    | rules_rust Integration   | [ ] Not Started |
-| 11    | rules_python Integration | [ ] Not Started |
-| 12    | rules_oci Integration    | [ ] Not Started |
+| Phase | Title                     | Status          |
+| ----- | ------------------------- | --------------- |
+| 9     | rules_cc Integration      | [x] In Progress (cc_library, cc_binary, cc_test build work) |
+| 10    | rules_rust Integration    | [x] Complete (rules_rust 0.40.0, rust_library + rust_binary) |
+| 11    | rules_python Integration  | [x] Complete (rules_python 1.8.0, enable_pystar=True, py_library + py_binary + py_test) |
+| 12    | protobuf Integration      | [ ] Not Started (protobuf 33.4+, Starlark proto rules) |
+| 13    | rules_oci Integration     | [ ] Not Started |
 
-### Infrastructure (Phases 13-16) - [Sub-plan](./kuro-bazel-subplans/05-infrastructure.md)
+### Infrastructure (Phases 14-17) - [Sub-plan](./kuro-bazel-subplans/05-infrastructure.md)
 
 | Phase | Title                              | Status          |
 | ----- | ---------------------------------- | --------------- |
-| 13    | Stable Rust Migration              | [ ] Not Started |
-| 14    | Local Build Isolation (Sandboxing) | [ ] Not Started |
-| 15    | Platform Support                   | [ ] Not Started |
-| 16    | Query Commands                     | [ ] Not Started |
+| 14    | Stable Rust Migration              | [ ] Not Started |
+| 15    | Local Build Isolation (Sandboxing) | [ ] Not Started |
+| 16    | Platform Support                   | [ ] Not Started |
+| 17    | Query Commands                     | [ ] Not Started |
 
 ---
 
@@ -346,9 +414,9 @@ We preserve the existing pytest infrastructure because:
 | Phase 4a-d | ADD bzlmod tests, DELETE cell tests                                   |
 | Phase 5    | ADD module extension tests                                            |
 | Phase 6    | ADD ctx/actions/provider/depset/runfiles tests                        |
-| Phase 7-10 | ADD rules\_\* integration tests                                       |
-| Phase 12   | ADD sandbox isolation tests                                           |
-| Phase 14   | ADD query function tests (deps, rdeps, kind, filter)                  |
+| Phase 7-13 | ADD rules\_\* integration tests                                       |
+| Phase 15   | ADD sandbox isolation tests                                           |
+| Phase 17   | ADD query function tests (deps, rdeps, kind, filter)                  |
 
 ### Test Categories to Delete (Buck2-Specific)
 

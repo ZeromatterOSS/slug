@@ -169,7 +169,49 @@ def FindModuleSpace(main_rel_path):
     else:
       stub_filename = os.path.join(os.path.dirname(stub_filename), target)
 
-  raise AssertionError('Cannot find .runfiles directory for %s' % sys.argv[0])
+  # Kuro compatibility: create a runfiles tree on-demand if not found.
+  # This handles cases where the build system doesn't pre-create runfiles.
+  return _CreateRunfilesOnDemand(main_rel_path)
+
+def _CreateRunfilesOnDemand(main_rel_path):
+  """Creates a minimal runfiles tree by symlinking from the project root."""
+  stub_filename = sys.argv[0]
+  if not os.path.isabs(stub_filename):
+    stub_filename = os.path.join(os.getcwd(), stub_filename)
+  module_space = stub_filename + '.runfiles'
+  workspace_name = '%workspace_name%'
+  ws_dir = os.path.join(module_space, workspace_name)
+  if not os.path.isdir(ws_dir):
+    os.makedirs(ws_dir, exist_ok=True)
+    # Find the project root by looking for common markers
+    project_root = _FindProjectRoot(stub_filename)
+    if project_root:
+      for entry in os.listdir(project_root):
+        if entry.startswith('.') or entry in ('buck-out', 'bazel-out', 'bazel-external'):
+          continue
+        src = os.path.join(project_root, entry)
+        dst = os.path.join(ws_dir, entry)
+        if not os.path.exists(dst):
+          try:
+            os.symlink(src, dst)
+          except OSError:
+            pass
+  return module_space
+
+def _FindProjectRoot(exe_path):
+  """Finds the project root by walking up from the executable path."""
+  # The executable is typically at buck-out/v2/gen/<cell>/<hash>/__<target>__/<exe>
+  # Walk up to find a directory containing .buckconfig, MODULE.bazel, or WORKSPACE
+  d = os.path.dirname(exe_path)
+  for _ in range(10):
+    for marker in ('.buckconfig', 'MODULE.bazel', 'WORKSPACE', 'WORKSPACE.bazel'):
+      if os.path.exists(os.path.join(d, marker)):
+        return d
+    parent = os.path.dirname(d)
+    if parent == d:
+      break
+    d = parent
+  return None
 
 def ExtractZip(zip_path, dest_dir):
   """Extracts the contents of a zip file, preserving the unix file mode bits.

@@ -72,6 +72,20 @@ use crate::interpreter::rule_defs::provider::FrozenDefaultInfo;
 use crate::interpreter::rule_defs::provider::ValueAsProviderLike;
 use crate::interpreter::rule_defs::provider::ty::abstract_provider::AbstractProvider;
 
+/// Extract the `providers` field from a Bazel legacy struct(providers=[...]) return value.
+/// Returns None if the value is not a struct or doesn't have a providers field.
+pub fn extract_providers_from_struct<'v>(value: Value<'v>) -> Option<Value<'v>> {
+    use starlark::values::structs::StructRef;
+    if let Some(struct_ref) = StructRef::from_value(value) {
+        for (key, val) in struct_ref.iter() {
+            if key.as_str() == "providers" {
+                return Some(val);
+            }
+        }
+    }
+    None
+}
+
 fn format_provider_keys_for_error(keys: &[String]) -> String {
     format!(
         "[{}]",
@@ -246,6 +260,11 @@ impl<'v, V: ValueLike<'v>> ProviderCollectionGen<V> {
                     providers.insert(provider.0.id().dupe(), value);
                     return Ok(providers);
                 }
+                // Bazel legacy compatibility: rules can return struct(providers=[...])
+                // instead of a flat list. Extract the providers list from the struct.
+                if let Some(providers_val) = extract_providers_from_struct(value) {
+                    return Self::try_from_value_impl(providers_val);
+                }
                 return Err(ProviderCollectionError::CollectionNotAList {
                     repr: value.to_repr(),
                 }
@@ -272,10 +291,14 @@ impl<'v, V: ValueLike<'v>> ProviderCollectionGen<V> {
                     };
                 }
                 None => {
-                    return Err(ProviderCollectionError::CollectionElementNotAProvider {
-                        repr: value.to_repr(),
-                    }
-                    .into());
+                    // For Bazel compatibility, skip non-provider objects in provider lists.
+                    // Some Bazel rulesets return stub providers (like config_common.FeatureFlagInfo)
+                    // that are not true provider instances. Skip them rather than failing.
+                    tracing::warn!(
+                        "Skipping non-provider object in provider list: {}",
+                        value.to_repr()
+                    );
+                    continue;
                 }
             }
         }

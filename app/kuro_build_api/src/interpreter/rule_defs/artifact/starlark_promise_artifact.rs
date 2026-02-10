@@ -201,6 +201,10 @@ impl<'v> StarlarkArtifactLike<'v> for StarlarkPromiseArtifact {
         }
     }
 
+    fn source_path_info(&self) -> Option<(kuro_core::package::PackageLabel, String)> {
+        None
+    }
+
     fn fingerprint<'s>(&'s self) -> ArtifactFingerprint<'s>
     where
         'v: 's,

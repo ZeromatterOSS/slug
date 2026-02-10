@@ -1,10 +1,34 @@
-# Rules Integration Phases (9-12)
+# Rules Integration Phases (9-13)
 
 > **Parent Plan**: [Kuro Bazel-Compatible Build Tool](../2026-01-21-kuro-bazel-compatible-build-tool.md)
 >
 > **Key Research**: [rules_cc Native Requirements](../research/2026-01-26-rules-cc-native-requirements.md)
 
-This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rust, rules_python, and rules_oci.
+This sub-plan covers integration with the rules_* ecosystem: rules_cc, rules_rust, rules_python, protobuf, and rules_oci.
+
+## Bazel 9.0 Native → Starlark Migration Architecture
+
+**Critical context for ALL rules_* phases**: In Bazel 9.0, all language rules are pure Starlark. The native (C++/Java) implementations have been removed from Bazel's core. Each rules_* repo has a different mechanism for detecting Bazel 9.0+ and switching to Starlark implementations. Kuro intercepts these mechanisms via synthetic repositories.
+
+### Pattern: Each rules_* repo checks Bazel version differently
+
+| Rules Repo | Detection Mechanism | What Kuro Must Provide |
+|---|---|---|
+| **rules_cc 0.2.16** | `_bazel_version_ge("9.0.0-pre.20250911")` via `@bazel_features` | `cc_common` native module |
+| **rules_python 1.8.0+** | `enable_pystar` config flag + `hasattr(native, "starlark_doc_extract")` | `py_internal` stubs, `PyInfo`/`PyRuntimeInfo` globals |
+| **protobuf 33.4+** | `hasattr(native, "proto_library")` → must return False | `ProtoInfo` provider, `proto_common` module stubs |
+| **rules_rust 0.40.0** | Pure Starlark always (no native fallback) | Detect system `rustc`/`cargo` |
+
+### Anti-pattern: Do NOT implement native language rules
+
+Kuro must NOT implement `native.py_library`, `native.py_binary`, `native.py_test`, `native.proto_library`, etc. These were removed from Bazel 9.0. They may be stubbed as `= None` on the `native` module to prevent crashes when code does `hasattr(native, "py_library")` or similar checks, but there must never be a real implementation behind them.
+
+Instead, Kuro should:
+
+1. **Generate synthetic repos** that configure each rules_* repo to use its Starlark path
+2. **Provide native modules** (`cc_common`, `proto_common`) that Starlark implementations call
+3. **Provide provider globals** (`PyInfo`, `ProtoInfo`) as Starlark builtins
+4. **Stub internal APIs** (`py_internal`, etc.) that Starlark implementations depend on
 
 ---
 
@@ -164,7 +188,7 @@ Components available from `ConfiguredTargetLabel`:
 
 Get rules_cc working to compile C and C++ code. For Bazel 9.0+, rules_cc is **almost entirely pure Starlark**. The key insight from research is that Kuro does NOT need to implement native providers or rules—only the native `cc_common` module that the Starlark implementations call into.
 
-### Architecture (Bazel 9.0.0+)
+### Migration Architecture (Bazel 9.0.0+)
 
 In rules_cc 0.2.16+ with Bazel 9.0+:
 
@@ -172,11 +196,23 @@ In rules_cc 0.2.16+ with Bazel 9.0+:
 - **Rules are pure Starlark**: `cc_library`, `cc_binary`, `cc_test` in `cc/private/rules_impl/*.bzl`
 - **Native builtin required**: The `cc_common` module for low-level action creation
 
-The version switch happens in `extensions.bzl:31`:
+#### Version Check Details
+
+The version switch happens in `cc/extensions.bzl:31` inside `_compatibility_proxy_repo_impl()`:
 ```starlark
 if _bazel_version_ge("9.0.0-pre.20250911"):
-    # Use pure Starlark implementations
+    # Bazel 9.0+: Load Starlark implementations from cc/private/rules_impl/
+    # proxy.bzl: cc_binary = @rules_cc//cc/private/rules_impl:cc_binary.bzl
+    # symbols.bzl: CcInfo = @rules_cc//cc/private:cc_info.bzl, cc_common = @rules_cc//cc/private:cc_common.bzl
+else:
+    # Pre-9.0: Delegate to native rules
+    # proxy.bzl: cc_binary = native.cc_binary
+    # symbols.bzl: NativeCcInfo = CcInfo (from native globals)
 ```
+
+The `_bazel_version_ge()` function comes from `@bazel_features//private:util.bzl`. Kuro reports `"9.0.0"` (no prerelease suffix), which compares greater than `"9.0.0-pre.20250911"` in semver (released > prerelease).
+
+**Kuro approach**: Generate synthetic `@cc_compatibility_proxy` repo matching the Bazel 9.0+ path (lines 61-109 of extensions.bzl). Implemented in `synthetic_repos.rs:386-478`.
 
 ### Changes Required:
 
@@ -369,24 +405,128 @@ use_repo(crate, "crates")
 
 ### Overview
 
-Get rules_python working for Python projects.
+Get rules_python working for Python projects. **Critical**: rules_python 1.8.0+ uses a config-driven switch (`enable_pystar`) to choose between native rules and Starlark implementations. For Bazel 9.0 compatibility, Kuro MUST use the Starlark path (`enable_pystar = True`), NOT implement `native.py_library`.
+
+### Migration Architecture
+
+#### How rules_python Detects Bazel Version
+
+Unlike rules_cc which compares version strings, rules_python uses **feature detection**:
+
+```starlark
+# internal_config_repo.bzl - Repository rule (NOT executed by Kuro - we generate synthetic repo)
+def _internal_config_repo_impl(rctx):
+    pystar_requested = _bool_from_environ(rctx, "RULES_PYTHON_ENABLE_PYSTAR", "1")  # default: enabled
+    if pystar_requested and hasattr(native, "starlark_doc_extract"):  # Bazel 7+ feature
+        enable_pystar = True
+    else:
+        enable_pystar = False
+    rctx.file("rules_python_config.bzl", "config = struct(enable_pystar = {})".format(enable_pystar))
+```
+
+#### Rule File Switching Pattern
+
+Each py_*.bzl file uses a ternary:
+
+```starlark
+# py_library.bzl:23
+load("@rules_python_internal//:rules_python_config.bzl", "config")
+load("//python/private/common:py_library_macro_bazel.bzl", _starlark_py_library = "py_library")
+
+_py_library_impl = _starlark_py_library if config.enable_pystar else native.py_library
+```
+
+Same pattern in `py_binary.bzl` and `py_test.bzl`.
+
+#### Why NOT `enable_pystar = False`
+
+Setting `enable_pystar = False` forces fallback to `native.py_library`, which:
+- Does NOT exist in Bazel 9.0 (removed from core)
+- Would require Kuro to implement native Python rule analysis
+- Is the WRONG architectural direction for Bazel 9.0 compatibility
+
+#### Why `enable_pystar = True`
+
+Setting `enable_pystar = True` uses rules_python's own Starlark implementations, which:
+- Are the only path in Bazel 9.0
+- Are well-tested (default since rules_python 0.40.0)
+- Require `py_internal` stubs (Bazel-internal API)
+- Require `hasattr(native, "starlark_doc_extract")` to return True (via `IS_BAZEL_7_OR_HIGHER` check in `util.bzl:87`)
 
 ### Changes Required:
 
 #### 1. Fetch rules_python from BCR
 
 ```python
-bazel_dep(name = "rules_python", version = "0.31.0")
+bazel_dep(name = "rules_python", version = "1.8.0")
 ```
 
-#### 2. Python Toolchain
+Version 1.8.0+ has pystar as default and the native rule fallback removed.
 
+#### 2. Update Synthetic `@rules_python_internal` Repository
+
+Change the current synthetic repo to generate `enable_pystar = True`:
+
+```python
+# @rules_python_internal//:rules_python_config.bzl
+config = struct(
+  enable_pystar = True,
+)
+```
+
+**File**: `app/kuro_bzlmod/src/synthetic_repos.rs` - `generate_rules_python_internal_config_repo()`
+
+#### 3. Implement `py_internal` Stubs
+
+The Starlark implementations load `@rules_python_internal//:py_internal.bzl` which re-exports Bazel's `py_internal` global. Kuro must provide this as a stub.
+
+Generate `@rules_python_internal//:py_internal.bzl`:
+```python
+# Stub py_internal for Kuro compatibility
+# The Starlark implementations use this for advanced features;
+# basic py_library/py_binary/py_test work with minimal stubs.
+py_internal_impl = struct(
+    # Add stubs as needed based on what rules_python actually calls
+)
+```
+
+#### 4. Ensure `native.starlark_doc_extract` Exists
+
+rules_python's `util.bzl:87` checks `IS_BAZEL_7_OR_HIGHER = hasattr(native, "starlark_doc_extract")`. Either:
+- Add `starlark_doc_extract` as a stub on the `native` module, OR
+- Ensure the check doesn't matter (since we generate the config synthetically)
+
+Note: Since Kuro generates `@rules_python_internal` synthetically (bypassing the repo rule), the `hasattr` check only matters in `util.bzl` where `IS_BAZEL_7_OR_HIGHER` is used for other purposes (like `py_runtime.bzl:21`).
+
+#### 5. Provide `PyInfo` and `PyRuntimeInfo` Globals
+
+Already implemented in `py_common.rs`. These are needed by `python/private/reexports.bzl`:
+```python
+BuiltinPyInfo = PyInfo           # native global
+BuiltinPyRuntimeInfo = PyRuntimeInfo  # native global
+```
+
+#### 6. Python Toolchain Detection
+
+For basic functionality, detect system Python:
 ```python
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(python_version = "3.11")
 ```
 
-#### 3. pip Integration
+The `pythons_hub` synthetic repo already handles this.
+
+#### 7. Test with Real Project
+
+```python
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+
+py_library(name = "hello_py_lib", srcs = ["hello_py.py"])
+py_binary(name = "hello_py_bin", srcs = ["hello_py_main.py"], deps = [":hello_py_lib"])
+py_test(name = "hello_py_test", srcs = ["hello_py_test.py"], deps = [":hello_py_lib"])
+```
+
+#### 8. pip Integration (Later)
 
 ```python
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
@@ -398,21 +538,136 @@ pip.parse(
 use_repo(pip, "pip")
 ```
 
+### Implementation Strategy (Iterative)
+
+1. Switch synthetic repo to `enable_pystar = True`
+2. Attempt build, fix errors one-by-one (same approach as rules_cc)
+3. Stub `py_internal` functions as rules_python's Starlark code exercises them
+4. Most basic py_library/py_binary/py_test should work without complex `py_internal` features
+5. Advanced features (coverage, C extensions via `PyWrapCcHelper`) can be stubbed
+
 ### Success Criteria:
 
 #### Automated Verification:
 
-- [ ] `kuro run //:py_main` executes Python
-- [ ] `kuro test //:py_test` runs pytest
-- [ ] pip dependencies available
+- [ ] `kuro build //:hello_py_lib` analyzes py_library via Starlark rules
+- [ ] `kuro build //:hello_py_bin` creates executable Python binary
+- [ ] `kuro run //:hello_py_bin` executes Python
+- [ ] `kuro test //:hello_py_test` runs test
+- [ ] `enable_pystar = True` path works (NOT native.py_library fallback)
 
 #### Manual Verification:
 
 - [ ] Build a Python project with pip dependencies
+- [ ] Verify Python toolchain detection works
 
 ---
 
-## Phase 12: rules_oci Integration
+## Phase 12: protobuf Integration
+
+### Overview
+
+Get Protocol Buffer compilation working. For Bazel 9.0, protobuf rules are pure Starlark in the `protobuf` BCR module (not `rules_proto`, which is archived).
+
+### Migration Architecture
+
+#### History
+
+- **Bazel 6-7**: `proto_library`, `cc_proto_library`, etc. were native rules in Bazel core
+- **Bazel 8 (Dec 2024)**: Proto rules removed from core, `--incompatible_autoload_externally` provided compat
+- **Bazel 9 (Jan 2026)**: Autoloading removed, explicit `load()` from `@protobuf//bazel/*.bzl` required
+- **Jan 14, 2026**: `rules_proto` repository archived (use `@protobuf` instead)
+
+#### How protobuf Detects Bazel Version
+
+protobuf uses **feature detection** (not version string comparison):
+
+```starlark
+# protobuf/bazel/proto_library.bzl
+def proto_library(**kwattrs):
+    if not hasattr(native, "proto_library"):
+        # Bazel 8+: Use Starlark implementation
+        _proto_library(**kwattrs)
+    else:
+        # Bazel 6-7: Use native implementation to avoid ProtoInfo mismatches
+        native.proto_library(**kwattrs)
+```
+
+Since Kuro targets Bazel 9.0 and does NOT register `native.proto_library`, `hasattr(native, "proto_library")` returns False → Starlark path is used automatically.
+
+#### Version Requirements
+
+- **protobuf 27.0** (in BCR cache): Uses `proto_library = native.proto_library` directly — **INCOMPATIBLE with Bazel 9.0**
+- **protobuf 33.4+**: Full Starlark implementations, required for Bazel 9.0
+- The BCR has protobuf up to 34.0-rc1
+
+### Changes Required:
+
+#### 1. Fetch protobuf from BCR
+
+```python
+bazel_dep(name = "protobuf", version = "33.5")
+```
+
+Note: protobuf has 18 direct dependencies including rules_cc, rules_python, rules_java, abseil-cpp, zlib, re2. This is a large dependency tree.
+
+#### 2. Ensure `native.proto_library` Is Not a Real Implementation
+
+Kuro must NOT register `proto_library` as a functioning native rule. It may be stubbed as `= None` on the `native` module if needed to avoid crashes, but `hasattr(native, "proto_library")` should return False (or the value should be None), so protobuf's Starlark path is triggered.
+
+#### 3. Provide `ProtoInfo` Provider
+
+protobuf's Starlark code references `ProtoInfo` (re-exported from `bazel/common/proto_info.bzl`). In newer versions this is defined in Starlark; in transitional versions it may reference the native `ProtoInfo`. Kuro may need a `ProtoInfo` provider stub similar to `PyInfo`.
+
+#### 4. Provide `proto_common` Module
+
+protobuf's Starlark implementations use `proto_common` for:
+- `proto_common.compile()` - Invoke protoc
+- `proto_common.ProtoLangToolchainInfo` - Toolchain provider
+
+Kuro needs native stubs for this module, similar to `cc_common`.
+
+#### 5. Handle protobuf's Large Dependency Tree
+
+protobuf depends on: rules_cc, rules_python, rules_java, rules_kotlin, rules_rust, rules_ruby, abseil-cpp, zlib, jsoncpp, re2, bazel_skylib, rules_pkg, rules_shell, rules_license, apple_support, platforms, bazel_features.
+
+Many of these may need synthetic repos or stub handling.
+
+#### 6. Test with Real Project
+
+```python
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
+load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@protobuf//bazel:py_proto_library.bzl", "py_proto_library")
+
+proto_library(
+    name = "hello_proto",
+    srcs = ["hello.proto"],
+)
+
+cc_proto_library(
+    name = "hello_cc_proto",
+    deps = [":hello_proto"],
+)
+```
+
+### Success Criteria:
+
+#### Automated Verification:
+
+- [ ] `kuro build //:hello_proto` compiles .proto files
+- [ ] `kuro build //:hello_cc_proto` generates C++ code from protos
+- [ ] `kuro build //:hello_py_proto` generates Python code from protos
+- [ ] `hasattr(native, "proto_library")` returns False
+
+#### Manual Verification:
+
+- [ ] Build a project with proto dependencies
+- [ ] Verify protoc is found/downloaded correctly
+
+---
+
+## Phase 13: rules_oci Integration
 
 ### Overview
 

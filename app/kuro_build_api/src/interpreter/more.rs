@@ -61,6 +61,7 @@ use crate::interpreter::rule_defs::provider::callable::register_provider;
 use crate::interpreter::rule_defs::provider::collection::register_provider_collection;
 use crate::interpreter::rule_defs::provider::dependency::register_dependency;
 use crate::interpreter::rule_defs::provider::registration::register_builtin_providers;
+use crate::interpreter::rule_defs::py_common::register_py_common;
 use crate::interpreter::rule_defs::register_rule_defs;
 use crate::interpreter::rule_defs::required_test_local_resource::register_required_test_local_resource;
 use crate::interpreter::rule_defs::resolved_macro::register_string_with_macros;
@@ -76,6 +77,7 @@ fn register_build_api_globals(globals: &mut GlobalsBuilder) {
     register_coverage_common(globals);
     register_platform_common(globals);
     register_proto_common(globals);
+    register_py_common(globals);
     register_cmd_args(globals);
     register_config(globals);
     register_configuration_field(globals);

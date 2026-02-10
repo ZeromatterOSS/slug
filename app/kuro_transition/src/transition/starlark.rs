@@ -40,7 +40,6 @@ use starlark::typing::Ty;
 use starlark::util::ArcStr;
 use starlark::values::Demand;
 use starlark::values::Freeze;
-use starlark::values::FreezeError;
 use starlark::values::FreezeResult;
 use starlark::values::Freezer;
 use starlark::values::FrozenStringValue;
@@ -138,9 +137,34 @@ impl Freeze for Transition<'_> {
 
     fn freeze(self, freezer: &Freezer) -> FreezeResult<FrozenTransition> {
         let implementation = freezer.freeze(self.implementation)?;
-        let id = self.id.into_inner().ok_or(FreezeError::new(
-            TransitionError::TransitionNotAssigned.to_string(),
-        ))?;
+        // In Bazel, transitions can be used inline without being assigned to a
+        // module-level variable. Generate a synthetic ID for such transitions
+        // using the path where the transition was defined.
+        let id = match self.id.into_inner() {
+            Some(id) => id,
+            None => {
+                use std::collections::HashMap;
+                use std::sync::Mutex;
+                use std::sync::atomic::AtomicU64;
+                use std::sync::atomic::Ordering;
+                // Use per-path counters so that the same module always produces
+                // the same IDs regardless of cross-module evaluation order.
+                static PER_PATH_COUNTERS: std::sync::LazyLock<
+                    Mutex<HashMap<ImportPath, AtomicU64>>,
+                > = std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+                let n = {
+                    let mut counters = PER_PATH_COUNTERS.lock().unwrap();
+                    let counter = counters
+                        .entry(self.path.clone())
+                        .or_insert_with(|| AtomicU64::new(0));
+                    counter.fetch_add(1, Ordering::Relaxed)
+                };
+                Arc::new(TransitionId::MagicObject {
+                    path: self.path.clone(),
+                    name: format!("_anonymous_{}", n),
+                })
+            }
+        };
         let refs = self
             .refs
             .into_iter()

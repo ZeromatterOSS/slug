@@ -65,6 +65,57 @@ impl<'v> StarlarkValue<'v> for ConfigCommonModule {
         static RES: MethodsStatic = MethodsStatic::new();
         RES.methods(config_common_module_methods)
     }
+
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "FeatureFlagInfo")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            // Stub provider callable for feature flags - returns a callable
+            // that creates struct-like objects with the given kwargs.
+            "FeatureFlagInfo" => Some(heap.alloc(FeatureFlagInfoProvider)),
+            _ => None,
+        }
+    }
+}
+
+// ============================================================================
+// FeatureFlagInfoProvider - Stub provider for config_common.FeatureFlagInfo
+// ============================================================================
+
+/// A stub callable provider for config_common.FeatureFlagInfo.
+/// When called, returns a struct with the provided fields (e.g., value).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct FeatureFlagInfoProvider;
+
+impl Display for FeatureFlagInfoProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "FeatureFlagInfo")
+    }
+}
+
+starlark_simple_value!(FeatureFlagInfoProvider);
+
+#[starlark_value(type = "FeatureFlagInfo")]
+impl<'v> StarlarkValue<'v> for FeatureFlagInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &starlark::eval::Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        // Create a simple struct from the kwargs.
+        // FeatureFlagInfo(value = "foo") -> struct(value = "foo")
+        let heap = eval.heap();
+        let kwargs = args.names_map()?;
+        let mut entries = SmallMap::new();
+        for (name, value) in kwargs.iter_hashed() {
+            let key: Value<'v> = heap.alloc(name.key().as_str());
+            entries.insert_hashed(key.get_hashed()?, *value);
+        }
+        Ok(heap.alloc(Dict::new(entries)))
+    }
 }
 
 // ============================================================================

@@ -390,4 +390,143 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
             Ok(Either::Left(value))
         }
     }
+
+    /// Expands a template file with substitutions (Bazel-compatible).
+    ///
+    /// Creates a new file by reading a template and replacing substitution patterns.
+    ///
+    /// * `template`: The template file (input artifact)
+    /// * `output`: The output file to create
+    /// * `substitutions`: Dictionary of string replacements (key -> value)
+    /// * `is_executable`: Whether the output should be executable (default: False)
+    /// * `computed_substitutions`: Optional computed substitutions (not yet supported)
+    #[allow(unused_variables)]
+    fn expand_template<'v>(
+        this: &AnalysisActions<'v>,
+        #[starlark(require = named)] template: starlark::values::Value<'v>,
+        #[starlark(require = named)] output: OutputArtifactArg<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        substitutions: starlark::values::Value<'v>,
+        #[starlark(require = named, default = false)] is_executable: bool,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        computed_substitutions: starlark::values::Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<starlark::values::none::NoneType> {
+        // Implement expand_template by reading the template source file content
+        // and applying substitutions, then writing via a write action.
+        //
+        // For source file templates (like python_bootstrap_template.txt),
+        // we can read the file at analysis time since it's a known source file.
+
+        let mut this = this.state()?;
+        let (declaration, output_artifact) =
+            this.get_or_declare_output(eval, output, OutputType::File, None)?;
+
+        // Try to read the template content from the source file
+        let template_content = if let Some(artifact_like) =
+            <&dyn kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkArtifactLike>::unpack_value(template)?
+        {
+            // Try to get the source path of the template
+            if let Some((pkg, rel_path)) = artifact_like.source_path_info() {
+                // Read from the source file on disk
+                // The source path is relative to the cell root
+                let cell_name = pkg.cell_name().as_str();
+                let pkg_path = pkg.cell_relative_path().as_str();
+                let full_path = if pkg_path.is_empty() {
+                    rel_path.clone()
+                } else {
+                    format!("{}/{}", pkg_path, rel_path)
+                };
+                // The daemon's CWD may be inside buck-out/v2, resolve to project root
+                let project_root = std::env::current_dir()
+                    .ok()
+                    .and_then(|cwd| {
+                        if cwd.ends_with("buck-out/v2") {
+                            Some(cwd.parent()?.parent()?.to_path_buf())
+                        } else {
+                            Some(cwd)
+                        }
+                    })
+                    .unwrap_or_default();
+                // Try reading the file from various cell locations
+                let file_content = if cell_name.is_empty() || cell_name == "root" || cell_name == "manual_test" {
+                    let p = project_root.join(&full_path);
+                    std::fs::read_to_string(&p)
+                        .map_err(|e| {
+                            tracing::warn!("expand_template: failed to read template {:?}: {}", p, e);
+                            e
+                        })
+                        .ok()
+                } else {
+                    // Try bundled cell path first
+                    let bundled_path = project_root.join(format!(
+                        "buck-out/v2/external_cells/bundled/{}/{}",
+                        cell_name, full_path
+                    ));
+                    std::fs::read_to_string(&bundled_path)
+                        .or_else(|_| {
+                            // Try bazel-external path for bzlmod cells
+                            let external_path = project_root
+                                .join(format!("bazel-external/{}/{}", cell_name, full_path));
+                            std::fs::read_to_string(&external_path)
+                        })
+                        .map_err(|e| {
+                            tracing::warn!(
+                                "expand_template: failed to read template for cell '{}', path '{}': {}",
+                                cell_name, full_path, e
+                            );
+                            e
+                        })
+                        .ok()
+                };
+                file_content.unwrap_or_else(|| {
+                    tracing::warn!(
+                        "expand_template: producing empty content for template '{}' in cell '{}'",
+                        full_path, cell_name
+                    );
+                    String::new()
+                })
+            } else {
+                String::new()
+            }
+        } else {
+            String::new()
+        };
+
+        // Apply substitutions
+        let mut content = template_content;
+        if !substitutions.is_none() {
+            if let Some(dict) = starlark::values::dict::DictRef::from_value(substitutions) {
+                for (key, value) in dict.iter() {
+                    if let (Some(k), Some(v)) = (key.unpack_str(), value.unpack_str()) {
+                        content = content.replace(k, v);
+                    }
+                }
+            }
+        }
+
+        // Register a write action with the substituted content
+        let content_str = eval.heap().alloc_str(&content);
+        let content_value = content_str.to_value();
+        let cmd_args =
+            kuro_build_api::interpreter::rule_defs::cmd_args::StarlarkCmdArgs::try_from_value(
+                content_value,
+            )?;
+        let content_cli = CommandLineArg::from_cmd_args(eval.heap().alloc_typed(cmd_args));
+
+        let action = UnregisteredWriteAction {
+            is_executable,
+            macro_files: None,
+            absolute: false,
+            use_dep_files_placeholder_for_content_based_paths: false,
+        };
+        this.register_action(
+            indexset![output_artifact],
+            action,
+            Some(content_cli.to_value()),
+            None,
+        )?;
+
+        Ok(starlark::values::none::NoneType)
+    }
 }

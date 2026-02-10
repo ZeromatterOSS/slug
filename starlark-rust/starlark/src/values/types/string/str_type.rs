@@ -272,6 +272,68 @@ impl<'v> StarlarkValue<'v> for StarlarkStr {
         }
     }
 
+    // Bazel-compatible: Label strings support .name, .package, .workspace_name attributes.
+    // In Bazel, Label("//pkg:target") returns a Label object with these attributes.
+    // In Kuro, Label() returns a string. We support attribute access on strings
+    // that look like labels (contain "//" or ":").
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        if !matches!(
+            attribute,
+            "name" | "package" | "workspace_name" | "workspace_root"
+        ) {
+            return false;
+        }
+        let s = self.as_str();
+        s.contains("//") || s.contains(':')
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        let s = self.as_str();
+        if !(s.contains("//") || s.contains(':')) {
+            return None;
+        }
+        match attribute {
+            "name" => {
+                // Extract target name: "@repo//pkg:target" -> "target"
+                if let Some(colon_idx) = s.rfind(':') {
+                    Some(heap.alloc(&s[colon_idx + 1..]))
+                } else if let Some(slash_idx) = s.rfind('/') {
+                    // "//pkg" -> "pkg" (infer target = last path component)
+                    Some(heap.alloc(&s[slash_idx + 1..]))
+                } else {
+                    Some(heap.alloc(s))
+                }
+            }
+            "package" => {
+                // Extract package: "@repo//pkg/sub:target" -> "pkg/sub"
+                let after_slashes = if let Some(idx) = s.find("//") {
+                    &s[idx + 2..]
+                } else {
+                    s
+                };
+                if let Some(colon_idx) = after_slashes.find(':') {
+                    Some(heap.alloc(&after_slashes[..colon_idx]))
+                } else {
+                    Some(heap.alloc(after_slashes))
+                }
+            }
+            "workspace_name" => {
+                // Extract repo: "@repo//..." -> "repo"
+                if let Some(stripped) = s.strip_prefix('@') {
+                    if let Some(idx) = stripped.find("//") {
+                        Some(heap.alloc(&stripped[..idx]))
+                    } else {
+                        Some(heap.alloc(stripped))
+                    }
+                } else {
+                    Some(heap.alloc(""))
+                }
+            }
+            "workspace_root" => Some(heap.alloc("")),
+            _ => None,
+        }
+    }
+
     fn compare(&self, other: Value) -> crate::Result<Ordering> {
         if let Some(other) = other.unpack_str() {
             Ok(self.as_str().cmp(other))
