@@ -448,7 +448,7 @@ This indicates both systems recognize the need for:
 ### Aspects Implementation
 - `app/kuro_interpreter_for_build/src/aspect.rs` - Phase 8a stub
 - `app/kuro_interpreter_for_build/src/attrs/attrs_global.rs:763-856` - Attribute integration
-- `thoughts/shared/plans/kuro-bazel-subplans/08-aspects.md` - Implementation plan
+- `thoughts/shared/plans/kuro-bazel-subplans/06-aspects.md` - Implementation plan
 
 ### Usage Examples
 - `bazel_tools/tools/compliance/gather_packages.bzl:38-219` - Aspect example
@@ -504,7 +504,7 @@ Monitor Bazel's AXL development for potential patterns to adopt in BXL, and cons
 
 ## Related Research
 
-- `thoughts/shared/plans/kuro-bazel-subplans/08-aspects.md` - Aspects implementation plan
+- `thoughts/shared/plans/kuro-bazel-subplans/06-aspects.md` - Aspects implementation plan
 - `thoughts/shared/plans/2026-01-21-kuro-bazel-compatible-build-tool.md` - Master plan
 - `thoughts/shared/research/bxl-vs-axl-comparison.md` - BXL vs AXL (incomplete)
 - `docs/rfcs/implemented/bxl.md` - BXL RFC

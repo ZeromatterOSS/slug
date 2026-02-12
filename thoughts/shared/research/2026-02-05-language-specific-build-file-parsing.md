@@ -1189,7 +1189,7 @@ c. **Native parser functions**: Add `native.parse_toml()`, `native.parse_json()`
 
 The thoughts directory contains extensive planning for language integration:
 
-- `thoughts/shared/plans/kuro-bazel-subplans/04-rules-integration.md` - Plans for rules_rust (crate_universe), rules_python (pip.parse)
+- `thoughts/shared/plans/kuro-bazel-subplans/07-rules-integration.md` - Plans for rules_rust (crate_universe), rules_python (pip.parse)
 - `thoughts/shared/plans/kuro-bazel-subplans/02-bzlmod-phase-5e.md` - Module extension execution with deferred repository model
 - `thoughts/shared/plans/kuro-bazel-subplans/02-bzlmod.md` - Overall bzlmod philosophy
 

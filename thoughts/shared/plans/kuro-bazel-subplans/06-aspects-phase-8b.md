@@ -1,6 +1,6 @@
 # Aspects Phase 8b: Aspect Context and Basic Execution
 
-> **Main Plan**: [08-aspects.md](./08-aspects.md)
+> **Main Plan**: [06-aspects.md](./06-aspects.md)
 > **Research**: [BXL vs Bazel Aspects Comparison](../../research/2026-01-30-bxl-vs-bazel-aspects-comparison.md)
 
 ## Overview
@@ -370,5 +370,5 @@ test_aspect = aspect(
 
 ### Related Documents
 
-- [08-aspects.md](./08-aspects.md) - Main aspects plan
+- [06-aspects.md](./06-aspects.md) - Main aspects plan
 - [BXL vs Aspects Research](../../research/2026-01-30-bxl-vs-bazel-aspects-comparison.md) - Why aspects must be native

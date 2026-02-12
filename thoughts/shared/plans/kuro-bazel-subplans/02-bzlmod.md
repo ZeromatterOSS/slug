@@ -148,7 +148,7 @@ The following **must remain in native Rust code**:
 
 Everything else should preferably be implemented in Starlark in `prelude/bazel_compat/`.
 
-See [06-prelude-architecture.md](./06-prelude-architecture.md) for detailed architecture explanation.
+See [04-prelude-architecture.md](./04-prelude-architecture.md) for detailed architecture explanation.
 
 ### Key Version Requirement
 

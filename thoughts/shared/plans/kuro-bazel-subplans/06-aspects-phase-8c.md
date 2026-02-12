@@ -1,7 +1,7 @@
 # Aspects Phase 8c: Shadow Graph Propagation and DICE Integration
 
-> **Main Plan**: [08-aspects.md](./08-aspects.md)
-> **Previous Phase**: [08-aspects-phase-8b.md](./08-aspects-phase-8b.md)
+> **Main Plan**: [06-aspects.md](./06-aspects.md)
+> **Previous Phase**: [06-aspects-phase-8b.md](./06-aspects-phase-8b.md)
 
 ## Overview
 
@@ -1438,5 +1438,5 @@ because `AspectKey::compute()` needs to load the aspect callable from its defini
 
 ### Related Documents
 
-- [08-aspects.md](./08-aspects.md) - Main aspects plan
-- [08-aspects-phase-8b.md](./08-aspects-phase-8b.md) - Phase 8b types (prerequisite)
+- [06-aspects.md](./06-aspects.md) - Main aspects plan
+- [06-aspects-phase-8b.md](./06-aspects-phase-8b.md) - Phase 8b types (prerequisite)

@@ -1,7 +1,7 @@
 # Aspects Phase 8e: required_aspect_providers for rules_cc Compatibility
 
-> **Main Plan**: [08-aspects.md](./08-aspects.md)
-> **Previous Phase**: [08-aspects-phase-8d.md](./08-aspects-phase-8d.md)
+> **Main Plan**: [06-aspects.md](./06-aspects.md)
+> **Previous Phase**: [06-aspects-phase-8d.md](./06-aspects-phase-8d.md)
 
 ## Overview
 
@@ -373,5 +373,5 @@ BUILD SUCCEEDED
 
 ### Related Documents
 
-- [08-aspects.md](./08-aspects.md) - Main aspects plan
-- [08-aspects-phase-8d.md](./08-aspects-phase-8d.md) - Shadow graph implementation
+- [06-aspects.md](./06-aspects.md) - Main aspects plan
+- [06-aspects-phase-8d.md](./06-aspects-phase-8d.md) - Shadow graph implementation

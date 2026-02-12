@@ -67,7 +67,7 @@ Kuro must support Bazel’s `depset` API **and** preserve Buck2’s `transitive_
 
 #### Design Goals
 
-1. **Bazel compatibility at the API boundary**: rules_*, prelude shims, and Bazel semantics should consume and return `depset`.
+1. **Bazel compatibility at the API boundary**: rules\_\*, prelude shims, and Bazel semantics should consume and return `depset`.
 2. **Buck2 internals can still use `transitive_set`** where projections, reductions, and typed definitions provide value.
 3. **Explicit conversion** (not implicit coercion) to avoid silent semantic loss.
 4. **Cache conversions** to avoid repeated materialization in hot analysis paths.
@@ -83,20 +83,21 @@ native.depset_from_transitive_set(t, order = "default")
 ```
 
 **Semantics:**
+
 - `depset -> transitive_set`:
-  - Use a single built‑in `transitive_set` definition (e.g. `BazelDepsetTset`) with one field (`items`).
-  - Preserve transitive structure when possible by wiring children as tset children.
-  - Ordering is **best‑effort**; store the `order` string for traversal hints.
+    - Use a single built‑in `transitive_set` definition (e.g. `BazelDepsetTset`) with one field (`items`).
+    - Preserve transitive structure when possible by wiring children as tset children.
+    - Ordering is **best‑effort**; store the `order` string for traversal hints.
 - `transitive_set -> depset`:
-  - Materialize via traversal (default preorder) and build a depset from values.
-  - Projections/reductions are not preserved; document this loss explicitly.
+    - Materialize via traversal (default preorder) and build a depset from values.
+    - Projections/reductions are not preserved; document this loss explicitly.
 
 #### Performance & Architectural Implications
 
 - **Conversion cost** is proportional to the transitive closure size if materialized. This can be expensive if done per target in analysis.
 - **Caching is required**:
-  - Cache on `FrozenTransitiveSet` for `depset` projection per order.
-  - Cache on `depset` objects for `transitive_set` projection per order.
+    - Cache on `FrozenTransitiveSet` for `depset` projection per order.
+    - Cache on `depset` objects for `transitive_set` projection per order.
 - **Hot‑path safety**: only convert at API boundaries, avoid repeated conversions in tight loops.
 - **Ordering fidelity**: Bazel `depset` order semantics do not perfectly match `transitive_set` traversal. The bridge must specify “best‑effort” mapping and document behavior.
 - **No implicit coercion**: attribute coercion should not silently convert between these types.
@@ -105,8 +106,8 @@ native.depset_from_transitive_set(t, order = "default")
 
 - Explicit conversion APIs exist and are documented.
 - Conversion round‑trip is deterministic for basic cases:
-  - `depset -> transitive_set -> depset` preserves element sets.
-  - `transitive_set -> depset -> transitive_set` preserves element sets.
+    - `depset -> transitive_set -> depset` preserves element sets.
+    - `transitive_set -> depset -> transitive_set` preserves element sets.
 - Conversion is cached and does not regress analysis time in representative rule graphs.
 
 ### Verification Criteria
@@ -132,20 +133,20 @@ native.depset_from_transitive_set(t, order = "default")
 5. **Remote execution initially** - Local execution first, RE later
 6. **GUI/IDE integration** - CLI only initially
 7. **Removing type annotations** - Keep starlark-rust's type support (Bazel is adding this)
-8. **Native language rule implementations** - In Bazel 9.0, language rules (cc_*, py_*, proto_*) are pure Starlark in their respective rules_* repos. Kuro does NOT implement `native.py_library`, `native.proto_library`, etc. See [Native → Starlark Migration Architecture](#native--starlark-migration-architecture).
+8. **Native language rule implementations** - In Bazel 9.0, language rules (cc*\*, py*_, proto\__) are pure Starlark in their respective rules\_\* repos. Kuro does NOT implement `native.py_library`, `native.proto_library`, etc. See [Native → Starlark Migration Architecture](#native--starlark-migration-architecture).
 
 ## Native → Starlark Migration Architecture
 
-A critical Bazel 9.0 design principle: **all language rules are pure Starlark**. The native (C++/Java) implementations that existed in Bazel's core have been completely removed. Each rules_* repo independently detects the Bazel version and switches to its own Starlark implementations. Kuro must understand and support each repo's switching mechanism.
+A critical Bazel 9.0 design principle: **all language rules are pure Starlark**. The native (C++/Java) implementations that existed in Bazel's core have been completely removed. Each rules\_\* repo independently detects the Bazel version and switches to its own Starlark implementations. Kuro must understand and support each repo's switching mechanism.
 
 ### Migration Pattern Summary
 
-| Rules Repo | Detection Mechanism | Switch Point | Starlark Path |
-|---|---|---|---|
-| **rules_cc 0.2.16** | Version string comparison | `_bazel_version_ge("9.0.0-pre.20250911")` | `@cc_compatibility_proxy` synthetic repo selects Starlark impls |
-| **rules_python 1.8.0+** | Config flag + feature detection | `enable_pystar` + `hasattr(native, "starlark_doc_extract")` | `@rules_python_internal` config repo enables Starlark impls |
-| **protobuf 33.4+** | Feature detection | `hasattr(native, "proto_library")` → False | Rules in `@protobuf//bazel/*.bzl` (self-contained) |
-| **rules_rust 0.40.0** | Pure Starlark always | N/A (no native fallback) | Rules in `@rules_rust//rust/` |
+| Rules Repo              | Detection Mechanism             | Switch Point                                                | Starlark Path                                                   |
+| ----------------------- | ------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------- |
+| **rules_cc 0.2.16**     | Version string comparison       | `_bazel_version_ge("9.0.0-pre.20250911")`                   | `@cc_compatibility_proxy` synthetic repo selects Starlark impls |
+| **rules_python 1.8.0+** | Config flag + feature detection | `enable_pystar` + `hasattr(native, "starlark_doc_extract")` | `@rules_python_internal` config repo enables Starlark impls     |
+| **protobuf 33.4+**      | Feature detection               | `hasattr(native, "proto_library")` → False                  | Rules in `@protobuf//bazel/*.bzl` (self-contained)              |
+| **rules_rust 0.40.0**   | Pure Starlark always            | N/A (no native fallback)                                    | Rules in `@rules_rust//rust/`                                   |
 
 ### rules_cc: Version-Based Proxy Repository
 
@@ -169,6 +170,7 @@ rules_python uses a two-stage mechanism:
 1. **Repository rule** (`internal_config_repo.bzl`): Checks `hasattr(native, "starlark_doc_extract")` (Bazel 7+ feature) AND `RULES_PYTHON_ENABLE_PYSTAR` env var (default `"1"`). Generates `@rules_python_internal//:rules_python_config.bzl`.
 
 2. **Rule files** (`py_library.bzl`, `py_binary.bzl`, `py_test.bzl`):
+
 ```starlark
 load("@rules_python_internal//:rules_python_config.bzl", "config")
 _py_library_impl = _starlark_py_library if config.enable_pystar else native.py_library
@@ -196,9 +198,9 @@ else:
 
 1. **Do NOT implement native language rules** (`native.py_library`, `native.proto_library`, etc.) — these are removed in Bazel 9.0. At most, stub them as `= None` on the `native` module to avoid crashes when code checks `hasattr(native, "py_library")`, but never provide a real implementation.
 2. **DO implement native modules** (`cc_common`, `proto_common`) that Starlark implementations call into
-3. **DO provide synthetic repos** that configure each rules_* repo to use its Starlark path
+3. **DO provide synthetic repos** that configure each rules\_\* repo to use its Starlark path
 4. **DO provide provider stubs** (`PyInfo`, `ProtoInfo`) that Starlark implementations reference
-5. **Version matters**: Use recent rules_* versions that support Bazel 9.0 (rules_cc 0.2.16, rules_python 1.8.0+, protobuf 33.4+)
+5. **Version matters**: Use recent rules\_\* versions that support Bazel 9.0 (rules_cc 0.2.16, rules_python 1.8.0+, protobuf 33.4+)
 
 ## BXL Preservation Strategy
 
@@ -213,12 +215,12 @@ BXL (Buck Extension Language) is a powerful build graph introspection system inh
 
 ### BXL vs Bazel Aspects
 
-| Feature | BXL | Bazel Aspects |
-|---------|-----|---------------|
-| **Invocation** | External (`kuro bxl`) | Internal (during analysis) |
-| **Purpose** | User-facing automation | Rule-internal computation |
-| **Execution** | After build/analysis | During analysis phase |
-| **Use Case** | IDE integration, custom analysis | Provider propagation, cross-cutting |
+| Feature        | BXL                              | Bazel Aspects                       |
+| -------------- | -------------------------------- | ----------------------------------- |
+| **Invocation** | External (`kuro bxl`)            | Internal (during analysis)          |
+| **Purpose**    | User-facing automation           | Rule-internal computation           |
+| **Execution**  | After build/analysis             | During analysis phase               |
+| **Use Case**   | IDE integration, custom analysis | Provider propagation, cross-cutting |
 
 BXL and aspects solve different problems - BXL is for external introspection, aspects are for internal computation. Both are needed.
 
@@ -267,16 +269,16 @@ We will fork Buck2 and progressively modify it to speak Bazel's dialect. The app
 
 The detailed implementation is split into focused sub-plans:
 
-| Sub-Plan                                                                 | Phases | Description                                                   | Status          |
-| ------------------------------------------------------------------------ | ------ | ------------------------------------------------------------- | --------------- |
-| [01-foundation.md](./kuro-bazel-subplans/01-foundation.md)               | 1-3    | Fork, rebrand, Starlark dialect, BUILD.bazel detection        | **Complete**    |
-| [02-bzlmod.md](./kuro-bazel-subplans/02-bzlmod.md)                       | 4a-5c  | bzlmod module system, BCR integration, resolution, extensions | **In Progress** |
-| [03-rule-primitives.md](./kuro-bazel-subplans/03-rule-primitives.md)     | 6a     | ctx/actions/providers API alignment                           | Not Started     |
-| [06-prelude-architecture.md](./kuro-bazel-subplans/06-prelude-architecture.md) | 6b | Prelude preservation, Bazel shim migration, cleanup          | Not Started     |
-| [07-builtins-compatibility.md](./kuro-bazel-subplans/07-builtins-compatibility.md) | 7a-7d | Bazel native rules, global functions, modules, Buck2 removal | Not Started     |
-| [08-aspects.md](./kuro-bazel-subplans/08-aspects.md)                     | 8a-8d  | Bazel aspects implementation (blocks rules_cc)                | **8a Complete** |
-| [04-rules-integration.md](./kuro-bazel-subplans/04-rules-integration.md) | 9-13   | rules_cc, rules_rust, rules_python, protobuf, rules_oci       | Not Started     |
-| [05-infrastructure.md](./kuro-bazel-subplans/05-infrastructure.md)       | 14-17  | Stable Rust, sandboxing, platform support, query              | Not Started     |
+| Sub-Plan                                                                           | Phases | Description                                                   | Status          |
+| ---------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------- | --------------- |
+| [01-foundation.md](./kuro-bazel-subplans/01-foundation.md)                         | 1-3    | Fork, rebrand, Starlark dialect, BUILD.bazel detection        | **Complete**    |
+| [02-bzlmod.md](./kuro-bazel-subplans/02-bzlmod.md)                                 | 4a-5c  | bzlmod module system, BCR integration, resolution, extensions | **In Progress** |
+| [03-rule-primitives.md](./kuro-bazel-subplans/03-rule-primitives.md)               | 6a     | ctx/actions/providers API alignment                           | Not Started     |
+| [04-prelude-architecture.md](./kuro-bazel-subplans/04-prelude-architecture.md)     | 6b     | Prelude preservation, Bazel shim migration, cleanup           | Not Started     |
+| [05-builtins-compatibility.md](./kuro-bazel-subplans/05-builtins-compatibility.md) | 7a-7d  | Bazel native rules, global functions, modules, Buck2 removal  | Not Started     |
+| [06-aspects.md](./kuro-bazel-subplans/06-aspects.md)                               | 8a-8d  | Bazel aspects implementation (blocks rules_cc)                | **8a Complete** |
+| [07-rules-integration.md](./kuro-bazel-subplans/07-rules-integration.md)           | 9-13   | rules_cc, rules_rust, rules_python, protobuf, rules_oci       | Not Started     |
+| [08-infrastructure.md](./kuro-bazel-subplans/08-infrastructure.md)                 | 14-17  | Stable Rust, sandboxing, platform support, query              | Not Started     |
 
 ### Related Research Documents
 
@@ -284,7 +286,7 @@ The detailed implementation is split into focused sub-plans:
 - [Test Infrastructure Mapping](../research/2026-01-22-test-infrastructure-mapping.md) - Test migration strategy
 - [BXL vs AXL Comparison](../research/bxl-vs-axl-comparison.md) - Compare Buck2's BXL with Aspect's AXL for build introspection
 - [rules_cc Native Requirements](../research/2026-01-26-rules-cc-native-requirements.md) - What Kuro must provide for rules_cc (Bazel 9.0+)
-- Native → Starlark Migration: Each rules_* repo's version detection is documented inline in [04-rules-integration.md](./kuro-bazel-subplans/04-rules-integration.md#bazel-90-native--starlark-migration-architecture)
+- Native → Starlark Migration: Each rules\_\* repo's version detection is documented inline in [07-rules-integration.md](./kuro-bazel-subplans/07-rules-integration.md#bazel-90-native--starlark-migration-architecture)
 
 ---
 
@@ -318,25 +320,25 @@ Quick reference to all phases and their locations:
 | ----- | ------------------------------------------ | --------------- |
 | 6a    | Rule Primitives and Provider Compatibility | [ ] Not Started |
 
-### Prelude Architecture (Phase 6b) - [Sub-plan](./kuro-bazel-subplans/06-prelude-architecture.md)
+### Prelude Architecture (Phase 6b) - [Sub-plan](./kuro-bazel-subplans/04-prelude-architecture.md)
 
-| Phase | Title                                          | Status          |
-| ----- | ---------------------------------------------- | --------------- |
-| 6b.1  | Preserve Buck2 Prelude Loading Mechanism       | [ ] Not Started |
+| Phase | Title                                            | Status          |
+| ----- | ------------------------------------------------ | --------------- | --- |
+| 6b.1  | Preserve Buck2 Prelude Loading Mechanism         | [ ] Not Started |
 | 6b.2  | Migrate Bazel Shims from Native Rust to Starlark | [ ] Not Started |
-| 6b.3  | Remove Unused Buck2 Prelude Code               | [ ] Not Started |
-| 6b.4  | Simplify Native Module Registration            | [ ] Not Started |
+| 6b.3  | Remove Unused Buck2 Prelude Code                 | [ ] Not Started | /   |
+| 6b.4  | Simplify Native Module Registration              | [ ] Not Started |
 
-### Builtins Compatibility (Phases 7a-7d) - [Sub-plan](./kuro-bazel-subplans/07-builtins-compatibility.md)
+### Builtins Compatibility (Phases 7a-7d) - [Sub-plan](./kuro-bazel-subplans/05-builtins-compatibility.md)
 
-| Phase | Title                                    | Status          |
-| ----- | ---------------------------------------- | --------------- |
-| 7a    | Bazel Native Rules                       | [ ] Not Started |
-| 7b    | Bazel Global Functions                   | [ ] Not Started |
-| 7c    | Bazel Top-Level Modules                  | [ ] Not Started |
-| 7d    | Buck2-Specific Removal                   | [ ] Not Started |
+| Phase | Title                   | Status          |
+| ----- | ----------------------- | --------------- |
+| 7a    | Bazel Native Rules      | [ ] Not Started |
+| 7b    | Bazel Global Functions  | [ ] Not Started |
+| 7c    | Bazel Top-Level Modules | [ ] Not Started |
+| 7d    | Buck2-Specific Removal  | [ ] Not Started |
 
-### Aspects (Phases 8a-8d) - [Sub-plan](./kuro-bazel-subplans/08-aspects.md)
+### Aspects (Phases 8a-8d) - [Sub-plan](./kuro-bazel-subplans/06-aspects.md)
 
 | Phase | Title                              | Status          |
 | ----- | ---------------------------------- | --------------- |
@@ -345,17 +347,17 @@ Quick reference to all phases and their locations:
 | 8c    | Shadow Graph Propagation           | [x] Complete    |
 | 8d    | Advanced Features                  | [ ] In Progress |
 
-### Rules Integration (Phases 9-13) - [Sub-plan](./kuro-bazel-subplans/04-rules-integration.md)
+### Rules Integration (Phases 9-13) - [Sub-plan](./kuro-bazel-subplans/07-rules-integration.md)
 
-| Phase | Title                     | Status          |
-| ----- | ------------------------- | --------------- |
-| 9     | rules_cc Integration      | [x] In Progress (cc_library, cc_binary, cc_test build work) |
-| 10    | rules_rust Integration    | [x] Complete (rules_rust 0.40.0, rust_library + rust_binary) |
-| 11    | rules_python Integration  | [x] Complete (rules_python 1.8.0, enable_pystar=True, py_library + py_binary + py_test) |
-| 12    | protobuf Integration      | [ ] Not Started (protobuf 33.4+, Starlark proto rules) |
-| 13    | rules_oci Integration     | [ ] Not Started |
+| Phase | Title                    | Status                                                                                  |
+| ----- | ------------------------ | --------------------------------------------------------------------------------------- |
+| 9     | rules_cc Integration     | [x] In Progress (cc_library, cc_binary, cc_test build work)                             |
+| 10    | rules_rust Integration   | [x] Complete (rules_rust 0.40.0, rust_library + rust_binary)                            |
+| 11    | rules_python Integration | [x] Complete (rules_python 1.8.0, enable_pystar=True, py_library + py_binary + py_test) |
+| 12    | protobuf Integration     | [ ] Not Started (protobuf 33.4+, Starlark proto rules)                                  |
+| 13    | rules_oci Integration    | [ ] Not Started                                                                         |
 
-### Infrastructure (Phases 14-17) - [Sub-plan](./kuro-bazel-subplans/05-infrastructure.md)
+### Infrastructure (Phases 14-17) - [Sub-plan](./kuro-bazel-subplans/08-infrastructure.md)
 
 | Phase | Title                              | Status          |
 | ----- | ---------------------------------- | --------------- |
@@ -455,6 +457,7 @@ This section documents important lessons learned during development that are bro
 **Root Cause:** The `kuro` symlink at project root points to `target/debug/kuro`, but development was using `cargo build --release` which outputs to `target/release/kuro`.
 
 **Solution:** Always match the build type to the symlink target:
+
 - Use `cargo build -p kuro` (debug) when using the `./kuro` symlink
 - Or update the symlink to point to release if using `cargo build --release`
 
@@ -475,6 +478,7 @@ Buck2 tracks action dependencies by visiting artifacts in command lines via `Com
 #### repo_name Aliasing
 
 The `bazel_dep(..., repo_name="alias")` pattern creates cell aliases that allow `@alias//...` to resolve to the actual module. Implementation involves:
+
 1. `collect_transitive_repo_aliases()` extracts aliases from transitive deps' MODULE.bazel files
 2. Aliases returned in `BzlmodResolutionResult.aliases`
 3. Merged into `root_aliases` HashMap

@@ -81,7 +81,7 @@ Bridge the gap between bzlmod module resolution and Kuro's build system. This ph
 - [x] **`@bazel_tools` built-in repository** - See **Phase 5c** (COMPLETE)
 - [x] **Version compatibility via `native.bazel_version`** - COMPLETE
 - [x] **ProtoInfo built-in provider** - COMPLETE (returns NoneType per Bazel 8+ behavior)
-- [x] **`aspect()` built-in** - See **[08-aspects.md](./08-aspects.md)** (Phase 8a COMPLETE)
+- [x] **`aspect()` built-in** - See **[06-aspects.md](./06-aspects.md)** (Phase 8a COMPLETE)
 - [x] **`allow_empty` parameter for attr.label_list()** - COMPLETE
 - [x] **`PackageSpecificationInfo` provider** - COMPLETE (added as NoneType in cc_common.rs)
 

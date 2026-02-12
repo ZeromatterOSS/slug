@@ -1,4 +1,4 @@
-# Infrastructure Phases (13-16)
+# Infrastructure Phases (14-17)
 
 > **Parent Plan**: [Kuro Bazel-Compatible Build Tool](../2026-01-21-kuro-bazel-compatible-build-tool.md)
 
@@ -6,7 +6,7 @@ This sub-plan covers infrastructure improvements: stable Rust migration, sandbox
 
 ---
 
-## Phase 13: Stable Rust Migration
+## Phase 14: Stable Rust Migration
 
 ### Overview
 
@@ -112,7 +112,7 @@ This cleanup removes the dual-mode OSS/internal distinction inherited from Buck2
 
 ---
 
-## Phase 14: Local Build Isolation (Sandboxing)
+## Phase 15: Local Build Isolation (Sandboxing)
 
 ### Overview
 
@@ -268,7 +268,7 @@ kuro build --sandbox_strategy=symlink //...
 - [ ] Same build succeeds with `--sandbox=false` (proving sandbox caught it)
 - [ ] Performance overhead is acceptable (< 10% slowdown)
 
-#### Test Migration (Phase 16):
+#### Test Migration (Phase 15):
 
 - [ ] ADD `tests/core/sandbox/test_input_isolation.py` for undeclared input detection
 - [ ] ADD `tests/core/sandbox/test_output_isolation.py` for undeclared output detection
@@ -281,7 +281,7 @@ kuro build --sandbox_strategy=symlink //...
 
 ---
 
-## Phase 15: Platform Support
+## Phase 16: Platform Support
 
 ### Overview
 
@@ -317,7 +317,7 @@ Ensure kuro works on Linux, Windows, and macOS.
 
 ---
 
-## Phase 16: Query Commands
+## Phase 17: Query Commands
 
 ### Overview
 
@@ -399,7 +399,7 @@ Support Bazel query syntax:
 
 - [ ] IDE/tooling integration using query commands works
 
-#### Test Migration (Phase 16):
+#### Test Migration (Phase 17):
 
 - [ ] UPDATE `tests/core/query/test_buildfiles.py` for Bazel buildfiles() function
 - [ ] ADD `tests/core/query/test_deps.py` for deps() function

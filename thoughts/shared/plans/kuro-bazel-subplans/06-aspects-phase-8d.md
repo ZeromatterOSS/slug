@@ -1,7 +1,7 @@
 # Aspects Phase 8d: Shadow Graph Propagation via compute_dep_aspects
 
-> **Main Plan**: [08-aspects.md](./08-aspects.md)
-> **Previous Phase**: [08-aspects-phase-8c.md](./08-aspects-phase-8c.md)
+> **Main Plan**: [06-aspects.md](./06-aspects.md)
+> **Previous Phase**: [06-aspects-phase-8c.md](./06-aspects-phase-8c.md)
 
 ## Overview
 
@@ -984,5 +984,5 @@ mod tests {
 
 ### Related Documents
 
-- [08-aspects.md](./08-aspects.md) - Main aspects plan
-- [08-aspects-phase-8c.md](./08-aspects-phase-8c.md) - Phase 8c implementation details
+- [06-aspects.md](./06-aspects.md) - Main aspects plan
+- [06-aspects-phase-8c.md](./06-aspects-phase-8c.md) - Phase 8c implementation details

@@ -349,7 +349,7 @@ These are useful and don't conflict with Bazel:
 
 ### Buck2 Prelude Directories to Remove
 
-Per 06-prelude-architecture.md, these language-specific directories should be removed:
+Per 04-prelude-architecture.md, these language-specific directories should be removed:
 
 | Directory | Contents | Bazel Replacement |
 |-----------|----------|-------------------|
@@ -382,7 +382,7 @@ Per 06-prelude-architecture.md, these language-specific directories should be re
 - [ ] Document `ctx.attr` as preferred over `ctx.attrs`
 
 **Phase 7d.3: Prelude Cleanup**
-- [ ] Remove unused prelude directories (per 06-prelude-architecture.md)
+- [ ] Remove unused prelude directories (per 04-prelude-architecture.md)
 - [ ] Keep core infrastructure: `prelude.bzl`, `native.bzl`, `rules.bzl`, etc.
 - [ ] Keep BXL support files: `prelude/bxl/`
 
