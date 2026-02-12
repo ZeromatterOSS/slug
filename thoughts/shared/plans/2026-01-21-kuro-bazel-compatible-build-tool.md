@@ -354,7 +354,7 @@ Quick reference to all phases and their locations:
 | 9     | rules_cc Integration     | [x] In Progress (cc_library, cc_binary, cc_test build work)                             |
 | 10    | rules_rust Integration   | [x] Complete (rules_rust 0.40.0, rust_library + rust_binary)                            |
 | 11    | rules_python Integration | [x] Complete (rules_python 1.8.0, enable_pystar=True, py_library + py_binary + py_test) |
-| 12    | protobuf Integration     | [ ] Not Started (protobuf 33.4+, Starlark proto rules)                                  |
+| 12    | protobuf Integration     | [x] In Progress (proto_library builds, cc_proto_library blocked by aspect attrs Phase 8d) |
 | 13    | rules_oci Integration    | [ ] Not Started                                                                         |
 
 ### Infrastructure (Phases 14-17) - [Sub-plan](./kuro-bazel-subplans/08-infrastructure.md)

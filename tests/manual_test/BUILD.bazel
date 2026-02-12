@@ -185,7 +185,8 @@ proto_library(
     srcs = ["hello.proto"],
 )
 
-# TODO: cc_proto_library once proto_library works
+# TODO: cc_proto_library requires aspect attribute resolution (Phase 8d)
+# The aspect needs _aspect_cc_proto_toolchain from configuration_field(fragment="proto")
 # load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 # cc_proto_library(
 #     name = "hello_cc_proto",

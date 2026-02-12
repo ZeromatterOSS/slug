@@ -1040,7 +1040,6 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let _unused = (
-            values,
             define_values,
             flag_values,
             tags,
@@ -1065,12 +1064,30 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             coerced_cvs,
         )));
 
+        // Coerce the values dict (Bazel native flag values)
+        use kuro_node::attrs::attr_type::dict::DictLiteral;
+        let coerced_values = if values.entries.is_empty() {
+            CoercedAttr::Dict(DictLiteral(ArcSlice::default()))
+        } else {
+            CoercedAttr::Dict(DictLiteral(ArcSlice::from_iter(values.entries.iter().map(
+                |(k, v)| {
+                    (
+                        CoercedAttr::String(StringLiteral(ArcStr::from(*k))),
+                        CoercedAttr::String(StringLiteral(ArcStr::from(*v))),
+                    )
+                },
+            ))))
+        };
+
         let vis_strings = extract_visibility_strings(visibility);
         let target_node = create_native_target_node(
             rule_defs::CONFIG_SETTING_RULE.clone(),
             internals.package(),
             name,
-            vec![("constraint_values".to_owned(), coerced_list)],
+            vec![
+                ("constraint_values".to_owned(), coerced_list),
+                ("values".to_owned(), coerced_values),
+            ],
             &vis_strings,
             &internals.default_visibility(),
         )?;

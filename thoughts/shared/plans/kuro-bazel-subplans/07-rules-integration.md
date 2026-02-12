@@ -565,6 +565,24 @@ use_repo(pip, "pip")
 
 ## Phase 12: protobuf Integration
 
+### Current Status (2026-02-12)
+
+**Implemented:**
+- [x] `proto_library` builds end-to-end (283 commands including protoc_minimal build from source)
+- [x] `config_setting` with `values` attribute now evaluates against known Bazel flag defaults
+  - `strict_public_imports` defaults to "off" → config_setting matches → `--allowed_public_imports` not added
+  - `strict_proto_deps` defaults to "off" → config_setting matches → `--direct_dependencies` not added
+  - Fix in: `native_rule_analysis.rs` (check_values_match_defaults) and `native_rules.rs` (store values dict)
+- [x] protobuf + abseil-cpp C++ code builds via rules_cc (all 283 commands succeed)
+- [x] `hasattr(native, "proto_library")` returns False → Starlark proto rules used
+
+**Blocking:**
+- [ ] `cc_proto_library` requires aspect attribute resolution (Phase 8d Advanced Features)
+  - The `cc_proto_aspect` has `_aspect_cc_proto_toolchain` attribute with `configuration_field()` default
+  - Current aspect ctx.attr creates empty struct (Phase 8b placeholder)
+  - Need: resolve `configuration_field(fragment="proto", name="proto_toolchain_for_cc")` → label → dependency
+  - Alternative: Enable `INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION = True` + implement `ctx.toolchains`
+
 ### Overview
 
 Get Protocol Buffer compilation working. For Bazel 9.0, protobuf rules are pure Starlark in the `protobuf` BCR module (not `rules_proto`, which is archived).
@@ -655,10 +673,10 @@ cc_proto_library(
 
 #### Automated Verification:
 
-- [ ] `kuro build //:hello_proto` compiles .proto files
-- [ ] `kuro build //:hello_cc_proto` generates C++ code from protos
+- [x] `kuro build //:hello_proto` compiles .proto files (283 commands, builds protoc_minimal from source)
+- [ ] `kuro build //:hello_cc_proto` generates C++ code from protos (blocked by aspect attribute resolution - Phase 8d)
 - [ ] `kuro build //:hello_py_proto` generates Python code from protos
-- [ ] `hasattr(native, "proto_library")` returns False
+- [x] `hasattr(native, "proto_library")` returns False
 
 #### Manual Verification:
 

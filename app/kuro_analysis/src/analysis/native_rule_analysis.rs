@@ -36,6 +36,8 @@ use kuro_core::deferred::key::DeferredHolderKey;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_error::internal_error;
+use kuro_node::attrs::coerced_attr::CoercedAttr;
+use kuro_node::attrs::inspect_options::AttrInspectOptions;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
 use kuro_node::rule_type::NativeRuleKind;
 use starlark::values::FrozenHeap;
@@ -60,7 +62,9 @@ pub fn analyze_native_rule(
         NativeRuleKind::Filegroup => analyze_filegroup(target, dep_analysis),
         NativeRuleKind::Alias => analyze_alias(target, dep_analysis),
         NativeRuleKind::LabelFlag => analyze_label_flag(target, dep_analysis),
-        NativeRuleKind::ConfigSetting => analyze_config_setting(target, dep_analysis),
+        NativeRuleKind::ConfigSetting => {
+            analyze_config_setting(target, configured_node, dep_analysis)
+        }
         NativeRuleKind::ToolchainType => create_minimal_analysis_result(target),
         NativeRuleKind::PackageGroup => create_minimal_analysis_result(target),
         NativeRuleKind::Genrule => create_minimal_analysis_result(target),
@@ -195,11 +199,66 @@ fn analyze_label_flag(
     }
 }
 
+/// Returns the default value for known Bazel command-line flags.
+/// Used for evaluating config_setting with `values` attribute.
+fn bazel_flag_default(flag: &str) -> Option<&'static str> {
+    match flag {
+        "strict_public_imports" => Some("off"),
+        "strict_proto_deps" => Some("off"),
+        // Add more known flag defaults as needed
+        _ => None,
+    }
+}
+
+/// Check if a config_setting's `values` attribute entries all match known Bazel defaults.
+/// Returns true if either:
+/// - The `values` attribute is empty (no flag-based constraints)
+/// - All flag values match their known Bazel defaults
+/// Returns false if any flag is unknown or its value doesn't match the default.
+fn check_values_match_defaults(configured_node: ConfiguredTargetNodeRef<'_>) -> bool {
+    // Try to read the `values` attribute from the unconfigured target node
+    let target_node = configured_node.to_owned();
+    let target_ref = target_node.target_node().as_ref();
+
+    if let Some(values_attr) = target_ref.attr_or_none("values", AttrInspectOptions::All) {
+        match values_attr.value {
+            CoercedAttr::Dict(dict_lit) => {
+                if dict_lit.0.is_empty() {
+                    // Empty values dict - no flag constraints
+                    return false;
+                }
+                // Check each flag:value pair against known defaults
+                for (key, value) in dict_lit.0.iter() {
+                    if let (CoercedAttr::String(k), CoercedAttr::String(v)) = (key, value) {
+                        match bazel_flag_default(k.0.as_str()) {
+                            Some(default_val) if v.0.as_str().eq_ignore_ascii_case(default_val) => {
+                                // This entry matches the default
+                            }
+                            _ => {
+                                // Unknown flag or value doesn't match default
+                                return false;
+                            }
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+                // All entries matched their defaults
+                true
+            }
+            _ => false,
+        }
+    } else {
+        false
+    }
+}
+
 /// Analyze a config_setting target.
 /// Creates a ConfigurationInfo provider by merging constraint data from all
 /// constraint_value deps. This allows `select()` to match against the config_setting.
 fn analyze_config_setting(
     target: &ConfiguredTargetLabel,
+    configured_node: ConfiguredTargetNodeRef<'_>,
     dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
 ) -> kuro_error::Result<AnalysisResult> {
     let heap = FrozenHeap::new();
@@ -223,13 +282,20 @@ fn analyze_config_setting(
         }
     }
 
-    // If no real constraint pairs found (flag_values/values only), add a sentinel
-    // constraint pair that will never match any real platform configuration.
-    // This ensures the config_setting is valid as a select() key but won't match.
+    // If no real constraint pairs found (flag_values/values only), check
+    // whether the `values` attribute references Bazel flags with known defaults.
+    // If all values match their defaults, the config_setting should match
+    // (empty constraint set = matches everything). Otherwise, add a sentinel
+    // that will never match any real platform configuration.
     if all_constraint_pairs.is_empty() {
-        let sentinel_setting = target.unconfigured().dupe();
-        let sentinel_value = ProvidersLabel::default_for(target.unconfigured().dupe());
-        all_constraint_pairs.push((sentinel_setting, sentinel_value));
+        let values_match_defaults = check_values_match_defaults(configured_node);
+
+        if !values_match_defaults {
+            let sentinel_setting = target.unconfigured().dupe();
+            let sentinel_value = ProvidersLabel::default_for(target.unconfigured().dupe());
+            all_constraint_pairs.push((sentinel_setting, sentinel_value));
+        }
+        // If values match defaults, leave constraint pairs empty → matches everything
     }
 
     // Create merged ConfigurationInfo with all constraint pairs
@@ -407,7 +473,7 @@ fn create_cc_analysis_result(target: &ConfiguredTargetLabel) -> kuro_error::Resu
     let default_info = FrozenDefaultInfo::testing_empty(&heap);
     let cc_info = heap.alloc(CcInfoInstanceStub);
 
-    let mut providers = SmallMap::from_iter([
+    let providers = SmallMap::from_iter([
         (
             DefaultInfoCallable::provider_id().dupe(),
             default_info.to_frozen_value(),
