@@ -14,6 +14,7 @@
 //! union operations. This is similar to Kuro's transitive_set but with
 //! a different API.
 
+use std::collections::HashSet;
 use std::fmt;
 use std::fmt::Display;
 use std::sync::OnceLock;
@@ -43,6 +44,7 @@ use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
+use starlark::values::ValueIdentity;
 use starlark::values::ValueLifetimeless;
 use starlark::values::ValueLike;
 use starlark::values::list::AllocList;
@@ -160,17 +162,29 @@ impl Depset {
     /// Collect all elements with a specific traversal order.
     pub fn collect_all_frozen_ordered(&self, order: &str) -> Vec<FrozenValue> {
         let mut result = Vec::new();
-        self.collect_frozen_recursive_ordered(&mut result, order);
+        let mut visited = HashSet::new();
+        self.collect_frozen_recursive_ordered(&mut result, order, &mut visited);
         result
     }
 
-    fn collect_frozen_recursive_ordered(&self, result: &mut Vec<FrozenValue>, order: &str) {
+    fn collect_frozen_recursive_ordered(
+        &self,
+        result: &mut Vec<FrozenValue>,
+        order: &str,
+        visited: &mut HashSet<usize>,
+    ) {
+        // Use pointer address of this Depset as identity to avoid exponential blowup
+        // on DAGs with shared substructure.
+        let self_id = self as *const Depset as usize;
+        if !visited.insert(self_id) {
+            return;
+        }
         match order {
             "postorder" | "topological" => {
                 // Transitive children first, then direct
                 for child in &self.children {
                     if let Some(child_depset) = child.downcast_ref::<Depset>() {
-                        child_depset.collect_frozen_recursive_ordered(result, order);
+                        child_depset.collect_frozen_recursive_ordered(result, order, visited);
                     }
                 }
                 for elem in &self.direct {
@@ -184,7 +198,7 @@ impl Depset {
                 }
                 for child in &self.children {
                     if let Some(child_depset) = child.downcast_ref::<Depset>() {
-                        child_depset.collect_frozen_recursive_ordered(result, order);
+                        child_depset.collect_frozen_recursive_ordered(result, order, visited);
                     }
                 }
             }
@@ -358,6 +372,20 @@ pub(crate) fn collect_depset_elements<'v>(
     elements: &mut Vec<Value<'v>>,
     heap: Heap<'v>,
 ) {
+    let mut visited = HashSet::new();
+    collect_depset_elements_impl(value, elements, heap, &mut visited);
+}
+
+fn collect_depset_elements_impl<'v>(
+    value: Value<'v>,
+    elements: &mut Vec<Value<'v>>,
+    heap: Heap<'v>,
+    visited: &mut HashSet<ValueIdentity<'v>>,
+) {
+    // Track visited depsets to avoid exponential blowup on DAGs with shared substructure.
+    if !visited.insert(value.identity()) {
+        return;
+    }
     // Try unfrozen live depset first
     if let Some(live) = value.downcast_ref::<LiveDepsetGen<Value>>() {
         // Collect direct elements
@@ -369,7 +397,7 @@ pub(crate) fn collect_depset_elements<'v>(
         // Recursively collect transitive
         if let Ok(trans_iter) = live.transitive.iterate(heap) {
             for child in trans_iter {
-                collect_depset_elements(child, elements, heap);
+                collect_depset_elements_impl(child, elements, heap, visited);
             }
         }
     }
@@ -392,7 +420,7 @@ pub(crate) fn collect_depset_elements<'v>(
         if let Some(trans_attr) = value.get_attr("transitive", heap).ok().flatten() {
             if let Ok(trans_iter) = trans_attr.iterate(heap) {
                 for child in trans_iter {
-                    collect_depset_elements(child, elements, heap);
+                    collect_depset_elements_impl(child, elements, heap, visited);
                 }
             }
         }
@@ -482,6 +510,22 @@ fn collect_depset_elements_ordered<'v>(
     heap: Heap<'v>,
     order: &str,
 ) {
+    let mut visited = HashSet::new();
+    collect_depset_elements_ordered_impl(value, elements, heap, order, &mut visited);
+}
+
+fn collect_depset_elements_ordered_impl<'v>(
+    value: Value<'v>,
+    elements: &mut Vec<Value<'v>>,
+    heap: Heap<'v>,
+    order: &str,
+    visited: &mut HashSet<ValueIdentity<'v>>,
+) {
+    // Track visited depsets to avoid exponential blowup on DAGs with shared substructure.
+    if !visited.insert(value.identity()) {
+        return;
+    }
+
     let is_postorder = matches!(order, "postorder" | "topological");
 
     // Try unfrozen live depset first
@@ -489,7 +533,7 @@ fn collect_depset_elements_ordered<'v>(
         if is_postorder {
             if let Ok(trans_iter) = live.transitive.iterate(heap) {
                 for child in trans_iter {
-                    collect_depset_elements_ordered(child, elements, heap, order);
+                    collect_depset_elements_ordered_impl(child, elements, heap, order, visited);
                 }
             }
             if let Ok(direct_iter) = live.direct.iterate(heap) {
@@ -505,7 +549,7 @@ fn collect_depset_elements_ordered<'v>(
             }
             if let Ok(trans_iter) = live.transitive.iterate(heap) {
                 for child in trans_iter {
-                    collect_depset_elements_ordered(child, elements, heap, order);
+                    collect_depset_elements_ordered_impl(child, elements, heap, order, visited);
                 }
             }
         }
@@ -522,7 +566,7 @@ fn collect_depset_elements_ordered<'v>(
             if let Some(trans_attr) = value.get_attr("transitive", heap).ok().flatten() {
                 if let Ok(trans_iter) = trans_attr.iterate(heap) {
                     for child in trans_iter {
-                        collect_depset_elements_ordered(child, elements, heap, order);
+                        collect_depset_elements_ordered_impl(child, elements, heap, order, visited);
                     }
                 }
             }
@@ -544,7 +588,7 @@ fn collect_depset_elements_ordered<'v>(
             if let Some(trans_attr) = value.get_attr("transitive", heap).ok().flatten() {
                 if let Ok(trans_iter) = trans_attr.iterate(heap) {
                     for child in trans_iter {
-                        collect_depset_elements_ordered(child, elements, heap, order);
+                        collect_depset_elements_ordered_impl(child, elements, heap, order, visited);
                     }
                 }
             }

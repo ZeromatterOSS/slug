@@ -175,16 +175,16 @@ py_test(
 )
 
 # =============================================================================
-# Phase 12: protobuf integration test
-# DISABLED: protobuf MODULE.bazel uses use_repo() repo-mapping syntax not yet supported
 # =============================================================================
-# load("@protobuf//bazel:proto_library.bzl", "proto_library")
-#
-# proto_library(
-#     name = "hello_proto",
-#     srcs = ["hello.proto"],
-# )
-#
+# Phase 12: protobuf integration test
+# =============================================================================
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
+
+proto_library(
+    name = "hello_proto",
+    srcs = ["hello.proto"],
+)
+
 # TODO: cc_proto_library once proto_library works
 # load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 # cc_proto_library(

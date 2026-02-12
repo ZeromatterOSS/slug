@@ -60,6 +60,56 @@ use crate::interpreter::rule_defs::context::AnalysisActions;
 use crate::interpreter::rule_defs::fragments::ConfigurationFragments;
 use crate::interpreter::rule_defs::provider::ProviderLike;
 
+/// Global storage for include directories discovered during analysis.
+/// Populated when cc_common.compile() processes sources and strip_include_prefix,
+/// and when native cc_library stubs are created for external repos.
+/// Used by create_cc_compile_action to add -I flags.
+static EXTERNAL_INCLUDE_DIRS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+/// Register an include directory path for use in compile actions.
+/// The path should be a relative path like "external/protobuf/src/" or "external/abseil-cpp/".
+pub fn register_external_include_dir(include_dir: &str) {
+    if let Ok(mut dirs) = EXTERNAL_INCLUDE_DIRS.lock() {
+        if !dirs.iter().any(|d| d == include_dir) {
+            dirs.push(include_dir.to_owned());
+        }
+    }
+}
+
+/// Get all registered external include directories.
+pub fn get_external_include_dirs() -> Vec<String> {
+    EXTERNAL_INCLUDE_DIRS
+        .lock()
+        .map(|dirs| dirs.clone())
+        .unwrap_or_default()
+}
+
+/// Choose the appropriate include flag for a directory path.
+///
+/// - Repo roots (`external/repo`) use `-isystem` (searched before standard system dirs)
+/// - Deep subdirs (`external/repo/a/b/...`) use `-idirafter` (searched AFTER standard
+///   system dirs) to prevent files like `endian.h` in `absl/base/internal/` from
+///   shadowing `/usr/include/endian.h`
+/// - Non-external dirs use `-I`
+fn include_flag_for_dir(dir: &str) -> String {
+    if dir.starts_with("external/") || dir.starts_with("bazel-out/") {
+        // Count path components after "external/<repo>/"
+        if dir.starts_with("external/") {
+            if let Some(second_slash) = dir[9..].find('/') {
+                let after_repo = &dir[9 + second_slash..];
+                let depth = after_repo.chars().filter(|c| *c == '/').count();
+                if depth >= 2 {
+                    // Deep subdir: use -idirafter to avoid shadowing system headers
+                    return format!("-idirafter{}", dir);
+                }
+            }
+        }
+        format!("-isystem{}", dir)
+    } else {
+        format!("-I{}", dir)
+    }
+}
+
 // ============================================================================
 // FeatureConfiguration - C++ feature configuration
 // ============================================================================
@@ -321,6 +371,15 @@ impl<'v> StarlarkValue<'v> for CtxCheatStub {
 pub struct CtxCheatWithActions<'v> {
     /// The real actions object (AnalysisActions)
     actions: Value<'v>,
+    /// Target cell name (e.g., "protobuf")
+    #[allocative(skip)]
+    cell_name: String,
+    /// Package path (e.g., "third_party/utf8_range")
+    #[allocative(skip)]
+    pkg_path: String,
+    /// Target name (e.g., "utf8_validity")
+    #[allocative(skip)]
+    target_name: String,
 }
 
 impl<'v> Display for CtxCheatWithActions<'v> {
@@ -348,7 +407,11 @@ impl<'v> StarlarkValue<'v> for CtxCheatWithActions<'v> {
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "label" => Some(heap.alloc(CtxCheatLabelStub)),
+            "label" => Some(heap.alloc(CtxCheatLabelDynamic {
+                name: self.target_name.clone(),
+                package: self.pkg_path.clone(),
+                workspace_name: self.cell_name.clone(),
+            })),
             "bin_dir" => Some(heap.alloc(CtxCheatDirStub {
                 path: "bazel-out/k8-fastbuild/bin".to_owned(),
             })),
@@ -658,6 +721,67 @@ fn ctx_cheat_label_stub_methods(builder: &mut MethodsBuilder) {
     }
 }
 
+/// A dynamic label with real target info for the ctx_cheat.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct CtxCheatLabelDynamic {
+    name: String,
+    package: String,
+    workspace_name: String,
+}
+
+impl Display for CtxCheatLabelDynamic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.workspace_name.is_empty() {
+            write!(f, "//{}:{}", self.package, self.name)
+        } else {
+            write!(
+                f,
+                "@{}//{}:{}",
+                self.workspace_name, self.package, self.name
+            )
+        }
+    }
+}
+
+starlark_simple_value!(CtxCheatLabelDynamic);
+
+#[starlark_value(type = "Label")]
+impl<'v> StarlarkValue<'v> for CtxCheatLabelDynamic {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(ctx_cheat_label_dynamic_methods)
+    }
+
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "name" | "package" | "workspace_name")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "name" => Some(heap.alloc_str(&self.name).to_value()),
+            "package" => Some(heap.alloc_str(&self.package).to_value()),
+            "workspace_name" => Some(heap.alloc_str(&self.workspace_name).to_value()),
+            _ => None,
+        }
+    }
+}
+
+#[starlark_module]
+fn ctx_cheat_label_dynamic_methods(builder: &mut MethodsBuilder) {
+    /// Returns a label with the same package but a different name.
+    fn same_package_label<'v>(
+        this: &CtxCheatLabelDynamic,
+        #[starlark(require = pos)] name: &str,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(heap.alloc(CtxCheatLabelDynamic {
+            name: name.to_owned(),
+            package: this.package.clone(),
+            workspace_name: this.workspace_name.clone(),
+        }))
+    }
+}
+
 // ============================================================================
 // HeaderInfoStub - Stub for header info returned by create_header_info
 // ============================================================================
@@ -895,7 +1019,16 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         let action_name_raw = action_name.into_option().unwrap_or("c-compile");
         let action_name_str = action_name_raw.replace("-", "_");
 
+        // Determine if this is a C++ compile action (vs plain C)
+        let is_cpp = action_name_raw.contains("c++") || action_name_raw.contains("cpp");
+
         // Get compiler path from toolchain if available, otherwise use default
+        // Use g++ for C++ files, gcc for C files
+        let default_compiler = if is_cpp {
+            "/usr/bin/g++"
+        } else {
+            "/usr/bin/gcc"
+        };
         let compiler_path = if !cc_toolchain.is_none() {
             // Try to get compiler path from toolchain
             cc_toolchain
@@ -903,9 +1036,9 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                 .ok()
                 .flatten()
                 .and_then(|v| v.unpack_str().map(|s| s.to_owned()))
-                .unwrap_or_else(|| "/usr/bin/gcc".to_owned())
+                .unwrap_or_else(|| default_compiler.to_owned())
         } else {
-            "/usr/bin/gcc".to_owned()
+            default_compiler.to_owned()
         };
 
         // Need to call .as_output() on the output artifact to mark it as an output
@@ -930,6 +1063,90 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         // Add PIC flag if needed
         if use_pic {
             args_vec.push(heap.alloc_str("-fPIC").to_value());
+        }
+
+        // Add include directories from compilation context (deduplicated)
+        // Strategy for external include directories:
+        // - Repo roots (external/repo): use -isystem (searched before standard system dirs)
+        // - Deep subdirs (external/repo/a/b/c): use -idirafter (searched AFTER standard
+        //   system dirs) to prevent shadowing system headers like endian.h, limits.h, etc.
+        let mut seen_include_dirs = std::collections::HashSet::new();
+        if !cc_compilation_context.is_none() {
+            for attr_name in &["includes", "system_includes", "quote_includes"] {
+                if let Ok(Some(includes_val)) = cc_compilation_context.get_attr(attr_name, heap) {
+                    if !includes_val.is_none() {
+                        let mut elements = Vec::new();
+                        crate::interpreter::rule_defs::depset::collect_depset_elements(
+                            includes_val,
+                            &mut elements,
+                            heap,
+                        );
+                        for elem in &elements {
+                            let dir = elem.to_str();
+                            if dir.is_empty()
+                                || dir.contains("_virtual_includes")
+                                || !seen_include_dirs.insert(dir.to_string())
+                            {
+                                continue;
+                            }
+                            let flag = include_flag_for_dir(&dir);
+                            args_vec.push(heap.alloc_str(&flag).to_value());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Add include paths for external repos and source directories.
+        if let Some(src_path_str) = source
+            .get_attr("path", heap)
+            .ok()
+            .flatten()
+            .and_then(|v| v.unpack_str())
+        {
+            // For external repo sources with /src/ dir, add as include path
+            if let Some(ext_idx) = src_path_str.find("/src/") {
+                let inc_dir = &src_path_str[..ext_idx + 5];
+                if seen_include_dirs.insert(inc_dir.to_string()) {
+                    let flag = include_flag_for_dir(inc_dir);
+                    args_vec.push(heap.alloc_str(&flag).to_value());
+                }
+                register_external_include_dir(inc_dir);
+            }
+            // Also add "external/<repo>/" for direct includes
+            if src_path_str.starts_with("external/") {
+                if let Some(second_slash) = src_path_str[9..].find('/') {
+                    let repo_dir = &src_path_str[..9 + second_slash];
+                    if seen_include_dirs.insert(repo_dir.to_string()) {
+                        let flag = include_flag_for_dir(repo_dir);
+                        args_vec.push(heap.alloc_str(&flag).to_value());
+                    }
+                    register_external_include_dir(repo_dir);
+                }
+            }
+            // Register source file's parent directory as an include path.
+            // Uses -idirafter (via include_flag_for_dir) for deep paths to avoid
+            // shadowing system headers.
+            if src_path_str.starts_with("external/") {
+                if let Some(second_slash) = src_path_str[9..].find('/') {
+                    let repo_end = 9 + second_slash;
+                    if let Some(last_slash) = src_path_str.rfind('/') {
+                        let src_dir = &src_path_str[..last_slash];
+                        let depth = src_dir[repo_end..].matches('/').count();
+                        if depth >= 1 && depth <= 3 {
+                            register_external_include_dir(src_dir);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Add include directories discovered during analysis
+        for include_dir in get_external_include_dirs() {
+            if seen_include_dirs.insert(include_dir.clone()) {
+                let flag = include_flag_for_dir(&include_dir);
+                args_vec.push(heap.alloc_str(&flag).to_value());
+            }
         }
 
         // Add dependency file generation flags if dotd_file is specified
@@ -977,11 +1194,14 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             .to_value();
 
         // Build named arguments for run()
-        // run(arguments, outputs=outputs, mnemonic=mnemonic, progress_message=msg)
+        // run(arguments, outputs=outputs, mnemonic=mnemonic, progress_message=msg, identifier=id)
+        // Use source path as identifier to disambiguate multiple compile actions
+        let identifier = heap.alloc_str(&source_path).to_value();
         let named_args: Vec<(&str, Value<'v>)> = vec![
             ("outputs", outputs_list),
             ("mnemonic", heap.alloc_str(&action_name_str).to_value()),
             ("progress_message", progress_msg),
+            ("identifier", identifier),
         ];
 
         // Invoke actions.run() using Starlark's function evaluation
@@ -1137,9 +1357,36 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] actions: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // Return a wrapper that preserves the real actions object
+        // Try to extract label info from the actions object
+        let (cell_name, pkg_path, target_name) = (|| -> Option<(String, String, String)> {
+            let analysis_actions = actions
+                .downcast_ref::<crate::interpreter::rule_defs::context::AnalysisActions>(
+            )?;
+            let state = analysis_actions.state.try_borrow().ok()?;
+            let registry = state.as_ref()?;
+            let owner = registry.actions.owner();
+            match owner {
+                kuro_core::deferred::key::DeferredHolderKey::Base(
+                    kuro_core::deferred::base_deferred_key::BaseDeferredKey::TargetLabel(label),
+                ) => {
+                    let cell = label.pkg().cell_name().as_str().to_owned();
+                    let pkg = label.pkg().cell_relative_path().to_string();
+                    let name = label.name().as_str().to_owned();
+                    Some((cell, pkg, name))
+                }
+                _ => None,
+            }
+        })()
+        .unwrap_or_else(|| ("".to_owned(), "stub".to_owned(), "stub".to_owned()));
+
+        // Return a wrapper that preserves the real actions object and label info
         // This allows create_cc_compile_action to register real actions
-        Ok(eval.heap().alloc(CtxCheatWithActions { actions }))
+        Ok(eval.heap().alloc(CtxCheatWithActions {
+            actions,
+            cell_name,
+            pkg_path,
+            target_name,
+        }))
     }
 
     /// Creates CcToolchainVariables from a dictionary.
@@ -1406,6 +1653,15 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         }
 
         // --- Libraries to link ---
+        // Wrap in --start-group/--end-group to handle circular dependencies between
+        // static libraries (e.g., abseil-cpp where libbase.a and libsynchronization.a
+        // have mutual references). Without this, the GNU linker only scans each .a
+        // file once and misses symbols from earlier files needed by later ones.
+        // Only add --start-group for executable linking (not ar/static-library or dynamic)
+        let is_executable_link = action_name_str.contains("executable");
+        if is_executable_link {
+            args.push(heap.alloc_str("-Wl,--start-group").to_value());
+        }
         // Process based on .type field from rules_cc provider instances
         if let Some(libs) = get_var("libraries_to_link") {
             if let Ok(iter) = libs.iterate(heap) {
@@ -1530,12 +1786,21 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             }
         }
 
+        if is_executable_link {
+            args.push(heap.alloc_str("-Wl,--end-group").to_value());
+        }
+
         // --- User link flags ---
+        // Deduplicate flags while preserving order, since transitive depsets
+        // can produce massive duplication (e.g., -lm -lpthread repeated 2000+ times).
         if let Some(flags) = get_var("user_link_flags") {
+            let mut seen_flags = std::collections::HashSet::new();
             if let Ok(iter) = flags.iterate(heap) {
                 for flag in iter {
-                    if flag.unpack_str().is_some() {
-                        args.push(flag);
+                    if let Some(s) = flag.unpack_str() {
+                        if seen_flags.insert(s.to_owned()) {
+                            args.push(flag);
+                        }
                     }
                 }
             }
@@ -2051,6 +2316,72 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             run_method.map(|v| v.to_string())
         );
 
+        // Register include directories from compilation_contexts (deps' contexts)
+        if !compilation_contexts.is_none() {
+            if let Ok(iter) = compilation_contexts.iterate(heap) {
+                for ctx in iter {
+                    // Extract includes from each dep compilation context
+                    for attr_name in &["includes", "system_includes", "quote_includes"] {
+                        if let Ok(Some(includes_val)) = ctx.get_attr(attr_name, heap) {
+                            if !includes_val.is_none() {
+                                let mut elements = Vec::new();
+                                crate::interpreter::rule_defs::depset::collect_depset_elements(
+                                    includes_val,
+                                    &mut elements,
+                                    heap,
+                                );
+                                for elem in &elements {
+                                    let dir = elem.to_str();
+                                    if !dir.is_empty() {
+                                        register_external_include_dir(&dir);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Handle strip_include_prefix - register the resolved directory as an include path
+        eprintln!(
+            "[cc_common.compile] strip_include_prefix={}, is_none={}",
+            strip_include_prefix,
+            strip_include_prefix.is_none()
+        );
+        if let Some(strip_prefix) = strip_include_prefix.unpack_str() {
+            eprintln!("[cc_common.compile] strip_prefix={}", strip_prefix);
+            if !strip_prefix.is_empty() {
+                // strip_include_prefix is relative to the repo root, e.g. "/third_party/utf8_range"
+                // We need to determine the repo name from the source paths
+                if !srcs.is_none() {
+                    if let Ok(iter) = srcs.iterate(heap) {
+                        for src_tuple in iter {
+                            let src = src_tuple
+                                .at(heap.alloc(0i32).to_value(), heap)
+                                .unwrap_or(src_tuple);
+                            if let Some(src_path) = src
+                                .get_attr("path", heap)
+                                .ok()
+                                .flatten()
+                                .and_then(|v| v.unpack_str())
+                            {
+                                if src_path.starts_with("external/") {
+                                    if let Some(second_slash) = src_path[9..].find('/') {
+                                        let repo = &src_path[..9 + second_slash];
+                                        let prefix = strip_prefix.trim_start_matches('/');
+                                        let include_dir = format!("{}/{}", repo, prefix);
+                                        register_external_include_dir(&include_dir);
+                                    }
+                                }
+                                break; // Only need one source to determine repo
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Process source files if provided
         // srcs is a list of (Artifact, Label) tuples from cc_helper.get_srcs()
         if !srcs.is_none() {
@@ -2074,6 +2405,18 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                         .flatten()
                         .and_then(|v| v.unpack_str())
                         .unwrap_or("unknown.c");
+
+                    // Register include dirs derived from source path for cross-target use
+                    if src_path.starts_with("external/") {
+                        if let Some(second_slash) = src_path[9..].find('/') {
+                            let repo_dir = &src_path[..9 + second_slash];
+                            register_external_include_dir(repo_dir);
+                            // Also register <repo>/src/ if the source is under src/
+                            if let Some(src_idx) = src_path.find("/src/") {
+                                register_external_include_dir(&src_path[..src_idx + 5]);
+                            }
+                        }
+                    }
 
                     // Determine output filename (replace extension with .o)
                     let basename = src_path.rsplit('/').next().unwrap_or(src_path);
@@ -2257,8 +2600,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // TODO(cc_common): Implement proper tool lookup from feature configuration
         // For now, return placeholder tool names
         let tool = match action_name {
-            "c-compile" | "c++-compile" => "/usr/bin/gcc",
-            "c++-link-executable" | "c++-link-dynamic-library" => "/usr/bin/gcc",
+            "c-compile" => "/usr/bin/gcc",
+            "c++-compile" => "/usr/bin/g++",
+            "c++-link-executable" | "c++-link-dynamic-library" => "/usr/bin/g++",
             "c++-link-static-library" => "/usr/bin/ar",
             "strip" => "/usr/bin/strip",
             "objcopy" => "/usr/bin/objcopy",
@@ -2606,6 +2950,26 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // Return a stub CcInfo - merging is a no-op for now
         Ok(CcInfoInstanceStub)
     }
+
+    /// Creates a debug context from compilation outputs.
+    #[allow(unused_variables)]
+    fn create_debug_context<'v>(
+        #[starlark(this)] _this: &CcCommonModule,
+        #[starlark(require = pos, default = NoneType)] compilation_outputs: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(heap.alloc(CcDebugContext))
+    }
+
+    /// Merges multiple debug contexts into one.
+    #[allow(unused_variables)]
+    fn merge_debug_context<'v>(
+        #[starlark(this)] _this: &CcCommonModule,
+        #[starlark(require = pos, default = NoneType)] debug_contexts: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(heap.alloc(CcDebugContext))
+    }
 }
 
 // ============================================================================
@@ -2890,8 +3254,19 @@ impl<'v> ProviderLike<'v> for CcInfoInstanceStub {
 
 #[starlark_value(type = "CcInfoInstance")]
 impl<'v> StarlarkValue<'v> for CcInfoInstanceStub {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(cc_info_instance_methods)
+    }
+
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "compilation_context" | "linking_context")
+        matches!(
+            attribute,
+            "compilation_context"
+                | "linking_context"
+                | "_legacy_transitive_native_libraries"
+                | "_debug_context"
+        )
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
@@ -2900,12 +3275,67 @@ impl<'v> StarlarkValue<'v> for CcInfoInstanceStub {
         match attribute {
             "compilation_context" => Some(heap.alloc(CompilationContextStub)),
             "linking_context" => Some(heap.alloc(LinkingContextStub)),
+            "_legacy_transitive_native_libraries" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_debug_context" => Some(heap.alloc(CcDebugContext)),
             _ => None,
         }
     }
 
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
         demand.provide_value::<&dyn ProviderLike>(self);
+    }
+}
+
+#[starlark_module]
+fn cc_info_instance_methods(builder: &mut MethodsBuilder) {
+    /// Returns transitive native libraries as a depset.
+    fn transitive_native_libraries<'v>(
+        this: &CcInfoInstanceStub,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        Ok(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+    }
+
+    /// Returns the debug context for this CcInfo.
+    fn debug_context<'v>(this: &CcInfoInstanceStub, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        Ok(heap.alloc(CcDebugContext))
+    }
+}
+
+// ============================================================================
+// CcDebugContext - Debug context stub
+// ============================================================================
+
+/// Stub for Bazel's CcDebugContext, returned by cc_common.create_debug_context()
+/// and cc_common.merge_debug_context().
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct CcDebugContext;
+
+impl Display for CcDebugContext {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CcDebugContext()")
+    }
+}
+
+starlark_simple_value!(CcDebugContext);
+
+#[starlark_value(type = "CcDebugContext")]
+impl<'v> StarlarkValue<'v> for CcDebugContext {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "files" | "pic_files")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "files" | "pic_files" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            _ => None,
+        }
     }
 }
 
