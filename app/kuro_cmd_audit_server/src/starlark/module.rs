@@ -49,6 +49,7 @@ pub(crate) async fn server_execute(
                             current_cell_path,
                             None,
                         ),
+                        package_dir: None,
                     },
                     // Otherwise `@arg` is expanded as mode file.
                     allow_missing_at_symbol: true,

@@ -28,6 +28,7 @@ use kuro_interpreter::types::rule::FROZEN_RULE_GET_IMPL;
 use kuro_interpreter::types::transition::transition_id_from_value;
 use kuro_node::attrs::attr::Attribute;
 use kuro_node::attrs::attr_type::AttrType;
+use kuro_node::attrs::attr_type::list::ListLiteral;
 use kuro_node::attrs::attr_type::string::StringLiteral;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::display::AttrDisplayWithContextExt;
@@ -39,6 +40,7 @@ use kuro_node::rule::Rule;
 use kuro_node::rule::RuleIncomingTransition;
 use kuro_node::rule_type::RuleType;
 use kuro_node::rule_type::StarlarkRuleType;
+use kuro_util::arc_str::ArcSlice;
 use kuro_util::arc_str::ArcStr;
 use starlark::any::ProvidesStaticType;
 use starlark::docs::DocFunction;
@@ -73,6 +75,7 @@ use starlark::values::dict::UnpackDictEntries;
 use starlark::values::list::ListType;
 use starlark::values::list::UnpackList;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
+use starlark::values::none::NoneOr;
 use starlark::values::starlark_value;
 use starlark::values::starlark_value_as_type::StarlarkValueAsType;
 use starlark::values::typing::FrozenStarlarkCallable;
@@ -687,6 +690,15 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
     /// MyRule = rule(impl = _my_rule, attrs = {...})
     /// ```
     fn rule<'v>(
+        // Bazel also allows passing implementation as first positional arg:
+        //   rule(_my_impl, attrs = {...})
+        #[starlark(default = NoneOr::None)] positional_impl: NoneOr<
+            StarlarkCallableChecked<
+                'v,
+                (AnalysisContextReprLate,),
+                Either<ListType<ProviderReprLate>, StarlarkPromise<'v>>,
+            >,
+        >,
         // Kuro-style parameter name
         #[starlark(require = named)] r#impl: Option<
             StarlarkCallableChecked<
@@ -737,6 +749,8 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         // Bazel-compatible: build setting descriptor (e.g., config.bool(flag=True))
         // TODO(bazel): Implement build setting value tracking via build_setting parameter
         #[starlark(require = named)] build_setting: Option<Value<'v>>,
+        // Catch-all for Bazel private params like _skylark_testable
+        #[starlark(kwargs)] extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkRuleCallable<'v>> {
         // TODO(bazel): Use the provides parameter to validate rule outputs
@@ -756,6 +770,7 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             exec_groups,
             outputs,
             executable,
+            extra_kwargs,
         );
 
         // When build_setting is specified, add build_setting_default as an implicit attribute.
@@ -806,15 +821,67 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             }
         }
 
-        // Support both `implementation` (Bazel) and `impl` (Kuro) parameter names
-        let impl_fn = match (implementation, r#impl) {
-            (Some(implementation), None) => implementation,
-            (None, Some(impl_fn)) => impl_fn,
-            (Some(_), Some(_)) => {
-                return Err(kuro_error::Error::from(RuleError::BothImplAndImplementation).into());
+        // Bazel: test=True rules get standard test attributes automatically.
+        // Use any() for flaky/local/shard_count since Bazel accepts bool/int/string
+        // (e.g., abseil-cpp uses `flaky = 1` instead of `flaky = True`).
+        if test {
+            let test_attrs: &[(&str, &str, AttrType)] = &[
+                ("size", "small", AttrType::string()),
+                ("timeout", "", AttrType::string()),
+                ("flaky", "", AttrType::any()),
+                ("shard_count", "", AttrType::any()),
+                ("local", "", AttrType::any()),
+                ("args", "", AttrType::list(AttrType::string())),
+                (
+                    "env",
+                    "",
+                    AttrType::dict(AttrType::string(), AttrType::string(), false),
+                ),
+                ("env_inherit", "", AttrType::list(AttrType::string())),
+            ];
+            for (name, default_val, attr_type) in test_attrs {
+                // Only add if not already defined by the rule
+                if !attrs.entries.iter().any(|(n, _)| *n == *name) {
+                    let default = if default_val.is_empty() {
+                        if *attr_type == AttrType::string() || *attr_type == AttrType::any() {
+                            Some(Arc::new(CoercedAttr::String(StringLiteral(ArcStr::from(
+                                "",
+                            )))))
+                        } else if *name == "env" {
+                            use kuro_node::attrs::attr_type::dict::DictLiteral;
+                            Some(Arc::new(CoercedAttr::Dict(
+                                DictLiteral(ArcSlice::default()),
+                            )))
+                        } else {
+                            Some(Arc::new(CoercedAttr::List(
+                                ListLiteral(ArcSlice::default()),
+                            )))
+                        }
+                    } else {
+                        Some(Arc::new(CoercedAttr::String(StringLiteral(ArcStr::from(
+                            *default_val,
+                        )))))
+                    };
+                    let test_attr =
+                        StarlarkAttribute::new(Attribute::new(default, name, attr_type.clone()));
+                    let test_value = eval.heap().alloc(test_attr);
+                    let test_ref = <&StarlarkAttribute>::unpack_value_err(test_value).unwrap();
+                    attrs.entries.push((name, test_ref));
+                }
             }
-            (None, None) => {
+        }
+
+        // Support positional arg, `implementation` (Bazel), and `impl` (Kuro) parameter names
+        let positional_impl = positional_impl.into_option();
+        let impl_fn = match (positional_impl, implementation, r#impl) {
+            (Some(positional), None, None) => positional,
+            (None, Some(implementation), None) => implementation,
+            (None, None, Some(impl_fn)) => impl_fn,
+            (None, None, None) => {
                 return Err(kuro_error::Error::from(RuleError::MissingImplementation).into());
+            }
+            _ => {
+                return Err(kuro_error::Error::from(RuleError::BothImplAndImplementation).into());
             }
         };
 

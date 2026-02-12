@@ -22,6 +22,7 @@ use kuro_common::dice::cells::HasCellResolver;
 use kuro_common::dice::cycles::CycleGuard;
 use kuro_common::file_ops::dice::DiceFileComputations;
 use kuro_common::file_ops::error::FileReadErrorContext;
+use kuro_common::find_buildfile::find_buildfile;
 use kuro_common::legacy_configs::dice::HasLegacyConfigs;
 use kuro_common::legacy_configs::dice::OpaqueLegacyBuckConfigOnDice;
 use kuro_common::package_boundary::HasPackageBoundaryExceptions;
@@ -131,11 +132,29 @@ impl<'c, 'd> HasCalculationDelegate<'c, 'd> for DiceComputations<'d> {
                     cell_alias_resolver,
                 )?;
 
+                // Compute package_dir by finding nearest ancestor with a BUILD file.
+                // This is needed for Bazel-compatible `:subdir/file.bzl` import resolution.
+                let package_dir = {
+                    let buildfiles = DiceFileComputations::buildfiles(ctx, self.0.cell()).await?;
+                    let mut found = None;
+                    for ancestor in self.0.ancestors() {
+                        if let Ok(dir_listing) = DiceFileComputations::read_dir(ctx, ancestor).await
+                        {
+                            if find_buildfile(&buildfiles, &dir_listing.included).is_some() {
+                                found = Some(ancestor.to_owned());
+                                break;
+                            }
+                        }
+                    }
+                    found
+                };
+
                 Ok(Arc::new(InterpreterForDir::new(
                     cell_info,
                     global_state.dupe(),
                     implicit_import_paths,
                     dirs_allowing_relative_paths,
+                    package_dir,
                 )?))
             }
 

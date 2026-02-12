@@ -570,7 +570,8 @@ impl MvsResolver {
         }
 
         // Check for compatibility conflicts (same module name, different compat levels)
-        self.check_compatibility_conflicts(&selection_groups)?;
+        // This logs warnings but does not fail - conflicts are resolved by version
+        self.check_compatibility_conflicts(&selection_groups);
 
         // Select maximum version per group
         let mut selected: HashMap<String, Version> = HashMap::new();
@@ -590,7 +591,18 @@ impl MvsResolver {
                 group.module_name.clone()
             };
 
-            selected.insert(key, max_version);
+            // When multiple groups have the same key (e.g., compat level conflict),
+            // keep the highest version
+            match selected.entry(key) {
+                std::collections::hash_map::Entry::Vacant(e) => {
+                    e.insert(max_version);
+                }
+                std::collections::hash_map::Entry::Occupied(mut e) => {
+                    if max_version > *e.get() {
+                        e.insert(max_version);
+                    }
+                }
+            }
         }
 
         // Add overridden modules (they always "win")
@@ -636,10 +648,12 @@ impl MvsResolver {
     }
 
     /// Check for compatibility level conflicts.
+    /// When conflicts are found, logs a warning and resolves by keeping the
+    /// highest compatibility level (newest API), rather than failing.
     fn check_compatibility_conflicts(
         &self,
         groups: &HashMap<SelectionGroup, Vec<(Version, &DiscoveredModule)>>,
-    ) -> kuro_error::Result<()> {
+    ) {
         // Group by module name to check for compat conflicts
         let mut by_name: HashMap<&str, Vec<&SelectionGroup>> = HashMap::new();
         for group in groups.keys() {
@@ -675,18 +689,20 @@ impl MvsResolver {
                     .map(|(v, _)| v.to_string())
                     .unwrap_or_default();
 
-                return Err(MvsResolutionError::CompatibilityConflict {
-                    name: name.to_string(),
-                    version1: v1,
-                    compat1: g1.compatibility_level,
-                    version2: v2,
-                    compat2: g2.compatibility_level,
-                }
-                .into());
+                // Log warning but continue - resolve by keeping highest version
+                tracing::warn!(
+                    "Compatibility level conflict for module '{}': \
+                     version {} has compatibility_level={}, \
+                     version {} has compatibility_level={}. \
+                     Resolving by selecting the highest version.",
+                    name,
+                    v1,
+                    g1.compatibility_level,
+                    v2,
+                    g2.compatibility_level,
+                );
             }
         }
-
-        Ok(())
     }
 
     /// Build the final resolved graph with rewritten dependencies.

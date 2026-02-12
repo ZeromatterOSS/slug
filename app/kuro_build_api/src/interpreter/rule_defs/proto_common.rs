@@ -128,8 +128,9 @@ impl<'v> StarlarkValue<'v> for ProtoCommonModule {
     fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             // This flag controls whether proto toolchain resolution is enabled.
-            // In Bazel 9.0+, this is typically true.
-            "INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION" => Some(Value::new_bool(true)),
+            // Set to false because Kuro doesn't implement Bazel-style toolchain resolution.
+            // This causes protobuf rules to use the legacy codepath with _proto_compiler attr.
+            "INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION" => Some(Value::new_bool(false)),
             _ => None,
         }
     }

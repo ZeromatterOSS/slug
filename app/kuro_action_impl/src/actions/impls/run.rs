@@ -816,6 +816,29 @@ impl RunAction {
         command_line_digest_for_dep_files.push_arg(env_len.to_string());
         command_line_digest_for_dep_files.push_count();
 
+        // Debug: log the expanded command line for cpp_link actions
+        {
+            use std::io::Write;
+            let category = self.starlark_values.category.as_str();
+            if category.contains("link") || category.contains("cpp") {
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("/tmp/cc_common_compile.log")
+                {
+                    let _ = writeln!(f, "[expand_command_line] category={}", category);
+                    let _ = writeln!(f, "  exe: {:?}", exe_rendered);
+                    let _ = writeln!(f, "  args count: {}", args_rendered.len());
+                    let total_len: usize = exe_rendered.iter().map(|s| s.len()).sum::<usize>()
+                        + args_rendered.iter().map(|s| s.len()).sum::<usize>();
+                    let _ = writeln!(f, "  total cmdline bytes: {}", total_len);
+                    for (i, arg) in args_rendered.iter().enumerate() {
+                        let _ = writeln!(f, "  arg[{}]: {}", i, arg);
+                    }
+                }
+            }
+        }
+
         Ok((
             ExpandedCommandLine {
                 exe: exe_rendered,

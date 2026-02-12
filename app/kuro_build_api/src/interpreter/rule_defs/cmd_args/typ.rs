@@ -963,9 +963,15 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Bazel-compatible: add all values joined with a separator.
+    /// Supports both 1-arg form: add_joined(values, join_with=...)
+    /// and 2-arg form: add_joined("--flag", values, join_with=...)
     fn add_joined<'v>(
         mut this: StarlarkCommandLineMut<'v>,
-        #[starlark(require = pos, default = starlark::values::none::NoneType)] values: Value<'v>,
+        #[starlark(require = pos, default = starlark::values::none::NoneType)]
+        arg_name_or_values: Value<'v>,
+        #[starlark(require = pos, default = starlark::values::none::NoneType)] maybe_values: Value<
+            'v,
+        >,
         #[starlark(require = named, default = ",")] join_with: &str,
         #[starlark(require = named, default = "")] format_each: &str,
         #[starlark(require = named, default = "")] format_joined: &str,
@@ -976,15 +982,20 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] uniquify: bool,
         #[starlark(require = named, default = false)] expand_directories: bool,
         #[starlark(require = named, default = false)] allow_closure: bool,
-        heap: Heap<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkCommandLineMut<'v>> {
-        let _ = (
-            map_each,
-            omit_if_empty,
-            uniquify,
-            expand_directories,
-            allow_closure,
-        );
+        let _ = (uniquify, expand_directories, allow_closure);
+        let heap = eval.heap();
+        // Determine if 2-arg form (arg_name, values) or 1-arg form (values)
+        let (arg_name, values) = if !maybe_values.is_none() {
+            // 2-arg form: add_joined("--flag", values, ...)
+            let name = arg_name_or_values.unpack_str().unwrap_or("");
+            (Some(name.to_owned()), maybe_values)
+        } else {
+            // 1-arg form: add_joined(values, ...)
+            (None, arg_name_or_values)
+        };
+
         if values.is_none() {
             return Ok(this);
         }
@@ -1004,7 +1015,29 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
         } else {
             vec![values]
         };
-        let items: Vec<String> = raw_items
+
+        // Apply map_each if provided
+        let mapped_items: Vec<Value<'v>> = if !map_each.is_none() {
+            let mut result = Vec::new();
+            for item in &raw_items {
+                if let Ok(mapped) = eval.eval_function(map_each, &[*item], &[]) {
+                    if mapped.is_none() {
+                        continue;
+                    } else if let Some(list) = ListRef::from_value(mapped) {
+                        result.extend(list.iter());
+                    } else {
+                        result.push(mapped);
+                    }
+                } else {
+                    result.push(*item);
+                }
+            }
+            result
+        } else {
+            raw_items
+        };
+
+        let items: Vec<String> = mapped_items
             .iter()
             .map(|v| {
                 let val_str = if let Ok(Some(path_val)) = v.get_attr("path", heap) {
@@ -1020,14 +1053,26 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
             })
             .collect();
 
+        if omit_if_empty && items.is_empty() {
+            return Ok(this);
+        }
+
         let joined = items.join(join_with);
         let result = if !format_joined.is_empty() {
             format_joined.replace("%s", &joined)
         } else {
             joined
         };
-        let s = heap.alloc_str(&result).to_value();
-        this.borrow.add_value(s)?;
+
+        // If arg_name is provided, prepend it
+        if let Some(name) = arg_name {
+            let combined = format!("{}={}", name, result);
+            let s = heap.alloc_str(&combined).to_value();
+            this.borrow.add_value(s)?;
+        } else {
+            let s = heap.alloc_str(&result).to_value();
+            this.borrow.add_value(s)?;
+        }
         Ok(this)
     }
 
@@ -1043,10 +1088,11 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
     /// Bazel-compatible: use a param file for the arguments.
     fn use_param_file<'v>(
         this: StarlarkCommandLineMut<'v>,
-        #[starlark(require = pos)] _param_file_arg: &str,
+        #[starlark(require = pos, default = "")] _param_file_arg: &str,
+        #[starlark(require = named, default = "")] param_file_arg: &str,
         #[starlark(require = named, default = false)] use_always: bool,
     ) -> starlark::Result<StarlarkCommandLineMut<'v>> {
-        let _ = use_always;
+        let _ = (param_file_arg, use_always);
         // Stub: param files not yet supported
         Ok(this)
     }

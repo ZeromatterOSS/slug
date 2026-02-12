@@ -94,6 +94,7 @@ impl PackageImplicitImports {
                         root_path.clone(),
                         None,
                     ),
+                    package_dir: None,
                 };
                 let import_path =
                     parse_import(&cell_alias_resolver, relative_import_option, import)?;

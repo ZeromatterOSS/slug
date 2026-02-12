@@ -236,7 +236,22 @@ pub const FEATURES_ATTRIBUTE: InternalAttribute = InternalAttribute {
     is_configurable: AttrIsConfigurable::No,
 };
 
-const INTERNAL_ATTRS: [InternalAttribute; 14] = [
+/// Bazel-compatible `applicable_licenses` attribute.
+/// A list of license targets that apply to this target.
+pub const APPLICABLE_LICENSES_ATTRIBUTE: InternalAttribute = InternalAttribute {
+    id: AttributeId(14),
+    name: "applicable_licenses",
+    attr: || {
+        Attribute::new(
+            Some(Arc::new(AnyAttrType::empty_list())),
+            "a list of license targets that apply to this target",
+            AttrType::list(AttrType::any()),
+        )
+    },
+    is_configurable: AttrIsConfigurable::No,
+};
+
+const INTERNAL_ATTRS: [InternalAttribute; 15] = [
     NAME_ATTRIBUTE,
     DEFAULT_TARGET_PLATFORM_ATTRIBUTE,
     TARGET_COMPATIBLE_WITH_ATTRIBUTE,
@@ -251,6 +266,7 @@ const INTERNAL_ATTRS: [InternalAttribute; 14] = [
     TESTONLY_ATTRIBUTE,
     DEPRECATION_ATTRIBUTE,
     FEATURES_ATTRIBUTE,
+    APPLICABLE_LICENSES_ATTRIBUTE,
 ];
 
 pub struct OptionalInternalAttribute {
@@ -282,7 +298,7 @@ const fn to_optional(attr: InternalAttribute) -> OptionalInternalAttribute {
 }
 
 /// Includes optional internal attrs
-const ALL_INTERNAL_ATTRS: [OptionalInternalAttribute; 15] = [
+const ALL_INTERNAL_ATTRS: [OptionalInternalAttribute; 16] = [
     to_optional(NAME_ATTRIBUTE),
     to_optional(DEFAULT_TARGET_PLATFORM_ATTRIBUTE),
     to_optional(TARGET_COMPATIBLE_WITH_ATTRIBUTE),
@@ -297,6 +313,7 @@ const ALL_INTERNAL_ATTRS: [OptionalInternalAttribute; 15] = [
     to_optional(TESTONLY_ATTRIBUTE),
     to_optional(DEPRECATION_ATTRIBUTE),
     to_optional(FEATURES_ATTRIBUTE),
+    to_optional(APPLICABLE_LICENSES_ATTRIBUTE),
     INCOMING_TRANSITION_ATTRIBUTE,
 ];
 

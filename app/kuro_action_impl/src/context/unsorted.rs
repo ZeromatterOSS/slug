@@ -150,6 +150,33 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
         ))
     }
 
+    /// Bazel-compatible: declare a shareable artifact.
+    /// In Bazel, this creates an artifact that can be shared across targets.
+    /// We implement it as a simple declare_output alias.
+    fn declare_shareable_artifact<'v>(
+        this: &AnalysisActions<'v>,
+        #[starlark(require = pos)] filename: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        sibling: starlark::values::Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<StarlarkDeclaredArtifact<'v>> {
+        let _ = sibling;
+        let artifact = this.state()?.declare_output(
+            None,
+            filename,
+            OutputType::FileOrDirectory,
+            eval.call_stack_top_location(),
+            BuckOutPathKind::Configuration,
+            eval.heap(),
+        )?;
+
+        Ok(StarlarkDeclaredArtifact::new(
+            eval.call_stack_top_location(),
+            artifact,
+            AssociatedArtifacts::new(),
+        ))
+    }
+
     /// Creates a new transitive set. For details, see https://kuro.build/docs/rule_authors/transitive_sets/.
     fn tset<'v>(
         this: &AnalysisActions<'v>,

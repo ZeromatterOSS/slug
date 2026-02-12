@@ -226,6 +226,17 @@ impl BuildAttrCoercionContext {
     }
 
     fn coerce_label_no_cache(&self, value: &str) -> kuro_error::Result<ProvidersLabel> {
+        // Bazel-compatible: `@repo` (bare repo ref without //) means `@repo//:repo`
+        let expanded;
+        let value = if value.starts_with('@') && !value.contains("//") {
+            let repo = &value[1..]; // strip @
+            let repo = repo.strip_suffix(':').unwrap_or(repo); // strip trailing : if present
+            expanded = format!("@{}//:{}", repo, repo);
+            expanded.as_str()
+        } else {
+            value
+        };
+
         // Use Bazel-compatible parsing which allows `@repo//pkg` to mean `@repo//pkg:pkg`
         match self.parse_pattern_bazel_compat::<ProvidersPatternExtra>(value) {
             Ok(result) => match result {
@@ -258,10 +269,10 @@ impl BuildAttrCoercionContext {
                 } else {
                     false
                 };
-                if is_bare_name && !is_source_file && self.enclosing_package.is_some() {
+                if is_bare_name && !is_source_file {
                     let adjusted = format!(":{}", value);
-                    match self.parse_pattern_bazel_compat::<ProvidersPatternExtra>(&adjusted)? {
-                        ParsedPattern::Target(package, target_name, providers) => {
+                    match self.parse_pattern_bazel_compat::<ProvidersPatternExtra>(&adjusted) {
+                        Ok(ParsedPattern::Target(package, target_name, providers)) => {
                             Ok(providers.into_providers_label(package, target_name.as_ref()))
                         }
                         _ => Err(

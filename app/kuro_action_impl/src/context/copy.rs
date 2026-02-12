@@ -156,9 +156,10 @@ pub(crate) fn analysis_actions_methods_copy(methods: &mut MethodsBuilder) {
         #[starlark(require = named)] target_file: ValueAsInputArtifactLike<'v>,
         #[starlark(require = named, default = false)] is_executable: bool,
         #[starlark(require = named, default = NoneOr::None)] progress_message: NoneOr<&str>,
+        #[starlark(require = named, default = false)] use_exec_root_for_source: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<ValueTyped<'v, StarlarkDeclaredArtifact<'v>>> {
-        let _ = (is_executable, progress_message);
+        let _ = (is_executable, progress_message, use_exec_root_for_source);
         Ok(copy_file_impl(
             eval,
             this,

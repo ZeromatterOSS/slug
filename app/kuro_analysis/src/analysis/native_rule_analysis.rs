@@ -22,6 +22,8 @@ use kuro_build_api::analysis::AnalysisResult;
 use kuro_build_api::analysis::registry::FrozenAnalysisValueStorage;
 use kuro_build_api::analysis::registry::RecordedAnalysisValues;
 use kuro_build_api::dynamic::storage::DYNAMIC_LAMBDA_PARAMS_STORAGES;
+use kuro_build_api::interpreter::rule_defs::cc_common::CcInfoInstanceStub;
+use kuro_build_api::interpreter::rule_defs::cc_common::CcInfoProvider;
 use kuro_build_api::interpreter::rule_defs::platform_common::ConstraintValueInfoInstance;
 use kuro_build_api::interpreter::rule_defs::platform_common::ConstraintValueInfoProvider;
 use kuro_build_api::interpreter::rule_defs::provider::FrozenBuiltinProviderLike;
@@ -61,6 +63,12 @@ pub fn analyze_native_rule(
         NativeRuleKind::ConfigSetting => analyze_config_setting(target, dep_analysis),
         NativeRuleKind::ToolchainType => create_minimal_analysis_result(target),
         NativeRuleKind::PackageGroup => create_minimal_analysis_result(target),
+        NativeRuleKind::Genrule => create_minimal_analysis_result(target),
+        NativeRuleKind::Platform => create_minimal_analysis_result(target),
+        NativeRuleKind::CcLibrary => create_cc_analysis_result(target),
+        NativeRuleKind::CcBinary => create_cc_analysis_result(target),
+        NativeRuleKind::CcTest => create_cc_analysis_result(target),
+        NativeRuleKind::TestSuite => create_minimal_analysis_result(target),
     }
 }
 
@@ -215,6 +223,15 @@ fn analyze_config_setting(
         }
     }
 
+    // If no real constraint pairs found (flag_values/values only), add a sentinel
+    // constraint pair that will never match any real platform configuration.
+    // This ensures the config_setting is valid as a select() key but won't match.
+    if all_constraint_pairs.is_empty() {
+        let sentinel_setting = target.unconfigured().dupe();
+        let sentinel_value = ProvidersLabel::default_for(target.unconfigured().dupe());
+        all_constraint_pairs.push((sentinel_setting, sentinel_value));
+    }
+
     // Create merged ConfigurationInfo with all constraint pairs
     let config_info =
         FrozenConfigurationInfo::for_native_config_setting(&all_constraint_pairs, &heap);
@@ -334,6 +351,69 @@ fn analyze_filegroup(
         DefaultInfoCallable::provider_id().dupe(),
         default_info.to_frozen_value(),
     )]);
+
+    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+        heap.alloc(FrozenProviderCollection::new(providers)),
+    )?;
+
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+
+    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+        value: FrozenAnalysisValueStorage::new_native(
+            self_key.dupe(),
+            DYNAMIC_LAMBDA_PARAMS_STORAGES
+                .get()
+                .unwrap()
+                .new_frozen_dynamic_lambda_params_storage(),
+            Some(provider_collection),
+        ),
+    });
+
+    let heap_ref = heap.into_ref();
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
+
+    let recorded_values = RecordedAnalysisValues::new_native(
+        self_key,
+        Some(analysis_storage),
+        RecordedActions::new(0),
+    );
+
+    Ok(AnalysisResult::new(
+        recorded_values,
+        None,
+        HashMap::new(),
+        0,
+        0,
+        None,
+    ))
+}
+
+/// Create an analysis result with DefaultInfo + CcInfo for native cc rules.
+fn create_cc_analysis_result(target: &ConfiguredTargetLabel) -> kuro_error::Result<AnalysisResult> {
+    // Register the repo root as an include directory for native cc_library stubs.
+    // This ensures that when other targets compile against this stub dep,
+    // headers from this repo can be found (e.g., "absl/base/macros.h" from abseil-cpp).
+    let cell_name = target.pkg().cell_name().as_str();
+    if !kuro_core::cells::is_root_cell_name(cell_name) {
+        let include_dir = format!("external/{}", cell_name);
+        kuro_build_api::interpreter::rule_defs::cc_common::register_external_include_dir(
+            &include_dir,
+        );
+    }
+
+    let heap = FrozenHeap::new();
+
+    let default_info = FrozenDefaultInfo::testing_empty(&heap);
+    let cc_info = heap.alloc(CcInfoInstanceStub);
+
+    let mut providers = SmallMap::from_iter([
+        (
+            DefaultInfoCallable::provider_id().dupe(),
+            default_info.to_frozen_value(),
+        ),
+        (CcInfoProvider::provider_id().dupe(), cc_info),
+    ]);
 
     let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
         heap.alloc(FrozenProviderCollection::new(providers)),

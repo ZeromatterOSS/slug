@@ -78,6 +78,10 @@ impl<'v> ActionsRegistry<'v> {
         }
     }
 
+    pub fn owner(&self) -> &DeferredHolderKey {
+        &self.owner
+    }
+
     pub fn declare_dynamic_output(
         &mut self,
         artifact: &BuildArtifact,

@@ -334,6 +334,43 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
         // - A list of package specifications like ["//foo:__pkg__", "//bar:__subpackages__"]
         Ok(NoneType)
     }
+
+    /// Creates an analysis test transition.
+    ///
+    /// In Bazel, `analysis_test_transition` creates a configuration transition
+    /// that can be used in analysis tests to modify build settings.
+    ///
+    /// Currently a stub that returns a struct with the settings stored.
+    fn analysis_test_transition<'v>(
+        #[starlark(require = named)] settings: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = settings;
+        // Return a simple struct as a placeholder transition object
+        Ok(eval.heap().alloc("analysis_test_transition_stub"))
+    }
+
+    /// Bazel's `AnalysisTestResultInfo` provider for analysis test results.
+    ///
+    /// Used by bazel_skylib's unittest framework to return test results.
+    fn AnalysisTestResultInfo<'v>(
+        #[starlark(require = named, default = false)] success: bool,
+        #[starlark(require = named, default = "")] message: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let entries = vec![
+            ("success", eval.heap().alloc(success)),
+            ("message", eval.heap().alloc(message)),
+        ];
+        Ok(eval.heap().alloc(AllocDict(entries)))
+    }
+
+    /// Bazel's `AnalysisFailureInfo` provider stub.
+    ///
+    /// Used by bazel_skylib's unittest framework to detect analysis failures.
+    fn AnalysisFailureInfo<'v>(eval: &mut Evaluator<'v, '_, '_>) -> starlark::Result<Value<'v>> {
+        Ok(eval.heap().alloc("AnalysisFailureInfo_stub"))
+    }
 }
 
 #[starlark_module]
@@ -371,15 +408,15 @@ pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
     ///
     /// See: https://bazel.build/reference/be/functions#exports_files
     fn exports_files<'v>(
-        #[starlark(require = pos)] srcs: UnpackListOrTuple<String>,
+        #[starlark(default = UnpackListOrTuple::default())] srcs: UnpackListOrTuple<String>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
-        _visibility: UnpackListOrTuple<String>,
+        visibility: UnpackListOrTuple<String>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
-        _licenses: UnpackListOrTuple<String>,
+        licenses: UnpackListOrTuple<String>,
     ) -> starlark::Result<NoneType> {
         // TODO(bazel-compat): Implement file visibility enforcement.
         // Currently a no-op - Kuro doesn't enforce file-level visibility.
-        let _unused = srcs;
+        let _ = (srcs, visibility, licenses);
         Ok(NoneType)
     }
 
@@ -403,17 +440,25 @@ pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
         #[starlark(require = named)] toolchain_type: &str,
         #[starlark(require = named)] toolchain: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
-        _exec_compatible_with: UnpackListOrTuple<String>,
+        exec_compatible_with: UnpackListOrTuple<String>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
-        _target_compatible_with: UnpackListOrTuple<String>,
+        target_compatible_with: UnpackListOrTuple<String>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
-        _target_settings: UnpackListOrTuple<String>,
+        target_settings: UnpackListOrTuple<String>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
-        _visibility: UnpackListOrTuple<String>,
+        visibility: UnpackListOrTuple<String>,
     ) -> starlark::Result<NoneType> {
         // TODO(toolchains): Implement toolchain registration and resolution.
         // Currently a no-op - Kuro doesn't yet support Bazel-style toolchains.
-        let _unused = (name, toolchain_type, toolchain);
+        let _ = (
+            name,
+            toolchain_type,
+            toolchain,
+            exec_compatible_with,
+            target_compatible_with,
+            target_settings,
+            visibility,
+        );
         Ok(NoneType)
     }
 

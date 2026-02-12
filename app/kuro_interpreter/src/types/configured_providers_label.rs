@@ -172,7 +172,7 @@ fn configured_label_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<StringValue<'v>> {
         let cell = this.label.target().pkg().cell_name().as_str();
-        if cell.is_empty() || cell == "root" {
+        if kuro_core::cells::is_root_cell_name(cell) {
             Ok(heap.alloc_str_intern(""))
         } else {
             Ok(heap.alloc_str_intern(&format!("external/{}", cell)))

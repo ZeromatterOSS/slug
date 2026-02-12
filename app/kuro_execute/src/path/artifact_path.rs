@@ -132,14 +132,24 @@ impl ArtifactPath<'_> {
                 }
             }
             Either::Right(buck) => {
-                // For source files, return cell-relative path + source path
-                let path = buck
+                // For source files, return cell-relative path + source path.
+                // For external repos (non-root cells), prefix with "external/<cell>"
+                // to match Bazel's execution-time path convention.
+                let cell_name = buck.package().cell_name().as_str();
+                let cell_relative = buck
                     .package()
                     .cell_relative_path()
                     .as_forward_relative_path()
                     .join(buck.path());
-                let path = path.join_cow(self.projected_path);
-                f(&path)
+                let path = cell_relative.join_cow(self.projected_path);
+
+                if !kuro_core::cells::is_root_cell_name(cell_name) {
+                    let full_path = format!("external/{}/{}", cell_name, path);
+                    let full_path_buf = ForwardRelativePathBuf::unchecked_new(full_path);
+                    f(&full_path_buf)
+                } else {
+                    f(&path)
+                }
             }
         }
     }

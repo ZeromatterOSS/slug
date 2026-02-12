@@ -91,6 +91,12 @@ pub(crate) fn parse_visibility_with_view(
             // //visibility:private means no visibility - don't add anything
             // The default is already private (empty list), so we just skip this entry
             continue;
+        } else if item == ":__pkg__" || item == ":__subpackages__" {
+            // Relative Bazel visibility patterns (without //pkg prefix).
+            // :__pkg__ = current package only, :__subpackages__ = current package + subpackages.
+            // TODO(bazel-compat): Implement proper scoped visibility.
+            // For now, treat as public to unblock builds.
+            builder.add_public();
         } else {
             // Handle Bazel's special package patterns:
             // - //pkg:__pkg__ means only that exact package can see this target

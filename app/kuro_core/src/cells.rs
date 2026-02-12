@@ -115,6 +115,28 @@ use crate::fs::project::ProjectRoot;
 use crate::fs::project_rel_path::ProjectRelativePath;
 use crate::fs::project_rel_path::ProjectRelativePathBuf;
 
+/// Global storage for the root cell name, used for Bazel compatibility.
+/// Set when CellResolver is created, read by workspace_root and artifact path logic.
+static ROOT_CELL_NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// Global storage for non-root cell names (external repos).
+static EXTERNAL_CELL_NAMES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+/// Check if a cell name is the root cell (main workspace).
+pub fn is_root_cell_name(cell_name: &str) -> bool {
+    cell_name.is_empty()
+        || cell_name == "root"
+        || ROOT_CELL_NAME.get().map_or(false, |root| root == cell_name)
+}
+
+/// Get all non-root cell names (external repos).
+pub fn get_external_cell_names() -> Vec<String> {
+    EXTERNAL_CELL_NAMES
+        .lock()
+        .map(|names| names.clone())
+        .unwrap_or_default()
+}
+
 /// Errors from cell creation
 #[derive(kuro_error::Error, Debug)]
 #[kuro(input)]
@@ -259,6 +281,17 @@ impl CellResolver {
         }
 
         let root_cell = root_cell.ok_or(CellError::NoRootCell)?;
+        // Store root cell name globally for Bazel compatibility checks
+        let _ = ROOT_CELL_NAME.set(root_cell.as_str().to_owned());
+        // Store non-root cell names for include path resolution
+        if let Ok(mut ext_names) = EXTERNAL_CELL_NAMES.lock() {
+            ext_names.clear();
+            for cell_name in cells_map.keys() {
+                if *cell_name != root_cell {
+                    ext_names.push(cell_name.as_str().to_owned());
+                }
+            }
+        }
         Ok(CellResolver(Arc::new(CellResolverInternals {
             cells: cells_map,
             root_cell,

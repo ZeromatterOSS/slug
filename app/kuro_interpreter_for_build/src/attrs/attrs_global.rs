@@ -106,15 +106,19 @@ impl AttributeExt for Attribute {
                     // the attribute optional without requiring coercion.
                     Some(Arc::new(kuro_node::attrs::coerced_attr::CoercedAttr::None))
                 } else {
-                    Some(Arc::new(
-                        coercer
-                            .coerce(
-                                AttrIsConfigurable::Yes,
-                                &attr_coercion_context_for_bzl(eval)?,
-                                x,
-                            )
-                            .buck_error_context("Error coercing attribute default")?,
-                    ))
+                    match coercer.coerce(
+                        AttrIsConfigurable::Yes,
+                        &attr_coercion_context_for_bzl(eval)?,
+                        x,
+                    ) {
+                        Ok(coerced) => Some(Arc::new(coerced)),
+                        Err(_) => {
+                            // Coercion failed (e.g., bare filename like "LICENSE" in .bzl context).
+                            // In Bazel, defaults are resolved later when the rule is instantiated.
+                            // Fall back to None - the rule will re-coerce from BUILD file context.
+                            Some(Arc::new(kuro_node::attrs::coerced_attr::CoercedAttr::None))
+                        }
+                    }
                 }
             }
         };

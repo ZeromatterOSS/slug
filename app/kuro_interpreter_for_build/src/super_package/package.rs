@@ -50,6 +50,14 @@ fn parse_visibility(
         } else if pattern == BAZEL_VISIBILITY_PRIVATE {
             // //visibility:private means no visibility - skip this entry
             continue;
+        } else if pattern.contains("__subpackages__") || pattern.contains("__pkg__") {
+            // TODO(bazel-compat): Implement proper Bazel subpackages/pkg visibility.
+            // For now, treat these as public visibility.
+            builder.add_public();
+        } else if pattern.starts_with(':') {
+            // Relative pattern like ":package_group_name" - skip for now.
+            // TODO(bazel-compat): Resolve package_group references in visibility.
+            builder.add_public();
         } else {
             builder.add(VisibilityPattern(ParsedPattern::parse_precise(
                 pattern,

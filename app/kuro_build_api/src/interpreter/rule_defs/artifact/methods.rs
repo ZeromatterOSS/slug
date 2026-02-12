@@ -121,18 +121,35 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
     /// The `Label` of the rule that originally created this artifact. May also be None in
     /// the case of source files, or if the artifact has not be used in an action, or if the
     /// action was not created by a rule.
+    ///
+    /// For Bazel compatibility, source files return a label constructed from their
+    /// source path (Bazel's File.owner always returns a Label, even for source files).
     #[starlark(attribute)]
     fn owner<'v>(
         this: &'v dyn StarlarkArtifactLike<'v>,
     ) -> starlark::Result<NoneOr<StarlarkConfiguredProvidersLabel>> {
         match this.owner()? {
-            None => Ok(NoneOr::None),
             Some(BaseDeferredKey::TargetLabel(target)) => {
                 Ok(NoneOr::Other(StarlarkConfiguredProvidersLabel::new(
                     ConfiguredProvidersLabel::new(target.dupe(), ProvidersName::Default),
                 )))
             }
-            Some(BaseDeferredKey::AnonTarget(_) | BaseDeferredKey::BxlLabel(_)) => Ok(NoneOr::None),
+            None | Some(BaseDeferredKey::AnonTarget(_) | BaseDeferredKey::BxlLabel(_)) => {
+                // For Bazel compatibility: source files should return an owner label
+                // derived from the source path (package + filename).
+                if let Some((package, name_str)) = this.source_path_info() {
+                    if let Ok(target_name) = TargetNameRef::new(&name_str) {
+                        let target_label = TargetLabel::new(package, target_name);
+                        let configured = target_label.configure(ConfigurationData::unbound());
+                        let providers_label =
+                            ConfiguredProvidersLabel::new(configured, ProvidersName::Default);
+                        return Ok(NoneOr::Other(StarlarkConfiguredProvidersLabel::new(
+                            providers_label,
+                        )));
+                    }
+                }
+                Ok(NoneOr::None)
+            }
         }
     }
 

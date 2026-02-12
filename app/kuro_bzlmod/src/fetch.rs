@@ -116,7 +116,8 @@ impl SourceFetcher {
 
         // Apply patches if any
         if !source_info.patches.is_empty() {
-            self.apply_patches(&dest_dir, source_info).await?;
+            self.apply_patches(&dest_dir, source_info, registry_url, name, version)
+                .await?;
         }
 
         // Mark as complete
@@ -400,25 +401,78 @@ impl SourceFetcher {
         &self,
         dest_dir: &Path,
         source_info: &SourceInfo,
+        registry_url: &str,
+        name: &str,
+        version: &str,
     ) -> kuro_error::Result<()> {
         if source_info.patches.is_empty() {
             return Ok(());
         }
 
-        tracing::debug!(
-            "Applying {} patches to {:?}",
+        tracing::info!(
+            "Applying {} patches to {}@{}",
             source_info.patches.len(),
-            dest_dir
+            name,
+            version
         );
 
         for (patch_file, _integrity) in &source_info.patches {
-            // TODO: Download patch file from registry and apply
-            // For now, just log a warning
-            tracing::warn!(
-                "Patch application not yet implemented: {} (strip={})",
-                patch_file,
-                source_info.patch_strip
+            // Download patch from registry: {base_url}/modules/{name}/{version}/patches/{patch_file}
+            let patch_url = format!(
+                "{}/modules/{}/{}/patches/{}",
+                registry_url, name, version, patch_file
             );
+            tracing::debug!("Fetching patch from {}", patch_url);
+
+            let response = self
+                .http_client
+                .get(&patch_url)
+                .await
+                .with_buck_error_context(|| format!("Failed to fetch patch: {}", patch_file))?;
+
+            let body = to_bytes(response.into_body()).await?;
+            let patch_content = body.to_vec();
+
+            // Apply patch using the `patch` command
+            let strip = source_info.patch_strip;
+            let mut cmd = Command::new("patch");
+            cmd.arg(format!("-p{}", strip))
+                .arg("--no-backup-if-mismatch")
+                .arg("-d")
+                .arg(dest_dir)
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped());
+
+            let mut child = cmd.spawn().map_err(|e| FetchError::PatchFailed {
+                patch: format!("{}: failed to spawn patch command: {}", patch_file, e),
+            })?;
+
+            // Write patch content to stdin
+            if let Some(mut stdin) = child.stdin.take() {
+                use std::io::Write;
+                stdin
+                    .write_all(&patch_content)
+                    .map_err(|e| FetchError::PatchFailed {
+                        patch: format!("{}: failed to write patch: {}", patch_file, e),
+                    })?;
+            }
+
+            let output = child
+                .wait_with_output()
+                .map_err(|e| FetchError::PatchFailed {
+                    patch: format!("{}: {}", patch_file, e),
+                })?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(FetchError::PatchFailed {
+                    patch: format!("{}: {}", patch_file, stderr),
+                }
+                .into());
+            }
+
+            tracing::debug!("Applied patch: {}", patch_file);
         }
 
         Ok(())

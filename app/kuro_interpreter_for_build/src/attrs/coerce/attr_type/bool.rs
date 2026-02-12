@@ -27,9 +27,15 @@ impl AttrTypeCoerce for BoolAttrType {
         _ctx: &dyn AttrCoercionContext,
         value: Value,
     ) -> kuro_error::Result<CoercedAttr> {
-        Ok(CoercedAttr::Bool(BoolLiteral(
-            UnpackValue::unpack_value_err(value)?,
-        )))
+        // Bazel allows integers for bool attributes (0 = False, nonzero = True)
+        let b = if let Some(b) = value.unpack_bool() {
+            b
+        } else if let Ok(Some(i)) = i64::unpack_value(value) {
+            i != 0
+        } else {
+            UnpackValue::unpack_value_err(value)?
+        };
+        Ok(CoercedAttr::Bool(BoolLiteral(b)))
     }
 
     fn starlark_type(&self) -> TyMaybeSelect {

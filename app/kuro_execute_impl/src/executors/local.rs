@@ -191,6 +191,21 @@ impl LocalExecutor {
         freeze_rx: impl ActionFreezeEventReceiver,
     ) -> impl futures::future::Future<Output = kuro_error::Result<CommandResult>> + Send + 'a {
         async move {
+            // Debug: log the command being executed
+            {
+                use std::io::Write;
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("/tmp/cc_common_compile.log")
+                {
+                    let _ = writeln!(
+                        f,
+                        "[local_exec] exe={}, working_dir={}",
+                        exe, working_directory
+                    );
+                }
+            }
             let working_directory = self.root.join_cow(working_directory);
 
             match &self.forkserver {

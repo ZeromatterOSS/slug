@@ -30,6 +30,7 @@ use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
+use starlark::values::list::AllocList;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 
@@ -490,6 +491,36 @@ fn bazel_py_fragment_methods(builder: &mut MethodsBuilder) {
 }
 
 // ============================================================================
+// ProtoFragment - Protocol Buffers configuration fragment
+// ============================================================================
+
+/// Proto configuration fragment stub.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct ProtoFragment;
+
+impl Display for ProtoFragment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "proto fragment")
+    }
+}
+
+starlark_simple_value!(ProtoFragment);
+
+#[starlark_value(type = "proto_fragment")]
+impl<'v> StarlarkValue<'v> for ProtoFragment {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "experimental_protoc_opts")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "experimental_protoc_opts" => Some(heap.alloc(AllocList::EMPTY)),
+            _ => None,
+        }
+    }
+}
+
+// ============================================================================
 // ConfigurationFragments - Container for all fragments
 // ============================================================================
 
@@ -528,7 +559,7 @@ impl<'v> StarlarkValue<'v> for ConfigurationFragments {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
-            "cpp" | "py" | "bazel_py" | "java" | "apple" | "platform"
+            "cpp" | "py" | "bazel_py" | "java" | "apple" | "platform" | "proto"
         )
     }
 
@@ -537,6 +568,7 @@ impl<'v> StarlarkValue<'v> for ConfigurationFragments {
             "cpp" => Some(heap.alloc(self.cpp.clone())),
             "py" => Some(heap.alloc(PyFragment)),
             "bazel_py" => Some(heap.alloc(BazelPyFragment)),
+            "proto" => Some(heap.alloc(ProtoFragment)),
             // TODO(fragments): Implement other fragments as needed
             "java" | "apple" | "platform" => Some(heap.alloc(NoneType)),
             _ => None,
@@ -551,6 +583,7 @@ impl<'v> StarlarkValue<'v> for ConfigurationFragments {
             "java".to_owned(),
             "apple".to_owned(),
             "platform".to_owned(),
+            "proto".to_owned(),
         ]
     }
 }

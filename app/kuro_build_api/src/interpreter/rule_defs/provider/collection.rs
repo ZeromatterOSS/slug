@@ -392,14 +392,15 @@ impl<'v, V: ValueLike<'v>> ProviderCollectionGen<V> {
                 match self.providers.get(&provider_id) {
                     Some(v) => Ok(Either::Left(v.to_value())),
                     None => {
-                        // For native providers (path: None), fall back to name-only matching.
-                        // This allows native provider stubs (e.g., CcInfo registered globally)
-                        // to match Starlark-defined providers with the same name from rulesets.
-                        if provider_id.path.is_none() {
-                            for (k, v) in self.providers.iter() {
-                                if k.name == provider_id.name {
-                                    return Ok(Either::Left(v.to_value()));
-                                }
+                        // Fall back to name-only matching when paths don't match.
+                        // Handles both directions:
+                        // 1. Query has path=None → match Starlark-defined provider by name
+                        // 2. Query has a path → match native provider (path=None) by name
+                        for (k, v) in self.providers.iter() {
+                            if k.name == provider_id.name
+                                && (provider_id.path.is_none() || k.path.is_none())
+                            {
+                                return Ok(Either::Left(v.to_value()));
                             }
                         }
                         Ok(Either::Right(provider_id))
@@ -521,14 +522,13 @@ impl FrozenProviderCollection {
         if self.providers.contains_key(provider_id) {
             return true;
         }
-        // For native providers (path: None), fall back to name-only matching.
-        // This allows native provider stubs (e.g., CcInfo registered globally)
-        // to match Starlark-defined providers with the same name from rulesets.
-        if provider_id.path.is_none() {
-            self.providers.keys().any(|k| k.name == provider_id.name)
-        } else {
-            false
-        }
+        // Fall back to name-only matching when paths don't match.
+        // This handles two cases:
+        // 1. Query has path=None (native provider) looking for Starlark-defined provider
+        // 2. Query has a path (Starlark provider) looking for native provider (path=None)
+        self.providers
+            .keys()
+            .any(|k| k.name == provider_id.name && (provider_id.path.is_none() || k.path.is_none()))
     }
 
     pub fn builtin_provider<'a, T: FrozenBuiltinProviderLike>(

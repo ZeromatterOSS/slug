@@ -284,6 +284,15 @@ impl TargetNode {
         if self.label().pkg() == target.pkg() {
             return Ok(true);
         }
+        // Cross-cell references bypass visibility checks.
+        // In Bazel's bzlmod model, inter-module access is governed by bazel_dep()
+        // declarations, and intra-module visibility patterns (like __subpackages__)
+        // are for organizing code within a module. Implicit rule dependencies
+        // (attr defaults from rule definitions) bypass visibility in Bazel; since
+        // we don't track dep origin, we approximate by skipping cross-cell checks.
+        if self.label().pkg().cell_name() != target.pkg().cell_name() {
+            return Ok(true);
+        }
         Ok(self.visibility()?.0.matches_target(target))
     }
 

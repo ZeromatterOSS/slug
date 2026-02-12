@@ -85,6 +85,7 @@ fn parse_starlark_paths(
                 current_dir.clone(),
                 None,
             ),
+            package_dir: None,
         },
     };
     let current_cell = BuildFileCell::new(current_dir.cell());

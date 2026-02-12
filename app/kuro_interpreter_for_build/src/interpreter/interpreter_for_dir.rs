@@ -159,6 +159,14 @@ pub(crate) struct InterpreterForDir {
     implicit_import_paths: Arc<ImplicitImportPaths>,
     /// Enable relative imports for the current dir
     current_dir_with_allowed_relative_dirs: Arc<CellPathWithAllowedRelativeDir>,
+    /// Optional package directory for Bazel-compatible `:subdir/file.bzl` resolution.
+    /// In Bazel, `:target` resolves relative to the nearest enclosing BUILD file's package,
+    /// not the .bzl file's directory. This field stores that enclosing package directory.
+    package_dir: Option<CellPath>,
+    /// Autoload path for @rules_cc//cc:defs.bzl in Bazel mode (no prelude).
+    /// When set, cc_library/cc_binary/cc_test from rules_cc will be automatically
+    /// imported into BUILD file environments, overriding native stubs.
+    rules_cc_autoload: Option<OwnedStarlarkModulePath>,
 }
 
 struct InterpreterLoadResolver {
@@ -190,6 +198,7 @@ impl LoadResolver for InterpreterLoadResolver {
     ) -> kuro_error::Result<OwnedStarlarkModulePath> {
         let relative_import_option = RelativeImports::Allow {
             current_dir_with_allowed_relative: &self.config.current_dir_with_allowed_relative_dirs,
+            package_dir: self.config.package_dir.as_ref(),
         };
         let path = parse_import(
             &self.config.cell_info.cell_alias_resolver(),
@@ -303,7 +312,33 @@ impl InterpreterForDir {
         global_state: Arc<GlobalInterpreterState>,
         implicit_import_paths: Arc<ImplicitImportPaths>,
         current_dir_with_allowed_relative_dirs: Arc<CellPathWithAllowedRelativeDir>,
+        package_dir: Option<CellPath>,
     ) -> kuro_error::Result<Self> {
+        // In Bazel mode (no prelude), auto-load rules_cc for BUILD files so that
+        // native cc_library/cc_binary/cc_test calls use rules_cc's Starlark
+        // implementations instead of empty native stubs.
+        let rules_cc_autoload = if global_state.configuror.prelude_import().is_none() {
+            cell_info
+                .cell_alias_resolver()
+                .resolve("rules_cc")
+                .ok()
+                .and_then(|_| {
+                    parse_import(
+                        cell_info.cell_alias_resolver(),
+                        RelativeImports::Disallow,
+                        "@rules_cc//cc:defs.bzl",
+                    )
+                    .ok()
+                    .and_then(|cell_path| {
+                        ImportPath::new_with_build_file_cells(cell_path, cell_info.name())
+                            .ok()
+                            .map(OwnedStarlarkModulePath::LoadFile)
+                    })
+                })
+        } else {
+            None
+        };
+
         Ok(Self {
             global_state,
             cell_info,
@@ -311,6 +346,8 @@ impl InterpreterForDir {
             ignore_attrs_for_profiling: Self::is_ignore_attrs_for_profiling()?,
             implicit_import_paths,
             current_dir_with_allowed_relative_dirs,
+            package_dir,
+            rules_cc_autoload,
         })
     }
 
@@ -380,6 +417,18 @@ impl InterpreterForDir {
                 })?
                 .env();
             env.import_public_symbols(root_env);
+        }
+
+        // Autoload rules_cc symbols in Bazel mode (no prelude).
+        // This makes cc_library/cc_binary/cc_test from rules_cc override native stubs,
+        // matching Bazel's autoloading behavior for BUILD files.
+        if let Some(OwnedStarlarkModulePath::LoadFile(ref import_path)) = self.rules_cc_autoload {
+            if let Some(rules_cc_module) = loaded_modules
+                .map
+                .get(&StarlarkModulePath::LoadFile(import_path))
+            {
+                env.import_public_symbols(rules_cc_module.env());
+            }
         }
 
         Ok((env, internals))
@@ -470,6 +519,10 @@ impl InterpreterForDir {
             }
             if let Some(i) = self.root_import() {
                 implicit_imports.push(OwnedStarlarkModulePath::LoadFile(i));
+            }
+            // Autoload rules_cc in Bazel mode (no prelude)
+            if let Some(ref rules_cc_path) = self.rules_cc_autoload {
+                implicit_imports.push(rules_cc_path.clone());
             }
         }
         ParseData::new(ast, implicit_imports, &self.load_resolver(import)).map(Ok)

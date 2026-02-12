@@ -560,6 +560,7 @@ pub(crate) fn parse_bxl_label_from_cli(
                 current_cell,
                 None,
             ),
+            package_dir: None,
         },
     };
     let import_path = parse_import_with_config(cell_alias_resolver, bxl_path, &opts)?;

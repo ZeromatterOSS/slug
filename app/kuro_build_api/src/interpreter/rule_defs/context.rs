@@ -1510,7 +1510,7 @@ starlark::starlark_simple_value!(LinkingContextStub);
 #[starlark::values::starlark_value(type = "LinkingContext")]
 impl<'v> StarlarkValue<'v> for LinkingContextStub {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "linker_inputs")
+        matches!(attribute, "linker_inputs" | "_extra_link_time_libraries")
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
@@ -1518,6 +1518,7 @@ impl<'v> StarlarkValue<'v> for LinkingContextStub {
             "linker_inputs" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
             }
+            "_extra_link_time_libraries" => Some(Value::new_none()),
             _ => None,
         }
     }
@@ -2081,6 +2082,13 @@ fn build_configuration_stub_methods(builder: &mut MethodsBuilder) {
     fn is_tool_configuration(this: &BuildConfigurationStub) -> starlark::Result<bool> {
         let _ = this;
         // TODO(bazel): Properly determine if this is an exec configuration
+        Ok(false)
+    }
+
+    /// Returns whether this configuration has a separate genfiles directory.
+    /// In modern Bazel, this is always false (genfiles merged with bin directory).
+    fn has_separate_genfiles_directory(this: &BuildConfigurationStub) -> starlark::Result<bool> {
+        let _ = this;
         Ok(false)
     }
 }

@@ -66,6 +66,18 @@ pub enum NativeRuleKind {
     ToolchainType,
     #[display("package_group")]
     PackageGroup,
+    #[display("genrule")]
+    Genrule,
+    #[display("platform")]
+    Platform,
+    #[display("cc_library")]
+    CcLibrary,
+    #[display("cc_binary")]
+    CcBinary,
+    #[display("cc_test")]
+    CcTest,
+    #[display("test_suite")]
+    TestSuite,
 }
 
 impl NativeRuleKind {
@@ -79,6 +91,12 @@ impl NativeRuleKind {
             NativeRuleKind::ConfigSetting => "config_setting",
             NativeRuleKind::ToolchainType => "toolchain_type",
             NativeRuleKind::PackageGroup => "package_group",
+            NativeRuleKind::Genrule => "genrule",
+            NativeRuleKind::Platform => "platform",
+            NativeRuleKind::CcLibrary => "cc_library",
+            NativeRuleKind::CcBinary => "cc_binary",
+            NativeRuleKind::CcTest => "cc_test",
+            NativeRuleKind::TestSuite => "test_suite",
         }
     }
 }
