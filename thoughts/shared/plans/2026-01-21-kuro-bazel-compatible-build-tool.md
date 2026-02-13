@@ -28,7 +28,6 @@ Named after the [Costasiella kuroshimae](https://en.wikipedia.org/wiki/Costasiel
 | Dep management   | Cells, no modules           | bzlmod mandatory         | Full bzlmod implementation                   |
 | Registry         | None                        | BCR                      | Registry client                              |
 | Local isolation  | None (RE-first)             | Sandboxing               | Implement sandboxing                         |
-| Rust toolchain   | Nightly required            | -                        | Migrate to stable Rust                       |
 | Target patterns  | `//pkg:`                    | `//pkg:all`              | Pattern parsing                              |
 | Visibility       | `"PUBLIC"`                  | `"//visibility:public"`  | Syntax change                                |
 
@@ -36,17 +35,16 @@ Named after the [Costasiella kuroshimae](https://en.wikipedia.org/wiki/Costasiel
 
 After completing this plan, kuro will:
 
-1. **Build with stable Rust** - No nightly compiler required
-2. **Parse and execute** standard Bazel 9.0 BUILD.bazel and MODULE.bazel files
-3. **Enforce build isolation** via local sandboxing
-4. **Fetch dependencies** from the Bazel Central Registry (BCR)
-5. **Run rules_cc** to compile C/C++ projects
-6. **Run rules_rust** to compile Rust projects
-7. **Run rules_python** to run Python projects
-8. **Run rules_oci** to build container images
-9. **Support query commands** for build graph introspection
-10. **Support Linux, Windows, and macOS** platforms
-11. **Preserve BXL** for future developer tooling (compile_commands.json, IDE integration)
+1. **Parse and execute** standard Bazel 9.0 BUILD.bazel and MODULE.bazel files
+2. **Enforce build isolation** via local sandboxing
+3. **Fetch dependencies** from the Bazel Central Registry (BCR)
+4. **Run rules_cc** to compile C/C++ projects
+5. **Run rules_rust** to compile Rust projects
+6. **Run rules_python** to run Python projects
+7. **Run rules_oci** to build container images
+8. **Support query commands** for build graph introspection
+9. **Support Linux, Windows, and macOS** platforms
+10. **Preserve BXL** for future developer tooling (compile_commands.json, IDE integration)
 
 ### Version Compatibility Requirements
 
@@ -112,7 +110,6 @@ native.depset_from_transitive_set(t, order = "default")
 
 ### Verification Criteria
 
-- [ ] `cargo build --release` works with stable Rust
 - [ ] `kuro build //...` works on a project using rules_cc
 - [ ] `kuro build //...` works on a project using rules_rust
 - [x] `kuro build //...` works on a project using rules_python
@@ -253,10 +250,9 @@ We will fork Buck2 and progressively modify it to speak Bazel's dialect. The app
 5. **Module extensions** - Support custom dependency resolution
 6. **Rule primitives** - Ensure ctx/actions/providers match Bazel API
 7. **Rules integration** - Test with actual rules\_\* packages
-8. **Stable Rust** - Remove nightly dependencies
-9. **Local sandboxing** - Add build isolation
-10. **Platform support** - Linux, Windows, macOS
-11. **Query commands** - Add bazel-compatible query interface
+8. **Local sandboxing** - Add build isolation
+9. **Platform support** - Linux, Windows, macOS
+10. **Query commands** - Add bazel-compatible query interface
 
 **Process Notes:**
 
@@ -278,7 +274,7 @@ The detailed implementation is split into focused sub-plans:
 | [05-builtins-compatibility.md](./kuro-bazel-subplans/05-builtins-compatibility.md) | 7a-7d  | Bazel native rules, global functions, modules, Buck2 removal  | Not Started     |
 | [06-aspects.md](./kuro-bazel-subplans/06-aspects.md)                               | 8a-8d  | Bazel aspects implementation (blocks rules_cc)                | **8a Complete** |
 | [07-rules-integration.md](./kuro-bazel-subplans/07-rules-integration.md)           | 9-13   | rules_cc, rules_rust, rules_python, protobuf, rules_oci       | Not Started     |
-| [08-infrastructure.md](./kuro-bazel-subplans/08-infrastructure.md)                 | 14-17  | Stable Rust, sandboxing, platform support, query              | Not Started     |
+| [08-infrastructure.md](./kuro-bazel-subplans/08-infrastructure.md)                 | 15-17  | Sandboxing, platform support, query                           | Not Started     |
 
 ### Related Research Documents
 
@@ -357,11 +353,10 @@ Quick reference to all phases and their locations:
 | 12    | protobuf Integration     | [x] Complete (proto_library + cc_proto_library build end-to-end, 313 commands) |
 | 13    | rules_oci Integration    | [ ] Not Started                                                                         |
 
-### Infrastructure (Phases 14-17) - [Sub-plan](./kuro-bazel-subplans/08-infrastructure.md)
+### Infrastructure (Phases 15-17) - [Sub-plan](./kuro-bazel-subplans/08-infrastructure.md)
 
 | Phase | Title                              | Status          |
 | ----- | ---------------------------------- | --------------- |
-| 14    | Stable Rust Migration              | [ ] Not Started |
 | 15    | Local Build Isolation (Sandboxing) | [ ] Not Started |
 | 16    | Platform Support                   | [ ] Not Started |
 | 17    | Query Commands                     | [ ] Not Started |
