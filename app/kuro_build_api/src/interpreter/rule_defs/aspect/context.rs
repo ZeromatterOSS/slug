@@ -226,6 +226,76 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
         // TODO(fragments): Pull actual configuration from target configuration
         Ok(heap.alloc(ConfigurationFragments::default()))
     }
+
+    /// Toolchain resolution stub.
+    ///
+    /// Provides access to `ctx.toolchains[toolchain_type]` for aspect implementations.
+    /// Currently uses the same stub as the rule context.
+    #[starlark(attribute)]
+    fn toolchains<'v>(this: RefAspectContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        use crate::interpreter::rule_defs::context::ToolchainsStub;
+        Ok(heap.alloc(ToolchainsStub))
+    }
+
+    /// Returns the list of features enabled for this target.
+    #[starlark(attribute)]
+    fn features<'v>(this: RefAspectContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        use starlark::values::list::AllocList;
+        Ok(heap.alloc(AllocList::EMPTY))
+    }
+
+    /// Returns the list of features disabled for this target.
+    #[starlark(attribute)]
+    fn disabled_features<'v>(
+        this: RefAspectContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        use starlark::values::list::AllocList;
+        Ok(heap.alloc(AllocList::EMPTY))
+    }
+
+    /// Returns the bin_dir for output artifacts.
+    #[starlark(attribute)]
+    fn bin_dir<'v>(this: RefAspectContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        Ok(heap.alloc("buck-out/v2/gen"))
+    }
+
+    /// Returns the genfiles_dir (same as bin_dir in Kuro).
+    #[starlark(attribute)]
+    fn genfiles_dir<'v>(this: RefAspectContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        Ok(heap.alloc("buck-out/v2/gen"))
+    }
+
+    /// Whether the target platform has a given constraint.
+    fn target_platform_has_constraint<'v>(
+        this: RefAspectContext<'v>,
+        #[starlark(require = pos)] _constraint: Value<'v>,
+    ) -> starlark::Result<bool> {
+        let _ = this;
+        Ok(false)
+    }
+
+    /// Returns the build configuration object.
+    #[starlark(attribute)]
+    fn configuration<'v>(
+        this: RefAspectContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        use crate::interpreter::rule_defs::context::BuildConfigurationStub;
+        Ok(heap.alloc(BuildConfigurationStub))
+    }
+
+    /// Returns whether coverage instrumentation is enabled for this target.
+    fn coverage_instrumented<'v>(this: RefAspectContext<'v>) -> starlark::Result<bool> {
+        let _ = this;
+        Ok(false)
+    }
 }
 
 #[starlark_value(type = "AspectContext")]

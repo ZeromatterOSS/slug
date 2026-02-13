@@ -18,4 +18,5 @@ pub mod attrs;
 pub fn init_late_bindings() {
     attrs::resolve::configured_attr::init_configured_attr_to_value();
     analysis::calculation::init_rule_analysis_calculation();
+    analysis::aspect_calculation::init_eval_aspect_deferred();
 }

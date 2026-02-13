@@ -594,12 +594,19 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
 
     /// The executable artifact for this target (Bazel compatibility).
     ///
-    /// Returns the executable artifact list (empty if not set, single element if set).
+    /// Returns the executable artifact if set, or None if not.
+    /// Bazel's DefaultInfo.executable returns a single File, not a list.
     #[starlark(attribute)]
     fn executable<'v>(
         this: &DefaultInfo<'v>,
-    ) -> starlark::Result<ValueOfUnchecked<'v, ListType<ValueIsInputArtifactAnnotation>>> {
-        Ok(this.executable.to_value())
+    ) -> starlark::Result<Value<'v>> {
+        let list_val = this.executable.get();
+        if let Some(list) = ListRef::from_value(list_val.to_value()) {
+            if let Some(first) = list.iter().next() {
+                return Ok(first);
+            }
+        }
+        Ok(Value::new_none())
     }
 }
 
@@ -679,34 +686,16 @@ fn depset_with_list_methods(builder: &mut MethodsBuilder) {
 }
 
 /// Extract elements from a Bazel depset value.
-/// Handles both frozen Depset and live LiveDepsetGen types.
+/// Handles all depset types: live LiveDepsetGen<Value>, frozen LiveDepsetGen<FrozenValue>,
+/// and Buck2's Depset type. Delegates to collect_depset_elements for consistent handling.
 fn extract_depset_elements<'v>(depset_val: Value<'v>, heap: Heap<'v>) -> Vec<Value<'v>> {
-    // Try LiveDepsetGen first (unfrozen depset during evaluation)
-    if let Some(live_depset) = depset_val.downcast_ref::<LiveDepsetGen<Value<'v>>>() {
-        let mut elements = Vec::new();
-        // Collect direct elements from the live depset
-        if let Ok(direct_iter) = live_depset.direct.iterate(heap) {
-            for elem in direct_iter {
-                elements.push(elem);
-            }
-        }
-        // Collect transitive elements
-        if let Ok(transitive_iter) = live_depset.transitive.iterate(heap) {
-            for child in transitive_iter {
-                // Recursively extract from child depsets
-                elements.extend(extract_depset_elements(child, heap));
-            }
-        }
-        return elements;
-    }
+    use crate::interpreter::rule_defs::depset::collect_depset_elements;
 
-    // Try frozen Depset
-    if let Some(frozen_depset) = depset_val.downcast_ref::<Depset>() {
-        return frozen_depset
-            .collect_all_frozen()
-            .into_iter()
-            .map(|v| v.to_value())
-            .collect();
+    let mut elements = Vec::new();
+    collect_depset_elements(depset_val, &mut elements, heap);
+
+    if !elements.is_empty() {
+        return elements;
     }
 
     // If it's already a list, just collect its elements

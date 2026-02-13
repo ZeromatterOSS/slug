@@ -115,9 +115,19 @@ pub(crate) fn parse_visibility_with_view(
                 item.to_owned()
             };
 
-            builder.add(VisibilityPattern(
-                ctx.coerce_target_pattern(&normalized_item)?,
-            ));
+            // Tolerate unknown cell aliases in visibility (e.g., @io_kythe in
+            // protobuf). These reference repos not present in the current build,
+            // so we simply skip the entry (being more permissive is safe).
+            match ctx.coerce_target_pattern(&normalized_item) {
+                Ok(pattern) => {
+                    builder.add(VisibilityPattern(pattern));
+                }
+                Err(_) => {
+                    // Skip visibility entries that can't be resolved
+                    // (e.g., references to repos not in the current workspace)
+                    continue;
+                }
+            }
         }
     }
     Ok(builder)

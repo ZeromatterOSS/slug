@@ -509,12 +509,19 @@ starlark_simple_value!(ProtoFragment);
 #[starlark_value(type = "proto_fragment")]
 impl<'v> StarlarkValue<'v> for ProtoFragment {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "experimental_protoc_opts")
+        matches!(
+            attribute,
+            "experimental_protoc_opts"
+                | "cc_proto_library_source_suffixes"
+                | "cc_proto_library_header_suffixes"
+        )
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "experimental_protoc_opts" => Some(heap.alloc(AllocList::EMPTY)),
+            "cc_proto_library_source_suffixes" => Some(heap.alloc(vec![".pb.cc"])),
+            "cc_proto_library_header_suffixes" => Some(heap.alloc(vec![".pb.h"])),
             _ => None,
         }
     }

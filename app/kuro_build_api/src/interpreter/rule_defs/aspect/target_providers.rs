@@ -188,6 +188,25 @@ impl<'v> StarlarkValue<'v> for AspectTargetProviders<'v> {
         RES.methods(aspect_target_methods)
     }
 
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "label")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "label" => {
+                // Return label as a Label-like object (string representation for now)
+                let label_str = self.label.unconfigured().to_string();
+                Some(heap.alloc(label_str))
+            }
+            _ => None,
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec!["label".to_owned()]
+    }
+
     /// Implements `target[SomeInfo]` - get a provider value.
     fn at(&self, index: Value<'v>, _heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         match index.as_provider_callable() {

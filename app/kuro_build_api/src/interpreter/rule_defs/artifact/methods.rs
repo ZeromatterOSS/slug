@@ -134,6 +134,16 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
                     ConfiguredProvidersLabel::new(target.dupe(), ProvidersName::Default),
                 )))
             }
+            Some(BaseDeferredKey::Aspect(key)) => {
+                // Aspect deferred key wraps a target - return the target's label
+                if let Some(label) = key.configured_label() {
+                    Ok(NoneOr::Other(StarlarkConfiguredProvidersLabel::new(
+                        ConfiguredProvidersLabel::new(label, ProvidersName::Default),
+                    )))
+                } else {
+                    Ok(NoneOr::None)
+                }
+            }
             None | Some(BaseDeferredKey::AnonTarget(_) | BaseDeferredKey::BxlLabel(_)) => {
                 // For Bazel compatibility: source files should return an owner label
                 // derived from the source path (package + filename).
@@ -170,6 +180,17 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
                 Ok(heap.alloc(StarlarkConfiguredProvidersLabel::new(
                     ConfiguredProvidersLabel::new(target.dupe(), ProvidersName::Default),
                 )))
+            }
+            Some(BaseDeferredKey::Aspect(key)) => {
+                // Aspect deferred key wraps a target - return the target's label
+                if let Some(label) = key.configured_label() {
+                    Ok(heap.alloc(StarlarkConfiguredProvidersLabel::new(
+                        ConfiguredProvidersLabel::new(label, ProvidersName::Default),
+                    )))
+                } else {
+                    let path_str = this.with_short_path(&|p| heap.alloc_str(p.as_str()))?;
+                    Ok(path_str.to_value())
+                }
             }
             Some(BaseDeferredKey::AnonTarget(_) | BaseDeferredKey::BxlLabel(_)) | None => {
                 // For source files, construct a proper label from the source path
@@ -232,19 +253,38 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
 
     /// The root directory of this artifact (Bazel-compatible).
     /// Returns a struct with a `path` attribute containing the output root.
+    /// For generated files, root.path is the buck-out prefix before the short_path.
     #[starlark(attribute)]
     fn root<'v>(
         this: &'v dyn StarlarkArtifactLike<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // For generated files, return the output root (e.g., bazel-out/k8-fastbuild/bin)
-        // For source files, return an empty root
-        let root_path = if this.is_source()? {
-            String::new()
+        if this.is_source()? {
+            return Ok(heap.alloc(ArtifactRootStub { path: String::new() }));
+        }
+        // Compute root = full_path with short_path stripped from the end
+        let full = this.with_full_path(&|p| heap.alloc_str(p.as_str()))?;
+        let short = this.with_short_path(&|p| heap.alloc_str(p.as_str()))?;
+        let full_str = full.as_str();
+        let short_str = short.as_str();
+        let root_path = if let Some(prefix) = full_str.strip_suffix(short_str) {
+            prefix.trim_end_matches('/').to_owned()
         } else {
-            "bazel-out/k8-fastbuild/bin".to_owned()
+            match full_str.rfind('/') {
+                Some(pos) => full_str[..pos].to_owned(),
+                None => String::new(),
+            }
         };
         Ok(heap.alloc(ArtifactRootStub { path: root_path }))
+    }
+
+    /// The executable file (Bazel FilesToRunProvider compatibility).
+    /// For artifacts, this just returns the artifact itself.
+    #[starlark(attribute)]
+    fn executable<'v>(
+        this: Value<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(this)
     }
 }
 

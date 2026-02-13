@@ -218,6 +218,7 @@ impl<'v> BxlActions<'v> {
                 BaseDeferredKey::AnonTarget(_) => true,
                 BaseDeferredKey::TargetLabel(_) => false,
                 BaseDeferredKey::BxlLabel(_) => false,
+                BaseDeferredKey::Aspect(_) => false,
             },
             DeferredHolderKey::DynamicLambda(_) => true,
         })

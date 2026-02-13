@@ -45,6 +45,14 @@ pub static EVAL_ANON_TARGET: LateBinding<
         -> Pin<Box<dyn Future<Output = kuro_error::Result<AnalysisResult>> + Send + 'c>>,
 > = LateBinding::new("EVAL_ANON_TARGET");
 
+pub static EVAL_ASPECT_DEFERRED: LateBinding<
+    for<'c> fn(
+        &'c mut DiceComputations,
+        Arc<dyn BaseDeferredKeyDyn>,
+    )
+        -> Pin<Box<dyn Future<Output = kuro_error::Result<AnalysisResult>> + Send + 'c>>,
+> = LateBinding::new("EVAL_ASPECT_DEFERRED");
+
 pub static GET_PROMISED_ARTIFACT: LateBinding<
     for<'c> fn(
         &'c PromiseArtifact,
@@ -76,6 +84,9 @@ async fn lookup_deferred_inner(
         }
         BaseDeferredKey::AnonTarget(target) => Ok(DeferredHolder::Analysis(
             (EVAL_ANON_TARGET.get()?)(dice, target.dupe()).await?,
+        )),
+        BaseDeferredKey::Aspect(key) => Ok(DeferredHolder::Analysis(
+            (EVAL_ASPECT_DEFERRED.get()?)(dice, key.dupe()).await?,
         )),
     }
 }

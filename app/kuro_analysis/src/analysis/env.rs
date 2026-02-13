@@ -284,6 +284,9 @@ struct AnalysisEnv<'a> {
     execution_platform: &'a ExecutionPlatformResolution,
     label: ConfiguredTargetLabel,
     cancellation: &'a CancellationContext,
+    /// Aspect results to merge into dependency provider collections (Phase 8h).
+    /// Maps dep label → aspect provider collection.
+    aspect_results: HashMap<ConfiguredTargetLabel, FrozenProviderCollectionValue>,
 }
 
 pub(crate) async fn run_analysis<'a>(
@@ -295,6 +298,7 @@ pub(crate) async fn run_analysis<'a>(
     rule_spec: &'a dyn RuleSpec,
     node: ConfiguredTargetNodeRef<'a>,
     cancellation: &CancellationContext,
+    aspect_results: HashMap<ConfiguredTargetLabel, FrozenProviderCollectionValue>,
 ) -> kuro_error::Result<AnalysisResult> {
     let analysis_env = AnalysisEnv {
         rule_spec,
@@ -303,6 +307,7 @@ pub(crate) async fn run_analysis<'a>(
         execution_platform,
         label: label.dupe(),
         cancellation,
+        aspect_results,
     };
     run_analysis_with_env(dice, analysis_env, node).await
 }
@@ -350,7 +355,21 @@ async fn run_analysis_with_env_underlying(
             .collect::<SmallMap<_, _>>();
 
         let (attributes, plugins) = {
-            let dep_analysis_results = get_deps_from_analysis_results(analysis_env.deps)?;
+            let mut dep_analysis_results = get_deps_from_analysis_results(analysis_env.deps)?;
+
+            // Phase 8h: Merge aspect providers into dependency provider collections.
+            // When a rule's attribute has aspects (e.g., deps with aspects=[cc_proto_aspect]),
+            // the aspect produces additional providers that should be accessible via dep[Provider].
+            if !analysis_env.aspect_results.is_empty() {
+                use kuro_build_api::interpreter::rule_defs::provider::collection::merge_provider_collections;
+                for (dep_label, aspect_providers) in &analysis_env.aspect_results {
+                    if let Some(base_providers) = dep_analysis_results.get(dep_label) {
+                        let merged = merge_provider_collections(base_providers, aspect_providers);
+                        dep_analysis_results.insert(dep_label.dupe(), merged);
+                    }
+                }
+            }
+
             let resolution_ctx = RuleAnalysisAttrResolutionContext {
                 module: &env,
                 dep_analysis_results,

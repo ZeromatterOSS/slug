@@ -82,6 +82,11 @@ impl StarlarkAttribute {
     pub fn default(&self) -> Option<&Arc<CoercedAttr>> {
         self.0.default()
     }
+
+    /// Get configuration_field info if this attr's default was a configuration_field().
+    pub fn configuration_field(&self) -> Option<(&str, &str)> {
+        self.0.configuration_field()
+    }
 }
 
 #[starlark_module]

@@ -20,9 +20,11 @@ use allocative::Allocative;
 use starlark::environment::GlobalsBuilder;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
+use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
+use starlark::values::Value;
 use starlark::values::starlark_value;
 
 /// A reference to a configuration field value.
@@ -43,7 +45,19 @@ impl Display for ConfigurationFieldRef {
 starlark_simple_value!(ConfigurationFieldRef);
 
 #[starlark_value(type = "configuration_field")]
-impl<'v> StarlarkValue<'v> for ConfigurationFieldRef {}
+impl<'v> StarlarkValue<'v> for ConfigurationFieldRef {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "fragment" | "name")
+    }
+
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "fragment" => Some(_heap.alloc_str(&self.fragment).to_value()),
+            "name" => Some(_heap.alloc_str(&self.name).to_value()),
+            _ => None,
+        }
+    }
+}
 
 /// Register the configuration_field global.
 #[starlark_module]

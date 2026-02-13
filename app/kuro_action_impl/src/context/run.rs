@@ -872,10 +872,31 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             }
         }
 
+        // Bazel compatibility: process the `tools` parameter if provided.
+        // Tools are extra executable binaries needed by the action (e.g., protoc plugins).
+        // They must be added as bazel_inputs so visit_artifacts tracks them as dependencies.
+        if let NoneOr::Other(bazel_tools) = tools {
+            let tool_items: Vec<Value<'v>> =
+                if let Ok(Some(to_list)) = bazel_tools.get_attr("to_list", eval.heap()) {
+                    if let Ok(list_val) = eval.eval_function(to_list, &[], &[]) {
+                        if let Ok(iter) = list_val.iterate(eval.heap()) {
+                            iter.collect()
+                        } else {
+                            vec![]
+                        }
+                    } else {
+                        vec![]
+                    }
+                } else if let Ok(iter) = bazel_tools.iterate(eval.heap()) {
+                    iter.collect()
+                } else {
+                    vec![bazel_tools]
+                };
+
+            collected_bazel_inputs.extend(tool_items);
+        }
+
         // Ignore other Bazel-specific parameters that are not yet implemented.
-        // Note: `outputs` is processed above for Bazel compatibility.
-        // Note: `executable` is handled above for Bazel compatibility.
-        // Note: `inputs` is processed above for Bazel compatibility.
         let _ = (
             progress_message,
             resource_set,
@@ -883,7 +904,6 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             execution_requirements,
             toolchain,
             exec_group,
-            tools,
             input_manifests,
             unused_inputs_list,
             shadowed_action,

@@ -25,7 +25,9 @@ alias(
     actual = "@com_google_protobuf//:java_toolchain",
 )
 
-alias(
+load("//tools/proto:cc_proto_toolchain.bzl", "cc_proto_toolchain")
+
+cc_proto_toolchain(
     name = "cc_toolchain",
-    actual = "@com_google_protobuf//:cc_toolchain",
+    runtime = "@protobuf//src/google/protobuf",
 )

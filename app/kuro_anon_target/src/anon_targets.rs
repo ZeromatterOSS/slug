@@ -229,7 +229,7 @@ impl AnonTargetKey {
             Self::prepare_anon_target_data(execution_platform, rule, attributes)?;
 
         let global_cfg_options = match owner_key {
-            BaseDeferredKey::TargetLabel(_) => None,
+            BaseDeferredKey::TargetLabel(_) | BaseDeferredKey::Aspect(_) => None,
             BaseDeferredKey::AnonTarget(anon) => anon.global_cfg_options(),
             BaseDeferredKey::BxlLabel(bxl) => bxl.0.global_cfg_options(),
         };

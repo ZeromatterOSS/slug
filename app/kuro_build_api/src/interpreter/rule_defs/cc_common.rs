@@ -1060,10 +1060,9 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         args_vec.push(heap.alloc_str("-o").to_value());
         args_vec.push(output_artifact); // Use the output artifact, not original output_file
 
-        // Add PIC flag if needed
-        if use_pic {
-            args_vec.push(heap.alloc_str("-fPIC").to_value());
-        }
+        // Always add -fPIC for position-independent code.
+        // This is safe for both static and dynamic linking and matches modern build system defaults.
+        args_vec.push(heap.alloc_str("-fPIC").to_value());
 
         // Add include directories from compilation context (deduplicated)
         // Strategy for external include directories:

@@ -18,6 +18,7 @@ use std::sync::Arc;
 use allocative::Allocative;
 use derive_more::Display;
 use dupe::Dupe;
+use kuro_build_api::analysis::AnalysisResult;
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_node::aspect_type::StarlarkAspectType;
@@ -47,16 +48,15 @@ impl AspectKey {
 
 /// Result of aspect computation (cached in DICE).
 ///
-/// This contains the frozen provider collection returned by the aspect's
-/// implementation function.
+/// Contains both the frozen provider collection (for provider access) and the
+/// full AnalysisResult (for action lookup during build execution).
 #[derive(Clone, Dupe, Debug, Allocative)]
 pub struct AspectValue {
     pub providers: FrozenProviderCollectionValue,
-}
-
-impl AspectValue {
-    // TODO(Phase 8c): Implement empty() once we have a way to create empty FrozenProviderCollection
-    // For now, this is not used since aspect computation is stubbed out
+    /// The full analysis result including recorded actions.
+    /// Needed by `EVAL_ASPECT_DEFERRED` to resolve action lookups for
+    /// aspect-registered artifacts.
+    pub analysis_result: Option<AnalysisResult>,
 }
 
 #[cfg(test)]

@@ -38,6 +38,96 @@ use super::aspect_key::AspectKey;
 use super::aspect_key::AspectValue;
 use super::calculation::AnalysisKey;
 
+/// Map a configuration_field(fragment, name) to a well-known label string.
+///
+/// In Bazel, configuration_field() reads from command-line flags. Since Kuro
+/// doesn't have these flags, we map known fields to their default label values.
+/// Parse a label string and analyze the target via DICE to get its providers.
+///
+/// Used to resolve aspect attribute defaults (e.g., configuration_field targets).
+/// The label is resolved relative to the target's cell context.
+async fn parse_and_analyze_label(
+    ctx: &mut DiceComputations<'_>,
+    label_str: &str,
+    target: &ConfiguredTargetLabel,
+) -> kuro_error::Result<(
+    ConfiguredTargetLabel,
+    kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue,
+)> {
+    use kuro_core::cells::name::CellName;
+    use kuro_core::cells::paths::CellRelativePath;
+    use kuro_core::package::PackageLabel;
+    use kuro_core::target::label::label::TargetLabel;
+    use kuro_core::target::name::TargetNameRef;
+
+    // Parse label: @repo//pkg:target
+    // Extract repo (cell), package, and target name
+    let label_str = label_str.trim();
+
+    // Strip @ prefix if present
+    let label_no_at = if let Some(stripped) = label_str.strip_prefix('@') {
+        stripped
+    } else {
+        label_str
+    };
+
+    // Split on //
+    let (cell_str, path_and_target) = label_no_at.split_once("//").ok_or_else(|| {
+        kuro_error::kuro_error!(
+            kuro_error::ErrorTag::Input,
+            "Invalid label format: {}",
+            label_str
+        )
+    })?;
+
+    // Split on :
+    let (pkg_path, target_name) = path_and_target.split_once(':').ok_or_else(|| {
+        // If no ':', target name = last path component (Bazel default)
+        kuro_error::kuro_error!(
+            kuro_error::ErrorTag::Input,
+            "Invalid label format (no target): {}",
+            label_str
+        )
+    })?;
+
+    // Resolve cell name - use the cell from the label or fall back to target's cell
+    let cell_name = if cell_str.is_empty() {
+        target.pkg().cell_name()
+    } else {
+        CellName::unchecked_new(cell_str)?
+    };
+
+    let pkg = PackageLabel::new(cell_name, CellRelativePath::unchecked_new(pkg_path))?;
+
+    let target_label = TargetLabel::new(pkg, TargetNameRef::unchecked_new(target_name));
+
+    // Use the same configuration as the parent target
+    let configured_label = target_label.configure(target.cfg().dupe());
+
+    // Analyze via DICE
+    let analysis_result = ctx
+        .compute(&AnalysisKey(configured_label.dupe()))
+        .await?
+        .buck_error_context("Failed to analyze aspect attribute dependency")?
+        .require_compatible()?;
+
+    Ok((configured_label, analysis_result.providers()?.to_owned()))
+}
+
+fn resolve_configuration_field_to_label(fragment: &str, name: &str) -> Option<&'static str> {
+    match (fragment, name) {
+        ("proto", "proto_toolchain_for_cc") => Some("@bazel_tools//tools/proto:cc_toolchain"),
+        ("proto", "proto_toolchain_for_java") => Some("@bazel_tools//tools/proto:java_toolchain"),
+        ("proto", "proto_toolchain_for_javalite") => {
+            Some("@bazel_tools//tools/proto:javalite_toolchain")
+        }
+        ("proto", "proto_compiler") => {
+            Some("@protobuf//src/google/protobuf/compiler:protoc_minimal")
+        }
+        _ => None,
+    }
+}
+
 #[async_trait]
 impl Key for AspectKey {
     type Value = kuro_error::Result<AspectValue>;
@@ -66,6 +156,7 @@ impl Key for AspectKey {
             let providers_ref = target_result.providers()?;
             return Ok(AspectValue {
                 providers: providers_ref.to_owned(),
+                analysis_result: None,
             });
         }
 
@@ -74,17 +165,21 @@ impl Key for AspectKey {
             compute_dep_aspects(ctx, &self.target, &aspect, &self.aspect_type).await?;
 
         // 5. Execute aspect implementation function with shadow graph
-        let providers = execute_aspect(
+        let (providers, analysis_result) = execute_aspect(
             ctx,
             &self.target,
             &aspect,
+            &self.aspect_type,
             &target_result,
             dep_aspects,
             cancellations,
         )
         .await?;
 
-        Ok(AspectValue { providers })
+        Ok(AspectValue {
+            providers,
+            analysis_result: Some(analysis_result),
+        })
     }
 
     fn equality(_: &Self::Value, _: &Self::Value) -> bool {
@@ -363,12 +458,14 @@ async fn execute_aspect(
     ctx: &mut DiceComputations<'_>,
     target: &ConfiguredTargetLabel,
     aspect: &OwnedFrozenValueTyped<FrozenStarlarkAspectCallable>,
+    aspect_type: &Arc<StarlarkAspectType>,
     target_result: &AnalysisResult,
     dep_aspects: HashMap<ConfiguredTargetLabel, AspectValue>,
     cancellations: &CancellationContext,
-) -> kuro_error::Result<
+) -> kuro_error::Result<(
     kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue,
-> {
+    AnalysisResult,
+)> {
     use kuro_build_api::analysis::registry::AnalysisRegistry;
     use kuro_build_api::interpreter::rule_defs::aspect::AspectContext;
     use kuro_build_api::interpreter::rule_defs::aspect::AspectRuleInfo;
@@ -466,6 +563,40 @@ async fn execute_aspect(
         combined
     };
 
+    // Resolve aspect attribute dependencies (async - before Starlark eval)
+    // For each aspect attr with a configuration_field() default, map to a label,
+    // analyze the target, and collect providers for ctx.attr resolution.
+    let aspect_attr_deps: HashMap<
+        String,
+        (
+            ConfiguredTargetLabel,
+            kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue,
+        ),
+    > = {
+        let mut attr_deps = HashMap::new();
+        let aspect_attrs = aspect.as_ref().attrs();
+
+        for (attr_name, starlark_attr) in aspect_attrs {
+            if let Some((fragment, name)) = starlark_attr.configuration_field() {
+                if let Some(label_str) = resolve_configuration_field_to_label(fragment, name) {
+                    // Parse the label and analyze the target
+                    match parse_and_analyze_label(ctx, label_str, target).await {
+                        Ok((resolved_label, providers)) => {
+                            attr_deps.insert(attr_name.clone(), (resolved_label, providers));
+                        }
+                        Err(_e) => {
+                            // Resolution failed - aspect may not use this attr
+                        }
+                    }
+                }
+            }
+        }
+        attr_deps
+    };
+
+    // Clone aspect_type for use inside the async block
+    let aspect_type_for_registry = aspect_type.dupe();
+
     // Execute aspect in a Starlark module environment (similar to rule analysis)
     let fut = async move {
         let result = BuckStarlarkModule::with_profiling_async(|env| async move {
@@ -544,8 +675,16 @@ async fn execute_aspect(
             };
 
             // 5. Create AnalysisRegistry for action registration
+            // Use BaseDeferredKey::Aspect so that action lookups route to the
+            // aspect's own AnalysisResult (not the target's).
+            let aspect_deferred_key = Arc::new(
+                super::aspect_deferred_key::AspectDeferredKey {
+                    target: target.dupe(),
+                    aspect_type: aspect_type_for_registry.dupe(),
+                },
+            );
             let registry = AnalysisRegistry::new_from_owner(
-                BaseDeferredKey::TargetLabel(target.dupe()),
+                BaseDeferredKey::Aspect(aspect_deferred_key),
                 execution_platform,
             )?;
 
@@ -556,7 +695,7 @@ async fn execute_aspect(
                 eval_provider.make_reentrant_evaluator(&env, cancellations.into())?;
 
             // 7. Execute aspect implementation function (inlined from run_aspect_basic)
-            let (aspect_context, provider_collection) = reentrant_eval.with_evaluator(|mut eval| {
+            let (aspect_context, provider_collection) = reentrant_eval.with_evaluator(|eval| {
                 eval.set_print_handler(&print);
                 eval.set_soft_error_handler(&KuroStarlarkSoftErrorHandler);
 
@@ -566,12 +705,47 @@ async fn execute_aspect(
                 // Get aspect implementation function
                 let aspect_impl = aspect.as_ref().implementation();
 
-                // Check if aspect has custom attributes
-                let has_attrs = !aspect.as_ref().attrs().is_empty();
+                // Resolve aspect-specific attributes (ctx.attr)
+                let aspect_attrs = aspect.as_ref().attrs();
+                let has_attrs = !aspect_attrs.is_empty();
 
-                // Create aspect-specific attributes
                 let aspect_attr = if has_attrs {
-                    let attrs_struct = eval.heap().alloc(AllocStruct::EMPTY);
+                    // Build attribute struct with resolved values
+                    let mut attr_pairs: Vec<(&str, starlark::values::Value)> = Vec::new();
+
+                    for (attr_name, _starlark_attr) in aspect_attrs {
+                        // Check if we resolved this attr as a configuration_field dep
+                        if let Some((resolved_label, providers)) = aspect_attr_deps.get(attr_name) {
+                            // Wrap as a dependency value (target[ProviderInfo] syntax)
+                            let dep_providers_label = kuro_core::provider::label::ConfiguredProvidersLabel::new(
+                                resolved_label.dupe(),
+                                kuro_core::provider::label::ProvidersName::Default,
+                            );
+                            let providers_ref = providers.lookup_inner(&dep_providers_label);
+                            match providers_ref {
+                                Ok(frozen_collection) => {
+                                    let collection_ref = frozen_collection.add_heap_ref(eval.module().frozen_heap());
+                                    let dep = eval.heap().alloc(
+                                        kuro_build_api::interpreter::rule_defs::provider::dependency::Dependency::new(
+                                            eval.heap(),
+                                            dep_providers_label,
+                                            collection_ref,
+                                            None,
+                                        ),
+                                    );
+                                    attr_pairs.push((attr_name, dep));
+                                }
+                                Err(_) => {
+                                    attr_pairs.push((attr_name, starlark::values::Value::new_none()));
+                                }
+                            }
+                        } else {
+                            // No resolved value - use None
+                            attr_pairs.push((attr_name, starlark::values::Value::new_none()));
+                        }
+                    }
+
+                    let attrs_struct = eval.heap().alloc(AllocStruct(attr_pairs));
                     Some(ValueOfUnchecked::new(attrs_struct))
                 } else {
                     None
@@ -627,11 +801,20 @@ async fn execute_aspect(
             let finished_eval = reentrant_eval.finish_evaluation();
             let (token, frozen_env, _) = finished_eval.freeze_and_finish(env)?;
 
-            // 10. Get the frozen provider collection
+            // 10. Get the frozen provider collection and build AnalysisResult
             let recorded_values = registry_finalizer(&frozen_env)?;
-            let frozen_providers = recorded_values.provider_collection()?;
+            let frozen_providers = recorded_values.provider_collection()?.to_owned();
 
-            Ok((token, frozen_providers.to_owned()))
+            let analysis_result = AnalysisResult::new(
+                recorded_values,
+                None, // no profiling data for aspects
+                std::collections::HashMap::new(), // no promise artifacts
+                0, // num_declared_actions (not tracked for aspects)
+                0, // num_declared_artifacts
+                None, // no validations
+            );
+
+            Ok((token, (frozen_providers, analysis_result)))
         })
         .await;
 
@@ -641,4 +824,36 @@ async fn execute_aspect(
     };
 
     unsafe { UnsafeSendFuture::new_encapsulates_starlark(fut) }.await
+}
+
+/// Initialize the `EVAL_ASPECT_DEFERRED` late binding.
+///
+/// This is called during program startup to register the aspect deferred key
+/// resolution handler. When the build system encounters `BaseDeferredKey::Aspect`,
+/// it dispatches through this handler to look up the aspect's DICE-cached
+/// `AnalysisResult`.
+pub fn init_eval_aspect_deferred() {
+    use kuro_build_api::deferred::calculation::EVAL_ASPECT_DEFERRED;
+
+    EVAL_ASPECT_DEFERRED.init(|ctx, key| {
+        Box::pin(async move {
+            let aspect_key = key
+                .into_any()
+                .downcast::<super::aspect_deferred_key::AspectDeferredKey>()
+                .ok()
+                .internal_error("Expecting AspectDeferredKey")?;
+
+            // Create the DICE key and compute the aspect result
+            let dice_key = AspectKey::new(aspect_key.target.dupe(), aspect_key.aspect_type.dupe());
+
+            let aspect_value = ctx
+                .compute(&dice_key)
+                .await?
+                .buck_error_context("Failed to compute aspect for deferred key")?;
+
+            aspect_value
+                .analysis_result
+                .internal_error("Aspect analysis result missing for deferred key")
+        })
+    });
 }

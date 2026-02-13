@@ -14,6 +14,7 @@ futures = { workspace = true }
 smallvec = { workspace = true }
 
 allocative = { workspace = true }
+cmp_any = { workspace = true }
 dice = { workspace = true }
 dupe = { workspace = true }
 gazebo = { workspace = true }
@@ -21,6 +22,7 @@ starlark = { workspace = true }
 starlark_map = { workspace = true }
 
 kuro_artifact = { workspace = true }
+kuro_fs = { workspace = true }
 kuro_build_api = { workspace = true }
 kuro_build_signals = { workspace = true }
 kuro_core = { workspace = true }

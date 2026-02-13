@@ -556,6 +556,12 @@ impl FrozenProviderCollection {
     pub fn provider_ids(&self) -> Vec<&ProviderId> {
         self.providers.keys().map(|k| &**k).collect()
     }
+
+    /// Iterate over all (ProviderId, FrozenValue) pairs in this collection.
+    /// Used for merging provider collections (e.g., base + aspect providers).
+    pub fn providers_iter(&self) -> impl Iterator<Item = (&Arc<ProviderId>, &FrozenValue)> {
+        self.providers.iter()
+    }
 }
 
 /// Thin wrapper around `FrozenValue` that can only be constructed if that value is a `FrozenProviderCollection`
@@ -726,6 +732,43 @@ impl<'f> FrozenProviderCollectionValueRef<'f> {
             },
         }
     }
+}
+
+/// Merge base target providers with aspect providers into a new FrozenProviderCollectionValue.
+/// Aspect providers take precedence over base providers (same key = aspect wins).
+/// This is used to present a unified provider view when a rule accesses deps that had aspects.
+pub fn merge_provider_collections(
+    base: &FrozenProviderCollectionValue,
+    aspect: &FrozenProviderCollectionValue,
+) -> FrozenProviderCollectionValue {
+    let heap = FrozenHeap::new();
+
+    // Keep both source heaps alive so the FrozenValues remain valid
+    heap.add_reference(base.value().owner());
+    heap.add_reference(aspect.value().owner());
+
+    // Build merged provider map: base first, then overlay aspect
+    let base_coll = base.provider_collection();
+    let aspect_coll = aspect.provider_collection();
+    let mut merged = SmallMap::new();
+
+    for (id, val) in base_coll.providers_iter() {
+        merged.insert(id.dupe(), *val);
+    }
+    for (id, val) in aspect_coll.providers_iter() {
+        merged.insert(id.dupe(), *val);
+    }
+
+    // Allocate the merged collection on the new heap
+    let merged_coll = FrozenProviderCollection::new(merged);
+    let frozen_val = heap.alloc(merged_coll);
+    let typed = FrozenValueTyped::new(frozen_val).unwrap();
+
+    // Convert heap to owned reference and wrap
+    let heap_ref = heap.into_ref();
+    let owned = unsafe { OwnedFrozenValueTyped::new(heap_ref, typed) };
+
+    FrozenProviderCollectionValue::from_value(owned)
 }
 
 pub mod tester {

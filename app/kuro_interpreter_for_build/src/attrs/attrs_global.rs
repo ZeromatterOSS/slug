@@ -64,6 +64,25 @@ enum AttrError {
     DefaultOnlyMustHaveDefault,
 }
 
+/// Resolve well-known configuration_field(fragment, name) pairs to real label strings.
+///
+/// In Bazel, `configuration_field(fragment="proto", name="proto_toolchain_for_cc")` reads
+/// a value from the command-line configuration. Kuro doesn't have these flags, so we
+/// map known fields to their well-known label targets.
+fn resolve_configuration_field_to_label(fragment: &str, name: &str) -> Option<&'static str> {
+    match (fragment, name) {
+        ("proto", "proto_toolchain_for_cc") => Some("@bazel_tools//tools/proto:cc_toolchain"),
+        ("proto", "proto_toolchain_for_java") => Some("@bazel_tools//tools/proto:java_toolchain"),
+        ("proto", "proto_toolchain_for_javalite") => {
+            Some("@bazel_tools//tools/proto:javalite_toolchain")
+        }
+        ("proto", "proto_compiler") => {
+            Some("@protobuf//src/google/protobuf/compiler:protoc_minimal")
+        }
+        _ => None,
+    }
+}
+
 pub(crate) trait AttributeExt {
     /// Helper to create an attribute from attrs.foo functions
     fn attr<'v>(
@@ -82,6 +101,9 @@ impl AttributeExt for Attribute {
         doc: &str,
         coercer: AttrType,
     ) -> kuro_error::Result<StarlarkAttribute> {
+        // Track configuration_field info before coercion loses it
+        let mut config_field_info: Option<(String, String)> = None;
+
         let default = match default {
             None => None,
             Some(x) => {
@@ -99,7 +121,44 @@ impl AttributeExt for Attribute {
                 // provide a value), and the rule implementation typically checks for
                 // None and handles it appropriately (e.g., _def_parser in rules_cc).
                 let value_type = x.get_type();
-                if value_type == "configuration_field" || value_type == "function" || x.is_none() {
+                if value_type == "configuration_field" {
+                    // Extract fragment/name from the ConfigurationFieldRef before losing it.
+                    // These are exposed via has_attr/get_attr on the StarlarkValue.
+                    let heap = eval.heap();
+                    let resolved_label =
+                        if let Ok(Some(fragment_val)) = x.get_attr("fragment", heap) {
+                            if let Ok(Some(name_val)) = x.get_attr("name", heap) {
+                                let fragment = fragment_val.unpack_str().unwrap_or("").to_owned();
+                                let name = name_val.unpack_str().unwrap_or("").to_owned();
+                                let label = resolve_configuration_field_to_label(&fragment, &name);
+                                config_field_info = Some((fragment, name));
+                                label
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+
+                    // If we resolved the configuration_field to a known label, coerce it
+                    // as a real dependency default. Otherwise fall back to None.
+                    match resolved_label {
+                        Some(label_str) => {
+                            let label_value = eval.heap().alloc(label_str);
+                            match coercer.coerce(
+                                AttrIsConfigurable::Yes,
+                                &attr_coercion_context_for_bzl(eval)?,
+                                label_value,
+                            ) {
+                                Ok(coerced) => Some(Arc::new(coerced)),
+                                Err(_) => Some(Arc::new(
+                                    kuro_node::attrs::coerced_attr::CoercedAttr::None,
+                                )),
+                            }
+                        }
+                        None => Some(Arc::new(kuro_node::attrs::coerced_attr::CoercedAttr::None)),
+                    }
+                } else if value_type == "function" || x.is_none() {
                     // Computed default or explicit None: use None as the default value.
                     // The rule implementation should check for None and handle it.
                     // For explicit None (from mandatory=False attributes), this makes
@@ -122,9 +181,11 @@ impl AttributeExt for Attribute {
                 }
             }
         };
-        Ok(StarlarkAttribute::new(Attribute::new(
-            default, doc, coercer,
-        )))
+        let mut attr = Attribute::new(default, doc, coercer);
+        if let Some((fragment, name)) = config_field_info {
+            attr = attr.with_configuration_field(fragment, name);
+        }
+        Ok(StarlarkAttribute::new(attr))
     }
 }
 

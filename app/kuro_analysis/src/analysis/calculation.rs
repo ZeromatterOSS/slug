@@ -26,6 +26,7 @@ use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
 use kuro_build_api::analysis::calculation::RuleAnalysisCalculationImpl;
 use kuro_build_api::build::detailed_aggregated_metrics::dice::HasDetailedAggregatedMetrics;
 use kuro_build_api::deferred::calculation::DeferredHolder;
+use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 use kuro_build_api::keep_going::KeepGoing;
 use kuro_build_signals::env::WaitingData;
 use kuro_core::configuration::compatibility::MaybeCompatible;
@@ -50,6 +51,7 @@ use kuro_interpreter::starlark_profiler::config::GetStarlarkProfilerInstrumentat
 use kuro_interpreter::starlark_profiler::data::StarlarkProfileDataAndStats;
 use kuro_interpreter::starlark_profiler::mode::StarlarkProfileMode;
 use kuro_node::attrs::attr_type::query::ResolvedQueryLiterals;
+use kuro_node::attrs::inspect_options::AttrInspectOptions;
 use kuro_node::bzl_or_bxl_path::BzlOrBxlPath;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
@@ -62,6 +64,7 @@ use kuro_query::query::syntax::simple::eval::set::TargetSet;
 use kuro_util::time_span::TimeSpan;
 use smallvec::SmallVec;
 
+use crate::analysis::aspect_key::AspectKey;
 use crate::analysis::env::RuleSpec;
 use crate::analysis::env::get_user_defined_rule_spec;
 use crate::analysis::env::run_analysis;
@@ -220,6 +223,99 @@ pub async fn get_dep_analysis<'v>(
     .await
 }
 
+/// Compute aspect results for dependencies that have aspects attached via attributes.
+///
+/// This scans the target's attributes for those with `aspects` (e.g.,
+/// `attr.label_list(aspects=[cc_proto_aspect])`), identifies which deps need aspect
+/// computation, and runs the aspects via DICE (leveraging caching from gather_deps()).
+///
+/// Returns a map from dep label to the aspect's provider collection, which should be
+/// merged into the dep's base provider collection during resolution.
+async fn compute_dep_aspects<'v>(
+    configured_node: ConfiguredTargetNodeRef<'v>,
+    dep_analysis: &[(&'v ConfiguredTargetLabel, AnalysisResult)],
+    ctx: &mut DiceComputations<'_>,
+) -> kuro_error::Result<HashMap<ConfiguredTargetLabel, FrozenProviderCollectionValue>> {
+    use kuro_core::provider::label::ConfiguredProvidersLabel;
+    use kuro_node::aspect_type::StarlarkAspectType;
+    use kuro_node::attrs::configured_traversal::ConfiguredAttrTraversal;
+
+    let pkg = configured_node.label().pkg();
+
+    // Collect (dep_label, aspect_type) pairs by traversing each attribute.
+    // Only apply aspects to deps from the specific attribute that declares those aspects.
+    struct DepCollector {
+        deps: Vec<ConfiguredTargetLabel>,
+    }
+    impl ConfiguredAttrTraversal for DepCollector {
+        fn dep(&mut self, dep: &ConfiguredProvidersLabel) -> kuro_error::Result<()> {
+            self.deps.push(dep.target().dupe());
+            Ok(())
+        }
+    }
+
+    let aspect_keys = {
+        let mut seen: Vec<(ConfiguredTargetLabel, usize)> = Vec::new();
+        let mut keys = Vec::new();
+
+        for a in configured_node.attrs(AttrInspectOptions::All) {
+            let aspects: Vec<_> = a.attr.aspects().iter().map(|asp| asp.dupe()).collect();
+            if aspects.is_empty() {
+                continue;
+            }
+
+            // Traverse this attribute to find which deps it resolves to
+            let mut collector = DepCollector { deps: Vec::new() };
+            let _ = a.value.traverse(pkg, &mut collector);
+
+            // Create AspectKeys only for these deps × this attribute's aspects
+            for dep_label in &collector.deps {
+                for aspect_type in &aspects {
+                    let id = Arc::as_ptr(aspect_type) as usize;
+                    if !seen.iter().any(|(l, i)| l == dep_label && *i == id) {
+                        seen.push((dep_label.dupe(), id));
+                        keys.push(AspectKey::new(dep_label.dupe(), aspect_type.dupe()));
+                    }
+                }
+            }
+        }
+        keys
+    };
+
+    if aspect_keys.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    // Compute all aspect keys via DICE (cached from gather_deps)
+    let mut aspect_results: HashMap<ConfiguredTargetLabel, FrozenProviderCollectionValue> =
+        HashMap::new();
+
+    for key in &aspect_keys {
+        match ctx.compute(key).await {
+            Ok(Ok(aspect_value)) => {
+                let dep_label = key.target.dupe();
+                if let Some(existing) = aspect_results.get(&dep_label) {
+                    let merged = kuro_build_api::interpreter::rule_defs::provider::collection::merge_provider_collections(
+                        existing,
+                        &aspect_value.providers,
+                    );
+                    aspect_results.insert(dep_label, merged);
+                } else {
+                    aspect_results.insert(dep_label, aspect_value.providers);
+                }
+            }
+            Ok(Err(_e)) => {
+                // Aspect computation failed - skip this dep
+            }
+            Err(_e) => {
+                // Aspect DICE computation failed - skip this dep
+            }
+        }
+    }
+
+    Ok(aspect_results)
+}
+
 pub async fn get_loaded_module(
     ctx: &mut DiceComputations<'_>,
     func: &StarlarkRuleType,
@@ -282,6 +378,9 @@ async fn get_analysis_result_inner(
                 )
                 .await?;
 
+            // Phase 8h: Compute aspect results for deps that have aspects on their attributes.
+            let aspect_results = compute_dep_aspects(configured_node, &dep_analysis, ctx).await?;
+
             let now = TimeSpan::start_now();
             let (res, spans) = async_record_root_spans(async {
                 let rule_spec = get_rule_spec(ctx, func).await?;
@@ -311,6 +410,7 @@ async fn get_analysis_result_inner(
                                 &rule_spec,
                                 configured_node,
                                 cancellation,
+                                aspect_results,
                             ),
                             kuro_data::AnalysisStageEnd {},
                         )

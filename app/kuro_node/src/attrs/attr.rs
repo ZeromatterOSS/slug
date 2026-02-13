@@ -40,6 +40,10 @@ pub struct Attribute {
     /// Aspects to apply to dependencies of this attribute (Phase 8c)
     /// Uses Arc<StarlarkAspectType> to enable DICE-based module loading with cheap cloning
     aspects: Vec<Arc<StarlarkAspectType>>,
+    /// Configuration field reference for attrs with `configuration_field()` defaults.
+    /// Stored as (fragment, name) when the attr default was a configuration_field().
+    /// This preserves the info that would otherwise be lost when the default is coerced to None.
+    configuration_field: Option<(String, String)>,
 }
 
 impl Attribute {
@@ -52,6 +56,7 @@ impl Attribute {
             doc: doc.to_owned(),
             coercer,
             aspects: Vec::new(),
+            configuration_field: None,
         }
     }
 
@@ -61,6 +66,7 @@ impl Attribute {
             doc: doc.to_owned(),
             coercer,
             aspects: Vec::new(),
+            configuration_field: None,
         }
     }
 
@@ -93,6 +99,19 @@ impl Attribute {
     /// Get the aspects attached to this attribute (Phase 8c).
     pub fn aspects(&self) -> &[Arc<StarlarkAspectType>] {
         &self.aspects
+    }
+
+    /// Get the configuration field reference, if this attr's default was configuration_field().
+    pub fn configuration_field(&self) -> Option<(&str, &str)> {
+        self.configuration_field
+            .as_ref()
+            .map(|(f, n)| (f.as_str(), n.as_str()))
+    }
+
+    /// Set the configuration field reference (fragment, name).
+    pub fn with_configuration_field(mut self, fragment: String, name: String) -> Self {
+        self.configuration_field = Some((fragment, name));
+        self
     }
 }
 

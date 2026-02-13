@@ -90,7 +90,14 @@ impl ArtifactPath<'_> {
                 // For build artifacts, construct the full buck-out path
                 // Path structure: buck-out/v2/gen/<cell_name>/<cfg_hash>/<cell_relative_path>/__<target_name>__/<artifact_path>
                 let owner = buck_out.owner().owner();
-                if let BaseDeferredKey::TargetLabel(target) = owner {
+                // Extract the target label from the owner key.
+                // For aspects, use the underlying target label.
+                let target_opt = match owner {
+                    BaseDeferredKey::TargetLabel(target) => Some(target.clone()),
+                    BaseDeferredKey::Aspect(aspect_key) => aspect_key.configured_label(),
+                    _ => None,
+                };
+                if let Some(target) = target_opt {
                     let cfg_hash = target.cfg().output_hash().as_str();
                     let cell_name = target.pkg().cell_name().as_str();
                     let cell_relative_path = target.pkg().cell_relative_path().as_str();
