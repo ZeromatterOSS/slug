@@ -260,7 +260,9 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         if this.is_source()? {
-            return Ok(heap.alloc(ArtifactRootStub { path: String::new() }));
+            return Ok(heap.alloc(ArtifactRootStub {
+                path: String::new(),
+            }));
         }
         // Compute root = full_path with short_path stripped from the end
         let full = this.with_full_path(&|p| heap.alloc_str(p.as_str()))?;
@@ -281,9 +283,7 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
     /// The executable file (Bazel FilesToRunProvider compatibility).
     /// For artifacts, this just returns the artifact itself.
     #[starlark(attribute)]
-    fn executable<'v>(
-        this: Value<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn executable<'v>(this: Value<'v>) -> starlark::Result<Value<'v>> {
         Ok(this)
     }
 }

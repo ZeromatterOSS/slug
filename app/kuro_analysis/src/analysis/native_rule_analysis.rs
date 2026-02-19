@@ -17,11 +17,14 @@
 use std::collections::HashMap;
 
 use dupe::Dupe;
+use kuro_artifact::artifact::artifact_type::Artifact;
+use kuro_artifact::artifact::source_artifact::SourceArtifact;
 use kuro_build_api::actions::registry::RecordedActions;
 use kuro_build_api::analysis::AnalysisResult;
 use kuro_build_api::analysis::registry::FrozenAnalysisValueStorage;
 use kuro_build_api::analysis::registry::RecordedAnalysisValues;
 use kuro_build_api::dynamic::storage::DYNAMIC_LAMBDA_PARAMS_STORAGES;
+use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
 use kuro_build_api::interpreter::rule_defs::cc_common::CcInfoInstanceStub;
 use kuro_build_api::interpreter::rule_defs::cc_common::CcInfoProvider;
 use kuro_build_api::interpreter::rule_defs::platform_common::ConstraintValueInfoInstance;
@@ -33,9 +36,11 @@ use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::Fro
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::deferred::key::DeferredHolderKey;
+use kuro_core::package::source_path::SourcePath;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_error::internal_error;
+use kuro_node::attrs::attr_type::list::ListLiteral;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::inspect_options::AttrInspectOptions;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
@@ -59,7 +64,7 @@ pub fn analyze_native_rule(
         NativeRuleKind::ConstraintValue => {
             analyze_constraint_value(target, configured_node, dep_analysis)
         }
-        NativeRuleKind::Filegroup => analyze_filegroup(target, dep_analysis),
+        NativeRuleKind::Filegroup => analyze_filegroup(target, configured_node, dep_analysis),
         NativeRuleKind::Alias => analyze_alias(target, dep_analysis),
         NativeRuleKind::LabelFlag => analyze_label_flag(target, dep_analysis),
         NativeRuleKind::ConfigSetting => {
@@ -375,30 +380,111 @@ fn analyze_alias(
     }
 }
 
+/// Extract source artifacts from a list `CoercedAttr` that may contain `SourceFile` entries.
+/// Handles `CoercedAttr::OneOf(SourceFile, _)` which is produced by `one_of([dep, source])`.
+fn collect_source_files_from_attr(
+    attr: &CoercedAttr,
+    pkg: &kuro_core::package::PackageLabel,
+    heap: &FrozenHeap,
+    out: &mut Vec<FrozenValue>,
+) {
+    match attr {
+        CoercedAttr::List(ListLiteral(items)) => {
+            for item in items.iter() {
+                collect_source_files_from_attr(item, pkg, heap, out);
+            }
+        }
+        CoercedAttr::OneOf(inner, _) => {
+            collect_source_files_from_attr(inner, pkg, heap, out);
+        }
+        CoercedAttr::SourceFile(coerced_path) => {
+            for path in coerced_path.inputs() {
+                let source_artifact = SourceArtifact::new(SourcePath::new(pkg.dupe(), path.dupe()));
+                let artifact = Artifact::from(source_artifact);
+                let starlark_artifact = heap.alloc_simple(StarlarkArtifact::new(artifact));
+                out.push(starlark_artifact);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Analyze a filegroup target.
 /// Filegroups collect files from their srcs and data deps.
+/// For filegroups with source files in srcs, returns DefaultInfo with those source artifacts.
 /// For filegroups with no srcs (like empty sentinel targets), returns empty DefaultInfo.
 /// For filegroups with deps, merges DefaultInfo.default_outputs from all deps.
 fn analyze_filegroup(
     target: &ConfiguredTargetLabel,
+    configured_node: ConfiguredTargetNodeRef<'_>,
     dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
 ) -> kuro_error::Result<AnalysisResult> {
-    if dep_analysis.is_empty() {
-        // Empty filegroup - return minimal DefaultInfo
-        return create_minimal_analysis_result(target);
+    // Check if this filegroup has source files in its srcs attr (from exports_files).
+    // Source files are not deps, so they don't appear in dep_analysis.
+    let heap = FrozenHeap::new();
+    let mut source_outputs: Vec<FrozenValue> = Vec::new();
+
+    let pkg = target.pkg();
+    let target_node = configured_node.to_owned();
+    let target_ref = target_node.target_node().as_ref();
+
+    if let Some(srcs_attr) = target_ref.attr_or_none("srcs", AttrInspectOptions::All) {
+        collect_source_files_from_attr(srcs_attr.value, &pkg, &heap, &mut source_outputs);
     }
 
-    // Fast path: single dep, just forward its result directly
-    if dep_analysis.len() == 1 {
+    if dep_analysis.is_empty() {
+        if source_outputs.is_empty() {
+            // Empty filegroup - return minimal DefaultInfo
+            return create_minimal_analysis_result(target);
+        }
+        // Source-only filegroup (from exports_files)
+        let default_info = FrozenDefaultInfo::with_outputs(&heap, source_outputs);
+        let providers = SmallMap::from_iter([(
+            DefaultInfoCallable::provider_id().dupe(),
+            default_info.to_frozen_value(),
+        )]);
+        let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+            heap.alloc(FrozenProviderCollection::new(providers)),
+        )?;
+        let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+        let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+            value: FrozenAnalysisValueStorage::new_native(
+                self_key.dupe(),
+                DYNAMIC_LAMBDA_PARAMS_STORAGES
+                    .get()
+                    .unwrap()
+                    .new_frozen_dynamic_lambda_params_storage(),
+                Some(provider_collection),
+            ),
+        });
+        let heap_ref = heap.into_ref();
+        let analysis_storage = unsafe {
+            OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()?
+        };
+        let recorded_values = RecordedAnalysisValues::new_native(
+            self_key,
+            Some(analysis_storage),
+            RecordedActions::new(0),
+        );
+        return Ok(AnalysisResult::new(
+            recorded_values,
+            None,
+            HashMap::new(),
+            0,
+            0,
+            None,
+        ));
+    }
+
+    // Fast path: single dep with no source files, just forward its result directly
+    if dep_analysis.len() == 1 && source_outputs.is_empty() {
         let (_label, result) = dep_analysis.into_iter().next().unwrap();
         return Ok(result);
     }
 
-    let heap = FrozenHeap::new();
-
-    // Collect default_outputs from all deps into a single merged list.
-    // We alloc each StarlarkArtifact on our heap so they live long enough.
-    let mut all_outputs: Vec<FrozenValue> = Vec::new();
+    // Collect default_outputs from all deps into a single merged list, plus source_outputs.
+    // Use the heap already created above.
+    let mut all_outputs: Vec<FrozenValue> = source_outputs;
     for (_dep_label, dep_result) in &dep_analysis {
         if let Ok(providers_ref) = dep_result.providers() {
             let collection: &FrozenProviderCollection = providers_ref.value().as_ref();

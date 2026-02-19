@@ -465,10 +465,59 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
                     ));
                     std::fs::read_to_string(&bundled_path)
                         .or_else(|_| {
-                            // Try bazel-external path for bzlmod cells
+                            // Try bazel-external direct path (no version) for bzlmod cells
                             let external_path = project_root
                                 .join(format!("bazel-external/{}/{}", cell_name, full_path));
                             std::fs::read_to_string(&external_path)
+                        })
+                        .or_else(|_| {
+                            // Try bazel-external versioned path: bazel-external/{cell}/{version}/{path}
+                            let cell_dir =
+                                project_root.join(format!("bazel-external/{}", cell_name));
+                            if let Ok(entries) = std::fs::read_dir(&cell_dir) {
+                                for entry in entries.flatten() {
+                                    if entry
+                                        .file_type()
+                                        .map(|t| t.is_dir() || t.is_symlink())
+                                        .unwrap_or(false)
+                                    {
+                                        let versioned_path = entry.path().join(&full_path);
+                                        if let Ok(content) =
+                                            std::fs::read_to_string(&versioned_path)
+                                        {
+                                            return Ok(content);
+                                        }
+                                    }
+                                }
+                            }
+                            // Also try buck-out/v2/external_cells/bzlmod/{cell}/{version}/{path}
+                            let bzlmod_dir = project_root.join(format!(
+                                "buck-out/v2/external_cells/bzlmod/{}",
+                                cell_name
+                            ));
+                            if let Ok(entries) = std::fs::read_dir(&bzlmod_dir) {
+                                for entry in entries.flatten() {
+                                    if entry
+                                        .file_type()
+                                        .map(|t| t.is_dir() || t.is_symlink())
+                                        .unwrap_or(false)
+                                    {
+                                        let versioned_path = entry.path().join(&full_path);
+                                        if let Ok(content) =
+                                            std::fs::read_to_string(&versioned_path)
+                                        {
+                                            return Ok(content);
+                                        }
+                                    }
+                                }
+                            }
+                            Err(std::io::Error::new(
+                                std::io::ErrorKind::NotFound,
+                                format!(
+                                    "template not found in any location for cell '{}', path '{}'",
+                                    cell_name, full_path
+                                ),
+                            ))
                         })
                         .map_err(|e| {
                             tracing::warn!(

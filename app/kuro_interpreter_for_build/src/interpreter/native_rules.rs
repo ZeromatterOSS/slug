@@ -1461,6 +1461,73 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         )
     }
 
+    /// Exports source files from this package for use by other packages.
+    ///
+    /// In Bazel, `exports_files` makes source files accessible as targets so that
+    /// other packages can reference them (e.g., via `attr.label(default = "file.txt")`).
+    ///
+    /// This implementation registers each file as a filegroup target so that
+    /// `ctx.file._attr` and `ctx.files._attr` work correctly.
+    ///
+    /// See: https://bazel.build/reference/be/functions#exports_files
+    fn exports_files<'v>(
+        #[starlark(default = UnpackListOrTuple::default())] srcs: UnpackListOrTuple<Value<'v>>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        licenses: UnpackListOrTuple<String>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let _ = licenses;
+        let internals = ModuleInternals::from_context(eval, "exports_files")?;
+        let coercion_ctx = internals.attr_coercion_context();
+
+        let vis_strings = extract_visibility_strings(visibility);
+        let default_vis = internals.default_visibility();
+
+        let src_list_type = AttrType::list(AttrType::one_of(vec![
+            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+            AttrType::source(false),
+        ]));
+
+        for src in srcs.items {
+            let file_str = match src.unpack_str() {
+                Some(s) => s,
+                None => continue, // Skip non-string values (e.g., from glob())
+            };
+
+            // Create srcs list with just this single source file
+            let src_list_value = eval.heap().alloc(vec![src]);
+            let coerced_srcs =
+                match src_list_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, src_list_value) {
+                    Ok(v) => v,
+                    Err(_) => continue, // Skip files that can't be coerced
+                };
+
+            let target_node = create_native_target_node(
+                rule_defs::FILEGROUP_RULE.clone(),
+                internals.package(),
+                file_str,
+                vec![
+                    ("srcs".to_owned(), coerced_srcs),
+                    (
+                        "data".to_owned(),
+                        CoercedAttr::List(ListLiteral(ArcSlice::default())),
+                    ),
+                ],
+                &vis_strings,
+                &default_vis,
+            )?;
+
+            // Silently skip if target already exists (duplicate exports_files entries
+            // or conflicts with rule targets are allowed in some Bazel setups).
+            let _ = internals.record(target_node);
+        }
+
+        Ok(NoneType)
+    }
+
     /// Native test_suite rule stub for Bazel compatibility.
     fn test_suite<'v>(
         #[starlark(require = named)] name: &str,

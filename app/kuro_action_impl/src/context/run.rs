@@ -38,6 +38,7 @@ use kuro_build_api::interpreter::rule_defs::provider::builtin::run_info::RunInfo
 use kuro_build_api::interpreter::rule_defs::provider::builtin::worker_run_info::WorkerRunInfo;
 use kuro_core::category::CategoryRef;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
+use kuro_core::execution_types::executor_config::MetaInternalExtraParams;
 use kuro_core::execution_types::executor_config::ReGangWorker;
 use kuro_core::execution_types::executor_config::RemoteExecutorDependency;
 use kuro_error::BuckErrorContext;
@@ -1017,4 +1018,243 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
         )?;
         Ok(NoneType)
     }
+
+    /// Run a shell command to produce one or more artifacts (Bazel-compatible).
+    ///
+    /// This is the Bazel equivalent of `ctx.actions.run()` but takes a shell command
+    /// string (executed via `bash -c`) or a list of strings (executed directly).
+    ///
+    /// Parameters:
+    /// - `outputs`: Required list of output files this action will produce
+    /// - `command`: Required shell command (string for `bash -c`, or list of strings)
+    /// - `inputs`: Optional input files (list or depset)
+    /// - `tools`: Optional tool dependencies (list or depset)
+    /// - `arguments`: Optional additional arguments appended to the command (string case)
+    /// - `env`: Optional dict of environment variables
+    /// - `mnemonic`: Optional short action description used as category
+    fn run_shell<'v>(
+        this: &AnalysisActions<'v>,
+        #[starlark(require = named)] outputs: Value<'v>,
+        #[starlark(require = named)] command: Value<'v>,
+        #[starlark(require = named, default = NoneOr::None)] inputs: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] tools: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] arguments: NoneOr<Value<'v>>,
+        #[starlark(require = named)] env: Option<
+            ValueOf<'v, UnpackDictEntries<UnpackAndDiscard<&'v str>, ValueAsCommandLineLike<'v>>>,
+        >,
+        #[starlark(require = named, default = NoneOr::None)] mnemonic: NoneOr<StringValue<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] progress_message: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = false)] use_default_shell_env: bool,
+        #[starlark(require = named, default = NoneOr::None)] execution_requirements: NoneOr<
+            Value<'v>,
+        >,
+        #[starlark(require = named, default = NoneOr::None)] input_manifests: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] exec_group: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] shadowed_action: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] resource_set: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] toolchain: NoneOr<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let _ = (
+            progress_message,
+            use_default_shell_env,
+            execution_requirements,
+            input_manifests,
+            exec_group,
+            shadowed_action,
+            resource_set,
+            toolchain,
+        );
+        let heap = eval.heap();
+
+        // Build the exe and args command lines:
+        // - String command: exe = ["/bin/bash", "-c"], args = [cmd_str, ...extra_arguments]
+        // - List command: exe = the list, args = extra_arguments
+        let (starlark_exe, starlark_args) = if let Some(cmd_str) = command.unpack_str() {
+            let exe_list = heap.alloc(vec![
+                heap.alloc_str("/bin/bash").to_value(),
+                heap.alloc_str("-c").to_value(),
+            ]);
+            let starlark_exe = StarlarkCmdArgs::try_from_value(exe_list)
+                .buck_error_context("run_shell: building bash exe")?;
+
+            let mut args_items = vec![heap.alloc_str(cmd_str).to_value()];
+            if let NoneOr::Other(extra_args) = arguments {
+                if let Ok(iter) = extra_args.iterate(heap) {
+                    args_items.extend(iter);
+                }
+            }
+            let args_list = heap.alloc(args_items);
+            let starlark_args = StarlarkCmdArgs::try_from_value(args_list)
+                .buck_error_context("run_shell: building shell args")?;
+            (starlark_exe, starlark_args)
+        } else {
+            // List or cmd_args: use directly as the exe command
+            let starlark_exe = StarlarkCmdArgs::try_from_value(command)
+                .buck_error_context("run_shell: building command from list")?;
+            let starlark_args = if let NoneOr::Other(extra_args) = arguments {
+                StarlarkCmdArgs::try_from_value(extra_args)
+                    .buck_error_context("run_shell: building extra arguments")?
+            } else {
+                StarlarkCmdArgs::default()
+            };
+            (starlark_exe, starlark_args)
+        };
+
+        let mut artifact_visitor = SimpleCommandLineArtifactVisitor::new();
+        starlark_exe.visit_artifacts(&mut artifact_visitor)?;
+        starlark_args.visit_artifacts(&mut artifact_visitor)?;
+
+        // Process declared outputs
+        let outputs_iter = outputs.iterate(heap).map_err(|_| {
+            kuro_error::Error::from(RunActionError::OutputsNotIterable(outputs.to_repr()))
+        })?;
+        for output_val in outputs_iter {
+            if let Some(declared) = output_val.downcast_ref::<StarlarkDeclaredArtifact>() {
+                artifact_visitor
+                    .declared_outputs
+                    .insert(declared.output_artifact());
+            } else if let Some(output_artifact) =
+                output_val.downcast_ref::<StarlarkOutputArtifact>()
+            {
+                artifact_visitor
+                    .declared_outputs
+                    .insert(output_artifact.artifact());
+            } else {
+                return Err(kuro_error::Error::from(RunActionError::InvalidOutputType(
+                    output_val.to_repr(),
+                ))
+                .into());
+            }
+        }
+        if artifact_visitor.declared_outputs.is_empty() {
+            return Err(kuro_error::Error::from(RunActionError::NoOutputsSpecified).into());
+        }
+
+        // Collect bazel_inputs for dependency tracking (inputs and tools)
+        let mut bazel_inputs: Vec<Value<'v>> = vec![];
+
+        if let NoneOr::Other(inputs_val) = inputs {
+            let items = collect_items_from_value(inputs_val, eval)?;
+            for input_val in items {
+                bazel_inputs.push(input_val);
+                if let Some(artifact) = input_val.downcast_ref::<StarlarkArtifact>() {
+                    artifact_visitor
+                        .inputs
+                        .insert(ArtifactGroup::Artifact(artifact.artifact().dupe()));
+                } else if let Some(declared) = input_val.downcast_ref::<StarlarkDeclaredArtifact>()
+                {
+                    if let Ok(group) = declared.get_artifact_group() {
+                        artifact_visitor.inputs.insert(group);
+                    }
+                }
+            }
+        }
+
+        if let NoneOr::Other(tools_val) = tools {
+            let items = collect_items_from_value(tools_val, eval)?;
+            for tool_val in items {
+                bazel_inputs.push(tool_val);
+                if let Some(artifact) = tool_val.downcast_ref::<StarlarkArtifact>() {
+                    artifact_visitor
+                        .inputs
+                        .insert(ArtifactGroup::Artifact(artifact.artifact().dupe()));
+                }
+            }
+        }
+
+        // Determine category from mnemonic (convert PascalCase to snake_case)
+        let effective_category = match mnemonic.into_option() {
+            Some(m) => {
+                let snake_case: String = m
+                    .as_str()
+                    .chars()
+                    .enumerate()
+                    .flat_map(|(i, c)| {
+                        if c.is_uppercase() && i > 0 {
+                            vec!['_', c.to_ascii_lowercase()]
+                        } else {
+                            vec![c.to_ascii_lowercase()]
+                        }
+                    })
+                    .collect();
+                heap.alloc_str(&snake_case)
+            }
+            None => heap.alloc_str("run_shell"),
+        };
+        CategoryRef::new(effective_category.as_str())?;
+
+        // Process environment variables
+        let starlark_env = match &env {
+            None => None,
+            Some(env_val) => {
+                for (_k, v) in &env_val.typed.entries {
+                    v.0.visit_artifacts(&mut artifact_visitor)?;
+                }
+                Some(env_val.as_unchecked().cast())
+            }
+        };
+
+        let starlark_values = heap.alloc_complex(StarlarkRunActionValues {
+            exe: heap.alloc_typed(starlark_exe),
+            args: heap.alloc_typed(starlark_args),
+            env: starlark_env,
+            worker: None,
+            remote_worker: None,
+            category: effective_category,
+            identifier: None,
+            outputs_for_error_handler: vec![],
+            bazel_inputs,
+        });
+
+        let action = UnregisteredRunAction {
+            executor_preference: new_executor_preference(false, false, false)?,
+            always_print_stderr: false,
+            weight: WeightClass::Permits(1),
+            low_pass_filter: true,
+            dep_files: RunActionDepFiles::new(),
+            metadata_param: None,
+            no_outputs_cleanup: false,
+            incremental_remote_outputs: false,
+            allow_cache_upload: None,
+            allow_dep_file_cache_upload: false,
+            allow_offline_output_cache: false,
+            force_full_hybrid_if_capable: false,
+            unique_input_inodes: false,
+            remote_execution_dependencies: vec![],
+            re_gang_workers: vec![],
+            remote_execution_custom_image: None,
+            meta_internal_extra_params: MetaInternalExtraParams::default(),
+            expected_eligible_for_dedupe: None,
+        };
+
+        this.state()?.register_action(
+            artifact_visitor.declared_outputs,
+            action,
+            Some(starlark_values),
+            None,
+        )?;
+        Ok(NoneType)
+    }
+}
+
+/// Collect items from a depset, list, or single value into a Vec<Value<'v>>.
+fn collect_items_from_value<'v>(
+    val: Value<'v>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> kuro_error::Result<Vec<Value<'v>>> {
+    // Check if it's a depset (has to_list method)
+    if let Ok(Some(to_list)) = val.get_attr("to_list", eval.heap()) {
+        if let Ok(list_val) = eval.eval_function(to_list, &[], &[]) {
+            if let Ok(iter) = list_val.iterate(eval.heap()) {
+                return Ok(iter.collect());
+            }
+        }
+    }
+    // Try to iterate (list, tuple, other iterables)
+    if let Ok(iter) = val.iterate(eval.heap()) {
+        return Ok(iter.collect());
+    }
+    // Single value
+    Ok(vec![val])
 }

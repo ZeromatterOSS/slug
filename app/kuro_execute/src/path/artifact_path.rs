@@ -63,19 +63,34 @@ impl ArtifactPath<'_> {
     where
         for<'b> F: FnOnce(&'b ForwardRelativePath) -> T,
     {
-        let base_short_path = match self.base_path.as_ref() {
-            Either::Left(buck_out) => buck_out.path(),
-            Either::Right(buck) => buck.path().as_ref(),
-        };
-
-        let path = base_short_path.join_cow(self.projected_path);
-
-        let path = match path.strip_prefix_components(self.hidden_components_count) {
-            Some(p) => p,
-            None => ForwardRelativePath::empty(),
-        };
-
-        f(path)
+        match self.base_path.as_ref() {
+            Either::Left(buck_out) => {
+                let base = buck_out.path();
+                let path = base.join_cow(self.projected_path);
+                let path = match path.strip_prefix_components(self.hidden_components_count) {
+                    Some(p) => p,
+                    None => ForwardRelativePath::empty(),
+                };
+                f(path)
+            }
+            Either::Right(source) => {
+                // Bazel-compatible short_path for source files:
+                // Returns the full cell-relative path (pkg/subpkg/file.py).
+                // For files in external repos accessed from a different workspace,
+                // Bazel uses "../repo/pkg/file.py" but we use the cell-relative path
+                // since pkg_path already encodes the package structure.
+                let pkg_path: &ForwardRelativePath = source.package().cell_relative_path().as_ref();
+                let file_rel: &ForwardRelativePath = source.path().as_ref();
+                // Construct the full cell-relative path: pkg/private/tar/build_tar.py
+                let base = pkg_path.join(file_rel);
+                let full = base.join(self.projected_path);
+                let path = match full.strip_prefix_components(self.hidden_components_count) {
+                    Some(p) => p,
+                    None => ForwardRelativePath::empty(),
+                };
+                f(path)
+            }
+        }
     }
 
     /// Returns the full execution path of the artifact.

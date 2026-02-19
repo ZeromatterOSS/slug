@@ -597,9 +597,7 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
     /// Returns the executable artifact if set, or None if not.
     /// Bazel's DefaultInfo.executable returns a single File, not a list.
     #[starlark(attribute)]
-    fn executable<'v>(
-        this: &DefaultInfo<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn executable<'v>(this: &DefaultInfo<'v>) -> starlark::Result<Value<'v>> {
         let list_val = this.executable.get();
         if let Some(list) = ListRef::from_value(list_val.to_value()) {
             if let Some(first) = list.iter().next() {

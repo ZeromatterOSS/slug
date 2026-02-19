@@ -392,14 +392,9 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
 
     /// Predeclared outputs from the rule definition (Bazel-compatible).
     ///
-    /// In Bazel, rules can declare output patterns in their `outputs` parameter.
-    /// These are accessible via `ctx.outputs.<name>`. For example, if a rule has:
-    ///   outputs = {"stripped_binary": "%{name}.stripped"}
-    /// Then ctx.outputs.stripped_binary would be the file for that output.
-    ///
-    /// This implementation pre-declares common outputs when first accessed and caches
-    /// the result for subsequent accesses.
-    /// TODO(outputs): Populate from actual rule definition outputs.
+    /// In Bazel, `attr.output()` attributes hold filename strings that the rule can
+    /// use to declare output files via `ctx.outputs.<name>`. This implementation
+    /// dynamically declares files on first access based on the string values in attrs.
     #[starlark(attribute)]
     fn outputs<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         // Check if we already have cached outputs
@@ -407,8 +402,11 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             return Ok(*cached);
         }
 
-        use kuro_core::fs::buck_out_path::BuckOutPathKind;
-        use kuro_execute::execute::request::OutputType;
+        let attrs_val = this
+            .0
+            .attrs
+            .map(|v| v.get())
+            .unwrap_or_else(Value::new_none);
 
         let target_name = this
             .0
@@ -417,54 +415,11 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             .map(|l| l.label().name().to_string())
             .unwrap_or_else(|| "output".to_string());
 
-        // Pre-declare common outputs using the analysis registry
-        let mut state = this.0.actions.state()?;
-
-        // Declare stripped_binary: <name>.stripped
-        let stripped_filename = format!("{}.stripped", target_name);
-        let stripped_binary = state
-            .declare_output(
-                None,
-                &stripped_filename,
-                OutputType::File,
-                None,
-                BuckOutPathKind::default(),
-                heap,
-            )
-            .ok();
-
-        // Declare executable (the main binary)
-        let executable = state
-            .declare_output(
-                None,
-                &target_name,
-                OutputType::File,
-                None,
-                BuckOutPathKind::default(),
-                heap,
-            )
-            .ok();
-
-        // Declare dwp_file: <name>.dwp
-        let dwp_filename = format!("{}.dwp", target_name);
-        let dwp_file = state
-            .declare_output(
-                None,
-                &dwp_filename,
-                OutputType::File,
-                None,
-                BuckOutPathKind::default(),
-                heap,
-            )
-            .ok();
-
-        drop(state); // Release the mutable borrow
-
-        // DeclaredArtifact needs to be converted to StarlarkDeclaredArtifact for allocation
         let outputs_value = heap.alloc(CtxOutputs {
-            stripped_binary: stripped_binary.map(|a| heap.alloc(crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact::new(None, a, crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts::new()))),
-            executable: executable.map(|a| heap.alloc(crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact::new(None, a, crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts::new()))),
-            dwp_file: dwp_file.map(|a| heap.alloc(crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact::new(None, a, crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts::new()))),
+            attrs: attrs_val,
+            actions: this.0.actions,
+            declared: RefCell::new(SmallMap::new()),
+            target_name,
         });
 
         // Cache the result
@@ -698,7 +653,22 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     #[starlark(attribute)]
     fn var<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
-        Ok(heap.alloc(CtxVarDict))
+        // Return an actual Dict so that dict(ctx.var) and iteration work correctly.
+        // TODO(bazel): Populate from real toolchain/configuration Make variables.
+        use starlark::values::dict::AllocDict;
+        Ok(heap.alloc(AllocDict([
+            ("BINDIR", "bazel-out/k8-fastbuild/bin"),
+            ("GENDIR", "bazel-out/k8-fastbuild/genfiles"),
+            ("TARGET_CPU", "k8"),
+            ("COMPILATION_MODE", "fastbuild"),
+            ("CC", "/usr/bin/gcc"),
+            ("CC_FLAGS", ""),
+            ("JAVA", "/usr/bin/java"),
+            ("JAVA_RUNFILES", ""),
+            ("JAVABASE", ""),
+            ("ABI_GLIBC_VERSION", "2.17"),
+            ("ABI", "local"),
+        ])))
     }
 
     /// Returns the value of a build setting rule (Bazel-compatible).
@@ -821,6 +791,224 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         // No platform constraints configured yet - always return false
         Ok(false)
     }
+
+    /// Expands Make variables and additional substitutions in a string (Bazel-compatible).
+    ///
+    /// This is a deprecated Bazel API that expands `$(VAR)` and `$(execpath ...)` patterns.
+    /// Still used by some rules (e.g., rules_python for import path expansion).
+    ///
+    /// Parameters:
+    /// - `attribute_name`: Name of the attribute (for error messages only)
+    /// - `command`: The string to expand
+    /// - `additional_substitutions`: Extra `$(VAR)` substitutions as a dict
+    #[allow(unused_variables)]
+    fn expand_make_variables<'v>(
+        this: RefAnalysisContext<'v>,
+        attribute_name: &str,
+        command: &str,
+        additional_substitutions: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<String> {
+        use starlark::values::dict::DictRef;
+
+        // Build substitution map from additional_substitutions
+        let mut substitutions: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
+
+        if let Some(subs_dict) = DictRef::from_value(additional_substitutions) {
+            for (k, v) in subs_dict.iter() {
+                if let (Some(key), Some(val)) = (k.unpack_str(), v.unpack_str()) {
+                    substitutions.insert(key.to_owned(), val.to_owned());
+                }
+            }
+        }
+
+        // Expand $(VAR) patterns using the substitutions + common defaults
+        let mut result = String::with_capacity(command.len());
+        let mut remaining = command;
+        while let Some(start) = remaining.find("$(") {
+            result.push_str(&remaining[..start]);
+            remaining = &remaining[start..];
+
+            if let Some(end) = remaining.find(')') {
+                let inner = &remaining[2..end].trim();
+                let after = &remaining[end + 1..];
+
+                if let Some(val) = substitutions.get(*inner) {
+                    result.push_str(val);
+                } else {
+                    // Leave unresolved $(VAR) patterns as-is
+                    result.push_str(&remaining[..end + 1]);
+                }
+                remaining = after;
+            } else {
+                // No closing paren - leave as-is
+                result.push_str("$(");
+                remaining = &remaining[2..];
+            }
+        }
+        result.push_str(remaining);
+
+        Ok(result)
+    }
+
+    /// Converts a string to a Label relative to the current package (Bazel-compatible).
+    ///
+    /// For example, `ctx.package_relative_label(":foo")` returns the Label for `:foo`
+    /// relative to the BUILD file's package.
+    #[allow(unused_variables)]
+    fn package_relative_label<'v>(
+        this: RefAnalysisContext<'v>,
+        input: &str,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        // Return the input as a string — sufficient for most rules that just use label.name
+        // TODO(labels): Return a proper Label value
+        Ok(heap.alloc_str(input).to_value())
+    }
+
+    /// Resolves tools and returns (input files depset, runfiles manifests) tuple (Bazel-compatible).
+    ///
+    /// This is used by rules to collect all files needed to run specified tools.
+    /// Returns a tuple of (depset of files, list of runfiles manifests).
+    #[allow(unused_variables)]
+    fn resolve_tools<'v>(
+        this: RefAnalysisContext<'v>,
+        #[starlark(require = named, default = NoneType)] tools: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        use starlark::values::list::AllocList;
+        // Return (empty list, empty list) as a tuple
+        // TODO(resolve_tools): Return actual tool files and manifests
+        let empty_files = heap.alloc(AllocList::EMPTY);
+        let empty_manifests = heap.alloc(AllocList::EMPTY);
+        Ok(heap.alloc((empty_files, empty_manifests)))
+    }
+
+    /// Expands `$(location label)` and `$(locations label)` templates in the input string.
+    ///
+    /// In Bazel, rules can use these templates to embed file paths of targets into strings.
+    /// This is used in genrule commands, args to cc_binary, etc.
+    ///
+    /// - `$(location :target)` expands to the path of the first default output of :target
+    /// - `$(locations :target)` expands to space-separated paths of all default outputs
+    ///
+    /// The `targets` parameter is a list of Dependency objects (from ctx.attr.* values)
+    /// that provide the pool of targets to look up. Labels are matched by their short form.
+    #[allow(unused_variables)]
+    fn expand_location<'v>(
+        this: RefAnalysisContext<'v>,
+        input: &str,
+        #[starlark(require = named, default = NoneType)] targets: Value<'v>,
+        #[starlark(require = named, default = false)] short_paths: bool,
+        heap: Heap<'v>,
+    ) -> starlark::Result<String> {
+        use crate::interpreter::rule_defs::provider::dependency::Dependency;
+        use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
+
+        // Build a mapping from target label suffixes (short names) to their output paths.
+        // We match both the full label form and short forms (":name", "name", "//pkg:name").
+        let mut label_to_paths: Vec<(String, Vec<String>)> = vec![];
+
+        // Helper to collect output paths from a FrozenProviderCollection
+        let collect_output_paths = |pc: starlark::values::FrozenValueTyped<
+            '_,
+            crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection,
+        >|
+         -> Vec<String> {
+            if let Ok(di) = pc.as_ref().default_info() {
+                di.default_outputs()
+                    .into_iter()
+                    .map(|art| {
+                        art.artifact()
+                            .get_path()
+                            .with_full_path(|p| p.as_str().to_owned())
+                    })
+                    .collect()
+            } else {
+                vec![]
+            }
+        };
+
+        if let Ok(iter) = targets.iterate(heap) {
+            for dep_val in iter {
+                let (dep_label, paths) = if let Some(dep) = dep_val.downcast_ref::<Dependency>() {
+                    let label_str = dep.label().label().to_string();
+                    let paths = collect_output_paths(dep.provider_collection());
+                    (label_str, paths)
+                } else if let Some(dep) = dep_val.downcast_ref::<FrozenDependency>() {
+                    let label_str = dep.label().label().to_string();
+                    let paths = collect_output_paths(dep.provider_collection());
+                    (label_str, paths)
+                } else {
+                    continue;
+                };
+                label_to_paths.push((dep_label, paths));
+            }
+        }
+
+        // Helper: find paths for a label string from the targets list
+        let find_paths = |label: &str| -> Option<Vec<String>> {
+            // Try exact match, then suffix match on ":name" part
+            for (dep_label, paths) in &label_to_paths {
+                // Exact match
+                if dep_label == label {
+                    return Some(paths.clone());
+                }
+                // Match on the target name part (after the last ':')
+                let dep_name = dep_label.rsplit(':').next().unwrap_or(dep_label.as_str());
+                let query_name = label.trim_start_matches(':');
+                if dep_name == query_name {
+                    return Some(paths.clone());
+                }
+            }
+            None
+        };
+
+        // Expand $(location label) and $(locations label) patterns
+        let mut result = String::with_capacity(input.len());
+        let mut remaining = input;
+        while let Some(start) = remaining.find("$(") {
+            result.push_str(&remaining[..start]);
+            remaining = &remaining[start..];
+
+            // Check for $(location ...) or $(locations ...)
+            let is_locations = remaining.starts_with("$(locations ");
+            let is_location = !is_locations && remaining.starts_with("$(location ");
+
+            if is_location || is_locations {
+                let prefix_len = if is_locations {
+                    "$(locations ".len()
+                } else {
+                    "$(location ".len()
+                };
+                if let Some(end) = remaining.find(')') {
+                    let label = remaining[prefix_len..end].trim();
+                    let after = &remaining[end + 1..];
+
+                    if let Some(paths) = find_paths(label) {
+                        if is_locations {
+                            result.push_str(&paths.join(" "));
+                        } else {
+                            result.push_str(paths.first().map(|s| s.as_str()).unwrap_or(""));
+                        }
+                    } else {
+                        // Label not found - leave the template as-is (or error)
+                        result.push_str(&remaining[..end + 1]);
+                    }
+                    remaining = after;
+                    continue;
+                }
+            }
+
+            // Not a location template - advance past "$("
+            result.push_str("$(");
+            remaining = &remaining[2..];
+        }
+        result.push_str(remaining);
+
+        Ok(result)
+    }
 }
 
 fn collect_runfiles_from_value<'v>(
@@ -869,24 +1057,32 @@ fn collect_runfiles_from_value<'v>(
 }
 
 // ============================================================================
-// CtxOutputs - Provides predeclared output files
+// CtxOutputs - Provides output files declared via attr.output()
 // ============================================================================
 
-/// Holds predeclared output files for ctx.outputs.
+/// Holds output files for ctx.outputs, supporting both `attr.output()` and `rule(outputs={...})`.
 ///
-/// In Bazel, rules can declare output patterns via `outputs = {...}` in the rule()
-/// definition. When `ctx.outputs.<name>` is accessed, it returns the declared file.
+/// In Bazel:
+/// - `attr.output()` attributes store filename strings in `ctx.attrs.<name>`. Accessing
+///   `ctx.outputs.<name>` declares a file with that name.
+/// - `rule(outputs={...})` defines pattern-based outputs like `"%{name}.stripped"`. These
+///   are expanded using the target name and made available via `ctx.outputs.<name>`.
 ///
-/// This struct holds the pre-declared artifacts that were created when ctx.outputs
-/// was accessed.
+/// This implementation handles both cases:
+/// 1. Dynamic: look up `ctx.attrs.<name>` as a string and declare a file with that filename
+/// 2. Pattern fallback: for well-known `rule(outputs={...})` patterns, generate from target name
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
 pub struct CtxOutputs<'v> {
-    /// The stripped binary output file: <name>.stripped
-    stripped_binary: Option<Value<'v>>,
-    /// The main executable output: <name>
-    executable: Option<Value<'v>>,
-    /// The DWP (debug info) file: <name>.dwp
-    dwp_file: Option<Value<'v>>,
+    /// The attrs struct - used to look up attr.output() string values
+    attrs: Value<'v>,
+    /// Analysis actions - used to declare artifacts on demand
+    actions: ValueTyped<'v, AnalysisActions<'v>>,
+    /// Cache of already-declared artifacts: attr_name → StarlarkDeclaredArtifact
+    declared: RefCell<SmallMap<String, Value<'v>>>,
+    /// Target name for pattern-based output expansion (e.g., "hello_bin" → "hello_bin.stripped")
+    /// Used for `rule(outputs={...})` patterns that aren't stored in attrs.
+    /// TODO(outputs): Replace with proper rule(outputs=...) parameter threading.
+    target_name: String,
 }
 
 impl<'v> std::fmt::Display for CtxOutputs<'v> {
@@ -903,25 +1099,89 @@ impl<'v> AllocValue<'v> for CtxOutputs<'v> {
 
 #[starlark::values::starlark_value(type = "ctx_outputs")]
 impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "stripped_binary" | "executable" | "dwp_file")
+    fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
+        // Check cache
+        if self.declared.borrow().contains_key(attribute) {
+            return true;
+        }
+        // Check if attrs has a string value for this attribute (i.e. it's an attr.output())
+        if let Ok(Some(v)) = self.attrs.get_attr(attribute, heap) {
+            if v.unpack_str().is_some() {
+                return true;
+            }
+        }
+        // Check well-known rule(outputs={...}) pattern names
+        matches!(attribute, "stripped_binary" | "dwp_file" | "executable")
     }
 
-    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "stripped_binary" => self.stripped_binary.or(Some(Value::new_none())),
-            "executable" => self.executable.or(Some(Value::new_none())),
-            "dwp_file" => self.dwp_file.or(Some(Value::new_none())),
-            _ => None,
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        // Check cache first
+        if let Some(v) = self.declared.borrow().get(attribute) {
+            return Some(*v);
         }
+
+        // Determine the filename for this output attribute.
+        // Case 1: attr.output() - the attribute value in attrs is the filename string
+        // Case 2: rule(outputs={...}) pattern - expand well-known patterns using target name
+        let filename_owned: String;
+        let filename: &str = if let Some(v) = self
+            .attrs
+            .get_attr(attribute, heap)
+            .ok()
+            .flatten()
+            .and_then(|v| v.unpack_str().map(|s| s.to_owned()))
+        {
+            filename_owned = v;
+            &filename_owned
+        } else {
+            // Fallback: expand common rule(outputs={...}) patterns using target name.
+            // TODO(outputs): Replace with proper rule(outputs={...}) parameter threading.
+            filename_owned = match attribute {
+                "stripped_binary" => format!("{}.stripped", self.target_name),
+                "dwp_file" => format!("{}.dwp", self.target_name),
+                "executable" => self.target_name.clone(),
+                _ => return None,
+            };
+            &filename_owned
+        };
+
+        if filename.is_empty() {
+            return None;
+        }
+
+        use kuro_core::fs::buck_out_path::BuckOutPathKind;
+        use kuro_execute::execute::request::OutputType;
+
+        // Declare the file via the analysis registry
+        let artifact = self
+            .actions
+            .state()
+            .ok()?
+            .declare_output(
+                None,
+                filename,
+                OutputType::File,
+                None,
+                BuckOutPathKind::default(),
+                heap,
+            )
+            .ok()?;
+
+        use crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
+        use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
+
+        let val = heap.alloc(StarlarkDeclaredArtifact::new(
+            None,
+            artifact,
+            AssociatedArtifacts::new(),
+        ));
+        self.declared.borrow_mut().insert(attribute.to_owned(), val);
+        Some(val)
     }
 
     fn dir_attr(&self) -> Vec<String> {
-        vec![
-            "stripped_binary".to_owned(),
-            "executable".to_owned(),
-            "dwp_file".to_owned(),
-        ]
+        // Return currently cached outputs; we can't enumerate all possible attr.output() names
+        self.declared.borrow().keys().map(|k| k.clone()).collect()
     }
 }
 
@@ -977,6 +1237,22 @@ impl<'v> StarlarkValue<'v> for ToolchainsStub {
         {
             // Python target toolchain - provide a stub with py3_runtime
             Ok(heap.alloc(PyToolchainInfoStub))
+        } else if target_name == "crane_toolchain_type" {
+            // OCI crane toolchain
+            let crane_path = detect_crane_path();
+            Ok(heap.alloc(OciCraneToolchainStub { crane_path }))
+        } else if target_name == "registry_toolchain_type" {
+            // OCI registry toolchain (uses crane registry serve)
+            let crane_path = detect_crane_path();
+            let launcher_path = get_or_create_oci_launcher();
+            Ok(heap.alloc(OciRegistryToolchainStub {
+                launcher_path,
+                registry_path: crane_path,
+            }))
+        } else if target_name == "jq_toolchain_type" {
+            // jq toolchain
+            let jq_path = detect_jq_path();
+            Ok(heap.alloc(JqToolchainStub { jq_path }))
         } else {
             // Return None for unknown toolchain types (exec_tools, launcher, etc.)
             Ok(Value::new_none())
@@ -2766,8 +3042,14 @@ impl<'v> StarlarkValue<'v> for PyRuntimeInfoStub {
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "interpreter_path" => {
-                // Use system python3 path
-                Some(heap.alloc_str("/usr/bin/python3").to_value())
+                // Use the magic sentinel to force the legacy bootstrap-template path.
+                // This makes rules_python fall back to ctx.file._bootstrap_template
+                // (which is @bazel_tools//tools/python:python_bootstrap_template.txt),
+                // since our PyRuntimeInfoStub doesn't provide a real bootstrap_template.
+                Some(
+                    heap.alloc_str("/_magic_pyruntime_sentinel_do_not_use")
+                        .to_value(),
+                )
             }
             "interpreter" => Some(Value::new_none()),
             "files" => Some(Value::new_none()),
@@ -2779,6 +3061,345 @@ impl<'v> StarlarkValue<'v> for PyRuntimeInfoStub {
             "implementation_name" => Some(heap.alloc_str("cpython").to_value()),
             "flag_values" => Some(heap.alloc(starlark::values::dict::Dict::default())),
             "site_init_template" => Some(Value::new_none()),
+            _ => None,
+        }
+    }
+}
+
+// ============================================================================
+// OCI toolchain stubs (crane, registry, jq)
+// ============================================================================
+
+/// Detect the crane binary path from common locations.
+fn detect_crane_path() -> String {
+    let candidates = [
+        "/home/wgray/go/bin/crane",
+        "/usr/local/bin/crane",
+        "/usr/bin/crane",
+        "crane",
+    ];
+    for path in &candidates {
+        if std::path::Path::new(path).exists() {
+            return path.to_string();
+        }
+    }
+    // Fall back to PATH lookup
+    if let Ok(output) = std::process::Command::new("which").arg("crane").output() {
+        if output.status.success() {
+            if let Ok(s) = std::str::from_utf8(&output.stdout) {
+                return s.trim().to_string();
+            }
+        }
+    }
+    "crane".to_string()
+}
+
+/// Detect the jq binary path.
+fn detect_jq_path() -> String {
+    let candidates = ["/usr/bin/jq", "/usr/local/bin/jq", "jq"];
+    for path in &candidates {
+        if std::path::Path::new(path).exists() {
+            return path.to_string();
+        }
+    }
+    "jq".to_string()
+}
+
+/// Get or create the OCI registry launcher script.
+/// The launcher script implements start_registry/stop_registry using crane registry serve.
+fn get_or_create_oci_launcher() -> String {
+    let launcher_path = "/tmp/kuro_oci_registry_launcher.sh";
+    if !std::path::Path::new(launcher_path).exists() {
+        let crane_path = detect_crane_path();
+        let content = format!(
+            r#"#!/usr/bin/env bash
+# Kuro OCI registry launcher - auto-generated
+CRANE_BIN="{crane_path}"
+
+function start_registry() {{
+    local storage_dir="$1"
+    local output="$2"
+    local deadline="${{3:-10}}"
+    local registry_pid="${{storage_dir}}/proc.pid"
+
+    mkdir -p "${{storage_dir}}"
+    "${{CRANE_BIN}}" registry serve --disk="${{storage_dir}}" --address=localhost:0 >>"${{output}}" 2>&1 &
+    echo "$!" > "${{registry_pid}}"
+
+    local timeout=$((SECONDS + ${{deadline}}))
+    local port=""
+    while [ "${{SECONDS}}" -lt "${{timeout}}" ]; do
+        port=$(grep -o "serving on port [0-9]*" "${{output}}" 2>/dev/null | tail -1 | grep -o "[0-9]*$")
+        if [ -n "${{port}}" ]; then
+            break
+        fi
+        sleep 0.1
+    done
+
+    if [ -z "${{port}}" ]; then
+        echo "registry didn't become ready within ${{deadline}}s." >&2
+        return 1
+    fi
+    echo "127.0.0.1:${{port}}"
+    return 0
+}}
+
+function stop_registry() {{
+    local storage_dir="$1"
+    local registry_pid="${{storage_dir}}/proc.pid"
+    if [ -f "${{registry_pid}}" ]; then
+        kill "$(cat "${{registry_pid}}")" 2>/dev/null || true
+        rm -f "${{registry_pid}}"
+    fi
+}}
+"#,
+        );
+        let _ = std::fs::write(launcher_path, &content);
+        // Make it executable
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(meta) = std::fs::metadata(launcher_path) {
+                let mut perms = meta.permissions();
+                perms.set_mode(0o755);
+                let _ = std::fs::set_permissions(launcher_path, perms);
+            }
+        }
+    }
+    launcher_path.to_string()
+}
+
+/// A stub that wraps a string path and provides a `.path` attribute.
+/// Used for crane_info.binary, registry_info.launcher, jqinfo.bin, etc.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct FileLikePathStub {
+    path: String,
+}
+
+impl std::fmt::Display for FileLikePathStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<file:{}>", self.path)
+    }
+}
+
+starlark::starlark_simple_value!(FileLikePathStub);
+
+#[starlark::values::starlark_value(type = "FileLikePath")]
+impl<'v> StarlarkValue<'v> for FileLikePathStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(
+            attribute,
+            "path"
+                | "short_path"
+                | "basename"
+                | "is_source"
+                | "is_directory"
+                | "extension"
+                | "owner"
+                | "root"
+        )
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "path" => Some(heap.alloc_str(&self.path).to_value()),
+            "short_path" => Some(heap.alloc_str(&self.path).to_value()),
+            "basename" => {
+                let basename = std::path::Path::new(&self.path)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(&self.path);
+                Some(heap.alloc_str(basename).to_value())
+            }
+            "is_source" => Some(Value::new_bool(true)),
+            "is_directory" => Some(Value::new_bool(false)),
+            _ => None,
+        }
+    }
+}
+
+/// Stub for crane_info provider (CraneInfo from rules_oci).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct OciCraneInfoStub {
+    crane_path: String,
+}
+
+impl std::fmt::Display for OciCraneInfoStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<CraneInfo>")
+    }
+}
+
+starlark::starlark_simple_value!(OciCraneInfoStub);
+
+#[starlark::values::starlark_value(type = "CraneInfo")]
+impl<'v> StarlarkValue<'v> for OciCraneInfoStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "binary" | "version")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "binary" => Some(heap.alloc(FileLikePathStub {
+                path: self.crane_path.clone(),
+            })),
+            "version" => Some(heap.alloc_str("0.19.1").to_value()),
+            _ => None,
+        }
+    }
+}
+
+/// Stub for OCI crane toolchain.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct OciCraneToolchainStub {
+    crane_path: String,
+}
+
+impl std::fmt::Display for OciCraneToolchainStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<CraneToolchain>")
+    }
+}
+
+starlark::starlark_simple_value!(OciCraneToolchainStub);
+
+#[starlark::values::starlark_value(type = "CraneToolchain")]
+impl<'v> StarlarkValue<'v> for OciCraneToolchainStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "crane_info")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "crane_info" => Some(heap.alloc(OciCraneInfoStub {
+                crane_path: self.crane_path.clone(),
+            })),
+            _ => None,
+        }
+    }
+}
+
+/// Stub for registry_info provider (RegistryInfo from rules_oci).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct OciRegistryInfoStub {
+    launcher_path: String,
+    registry_path: String,
+}
+
+impl std::fmt::Display for OciRegistryInfoStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<RegistryInfo>")
+    }
+}
+
+starlark::starlark_simple_value!(OciRegistryInfoStub);
+
+#[starlark::values::starlark_value(type = "RegistryInfo")]
+impl<'v> StarlarkValue<'v> for OciRegistryInfoStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "launcher" | "registry")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "launcher" => Some(heap.alloc(FileLikePathStub {
+                path: self.launcher_path.clone(),
+            })),
+            "registry" => Some(heap.alloc(FileLikePathStub {
+                path: self.registry_path.clone(),
+            })),
+            _ => None,
+        }
+    }
+}
+
+/// Stub for OCI registry toolchain.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct OciRegistryToolchainStub {
+    launcher_path: String,
+    registry_path: String,
+}
+
+impl std::fmt::Display for OciRegistryToolchainStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<RegistryToolchain>")
+    }
+}
+
+starlark::starlark_simple_value!(OciRegistryToolchainStub);
+
+#[starlark::values::starlark_value(type = "RegistryToolchain")]
+impl<'v> StarlarkValue<'v> for OciRegistryToolchainStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "registry_info")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "registry_info" => Some(heap.alloc(OciRegistryInfoStub {
+                launcher_path: self.launcher_path.clone(),
+                registry_path: self.registry_path.clone(),
+            })),
+            _ => None,
+        }
+    }
+}
+
+/// Stub for jqinfo provider (from aspect_bazel_lib jq toolchain).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct JqInfoStub {
+    jq_path: String,
+}
+
+impl std::fmt::Display for JqInfoStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<JqInfo>")
+    }
+}
+
+starlark::starlark_simple_value!(JqInfoStub);
+
+#[starlark::values::starlark_value(type = "JqInfo")]
+impl<'v> StarlarkValue<'v> for JqInfoStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "bin")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "bin" => Some(heap.alloc(FileLikePathStub {
+                path: self.jq_path.clone(),
+            })),
+            _ => None,
+        }
+    }
+}
+
+/// Stub for jq toolchain (from aspect_bazel_lib).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct JqToolchainStub {
+    jq_path: String,
+}
+
+impl std::fmt::Display for JqToolchainStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<JqToolchain>")
+    }
+}
+
+starlark::starlark_simple_value!(JqToolchainStub);
+
+#[starlark::values::starlark_value(type = "JqToolchain")]
+impl<'v> StarlarkValue<'v> for JqToolchainStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "jqinfo")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "jqinfo" => Some(heap.alloc(JqInfoStub {
+                jq_path: self.jq_path.clone(),
+            })),
             _ => None,
         }
     }

@@ -23,7 +23,6 @@ use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::values::FrozenValueTyped;
 use starlark::values::Value;
-use starlark::values::ValueLike;
 use starlark::values::ValueOfUnchecked;
 use starlark::values::ValueTyped;
 use starlark::values::typing::StarlarkIter;
@@ -314,87 +313,5 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<ValueTyped<'v, StarlarkCmdArgs<'v>>> {
         let _ = this;
         Ok(eval.heap().alloc_typed(StarlarkCmdArgs::default()))
-    }
-
-    /// Bazel-compatible run_shell for executing shell commands.
-    ///
-    /// Creates an action that runs a shell command. This is a convenience
-    /// wrapper that executes commands through the shell.
-    ///
-    /// Parameters:
-    /// - `outputs`: List of output files this action will produce
-    /// - `inputs`: Optional list of input files
-    /// - `command`: The shell command to run (string or list of strings)
-    /// - `arguments`: Optional additional arguments appended to the command
-    /// - `env`: Optional environment variables
-    /// - `mnemonic`: Optional short action description for the console
-    /// - `progress_message`: Optional detailed progress message
-    ///
-    /// Example:
-    /// ```python
-    /// ctx.actions.run_shell(
-    ///     outputs = [output_file],
-    ///     command = "echo hello > $1",
-    ///     arguments = [output_file.path],
-    /// )
-    /// ```
-    #[allow(unused_variables)]
-    fn run_shell<'v>(
-        this: &AnalysisActions<'v>,
-        #[starlark(require = named)] outputs: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        inputs: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        tools: starlark::values::Value<'v>,
-        #[starlark(require = named)] command: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        arguments: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        env: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        mnemonic: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        progress_message: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        use_default_shell_env: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        execution_requirements: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        input_manifests: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        exec_group: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        shadowed_action: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        resource_set: starlark::values::Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        toolchain: starlark::values::Value<'v>,
-        eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<starlark::values::none::NoneType> {
-        // TODO(run_shell): Implement proper shell action registration
-        // For now, this is a stub that accepts the parameters but does not execute.
-        // A full implementation would:
-        // 1. Build the command line: ["bash", "-c", command, "--"] + arguments
-        // 2. Register a run action with the shell wrapper
-        //
-        // This stub allows rules_cc and other Bazel rules to proceed without errors
-        // during loading and analysis phases.
-
-        // Just register a simple action for now
-        // The outputs need to be bound to prevent analysis errors
-        use starlark::values::list::ListRef;
-
-        if let Some(outputs_list) = ListRef::from_value(outputs) {
-            for output in outputs_list.iter() {
-                // Try to get as a declared artifact and bind it to a simple action
-                // This is a placeholder - proper implementation would create a shell action
-                if let Some(declared) = output.downcast_ref::<StarlarkDeclaredArtifact>() {
-                    // For now, just log that we saw this output
-                    // A real implementation would bind it to a shell execution action
-                }
-            }
-        }
-
-        Ok(starlark::values::none::NoneType)
     }
 }

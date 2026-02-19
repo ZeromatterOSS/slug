@@ -395,31 +395,6 @@ pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
-    /// Declares which files in a package are publicly visible.
-    ///
-    /// This is a Bazel built-in function that marks files for export. In Kuro,
-    /// this is currently a no-op stub - all files in a package are accessible.
-    ///
-    /// Example:
-    /// ```python
-    /// exports_files(["version.bzl", "globals.bzl"])
-    /// exports_files(["data.txt"], visibility = ["//some/package:__pkg__"])
-    /// ```
-    ///
-    /// See: https://bazel.build/reference/be/functions#exports_files
-    fn exports_files<'v>(
-        #[starlark(default = UnpackListOrTuple::default())] srcs: UnpackListOrTuple<String>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        visibility: UnpackListOrTuple<String>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        licenses: UnpackListOrTuple<String>,
-    ) -> starlark::Result<NoneType> {
-        // TODO(bazel-compat): Implement file visibility enforcement.
-        // Currently a no-op - Kuro doesn't enforce file-level visibility.
-        let _ = (srcs, visibility, licenses);
-        Ok(NoneType)
-    }
-
     /// Declares a toolchain for use by rules that support toolchain resolution.
     ///
     /// This is a Bazel built-in function for declaring toolchains. In Kuro,
