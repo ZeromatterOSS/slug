@@ -78,6 +78,10 @@ impl QueryTarget for ConfiguredTargetNode {
         Some(self.tests().map(|t| t.target().dupe()))
     }
 
+    fn is_test(&self) -> bool {
+        self.target_node().is_test()
+    }
+
     fn special_attrs_for_each<E, F: FnMut(&str, &Self::Attr<'_>) -> Result<(), E>>(
         &self,
         mut func: F,

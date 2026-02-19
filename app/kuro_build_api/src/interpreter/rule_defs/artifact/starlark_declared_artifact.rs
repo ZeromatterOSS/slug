@@ -20,6 +20,7 @@ use kuro_artifact::artifact::artifact_type::OutputArtifact;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_error::BuckErrorContext;
 use kuro_error::kuro_error;
+use kuro_execute::execute::request::OutputType;
 use kuro_execute::path::artifact_path::ArtifactPath;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
@@ -140,6 +141,10 @@ impl<'v> StarlarkArtifactLike<'v> for StarlarkDeclaredArtifact<'v> {
 
     fn is_source(&'v self) -> kuro_error::Result<bool> {
         Ok(false)
+    }
+
+    fn is_directory(&self) -> bool {
+        matches!(self.artifact.output_type(), OutputType::Directory)
     }
 
     fn owner(&'v self) -> kuro_error::Result<Option<BaseDeferredKey>> {

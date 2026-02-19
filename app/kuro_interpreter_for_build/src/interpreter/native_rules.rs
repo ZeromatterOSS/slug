@@ -197,12 +197,20 @@ mod rule_defs {
     });
 
     /// Creates the AttributeSpec for label_flag.
-    /// label_flag has a required `build_setting_default` attribute pointing to a target.
+    /// label_flag is a Bazel build setting that holds a label value.
+    /// The `build_setting_default` is stored as a STRING (not a dep) because in Bazel,
+    /// label_flag targets do NOT create dependency edges to their default value.
+    /// The label_flag is a configuration flag; its value is resolved at configuration time,
+    /// not at loading time. Treating it as a dep would create false cycles (e.g., in rules_rust
+    /// where process_wrapper → import → import_macro_label → import_macro → import_macro_impl
+    /// → process_wrapper forms a cycle only if import_macro_label follows its default as a dep).
     fn label_flag_attributes() -> AttributeSpec {
         let default_attr = Attribute::new(
-            None, // No default - required attribute
-            "The default value for this label flag",
-            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+            Some(Arc::new(CoercedAttr::String(StringLiteral(ArcStr::from(
+                "",
+            ))))),
+            "The default label value for this flag (stored as string, not a dep)",
+            AttrType::string(),
         );
 
         AttributeSpec::from(
@@ -959,20 +967,14 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
     ) -> starlark::Result<NoneType> {
         let _ = (tags, testonly, deprecation, features);
         let internals = ModuleInternals::from_context(eval, "label_flag")?;
-        let coercion_ctx = internals.attr_coercion_context();
 
-        // Coerce the build_setting_default label to a dep attribute
-        // Bazel allows bare names like "import_macro" as shorthand for ":import_macro"
-        let default_str = if !build_setting_default.contains('/')
-            && !build_setting_default.starts_with(':')
-            && !build_setting_default.starts_with('@')
-        {
-            format!(":{}", build_setting_default)
-        } else {
-            build_setting_default.to_owned()
-        };
-        let label = coercion_ctx.coerce_providers_label(&default_str)?;
-        let coerced_default = CoercedAttr::Dep(label);
+        // Store build_setting_default as a plain string - NOT as a dep.
+        // In Bazel, label_flag is a build setting (configuration flag) whose value is resolved
+        // at configuration time. The build_setting_default is just the DEFAULT VALUE of the flag,
+        // not a regular dep edge. If we stored it as a dep, we'd create false cycles in the
+        // dependency graph (e.g., rules_rust's import macro bootstrapping cycle).
+        let coerced_default =
+            CoercedAttr::String(StringLiteral(ArcStr::from(build_setting_default)));
 
         let target_node = create_native_target_node(
             rule_defs::LABEL_FLAG_RULE.clone(),

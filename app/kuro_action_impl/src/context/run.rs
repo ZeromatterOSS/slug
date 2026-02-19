@@ -1078,7 +1078,15 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             let starlark_exe = StarlarkCmdArgs::try_from_value(exe_list)
                 .buck_error_context("run_shell: building bash exe")?;
 
-            let mut args_items = vec![heap.alloc_str(cmd_str).to_value()];
+            // In Bazel, run_shell with a string command and `arguments` passes them as
+            // $1, $2, ... to the shell script. The bash -c invocation is:
+            //   bash -c 'script' $0_placeholder arg1 arg2 ...
+            // where $0_placeholder (the "script name") occupies $0, and the actual
+            // arguments start at $1. We use an empty string as the $0 placeholder.
+            let mut args_items = vec![
+                heap.alloc_str(cmd_str).to_value(),
+                heap.alloc_str("").to_value(), // placeholder for $0 (bash script name)
+            ];
             if let NoneOr::Other(extra_args) = arguments {
                 if let Ok(iter) = extra_args.iterate(heap) {
                     args_items.extend(iter);

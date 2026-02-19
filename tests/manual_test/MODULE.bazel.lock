@@ -1,0 +1,23 @@
+{
+  "lockFileVersion": 26,
+  "registryFileHashes": {},
+  "selectedYankedVersions": {},
+  "moduleExtensions": {
+    "//:test_repo_ext.bzl%repo_ext": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-zHw7iCvojoUjLvUY2czSFgfm5KDfpujM9fIcgOCw63M=",
+        "usagesDigest": "sha256-+c0ey6CZlTvWPiUBxyLIRiYwNKHetOPeyH+UhEk+OCU=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {
+          "my_test_repo": {
+            "repoRuleId": "manual_test//test_repo_ctx_simple.bzl%simple_repo",
+            "attributes": {
+              "test_attr": "world"
+            }
+          }
+        }
+      }
+    }
+  },
+  "facts": {}
+}

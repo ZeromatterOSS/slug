@@ -106,7 +106,6 @@ impl RepositoryRuleResult {
         self.content_hash = Some(hash);
         self
     }
-
 }
 
 /// DICE key for repository rule execution.

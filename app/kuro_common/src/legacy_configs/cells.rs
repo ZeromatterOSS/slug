@@ -427,8 +427,7 @@ impl BuckConfigBasedCells {
                 has_module_bazel = true;
 
                 // Root cell comes from MODULE.bazel module(name = "...")
-                let root_cell_name =
-                    CellName::unchecked_new(&bzlmod_result.root_module_name)?;
+                let root_cell_name = CellName::unchecked_new(&bzlmod_result.root_module_name)?;
                 cell_definitions.push((root_cell_name, root_path.clone()));
                 tracing::info!(
                     "Root cell '{}' defined from MODULE.bazel",

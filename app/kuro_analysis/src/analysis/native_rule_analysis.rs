@@ -66,7 +66,7 @@ pub fn analyze_native_rule(
         }
         NativeRuleKind::Filegroup => analyze_filegroup(target, configured_node, dep_analysis),
         NativeRuleKind::Alias => analyze_alias(target, dep_analysis),
-        NativeRuleKind::LabelFlag => analyze_label_flag(target, dep_analysis),
+        NativeRuleKind::LabelFlag => analyze_label_flag(target, dep_analysis), // dep_analysis is empty (build_setting_default is a string, not a dep)
         NativeRuleKind::ConfigSetting => {
             analyze_config_setting(target, configured_node, dep_analysis)
         }
@@ -182,26 +182,62 @@ fn analyze_constraint_value(
 }
 
 /// Analyze a label_flag target.
-/// A label_flag forwards all providers from its `build_setting_default` target.
-/// This is similar to alias - it acts as a configurable indirection.
+/// A label_flag is a Bazel build setting that holds a label value.
+/// Its build_setting_default is stored as a plain string (not a dep), so there are no
+/// deps to forward.
+///
+/// We return DefaultInfo + minimal CcInfo so that when rules (like rules_rust's
+/// rust_binary_without_process_wrapper) resolve their `_import_macro_dep` through
+/// an alias chain ending at a label_flag, the dep is recognized as a cc_library-like
+/// dep (via CcInfo) rather than triggering "rust targets can only depend on rust_library
+/// or cc_library" errors in collect_deps. The CcInfo has an empty linking context,
+/// so it contributes no linker flags.
 fn analyze_label_flag(
     target: &ConfiguredTargetLabel,
-    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+    _dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
 ) -> kuro_error::Result<AnalysisResult> {
-    // label_flag has exactly one dep (build_setting_default), forward its providers
-    if dep_analysis.len() == 1 {
-        let (_default_label, default_result) = dep_analysis.into_iter().next().unwrap();
-        Ok(default_result)
-    } else if dep_analysis.is_empty() {
-        // No deps resolved - return minimal DefaultInfo
-        create_minimal_analysis_result(target)
-    } else {
-        Err(internal_error!(
-            "label_flag target {} has {} dependencies. Expected exactly one 'build_setting_default' dependency.",
-            target,
-            dep_analysis.len()
-        ))
-    }
+    let heap = FrozenHeap::new();
+    let default_info = FrozenDefaultInfo::testing_empty(&heap);
+    // Minimal CcInfo with empty linking context - required so that label_flag
+    // deps (via alias chains) pass the rules_rust collect_deps provider check.
+    let cc_info = heap.alloc(CcInfoInstanceStub);
+    let providers = SmallMap::from_iter([
+        (
+            DefaultInfoCallable::provider_id().dupe(),
+            default_info.to_frozen_value(),
+        ),
+        (CcInfoProvider::provider_id().dupe(), cc_info),
+    ]);
+    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+        heap.alloc(FrozenProviderCollection::new(providers)),
+    )?;
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+        value: FrozenAnalysisValueStorage::new_native(
+            self_key.dupe(),
+            DYNAMIC_LAMBDA_PARAMS_STORAGES
+                .get()
+                .unwrap()
+                .new_frozen_dynamic_lambda_params_storage(),
+            Some(provider_collection),
+        ),
+    });
+    let heap_ref = heap.into_ref();
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
+    let recorded_values = RecordedAnalysisValues::new_native(
+        self_key,
+        Some(analysis_storage),
+        RecordedActions::new(0),
+    );
+    Ok(AnalysisResult::new(
+        recorded_values,
+        None,
+        HashMap::new(),
+        0,
+        0,
+        None,
+    ))
 }
 
 /// Returns the default value for known Bazel command-line flags.

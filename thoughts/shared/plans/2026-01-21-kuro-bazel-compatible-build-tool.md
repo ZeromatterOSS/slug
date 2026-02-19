@@ -361,7 +361,7 @@ Quick reference to all phases and their locations:
 
 | Phase | Title                    | Status                                                                                  |
 | ----- | ------------------------ | --------------------------------------------------------------------------------------- |
-| 10    | rules_cc Integration     | [x] In Progress (cc_library, cc_binary, cc_test build work)                             |
+| 10    | rules_cc Integration     | [x] In Progress (cc_library, cc_binary, cc_test build+test work; linkstatic=True and False; RPATH fix)                             |
 | 11    | rules_rust Integration   | [x] Complete (rules_rust 0.40.0, rust_library + rust_binary)                            |
 | 12    | rules_python Integration | [x] Complete (rules_python 1.8.0, enable_pystar=True, py_library + py_binary + py_test) |
 | 13    | protobuf Integration     | [x] Complete (proto_library + cc_proto_library build end-to-end, 313 commands) |
@@ -373,7 +373,7 @@ Quick reference to all phases and their locations:
 | ----- | ---------------------------------- | --------------- |
 | 16    | Local Build Isolation (Sandboxing) | [ ] Not Started |
 | 17    | Platform Support                   | [ ] Not Started |
-| 18    | Query Commands                     | [ ] Not Started |
+| 18    | Query Commands + Test Runner       | [x] Functional (deps, rdeps, allpaths, somepath, kind, attr, filter, buildfiles, tests; --output=label/json/build/graph; kuro test //... runs 4 tests) |
 
 ---
 

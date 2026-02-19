@@ -122,32 +122,30 @@ fn maybe_inject_test_info<'v>(
         return Ok(list_res);
     }
 
-    // Get executable from DefaultInfo
+    // Get executable from DefaultInfo.
+    // DefaultInfo.executable returns a single File value (not a list), or None.
     if let Some(di_value) = default_info_value {
-        if let Ok(Some(executable_list)) = di_value.get_attr("executable", heap) {
-            if let Ok(iter) = executable_list.iterate(heap) {
-                let items: Vec<Value<'v>> = iter.collect();
-                if let Some(exe) = items.first() {
-                    // Create ExternalRunnerTestInfo with the executable as command
-                    let test_type = heap.alloc_str("custom").to_value();
-                    let command = heap.alloc(vec![*exe]);
-                    let test_info =
-                        create_external_runner_test_info_for_bazel_test(test_type, command);
-                    let test_info_value = heap.alloc(test_info);
+        if let Ok(Some(exe)) = di_value.get_attr("executable", heap) {
+            if !exe.is_none() {
+                // Create ExternalRunnerTestInfo with the executable as command
+                let test_type = heap.alloc_str("custom").to_value();
+                let command = heap.alloc(vec![exe]);
+                let test_info =
+                    create_external_runner_test_info_for_bazel_test(test_type, command);
+                let test_info_value = heap.alloc(test_info);
 
-                    // Create new list with test_info appended
-                    let mut new_list: Vec<Value<'v>> = list.iter().collect();
-                    new_list.push(test_info_value);
-                    let new_list_val = heap.alloc(new_list);
-                    if is_struct {
-                        // Re-wrap in struct(providers=[...]) to maintain pattern
-                        return Ok(heap.alloc(starlark::values::structs::AllocStruct([(
-                            "providers",
-                            new_list_val,
-                        )])));
-                    }
-                    return Ok(new_list_val);
+                // Create new list with test_info appended
+                let mut new_list: Vec<Value<'v>> = list.iter().collect();
+                new_list.push(test_info_value);
+                let new_list_val = heap.alloc(new_list);
+                if is_struct {
+                    // Re-wrap in struct(providers=[...]) to maintain pattern
+                    return Ok(heap.alloc(starlark::values::structs::AllocStruct([(
+                        "providers",
+                        new_list_val,
+                    )])));
                 }
+                return Ok(new_list_val);
             }
         }
     }

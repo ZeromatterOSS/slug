@@ -16,6 +16,7 @@ use dupe::OptionDupedExt;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::artifact_type::BaseArtifactKind;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
+use kuro_execute::execute::request::OutputType;
 use kuro_execute::path::artifact_path::ArtifactPath;
 use kuro_fs::paths::file_name::FileName;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
@@ -147,6 +148,13 @@ impl<'v> StarlarkArtifactLike<'v> for StarlarkArtifact {
 
     fn is_source(&'v self) -> kuro_error::Result<bool> {
         Ok(self.artifact.is_source())
+    }
+
+    fn is_directory(&self) -> bool {
+        match self.artifact.as_parts().0 {
+            BaseArtifactKind::Build(ba) => matches!(ba.output_type(), OutputType::Directory),
+            BaseArtifactKind::Source(_) => false,
+        }
     }
 
     fn owner(&'v self) -> kuro_error::Result<Option<BaseDeferredKey>> {

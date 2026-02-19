@@ -1293,10 +1293,12 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
         let _unused = mandatory;
-        // Output attributes in Bazel are typically strings that name the output file.
-        // The actual output declaration happens during the rule's implementation via
-        // ctx.actions.declare_file(). We use a string attr to capture the name.
-        Ok(Attribute::attr(eval, default, doc, AttrType::string())?)
+        // Output attributes in Bazel declare output file names.
+        // We mark this as an output attr so that when this target is recorded,
+        // the output filename is registered for Bazel-compatible output file label resolution.
+        let mut sa = Attribute::attr(eval, default, doc, AttrType::string())?;
+        sa.is_output = true;
+        Ok(sa)
     }
 
     /// Declares a list of output files that the rule will generate.

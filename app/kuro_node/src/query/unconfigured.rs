@@ -68,6 +68,10 @@ impl QueryTarget for TargetNode {
         Some(self.tests().map(|t| t.target().dupe()))
     }
 
+    fn is_test(&self) -> bool {
+        TargetNode::is_test(self)
+    }
+
     fn attr_any_matches(
         attr: &Self::Attr<'_>,
         filter: &dyn Fn(&str) -> kuro_error::Result<bool>,

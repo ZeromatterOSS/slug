@@ -34,14 +34,18 @@ enum StarlarkAttributeError {
     DefaultOnlyInNested,
 }
 
-#[derive(
-    derive_more::Display,
-    Debug,
-    ProvidesStaticType,
-    NoSerialize,
-    Allocative
-)]
-pub struct StarlarkAttribute(Attribute);
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct StarlarkAttribute {
+    inner: Attribute,
+    /// True if this is an `attr.output()` attribute (Bazel output file declaration).
+    pub is_output: bool,
+}
+
+impl std::fmt::Display for StarlarkAttribute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.inner, f)
+    }
+}
 
 starlark_simple_value!(StarlarkAttribute);
 
@@ -60,32 +64,42 @@ impl<'v> StarlarkValue<'v> for StarlarkAttribute {
 
 impl StarlarkAttribute {
     pub fn new(attr: Attribute) -> Self {
-        Self(attr)
+        Self {
+            inner: attr,
+            is_output: false,
+        }
+    }
+
+    pub fn new_output(attr: Attribute) -> Self {
+        Self {
+            inner: attr,
+            is_output: true,
+        }
     }
 
     pub fn clone_attribute(&self) -> Attribute {
-        self.0.clone()
+        self.inner.clone()
     }
 
     /// Coercer to put into higher lever coercer (e. g. for `attrs.list(xxx)`).
     pub fn coercer_for_inner(&self) -> kuro_error::Result<AttrType> {
-        if self.0.is_default_only() {
+        if self.inner.is_default_only() {
             return Err(StarlarkAttributeError::DefaultOnlyInNested.into());
         }
-        Ok(self.0.coercer().dupe())
+        Ok(self.inner.coercer().dupe())
     }
 
     pub fn coercer_for_default_only(&self) -> AttrType {
-        self.0.coercer().dupe()
+        self.inner.coercer().dupe()
     }
 
     pub fn default(&self) -> Option<&Arc<CoercedAttr>> {
-        self.0.default()
+        self.inner.default()
     }
 
     /// Get configuration_field info if this attr's default was a configuration_field().
     pub fn configuration_field(&self) -> Option<(&str, &str)> {
-        self.0.configuration_field()
+        self.inner.configuration_field()
     }
 }
 

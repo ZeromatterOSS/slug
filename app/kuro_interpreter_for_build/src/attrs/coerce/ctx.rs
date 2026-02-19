@@ -9,6 +9,7 @@
  */
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -103,6 +104,11 @@ pub struct BuildAttrCoercionContext {
     // than select values
     dict_interner: AttrCoercionInterner<ArcSlice<(CoercedAttr, CoercedAttr)>>,
     select_interner: AttrCoercionInterner<ArcSlice<(ConfigurationSettingKey, CoercedAttr)>>,
+    /// Bazel-compatible output file label registry.
+    /// Maps output filename → producing target name for the current package.
+    /// Populated when a target with `attr.output()` attributes is recorded.
+    /// Allows other targets to reference output files by bare filename as deps.
+    output_file_registry: RefCell<HashMap<String, String>>,
 }
 
 impl Debug for BuildAttrCoercionContext {
@@ -136,7 +142,17 @@ impl BuildAttrCoercionContext {
             list_interner: AttrCoercionInterner::new(),
             dict_interner: AttrCoercionInterner::new(),
             select_interner: AttrCoercionInterner::new(),
+            output_file_registry: RefCell::new(HashMap::new()),
         }
+    }
+
+    /// Register an output file label for Bazel-compatible output file reference resolution.
+    /// When a rule with `attr.output()` is declared, its output filenames are registered here
+    /// so other targets in the same package can reference them by bare filename as deps.
+    pub fn register_output_file(&self, filename: String, target_name: String) {
+        self.output_file_registry
+            .borrow_mut()
+            .insert(filename, target_name);
     }
 
     pub fn new_no_package(
@@ -270,7 +286,11 @@ impl BuildAttrCoercionContext {
                     false
                 };
                 if is_bare_name && !is_source_file {
-                    let adjusted = format!(":{}", value);
+                    // Bazel-compatible: check if this bare name is a known output file
+                    // from another target in this package (declared with attr.output()).
+                    let output_target = self.output_file_registry.borrow().get(value).cloned();
+                    let target_name_to_use = output_target.as_deref().unwrap_or(value);
+                    let adjusted = format!(":{}", target_name_to_use);
                     match self.parse_pattern_bazel_compat::<ProvidersPatternExtra>(&adjusted) {
                         Ok(ParsedPattern::Target(package, target_name, providers)) => {
                             Ok(providers.into_providers_label(package, target_name.as_ref()))

@@ -181,6 +181,10 @@ pub struct StarlarkRepositoryRule<'v> {
     _remotable: bool,
     /// Documentation string.
     doc: Option<String>,
+    /// The bzl file path where this rule was defined (e.g. "manual_test//test_repo_ctx_simple.bzl").
+    /// Used to construct the full repo_rule_id in extension context so the DICE executor
+    /// can locate and execute the Starlark implementation.
+    bzl_path: Option<String>,
 }
 
 impl<'v> Display for StarlarkRepositoryRule<'v> {
@@ -211,12 +215,16 @@ impl<'v> StarlarkRepositoryRule<'v> {
     ) -> kuro_error::Result<StarlarkRepositoryRule<'v>> {
         // When there's no build context (e.g. standalone/sync evaluator), allow the call.
         // When there is a context, verify we're in a .bzl file.
-        if let Some(build_context) = eval.extra.and_then(|e| e.downcast_ref::<BuildContext>()) {
+        let bzl_path = if let Some(build_context) =
+            eval.extra.and_then(|e| e.downcast_ref::<BuildContext>())
+        {
             match &build_context.additional {
-                PerFileTypeContext::Bzl(_) => {}
+                PerFileTypeContext::Bzl(bzl_ctx) => Some(bzl_ctx.bzl_path.to_string()),
                 _ => return Err(RepositoryRuleError::RuleNotInBzl.into()),
             }
-        }
+        } else {
+            None
+        };
 
         Ok(StarlarkRepositoryRule {
             name: RefCell::new(None),
@@ -231,6 +239,7 @@ impl<'v> StarlarkRepositoryRule<'v> {
             } else {
                 Some(doc.to_owned())
             },
+            bzl_path,
         })
     }
 }
@@ -294,6 +303,8 @@ pub struct FrozenStarlarkRepositoryRule {
     configure: bool,
     /// Documentation string.
     doc: Option<String>,
+    /// The bzl file path where this rule was defined (e.g. "manual_test//test_repo_ctx_simple.bzl").
+    bzl_path: Option<String>,
 }
 
 starlark_simple_value!(FrozenStarlarkRepositoryRule);
@@ -319,6 +330,7 @@ impl<'v> Freeze for StarlarkRepositoryRule<'v> {
             environ: self.environ,
             configure: self.configure,
             doc: self.doc,
+            bzl_path: self.bzl_path,
         })
     }
 }
@@ -390,10 +402,13 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRepositoryRule {
         // Outside extension context, we record RepositoryInvocations for immediate tracking.
         if in_extension_context() {
             // Build a RepoSpec for deferred execution.
-            // Use the short rule name. The full bzl path (e.g.,
-            // "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive") is constructed
-            // by the executor when available. The short name suffices for builtin rules.
-            let repo_rule_id = self.name.clone();
+            // Use "{bzl_path}%{name}" format so the DICE executor can locate the Starlark
+            // implementation. For builtin rules (no bzl_path), just use the rule name.
+            let repo_rule_id = if let Some(bzl_path) = &self.bzl_path {
+                format!("{}%{}", bzl_path, self.name)
+            } else {
+                self.name.clone()
+            };
             let mut spec = RepoSpec::new(repo_rule_id);
 
             // Convert all kwargs (except 'name') to attributes

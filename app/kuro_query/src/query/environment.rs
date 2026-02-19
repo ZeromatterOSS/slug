@@ -111,6 +111,14 @@ pub trait QueryTarget: LabeledNode + Dupe + Send + Sync + 'static {
         None::<iter::Empty<Self::Key>>
     }
 
+    /// Returns true if this target is a test rule (e.g. cc_test, py_test, etc.).
+    ///
+    /// This is used by the `tests()` query function to include test targets directly,
+    /// matching Bazel's behavior where `tests(//...)` returns all test rule targets.
+    fn is_test(&self) -> bool {
+        false
+    }
+
     fn attr_any_matches(
         attr: &Self::Attr<'_>,
         filter: &dyn Fn(&str) -> kuro_error::Result<bool>,
@@ -287,6 +295,18 @@ pub trait QueryEnvironment: Send + Sync {
         &self,
         targets: &TargetSet<Self::Target>,
     ) -> kuro_error::Result<TargetSet<Self::Target>> {
+        let mut ret = TargetSet::new();
+
+        // Bazel-compatible: include test rule targets directly.
+        // In Bazel, tests(//...) returns all test rule targets (cc_test, py_test, etc.)
+        // as well as expanding test_suite targets via their `tests` attribute.
+        for target in targets.iter() {
+            if target.is_test() {
+                ret.insert(target.dupe());
+            }
+        }
+
+        // Also follow the `tests` attribute (for test_suite targets).
         let target_tests = targets
             .iter()
             .map(|target| {
@@ -313,7 +333,6 @@ pub trait QueryEnvironment: Send + Sync {
             })
             .collect::<FuturesUnordered<_>>();
 
-        let mut ret = TargetSet::new();
         while let Some(test) = futs.try_next().await? {
             ret.insert(test);
         }

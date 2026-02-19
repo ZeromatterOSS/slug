@@ -47,6 +47,11 @@ pub trait StarlarkArtifactLike<'v>: Display {
 
     fn is_source(&'v self) -> kuro_error::Result<bool>;
 
+    /// Returns true if this artifact was declared as a directory (via declare_directory).
+    fn is_directory(&self) -> bool {
+        false
+    }
+
     fn owner(&'v self) -> kuro_error::Result<Option<BaseDeferredKey>>;
 
     fn with_short_path(

@@ -607,6 +607,68 @@ impl<Env: QueryEnvironment> DefaultQueryFunctionsModule<Env> {
         Ok(self.implementation.testsof(env, &targets).await?.into())
     }
 
+    /// Bazel-compatible alias for `testsof()`.
+    ///
+    /// Returns all test rules reachable from the given [*target expression*](#target-expression).
+    /// Expands `test_suite` targets to their constituent tests.
+    ///
+    /// For example:
+    /// ```text
+    /// $ kuro uquery "tests(//...)"
+    /// ```
+    async fn tests(&self, env: &Env, targets: TargetSet<Env::Target>) -> QueryFuncResult<Env> {
+        Ok(self.implementation.testsof(env, &targets).await?.into())
+    }
+
+    /// Bazel-compatible alias for `allbuildfiles()`.
+    ///
+    /// For each target in the provided [*target expression*](#target-expression),
+    /// returns the build file where the target is defined,
+    /// along with all transitive imports of that file.
+    ///
+    /// For example:
+    /// ```text
+    /// $ kuro uquery "buildfiles(//...)"
+    /// ```
+    async fn buildfiles(
+        &self,
+        env: &Env,
+        universe: TargetSet<Env::Target>,
+    ) -> QueryFuncResult<Env> {
+        Ok(self
+            .implementation
+            .allbuildfiles(env, &universe)
+            .await?
+            .into())
+    }
+
+    /// Rule attribute filtering with regex (Bazel-compatible).
+    ///
+    /// Bazel-compatible version of `attrregexfilter()`. Evaluates the given
+    /// [*target expression*](#target-expression) and filters the resulting build targets
+    /// to those where the specified attribute's value matches the given regex pattern.
+    ///
+    /// - If the attribute is a single value, it is matched against the pattern.
+    /// - If the attribute is a list, the target is returned if any element matches.
+    /// - If the attribute is a label, its string representation is matched.
+    ///
+    /// For example:
+    /// ```text
+    /// $ kuro uquery "attr(deps, '//foo:bar', //...)"
+    /// ```
+    /// returns targets that have `//foo:bar` in their `deps` attribute.
+    async fn attr(
+        &self,
+        attr: String,
+        value_pattern: String,
+        targets: TargetSet<Env::Target>,
+    ) -> QueryFuncResult<Env> {
+        Ok(self
+            .implementation
+            .attrregexfilter(&attr, &value_pattern, &targets)?
+            .into())
+    }
+
     // These three functions are intentionally implemented as errors. They are only available within the context
     // of a deps functions 3rd parameter expr. When used in that context, the QueryFunctions will be augmented to
     // have non-erroring implementations.

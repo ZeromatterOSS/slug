@@ -1219,7 +1219,18 @@ impl<'v> StarlarkValue<'v> for ToolchainsStub {
     /// Checks the key to determine which kind of toolchain to return.
     /// Returns None for unrecognized toolchain types.
     fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let key_str = index.unpack_str().unwrap_or("");
+        // Get the key string - handle both str and Label objects.
+        // Label("//rust:toolchain_type") is a BazelLabel, not a str, so unpack_str() returns None.
+        // Using format!("{}", index) gives the Display representation:
+        //   - for str: includes quotes (e.g., `"@rules_rust//rust:toolchain_type"`) but we use unpack_str first
+        //   - for BazelLabel: returns the raw label string (e.g., `@rules_rust//rust:toolchain_type`)
+        let owned_str;
+        let key_str = if let Some(s) = index.unpack_str() {
+            s
+        } else {
+            owned_str = format!("{}", index);
+            &owned_str
+        };
         // Extract target name (after :) and package path (before :) for matching
         let (pkg_path, target_name) = key_str.rsplit_once(':').unwrap_or(("", key_str));
         // Extract the last package segment (e.g., "cpp" from "//tools/cpp")
@@ -1227,7 +1238,10 @@ impl<'v> StarlarkValue<'v> for ToolchainsStub {
             .rsplit_once('/')
             .map(|(_, seg)| seg)
             .unwrap_or(pkg_path);
-        if target_name == "rust_toolchain" || target_name == "rustfmt_toolchain" {
+        if target_name == "rust_toolchain"
+            || target_name == "rustfmt_toolchain"
+            || (target_name == "toolchain_type" && pkg_segment == "rust")
+        {
             Ok(heap.alloc(RustToolchainInfoStub))
         } else if target_name == "toolchain_type" && (pkg_segment == "cc" || pkg_segment == "cpp") {
             Ok(heap.alloc(CcToolchainInfoStub))

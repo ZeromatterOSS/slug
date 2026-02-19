@@ -1825,42 +1825,10 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         });
 
         let make_origin_rpath = |dir_str: &str| -> String {
-            if let Some(ref out_dir) = output_dir {
-                // Normalize: strip leading "../" components from dir_str.
-                // rules_cc may produce relative paths like "../../../buck-out/v2/gen/..."
-                // but we need the project-root-relative path for $ORIGIN computation.
-                let mut normalized = dir_str;
-                while normalized.starts_with("../") {
-                    normalized = &normalized[3..];
-                }
-                if normalized == ".." {
-                    normalized = "";
-                }
-
-                // Compute relative path from binary's directory to the library directory
-                let from_components: Vec<&str> =
-                    out_dir.split('/').filter(|s| !s.is_empty()).collect();
-                let to_components: Vec<&str> =
-                    normalized.split('/').filter(|s| !s.is_empty()).collect();
-                let common = from_components
-                    .iter()
-                    .zip(to_components.iter())
-                    .take_while(|(a, b)| a == b)
-                    .count();
-                let up_count = from_components.len() - common;
-                let mut rel = String::from("$ORIGIN");
-                for _ in 0..up_count {
-                    rel.push_str("/..");
-                }
-                for &component in &to_components[common..] {
-                    rel.push('/');
-                    rel.push_str(component);
-                }
-                format!("-Wl,-rpath,{}", rel)
-            } else {
-                // No output path available, use as-is (fallback)
-                format!("-Wl,-rpath,{}", dir_str)
-            }
+            // runtime_library_search_directories paths are relative to the binary's
+            // output directory (i.e., relative to $ORIGIN). Use them directly.
+            // e.g. dir_str="../__hello_lib__" → "-Wl,-rpath,$ORIGIN/../__hello_lib__"
+            format!("-Wl,-rpath,$ORIGIN/{}", dir_str)
         };
 
         let mut has_rpath = false;

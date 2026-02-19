@@ -32,6 +32,7 @@ use kuro_node::attrs::attr_type::list::ListLiteral;
 use kuro_node::attrs::attr_type::string::StringLiteral;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::display::AttrDisplayWithContextExt;
+use kuro_node::attrs::inspect_options::AttrInspectOptions;
 use kuro_node::attrs::spec::AttributeSpec;
 use kuro_node::bzl_or_bxl_path::BzlOrBxlPath;
 use kuro_node::nodes::unconfigured::RuleKind;
@@ -132,6 +133,9 @@ pub struct StarlarkRuleCallable<'v> {
     artifact_promise_mappings: Option<ArtifactPromiseMappings<'v>>,
     /// Whether this is a Bazel test rule (created with `rule(test=True)`).
     is_test: bool,
+    /// Names of attributes that are `attr.output()` type.
+    /// Used to register output file labels for Bazel-compatible dep resolution.
+    output_attr_names: Vec<String>,
 }
 
 /// Mappings of promise artifact name to the starlark function that will produce it, for anon targets.
@@ -223,6 +227,8 @@ impl<'v> StarlarkRuleCallable<'v> {
             ),
         };
 
+        // Collect names of output attrs before sorting/consuming
+        let mut output_attr_names: Vec<String> = Vec::new();
         let sorted_validated_attrs = attrs
             .entries
             .into_iter()
@@ -231,6 +237,9 @@ impl<'v> StarlarkRuleCallable<'v> {
                 if name == NAME_ATTRIBUTE_FIELD {
                     Err(RuleError::InvalidParameterName(NAME_ATTRIBUTE_FIELD.to_owned()).into())
                 } else {
+                    if value.is_output {
+                        output_attr_names.push(name.to_owned());
+                    }
                     Ok((name.to_owned(), value.clone_attribute()))
                 }
             })
@@ -298,6 +307,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             ignore_attrs_for_profiling: build_context.ignore_attrs_for_profiling,
             artifact_promise_mappings,
             is_test,
+            output_attr_names,
         })
     }
 
@@ -505,6 +515,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
             ty: self.ty,
             ignore_attrs_for_profiling: self.ignore_attrs_for_profiling,
             artifact_promise_mappings,
+            output_attr_names: self.output_attr_names,
         })
     }
 }
@@ -523,6 +534,9 @@ pub struct FrozenStarlarkRuleCallable {
     ty: Ty,
     ignore_attrs_for_profiling: bool,
     artifact_promise_mappings: Option<FrozenArtifactPromiseMappings>,
+    /// Names of `attr.output()` attributes. Used to register output file labels for
+    /// Bazel-compatible output file label resolution.
+    output_attr_names: Vec<String>,
 }
 starlark_simple_value!(FrozenStarlarkRuleCallable);
 
@@ -597,6 +611,25 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRuleCallable {
                     self.ignore_attrs_for_profiling,
                     call_stack,
                 )?;
+                // Register output file labels for Bazel-compatible dep resolution.
+                // When a target has attr.output() attrs, other targets in the same package
+                // can reference those output files by bare filename as deps.
+                if !self.output_attr_names.is_empty() {
+                    let target_name = target_node.label().name().as_str().to_owned();
+                    let coerce_ctx = internals.attr_coercion_context();
+                    for attr_name in &self.output_attr_names {
+                        if let Ok(Some(attr_full)) =
+                            target_node.attr(attr_name, AttrInspectOptions::All)
+                        {
+                            if let CoercedAttr::String(s) = attr_full.value {
+                                coerce_ctx.register_output_file(
+                                    s.0.as_str().to_owned(),
+                                    target_name.clone(),
+                                );
+                            }
+                        }
+                    }
+                }
                 internals.record(target_node)?;
                 Ok(Value::new_none())
             })
