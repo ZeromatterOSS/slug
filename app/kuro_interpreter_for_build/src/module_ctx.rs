@@ -133,6 +133,19 @@ fn repository_os_methods(builder: &mut MethodsBuilder) {
     fn arch(this: &RepositoryOs) -> starlark::Result<String> {
         Ok(this.arch.clone())
     }
+
+    /// A snapshot of the environment variables at the time repository rules are executed.
+    #[starlark(attribute)]
+    fn environ<'v>(this: &RepositoryOs, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let mut map = SmallMap::new();
+        for (key, val) in std::env::vars() {
+            map.insert_hashed(
+                heap.alloc_str(&key).to_value().get_hashed().unwrap(),
+                heap.alloc_str(&val).to_value(),
+            );
+        }
+        Ok(heap.alloc(Dict::new(map)))
+    }
 }
 
 // ============================================================================

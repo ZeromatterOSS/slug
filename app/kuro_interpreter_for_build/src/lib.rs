@@ -29,6 +29,7 @@ pub(crate) mod plugins;
 pub mod repository_ctx;
 pub mod repository_rule;
 pub mod rule;
+pub mod starlark_repo_rule_executor_impl;
 pub mod subrule;
 pub mod super_package;
 
@@ -43,5 +44,6 @@ pub fn init_late_bindings() {
         rule::init_frozen_rule_get_impl();
         rule::init_frozen_promise_artifact_mappings_get_impl();
         module_extension_executor_impl::init_module_extension_executor();
+        starlark_repo_rule_executor_impl::init_starlark_repo_rule_executor();
     });
 }

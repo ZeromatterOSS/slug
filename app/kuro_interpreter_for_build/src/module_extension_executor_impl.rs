@@ -96,7 +96,7 @@ enum ExtensionExecutionError {
 /// - `//local:extension.bzl` (root module)
 ///
 /// The `@repo_name` or `@@repo_name` part maps to a cell name.
-fn parse_bzlmod_bzl_path(
+pub(crate) fn parse_bzlmod_bzl_path(
     bzl_path: &str,
     cell_resolver: &kuro_core::cells::CellResolver,
 ) -> kuro_error::Result<ImportPath> {
@@ -138,8 +138,12 @@ fn parse_bzlmod_bzl_path(
     // Parse the path:file.bzl part
     // Format: "python/extensions:pip.bzl" or just "pip.bzl"
     let cell_relative_path = if let Some((dir, file)) = path_part.rsplit_once(':') {
-        // dir:file format
-        format!("{}/{}", dir, file)
+        // dir:file format - if dir is empty (e.g., "//:file.bzl"), just use file name
+        if dir.is_empty() {
+            file.to_owned()
+        } else {
+            format!("{}/{}", dir, file)
+        }
     } else {
         // Just a file, no directory
         path_part.to_owned()

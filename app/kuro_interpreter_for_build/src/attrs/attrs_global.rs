@@ -14,10 +14,14 @@ use dupe::Dupe;
 use dupe::OptionDupedExt;
 use either::Either;
 use gazebo::prelude::*;
+use kuro_common::package_listing::listing::PackageListing;
+use kuro_core::cells::cell_path_with_allowed_relative_dir::CellPathWithAllowedRelativeDir;
 use kuro_core::configuration::transition::id::TransitionId;
+use kuro_core::package::PackageLabel;
 use kuro_core::plugins::PluginKindSet;
 use kuro_core::target::label::interner::ConcurrentTargetLabelInterner;
 use kuro_error::BuckErrorContext;
+use kuro_fs::paths::file_name::FileNameBuf;
 use kuro_interpreter::coerce::COERCE_PROVIDERS_LABEL_FOR_BZL;
 use kuro_interpreter::types::provider::callable::ValueAsProviderCallableLike;
 use kuro_interpreter::types::transition::transition_id_from_value;
@@ -46,6 +50,7 @@ use crate::attrs::coerce::ctx::BuildAttrCoercionContext;
 use crate::attrs::starlark_attribute::StarlarkAttribute;
 use crate::attrs::starlark_attribute::register_attr_type;
 use crate::interpreter::build_context::BuildContext;
+use crate::interpreter::build_context::PerFileTypeContext;
 use crate::interpreter::selector::StarlarkSelector;
 use crate::plugins::AllPlugins;
 use crate::plugins::PluginKindArg;
@@ -145,11 +150,21 @@ impl AttributeExt for Attribute {
                     match resolved_label {
                         Some(label_str) => {
                             let label_value = eval.heap().alloc(label_str);
-                            match coercer.coerce(
-                                AttrIsConfigurable::Yes,
-                                &attr_coercion_context_for_bzl(eval)?,
-                                label_value,
-                            ) {
+                            let coerce_ctx = match attr_coercion_context_for_bzl(eval) {
+                                Ok(ctx) => ctx,
+                                Err(_) => {
+                                    // No coercion context available (standalone mode) - skip default
+                                    return Ok(StarlarkAttribute::new(Attribute::new(
+                                        Some(Arc::new(
+                                            kuro_node::attrs::coerced_attr::CoercedAttr::None,
+                                        )),
+                                        doc,
+                                        coercer,
+                                    )));
+                                }
+                            };
+                            match coercer.coerce(AttrIsConfigurable::Yes, &coerce_ctx, label_value)
+                            {
                                 Ok(coerced) => Some(Arc::new(coerced)),
                                 Err(_) => Some(Arc::new(
                                     kuro_node::attrs::coerced_attr::CoercedAttr::None,
@@ -165,17 +180,22 @@ impl AttributeExt for Attribute {
                     // the attribute optional without requiring coercion.
                     Some(Arc::new(kuro_node::attrs::coerced_attr::CoercedAttr::None))
                 } else {
-                    match coercer.coerce(
-                        AttrIsConfigurable::Yes,
-                        &attr_coercion_context_for_bzl(eval)?,
-                        x,
-                    ) {
-                        Ok(coerced) => Some(Arc::new(coerced)),
-                        Err(_) => {
-                            // Coercion failed (e.g., bare filename like "LICENSE" in .bzl context).
-                            // In Bazel, defaults are resolved later when the rule is instantiated.
-                            // Fall back to None - the rule will re-coerce from BUILD file context.
-                            Some(Arc::new(kuro_node::attrs::coerced_attr::CoercedAttr::None))
+                    // If we can't get a coercion context (e.g., standalone/sync evaluator
+                    // without a BuildContext), fall back to None default. The rule will
+                    // re-coerce the default from BUILD file context when instantiated.
+                    match attr_coercion_context_for_bzl(eval) {
+                        Err(_) => Some(Arc::new(kuro_node::attrs::coerced_attr::CoercedAttr::None)),
+                        Ok(coerce_ctx) => {
+                            match coercer.coerce(AttrIsConfigurable::Yes, &coerce_ctx, x) {
+                                Ok(coerced) => Some(Arc::new(coerced)),
+                                Err(_) => {
+                                    // Coercion failed (e.g., bare filename like "LICENSE").
+                                    // Fall back to None - the rule will re-coerce from BUILD context.
+                                    Some(Arc::new(
+                                        kuro_node::attrs::coerced_attr::CoercedAttr::None,
+                                    ))
+                                }
+                            }
                         }
                     }
                 }
@@ -189,11 +209,35 @@ impl AttributeExt for Attribute {
     }
 }
 
-/// Coerction context for evaluating bzl files (attr default, transition rules).
+/// Coercion context for evaluating bzl files (attr default, transition rules).
 pub(crate) fn attr_coercion_context_for_bzl<'v>(
     eval: &Evaluator<'v, '_, '_>,
 ) -> kuro_error::Result<BuildAttrCoercionContext> {
     let build_context = BuildContext::from_context(eval)?;
+
+    // For bzl files, use the bzl file's package as context for relative label resolution.
+    // This allows defaults like `default = "empty.tar"` to coerce to `:empty.tar`
+    // relative to the bzl file's package (matching Bazel semantics where attr defaults
+    // are resolved relative to the .bzl file's package).
+    if let PerFileTypeContext::Bzl(bzl_ctx) = &build_context.additional {
+        let bzl_package_path = bzl_ctx.bzl_path.path_parent();
+        if let Ok(package_label) = PackageLabel::from_cell_path(bzl_package_path) {
+            // Use empty listing - we don't have real file listing here,
+            // but that's OK since we only need label resolution, not path coercion.
+            let empty_listing = PackageListing::empty(FileNameBuf::unchecked_new("BUILD.bazel"));
+            let bzl_cell_path = bzl_package_path.to_owned();
+            return Ok(BuildAttrCoercionContext::new_with_package(
+                build_context.cell_info().cell_resolver().dupe(),
+                build_context.cell_info().cell_alias_resolver().dupe(),
+                (package_label, empty_listing),
+                false,
+                // It is OK to not deduplicate because we don't coerce a lot of labels in bzl files.
+                Arc::new(ConcurrentTargetLabelInterner::default()),
+                CellPathWithAllowedRelativeDir::backwards_relative_not_supported(bzl_cell_path),
+            ));
+        }
+    }
+
     Ok(BuildAttrCoercionContext::new_no_package(
         build_context.cell_info().cell_resolver().dupe(),
         build_context.cell_info().name().name(),

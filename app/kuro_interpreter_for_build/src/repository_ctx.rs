@@ -472,6 +472,8 @@ impl<'v> StarlarkValue<'v> for RepoMetadata {
 pub struct RepositoryContext {
     /// The name of the repository being created.
     name: String,
+    /// The original name as specified by the caller (may differ in bzlmod).
+    original_name: String,
     /// Attribute values passed to the rule.
     attr: RepositoryAttr,
     /// The working directory for this repository.
@@ -486,7 +488,23 @@ impl RepositoryContext {
     /// Create a new repository context.
     pub fn new(name: String, attr: RepositoryAttr, working_dir: PathBuf) -> Self {
         Self {
+            original_name: name.clone(),
             name,
+            attr,
+            working_dir: Arc::new(working_dir),
+        }
+    }
+
+    /// Create a new repository context with an explicit original_name.
+    pub fn new_with_original_name(
+        name: String,
+        original_name: String,
+        attr: RepositoryAttr,
+        working_dir: PathBuf,
+    ) -> Self {
+        Self {
+            name,
+            original_name,
             attr,
             working_dir: Arc::new(working_dir),
         }
@@ -498,6 +516,7 @@ impl RepositoryContext {
         let temp_dir = std::env::temp_dir().join("kuro_repos").join(name);
         let _ = std::fs::create_dir_all(&temp_dir);
         Self {
+            original_name: name.to_owned(),
             name: name.to_owned(),
             attr: RepositoryAttr::empty(),
             working_dir: Arc::new(temp_dir),
@@ -1360,6 +1379,38 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         Ok(Value::new_none())
     }
 
+    /// Rename a file or directory.
+    fn rename<'v>(
+        this: &RepositoryContext,
+        #[starlark(require = pos)] src: Value<'v>,
+        #[starlark(require = pos)] dst: Value<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let src_str = if let Some(s) = src.unpack_str() {
+            s.to_owned()
+        } else if let Some(repo_path) = src.downcast_ref::<RepositoryPath>() {
+            repo_path.path_str().to_owned()
+        } else {
+            src.to_repr()
+        };
+        let dst_str = if let Some(s) = dst.unpack_str() {
+            s.to_owned()
+        } else if let Some(repo_path) = dst.downcast_ref::<RepositoryPath>() {
+            repo_path.path_str().to_owned()
+        } else {
+            dst.to_repr()
+        };
+        let src_path = this.resolve_path(&src_str);
+        let dst_path = this.resolve_path(&dst_str);
+        if let Some(parent) = dst_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                starlark::Error::new_other(anyhow!("Failed to create parent directory: {}", e))
+            })?;
+        }
+        std::fs::rename(&src_path, &dst_path)
+            .map_err(|e| starlark::Error::new_other(anyhow!("Failed to rename: {}", e)))?;
+        Ok(Value::new_none())
+    }
+
     /// Watch a path for changes.
     /// Currently a no-op stub - Kuro doesn't support watch yet.
     fn watch<'v>(
@@ -1367,6 +1418,16 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] _path: Value<'v>,
     ) -> starlark::Result<Value<'v>> {
         // Watch is a no-op for now
+        Ok(Value::new_none())
+    }
+
+    /// Watch a directory tree for changes.
+    /// Currently a no-op stub - Kuro doesn't support watch yet.
+    fn watch_tree<'v>(
+        this: &RepositoryContext,
+        #[starlark(require = pos)] _path: Value<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        // watch_tree is a no-op for now
         Ok(Value::new_none())
     }
 
@@ -1408,7 +1469,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     fn getenv(
         this: &RepositoryContext,
         #[starlark(require = pos)] name: &str,
-        #[starlark(require = named)] default: Option<&str>,
+        default: Option<&str>,
     ) -> starlark::Result<String> {
         match std::env::var(name) {
             Ok(v) => Ok(v),
@@ -1440,12 +1501,16 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
 #[starlark_value(type = "repository_ctx")]
 impl<'v> StarlarkValue<'v> for RepositoryContext {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "name" | "attr" | "os" | "workspace_root")
+        matches!(
+            attribute,
+            "name" | "original_name" | "attr" | "os" | "workspace_root"
+        )
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "name" => Some(heap.alloc(&self.name as &str)),
+            "original_name" => Some(heap.alloc(&self.original_name as &str)),
             "attr" => Some(heap.alloc(self.attr.clone())),
             "os" => Some(heap.alloc(RepositoryOs::new())),
             "workspace_root" => Some(heap.alloc(RepositoryPath::with_base_dir(
@@ -1459,6 +1524,7 @@ impl<'v> StarlarkValue<'v> for RepositoryContext {
     fn dir_attr(&self) -> Vec<String> {
         vec![
             "name".to_owned(),
+            "original_name".to_owned(),
             "attr".to_owned(),
             "os".to_owned(),
             "workspace_root".to_owned(),

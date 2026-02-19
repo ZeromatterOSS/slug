@@ -265,12 +265,13 @@ impl<'v> StarlarkModuleExtension<'v> {
         environ: Vec<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> kuro_error::Result<StarlarkModuleExtension<'v>> {
-        let build_context = BuildContext::from_context(eval)?;
-
-        // Verify we're in a .bzl file
-        match &build_context.additional {
-            PerFileTypeContext::Bzl(_) => {}
-            _ => return Err(ModuleExtensionError::ExtensionNotInBzl.into()),
+        // When there's no build context (e.g. standalone/sync evaluator), allow the call.
+        // When there is a context, verify we're in a .bzl file.
+        if let Some(build_context) = eval.extra.and_then(|e| e.downcast_ref::<BuildContext>()) {
+            match &build_context.additional {
+                PerFileTypeContext::Bzl(_) => {}
+                _ => return Err(ModuleExtensionError::ExtensionNotInBzl.into()),
+            }
         }
 
         Ok(StarlarkModuleExtension {
@@ -477,13 +478,15 @@ pub fn register_module_extension_function(builder: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] doc: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkTagClass<'v>> {
-        let build_context = BuildContext::from_context(eval)?;
-
-        // Verify we're in a .bzl file
-        match &build_context.additional {
-            PerFileTypeContext::Bzl(_) => {}
-            _ => {
-                return Err(kuro_error::Error::from(ModuleExtensionError::TagClassNotInBzl).into());
+        // When there's no build context (standalone mode), allow the call.
+        if let Some(build_context) = eval.extra.and_then(|e| e.downcast_ref::<BuildContext>()) {
+            match &build_context.additional {
+                PerFileTypeContext::Bzl(_) => {}
+                _ => {
+                    return Err(
+                        kuro_error::Error::from(ModuleExtensionError::TagClassNotInBzl).into(),
+                    );
+                }
             }
         }
 

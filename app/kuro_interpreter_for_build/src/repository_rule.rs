@@ -209,12 +209,13 @@ impl<'v> StarlarkRepositoryRule<'v> {
         doc: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> kuro_error::Result<StarlarkRepositoryRule<'v>> {
-        let build_context = BuildContext::from_context(eval)?;
-
-        // Verify we're in a .bzl file
-        match &build_context.additional {
-            PerFileTypeContext::Bzl(_) => {}
-            _ => return Err(RepositoryRuleError::RuleNotInBzl.into()),
+        // When there's no build context (e.g. standalone/sync evaluator), allow the call.
+        // When there is a context, verify we're in a .bzl file.
+        if let Some(build_context) = eval.extra.and_then(|e| e.downcast_ref::<BuildContext>()) {
+            match &build_context.additional {
+                PerFileTypeContext::Bzl(_) => {}
+                _ => return Err(RepositoryRuleError::RuleNotInBzl.into()),
+            }
         }
 
         Ok(StarlarkRepositoryRule {
@@ -388,9 +389,12 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRepositoryRule {
         // In extension context, we capture RepoSpecs for deferred execution.
         // Outside extension context, we record RepositoryInvocations for immediate tracking.
         if in_extension_context() {
-            // Build a RepoSpec for deferred execution
-            // The repo_rule_id uses the rule name; full path will be enhanced later
-            let mut spec = RepoSpec::new(self.name.clone());
+            // Build a RepoSpec for deferred execution.
+            // Use the short rule name. The full bzl path (e.g.,
+            // "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive") is constructed
+            // by the executor when available. The short name suffices for builtin rules.
+            let repo_rule_id = self.name.clone();
+            let mut spec = RepoSpec::new(repo_rule_id);
 
             // Convert all kwargs (except 'name') to attributes
             for (key, value) in kwargs.iter() {
