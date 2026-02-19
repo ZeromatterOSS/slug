@@ -23,3 +23,14 @@ bazel_dep(name = "rules_python", version = "1.8.0")
 
 # protobuf dependency - Phase 12 integration
 bazel_dep(name = "protobuf", version = "33.3.bcr.1")
+
+# rules_pkg dependency - Phase 13 integration (pkg_tar for OCI layers)
+bazel_dep(name = "rules_pkg", version = "1.0.1")
+
+# rules_oci dependency - Phase 13 integration (OCI image building)
+bazel_dep(name = "rules_oci", version = "1.7.0")
+bazel_dep(name = "aspect_bazel_lib", version = "1.36.0")
+
+# repository_rule / repository_ctx test - Phase 5
+repo_ext = use_extension("//:test_repo_ext.bzl", "repo_ext")
+use_repo(repo_ext, "my_test_repo")

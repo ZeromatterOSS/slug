@@ -1,5 +1,2 @@
-[cells]
-manual_test = .
-compatibility_proxy = bazel-external/compatibility_proxy
-# prelude = prelude  # DISABLED: Phase 8c-interim - prelude removed
-# bazel_tools auto-registration disabled (Phase 8c-interim)
+# Cell definitions are derived from MODULE.bazel.
+# This file is kept for Kuro-specific config settings only.

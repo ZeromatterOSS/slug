@@ -269,12 +269,13 @@ The detailed implementation is split into focused sub-plans:
 | ---------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------- | --------------- |
 | [01-foundation.md](./kuro-bazel-subplans/01-foundation.md)                         | 1-3    | Fork, rebrand, Starlark dialect, BUILD.bazel detection        | **Complete**    |
 | [02-bzlmod.md](./kuro-bazel-subplans/02-bzlmod.md)                                 | 4a-5c  | bzlmod module system, BCR integration, resolution, extensions | **In Progress** |
-| [03-rule-primitives.md](./kuro-bazel-subplans/03-rule-primitives.md)               | 6a     | ctx/actions/providers API alignment                           | Not Started     |
+| [03-rule-primitives.md](./kuro-bazel-subplans/03-rule-primitives.md)               | 6a,6c  | ctx/actions/providers API alignment + repository_ctx          | **Partial** (many ctx members done reactively during phases 9-12) |
 | [04-prelude-architecture.md](./kuro-bazel-subplans/04-prelude-architecture.md)     | 6b     | Prelude preservation, Bazel shim migration, cleanup           | Not Started     |
 | [05-builtins-compatibility.md](./kuro-bazel-subplans/05-builtins-compatibility.md) | 7a-7d  | Bazel native rules, global functions, modules, Buck2 removal  | Not Started     |
 | [06-aspects.md](./kuro-bazel-subplans/06-aspects.md)                               | 8a-8d  | Bazel aspects implementation (blocks rules_cc)                | **8a Complete** |
-| [07-rules-integration.md](./kuro-bazel-subplans/07-rules-integration.md)           | 9-13   | rules_cc, rules_rust, rules_python, protobuf, rules_oci       | Not Started     |
-| [08-infrastructure.md](./kuro-bazel-subplans/08-infrastructure.md)                 | 15-17  | Sandboxing, platform support, query                           | Not Started     |
+| [09-unified-execution-architecture.md](./kuro-bazel-subplans/09-unified-execution-architecture.md) | 9a-9f  | Lockfile compat, unified DICE execution, .buckconfig removal  | Not Started     |
+| [07-rules-integration.md](./kuro-bazel-subplans/07-rules-integration.md)           | 10-14  | rules_cc, rules_rust, rules_python, protobuf, rules_oci       | Not Started     |
+| [08-infrastructure.md](./kuro-bazel-subplans/08-infrastructure.md)                 | 16-18  | Sandboxing, platform support, query                           | Not Started     |
 
 ### Related Research Documents
 
@@ -282,6 +283,7 @@ The detailed implementation is split into focused sub-plans:
 - [Test Infrastructure Mapping](../research/2026-01-22-test-infrastructure-mapping.md) - Test migration strategy
 - [BXL vs AXL Comparison](../research/bxl-vs-axl-comparison.md) - Compare Buck2's BXL with Aspect's AXL for build introspection
 - [rules_cc Native Requirements](../research/2026-01-26-rules-cc-native-requirements.md) - What Kuro must provide for rules_cc (Bazel 9.0+)
+- [Sync Extension Executor Architecture Analysis](../research/2026-02-18-sync-extension-executor-architecture-analysis.md) - Comparison of Kuro's sync executor vs Bazel/Buck2 approaches
 - Native → Starlark Migration: Each rules\_\* repo's version detection is documented inline in [07-rules-integration.md](./kuro-bazel-subplans/07-rules-integration.md#bazel-90-native--starlark-migration-architecture)
 
 ---
@@ -310,11 +312,12 @@ Quick reference to all phases and their locations:
 | 5b    | bzlmod Build Integration         | [ ] In Progress                               |
 | 5c    | Bundle @bazel_tools Repository   | [x] Bundled (file loading blocked by APIs)    |
 
-### Rule Primitives (Phase 6a) - [Sub-plan](./kuro-bazel-subplans/03-rule-primitives.md)
+### Rule Primitives (Phases 6a, 6c) - [Sub-plan](./kuro-bazel-subplans/03-rule-primitives.md)
 
 | Phase | Title                                      | Status          |
 | ----- | ------------------------------------------ | --------------- |
-| 6a    | Rule Primitives and Provider Compatibility | [ ] Not Started |
+| 6a    | `ctx` and `ctx.actions` Completeness       | [~] Partial — Tier 1 items complete (run_shell, expand_location, add_joined all done); Tier 2-4 items remain |
+| 6c    | `repository_ctx` Implementation            | [x] Done — full implementation in `repository_ctx.rs`; all 5 attrs + 18 methods; Starlark repo rule execution via late binding in `starlark_repo_rule_executor.rs` |
 
 ### Prelude Architecture (Phase 6b) - [Sub-plan](./kuro-bazel-subplans/04-prelude-architecture.md)
 
@@ -343,23 +346,34 @@ Quick reference to all phases and their locations:
 | 8c    | Shadow Graph Propagation           | [x] Complete    |
 | 8d    | Advanced Features                  | [x] Complete (aspect attr resolution, cc_proto_library) |
 
-### Rules Integration (Phases 9-13) - [Sub-plan](./kuro-bazel-subplans/07-rules-integration.md)
-
-| Phase | Title                    | Status                                                                                  |
-| ----- | ------------------------ | --------------------------------------------------------------------------------------- |
-| 9     | rules_cc Integration     | [x] In Progress (cc_library, cc_binary, cc_test build work)                             |
-| 10    | rules_rust Integration   | [x] Complete (rules_rust 0.40.0, rust_library + rust_binary)                            |
-| 11    | rules_python Integration | [x] Complete (rules_python 1.8.0, enable_pystar=True, py_library + py_binary + py_test) |
-| 12    | protobuf Integration     | [x] Complete (proto_library + cc_proto_library build end-to-end, 313 commands) |
-| 13    | rules_oci Integration    | [ ] Not Started                                                                         |
-
-### Infrastructure (Phases 15-17) - [Sub-plan](./kuro-bazel-subplans/08-infrastructure.md)
+### Unified Execution Architecture (Phases 9a-9f) - [Sub-plan](./kuro-bazel-subplans/09-unified-execution-architecture.md)
 
 | Phase | Title                              | Status          |
 | ----- | ---------------------------------- | --------------- |
-| 15    | Local Build Isolation (Sandboxing) | [ ] Not Started |
-| 16    | Platform Support                   | [ ] Not Started |
-| 17    | Query Commands                     | [ ] Not Started |
+| 9a    | Lockfile Format Compatibility      | [x] Complete (Bazel 9.0 format, version 26) |
+| 9b    | Pre-Computed Canonical Names       | [x] Complete (pre_compute_extension_repo_cells) |
+| 9c    | DICE-Only Extension Execution      | [x] Complete (sync executor removed) |
+| 9d    | .buckconfig Elimination for Cells  | [x] Complete (cells from MODULE.bazel only) |
+| 9e    | Configuration Migration (.bazelrc) | [ ] Deferred (lower priority) |
+| 9f    | Cleanup and Unification            | [x] Complete (dead code removed) |
+
+### Rules Integration (Phases 10-14) - [Sub-plan](./kuro-bazel-subplans/07-rules-integration.md)
+
+| Phase | Title                    | Status                                                                                  |
+| ----- | ------------------------ | --------------------------------------------------------------------------------------- |
+| 10    | rules_cc Integration     | [x] In Progress (cc_library, cc_binary, cc_test build work)                             |
+| 11    | rules_rust Integration   | [x] Complete (rules_rust 0.40.0, rust_library + rust_binary)                            |
+| 12    | rules_python Integration | [x] Complete (rules_python 1.8.0, enable_pystar=True, py_library + py_binary + py_test) |
+| 13    | protobuf Integration     | [x] Complete (proto_library + cc_proto_library build end-to-end, 313 commands) |
+| 14    | rules_oci Integration    | [x] Complete (rules_pkg/pkg_tar + oci_image build end-to-end 2026-02-19)                |
+
+### Infrastructure (Phases 16-18) - [Sub-plan](./kuro-bazel-subplans/08-infrastructure.md)
+
+| Phase | Title                              | Status          |
+| ----- | ---------------------------------- | --------------- |
+| 16    | Local Build Isolation (Sandboxing) | [ ] Not Started |
+| 17    | Platform Support                   | [ ] Not Started |
+| 18    | Query Commands                     | [ ] Not Started |
 
 ---
 

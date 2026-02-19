@@ -691,6 +691,14 @@ cc_proto_library(
 
 Enable container image building via rules_oci.
 
+### Prerequisite Status (2026-02-19)
+
+- [x] **rules_pkg 1.0.1 + pkg_tar**: `kuro build //:hello_bin_tar` succeeds, produces valid tar
+  - Key fixes: `File.short_path` for source files now returns full cell-relative path (`pkg/private/tar/build_tar.py` not just `build_tar.py`)
+  - `_CreateRunfilesOnDemand` in bootstrap template now looks for `bazel-external/{workspace}/{version}/` and creates correct symlink
+  - `ctx.outputs` redesigned to be fully dynamic (supports `attr.output()` attributes)
+  - `ctx.var` returns real starlark Dict (supports iteration)
+
 ### Changes Required:
 
 #### 1. Fetch rules_oci and rules_pkg
@@ -720,10 +728,23 @@ oci_image(
 )
 ```
 
+#### 3. oci_pull Repository Rule
+
+`oci_pull` is a `repository_rule` that downloads an OCI image at repo-fetch time. It requires `repository_ctx` integration (Phase 6c). Without it, we need a synthetic repository approach.
+
+**Option A: Synthetic `oci_pull`** (faster path):
+- Create a fake `@distroless_base` repository with minimal OCI structure
+- Allows testing `oci_image` analysis/build without real HTTP downloads
+
+**Option B: Full `repository_ctx` integration** (correct path):
+- Phase 6c implementation must be functional
+- `oci_pull` will actually download base images from registries
+
 ### Success Criteria:
 
 #### Automated Verification:
 
+- [ ] `kuro build //:hello_bin_tar` creates valid tar file (`hello_bin_tar.tar` contains `/usr/local/bin/hello_bin`) — **DONE (2026-02-19)**
 - [ ] `kuro build //:image` creates OCI image
 - [ ] Multi-arch images work
 

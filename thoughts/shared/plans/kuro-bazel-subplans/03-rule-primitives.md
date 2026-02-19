@@ -1,364 +1,394 @@
-# Rule Primitives Phase (6)
+# Rule Primitives Phase (6a + 6c)
 
 > **Parent Plan**: [Kuro Bazel-Compatible Build Tool](../2026-01-21-kuro-bazel-compatible-build-tool.md)
+>
+> **Bazel Reference Docs**:
+> - [ctx](https://bazel.build/rules/lib/builtins/ctx)
+> - [ctx.actions](https://bazel.build/rules/lib/builtins/actions)
+> - [Args](https://bazel.build/rules/lib/builtins/Args)
+> - [repository_ctx](https://bazel.build/rules/lib/builtins/repository_ctx)
+> - [repository_os](https://bazel.build/rules/lib/builtins/repository_os)
 
-This sub-plan covers ensuring kuro's rule execution API matches Bazel's ctx, actions, and provider interfaces.
+This sub-plan covers ensuring Kuro's rule execution API matches every member of Bazel's `ctx`, `ctx.actions`, and `repository_ctx` interfaces.
 
 ---
 
-## Phase 6: Rule Primitives and Provider Compatibility
+## Phase 6a: `ctx` and `ctx.actions` Completeness
 
 ### Overview
 
-Ensure kuro's rule execution API matches Bazel's ctx, actions, and provider interfaces. Kuro already has substantial infrastructure that needs Bazel API alignment.
-
-### Kuro Existing Implementation
-
-Kuro already has most of this infrastructure. The work is primarily **API alignment**, not building from scratch:
-
-| Feature                        | Kuro Location                                                                       | Status                                   |
-| ------------------------------ | ----------------------------------------------------------------------------------- | ---------------------------------------- |
-| `AnalysisContext` (ctx)        | `app/kuro_build_api/src/interpreter/rule_defs/context.rs:176`                       | Exists, needs API tweaks                 |
-| `ctx.attr`                     | `app/kuro_build_api/src/interpreter/rule_defs/context.rs`                           | **Kuro uses `ctx.attrs`**, needs alias   |
-| `ctx.actions`                  | `app/kuro_build_api/src/interpreter/rule_defs/context.rs:60`                        | Exists via `AnalysisActions`             |
-| `ctx.actions.run()`            | `app/kuro_action_impl/src/context/run.rs:121`                                       | Exists, verify parameter names           |
-| `ctx.actions.write()`          | `app/kuro_action_impl/src/context/write.rs:110`                                     | **Kuro uses positional args**, Bazel uses named |
-| `ctx.actions.declare_output()` | `app/kuro_action_impl/src/context/unsorted.rs:50`                                   | **Needs alias to `declare_file()`**      |
-| `DefaultInfo`                  | `app/kuro_build_api/src/interpreter/rule_defs/provider/builtin/default_info.rs:136` | Exists                                   |
-| `RunInfo`                      | `app/kuro_build_api/src/interpreter/rule_defs/provider/builtin/run_info.rs`         | Exists                                   |
-| `TransitiveSet`                | `app/kuro_build_api/src/interpreter/rule_defs/transitive_set/transitive_set.rs:112` | Exists, needs `depset` alias             |
-| Action execution               | `app/kuro_build_api/src/actions/execute/action_executor.rs:312`                     | Exists                                   |
-
-**Critical API Discrepancies Found During Testing:**
-
-These discrepancies were discovered while testing `examples/bzlmod_local_test/`:
-
-1. **`ctx.attr` vs `ctx.attrs`**: Bazel uses `ctx.attr.foo`, Kuro uses `ctx.attrs.foo`. Need to add `attr` as an alias.
-2. **`declare_file()` vs `declare_output()`**: Bazel uses `ctx.actions.declare_file()`, Kuro uses `ctx.actions.declare_output()`. Need to add alias.
-3. **`write()` parameter style**: Bazel accepts `write(output=out, content=text)`, Kuro requires positional `write(out, text)`. Need to accept both styles.
-
-### Bazel Source References
-
-This is a critical phase - the rule API must match Bazel exactly. Study these thoroughly:
-
-| Feature                 | Bazel Source File                                                                            |
-| ----------------------- | -------------------------------------------------------------------------------------------- |
-| **ctx object**          | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkRuleContextApi.java`   |
-| ctx implementation      | `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleContext.java`     |
-| **actions API**         | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/StarlarkActionFactoryApi.java` |
-| actions implementation  | `src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkActionFactory.java`   |
-| **Args builder**        | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/CommandLineArgsApi.java`       |
-| Args implementation     | `src/main/java/com/google/devtools/build/lib/analysis/starlark/Args.java`                    |
-| **DefaultInfo**         | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/DefaultInfoApi.java`           |
-| **RunInfo**             | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/RunEnvironmentInfoApi.java`    |
-| **OutputGroupInfo**     | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/OutputGroupInfoApi.java`       |
-| **depset**              | `src/main/java/com/google/devtools/build/lib/collect/nestedset/Depset.java`                  |
-| depset ordering         | `src/main/java/com/google/devtools/build/lib/collect/nestedset/Order.java`                   |
-| **Runfiles**            | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/RunfilesApi.java`              |
-| Runfiles implementation | `src/main/java/com/google/devtools/build/lib/analysis/Runfiles.java`                         |
-| **Provider definition** | `src/main/java/com/google/devtools/build/lib/starlarkbuildapi/ProviderApi.java`              |
-
-**Starlark builtins (important!):**
-
-- `src/main/starlark/builtins_bzl/common/` - Built-in rule implementations in Starlark
-- These show how Bazel's own rules use the ctx/actions API
-
-**Key tests:**
-
-- `src/test/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleContextTest.java`
-- `src/test/java/com/google/devtools/build/lib/analysis/RunfilesTest.java`
-
-### Changes Required:
-
-#### 1. AnalysisContext (ctx) API Alignment
-
-**File**: `app/kuro_build_api/src/interpreter/rule_defs/context.rs`
-
-Current Kuro `AnalysisContext` (line 176) needs these additional/renamed attributes:
-
-```python
-# Bazel ctx attributes (ensure all available):
-ctx.label              # ✓ Already exists
-ctx.attr               # ✓ Already exists (line 295)
-ctx.file               # ✓ Implemented (2026-02-02) - CtxFile type in context.rs
-ctx.files              # ✓ Implemented (2026-02-02) - CtxFiles type in context.rs
-ctx.executable         # ✓ Implemented (2026-02-02) - CtxExecutable type in context.rs
-ctx.outputs            # ✓ Exists as declare_output, needs direct access
-ctx.actions            # ✓ Already exists (line 178)
-ctx.build_file_path    # ✓ Implemented (2026-02-02) - returns BUILD.bazel path
-ctx.workspace_name     # ✓ Implemented (2026-02-02) - returns module name
-ctx.bin_dir            # ✓ Implemented (2026-02-02) - CtxDirRoot type
-ctx.genfiles_dir       # ✓ Implemented (2026-02-02) - CtxDirRoot type
-ctx.var                # ✓ Implemented (2026-02-02) - CtxVarDict type
-ctx.configuration      # NEED: Build configuration access
-ctx.fragments          # NEED: Configuration fragments
-```
-
-Add to `analysis_context_methods()` (line 295):
-
-```rust
-#[starlark_module]
-fn analysis_context_methods(builder: &mut MethodsBuilder) {
-    // Existing methods...
-
-    #[starlark(attribute)]
-    fn file<'v>(this: &AnalysisContext<'v>) -> anyhow::Result<...> {
-        // Return struct with single-file attributes
-    }
-
-    #[starlark(attribute)]
-    fn files<'v>(this: &AnalysisContext<'v>) -> anyhow::Result<...> {
-        // Return struct with file-list attributes
-    }
-
-    #[starlark(attribute)]
-    fn executable<'v>(this: &AnalysisContext<'v>) -> anyhow::Result<...> {
-        // Return struct with executable attributes
-    }
-
-    #[starlark(attribute)]
-    fn build_file_path<'v>(this: &AnalysisContext<'v>) -> anyhow::Result<&str> {
-        // Return path to BUILD.bazel file
-    }
-
-    #[starlark(attribute)]
-    fn workspace_name<'v>(this: &AnalysisContext<'v>) -> anyhow::Result<&str> {
-        // Return module name from MODULE.bazel
-    }
-}
-```
-
-#### 2. Actions API Alignment
-
-**Files**: `app/kuro_action_impl/src/context/*.rs`
-
-| Bazel Method          | Kuro File        | Status                          |
-| --------------------- | ---------------- | ------------------------------- |
-| `run()`               | `run.rs:121`     | ✓ Verify parameters match Bazel |
-| `run_shell()`         | `unsorted.rs:313`| ✓ Implemented (stub, 2026-02-02)|
-| `write()`             | `write.rs:110`   | ✓ Exists                        |
-| `declare_file()`      | `unsorted.rs:98` | ✓ Implemented (2026-02-02)      |
-| `declare_directory()` | `unsorted.rs:127`| ✓ Implemented (2026-02-02)      |
-| `args()`              | `unsorted.rs:282`| ✓ Implemented (2026-02-02)      |
-| `symlink()`           | `copy.rs`        | CHECK: May exist                |
-| `expand_template()`   | TBD              | NEED: Template expansion        |
-
-**Key addition - `ctx.actions.args()` builder:**
-
-```rust
-// New file: app/kuro_action_impl/src/context/args.rs
-
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct ArgsBuilder {
-    items: Vec<ArgItem>,
-    param_file: Option<ParamFileSpec>,
-}
-
-impl<'v> StarlarkValue<'v> for ArgsBuilder {
-    // Methods: add(), add_all(), add_joined(), use_param_file(), set_param_file_format()
-}
-```
-
-#### 3. depset() Global Function
-
-**File**: `app/kuro_build_api/src/interpreter/rule_defs/transitive_set/globals.rs`
-
-Kuro uses `transitive_set()` but Bazel uses `depset()`. Add alias:
-
-```rust
-#[starlark_module]
-pub fn register_depset(builder: &mut GlobalsBuilder) {
-    /// Bazel-compatible depset (alias for transitive_set)
-    fn depset<'v>(
-        direct: Option<&List<'v>>,
-        transitive: Option<&List<'v>>,
-        order: Option<&str>,  // "default", "postorder", "preorder", "topological"
-    ) -> anyhow::Result<TransitiveSet<'v>> {
-        // Map to transitive_set implementation
-    }
-}
-```
-
-**Order mapping:**
-| Bazel Order | Kuro Equivalent |
-|-------------|-----------------|
-| `"default"` | BFS traversal |
-| `"postorder"` | `PostorderTransitiveSetIterator` (line 110) |
-| `"preorder"` | `PreorderTransitiveSetIterator` (line 53) |
-| `"topological"` | `TopologicalTransitiveSetIterator` (line 189) |
-
-#### 3b. Depset ↔ TransitiveSet Bridge
-
-**Goal**: Provide explicit conversion helpers for Kuro‑specific rules that want to use `transitive_set` internally while exposing Bazel `depset` at API boundaries.
-
-**Proposed APIs** (native helpers, names subject to bikeshed):
-```python
-native.transitive_set_from_depset(d, order = "default")
-native.depset_from_transitive_set(t, order = "default")
-```
-
-**Implementation sketch**:
-
-- **Location**: `app/kuro_build_api/src/interpreter/rule_defs/depset.rs` (bridge helpers)
-- **Supporting types**:
-  - Add a built‑in `TransitiveSetDefinition` (e.g. `BazelDepsetTset`) with a single `items` field.
-  - Cache conversion results on frozen values:
-    - `FrozenTransitiveSet` → cached `depset` per order.
-    - `depset` → cached `transitive_set` per order.
-- **Semantics**:
-  - `depset -> transitive_set`: preserve structure by wiring depset children into tset children where possible; keep `order` metadata for traversal hints.
-  - `transitive_set -> depset`: materialize via traversal (default preorder) and build a depset; projections/reductions are dropped.
-  - Explicit conversion only (no implicit coercion in attr coercers).
-
-**Performance considerations**:
-- Avoid repeated materialization: add per‑order caches to prevent hot‑path regressions.
-- Conversion should be applied only at API boundaries (providers, native functions).
-
-**Tests**:
-- Round‑trip conversion preserves set membership.
-- Ordering behavior tested for `"default"`, `"preorder"`, `"postorder"`, `"topological"`.
-- Frozen/live conversion works in both directions.
-
-#### 4. Built-in Providers
-
-**Directory**: `app/kuro_build_api/src/interpreter/rule_defs/provider/builtin/`
-
-**DefaultInfo** (line 136 in `default_info.rs`):
-
-- ✓ Already exists with `files`, `runfiles`, `executable`
-- ✓ Bazel-style `files` parameter now properly converts depset to default_outputs (fixed 2026-02-03)
-  - Added `extract_depset_elements()` helper to handle both frozen and live depsets
-  - Supports nested depsets with transitive children
-  - Test: `tests/simple_files_test:bazel_files_test` verifies this works
-
-**NEED: OutputGroupInfo**
-
-```rust
-// New file: output_group_info.rs
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct OutputGroupInfo {
-    groups: HashMap<String, TransitiveSet>,
-}
-```
-
-**NEED: CcInfo, PyInfo** (for rules_cc, rules_python integration):
-
-```rust
-// New file: cc_info.rs - Critical for Phase 7
-pub struct CcInfo {
-    compilation_context: CompilationContext,
-    linking_context: LinkingContext,
-}
-
-pub struct CompilationContext {
-    headers: TransitiveSet,
-    includes: TransitiveSet,
-    defines: TransitiveSet,
-    // ...
-}
-```
-
-#### 5. Provider Access Semantics (Completed 2026-02-02)
-
-**Critical for rules_cc analysis phase** - The `in` operator must work for checking providers on targets and artifacts.
-
-| Operation | Bazel Behavior | Kuro Status | Blocker For |
-|-----------|---------------|-------------|-------------|
-| `Provider in target` | Returns `True` if target provides Provider | ✓ Implemented (Dependency type) | rules_cc analysis |
-| `Provider in artifact` | Returns `True` (source artifacts have DefaultInfo) | ✓ Implemented | rules_cc analysis |
-| `target[Provider]` | Returns provider instance or error | ✓ Implemented | rules_cc analysis |
-| `artifact[Provider]` | Returns DefaultInfo with artifact as default_output | ✓ Implemented | rules_cc analysis |
-
-**Example from rules_cc** (`cc_helper.bzl:369`):
-```python
-# This pattern is used extensively in rules_cc
-if DefaultInfo in attr_value:
-    files = attr_value[DefaultInfo].files.to_list()
-    # ... process files
-```
-
-**Current Error:**
-```
-error: Operation `in` not supported for types `default_info_callable` and `Artifact`
-```
-
-**Files to Modify:**
-
-1. **Artifact type** - `app/kuro_build_api/src/artifact/artifact_type.rs`
-   - Implement `StarlarkValue::is_in()` for Artifact to support `Provider in artifact`
-
-2. **Target/dependency type** - Location TBD
-   - Implement `StarlarkValue::is_in()` for configured targets
-
-3. **Provider callable** - `app/kuro_build_api/src/interpreter/rule_defs/provider/`
-   - Ensure `DefaultInfo` and other providers work as dict keys for `in` checks
-
-**Implementation Notes:**
-
-In Bazel, source files (artifacts) implicitly have `DefaultInfo` with the file in `files`. The `in` operator checks if a provider type is available on a target/artifact.
-
-```python
-# Bazel behavior:
-src_file = ctx.file.src  # An artifact
-DefaultInfo in src_file  # Returns True
-src_file[DefaultInfo]    # Returns DefaultInfo(files=depset([src_file]))
-```
-
-#### 6. Runfiles
-
-**File**: Likely in `app/kuro_build_api/src/interpreter/rule_defs/`
-
-```python
-ctx.runfiles(
-    files = [...],
-    transitive_files = depset(...),
-    symlinks = {...},
-    root_symlinks = {...},
-    collect_data = True,
-    collect_default = True,
-)
-```
-
-Check Kuro's existing runfiles implementation and align API.
-
-### Success Criteria:
-
-#### Automated Verification:
-
-- [ ] ctx.actions.run() executes actions correctly
-- [x] ctx.actions.args() builds command lines (implemented 2026-02-02)
-- [ ] depset operations are efficient
-- [x] DefaultInfo provider works (including Bazel-style `files` parameter - fixed 2026-02-03)
-- [x] `Provider in target` operator works (e.g., `DefaultInfo in dep`)
-- [x] `Provider in artifact` operator works (e.g., `DefaultInfo in src_file`)
-- [x] `target[Provider]` indexing works
-- [x] `artifact[Provider]` indexing works (returns synthetic DefaultInfo)
-- [x] Runfiles are collected correctly
-- [x] All documented ctx methods available (implemented 2026-02-02: ctx.file, ctx.files, ctx.executable, ctx.bin_dir, ctx.genfiles_dir, ctx.workspace_name, ctx.build_file_path, ctx.var)
-- [x] ctx.files.<attr> extracts File objects from dependencies (fixed 2026-02-05: CtxFiles/CtxFile now extract DefaultInfo.default_outputs from Dependency objects)
-- [x] Label() in .bzl files resolves relative to .bzl file's repository (fixed 2026-02-05: uses starlark_path().cell() instead of cell_info().name())
+Bazel's `ctx` object (passed to every rule implementation function) has **21 attributes** and **7 methods**. Its `ctx.actions` sub-object has **12 methods**. The `Args` object returned by `ctx.actions.args()` has **5 methods**. This phase implements every member to full Bazel 9.0 specification.
+
+### Key Files
+
+| Component | Kuro Location |
+|-----------|--------------|
+| `AnalysisContext` (ctx) | `app/kuro_build_api/src/interpreter/rule_defs/context.rs` |
+| `AnalysisActions` (ctx.actions) | `app/kuro_build_api/src/interpreter/rule_defs/context.rs:68` (struct) |
+| Actions method registration | `app/kuro_action_impl/src/context.rs:33` (late-binding init) |
+| `ctx.actions.run()` | `app/kuro_action_impl/src/context/run.rs` |
+| `ctx.actions.write()` | `app/kuro_action_impl/src/context/write.rs` |
+| `ctx.actions.expand_template()` | `app/kuro_action_impl/src/context/write.rs:404` |
+| `ctx.actions.symlink()` | `app/kuro_action_impl/src/context/copy.rs:153` |
+| Other actions | `app/kuro_action_impl/src/context/unsorted.rs` |
+| `StarlarkCmdArgs` (Args) | `app/kuro_build_api/src/interpreter/rule_defs/cmd_args/typ.rs` |
+
+---
+
+### 6a.1: Complete `ctx` Attribute/Method Audit
+
+Status key: **Done** = fully working, **Stub** = exists but returns hardcoded/incomplete data, **Missing** = not implemented.
+
+#### ctx Attributes
+
+| # | Bazel Member | Type | Kuro Status | Notes |
+|---|---|---|---|---|
+| 1 | `ctx.actions` | `actions` | **Done** | `AnalysisActions` sub-object |
+| 2 | `ctx.attr` | `struct` | **Done** | Alias for `ctx.attrs` (context.rs:355) |
+| 3 | `ctx.bin_dir` | `root` | **Stub** | Hardcoded `"bazel-out/k8-fastbuild/bin"` (context.rs:614). Needs to derive from actual configuration. |
+| 4 | `ctx.build_file_path` | `string` | **Stub** | Derives from label string (context.rs:567). Deprecated in Bazel — low priority to improve. |
+| 5 | `ctx.build_setting_value` | varies | **Done** | Reads from attrs (context.rs:711) |
+| 6 | `ctx.configuration` | `configuration` | **Stub** | Returns `BuildConfigurationStub` (context.rs:510). Needs real config. |
+| 7 | `ctx.disabled_features` | `list[str]` | **Stub** | Returns `[]` (context.rs:495) |
+| 8 | `ctx.exec_groups` | `ExecGroupCollection` | **Stub** | Returns `ExecGroupsDict` stub (context.rs:677) |
+| 9 | `ctx.executable` | `struct` | **Done** | `CtxExecutable` (context.rs:552) |
+| 10 | `ctx.features` | `list[str]` | **Stub** | Returns `[]` (context.rs:483) |
+| 11 | `ctx.file` | `struct` | **Done** | `CtxFile` (context.rs:537) |
+| 12 | `ctx.files` | `struct` | **Done** | `CtxFiles` (context.rs:523) |
+| 13 | `ctx.fragments` | `fragments` | **Stub** | Returns `ConfigurationFragments::default()` (context.rs:368). Has `ctx.fragments.cpp` sub-stub. |
+| 14 | `ctx.genfiles_dir` | `root` | **Stub** | Hardcoded `"bazel-out/k8-fastbuild/genfiles"` (context.rs:628) |
+| 15 | `ctx.info_file` | `File` | **Stub** | Returns string `"bazel-out/stable-status.txt"` (context.rs:658). Should return a real `File` object. |
+| 16 | `ctx.label` | `Label` | **Done** | `StarlarkConfiguredProvidersLabel` (context.rs:331) |
+| 17 | `ctx.outputs` | `structure` | **Stub** | Hardcodes 3 artifacts: stripped_binary, executable, dwp_file (context.rs:403). Doesn't read from rule `outputs={}`. Deprecated in Bazel. |
+| 18 | `ctx.toolchains` | `ToolchainContext` | **Stub** | Returns `ToolchainsStub` with hardcoded cc/rust/python detection (context.rs:387) |
+| 19 | `ctx.var` | `dict[str,str]` | **Stub** | `CtxVarDict` stub (context.rs:698) |
+| 20 | `ctx.version_file` | `File` | **Stub** | Returns string `"bazel-out/volatile-status.txt"` (context.rs:646). Should return a real `File` object. |
+| 21 | `ctx.workspace_name` | `string` | **Done** | Returns cell name (context.rs:595). In Bazel with bzlmod this is always `"_main"`. |
+| — | `ctx.aspect_ids` | `list[str]` | **Missing** | Aspect-only. List of applied aspect IDs. |
+| — | `ctx.rule` | `rule_attributes` | **Missing** | Aspect-only. Rule attrs of the target an aspect is applied to. |
+| — | `ctx.split_attr` | `struct` | **Missing** | For config transition attributes. Low priority. |
+| — | `ctx.super` | callable | **Missing** | Experimental rule inheritance. Very low priority. |
+
+#### ctx Methods
+
+| # | Bazel Method | Returns | Kuro Status | Notes |
+|---|---|---|---|---|
+| 1 | `ctx.coverage_instrumented(target?)` | `bool` | **Stub** | Always returns `False` (context.rs:750) |
+| 2 | `ctx.expand_location(input, targets=[])` | `string` | **Done** | Expands `$(location ...)` templates (context.rs). Resolves `$(location :label)` and `$(locations :label)` from provided `targets` list. |
+| 3 | `ctx.expand_make_variables(attr, cmd, subs)` | `string` | **Missing** | Deprecated in Bazel. Expands `$(VAR)` Make variables. |
+| 4 | `ctx.package_relative_label(input)` | `Label` | **Missing** | Converts string to Label relative to BUILD package. |
+| 5 | `ctx.resolve_command(...)` | `tuple` | **Missing** | Experimental. Low priority. |
+| 6 | `ctx.resolve_tools(tools=[])` | `tuple` | **Missing** | Returns depset of tool files + runfiles. |
+| 7 | `ctx.runfiles(files, transitive_files, ...)` | `runfiles` | **Done** | Implemented (context.rs:762) |
+| 8 | `ctx.target_platform_has_constraint(cv)` | `bool` | **Stub** | Always returns `False` (context.rs:817) |
+| — | `ctx.created_actions()` | `Actions` | **Missing** | Testing-only (`_skylark_testable=True`). Very low priority. |
+
+---
+
+### 6a.2: Complete `ctx.actions` Method Audit
+
+| # | Bazel Method | Kuro Status | Notes |
+|---|---|---|---|
+| 1 | `ctx.actions.args()` | **Done** | Returns `StarlarkCmdArgs` (unsorted.rs:311) |
+| 2 | `ctx.actions.declare_directory(filename, sibling?)` | **Done** | unsorted.rs:128. `sibling` accepted but ignored. |
+| 3 | `ctx.actions.declare_file(filename, sibling?)` | **Done** | unsorted.rs:98. `sibling` accepted but ignored. |
+| 4 | `ctx.actions.declare_symlink(filename, sibling?)` | **Missing** | Requires `--experimental_allow_unresolved_symlinks`. Low priority. |
+| 5 | `ctx.actions.do_nothing(mnemonic, inputs=[])` | **Missing** | No-op placeholder action. Low priority. |
+| 6 | `ctx.actions.expand_template(template, output, substitutions, is_executable?, computed_substitutions?)` | **Done** | write.rs:404. Reads template at analysis time. `computed_substitutions` accepted but not used. |
+| 7 | `ctx.actions.run(outputs, executable, inputs, arguments, ...)` | **Done** | run.rs:243. Supports both Buck2 (`exe=`) and Bazel (`executable=`) styles. |
+| 8 | `ctx.actions.run_shell(outputs, command, inputs, arguments, ...)` | **Done** | run.rs:1036. Registers a real `UnregisteredRunAction`. String command wraps via `bash -c`. List command uses directly as exe. Full input/output/env tracking. |
+| 9 | `ctx.actions.symlink(output, target_file?, target_path?, is_executable?, ...)` | **Done** | copy.rs:153. Bazel-compatible named parameters. |
+| 10 | `ctx.actions.template_dict()` | **Missing** | Returns `TemplateDict` for lazy computed substitutions in `expand_template`. Low priority. |
+| 11 | `ctx.actions.write(output, content, is_executable?)` | **Done** | write.rs:201 |
+| — | `ctx.actions.map_directory(...)` | **Missing** | Experimental directory mapping. Very low priority. |
+
+---
+
+### 6a.3: Complete `Args` Object Method Audit
+
+The `Args` object is returned by `ctx.actions.args()`. In Kuro this is `StarlarkCmdArgs`.
+
+| # | Bazel Method | Kuro Status | Notes |
+|---|---|---|---|
+| 1 | `args.add(arg_or_value, value?, format?)` | **Done** | cmd_args/typ.rs. Supports flag+value, format string with `%s`. |
+| 2 | `args.add_all(values, map_each?, format_each?, before_each?, omit_if_empty?, uniquify?, expand_directories?, terminate_with?, allow_closure?)` | **Done** | cmd_args/typ.rs. `map_each`, `uniquify`, `omit_if_empty` implemented. |
+| 3 | `args.add_joined(values, join_with, map_each?, format_each?, format_joined?, omit_if_empty?, uniquify?, allow_closure?)` | **Done** | cmd_args/typ.rs:968. Joins items into a single argument with delimiter. |
+| 4 | `args.set_param_file_format(format)` | **Missing** | Sets format for param file spilling (`"multiline"`, `"shell"`, `"flag_per_line"`). |
+| 5 | `args.use_param_file(param_file_arg, use_always?)` | **Missing** | Enables param file spilling for long command lines. |
+
+---
+
+### 6a.4: Implementation Priority
+
+**Tier 1 — Critical blockers (needed by rules already in use):**
+
+| Item | Blocking | Effort | Status |
+|---|---|---|---|
+| `ctx.actions.run_shell()` — make it register a real action | rules_pkg `build_tar.py`, rules_oci scripts, rules_shell | Medium — wire up like `run()` but invoke via `sh -c` | **DONE** (run.rs:1036) |
+| `ctx.expand_location(input, targets)` | rules_pkg, rules_shell, many custom rules | Medium — resolve `$(location :target)` to file paths | **DONE** (context.rs) |
+| `args.add_joined(values, join_with, ...)` | rules_rust `rustc` flags, rules_cc link args | Small — similar to `add_all` but join with delimiter | **DONE** (typ.rs:968) |
+
+**Tier 2 — Important for correctness:**
+
+| Item | Blocking | Effort |
+|---|---|---|
+| `ctx.info_file` / `ctx.version_file` — return real `File` objects | Build stamping (rules_rust, rules_go) | Small — declare artifacts instead of returning strings |
+| `ctx.bin_dir` / `ctx.genfiles_dir` — derive from real config | Correct output paths | Small — read from configured target label |
+| `ctx.features` / `ctx.disabled_features` — read from rule attrs | rules_cc feature configuration | Small — extract from `features` attribute |
+| `args.use_param_file()` / `args.set_param_file_format()` | Long command lines (protobuf compilations) | Medium — Buck2 already has param file infrastructure |
+
+**Tier 3 — Needed for completeness:**
+
+| Item | Notes | Effort |
+|---|---|---|
+| `ctx.package_relative_label(input)` | Label resolution utility | Small |
+| `ctx.resolve_tools(tools)` | Collect tool files + runfiles | Small |
+| `ctx.expand_make_variables(...)` | Deprecated but some rules use it | Small |
+| `ctx.actions.do_nothing(mnemonic, inputs)` | No-op action | Trivial |
+| `ctx.actions.declare_symlink(filename)` | Unresolved symlink support | Small |
+| `ctx.actions.template_dict()` | Lazy computed substitutions | Medium |
+
+**Tier 4 — Low priority / experimental:**
+
+| Item | Notes |
+|---|---|
+| `ctx.aspect_ids` | Only needed in aspect implementations |
+| `ctx.rule` | Only needed in aspect implementations |
+| `ctx.split_attr` | Config transitions — advanced feature |
+| `ctx.configuration` — real implementation | Needs DICE configuration integration |
+| `ctx.exec_groups` — real implementation | Needs execution platform resolution |
+| `ctx.toolchains` — real implementation | Needs toolchain resolution framework |
+| `ctx.super` | Experimental rule inheritance |
+| `ctx.created_actions()` | Testing infrastructure only |
+| `ctx.actions.map_directory()` | Experimental |
+
+---
+
+### 6a.5: depset / TransitiveSet
+
+This section is unchanged from the original plan. Key items:
+
+- [x] `depset()` global function implemented (alias for transitive_set)
+- [x] `depset.to_list()` works
+- [x] `depset.direct` and `depset.transitive` attributes work for frozen depsets
+- [x] Deduplication in depset traversal (HashSet-based)
+- [ ] depset ↔ TransitiveSet bridge (explicit conversion helpers) — **deferred, not currently blocking**
+
+### 6a.6: Built-in Providers
+
+- [x] `DefaultInfo` — fully working (files, runfiles, executable, data_runfiles, default_runfiles)
+- [x] `Provider in target` / `target[Provider]` indexing
+- [x] `Provider in artifact` / `artifact[Provider]` indexing
+- [ ] `OutputGroupInfo` — not implemented, needed for IDE integration
+- [x] `CcInfo`, `PyInfo`, `ProtoInfo` — handled by Starlark `provider()` in rules_cc/python/protobuf (no native impl needed)
+
+---
+
+## Phase 6c: `repository_ctx` Implementation
+
+### Overview
+
+Bazel's `repository_ctx` object (passed to `repository_rule` implementation functions) has **5 attributes** and **18 methods**. **IMPLEMENTED** — full implementation in `app/kuro_interpreter_for_build/src/repository_ctx.rs`. Starlark execution of custom repository rules wired via late binding in `kuro_bzlmod/src/starlark_repo_rule_executor.rs` + `kuro_interpreter_for_build/src/starlark_repo_rule_executor_impl.rs`.
+
+Implementing `repository_ctx` enables actual execution of `repository_rule()` functions, which is required for:
+- `oci_pull` (rules_oci) — downloads container images at repo-rule time
+- `rust_register_toolchains` (rules_rust) — downloads Rust toolchain
+- `python.toolchain` (rules_python) — downloads Python interpreter
+- Any non-synthetic module extension that creates repos via `repository_rule()`
+
+### Bazel Reference
+
+| Component | Bazel Docs |
+|-----------|-----------|
+| `repository_ctx` | https://bazel.build/rules/lib/builtins/repository_ctx |
+| `repository_os` | https://bazel.build/rules/lib/builtins/repository_os |
+| `repository_rule()` | https://bazel.build/rules/lib/globals/bzl#repository_rule |
+
+---
+
+### 6c.1: Complete `repository_ctx` Attribute Audit
+
+| # | Bazel Member | Type | Description |
+|---|---|---|---|
+| 1 | `repository_ctx.attr` | `struct` | Values of the repo rule's declared attributes |
+| 2 | `repository_ctx.name` | `string` | Canonical name of the external repository |
+| 3 | `repository_ctx.original_name` | `string` | Name originally specified by caller (may differ in bzlmod) |
+| 4 | `repository_ctx.os` | `repository_os` | OS/platform information struct |
+| 5 | `repository_ctx.workspace_root` | `path` | Path to root workspace |
+
+`repository_ctx.os` members:
+
+| Member | Type | Description |
+|---|---|---|
+| `os.arch` | `string` | CPU architecture (e.g., `"amd64"`, `"aarch64"`) |
+| `os.environ` | `dict` | Snapshot of environment variables (no dep tracking) |
+| `os.name` | `string` | OS name (e.g., `"linux"`, `"mac os x"`) |
+
+---
+
+### 6c.2: Complete `repository_ctx` Method Audit
+
+All methods are **Missing** in Kuro.
+
+#### Filesystem Operations
+
+| # | Method | Params | Returns | Description |
+|---|---|---|---|---|
+| 1 | `file(path, content, executable?, legacy_utf8?)` | path, content=`''`, executable=`True` | `None` | Create a file in the repo directory |
+| 2 | `symlink(target, link_name)` | target, link_name | `None` | Create a symlink |
+| 3 | `template(path, template, substitutions?, executable?, watch_template?)` | path, template, subs=`{}` | `None` | Create file from template with substitutions |
+| 4 | `delete(path)` | path | `bool` | Delete file/directory, returns True if existed |
+| 5 | `read(path, watch?)` | path, watch=`'auto'` | `string` | Read file contents |
+| 6 | `rename(src, dst)` | src, dst | `None` | Rename file or directory |
+| 7 | `path(path)` | string/Label/path | `path` | Convert to path object |
+
+#### Download Operations
+
+| # | Method | Key Params | Returns | Description |
+|---|---|---|---|---|
+| 8 | `download(url, output?, sha256?, executable?, allow_fail?, canonical_id?, auth?, headers?, integrity?, block?)` | url(s), output, sha256/integrity | `struct{success, sha256, integrity}` | Download a file from URL(s) |
+| 9 | `download_and_extract(url, output?, sha256?, type?, strip_prefix?, allow_fail?, canonical_id?, auth?, headers?, integrity?, rename_files?)` | url(s), output, sha256/integrity, strip_prefix | `struct{success, sha256, integrity}` | Download and extract archive |
+| 10 | `extract(archive, output?, strip_prefix?, rename_files?, watch_archive?, type?)` | archive, strip_prefix | `None` | Extract a local archive |
+
+#### Execution
+
+| # | Method | Params | Returns | Description |
+|---|---|---|---|---|
+| 11 | `execute(arguments, timeout?, environment?, quiet?, working_directory?)` | arguments, timeout=600 | `exec_result{return_code, stdout, stderr}` | Run a command |
+| 12 | `which(program)` | program name | `path` or `None` | Find program on PATH |
+
+#### Environment and Metadata
+
+| # | Method | Params | Returns | Description |
+|---|---|---|---|---|
+| 13 | `getenv(name, default?)` | name, default=None | `string?` | Get env var (with dep tracking) |
+| 14 | `report_progress(status?)` | status string | `None` | Report fetch progress to UI |
+| 15 | `repo_metadata(reproducible?, attrs_for_reproducibility?)` | flags | `repo_metadata` | Declare reproducibility info |
+
+#### Patching and Watching
+
+| # | Method | Params | Returns | Description |
+|---|---|---|---|---|
+| 16 | `patch(patch_file, strip?, watch_patch?)` | patch_file, strip=0 | `None` | Apply a patch file |
+| 17 | `watch(path)` | path | `None` | Watch file for changes (triggers re-fetch) |
+| 18 | `watch_tree(path)` | path | `None` | Watch directory tree for changes |
+
+---
+
+### 6c.3: Implementation Priority
+
+**Tier 1 — Required for module extension execution:**
+
+These are needed to move from synthetic repos to actual `repository_rule()` execution:
+
+| Method | Why | Effort |
+|---|---|---|
+| `repository_ctx.file()` | Every repo rule creates files | Small |
+| `repository_ctx.symlink()` | Link to downloaded content | Small |
+| `repository_ctx.execute()` | Run configuration detection commands | Medium |
+| `repository_ctx.which()` | Find system tools (gcc, python, rustc) | Small |
+| `repository_ctx.path()` | Path manipulation | Small |
+| `repository_ctx.read()` | Read existing files | Small |
+| `repository_ctx.attr` | Access rule attributes | Small |
+| `repository_ctx.name` | Repo name | Trivial |
+| `repository_ctx.os` | OS detection (arch, name, environ) | Small |
+| `repository_ctx.workspace_root` | Root path | Trivial |
+| `repository_ctx.getenv()` | Environment variable access | Small |
+
+**Tier 2 — Required for remote dependency fetching:**
+
+| Method | Why | Effort |
+|---|---|---|
+| `repository_ctx.download()` | Fetch toolchains, OCI images | Medium-Large — needs HTTP client, caching, integrity checks |
+| `repository_ctx.download_and_extract()` | Fetch and unpack archives | Medium — extends download with archive extraction |
+| `repository_ctx.extract()` | Extract local archives | Small — just archive extraction |
+| `repository_ctx.template()` | Generate config files from templates | Small |
+| `repository_ctx.delete()` | Cleanup operations | Trivial |
+| `repository_ctx.rename()` | File operations | Trivial |
+
+**Tier 3 — Nice to have:**
+
+| Method | Why | Effort |
+|---|---|---|
+| `repository_ctx.patch()` | Apply patches to downloaded sources | Small |
+| `repository_ctx.report_progress()` | UI progress reporting | Small |
+| `repository_ctx.watch()` / `watch_tree()` | Incremental re-fetch | Medium |
+| `repository_ctx.original_name` | bzlmod name mapping | Trivial |
+| `repository_ctx.repo_metadata()` | Reproducibility metadata | Small |
+
+---
+
+### 6c.4: Architecture
+
+`repository_ctx` operates in a fundamentally different phase than `ctx`:
+
+| Aspect | `ctx` (analysis) | `repository_ctx` (loading/fetching) |
+|--------|-------------------|--------------------------------------|
+| **When** | During target analysis (DICE) | During repository fetching (before analysis) |
+| **Where** | In-memory, DICE-cached | On-disk, creates files in external repo dir |
+| **Side effects** | None (declarative actions) | Yes (downloads, file I/O, subprocess execution) |
+| **Caching** | DICE incremental | Hash-based repo cache (integrity checks) |
+
+**Implementation approach**: Create a new `RepositoryContext` Starlark type in a new file (e.g., `app/kuro_bzlmod/src/repository_ctx.rs`) that:
+1. Wraps a filesystem root (the repo's output directory)
+2. Provides all the methods above as Starlark functions
+3. Integrates with the existing bzlmod resolution pipeline
+4. Replaces synthetic repo generation for repos whose `repository_rule` is available
+
+**Integration point**: Currently, `synthetic_repos.rs` generates static files for known extensions. With `repository_ctx`, the flow becomes:
+1. Parse MODULE.bazel → resolve deps → identify extension repos
+2. For known extensions with synthetic overrides → use synthetic repos (fast path)
+3. For unknown extensions → execute the `repository_rule()` impl with a real `repository_ctx` (slow path)
+4. Cache the result keyed by rule inputs hash
+
+---
+
+### Success Criteria
+
+#### Phase 6a — Automated Verification:
+
+- [x] `ctx.attr` alias works (implemented)
+- [x] `ctx.actions.args()` builds command lines (implemented)
+- [x] `ctx.actions.declare_file()` / `declare_directory()` work (implemented)
+- [x] `ctx.actions.run()` executes actions correctly (implemented)
+- [x] `ctx.actions.write()` writes files (implemented)
+- [x] `ctx.actions.expand_template()` expands templates (implemented)
+- [x] `ctx.actions.symlink()` creates symlinks (implemented)
+- [x] `ctx.file` / `ctx.files` / `ctx.executable` work (implemented)
+- [x] `DefaultInfo` provider works including Bazel-style `files` parameter (implemented)
+- [x] `Provider in target/artifact` and `target[Provider]` indexing work (implemented)
+- [x] `ctx.runfiles()` collects runfiles (implemented)
+- [x] `depset()` global function works (implemented)
+- [ ] `ctx.actions.run_shell()` registers and executes real shell actions
+- [ ] `ctx.expand_location()` resolves `$(location ...)` templates
+- [ ] `args.add_joined()` joins items with delimiter
+- [ ] `args.use_param_file()` / `set_param_file_format()` support param files
+- [ ] `ctx.info_file` / `ctx.version_file` return real File objects
+- [ ] `ctx.features` / `ctx.disabled_features` read from rule attributes
+- [ ] `ctx.package_relative_label()` resolves strings to Labels
+
+#### Phase 6c — Automated Verification:
+
+- [x] `repository_rule()` function is recognized in .bzl files (implemented via `repository_rule.rs`)
+- [x] `repository_ctx.file()` creates files in repo directory (implemented)
+- [x] `repository_ctx.execute()` runs commands and returns exec_result (implemented)
+- [x] `repository_ctx.which()` finds programs on PATH (implemented)
+- [x] `repository_ctx.download()` fetches files with integrity checking (implemented)
+- [x] `repository_ctx.download_and_extract()` fetches and unpacks archives (implemented)
+- [x] `repository_ctx.os` returns correct platform info (implemented with name/arch/environ)
+- [x] `repository_ctx.original_name` attribute (added)
+- [x] `repository_ctx.rename()` method (added)
+- [x] `repository_ctx.watch_tree()` method no-op (added)
+- [x] Starlark repository rule execution wired via late binding (implemented)
+- [x] A simple `repository_rule` can replace a synthetic repo — **verified 2026-02-18**: `test_repo_ctx_simple.bzl` + `test_repo_ext.bzl` + `@my_test_repo//:empty` build end-to-end
 
 #### Manual Verification:
 
-- [x] Simple rule that compiles a C file works (verified 2026-02-02: cc_library from rules_cc builds successfully)
-- [x] Rule with transitive dependencies collects all inputs (verified 2026-02-02: diamond dependency pattern with aspects)
-
-#### Test Migration (Phase 6):
-
-- [x] UPDATE `tests/core/analysis/test_cmd_args.py` for `ctx.actions.args()` API
-- [ ] UPDATE `tests/core/transitive_sets/test_transitive_sets.py` → rename to `test_depset.py`
-- [ ] ADD `tests/core/analysis/test_ctx_attr.py` for ctx.attr access
-- [ ] ADD `tests/core/analysis/test_ctx_file.py` for ctx.file/ctx.files
-- [ ] ADD `tests/core/analysis/test_ctx_actions_run.py` for ctx.actions.run()
-- [ ] ADD `tests/core/analysis/test_ctx_actions_write.py` for ctx.actions.write()
-- [ ] ADD `tests/core/analysis/test_ctx_actions_declare.py` for declare_file/directory
-- [ ] ADD `tests/core/analysis/test_default_info.py` for DefaultInfo provider
-- [ ] ADD `tests/core/analysis/test_provider_in_operator.py` for `Provider in target/artifact`
-- [x] ADD `tests/core/analysis/test_runfiles.py` for runfiles collection
-- [ ] ADD `tests/core/analysis/test_depset_ordering.py` for depset order parameter
-- [ ] ADD `tests/core/analysis/test_depset_transitive_set_bridge.py` for explicit conversion helpers
-- [ ] ADD depset ordering coverage: `default`, `preorder`, `postorder`, `topological`
-- [ ] ADD depset merge-rule coverage (only same order or `default` allowed)
-- [ ] ADD `tests/core/analysis/test_provider_definition.py` for custom providers
+- [x] rules_cc cc_library/cc_binary/cc_test build successfully (verified)
+- [x] rules_rust rust_library/rust_binary build successfully (verified)
+- [x] rules_python py_library/py_binary/py_test build successfully (verified)
+- [x] protobuf proto_library + cc_proto_library build successfully (verified)
+- [ ] rules_oci oci_image builds (requires run_shell + repository_ctx)
+- [x] rules_pkg pkg_tar builds (pkg_tar works 2026-02-19)
 
 ---
