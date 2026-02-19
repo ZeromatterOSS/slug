@@ -16,23 +16,28 @@
 //!
 //! # Lockfile Format
 //!
-//! The lockfile is a JSON file compatible with Bazel's MODULE.bazel.lock format:
+//! The lockfile is a JSON file compatible with Bazel 9.0's MODULE.bazel.lock format
+//! (lockFileVersion 26):
 //!
 //! ```json
 //! {
-//!   "lockFileVersion": 24,
+//!   "lockFileVersion": 26,
 //!   "registryFileHashes": {
-//!     "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel": "sha256-..."
+//!     "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel": "sha256-hex"
 //!   },
 //!   "selectedYankedVersions": {},
-//!   "moduleDepGraph": {
-//!     "rules_cc@0.0.9": {
-//!       "name": "rules_cc",
-//!       "version": "0.0.9",
-//!       "compatibilityLevel": 0,
-//!       "dependencies": {}
+//!   "moduleExtensions": {
+//!     "@@rules_python+//python/extensions:pip.bzl%pip": {
+//!       "general": {
+//!         "bzlTransitiveDigest": "base64-encoded-sha256",
+//!         "usagesDigest": "base64-encoded-sha256",
+//!         "recordedInputs": [],
+//!         "generatedRepoSpecs": {},
+//!         "moduleExtensionMetadata": null
+//!       }
 //!     }
-//!   }
+//!   },
+//!   "facts": {}
 //! }
 //! ```
 
@@ -50,14 +55,10 @@ use sha2::Sha256;
 
 use crate::repo_spec::RepoSpec;
 use crate::repository_invocations::AttrValue;
-use crate::resolution::ModuleSource;
-use crate::resolution::ResolvedGraph;
-use crate::resolution::ResolvedModuleInfo;
-use crate::types::Module;
 
 /// Current lockfile format version.
-/// This matches Bazel 9.0's lockfile version.
-pub const LOCKFILE_VERSION: u32 = 24;
+/// This matches Bazel 9.0's lockfile version (26).
+pub const LOCKFILE_VERSION: u32 = 26;
 
 /// Errors that can occur during lockfile operations.
 #[derive(Debug, kuro_error::Error)]
@@ -91,20 +92,20 @@ pub enum LockfileError {
     LockfileModeError,
 }
 
-/// The MODE.bazel.lock file content.
+/// The MODULE.bazel.lock file content.
+///
+/// Compatible with Bazel 9.0's lockfile format (lockFileVersion 26).
+/// Deprecated fields from older formats are preserved for backwards-compatible
+/// deserialization but are no longer written.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Lockfile {
     /// Lockfile format version.
     pub lock_file_version: u32,
 
-    /// Hash of the root MODULE.bazel file.
-    #[serde(default)]
-    pub module_file_hash: String,
-
     /// Map from registry file URL to its integrity hash.
     /// Keys are URLs like "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel"
-    /// Values are SRI hashes like "sha256-base64encodedHash"
+    /// Values are hex-encoded SHA256 hashes.
     #[serde(default)]
     pub registry_file_hashes: HashMap<String, String>,
 
@@ -113,63 +114,34 @@ pub struct Lockfile {
     #[serde(default)]
     pub selected_yanked_versions: HashMap<String, String>,
 
-    /// The resolved module dependency graph.
-    /// Keys are "module@version" or just "module" for single-version modules.
-    #[serde(default)]
-    pub module_dep_graph: HashMap<String, LockfileModuleNode>,
-
     /// Module extension results.
-    /// Keys are extension identifiers.
+    /// Keys are extension identifiers (e.g., "@@rules_python+//python/extensions:pip.bzl%pip").
     #[serde(default)]
     pub module_extensions: HashMap<String, LockfileExtensionData>,
 
-    /// Repository rule execution results.
-    /// Keys are repository names (e.g., "rules_cc").
+    /// Bazel 9.0 facts field. Used by some extensions for metadata.
     #[serde(default)]
-    pub repository_rules: HashMap<String, RepositoryRuleLockEntry>,
-}
+    pub facts: HashMap<String, serde_json::Value>,
 
-/// A module node in the lockfile dependency graph.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct LockfileModuleNode {
-    /// Module name.
-    pub name: String,
+    // =========================================================================
+    // Deprecated fields (Bazel 8.0+ removed these)
+    //
+    // Kept for backwards-compatible deserialization of old lockfiles.
+    // These are never written to new lockfiles (skip_serializing).
+    // =========================================================================
+    /// DEPRECATED: Hash of the root MODULE.bazel file (removed in Bazel 8.0+).
+    #[serde(default, skip_serializing)]
+    pub module_file_hash: String,
 
-    /// Module version.
-    pub version: String,
+    /// DEPRECATED: The resolved module dependency graph (removed in Bazel 8.0+).
+    /// Kept as opaque JSON for backwards-compatible deserialization only.
+    #[serde(default, skip_serializing)]
+    pub module_dep_graph: HashMap<String, serde_json::Value>,
 
-    /// Compatibility level.
-    #[serde(default)]
-    pub compatibility_level: u32,
-
-    /// Direct dependencies (module name -> version).
-    #[serde(default)]
-    pub dependencies: HashMap<String, String>,
-
-    /// Registry URL this module was fetched from.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub registry: Option<String>,
-
-    /// For non-registry modules, the source type.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub source_type: Option<String>,
-
-    /// For local path overrides.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub local_path: Option<String>,
-
-    /// For git overrides.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub git_remote: Option<String>,
-
-    /// Git commit hash.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub git_commit: Option<String>,
-
-    /// For archive overrides.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub archive_urls: Option<Vec<String>>,
+    /// DEPRECATED: Repository rule execution results (Kuro-specific, not in Bazel).
+    /// Kept as opaque JSON for backwards-compatible deserialization only.
+    #[serde(default, skip_serializing)]
+    pub repository_rules: HashMap<String, serde_json::Value>,
 }
 
 /// Module extension data in the lockfile (Bazel-compatible format).
@@ -189,6 +161,7 @@ pub struct LockfileExtensionData {
 ///
 /// Contains the information needed to validate cached extension results
 /// and the actual generated repository specifications.
+/// Matches Bazel 9.0's extension general data format.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct LockfileExtensionGeneral {
@@ -200,10 +173,22 @@ pub struct LockfileExtensionGeneral {
     /// Used for cache invalidation when extension inputs change.
     pub usages_digest: String,
 
+    /// Recorded inputs that affect extension execution.
+    /// Bazel 9.0 format - list of strings in these formats:
+    /// - `REPO_MAPPING:<module>+,<apparent_name> <canonical_name>`
+    /// - `FILE:@@<module>+//<path> <sha256-hex>`
+    /// - `ENV:<VARIABLE_NAME>`
+    #[serde(default)]
+    pub recorded_inputs: Vec<String>,
+
     /// Generated repository specifications.
     /// Keys are internal names (e.g., "numpy"), values are full RepoSpec data.
     #[serde(default)]
     pub generated_repo_specs: HashMap<String, LockfileRepoSpec>,
+
+    /// Module extension metadata. Nullable (null when not provided by the extension).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub module_extension_metadata: Option<serde_json::Value>,
 }
 
 /// A repository specification in the lockfile (Bazel-compatible format).
@@ -234,7 +219,9 @@ impl LockfileExtensionData {
             general: Some(LockfileExtensionGeneral {
                 bzl_transitive_digest,
                 usages_digest,
+                recorded_inputs: Vec::new(),
                 generated_repo_specs,
+                module_extension_metadata: None,
             }),
         }
     }
@@ -364,97 +351,21 @@ pub fn json_to_attr_value(value: &serde_json::Value) -> AttrValue {
 /// Lock entry for a repository rule execution result.
 ///
 /// This caches the result of executing a repository rule (like `http_archive`
-/// or `git_repository`) so that subsequent builds don't need to re-download
-/// or re-execute the rule.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RepositoryRuleLockEntry {
-    /// The repository rule that created this repository (e.g., "http_archive").
-    pub rule_name: String,
-
-    /// Hash of input attributes for cache invalidation.
-    pub attrs_hash: String,
-
-    /// Hash of the downloaded/generated content (for integrity verification).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub content_hash: Option<String>,
-
-    /// Files that were downloaded during execution.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub downloaded_files: Vec<DownloadedFileLockEntry>,
-
-    /// Timestamp when this entry was created (for debugging).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub created_at: Option<String>,
-}
-
-/// A file downloaded during repository rule execution.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DownloadedFileLockEntry {
-    /// The URL the file was downloaded from.
-    pub url: String,
-
-    /// Integrity hash in SRI format (e.g., "sha256-base64hash").
-    pub integrity: String,
-
-    /// Output path relative to repository root.
-    pub output_path: String,
-}
-
-impl RepositoryRuleLockEntry {
-    /// Create a new lock entry for a repository rule.
-    pub fn new(rule_name: String, attrs_hash: String) -> Self {
-        Self {
-            rule_name,
-            attrs_hash,
-            content_hash: None,
-            downloaded_files: Vec::new(),
-            created_at: None,
-        }
-    }
-
-    /// Set the content hash.
-    pub fn with_content_hash(mut self, hash: String) -> Self {
-        self.content_hash = Some(hash);
-        self
-    }
-
-    /// Add a downloaded file entry.
-    pub fn with_downloaded_file(
-        mut self,
-        url: String,
-        integrity: String,
-        output_path: String,
-    ) -> Self {
-        self.downloaded_files.push(DownloadedFileLockEntry {
-            url,
-            integrity,
-            output_path,
-        });
-        self
-    }
-
-    /// Set the creation timestamp.
-    pub fn with_timestamp(mut self) -> Self {
-        use std::time::SystemTime;
-        if let Ok(duration) = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
-            self.created_at = Some(format!("{}", duration.as_secs()));
-        }
-        self
-    }
-}
+// RepositoryRuleLockEntry and DownloadedFileLockEntry removed in Phase 9f.
+// The `repository_rules` field now uses serde_json::Value for backwards-compat only.
 
 impl Lockfile {
     /// Create a new empty lockfile.
     pub fn new() -> Self {
         Self {
             lock_file_version: LOCKFILE_VERSION,
-            module_file_hash: String::new(),
             registry_file_hashes: HashMap::new(),
             selected_yanked_versions: HashMap::new(),
-            module_dep_graph: HashMap::new(),
             module_extensions: HashMap::new(),
+            facts: HashMap::new(),
+            // Deprecated fields
+            module_file_hash: String::new(),
+            module_dep_graph: HashMap::new(),
             repository_rules: HashMap::new(),
         }
     }
@@ -507,130 +418,10 @@ impl Lockfile {
         Ok(())
     }
 
-    /// Check if the lockfile is valid for the given root module.
-    ///
-    /// Returns true if the lockfile can be used (MODULE.bazel hasn't changed).
-    pub fn is_valid_for(&self, root_module: &Module, module_bazel_path: &Path) -> bool {
-        // Check version
-        if self.lock_file_version > LOCKFILE_VERSION {
-            return false;
-        }
-
-        // Check MODULE.bazel hash
-        let current_hash = match compute_file_hash(module_bazel_path) {
-            Ok(h) => h,
-            Err(_) => return false,
-        };
-
-        if self.module_file_hash != current_hash {
-            return false;
-        }
-
-        // Basic sanity check - module name should match
-        if let Some(root_node) = self.module_dep_graph.get(&root_module.name) {
-            if root_node.name != root_module.name {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    /// Convert from a ResolvedGraph to populate the lockfile.
-    pub fn from_resolved_graph(
-        graph: &ResolvedGraph,
-        module_bazel_path: &Path,
-    ) -> kuro_error::Result<Self> {
-        let mut lockfile = Lockfile::new();
-
-        // Compute hash of root MODULE.bazel
-        lockfile.module_file_hash = compute_file_hash(module_bazel_path)?;
-
-        // Convert resolved modules to lockfile nodes
-        for (name, info) in &graph.modules {
-            let key = format!("{}@{}", name, info.version);
-            let node = LockfileModuleNode::from_resolved_info(info);
-            lockfile.module_dep_graph.insert(key, node);
-        }
-
-        Ok(lockfile)
-    }
-
-    /// Convert the lockfile back to a ResolvedGraph.
-    pub fn to_resolved_graph(&self) -> ResolvedGraph {
-        let mut graph = ResolvedGraph::default();
-
-        for (key, node) in &self.module_dep_graph {
-            // Extract name from key (could be "name" or "name@version")
-            let name = if key.contains('@') {
-                key.split('@').next().unwrap().to_string()
-            } else {
-                key.clone()
-            };
-
-            graph
-                .selected_versions
-                .insert(name.clone(), node.version.clone());
-
-            let source = node.to_module_source();
-
-            let info = ResolvedModuleInfo {
-                name: name.clone(),
-                version: node.version.clone(),
-                compatibility_level: node.compatibility_level,
-                dependencies: node.dependencies.clone(),
-                source,
-                source_path: node.local_path.as_ref().map(PathBuf::from),
-            };
-
-            graph.modules.insert(name.clone(), info);
-            graph.resolution_order.push(name);
-        }
-
-        graph
-    }
-
     /// Add a registry file hash to the lockfile.
     pub fn add_registry_hash(&mut self, url: &str, content: &str) {
         let hash = compute_sri_hash(content.as_bytes());
         self.registry_file_hashes.insert(url.to_string(), hash);
-    }
-
-    /// Check if a repository rule has a valid cache entry.
-    ///
-    /// Returns `Some(&entry)` if the repository exists in the lockfile and
-    /// the attrs_hash matches (indicating the inputs haven't changed).
-    pub fn get_repository_rule_cache(
-        &self,
-        repo_name: &str,
-        attrs_hash: &str,
-    ) -> Option<&RepositoryRuleLockEntry> {
-        self.repository_rules
-            .get(repo_name)
-            .filter(|entry| entry.attrs_hash == attrs_hash)
-    }
-
-    /// Add or update a repository rule cache entry.
-    pub fn set_repository_rule_cache(&mut self, repo_name: String, entry: RepositoryRuleLockEntry) {
-        self.repository_rules.insert(repo_name, entry);
-    }
-
-    /// Remove a repository rule cache entry.
-    pub fn remove_repository_rule_cache(
-        &mut self,
-        repo_name: &str,
-    ) -> Option<RepositoryRuleLockEntry> {
-        self.repository_rules.remove(repo_name)
-    }
-
-    /// Check if any repository rules are cached.
-    pub fn has_repository_rules(&self) -> bool {
-        !self.repository_rules.is_empty()
-    }
-
-    /// Get all cached repository rule names.
-    pub fn repository_rule_names(&self) -> impl Iterator<Item = &str> {
-        self.repository_rules.keys().map(|s| s.as_str())
     }
 
     // =========================================================================
@@ -747,69 +538,6 @@ impl Default for Lockfile {
     }
 }
 
-impl LockfileModuleNode {
-    /// Create from a ResolvedModuleInfo.
-    pub fn from_resolved_info(info: &ResolvedModuleInfo) -> Self {
-        let mut node = Self {
-            name: info.name.clone(),
-            version: info.version.clone(),
-            compatibility_level: info.compatibility_level,
-            dependencies: info.dependencies.clone(),
-            registry: None,
-            source_type: None,
-            local_path: None,
-            git_remote: None,
-            git_commit: None,
-            archive_urls: None,
-        };
-
-        match &info.source {
-            ModuleSource::Registry { url } => {
-                node.registry = Some(url.clone());
-            }
-            ModuleSource::LocalPath { path } => {
-                node.source_type = Some("local_path".to_string());
-                node.local_path = Some(path.clone());
-            }
-            ModuleSource::Git { remote, commit } => {
-                node.source_type = Some("git".to_string());
-                node.git_remote = Some(remote.clone());
-                node.git_commit = Some(commit.clone());
-            }
-            ModuleSource::Archive { urls } => {
-                node.source_type = Some("archive".to_string());
-                node.archive_urls = Some(urls.clone());
-            }
-        }
-
-        node
-    }
-
-    /// Convert back to ModuleSource.
-    pub fn to_module_source(&self) -> ModuleSource {
-        if let Some(url) = &self.registry {
-            return ModuleSource::Registry { url: url.clone() };
-        }
-
-        match self.source_type.as_deref() {
-            Some("local_path") => ModuleSource::LocalPath {
-                path: self.local_path.clone().unwrap_or_default(),
-            },
-            Some("git") => ModuleSource::Git {
-                remote: self.git_remote.clone().unwrap_or_default(),
-                commit: self.git_commit.clone().unwrap_or_default(),
-            },
-            Some("archive") => ModuleSource::Archive {
-                urls: self.archive_urls.clone().unwrap_or_default(),
-            },
-            _ => {
-                // Default to registry with empty URL
-                ModuleSource::Registry { url: String::new() }
-            }
-        }
-    }
-}
-
 /// Compute SHA256 hash of a file and return as SRI format.
 pub fn compute_file_hash(path: &Path) -> kuro_error::Result<String> {
     let content = fs::read(path).buck_error_context(format!(
@@ -877,29 +605,73 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("MODULE.bazel.lock");
 
-        let mut lockfile = Lockfile::new();
-        lockfile.module_file_hash = "sha256-abc123".to_string();
-        lockfile.module_dep_graph.insert(
-            "rules_cc@0.0.9".to_string(),
-            LockfileModuleNode {
-                name: "rules_cc".to_string(),
-                version: "0.0.9".to_string(),
-                compatibility_level: 0,
-                dependencies: HashMap::new(),
-                registry: Some("https://bcr.bazel.build".to_string()),
-                source_type: None,
-                local_path: None,
-                git_remote: None,
-                git_commit: None,
-                archive_urls: None,
-            },
-        );
-
+        let lockfile = Lockfile::new();
         lockfile.write(&path).unwrap();
 
         let loaded = Lockfile::read(&path).unwrap();
         assert_eq!(loaded.lock_file_version, LOCKFILE_VERSION);
-        assert_eq!(loaded.module_file_hash, "sha256-abc123");
+        // Deprecated fields should not be serialized
+        assert!(loaded.module_file_hash.is_empty());
+        assert!(loaded.module_dep_graph.is_empty());
+        assert!(loaded.repository_rules.is_empty());
+        // New fields should be present
+        assert!(loaded.facts.is_empty());
+    }
+
+    #[test]
+    fn test_lockfile_bazel9_format() {
+        // Verify the serialized JSON matches Bazel 9.0 format
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("MODULE.bazel.lock");
+
+        let lockfile = Lockfile::new();
+        lockfile.write(&path).unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        // Must have lockFileVersion 26
+        assert_eq!(json["lockFileVersion"], 26);
+        // Must have these Bazel 9.0 fields
+        assert!(json.get("registryFileHashes").is_some());
+        assert!(json.get("selectedYankedVersions").is_some());
+        assert!(json.get("moduleExtensions").is_some());
+        assert!(json.get("facts").is_some());
+        // Must NOT have deprecated fields
+        assert!(json.get("moduleFileHash").is_none());
+        assert!(json.get("moduleDepGraph").is_none());
+        assert!(json.get("repositoryRules").is_none());
+    }
+
+    #[test]
+    fn test_lockfile_backwards_compat_old_format() {
+        // Verify we can read old-format lockfiles (v24 with deprecated fields)
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("MODULE.bazel.lock");
+
+        let old_format_json = r#"{
+            "lockFileVersion": 24,
+            "moduleFileHash": "sha256-oldhash",
+            "registryFileHashes": {},
+            "selectedYankedVersions": {},
+            "moduleDepGraph": {
+                "rules_cc@0.0.9": {
+                    "name": "rules_cc",
+                    "version": "0.0.9",
+                    "compatibilityLevel": 0,
+                    "dependencies": {}
+                }
+            },
+            "moduleExtensions": {},
+            "repositoryRules": {}
+        }"#;
+
+        fs::write(&path, old_format_json).unwrap();
+        let loaded = Lockfile::read(&path).unwrap();
+
+        // Should successfully read old fields
+        assert_eq!(loaded.lock_file_version, 24);
+        assert_eq!(loaded.module_file_hash, "sha256-oldhash");
         assert!(loaded.module_dep_graph.contains_key("rules_cc@0.0.9"));
     }
 
@@ -922,59 +694,6 @@ mod tests {
     }
 
     #[test]
-    fn test_lockfile_validity() {
-        let dir = TempDir::new().unwrap();
-        let module_path = dir.path().join("MODULE.bazel");
-        fs::write(&module_path, "module(name = \"test\", version = \"1.0.0\")").unwrap();
-
-        let mut lockfile = Lockfile::new();
-        lockfile.module_file_hash = compute_file_hash(&module_path).unwrap();
-
-        let module = Module::new(
-            "test".to_string(),
-            crate::version::Version::parse("1.0.0").unwrap(),
-        );
-
-        assert!(lockfile.is_valid_for(&module, &module_path));
-
-        // Modify MODULE.bazel
-        fs::write(&module_path, "module(name = \"test\", version = \"2.0.0\")").unwrap();
-        assert!(!lockfile.is_valid_for(&module, &module_path));
-    }
-
-    #[test]
-    fn test_module_node_source_conversion() {
-        // Test registry source
-        let info = ResolvedModuleInfo {
-            name: "test".to_string(),
-            version: "1.0.0".to_string(),
-            compatibility_level: 0,
-            dependencies: HashMap::new(),
-            source: ModuleSource::Registry {
-                url: "https://bcr.bazel.build".to_string(),
-            },
-            source_path: None,
-        };
-        let node = LockfileModuleNode::from_resolved_info(&info);
-        assert_eq!(node.registry, Some("https://bcr.bazel.build".to_string()));
-
-        // Test local path source
-        let info = ResolvedModuleInfo {
-            name: "local".to_string(),
-            version: "0.0.0".to_string(),
-            compatibility_level: 0,
-            dependencies: HashMap::new(),
-            source: ModuleSource::LocalPath {
-                path: "../local_module".to_string(),
-            },
-            source_path: Some(PathBuf::from("../local_module")),
-        };
-        let node = LockfileModuleNode::from_resolved_info(&info);
-        assert_eq!(node.source_type, Some("local_path".to_string()));
-        assert_eq!(node.local_path, Some("../local_module".to_string()));
-    }
-
-    #[test]
     fn test_lockfile_mode_parsing() {
         assert_eq!(LockfileMode::from_str("update"), Some(LockfileMode::Update));
         assert_eq!(
@@ -984,85 +703,6 @@ mod tests {
         assert_eq!(LockfileMode::from_str("error"), Some(LockfileMode::Error));
         assert_eq!(LockfileMode::from_str("off"), Some(LockfileMode::Off));
         assert_eq!(LockfileMode::from_str("invalid"), None);
-    }
-
-    #[test]
-    fn test_repository_rule_lock_entry() {
-        let entry =
-            RepositoryRuleLockEntry::new("http_archive".to_string(), "sha256-abc123".to_string())
-                .with_content_hash("sha256-def456".to_string())
-                .with_downloaded_file(
-                    "https://example.com/archive.tar.gz".to_string(),
-                    "sha256-xyz789".to_string(),
-                    "archive.tar.gz".to_string(),
-                );
-
-        assert_eq!(entry.rule_name, "http_archive");
-        assert_eq!(entry.attrs_hash, "sha256-abc123");
-        assert_eq!(entry.content_hash, Some("sha256-def456".to_string()));
-        assert_eq!(entry.downloaded_files.len(), 1);
-        assert_eq!(
-            entry.downloaded_files[0].url,
-            "https://example.com/archive.tar.gz"
-        );
-    }
-
-    #[test]
-    fn test_lockfile_repository_rule_cache() {
-        let mut lockfile = Lockfile::new();
-
-        // Initially empty
-        assert!(!lockfile.has_repository_rules());
-        assert!(lockfile.get_repository_rule_cache("foo", "hash1").is_none());
-
-        // Add an entry
-        let entry = RepositoryRuleLockEntry::new("http_archive".to_string(), "hash1".to_string());
-        lockfile.set_repository_rule_cache("foo".to_string(), entry);
-
-        // Now it should exist
-        assert!(lockfile.has_repository_rules());
-        assert!(lockfile.get_repository_rule_cache("foo", "hash1").is_some());
-
-        // Wrong hash should not match
-        assert!(lockfile.get_repository_rule_cache("foo", "hash2").is_none());
-
-        // Wrong name should not match
-        assert!(lockfile.get_repository_rule_cache("bar", "hash1").is_none());
-
-        // Remove it
-        let removed = lockfile.remove_repository_rule_cache("foo");
-        assert!(removed.is_some());
-        assert!(!lockfile.has_repository_rules());
-    }
-
-    #[test]
-    fn test_lockfile_repository_rules_serialization() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("MODULE.bazel.lock");
-
-        let mut lockfile = Lockfile::new();
-        lockfile.set_repository_rule_cache(
-            "rules_cc".to_string(),
-            RepositoryRuleLockEntry::new("http_archive".to_string(), "sha256-abc".to_string())
-                .with_content_hash("sha256-def".to_string())
-                .with_downloaded_file(
-                    "https://github.com/rules_cc/archive.tar.gz".to_string(),
-                    "sha256-ghi".to_string(),
-                    "rules_cc.tar.gz".to_string(),
-                ),
-        );
-
-        lockfile.write(&path).unwrap();
-
-        let loaded = Lockfile::read(&path).unwrap();
-        assert!(loaded.has_repository_rules());
-
-        let entry = loaded
-            .get_repository_rule_cache("rules_cc", "sha256-abc")
-            .unwrap();
-        assert_eq!(entry.rule_name, "http_archive");
-        assert_eq!(entry.content_hash, Some("sha256-def".to_string()));
-        assert_eq!(entry.downloaded_files.len(), 1);
     }
 
     // =========================================================================

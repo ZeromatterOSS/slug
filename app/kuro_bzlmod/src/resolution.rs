@@ -892,69 +892,35 @@ use crate::lockfile::lockfile_path;
 pub async fn resolve_with_lockfile(
     root: &Module,
     workspace_root: &Path,
-    module_bazel_path: &Path,
+    _module_bazel_path: &Path,
     mode: LockfileMode,
 ) -> kuro_error::Result<ResolvedGraph> {
     let lock_path = lockfile_path(workspace_root);
 
-    // Handle lockfile mode
-    match mode {
-        LockfileMode::Off => {
-            // Don't use lockfile, always resolve
-            return resolve_fresh(root, workspace_root, module_bazel_path, None).await;
+    // In Bazel 9.0+ format, the lockfile no longer caches the module dependency graph.
+    // Module resolution always runs fresh (it's fast - just MODULE.bazel parsing + MVS).
+    // The lockfile's primary purpose is extension result caching.
+    let write_lockfile = match mode {
+        LockfileMode::Off => false,
+        LockfileMode::Refresh => true,
+        LockfileMode::Update => true,
+        LockfileMode::Error => {
+            // In error mode, we still resolve fresh but don't update the lockfile
+            // (error mode only applies to extension caching, not module resolution)
+            false
         }
-        LockfileMode::Refresh => {
-            // Always re-resolve but update lockfile
-            return resolve_fresh(root, workspace_root, module_bazel_path, Some(&lock_path)).await;
-        }
-        LockfileMode::Update | LockfileMode::Error => {
-            // Check lockfile first
-        }
-    }
+    };
 
-    // Try to use existing lockfile
-    if lock_path.exists() {
-        match Lockfile::read(&lock_path) {
-            Ok(lockfile) => {
-                if lockfile.is_valid_for(root, module_bazel_path) {
-                    tracing::info!("Using cached resolution from lockfile");
-                    return Ok(lockfile.to_resolved_graph());
-                } else {
-                    tracing::info!("Lockfile is stale, re-resolving");
-                }
-            }
-            Err(e) => {
-                tracing::warn!("Failed to read lockfile: {}, re-resolving", e);
-            }
-        }
-    }
-
-    // Check if we're in error mode and would need to update
-    if mode == LockfileMode::Error {
-        return Err(crate::lockfile::LockfileError::LockfileModeError.into());
-    }
-
-    // Resolve fresh
-    resolve_fresh(root, workspace_root, module_bazel_path, Some(&lock_path)).await
-}
-
-/// Perform fresh MVS resolution and optionally update lockfile.
-async fn resolve_fresh(
-    root: &Module,
-    workspace_root: &Path,
-    module_bazel_path: &Path,
-    lockfile_path: Option<&Path>,
-) -> kuro_error::Result<ResolvedGraph> {
+    // Always resolve fresh
     let cache = ModuleCache::new()?;
     let mut resolver = MvsResolver::new(cache).await?;
-
     let graph = resolver.resolve(root, workspace_root).await?;
 
-    // Update lockfile if path provided
-    if let Some(path) = lockfile_path {
-        let lockfile = Lockfile::from_resolved_graph(&graph, module_bazel_path)?;
-        lockfile.write(path)?;
-        tracing::info!("Updated lockfile at {}", path.display());
+    // Write lockfile if needed (creates the file for extension caching)
+    if write_lockfile && !lock_path.exists() {
+        let lockfile = Lockfile::new();
+        lockfile.write(&lock_path)?;
+        tracing::info!("Created lockfile at {}", lock_path.display());
     }
 
     Ok(graph)

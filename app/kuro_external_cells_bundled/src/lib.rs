@@ -55,6 +55,20 @@ const BAZEL_TOOLS: BundledCell = BundledCell {
     is_testing: false,
 };
 
+#[cfg(not(buck_build))]
+mod local_config_platform {
+    include!(concat!(
+        env!("OUT_DIR"),
+        "/local_config_platform_include.rs"
+    ));
+}
+
+const LOCAL_CONFIG_PLATFORM: BundledCell = BundledCell {
+    name: "local_config_platform",
+    files: local_config_platform::DATA,
+    is_testing: false,
+};
+
 const TEST_CELL: BundledCell = BundledCell {
     name: "test_bundled_cell",
     files: &[
@@ -99,8 +113,9 @@ const TEST_CELL: BundledCell = BundledCell {
 
 pub const fn get_bundled_data() -> &'static [BundledCell] {
     // bazel_tools is required for rules_cc (references @bazel_tools//tools/cpp:...)
+    // local_config_platform provides HOST_CONSTRAINTS for the current platform
     // prelude removed - Kuro doesn't need buck2 compatibility
-    &[BAZEL_TOOLS, TEST_CELL]
+    &[BAZEL_TOOLS, LOCAL_CONFIG_PLATFORM, TEST_CELL]
 }
 
 #[cfg(test)]

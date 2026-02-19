@@ -53,6 +53,34 @@ fn imp() -> io::Result<()> {
         std::fs::File::create(out_dir.join("bazel_tools_include.rs"))?,
     )?;
 
+    // Generate local_config_platform bundled files
+    // This is a Bazel auto-generated repo providing HOST_CONSTRAINTS for the current platform.
+    let local_config_platform_out = out_dir.join("local_config_platform_src");
+    std::fs::create_dir_all(&local_config_platform_out)?;
+
+    let os_constraint = match std::env::consts::OS {
+        "linux" => "@platforms//os:linux",
+        "macos" => "@platforms//os:osx",
+        "windows" => "@platforms//os:windows",
+        _ => "@platforms//os:linux",
+    };
+    let cpu_constraint = match std::env::consts::ARCH {
+        "x86_64" => "@platforms//cpu:x86_64",
+        "aarch64" => "@platforms//cpu:aarch64",
+        _ => "@platforms//cpu:x86_64",
+    };
+    let constraints_content =
+        format!("HOST_CONSTRAINTS = [\n    \"{cpu_constraint}\",\n    \"{os_constraint}\",\n]\n");
+    std::fs::write(
+        local_config_platform_out.join("constraints.bzl"),
+        &constraints_content,
+    )?;
+
+    write_include_file(
+        &local_config_platform_out,
+        std::fs::File::create(out_dir.join("local_config_platform_include.rs"))?,
+    )?;
+
     Ok(())
 }
 

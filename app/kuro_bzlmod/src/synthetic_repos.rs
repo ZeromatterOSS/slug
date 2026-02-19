@@ -875,11 +875,14 @@ config = struct(
 # code calls into (normally native Java code in Bazel).
 
 def _get_label_repo_runfiles_path(label):
-    """Returns runfiles path for a label's repository.
+    """Returns the package path of a label within its repository's runfiles.
 
-    For the main repo, returns "". For external repos, returns the repo name.
+    This is used by rules_python to compute the Python import path prefix.
+    For a label like `rules_pkg//pkg/private:manifest`, this returns "pkg/private".
+    For a root-level label like `//foo:bar`, this returns "foo".
     """
-    return ""
+    pkg = label.package if hasattr(label, "package") else ""
+    return pkg
 
 def _is_singleton_depset(files):
     """Optimized check for whether a depset has exactly one element."""

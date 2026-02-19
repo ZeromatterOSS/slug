@@ -40,7 +40,6 @@ use dice::DiceComputations;
 use dice::Key;
 use dupe::Dupe;
 
-use crate::lockfile::RepositoryRuleLockEntry;
 use crate::repo_spec::RepoSpec;
 use crate::repository_invocations::RepositoryInvocation;
 
@@ -108,18 +107,6 @@ impl RepositoryRuleResult {
         self
     }
 
-    /// Create a lockfile entry from this result.
-    ///
-    /// This can be used to cache the repository rule execution in the lockfile.
-    pub fn to_lock_entry(&self, rule_name: &str, attrs_hash: &str) -> RepositoryRuleLockEntry {
-        let mut entry = RepositoryRuleLockEntry::new(rule_name.to_owned(), attrs_hash.to_owned());
-
-        if let Some(hash) = &self.content_hash {
-            entry = entry.with_content_hash(hash.clone());
-        }
-
-        entry.with_timestamp()
-    }
 }
 
 /// DICE key for repository rule execution.
@@ -222,7 +209,7 @@ impl Key for RepositoryRuleExecutionKey {
 #[derive(Clone, Debug, Display, Allocative, Dupe)]
 #[display("ExtensionRepoKey({}, {})", canonical_name, spec_hash)]
 pub struct ExtensionRepoExecutionKey {
-    /// Canonical repo name (e.g., "_main~pip~numpy").
+    /// Canonical repo name (e.g., "_main+pip+numpy").
     pub canonical_name: Arc<str>,
 
     /// Extension that generated this repo (e.g., "@@rules_python//pip:pip.bzl%pip").
@@ -315,7 +302,7 @@ impl Key for ExtensionRepoExecutionKey {
 
     async fn compute(
         &self,
-        _ctx: &mut DiceComputations,
+        ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         tracing::info!(
@@ -334,7 +321,83 @@ impl Key for ExtensionRepoExecutionKey {
             self.project_root
         );
 
-        // Execute the repository rule using the repository executor
+        let working_dir = self
+            .project_root
+            .join("bazel-external")
+            .join(self.canonical_name.as_ref());
+
+        // For non-builtin rules with a known Starlark source, try Starlark execution
+        if !crate::starlark_repo_rule_executor::is_builtin_repo_rule(&invocation.rule_name) {
+            if let Some(rule_source) = &invocation.rule_source {
+                // Extract bzl_path and rule_name from rule_source
+                // Format: "@@module//path:file.bzl%rule_name"
+                if let Some(percent_pos) = rule_source.rfind('%') {
+                    let rule_bzl_path = &rule_source[..percent_pos];
+                    let rule_fn_name = &rule_source[percent_pos + 1..];
+
+                    if let Ok(executor) =
+                        crate::starlark_repo_rule_executor::STARLARK_REPO_RULE_EXECUTOR_IMPL.get()
+                    {
+                        tracing::info!(
+                            "Executing Starlark repository rule '{}' from '{}' for '{}'",
+                            rule_fn_name,
+                            rule_bzl_path,
+                            self.canonical_name
+                        );
+
+                        // Prepare working directory
+                        if !working_dir.exists() {
+                            std::fs::create_dir_all(&working_dir).map_err(|e| {
+                                RepositoryExecutionError::WorkingDirFailed {
+                                    reason: format!("Failed to create directory: {}", e),
+                                }
+                            })?;
+                        }
+
+                        match executor
+                            .execute_rule(
+                                ctx,
+                                &invocation,
+                                rule_bzl_path,
+                                rule_fn_name,
+                                &working_dir,
+                            )
+                            .await
+                        {
+                            Ok(()) => {
+                                // Mark as complete and write WORKSPACE if missing
+                                if !working_dir.join("WORKSPACE").exists()
+                                    && !working_dir.join("WORKSPACE.bazel").exists()
+                                {
+                                    let _ = std::fs::write(
+                                        working_dir.join("WORKSPACE.bazel"),
+                                        format!("workspace(name = \"{}\")\n", self.canonical_name),
+                                    );
+                                }
+                                let _ = std::fs::write(
+                                    working_dir.join(".kuro_repo_complete"),
+                                    "complete",
+                                );
+                                return Ok(Arc::new(RepositoryRuleResult::success(
+                                    self.canonical_name.to_string(),
+                                    working_dir,
+                                )));
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    "Starlark execution of '{}' failed, falling back to native: {}",
+                                    rule_fn_name,
+                                    e
+                                );
+                                // Fall through to native executor
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Execute the repository rule using the native repository executor
         // This handles http_archive, git_repository, local_repository, etc.
         let result =
             crate::repository_executor::execute_repository_rule(&invocation, &self.project_root)?;
@@ -368,7 +431,7 @@ impl Key for ExtensionRepoExecutionKey {
 /// for execution.
 ///
 /// # Arguments
-/// * `canonical_name` - The canonical name for this repository (e.g., "_main~pip~numpy")
+/// * `canonical_name` - The canonical name for this repository (e.g., "_main+pip+numpy")
 /// * `repo_spec` - The captured RepoSpec from extension execution
 ///
 /// # Returns
@@ -398,13 +461,19 @@ pub fn repo_spec_to_invocation(
 
 /// Extract the rule name from a repo_rule_id.
 ///
-/// Handles format: `@@module//path:file.bzl%rule_name`
-/// Returns the `rule_name` part (after the `%`).
+/// Handles formats:
+/// - `@@module//path:file.bzl%rule_name` → `rule_name`
+/// - `rule_name` (plain name without bzl path) → `rule_name`
 fn extract_rule_name_from_id(repo_rule_id: &str) -> Option<String> {
-    // Look for %rule_name at the end
-    repo_rule_id
-        .rfind('%')
-        .map(|pos| repo_rule_id[pos + 1..].to_owned())
+    if let Some(pos) = repo_rule_id.rfind('%') {
+        Some(repo_rule_id[pos + 1..].to_owned())
+    } else if !repo_rule_id.is_empty() {
+        // Plain rule name (e.g., from DICE-based extension execution
+        // where bzl_context wasn't set)
+        Some(repo_rule_id.to_owned())
+    } else {
+        None
+    }
 }
 
 /// Registry of repository rule invocations for DICE lookup.
@@ -604,13 +673,13 @@ mod tests {
                 .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
 
         let key = ExtensionRepoExecutionKey::new(
-            "_main~pip~numpy".to_owned(),
+            "_main+pip+numpy".to_owned(),
             "@@rules_python//pip:pip.bzl%pip".to_owned(),
             repo_spec,
             PathBuf::from("/tmp/project"),
         );
 
-        assert_eq!(key.canonical_name.as_ref(), "_main~pip~numpy");
+        assert_eq!(key.canonical_name.as_ref(), "_main+pip+numpy");
         assert_eq!(key.extension_id.as_ref(), "@@rules_python//pip:pip.bzl%pip");
         assert!(key.spec_hash.starts_with("sha256-"));
         assert_eq!(
@@ -630,13 +699,13 @@ mod tests {
         );
 
         let key = ExtensionRepoExecutionKey::from_arcs(
-            Arc::from("_main~go_deps~gazelle"),
+            Arc::from("_main+go_deps+gazelle"),
             Arc::from("@@rules_go//deps:go_deps.bzl%go_deps"),
             repo_spec.clone(),
             Arc::new(PathBuf::from("/project")),
         );
 
-        assert_eq!(key.canonical_name.as_ref(), "_main~go_deps~gazelle");
+        assert_eq!(key.canonical_name.as_ref(), "_main+go_deps+gazelle");
         assert_eq!(
             key.extension_id.as_ref(),
             "@@rules_go//deps:go_deps.bzl%go_deps"
@@ -649,13 +718,13 @@ mod tests {
     fn test_extension_repo_key_display() {
         let repo_spec = RepoSpec::new("@@tools//repo:http.bzl%http_archive".to_owned());
         let key = ExtensionRepoExecutionKey::new_with_cwd(
-            "_main~ext~repo".to_owned(),
+            "_main+ext+repo".to_owned(),
             "@@module//ext.bzl%ext".to_owned(),
             repo_spec,
         );
 
         let display = format!("{}", key);
-        assert!(display.starts_with("ExtensionRepoKey(_main~ext~repo, sha256-"));
+        assert!(display.starts_with("ExtensionRepoKey(_main+ext+repo, sha256-"));
         assert!(display.ends_with(")"));
     }
 
@@ -672,12 +741,12 @@ mod tests {
         );
 
         let key1 = ExtensionRepoExecutionKey::new_with_cwd(
-            "_main~ext~repo".to_owned(),
+            "_main+ext+repo".to_owned(),
             "@@m//e.bzl%ext".to_owned(),
             spec1,
         );
         let key2 = ExtensionRepoExecutionKey::new_with_cwd(
-            "_main~ext~repo".to_owned(),
+            "_main+ext+repo".to_owned(),
             "@@m//e.bzl%ext".to_owned(),
             spec2,
         );
@@ -691,13 +760,13 @@ mod tests {
         let spec = RepoSpec::new("@@tools//repo:http.bzl%http_archive".to_owned());
 
         let key1 = ExtensionRepoExecutionKey::new(
-            "_main~ext~repo".to_owned(),
+            "_main+ext+repo".to_owned(),
             "@@m//e.bzl%ext".to_owned(),
             spec.clone(),
             PathBuf::from("/project1"),
         );
         let key2 = ExtensionRepoExecutionKey::new(
-            "_main~ext~repo".to_owned(),
+            "_main+ext+repo".to_owned(),
             "@@m//e.bzl%ext".to_owned(),
             spec,
             PathBuf::from("/project2"),
@@ -719,9 +788,9 @@ mod tests {
                 )
                 .with_attr("sha256".to_owned(), AttrValue::String("abc123".to_owned()));
 
-        let invocation = repo_spec_to_invocation("_main~pip~numpy", &repo_spec).unwrap();
+        let invocation = repo_spec_to_invocation("_main+pip+numpy", &repo_spec).unwrap();
 
-        assert_eq!(invocation.name, "_main~pip~numpy");
+        assert_eq!(invocation.name, "_main+pip+numpy");
         assert_eq!(invocation.rule_name, "http_archive");
         assert_eq!(
             invocation.rule_source,
@@ -755,9 +824,9 @@ mod tests {
             );
 
         let invocation =
-            repo_spec_to_invocation("_main~go_deps~com_github_foo_bar", &repo_spec).unwrap();
+            repo_spec_to_invocation("_main+go_deps+com_github_foo_bar", &repo_spec).unwrap();
 
-        assert_eq!(invocation.name, "_main~go_deps~com_github_foo_bar");
+        assert_eq!(invocation.name, "_main+go_deps+com_github_foo_bar");
         assert_eq!(invocation.rule_name, "go_repository");
         assert_eq!(invocation.attrs.len(), 4);
     }
@@ -766,19 +835,27 @@ mod tests {
     fn test_repo_spec_to_invocation_no_attrs() {
         let repo_spec = RepoSpec::new("@@//local:repo.bzl%local_repository".to_owned());
 
-        let invocation = repo_spec_to_invocation("_main~local~myrepo", &repo_spec).unwrap();
+        let invocation = repo_spec_to_invocation("_main+local+myrepo", &repo_spec).unwrap();
 
-        assert_eq!(invocation.name, "_main~local~myrepo");
+        assert_eq!(invocation.name, "_main+local+myrepo");
         assert_eq!(invocation.rule_name, "local_repository");
         assert!(invocation.attrs.is_empty());
     }
 
     #[test]
-    fn test_repo_spec_to_invocation_invalid_rule_id() {
-        // Missing % separator
-        let repo_spec = RepoSpec::new("@@bazel_tools//tools/build_defs/repo:http.bzl".to_owned());
+    fn test_repo_spec_to_invocation_plain_rule_name() {
+        // Plain rule name (no % separator) - common in DICE-based extension execution
+        let repo_spec = RepoSpec::new("http_archive".to_owned());
 
-        let result = repo_spec_to_invocation("_main~ext~repo", &repo_spec);
+        let invocation = repo_spec_to_invocation("_main+ext+repo", &repo_spec).unwrap();
+        assert_eq!(invocation.rule_name, "http_archive");
+    }
+
+    #[test]
+    fn test_repo_spec_to_invocation_empty_rule_id() {
+        let repo_spec = RepoSpec::new(String::new());
+
+        let result = repo_spec_to_invocation("_main+ext+repo", &repo_spec);
         assert!(result.is_err());
     }
 
@@ -801,7 +878,12 @@ mod tests {
             extract_rule_name_from_id("@@module//path%weird:file.bzl%actual_rule"),
             Some("actual_rule".to_owned())
         );
-        // Missing %
-        assert_eq!(extract_rule_name_from_id("@@module//path:file.bzl"), None);
+        // Plain rule name (no bzl path)
+        assert_eq!(
+            extract_rule_name_from_id("http_archive"),
+            Some("http_archive".to_owned())
+        );
+        // Empty string
+        assert_eq!(extract_rule_name_from_id(""), None);
     }
 }

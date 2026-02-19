@@ -17,23 +17,14 @@ use std::sync::Arc;
 use allocative::Allocative;
 use dice::DiceComputations;
 use dupe::Dupe;
-use kuro_bzlmod::Lockfile;
 use kuro_bzlmod::ModuleCache;
-use kuro_bzlmod::ModuleExtensionResult;
 use kuro_bzlmod::ModuleSource;
 use kuro_bzlmod::MvsResolver;
 use kuro_bzlmod::ResolvedGraph;
-use kuro_bzlmod::aggregate_extensions;
-use kuro_bzlmod::build_extension_cells;
-use kuro_bzlmod::build_use_repo_aliases;
-use kuro_bzlmod::compute_bzl_transitive_digest;
-use kuro_bzlmod::compute_extension_input_hash;
-use kuro_bzlmod::lockfile_path;
 use kuro_bzlmod::parse_module_bazel;
 use kuro_bzlmod::resolve_local_modules;
 use kuro_bzlmod::synthetic_repos::collect_synthetic_repos;
 use kuro_bzlmod::synthetic_repos::materialize_synthetic_repos;
-use kuro_bzlmod::types::ExtensionUsage;
 use kuro_bzlmod::types::ParsedModuleFile;
 use kuro_core::cells::CellAliasResolver;
 use kuro_core::cells::CellResolver;
@@ -249,6 +240,9 @@ pub struct BuckConfigBasedCells {
 
 /// Result of bzlmod dependency resolution.
 struct BzlmodResolutionResult {
+    /// Root module name from MODULE.bazel `module(name = "...")`.
+    /// Used as the root cell name (falls back to `_main` if empty).
+    root_module_name: String,
     /// Cells to register: (name, path, optional setup for remote modules)
     cells: Vec<(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)>,
     /// Extension-generated cells: (name, path, setup for extension repos)
@@ -418,57 +412,41 @@ impl BuckConfigBasedCells {
         .await?;
 
         let mut cell_definitions = Vec::new();
-
-        // `cells` is preferred over `repositories` since it's more clear, however it's unlikely
-        // that we'll ever remove `repositories` since that's probably unnecessary breakage in OSS.
-        //
-        // Note that `cells` is kuro-only
-        let repositories = root_config
-            .get_section("cells")
-            .or_else(|| root_config.get_section("repositories"));
-        if let Some(repositories) = repositories {
-            for (alias, alias_path) in repositories.iter() {
-                let alias_path = CellRootPathBuf::new(
-                    root_path.as_project_relative_path()
-                        .join_normalized(RelativePath::new(alias_path.as_str()))
-                        .with_buck_error_context(|| {
-                            format!(
-                                "expected alias path to be a relative path, but found `{}` for `{}`",
-                                alias_path.as_str(),
-                                alias,
-                            )
-                        })?
-                );
-                let name = CellName::unchecked_new(alias)?;
-                cell_definitions.push((name, alias_path));
-            }
-        }
-
-        // ===== Bzlmod Integration =====
-        // Check for MODULE.bazel and resolve dependencies from BCR
-        // Collect bzlmod cells with their external origins for later marking
         let mut bzlmod_external_cells: Vec<(CellName, BzlmodCellSetup)> = Vec::new();
         let mut bzlmod_extension_cells: Vec<(CellName, ExtensionRepoCellSetup)> = Vec::new();
         let mut bzlmod_bundled_cells: Vec<CellName> = Vec::new();
+        let mut has_module_bazel = false;
+
+        // ===== Bzlmod Integration =====
+        // When MODULE.bazel exists, ALL cell definitions come from bzlmod resolution.
+        // The root cell name is derived from module(name = "...") in MODULE.bazel.
+        // .buckconfig [cells], [cell_aliases], and [external_cells] sections are skipped.
         let mut bzlmod_aliases: Vec<(NonEmptyCellAlias, CellName)> = Vec::new();
         if let Some(project_fs) = project_fs {
             if let Some(bzlmod_result) = Self::resolve_bzlmod_dependencies(project_fs).await? {
+                has_module_bazel = true;
+
+                // Root cell comes from MODULE.bazel module(name = "...")
+                let root_cell_name =
+                    CellName::unchecked_new(&bzlmod_result.root_module_name)?;
+                cell_definitions.push((root_cell_name, root_path.clone()));
+                tracing::info!(
+                    "Root cell '{}' defined from MODULE.bazel",
+                    bzlmod_result.root_module_name
+                );
+
                 for (name, path, maybe_setup) in bzlmod_result.cells {
-                    // Don't override cells defined in .buckconfig
                     if !cell_definitions.iter().any(|(n, _)| *n == name) {
                         cell_definitions.push((name, path));
                         tracing::info!("Added bzlmod cell: {}", name);
 
-                        // If this is a remote BCR module, track it for marking as external
                         if let Some(setup) = maybe_setup {
                             bzlmod_external_cells.push((name, setup));
                         }
                     }
                 }
 
-                // Process extension-generated cells from lockfile cache
                 for (name, path, setup) in bzlmod_result.extension_cells {
-                    // Don't override cells defined in .buckconfig or bzlmod
                     if !cell_definitions.iter().any(|(n, _)| *n == name) {
                         cell_definitions.push((name, path));
                         tracing::info!("Added extension repo cell: {}", name);
@@ -476,35 +454,83 @@ impl BuckConfigBasedCells {
                     }
                 }
 
-                // Collect repo_name aliases for later merging
                 bzlmod_aliases = bzlmod_result.aliases;
 
                 // Auto-register @bazel_tools for bzlmod projects
-                // rules_cc requires @bazel_tools//tools/cpp:...
                 let bazel_tools_name = CellName::unchecked_new("bazel_tools")?;
                 if !cell_definitions.iter().any(|(n, _)| *n == bazel_tools_name) {
                     let bazel_tools_path =
                         CellRootPathBuf::new(ProjectRelativePath::new("bazel_tools")?.to_owned());
                     cell_definitions.push((bazel_tools_name, bazel_tools_path));
                     bzlmod_bundled_cells.push(bazel_tools_name);
-                    // Note: Cell is automatically added as an alias in CellsAggregator::new()
-                    // so we don't need to add it to bzlmod_aliases explicitly
                     tracing::info!("Auto-registered bundled cell: bazel_tools");
+                }
+
+                // Auto-register @local_config_platform for bzlmod projects
+                let lcp_name = CellName::unchecked_new("local_config_platform")?;
+                if !cell_definitions.iter().any(|(n, _)| *n == lcp_name) {
+                    let lcp_path = CellRootPathBuf::new(
+                        ProjectRelativePath::new("local_config_platform")?.to_owned(),
+                    );
+                    cell_definitions.push((lcp_name, lcp_path));
+                    bzlmod_bundled_cells.push(lcp_name);
+                    tracing::info!("Auto-registered bundled cell: local_config_platform");
+                }
+            }
+        }
+
+        // Legacy .buckconfig cell definitions - only used when MODULE.bazel is NOT present
+        if !has_module_bazel {
+            let repositories = root_config
+                .get_section("cells")
+                .or_else(|| root_config.get_section("repositories"));
+            if let Some(repositories) = repositories {
+                for (alias, alias_path) in repositories.iter() {
+                    let alias_path = CellRootPathBuf::new(
+                        root_path
+                            .as_project_relative_path()
+                            .join_normalized(RelativePath::new(alias_path.as_str()))
+                            .with_buck_error_context(|| {
+                                format!(
+                                    "expected alias path to be a relative path, but found `{}` for `{}`",
+                                    alias_path.as_str(),
+                                    alias,
+                                )
+                            })?,
+                    );
+                    let name = CellName::unchecked_new(alias)?;
+                    cell_definitions.push((name, alias_path));
                 }
             }
         }
         // ===== End Bzlmod Integration =====
 
-        // Merge config aliases with bzlmod aliases (bzlmod aliases come from repo_name parameters)
-        let mut root_aliases: HashMap<NonEmptyCellAlias, NonEmptyCellAlias> =
-            Self::get_cell_aliases_from_config(&root_config)?.collect();
+        // Build root aliases:
+        // - When MODULE.bazel exists: only bzlmod aliases (skip .buckconfig [cell_aliases])
+        // - When no MODULE.bazel: merge .buckconfig aliases with bzlmod aliases
+        let mut root_aliases: HashMap<NonEmptyCellAlias, NonEmptyCellAlias> = if has_module_bazel {
+            HashMap::new()
+        } else {
+            Self::get_cell_aliases_from_config(&root_config)?.collect()
+        };
         for (alias, target) in bzlmod_aliases {
-            // Convert CellName to NonEmptyCellAlias for the target
             let target_alias = NonEmptyCellAlias::new(target.as_str().to_owned())?;
-            if !root_aliases.contains_key(&alias) {
-                tracing::info!("Adding bzlmod repo_name alias: {} -> {}", alias, target);
-                root_aliases.insert(alias, target_alias);
+            if root_aliases.contains_key(&alias) {
+                continue;
             }
+            if cell_definitions
+                .iter()
+                .any(|(n, _)| n.as_str() == alias.as_str())
+            {
+                tracing::debug!(
+                    "Skipping bzlmod alias '{}' -> '{}': conflicts with cell definition",
+                    alias,
+                    target
+                );
+                continue;
+            }
+            tracing::info!("Adding bzlmod repo_name alias: {} -> {}", alias, target);
+            root_aliases.insert(alias, target_alias);
         }
 
         let mut aggregator = CellsAggregator::new(cell_definitions, root_aliases.clone())?;
@@ -519,30 +545,29 @@ impl BuckConfigBasedCells {
             aggregator.mark_external_cell(name, ExternalCellOrigin::Bundled(name))?;
         }
 
-        // Mark extension-generated cells (from lockfile cache)
+        // Mark extension-generated cells
         for (name, setup) in bzlmod_extension_cells {
             aggregator.mark_external_cell(name, ExternalCellOrigin::ExtensionRepo(setup))?;
         }
 
-        if let Some(external_cells) = root_config.get_section("external_cells") {
-            for (alias, origin) in external_cells.iter() {
-                if origin.as_str() == "disabled" {
-                    // Ignore this entry, treat it as a normal cell
-                    continue;
-                }
-                let alias = NonEmptyCellAlias::new(alias.to_owned())?;
-                let name = aggregator.resolve_root_alias(alias)?;
-                let origin = Self::parse_external_cell_origin(name, origin.as_str(), &root_config)?;
-                if let ExternalCellOrigin::Bundled(name) = origin {
-                    // This code is executed both in the client and in the daemon. When in the
-                    // client and using a client-only build, this late binding might not be bound,
-                    // and so we can't check this. That doesn't matter though, as we'll get an error
-                    // when this fails in the daemon anyway
-                    if let Ok(imp) = EXTERNAL_CELLS_IMPL.get() {
-                        imp.check_bundled_cell_exists(name)?;
+        // Legacy .buckconfig [external_cells] - only used when MODULE.bazel is NOT present
+        if !has_module_bazel {
+            if let Some(external_cells) = root_config.get_section("external_cells") {
+                for (alias, origin) in external_cells.iter() {
+                    if origin.as_str() == "disabled" {
+                        continue;
                     }
+                    let alias = NonEmptyCellAlias::new(alias.to_owned())?;
+                    let name = aggregator.resolve_root_alias(alias)?;
+                    let origin =
+                        Self::parse_external_cell_origin(name, origin.as_str(), &root_config)?;
+                    if let ExternalCellOrigin::Bundled(name) = origin {
+                        if let Ok(imp) = EXTERNAL_CELLS_IMPL.get() {
+                            imp.check_bundled_cell_exists(name)?;
+                        }
+                    }
+                    aggregator.mark_external_cell(name, origin)?;
                 }
-                aggregator.mark_external_cell(name, origin)?;
             }
         }
 
@@ -895,31 +920,89 @@ impl BuckConfigBasedCells {
             }
         }
 
-        // Resolve extension repos from lockfile cache
+        // Pre-compute extension repo cells from use_repo() declarations alone.
+        // This is the Bazel 9.0-compatible approach: canonical names are deterministic
+        // from MODULE.bazel topology, no extension execution or lockfile needed.
         let root_module_name = if parsed.module.name.is_empty() {
             "_main"
         } else {
             &parsed.module.name
         };
-        let (ext_cells, ext_aliases) = Self::resolve_extension_repos_from_lockfile(
-            project_root,
-            &parsed_modules,
-            root_module_name,
-        )
-        .await?;
+        let (pre_computed_cells, pre_computed_aliases) =
+            kuro_bzlmod::pre_compute_extension_repo_cells(&parsed_modules, root_module_name)?;
+
+        // Aggregate extension usages from all modules and store globally.
+        // This data is needed by DICE when extension repos are lazily executed.
+        let mut module_extensions: std::collections::HashMap<
+            String,
+            Vec<kuro_bzlmod::types::ExtensionUsage>,
+        > = std::collections::HashMap::new();
+        for (module_name, parsed_mod) in &parsed_modules {
+            if !parsed_mod.extension_usages.is_empty() {
+                module_extensions.insert(module_name.clone(), parsed_mod.extension_usages.clone());
+            }
+        }
+        let aggregated = kuro_bzlmod::aggregate_extensions(&module_extensions);
+        kuro_bzlmod::set_extension_aggregations(
+            aggregated,
+            root_module_name.to_owned(),
+            project_root.root().to_path_buf(),
+        );
+
+        // Convert pre-computed cells to the format expected by BzlmodResolutionResult
+        let mut ext_cells = Vec::new();
+        for cell in pre_computed_cells {
+            let cell_name = CellName::unchecked_new(&cell.canonical_name)?;
+            let cell_path = CellRootPathBuf::new(ProjectRelativePath::new(&cell.path)?.to_owned());
+            let setup = ExtensionRepoCellSetup {
+                canonical_name: Arc::from(cell.canonical_name.as_str()),
+                extension_id: Arc::from(cell.extension_id.as_str()),
+                internal_name: Arc::from(cell.internal_name.as_str()),
+                spec_hash: Arc::from(cell.spec_hash.as_str()),
+                repo_spec_json: Arc::from(cell.repo_spec_json.as_str()),
+                materialized: false,
+            };
+            ext_cells.push((cell_name, cell_path, setup));
+        }
+
+        // Build a set of existing cell names (from bzlmod deps + synthetic repos)
+        // to avoid creating aliases that conflict with cell names.
+        let existing_cell_names: std::collections::HashSet<&str> =
+            cells.iter().map(|(name, _, _)| name.as_str()).collect();
+
+        // Convert pre-computed aliases, skipping those that conflict with existing cells.
+        // This happens when synthetic repos create cells with bare names (e.g., "cui__camino-1.1.6")
+        // that would conflict with an alias of the same name from use_repo() declarations.
+        let mut ext_aliases = Vec::new();
+        for alias in pre_computed_aliases {
+            if existing_cell_names.contains(alias.apparent_name.as_str()) {
+                tracing::debug!(
+                    "Skipping alias '{}' -> '{}': cell already exists (synthetic repo)",
+                    alias.apparent_name,
+                    alias.canonical_name
+                );
+                continue;
+            }
+            let apparent_name = NonEmptyCellAlias::new(alias.apparent_name)?;
+            let canonical_name = CellName::unchecked_new(&alias.canonical_name)?;
+            ext_aliases.push((apparent_name, canonical_name));
+        }
 
         // Add extension aliases to the main aliases list
         aliases.extend(ext_aliases);
 
-        if cells.is_empty() && ext_cells.is_empty() && aliases.is_empty() {
-            Ok(None)
+        let root_module_name = if parsed.module.name.is_empty() {
+            "_main".to_owned()
         } else {
-            Ok(Some(BzlmodResolutionResult {
-                cells,
-                extension_cells: ext_cells,
-                aliases,
-            }))
-        }
+            parsed.module.name.clone()
+        };
+
+        Ok(Some(BzlmodResolutionResult {
+            root_module_name,
+            cells,
+            extension_cells: ext_cells,
+            aliases,
+        }))
     }
 
     /// Collect repo_name aliases from transitive dependencies.
@@ -1092,190 +1175,6 @@ impl BuckConfigBasedCells {
                 Ok(Vec::new())
             }
         }
-    }
-
-    /// Resolve extension repos from lockfile cache.
-    ///
-    /// This function:
-    /// 1. Reads the lockfile if it exists
-    /// 2. Aggregates extension usages from all parsed modules
-    /// 3. For each extension, checks if cached repo specs exist in lockfile
-    /// 4. If cached, builds cells and aliases from the cached data
-    /// 5. Returns both cells and aliases for registration
-    ///
-    /// This enables `@repo_name` references from `use_repo()` to resolve properly
-    /// by registering extension-generated repos as cells before DICE is available.
-    ///
-    /// Extensions NOT in the lockfile are skipped - they will either:
-    /// - Be executed when first accessed (via lazy materialization)
-    /// - Fail with "unknown cell" error (user needs to run build first to populate lockfile)
-    async fn resolve_extension_repos_from_lockfile(
-        project_root: &ProjectRoot,
-        parsed_modules: &[(String, ParsedModuleFile)],
-        _root_module_name: &str,
-    ) -> kuro_error::Result<(
-        Vec<(CellName, CellRootPathBuf, ExtensionRepoCellSetup)>,
-        Vec<(NonEmptyCellAlias, CellName)>,
-    )> {
-        let lock_path = lockfile_path(project_root.root().as_path());
-
-        // Read lockfile if it exists
-        let lockfile = if lock_path.exists() {
-            match Lockfile::read(&lock_path) {
-                Ok(lf) => {
-                    tracing::debug!("Read lockfile for extension cache lookup");
-                    Some(lf)
-                }
-                Err(e) => {
-                    tracing::debug!("Could not read lockfile: {}", e);
-                    None
-                }
-            }
-        } else {
-            tracing::debug!("No lockfile found at {:?}", lock_path);
-            None
-        };
-
-        let lockfile = match lockfile {
-            Some(lf) => lf,
-            None => return Ok((Vec::new(), Vec::new())),
-        };
-
-        if !lockfile.has_extension_cache() {
-            tracing::debug!("Lockfile has no extension cache");
-            return Ok((Vec::new(), Vec::new()));
-        }
-
-        // Collect extension usages from all modules
-        let mut module_extensions: HashMap<String, Vec<ExtensionUsage>> = HashMap::new();
-        for (module_name, parsed) in parsed_modules {
-            if !parsed.extension_usages.is_empty() {
-                module_extensions.insert(module_name.clone(), parsed.extension_usages.clone());
-            }
-        }
-
-        if module_extensions.is_empty() {
-            return Ok((Vec::new(), Vec::new()));
-        }
-
-        // Aggregate extensions
-        let aggregated = aggregate_extensions(&module_extensions);
-        tracing::debug!(
-            "Aggregated {} extension(s) for lockfile lookup",
-            aggregated.len()
-        );
-
-        let mut cells = Vec::new();
-        let mut aliases: Vec<(NonEmptyCellAlias, CellName)> = Vec::new();
-
-        for (ext_id, agg_ext) in &aggregated {
-            // Compute digests for cache lookup
-            // Note: bzl_transitive_digest ideally hashes all .bzl files the extension depends on.
-            // For now, we use a simplified hash based on extension_id. This provides basic
-            // cache lookup but may have false misses if the extension .bzl files change.
-            let bzl_transitive_digest = compute_bzl_transitive_digest(ext_id);
-            let usages_digest = compute_extension_input_hash(agg_ext);
-
-            // Check lockfile cache
-            let cached_specs =
-                lockfile.get_extension_cache(ext_id, &bzl_transitive_digest, &usages_digest);
-            let cached_specs = match cached_specs {
-                Some(specs) => specs,
-                None => {
-                    tracing::info!(
-                        "Extension '{}' not in lockfile cache - repos will be resolved on first access (run a build to populate lockfile)",
-                        ext_id
-                    );
-                    continue;
-                }
-            };
-
-            tracing::info!(
-                "Extension '{}' found in lockfile cache with {} repo(s)",
-                ext_id,
-                cached_specs.len()
-            );
-
-            // Build ModuleExtensionResult from cached data
-            let ext_result = ModuleExtensionResult::new(
-                Arc::from(ext_id.as_str()),
-                usages_digest.clone(),
-                cached_specs,
-            );
-
-            // Build cells from the cached repo specs
-            let cell_defs = match build_extension_cells(&ext_result) {
-                Ok(defs) => defs,
-                Err(e) => {
-                    tracing::warn!("Failed to build cells for extension '{}': {}", ext_id, e);
-                    continue;
-                }
-            };
-
-            // Convert PendingRepoCells to the format expected by cell registration
-            for pending_cell in cell_defs.cells {
-                let cell_name = CellName::unchecked_new(&pending_cell.canonical_name)?;
-                let cell_path =
-                    CellRootPathBuf::new(ProjectRelativePath::new(&pending_cell.path)?.to_owned());
-
-                let setup = ExtensionRepoCellSetup {
-                    canonical_name: Arc::from(pending_cell.canonical_name.as_str()),
-                    extension_id: Arc::from(pending_cell.extension_id.as_str()),
-                    internal_name: Arc::from(pending_cell.internal_name.as_str()),
-                    spec_hash: Arc::from(pending_cell.spec_hash.as_str()),
-                    repo_spec_json: Arc::from(pending_cell.repo_spec_json.as_str()),
-                    materialized: false,
-                };
-
-                tracing::debug!(
-                    "Registering extension repo cell: {} (internal: {})",
-                    pending_cell.canonical_name,
-                    pending_cell.internal_name
-                );
-
-                cells.push((cell_name, cell_path, setup));
-            }
-
-            // Build aliases from use_repo() declarations
-            // Collect all use_repos for this extension across all modules
-            let mut all_use_repos = Vec::new();
-            for (_, parsed) in parsed_modules {
-                for usage in &parsed.extension_usages {
-                    if usage.extension_id() == *ext_id {
-                        all_use_repos.extend(usage.imports.iter().cloned());
-                    }
-                }
-            }
-
-            let ext_aliases = match build_use_repo_aliases(&ext_result, &all_use_repos) {
-                Ok(a) => a,
-                Err(e) => {
-                    tracing::warn!("Failed to build aliases for extension '{}': {}", ext_id, e);
-                    continue;
-                }
-            };
-
-            for alias in ext_aliases {
-                let apparent_name = NonEmptyCellAlias::new(alias.apparent_name.clone())?;
-                let canonical_name = CellName::unchecked_new(&alias.canonical_name)?;
-
-                tracing::debug!(
-                    "Extension repo alias: {} -> {}",
-                    alias.apparent_name,
-                    alias.canonical_name
-                );
-
-                aliases.push((apparent_name, canonical_name));
-            }
-        }
-
-        tracing::info!(
-            "Resolved {} extension repo cell(s) and {} alias(es) from lockfile",
-            cells.len(),
-            aliases.len()
-        );
-
-        Ok((cells, aliases))
     }
 
     pub(crate) fn get_cell_aliases_from_config(

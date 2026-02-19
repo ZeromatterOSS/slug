@@ -92,7 +92,7 @@ pub enum ExtensionRepoError {
 pub(crate) struct ExtensionRepoFileOpsDelegate {
     /// The cell name.
     cell_name: CellName,
-    /// The canonical name of the repository (e.g., "_main~pip~numpy").
+    /// The canonical name of the repository (e.g., "_main+pip+numpy").
     /// Kept for debugging and error messages.
     #[allow(dead_code)]
     canonical_name: String,
@@ -322,13 +322,59 @@ pub(crate) async fn get_file_ops_delegate(
             setup.canonical_name
         );
 
-        // Deserialize the RepoSpec from JSON
-        let repo_spec: RepoSpec = serde_json::from_str(&setup.repo_spec_json).map_err(|e| {
-            ExtensionRepoError::DeserializationFailed {
+        // Get the RepoSpec: either from cached JSON or by executing the extension via DICE
+        let repo_spec = if !setup.repo_spec_json.is_empty() {
+            // Cached RepoSpec from lockfile (populated by previous builds)
+            serde_json::from_str::<RepoSpec>(&setup.repo_spec_json).map_err(|e| {
+                ExtensionRepoError::DeserializationFailed {
+                    canonical_name: setup.canonical_name.to_string(),
+                    reason: e.to_string(),
+                }
+            })?
+        } else {
+            // No cached RepoSpec - execute the extension via DICE to get it.
+            // This is the Bazel 9.0-compatible path: cells are pre-computed from
+            // use_repo() declarations, and extensions execute lazily on first access.
+            tracing::info!(
+                "No cached RepoSpec for '{}', executing extension '{}' via DICE",
+                setup.canonical_name,
+                setup.extension_id
+            );
+
+            let ext_key = kuro_bzlmod::create_extension_execution_key(&setup.extension_id)
+                .ok_or_else(|| ExtensionRepoError::MaterializationFailed {
+                    canonical_name: setup.canonical_name.to_string(),
+                    reason: format!(
+                        "Extension '{}' not found in aggregation data",
+                        setup.extension_id
+                    ),
+                })?;
+
+            let ext_result = ctx.compute(&ext_key).await.map_err(|e| {
+                ExtensionRepoError::MaterializationFailed {
+                    canonical_name: setup.canonical_name.to_string(),
+                    reason: format!("Extension execution DICE error: {}", e),
+                }
+            })?;
+
+            let ext_result = ext_result.map_err(|e| ExtensionRepoError::MaterializationFailed {
                 canonical_name: setup.canonical_name.to_string(),
-                reason: e.to_string(),
-            }
-        })?;
+                reason: format!("Extension '{}' execution failed: {}", setup.extension_id, e),
+            })?;
+
+            ext_result
+                .get_repo_spec(&setup.internal_name)
+                .cloned()
+                .ok_or_else(|| ExtensionRepoError::MaterializationFailed {
+                    canonical_name: setup.canonical_name.to_string(),
+                    reason: format!(
+                        "Extension '{}' did not generate repo '{}' (available: {:?})",
+                        setup.extension_id,
+                        setup.internal_name,
+                        ext_result.repo_names().collect::<Vec<_>>()
+                    ),
+                })?
+        };
 
         // Create the execution key for lazy materialization
         let key = ExtensionRepoExecutionKey::new(
@@ -339,7 +385,6 @@ pub(crate) async fn get_file_ops_delegate(
         );
 
         // Execute via DICE to materialize the repository
-        // This downloads/extracts the repository content to bazel-external/{canonical_name}
         let result =
             ctx.compute(&key)
                 .await
@@ -348,7 +393,6 @@ pub(crate) async fn get_file_ops_delegate(
                     reason: format!("DICE computation failed: {}", e),
                 })?;
 
-        // Check if the execution succeeded
         let repo_result = result.map_err(|e| ExtensionRepoError::MaterializationFailed {
             canonical_name: setup.canonical_name.to_string(),
             reason: format!("Repository rule execution failed: {}", e),

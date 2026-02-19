@@ -116,7 +116,7 @@ pub struct RepositoryRuleCellSetup {
 )]
 #[display("extension_repo({}, {})", canonical_name, extension_id)]
 pub struct ExtensionRepoCellSetup {
-    /// Canonical repository name (e.g., "_main~pip~numpy").
+    /// Canonical repository name (e.g., "_main+pip+numpy").
     pub canonical_name: Arc<str>,
     /// Extension that generated this repo (e.g., "@@rules_python//pip:pip.bzl%pip").
     pub extension_id: Arc<str>,

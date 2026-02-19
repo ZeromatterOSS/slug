@@ -33,6 +33,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use allocative::Allocative;
 use async_trait::async_trait;
@@ -47,6 +48,50 @@ use crate::extensions::compute_extension_input_hash;
 use crate::lockfile::Lockfile;
 use crate::lockfile::lockfile_path;
 use crate::module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
+
+/// Global storage for extension aggregation data, populated during cell resolution.
+///
+/// This data is needed when extension repos are lazily executed inside DICE.
+/// It contains the aggregated tags from all modules for each extension,
+/// plus the root module name and project root needed to create execution keys.
+struct ExtensionAggregationData {
+    aggregations: HashMap<String, AggregatedExtension>,
+    root_module_name: String,
+    project_root: PathBuf,
+}
+
+static EXTENSION_AGGREGATIONS: Mutex<Option<ExtensionAggregationData>> = Mutex::new(None);
+
+/// Store aggregated extension data for later DICE-based execution.
+///
+/// Called during cell resolution after aggregating all extension usages
+/// from MODULE.bazel files across the dependency graph.
+pub fn set_extension_aggregations(
+    aggregations: HashMap<String, AggregatedExtension>,
+    root_module_name: String,
+    project_root: PathBuf,
+) {
+    let mut guard = EXTENSION_AGGREGATIONS.lock().unwrap();
+    *guard = Some(ExtensionAggregationData {
+        aggregations,
+        root_module_name,
+        project_root,
+    });
+}
+
+/// Look up the aggregated extension data and create a `ModuleExtensionExecutionKey`.
+///
+/// Returns `None` if the extension is not found or aggregation data hasn't been set.
+pub fn create_extension_execution_key(extension_id: &str) -> Option<ModuleExtensionExecutionKey> {
+    let guard = EXTENSION_AGGREGATIONS.lock().unwrap();
+    let data = guard.as_ref()?;
+    let aggregated = data.aggregations.get(extension_id)?;
+    Some(ModuleExtensionExecutionKey::new_with_lockfile(
+        aggregated.clone(),
+        data.root_module_name.clone(),
+        data.project_root.clone(),
+    ))
+}
 use crate::repo_spec::RepoSpec;
 
 /// Errors during module extension execution.
@@ -91,7 +136,7 @@ pub struct ModuleExtensionResult {
     pub generated_repo_specs: HashMap<String, RepoSpec>,
 
     /// Canonical name mapping.
-    /// Maps internal_name -> canonical_name (e.g., "numpy" -> "_main~pip~numpy")
+    /// Maps internal_name -> canonical_name (e.g., "numpy" -> "_main+pip+numpy")
     pub canonical_names: HashMap<String, String>,
 }
 
@@ -541,7 +586,7 @@ fn sanitize_extension_id_for_path(extension_id: &str) -> String {
         .chars()
         .map(|c| match c {
             '/' | '\\' | ':' | '@' | '%' | ' ' => '_',
-            c if c.is_alphanumeric() || c == '_' || c == '-' || c == '~' || c == '.' => c,
+            c if c.is_alphanumeric() || c == '_' || c == '-' || c == '+' || c == '.' => c,
             _ => '_',
         })
         .collect()
@@ -549,7 +594,8 @@ fn sanitize_extension_id_for_path(extension_id: &str) -> String {
 
 /// Build canonical names for extension-generated repositories.
 ///
-/// Format: `_main~{extension_unique_name}~{internal_name}`
+/// Format: `_main+{extension_unique_name}+{internal_name}`
+/// (Bazel 9.0 uses `+` as the separator in canonical names)
 ///
 /// The extension unique name is derived from the extension ID by extracting
 /// the extension name (after the `%` in the bzl label).
@@ -561,7 +607,7 @@ pub fn build_canonical_names(
     specs
         .keys()
         .map(|internal| {
-            let canonical = format!("_main~{}~{}", ext_name, internal);
+            let canonical = format!("_main+{}+{}", ext_name, internal);
             (internal.clone(), canonical)
         })
         .collect()
@@ -705,8 +751,8 @@ mod tests {
             specs,
         );
 
-        assert_eq!(result.canonical_name("foo"), Some("_main~my_extension~foo"));
-        assert_eq!(result.canonical_name("bar"), Some("_main~my_extension~bar"));
+        assert_eq!(result.canonical_name("foo"), Some("_main+my_extension+foo"));
+        assert_eq!(result.canonical_name("bar"), Some("_main+my_extension+bar"));
         assert_eq!(result.canonical_name("baz"), None);
     }
 
@@ -722,11 +768,11 @@ mod tests {
         );
 
         assert_eq!(
-            result.internal_name_from_canonical("_main~pip~numpy"),
+            result.internal_name_from_canonical("_main+pip+numpy"),
             Some("numpy")
         );
         assert_eq!(
-            result.internal_name_from_canonical("_main~pip~pandas"),
+            result.internal_name_from_canonical("_main+pip+pandas"),
             None
         );
     }
@@ -758,8 +804,8 @@ mod tests {
 
         let names = build_canonical_names("@@rules_python//pip:pip.bzl%pip", &specs);
 
-        assert_eq!(names.get("numpy"), Some(&"_main~pip~numpy".to_owned()));
-        assert_eq!(names.get("pandas"), Some(&"_main~pip~pandas".to_owned()));
+        assert_eq!(names.get("numpy"), Some(&"_main+pip+numpy".to_owned()));
+        assert_eq!(names.get("pandas"), Some(&"_main+pip+pandas".to_owned()));
     }
 
     #[test]
@@ -967,9 +1013,12 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let lock_path = temp_dir.path().join("MODULE.bazel.lock");
 
-        // Create initial lockfile with some data
+        // Create initial lockfile with a registry hash
         let mut lockfile = Lockfile::new();
-        lockfile.module_file_hash = "initial-hash".to_owned();
+        lockfile.registry_file_hashes.insert(
+            "https://bcr.bazel.build/test".to_owned(),
+            "sha256-abc".to_owned(),
+        );
         lockfile.write(&lock_path).unwrap();
 
         // Update with extension cache
@@ -979,7 +1028,11 @@ mod tests {
 
         // Verify existing data is preserved
         let lockfile = Lockfile::read(&lock_path).unwrap();
-        assert_eq!(lockfile.module_file_hash, "initial-hash");
+        assert!(
+            lockfile
+                .registry_file_hashes
+                .contains_key("https://bcr.bazel.build/test")
+        );
         assert!(lockfile.has_extension_cache());
     }
 
