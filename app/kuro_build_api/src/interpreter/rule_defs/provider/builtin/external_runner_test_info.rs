@@ -504,6 +504,37 @@ where
     Ok(())
 }
 
+/// Create a frozen `ExternalRunnerTestInfo` for native sh_test rules.
+///
+/// This creates a properly frozen provider that can be added directly to a
+/// `FrozenProviderCollection` in native rule analysis (without going through a Starlark heap).
+///
+/// The `command_fv` should be a frozen list value containing the command arguments
+/// (e.g., a frozen list `["/path/to/script.sh"]`).
+pub fn create_frozen_sh_test_info(
+    heap: &starlark::values::FrozenHeap,
+    command_fv: starlark::values::FrozenValue,
+) -> FrozenExternalRunnerTestInfo {
+    use starlark::values::AllocFrozenValue;
+    use starlark::values::FrozenValueOfUnchecked;
+    let test_type = heap.alloc("sh_test");
+    let none = starlark::values::FrozenValue::new_none();
+    FrozenExternalRunnerTestInfo {
+        test_type: FrozenValueOfUnchecked::new(test_type),
+        command: FrozenValueOfUnchecked::new(command_fv),
+        env: FrozenValueOfUnchecked::new(none),
+        labels: FrozenValueOfUnchecked::new(none),
+        contacts: FrozenValueOfUnchecked::new(none),
+        use_project_relative_paths: FrozenValueOfUnchecked::new(none),
+        run_from_project_root: FrozenValueOfUnchecked::new(none),
+        default_executor: FrozenValueOfUnchecked::new(none),
+        executor_overrides: FrozenValueOfUnchecked::new(none),
+        local_resources: FrozenValueOfUnchecked::new(none),
+        required_local_resources: FrozenValueOfUnchecked::new(none),
+        worker: FrozenValueOfUnchecked::new(none),
+    }
+}
+
 /// Create an `ExternalRunnerTestInfo` from Rust code.
 ///
 /// Used to auto-inject test info for Bazel test rules (`rule(test=True)`)

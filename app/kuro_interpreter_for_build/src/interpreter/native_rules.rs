@@ -587,6 +587,84 @@ mod rule_defs {
             is_test: false,
         })
     });
+
+    /// Creates the AttributeSpec for sh_binary / sh_test / sh_library.
+    /// These rules share the same attribute set: srcs, deps, data.
+    fn sh_rule_attributes() -> AttributeSpec {
+        let srcs_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
+            "Shell script source files",
+            AttrType::list(AttrType::one_of(vec![
+                AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+                AttrType::source(false),
+            ])),
+        );
+
+        let deps_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
+            "Dependencies",
+            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
+        );
+
+        let data_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
+            "Data files available at runtime",
+            AttrType::list(AttrType::one_of(vec![
+                AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+                AttrType::source(false),
+            ])),
+        );
+
+        AttributeSpec::from(
+            vec![
+                ("srcs".to_owned(), srcs_attr),
+                ("deps".to_owned(), deps_attr),
+                ("data".to_owned(), data_attr),
+            ],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("sh rule attributes should be valid")
+    }
+
+    pub static SH_BINARY_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: sh_rule_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::ShBinary),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+        })
+    });
+
+    pub static SH_TEST_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: sh_rule_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::ShTest),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: true,
+        })
+    });
+
+    pub static SH_LIBRARY_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: sh_rule_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::ShLibrary),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+        })
+    });
 }
 
 /// Bazel-style visibility constants
@@ -747,6 +825,51 @@ fn create_native_cc_target<'v>(
             ("defines".to_owned(), empty_string_list.clone()),
             ("local_defines".to_owned(), empty_string_list.clone()),
             ("includes".to_owned(), empty_string_list),
+        ],
+        &extract_visibility_strings(visibility),
+        &internals.default_visibility(),
+    )?;
+
+    internals.record(target_node)?;
+    Ok(NoneType)
+}
+
+/// Helper to create a native sh_* target node (sh_binary, sh_test, sh_library).
+fn create_sh_target<'v>(
+    rule: Arc<Rule>,
+    name: &str,
+    srcs: Value<'v>,
+    deps: Value<'v>,
+    visibility: Value<'v>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> starlark::Result<NoneType> {
+    let internals = ModuleInternals::from_context(eval, "sh_rule")?;
+    let coercion_ctx = internals.attr_coercion_context();
+
+    let src_type = AttrType::list(AttrType::one_of(vec![
+        AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+        AttrType::source(false),
+    ]));
+    let dep_type = AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY));
+
+    let empty_list = eval.heap().alloc(starlark::values::list::AllocList::EMPTY);
+    let srcs_val = if srcs.is_none() { empty_list } else { srcs };
+    let deps_val = if deps.is_none() { empty_list } else { deps };
+
+    let coerced_srcs = src_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, srcs_val)?;
+    let coerced_deps = dep_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, deps_val)?;
+
+    let target_node = create_native_target_node(
+        rule,
+        internals.package(),
+        name,
+        vec![
+            ("srcs".to_owned(), coerced_srcs),
+            ("deps".to_owned(), coerced_deps),
+            (
+                "data".to_owned(),
+                CoercedAttr::List(ListLiteral(kuro_util::arc_str::ArcSlice::default())),
+            ),
         ],
         &extract_visibility_strings(visibility),
         &internals.default_visibility(),
@@ -1654,6 +1777,78 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
 
         internals.record(target_node)?;
         Ok(NoneType)
+    }
+
+    /// Bazel's sh_binary rule: creates a binary from shell scripts.
+    ///
+    /// See: https://bazel.build/reference/be/shell#sh_binary
+    fn sh_binary<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] extra_kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let _ = extra_kwargs;
+        create_sh_target(
+            rule_defs::SH_BINARY_RULE.clone(),
+            name,
+            srcs,
+            deps,
+            visibility,
+            eval,
+        )
+    }
+
+    /// Bazel's sh_test rule: creates a test target from shell scripts.
+    ///
+    /// See: https://bazel.build/reference/be/shell#sh_test
+    fn sh_test<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] extra_kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let _ = extra_kwargs;
+        create_sh_target(
+            rule_defs::SH_TEST_RULE.clone(),
+            name,
+            srcs,
+            deps,
+            visibility,
+            eval,
+        )
+    }
+
+    /// Bazel's sh_library rule: creates a library from shell scripts.
+    ///
+    /// See: https://bazel.build/reference/be/shell#sh_library
+    fn sh_library<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] extra_kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let _ = extra_kwargs;
+        create_sh_target(
+            rule_defs::SH_LIBRARY_RULE.clone(),
+            name,
+            srcs,
+            deps,
+            visibility,
+            eval,
+        )
     }
 
     /// Native test_suite rule stub for Bazel compatibility.

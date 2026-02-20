@@ -260,3 +260,21 @@ genrule(
     outs = ["hello_copy.c"],
     cmd = "cp $< $@",
 )
+
+# =============================================================================
+# Phase 7a: sh_binary/sh_test/sh_library test
+# =============================================================================
+sh_binary(
+    name = "hello_sh",
+    srcs = ["hello.sh"],
+)
+
+sh_test(
+    name = "hello_sh_test",
+    srcs = ["hello.sh"],
+)
+
+sh_library(
+    name = "hello_sh_lib",
+    srcs = ["hello.sh"],
+)

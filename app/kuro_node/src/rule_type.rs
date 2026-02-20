@@ -80,6 +80,12 @@ pub enum NativeRuleKind {
     TestSuite,
     #[display("toolchain")]
     Toolchain,
+    #[display("sh_binary")]
+    ShBinary,
+    #[display("sh_test")]
+    ShTest,
+    #[display("sh_library")]
+    ShLibrary,
 }
 
 impl NativeRuleKind {
@@ -100,6 +106,9 @@ impl NativeRuleKind {
             NativeRuleKind::CcTest => "cc_test",
             NativeRuleKind::TestSuite => "test_suite",
             NativeRuleKind::Toolchain => "toolchain",
+            NativeRuleKind::ShBinary => "sh_binary",
+            NativeRuleKind::ShTest => "sh_test",
+            NativeRuleKind::ShLibrary => "sh_library",
         }
     }
 }

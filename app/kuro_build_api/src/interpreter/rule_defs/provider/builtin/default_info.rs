@@ -264,6 +264,39 @@ impl FrozenDefaultInfo {
         .unwrap()
     }
 
+    /// Create a FrozenDefaultInfo with an executable set.
+    /// Used for sh_binary/sh_test native rules.
+    pub fn with_executable(
+        heap: &FrozenHeap,
+        executable_value: FrozenValue,
+    ) -> FrozenValueTyped<'static, FrozenDefaultInfo> {
+        let sub_targets = heap
+            .alloc_typed_unchecked(AllocDict(
+                iter::empty::<(String, FrozenProviderCollection)>(),
+            ))
+            .cast();
+        // default_outputs contains the executable too
+        let default_outputs =
+            FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList([executable_value])));
+        let other_outputs =
+            FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
+        let default_runfiles =
+            FrozenValueOfUnchecked::<FrozenValue>::new(empty_runfiles_frozen(heap));
+        let data_runfiles = FrozenValueOfUnchecked::<FrozenValue>::new(empty_runfiles_frozen(heap));
+        // executable is a list with 0 or 1 items (0 = not executable, 1 = executable)
+        let executable =
+            FrozenValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList([executable_value])));
+        FrozenValueTyped::new_err(heap.alloc(FrozenDefaultInfo {
+            sub_targets,
+            default_outputs,
+            other_outputs,
+            default_runfiles,
+            data_runfiles,
+            executable,
+        }))
+        .unwrap()
+    }
+
     /// Create a FrozenDefaultInfo with specific default_outputs on the given heap.
     /// Used for merging outputs from multiple dependencies (e.g., filegroup).
     pub fn with_outputs(

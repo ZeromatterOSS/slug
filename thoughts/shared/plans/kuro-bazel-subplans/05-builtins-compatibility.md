@@ -66,13 +66,15 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 - [x] Implement `constraint_setting` rule
 - [x] Implement `constraint_value` rule
 - [x] Implement `platform` rule (produces PlatformInfo with merged constraints from constraint_values deps)
-- [ ] Implement `toolchain` rule (currently no-op stub in natives.rs)
+- [x] Implement `toolchain` rule (creates native TargetNode with toolchain_type + toolchain deps)
 - [x] Implement `toolchain_type` rule (minimal stub, create_minimal_analysis_result)
 
 **Phase 7a.3: Missing Rules**
 - [x] Implement `config_setting` rule (critical for `select()`)
 - [ ] Implement `genquery` rule
-- [ ] Implement `sh_library` rule
+- [x] Implement `sh_library` rule (native rule returning srcs as DefaultInfo outputs)
+- [x] Implement `sh_binary` rule (native rule with DefaultInfo.executable set to first src)
+- [x] Implement `sh_test` rule (like sh_binary + ExternalRunnerTestInfo, `kuro test` works)
 - [ ] (Low priority) `starlark_doc_extract`
 
 ### Success Criteria (Phase 7a)
@@ -141,7 +143,7 @@ These functions must be available in all .bzl files without any `load()` stateme
 **Phase 7b.2: Missing Functions**
 - [ ] Implement `package_default_visibility()`
 - [ ] Implement `package_group()` rule
-- [ ] Implement `subpackages()`
+- [x] Implement `subpackages()` (returns direct subpackage paths from package listing)
 - [ ] Implement `exports_files()` (verify or implement)
 - [ ] Implement `configuration_field()`
 - [ ] Implement `analysis_test_transition()`

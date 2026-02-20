@@ -39,6 +39,8 @@ use kuro_build_api::interpreter::rule_defs::provider::FrozenBuiltinProviderLike;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::configuration_info::FrozenConfigurationInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::FrozenDefaultInfo;
+use kuro_build_api::interpreter::rule_defs::provider::builtin::external_runner_test_info::FrozenExternalRunnerTestInfo;
+use kuro_build_api::interpreter::rule_defs::provider::builtin::external_runner_test_info::create_frozen_sh_test_info;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::platform_info::FrozenPlatformInfo;
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
@@ -95,6 +97,9 @@ pub fn analyze_native_rule(
         NativeRuleKind::CcTest => create_cc_analysis_result(target),
         NativeRuleKind::TestSuite => create_minimal_analysis_result(target),
         NativeRuleKind::Toolchain => create_minimal_analysis_result(target),
+        NativeRuleKind::ShLibrary => analyze_sh_library(target, configured_node, dep_analysis),
+        NativeRuleKind::ShBinary => analyze_sh_binary(target, configured_node),
+        NativeRuleKind::ShTest => analyze_sh_test(target, configured_node),
     }
 }
 
@@ -958,6 +963,183 @@ fn analyze_platform(
         None,
         HashMap::new(),
         0,
+        0,
+        None,
+    ))
+}
+
+/// Analyze an `sh_library` target.
+///
+/// Returns DefaultInfo with all `srcs` source files as default_outputs.
+/// Behaves like filegroup but for shell scripts.
+fn analyze_sh_library(
+    target: &ConfiguredTargetLabel,
+    configured_node: ConfiguredTargetNodeRef<'_>,
+    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+) -> kuro_error::Result<AnalysisResult> {
+    let heap = FrozenHeap::new();
+    let mut source_outputs: Vec<FrozenValue> = Vec::new();
+    let pkg = target.pkg();
+
+    if let Some(srcs_attr) = configured_node.get("srcs", AttrInspectOptions::All) {
+        collect_source_files_from_configured_attr(
+            &srcs_attr.value,
+            &pkg,
+            &heap,
+            &mut source_outputs,
+        );
+    }
+
+    // Also merge outputs from dep analysis
+    let mut all_outputs = source_outputs;
+    for (_dep_label, dep_result) in &dep_analysis {
+        if let Ok(providers_ref) = dep_result.providers() {
+            let collection: &FrozenProviderCollection = providers_ref.value().as_ref();
+            if let Some(default_info) = collection.builtin_provider::<FrozenDefaultInfo>() {
+                for artifact in default_info.default_outputs() {
+                    all_outputs.push(heap.alloc(artifact));
+                }
+            }
+        }
+    }
+
+    let default_info = if all_outputs.is_empty() {
+        FrozenDefaultInfo::testing_empty(&heap)
+    } else {
+        FrozenDefaultInfo::with_outputs(&heap, all_outputs)
+    };
+
+    let providers = SmallMap::from_iter([(
+        DefaultInfoCallable::provider_id().dupe(),
+        default_info.to_frozen_value(),
+    )]);
+
+    make_native_analysis_result(target, heap, providers, 0)
+}
+
+/// Analyze an `sh_binary` target.
+///
+/// Returns DefaultInfo with the first source file as both a default output and the executable.
+/// The shell script is used directly as the executable (it must have +x bits set).
+fn analyze_sh_binary(
+    target: &ConfiguredTargetLabel,
+    configured_node: ConfiguredTargetNodeRef<'_>,
+) -> kuro_error::Result<AnalysisResult> {
+    let heap = FrozenHeap::new();
+    let pkg = target.pkg();
+    let mut source_outputs: Vec<FrozenValue> = Vec::new();
+
+    if let Some(srcs_attr) = configured_node.get("srcs", AttrInspectOptions::All) {
+        collect_source_files_from_configured_attr(
+            &srcs_attr.value,
+            &pkg,
+            &heap,
+            &mut source_outputs,
+        );
+    }
+
+    let default_info = if let Some(&first_src) = source_outputs.first() {
+        FrozenDefaultInfo::with_executable(&heap, first_src)
+    } else {
+        FrozenDefaultInfo::testing_empty(&heap)
+    };
+
+    let providers = SmallMap::from_iter([(
+        DefaultInfoCallable::provider_id().dupe(),
+        default_info.to_frozen_value(),
+    )]);
+
+    make_native_analysis_result(target, heap, providers, 0)
+}
+
+/// Analyze an `sh_test` target.
+///
+/// Like `sh_binary` but also includes `ExternalRunnerTestInfo` so that
+/// `kuro test //:foo_sh_test` works.
+fn analyze_sh_test(
+    target: &ConfiguredTargetLabel,
+    configured_node: ConfiguredTargetNodeRef<'_>,
+) -> kuro_error::Result<AnalysisResult> {
+    let heap = FrozenHeap::new();
+    let pkg = target.pkg();
+    let mut source_outputs: Vec<FrozenValue> = Vec::new();
+
+    if let Some(srcs_attr) = configured_node.get("srcs", AttrInspectOptions::All) {
+        collect_source_files_from_configured_attr(
+            &srcs_attr.value,
+            &pkg,
+            &heap,
+            &mut source_outputs,
+        );
+    }
+
+    let (default_info, test_command_fv) = if let Some(&first_src) = source_outputs.first() {
+        let di = FrozenDefaultInfo::with_executable(&heap, first_src);
+        // Command is a list containing the script path
+        let cmd_list = heap.alloc(starlark::values::list::AllocList([first_src]));
+        (di, cmd_list)
+    } else {
+        let di = FrozenDefaultInfo::testing_empty(&heap);
+        let empty_list = heap.alloc(starlark::values::list::AllocList::EMPTY);
+        (di, empty_list)
+    };
+
+    let test_info = create_frozen_sh_test_info(&heap, test_command_fv);
+    let test_info_fv = heap.alloc(test_info);
+
+    let providers = SmallMap::from_iter([
+        (
+            DefaultInfoCallable::provider_id().dupe(),
+            default_info.to_frozen_value(),
+        ),
+        (
+            FrozenExternalRunnerTestInfo::builtin_provider_id().dupe(),
+            test_info_fv,
+        ),
+    ]);
+
+    make_native_analysis_result(target, heap, providers, 0)
+}
+
+/// Build a `AnalysisResult` from a FrozenHeap + providers map.
+/// Avoids boilerplate duplication across sh_library, sh_binary, sh_test.
+fn make_native_analysis_result(
+    target: &ConfiguredTargetLabel,
+    heap: FrozenHeap,
+    providers: SmallMap<std::sync::Arc<kuro_core::provider::id::ProviderId>, FrozenValue>,
+    num_actions: u64,
+) -> kuro_error::Result<AnalysisResult> {
+    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+        heap.alloc(FrozenProviderCollection::new(providers)),
+    )?;
+
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+        value: FrozenAnalysisValueStorage::new_native(
+            self_key.dupe(),
+            DYNAMIC_LAMBDA_PARAMS_STORAGES
+                .get()
+                .unwrap()
+                .new_frozen_dynamic_lambda_params_storage(),
+            Some(provider_collection),
+        ),
+    });
+
+    let heap_ref = heap.into_ref();
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
+
+    let recorded_values = RecordedAnalysisValues::new_native(
+        self_key,
+        Some(analysis_storage),
+        RecordedActions::new(0),
+    );
+
+    Ok(AnalysisResult::new(
+        recorded_values,
+        None,
+        HashMap::new(),
+        num_actions,
         0,
         None,
     ))
