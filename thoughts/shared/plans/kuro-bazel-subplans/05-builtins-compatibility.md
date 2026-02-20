@@ -141,12 +141,12 @@ These functions must be available in all .bzl files without any `load()` stateme
 - [ ] Add missing parameters where needed
 
 **Phase 7b.2: Missing Functions**
-- [ ] Implement `package_default_visibility()`
-- [ ] Implement `package_group()` rule
+- [x] Implement `package_default_visibility()` (deprecated setter, delegates to set_build_file_default_visibility)
+- [x] Implement `package_group()` rule (registers filegroup target with visibility attrs)
 - [x] Implement `subpackages()` (returns direct subpackage paths from package listing)
-- [ ] Implement `exports_files()` (verify or implement)
-- [ ] Implement `configuration_field()`
-- [ ] Implement `analysis_test_transition()`
+- [x] Implement `exports_files()` (registers each file as a native filegroup target in native_rules.rs)
+- [x] Implement `configuration_field()` (stub in configuration_field.rs, resolves to known labels)
+- [x] Implement `analysis_test_transition()` (stub in register_bzl_module_globals)
 
 ### Success Criteria (Phase 7b)
 
@@ -230,7 +230,7 @@ These modules must be available as globals in .bzl files.
 | `ConstraintValueInfo` | Provider | ✓ Implemented (ProviderCallableLike + ProviderLike instance) |
 | `PlatformInfo` | Provider | Stub (not callable yet) |
 | `TemplateVariableInfo` | Provider | ✓ Implemented (callable, creates instances) |
-| `ToolchainInfo` | Provider | Stub (not callable yet) |
+| `ToolchainInfo` | Provider | ✓ Implemented (callable, kwargs→dict, ProviderCallableLike) |
 
 **Status**: Partially implemented - ConstraintValueInfo, ConstraintSettingInfo, TemplateVariableInfo work
 

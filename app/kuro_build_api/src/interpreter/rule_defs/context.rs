@@ -433,28 +433,55 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// Returns a list of feature flag names enabled for this target via the
     /// `features` attribute in the BUILD file or command line.
     ///
-    /// TODO(features): Populate from actual target configuration.
+    /// Returns the list of features enabled for this target via the `features` attribute.
+    /// Features with a `-` prefix are excluded (those are "disabled" features).
     #[starlark(attribute)]
     fn features<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let _ = this;
         use starlark::values::list::AllocList;
-        // Return empty list for now
+        if let Some(attrs) = this.0.attrs {
+            if let Some(features_val) = attrs.get().get_attr("features", heap)? {
+                if let Some(list) = starlark::values::list::ListRef::from_value(features_val) {
+                    let enabled: Vec<Value<'v>> = list
+                        .iter()
+                        .filter(|v| v.unpack_str().map(|s| !s.starts_with('-')).unwrap_or(false))
+                        .collect();
+                    return Ok(heap.alloc(AllocList(enabled)));
+                }
+            }
+        }
         Ok(heap.alloc(AllocList::EMPTY))
     }
 
     /// Feature flags disabled for this target (Bazel-compatible).
     ///
     /// Returns a list of feature flag names disabled for this target.
-    ///
-    /// TODO(features): Populate from actual target configuration.
+    /// These come from features with a `-` prefix in the `features` attribute.
     #[starlark(attribute)]
     fn disabled_features<'v>(
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = this;
         use starlark::values::list::AllocList;
-        // Return empty list for now
+        if let Some(attrs) = this.0.attrs {
+            if let Some(features_val) = attrs.get().get_attr("features", heap)? {
+                if let Some(list) = starlark::values::list::ListRef::from_value(features_val) {
+                    let disabled: Vec<Value<'v>> = list
+                        .iter()
+                        .filter_map(|v| {
+                            v.unpack_str().and_then(|s| {
+                                if s.starts_with('-') {
+                                    // Return the feature name without the '-' prefix
+                                    Some(heap.alloc_str(&s[1..]).to_value())
+                                } else {
+                                    None
+                                }
+                            })
+                        })
+                        .collect();
+                    return Ok(heap.alloc(AllocList(disabled)));
+                }
+            }
+        }
         Ok(heap.alloc(AllocList::EMPTY))
     }
 

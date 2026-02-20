@@ -33,6 +33,7 @@ use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::eval::Evaluator;
+use starlark::starlark_complex_value;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
 use starlark::values::Demand;
@@ -41,6 +42,9 @@ use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
+use starlark::values::ValueLifetimeless;
+use starlark::values::ValueLike;
+use starlark::values::dict::AllocDict;
 use starlark::values::dict::DictRef;
 use starlark::values::starlark_value;
 use starlark_map::small_map::SmallMap;
@@ -284,11 +288,33 @@ impl<'v> StarlarkValue<'v> for PlatformInfoProvider {}
 // ToolchainInfo - Provider for toolchain information
 // ============================================================================
 
-/// ToolchainInfo provider for toolchain resolution.
+/// ToolchainInfo provider callable.
 ///
-/// This provider is used by toolchain rules to declare toolchain capabilities.
+/// In Bazel, toolchain rule implementations return `platform_common.ToolchainInfo(...)`
+/// to declare what they provide. The kwargs become attributes on the instance:
+///
+/// ```python
+/// def _cc_toolchain_impl(ctx):
+///     return [platform_common.ToolchainInfo(cc = cc_info, ...)]
+/// ```
+///
+/// Instances are stored in provider collections and retrieved via
+/// `target[platform_common.ToolchainInfo]` or `ctx.toolchains["//type"].field`.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct ToolchainInfoProvider;
+
+impl ToolchainInfoProvider {
+    /// Get the static provider ID for ToolchainInfo.
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "ToolchainInfo".to_owned(),
+            })
+        })
+    }
+}
 
 impl Display for ToolchainInfoProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -298,8 +324,110 @@ impl Display for ToolchainInfoProvider {
 
 starlark_simple_value!(ToolchainInfoProvider);
 
+impl ProviderCallableLike for ToolchainInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
 #[starlark_value(type = "ToolchainInfo")]
-impl<'v> StarlarkValue<'v> for ToolchainInfoProvider {}
+impl<'v> StarlarkValue<'v> for ToolchainInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &starlark::eval::Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        // Collect all kwargs into a dict
+        let kwargs = args.names_map()?;
+        let fields = eval.heap().alloc(starlark::values::dict::AllocDict(
+            kwargs.into_iter().map(|(k, v)| (k.as_str(), v)),
+        ));
+        Ok(eval.heap().alloc(ToolchainInfoInstanceGen { fields }))
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+/// An instance of ToolchainInfo with dynamic fields.
+///
+/// Created by calling `platform_common.ToolchainInfo(field1=val1, field2=val2, ...)`.
+/// The fields are accessible as attributes: `info.field1`, `info.field2`, etc.
+/// Fields are stored as a Starlark dict value to properly handle freezing.
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    starlark::values::Trace,
+    starlark::coerce::Coerce,
+    starlark::values::Freeze
+)]
+#[repr(C)]
+pub struct ToolchainInfoInstanceGen<V: starlark::values::ValueLifetimeless> {
+    /// Fields stored as a dict
+    fields: V,
+}
+
+starlark_complex_value!(pub ToolchainInfoInstance);
+
+impl<V: starlark::values::ValueLifetimeless> Display for ToolchainInfoInstanceGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ToolchainInfo(...)")
+    }
+}
+
+impl<'v, V: starlark::values::ValueLike<'v>> ProviderLike<'v> for ToolchainInfoInstanceGen<V>
+where
+    Self: Debug,
+{
+    fn id(&self) -> &Arc<ProviderId> {
+        ToolchainInfoProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        // Items are exposed via get_attr
+        vec![]
+    }
+}
+
+#[starlark::values::starlark_value(type = "ToolchainInfo")]
+impl<'v, V: starlark::values::ValueLike<'v>> StarlarkValue<'v> for ToolchainInfoInstanceGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
+        if let Ok(iter) = self.fields.to_value().iterate(heap) {
+            for key in iter {
+                if key.unpack_str() == Some(attribute) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        let key = heap.alloc_str(attribute);
+        self.fields.to_value().at(key.to_value(), heap).ok()
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        if let Some(dict) = DictRef::from_value(self.fields.to_value()) {
+            return dict
+                .keys()
+                .filter_map(|k| k.unpack_str().map(|s| s.to_owned()))
+                .collect();
+        }
+        vec![]
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
+    }
+}
 
 // ============================================================================
 // TemplateVariableInfo - Provider for Make variable values

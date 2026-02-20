@@ -95,6 +95,53 @@ fn parse_within_view(
 /// Globals for `PACKAGE` files and `bzl` files included from `PACKAGE` files.
 #[starlark_module]
 pub(crate) fn register_package_function(globals: &mut GlobalsBuilder) {
+    /// Deprecated. Use `package(default_visibility=...)` instead.
+    ///
+    /// Sets the default visibility for all targets in the package. When called,
+    /// all targets in the BUILD file will use this visibility unless they specify
+    /// an explicit visibility attribute.
+    ///
+    /// Example:
+    /// ```python
+    /// package_default_visibility(["//visibility:public"])
+    /// # or
+    /// package_default_visibility(["//my_package:__subpackages__"])
+    /// ```
+    ///
+    /// See: https://bazel.build/reference/be/functions#package_default_visibility
+    fn package_default_visibility(
+        #[starlark(require = pos)] visibility: UnpackListOrTuple<String>,
+        eval: &mut Evaluator,
+    ) -> starlark::Result<NoneType> {
+        let build_context = BuildContext::from_context(eval)?;
+        // Only valid in BUILD files, not PACKAGE files
+        if build_context
+            .additional
+            .require_package_file("package_default_visibility")
+            .is_ok()
+        {
+            // In PACKAGE files, this is a no-op (package() should be used instead)
+            return Ok(NoneType);
+        }
+        if !visibility.items.is_empty() {
+            let vis = parse_visibility(
+                &visibility.items,
+                build_context.cell_info().name().name(),
+                build_context.cell_info().cell_resolver(),
+                build_context.cell_info().cell_alias_resolver(),
+            )?;
+            if let Ok(internals) =
+                crate::interpreter::module_internals::ModuleInternals::from_context(
+                    eval,
+                    "package_default_visibility",
+                )
+            {
+                internals.set_build_file_default_visibility(vis);
+            }
+        }
+        Ok(NoneType)
+    }
+
     /// DO NOT USE THIS FUNCTION!
     ///
     /// It controls which test config to use in downstream systems. Mostly likely you don't want to specify it by yourself.
