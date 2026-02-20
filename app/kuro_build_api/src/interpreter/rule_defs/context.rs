@@ -594,31 +594,30 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     ///
     /// Returns a root object representing the output tree for binaries.
     /// Access the path via `ctx.bin_dir.path`.
+    ///
+    /// In Kuro, derives the path from the target's cell name and configuration hash:
+    /// `buck-out/v2/gen/<cell>/<cfg_hash>`
     #[starlark(attribute)]
     fn bin_dir<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        // Return a stub that provides a path attribute
-        // TODO: Get actual configuration-specific output path
-        Ok(heap.alloc(CtxDirRoot {
-            path: "bazel-out/k8-fastbuild/bin".to_owned(),
-        }))
+        let path = bin_dir_path_from_label(this.0.label);
+        Ok(heap.alloc(CtxDirRoot { path }))
     }
 
     /// Output directory for generated files (Bazel-compatible).
     ///
     /// Returns a root object representing the output tree for generated files.
     /// Access the path via `ctx.genfiles_dir.path`.
+    ///
+    /// In Kuro, this returns the same root as `bin_dir` since there is no
+    /// separate genfiles directory.
     #[starlark(attribute)]
     fn genfiles_dir<'v>(
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        // Return a stub that provides a path attribute
-        // TODO: Get actual configuration-specific output path
-        Ok(heap.alloc(CtxDirRoot {
-            path: "bazel-out/k8-fastbuild/genfiles".to_owned(),
-        }))
+        // In Kuro, genfiles and bin share the same output root
+        let path = bin_dir_path_from_label(this.0.label);
+        Ok(heap.alloc(CtxDirRoot { path }))
     }
 
     /// Volatile build status file (Bazel-compatible).
@@ -680,13 +679,13 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// ```
     #[starlark(attribute)]
     fn var<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let _ = this;
         // Return an actual Dict so that dict(ctx.var) and iteration work correctly.
-        // TODO(bazel): Populate from real toolchain/configuration Make variables.
-        use starlark::values::dict::AllocDict;
-        Ok(heap.alloc(AllocDict([
-            ("BINDIR", "bazel-out/k8-fastbuild/bin"),
-            ("GENDIR", "bazel-out/k8-fastbuild/genfiles"),
+        // BINDIR and GENDIR are derived from the actual target's cell/configuration.
+        let bin_dir = bin_dir_path_from_label(this.0.label);
+        use starlark::values::dict::Dict;
+        let entries: &[(&str, &str)] = &[
+            ("BINDIR", bin_dir.as_str()),
+            ("GENDIR", bin_dir.as_str()),
             ("TARGET_CPU", "k8"),
             ("COMPILATION_MODE", "fastbuild"),
             ("CC", "/usr/bin/gcc"),
@@ -696,7 +695,14 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             ("JAVABASE", ""),
             ("ABI_GLIBC_VERSION", "2.17"),
             ("ABI", "local"),
-        ])))
+        ];
+        let mut map: SmallMap<Value, Value> = SmallMap::new();
+        for (k, v) in entries {
+            let key = heap.alloc_str(k).to_value();
+            let val = heap.alloc_str(v).to_value();
+            map.insert_hashed(key.get_hashed().unwrap(), val);
+        }
+        Ok(heap.alloc(Dict::new(map)))
     }
 
     /// Returns the value of a build setting rule (Bazel-compatible).
@@ -1056,6 +1062,28 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         result.push_str(remaining);
 
         Ok(result)
+    }
+}
+
+/// Derives the output directory path from a configured target label.
+///
+/// In Kuro, the output path is `buck-out/v2/gen/<cell>/<cfg_hash>`.
+/// Falls back to `buck-out/v2/gen` if no label is available.
+fn bin_dir_path_from_label(
+    label: Option<
+        starlark::values::ValueTyped<
+            '_,
+            kuro_interpreter::types::configured_providers_label::StarlarkConfiguredProvidersLabel,
+        >,
+    >,
+) -> String {
+    if let Some(label) = label {
+        let target = label.label().target();
+        let cell_name = target.pkg().cell_name().as_str();
+        let cfg_hash = label.label().cfg().output_hash().as_str();
+        format!("buck-out/v2/gen/{}/{}", cell_name, cfg_hash)
+    } else {
+        "buck-out/v2/gen".to_owned()
     }
 }
 
