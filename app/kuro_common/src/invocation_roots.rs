@@ -92,6 +92,13 @@ fn get_roots(from: &AbsWorkingDir) -> kuro_error::Result<Option<InvocationRoots>
             project_root = Some(curr.to_owned());
         }
 
+        // MODULE.bazel is a hard workspace boundary (Bazel semantics: nearest ancestor wins).
+        // Stop searching further up the directory tree so that a standalone Bazel project with
+        // its own MODULE.bazel is not subsumed by a parent .buckconfig project.
+        if has_module_bazel {
+            break;
+        }
+
         if fs_util::try_exists(curr.join(FileName::unchecked_new(".buckroot")))? {
             break;
         }
