@@ -8,10 +8,8 @@
  * above-listed licenses.
  */
 
-use std::fmt;
-
-use allocative::Allocative;
 use anyhow::anyhow;
+use kuro_build_api::interpreter::rule_defs::bazel_label::BazelLabel;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
 use kuro_build_api::interpreter::rule_defs::depset::Depset;
 use kuro_build_api::interpreter::rule_defs::depset::bazel_depset_tset_definition;
@@ -115,126 +113,6 @@ fn extract_cell_and_package_from_filename(filename: &str) -> (String, String) {
         return (String::new(), filename[..last_slash].to_owned());
     }
     (String::new(), String::new())
-}
-
-/// A Bazel-compatible Label object.
-///
-/// In Bazel, `Label("//pkg:target")` returns a Label object with attributes like
-/// `.name`, `.package`, `.workspace_name`, etc. This type provides those attributes
-/// while also being usable as a string (via Display/to_str).
-#[derive(
-    Debug,
-    Clone,
-    starlark::values::ProvidesStaticType,
-    starlark::values::NoSerialize,
-    Allocative
-)]
-pub(crate) struct BazelLabel {
-    /// The full resolved label string (e.g., "@repo//pkg:target")
-    full: String,
-    /// The target name (e.g., "target")
-    name: String,
-    /// The package path (e.g., "pkg" or "pkg/sub")
-    package: String,
-    /// The workspace/repo name (e.g., "repo" or "")
-    workspace_name: String,
-}
-
-impl fmt::Display for BazelLabel {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.full)
-    }
-}
-
-starlark::starlark_simple_value!(BazelLabel);
-
-#[starlark::values::starlark_value(type = "Label")]
-impl<'v> starlark::values::StarlarkValue<'v> for BazelLabel {
-    fn has_attr(&self, attribute: &str, _heap: starlark::values::Heap<'v>) -> bool {
-        matches!(
-            attribute,
-            "name" | "package" | "workspace_name" | "workspace_root" | "relative"
-        )
-    }
-
-    fn get_attr(
-        &self,
-        attribute: &str,
-        heap: starlark::values::Heap<'v>,
-    ) -> Option<starlark::values::Value<'v>> {
-        match attribute {
-            "name" => Some(heap.alloc(self.name.as_str())),
-            "package" => Some(heap.alloc(self.package.as_str())),
-            "workspace_name" => Some(heap.alloc(self.workspace_name.as_str())),
-            "workspace_root" => Some(heap.alloc("")),
-            "relative" => {
-                // Return a callable that resolves relative labels
-                // For now, return a string representation
-                Some(heap.alloc(self.full.as_str()))
-            }
-            _ => None,
-        }
-    }
-
-    fn equals(&self, other: starlark::values::Value<'v>) -> starlark::Result<bool> {
-        if let Some(other_label) = other.downcast_ref::<BazelLabel>() {
-            Ok(self.full == other_label.full)
-        } else if let Some(s) = other.unpack_str() {
-            Ok(self.full == s)
-        } else {
-            Ok(false)
-        }
-    }
-
-    fn write_hash(
-        &self,
-        hasher: &mut starlark::collections::StarlarkHasher,
-    ) -> starlark::Result<()> {
-        use std::hash::Hash;
-        self.full.hash(hasher);
-        Ok(())
-    }
-
-    fn to_bool(&self) -> bool {
-        true
-    }
-}
-
-impl BazelLabel {
-    fn parse(label_str: &str) -> Self {
-        // Parse "@repo//pkg:target" format
-        let (workspace, rest) = if let Some(stripped) = label_str.strip_prefix('@') {
-            if let Some(idx) = stripped.find("//") {
-                (stripped[..idx].to_owned(), &stripped[idx + 2..])
-            } else {
-                (stripped.to_owned(), "")
-            }
-        } else if let Some(stripped) = label_str.strip_prefix("//") {
-            (String::new(), stripped)
-        } else {
-            (String::new(), label_str)
-        };
-
-        let (package, name) = if let Some(colon_idx) = rest.find(':') {
-            (
-                rest[..colon_idx].to_owned(),
-                rest[colon_idx + 1..].to_owned(),
-            )
-        } else if rest.is_empty() {
-            (String::new(), String::new())
-        } else {
-            // No colon - infer target name from last path component
-            let last = rest.rsplit('/').next().unwrap_or(rest);
-            (rest.to_owned(), last.to_owned())
-        };
-
-        BazelLabel {
-            full: label_str.to_owned(),
-            name,
-            package,
-            workspace_name: workspace,
-        }
-    }
 }
 
 /// Register Bazel-specific module-level globals.

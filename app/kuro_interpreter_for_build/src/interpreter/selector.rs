@@ -322,14 +322,13 @@ pub fn register_select(globals: &mut GlobalsBuilder) {
                     };
                     normalized.insert_hashed(k_str.get_hashed(), v);
                 }
-                let new_dict = heap.alloc(Dict::new(
-                    starlark::coerce::coerce(normalized),
-                ));
+                let new_dict = heap.alloc(Dict::new(starlark::coerce::coerce(normalized)));
                 let typed = ValueOf::unpack_value_err(new_dict)?;
                 return Ok(StarlarkSelector::new(typed));
             }
         }
-        let typed: ValueOf<'v, DictType<StringValue<'v>, Value<'v>>> = ValueOf::unpack_value_err(d)?;
+        let typed: ValueOf<'v, DictType<StringValue<'v>, Value<'v>>> =
+            ValueOf::unpack_value_err(d)?;
         Ok(StarlarkSelector::new(typed))
     }
 

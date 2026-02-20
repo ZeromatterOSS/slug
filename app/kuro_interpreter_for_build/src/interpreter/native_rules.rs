@@ -1189,15 +1189,15 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         // Bazel: dict of configuration values (e.g., {"compilation_mode": "opt"})
         // TODO(bazel): Implement values-based config_setting matching
         // Accept Value<'v> to handle both string and Label() keys.
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        values: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] values: Value<'v>,
         // Bazel: dict for --define flag values
         #[starlark(require = named, default = starlark::values::none::NoneType)]
         define_values: Value<'v>,
         // Bazel: dict mapping build setting labels to expected values
         // Keys may be Label() objects (e.g., flag_values = {Label("//..."): "val"})
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        flag_values: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] flag_values: Value<
+            'v,
+        >,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,

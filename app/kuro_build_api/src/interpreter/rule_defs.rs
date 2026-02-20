@@ -16,6 +16,7 @@ pub mod apple_common;
 pub mod artifact;
 pub mod artifact_tagging;
 pub mod aspect;
+pub mod bazel_label;
 pub mod cc_common;
 pub mod cmd_args;
 pub mod command_executor_config;

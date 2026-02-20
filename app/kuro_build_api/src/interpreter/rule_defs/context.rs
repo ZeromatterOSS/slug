@@ -56,6 +56,7 @@ use starlark::values::type_repr::StarlarkTypeRepr;
 use crate::analysis::anon_promises_dyn::RunAnonPromisesAccessor;
 use crate::analysis::registry::AnalysisRegistry;
 use crate::deferred::calculation::GET_PROMISED_ARTIFACT;
+use crate::interpreter::rule_defs::bazel_label::BazelLabel;
 use crate::interpreter::rule_defs::fragments::ConfigurationFragments;
 use crate::interpreter::rule_defs::fragments::CppFragment;
 use crate::interpreter::rule_defs::plugins::AnalysisPlugins;
@@ -883,15 +884,35 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     ///
     /// For example, `ctx.package_relative_label(":foo")` returns the Label for `:foo`
     /// relative to the BUILD file's package.
-    #[allow(unused_variables)]
     fn package_relative_label<'v>(
         this: RefAnalysisContext<'v>,
         input: &str,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // Return the input as a string — sufficient for most rules that just use label.name
-        // TODO(labels): Return a proper Label value
-        Ok(heap.alloc_str(input).to_value())
+        // Get the current target's cell and package from ctx.label
+        let (cell_name, pkg_path) = if let Some(label) = this.0.label {
+            let tgt = label.label().target();
+            let cell = tgt.pkg().cell_name().as_str().to_owned();
+            let pkg = tgt.pkg().cell_relative_path().as_str().to_owned();
+            (cell, pkg)
+        } else {
+            // No label context (dynamic_output / BXL) — return input as-is
+            return Ok(heap.alloc(BazelLabel::parse(input)));
+        };
+
+        let resolved = if input.starts_with('@') {
+            // Already fully qualified
+            input.to_owned()
+        } else if input.starts_with("//") {
+            // Absolute within current cell
+            format!("@{}{}", cell_name, input)
+        } else {
+            // Relative (:target or bare target)
+            let target = input.strip_prefix(':').unwrap_or(input);
+            format!("@{}//{}:{}", cell_name, pkg_path, target)
+        };
+
+        Ok(heap.alloc(BazelLabel::parse(&resolved)))
     }
 
     /// Resolves tools and returns (input files depset, runfiles manifests) tuple (Bazel-compatible).
