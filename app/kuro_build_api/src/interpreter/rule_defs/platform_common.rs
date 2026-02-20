@@ -267,11 +267,29 @@ impl<'v> StarlarkValue<'v> for ConstraintSettingInfoProvider {
 // PlatformInfo - Provider for platform information
 // ============================================================================
 
-/// PlatformInfo provider type.
+/// PlatformInfo provider callable.
 ///
-/// TODO(bazel): Implement full platform info semantics.
+/// In Bazel, `platform()` targets provide PlatformInfo. It can also be created directly:
+/// ```python
+/// platform_common.PlatformInfo(label=..., constraints=[...])
+/// ```
+///
+/// Used as a key for provider indexing: `target[platform_common.PlatformInfo]`
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct PlatformInfoProvider;
+
+impl PlatformInfoProvider {
+    /// Get the static provider ID for PlatformInfo.
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "PlatformInfo".to_owned(),
+            })
+        })
+    }
+}
 
 impl Display for PlatformInfoProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -281,8 +299,98 @@ impl Display for PlatformInfoProvider {
 
 starlark_simple_value!(PlatformInfoProvider);
 
+impl ProviderCallableLike for PlatformInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
 #[starlark_value(type = "PlatformInfo")]
-impl<'v> StarlarkValue<'v> for PlatformInfoProvider {}
+impl<'v> StarlarkValue<'v> for PlatformInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &starlark::eval::Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        // Collect all kwargs into a dict for the instance
+        let kwargs = args.names_map()?;
+        let fields = eval
+            .heap()
+            .alloc(AllocDict(kwargs.into_iter().map(|(k, v)| (k.as_str(), v))));
+        Ok(eval.heap().alloc(PlatformInfoInstanceGen { fields }))
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+/// An instance of PlatformInfo with label and constraints fields.
+///
+/// Created by calling `platform_common.PlatformInfo(label=..., constraints=[...])`.
+/// The fields are accessible as attributes.
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    starlark::values::Trace,
+    starlark::coerce::Coerce,
+    starlark::values::Freeze
+)]
+#[repr(C)]
+pub struct PlatformInfoInstanceGen<V: ValueLifetimeless> {
+    /// Fields stored as a dict
+    fields: V,
+}
+
+starlark_complex_value!(pub PlatformInfoInstance);
+
+impl<V: ValueLifetimeless> Display for PlatformInfoInstanceGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PlatformInfo(...)")
+    }
+}
+
+impl<'v, V: ValueLike<'v>> ProviderLike<'v> for PlatformInfoInstanceGen<V>
+where
+    Self: Debug,
+{
+    fn id(&self) -> &Arc<ProviderId> {
+        PlatformInfoProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        vec![]
+    }
+}
+
+#[starlark::values::starlark_value(type = "PlatformInfo")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for PlatformInfoInstanceGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
+        if let Ok(iter) = self.fields.to_value().iterate(heap) {
+            for key in iter {
+                if key.unpack_str() == Some(attribute) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        let key = heap.alloc_str(attribute);
+        self.fields.to_value().at(key.to_value(), heap).ok()
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
+    }
+}
 
 // ============================================================================
 // ToolchainInfo - Provider for toolchain information

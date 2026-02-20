@@ -19,6 +19,31 @@ use crate::attrs::coerce::AttrTypeCoerce;
 use crate::attrs::coerce::attr_type::ty_maybe_select::TyMaybeSelect;
 use crate::attrs::coerce::coerced_attr::CoercedAttrExr;
 
+/// Extract a string from a Starlark value for label coercion.
+///
+/// Handles both regular string values and Bazel `Label` objects returned from `Label()`.
+/// - For strings: returns the raw string content (no quotes)
+/// - For Label objects: returns the full resolved label string (e.g., `@repo//pkg:target`)
+///
+/// `format!("{}", value)` on a starlark Value calls the type's Display impl with "repr"
+/// semantics (strings get quoted), so we must use `unpack_str()` for strings and fall
+/// back to Display (which for BazelLabel returns the raw label string) for Label types.
+pub(super) fn unpack_str_or_label(value: Value<'_>) -> kuro_error::Result<String> {
+    if let Some(s) = value.unpack_str() {
+        return Ok(s.to_owned());
+    }
+    // Handle BazelLabel objects (starlark type "Label") returned from Label() calls.
+    // BazelLabel::Display::fmt writes self.full, the resolved label string.
+    if value.get_type() == "Label" {
+        return Ok(format!("{}", value));
+    }
+    // Not a string or Label - produce a type error
+    value
+        .unpack_str_err()
+        .map(|s| s.to_owned())
+        .map_err(|e| e.into())
+}
+
 pub mod any;
 pub mod arg;
 pub mod bool;

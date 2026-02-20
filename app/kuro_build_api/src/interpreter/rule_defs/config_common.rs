@@ -186,12 +186,22 @@ fn config_common_module_methods(builder: &mut MethodsBuilder) {
     ///   A ToolchainTypeRequirement that can be used in rule definitions.
     fn toolchain_type<'v>(
         #[starlark(this)] _this: &ConfigCommonModule,
-        #[starlark(require = pos)] toolchain_type: &str,
+        #[starlark(require = pos)] toolchain_type: Value<'v>,
         #[starlark(require = named)] mandatory: Option<bool>,
         #[allow(unused_variables)] eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<ToolchainTypeRequirement> {
+        // Accept both plain strings and Label() objects (which return BazelLabel type).
+        // Label objects display as the full resolved label string.
+        // Accept both plain strings and Label() objects (BazelLabel type).
+        // Label objects display as the full resolved label string.
+        let toolchain_type_str = if let Some(s) = toolchain_type.unpack_str() {
+            s.to_owned()
+        } else {
+            // For Label objects and other display types, use Display which returns full label
+            format!("{}", toolchain_type)
+        };
         Ok(ToolchainTypeRequirement {
-            toolchain_type: toolchain_type.to_owned(),
+            toolchain_type: toolchain_type_str,
             mandatory: mandatory.unwrap_or(true),
         })
     }

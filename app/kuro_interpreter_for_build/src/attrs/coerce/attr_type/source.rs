@@ -17,6 +17,7 @@ use starlark::values::Value;
 
 use crate::attrs::coerce::AttrTypeCoerce;
 use crate::attrs::coerce::attr_type::ty_maybe_select::TyMaybeSelect;
+use crate::attrs::coerce::attr_type::unpack_str_or_label;
 
 #[derive(Debug, kuro_error::Error)]
 #[kuro(input)]
@@ -41,7 +42,8 @@ impl AttrTypeCoerce for SourceAttrType {
         ctx: &dyn AttrCoercionContext,
         value: Value,
     ) -> kuro_error::Result<CoercedAttr> {
-        let source_label = value.unpack_str_err()?;
+        let source_label = unpack_str_or_label(value)?;
+        let source_label = source_label.as_str();
 
         let label_err = if source_label.contains(':') {
             match ctx.coerce_providers_label(source_label) {

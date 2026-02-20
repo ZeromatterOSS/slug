@@ -125,7 +125,7 @@ These functions must be available in all .bzl files without any `load()` stateme
 | `module_name` | Returns module name | ✓ Implemented | `natives.rs` |
 | `module_version` | Returns module version | ✓ Implemented | `natives.rs` |
 | `package` | Declares package metadata | ✓ Implemented | `package.rs` |
-| `package_default_visibility` | Returns default visibility | Needs implementation | |
+| `package_default_visibility` | Returns default visibility | ✓ Implemented | `package.rs` |
 | `package_group` | Defines package set for visibility | Needs implementation | |
 | `package_name` | Returns package name | ✓ Implemented | `natives.rs` |
 | `package_relative_label` | Converts string to Label | ✓ Implemented | `natives.rs` |
@@ -228,7 +228,7 @@ These modules must be available as globals in .bzl files.
 |----------|-------------|-------------|
 | `ConstraintSettingInfo` | Provider | ✓ Implemented (ProviderCallableLike) |
 | `ConstraintValueInfo` | Provider | ✓ Implemented (ProviderCallableLike + ProviderLike instance) |
-| `PlatformInfo` | Provider | Stub (not callable yet) |
+| `PlatformInfo` | Provider | ✓ Implemented (callable, kwargs→dict, ProviderCallableLike) |
 | `TemplateVariableInfo` | Provider | ✓ Implemented (callable, creates instances) |
 | `ToolchainInfo` | Provider | ✓ Implemented (callable, kwargs→dict, ProviderCallableLike) |
 

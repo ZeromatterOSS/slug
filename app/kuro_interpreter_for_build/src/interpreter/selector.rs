@@ -300,9 +300,37 @@ pub fn register_select(globals: &mut GlobalsBuilder) {
     const Select: StarlarkValueAsType<StarlarkSelector> = StarlarkValueAsType::new();
 
     fn select<'v>(
-        #[starlark(require = pos)] d: ValueOf<'v, DictType<StringValue<'v>, Value<'v>>>,
+        #[starlark(require = pos)] d: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkSelector<'v>> {
-        Ok(StarlarkSelector::new(d))
+        // Normalize dict keys: Label() objects (BazelLabel type) should be converted
+        // to strings, since select() keys are always label strings.
+        // In Bazel, `select({Label("//foo:bar"): val})` is common and valid.
+        if let Some(dict_ref) = DictRef::from_value(d) {
+            let needs_normalization = dict_ref.iter().any(|(k, _)| k.get_type() == "Label");
+            if needs_normalization {
+                // Build a new dict with string keys
+                let heap = eval.heap();
+                let mut normalized = SmallMap::with_capacity(dict_ref.len());
+                for (k, v) in dict_ref.iter() {
+                    let k_str = if let Some(s) = k.unpack_str() {
+                        heap.alloc_str(s)
+                    } else {
+                        // Label objects: Display returns the full label string
+                        let s = format!("{}", k);
+                        heap.alloc_str(&s)
+                    };
+                    normalized.insert_hashed(k_str.get_hashed(), v);
+                }
+                let new_dict = heap.alloc(Dict::new(
+                    starlark::coerce::coerce(normalized),
+                ));
+                let typed = ValueOf::unpack_value_err(new_dict)?;
+                return Ok(StarlarkSelector::new(typed));
+            }
+        }
+        let typed: ValueOf<'v, DictType<StringValue<'v>, Value<'v>>> = ValueOf::unpack_value_err(d)?;
+        Ok(StarlarkSelector::new(typed))
     }
 
     /// Maps a selector.

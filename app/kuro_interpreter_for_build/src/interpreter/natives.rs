@@ -258,7 +258,7 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
     fn Label<'v>(
         #[starlark(require = pos)] label_string: &str,
         eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<StringValue<'v>> {
+    ) -> starlark::Result<Value<'v>> {
         // In Bazel, Label() resolves relative to the file where it appears:
         // - In a .bzl file: // resolves to the .bzl file's repository
         // - In a BUILD file: // resolves to the BUILD file's repository
@@ -306,7 +306,7 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
             format!("@{}//{}:{}", file_cell, pkg_path, target)
         };
 
-        Ok(eval.heap().alloc_str(&resolved))
+        Ok(eval.heap().alloc(BazelLabel::parse(&resolved)))
     }
 
     /// Declares the visibility of the current .bzl file.

@@ -22,6 +22,7 @@ use starlark::values::Value;
 
 use crate::attrs::coerce::AttrTypeCoerce;
 use crate::attrs::coerce::attr_type::ty_maybe_select::TyMaybeSelect;
+use crate::attrs::coerce::attr_type::unpack_str_or_label;
 
 impl AttrTypeCoerce for TransitionDepAttrType {
     fn coerce_item(
@@ -31,7 +32,10 @@ impl AttrTypeCoerce for TransitionDepAttrType {
         value: Value,
     ) -> kuro_error::Result<CoercedAttr> {
         let (dep, transition) = if self.transition.is_some() {
-            (ctx.coerce_providers_label(value.unpack_str_err()?)?, None)
+            (
+                ctx.coerce_providers_label(&unpack_str_or_label(value)?)?,
+                None,
+            )
         } else {
             let (dep, transition) = UnpackValue::unpack_value_err(value)?;
             (

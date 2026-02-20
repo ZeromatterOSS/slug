@@ -21,6 +21,7 @@ use starlark::values::Value;
 
 use crate::attrs::coerce::AttrTypeCoerce;
 use crate::attrs::coerce::attr_type::ty_maybe_select::TyMaybeSelect;
+use crate::attrs::coerce::attr_type::unpack_str_or_label;
 
 impl AttrTypeCoerce for DepAttrType {
     fn coerce_item(
@@ -29,7 +30,7 @@ impl AttrTypeCoerce for DepAttrType {
         ctx: &dyn AttrCoercionContext,
         value: Value,
     ) -> kuro_error::Result<CoercedAttr> {
-        let label = ctx.coerce_providers_label(value.unpack_str_err()?)?;
+        let label = ctx.coerce_providers_label(&unpack_str_or_label(value)?)?;
 
         Ok(CoercedAttr::Dep(label))
     }

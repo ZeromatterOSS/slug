@@ -1188,14 +1188,16 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         constraint_values: UnpackListOrTuple<String>,
         // Bazel: dict of configuration values (e.g., {"compilation_mode": "opt"})
         // TODO(bazel): Implement values-based config_setting matching
-        #[starlark(require = named, default = UnpackDictEntries::default())]
-        values: UnpackDictEntries<&str, &str>,
+        // Accept Value<'v> to handle both string and Label() keys.
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        values: Value<'v>,
         // Bazel: dict for --define flag values
-        #[starlark(require = named, default = UnpackDictEntries::default())]
-        define_values: UnpackDictEntries<&str, &str>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        define_values: Value<'v>,
         // Bazel: dict mapping build setting labels to expected values
-        #[starlark(require = named, default = UnpackDictEntries::default())]
-        flag_values: UnpackDictEntries<&str, &str>,
+        // Keys may be Label() objects (e.g., flag_values = {Label("//..."): "val"})
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        flag_values: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
@@ -1236,17 +1238,28 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
 
         // Coerce the values dict (Bazel native flag values)
         use kuro_node::attrs::attr_type::dict::DictLiteral;
-        let coerced_values = if values.entries.is_empty() {
-            CoercedAttr::Dict(DictLiteral(ArcSlice::default()))
-        } else {
-            CoercedAttr::Dict(DictLiteral(ArcSlice::from_iter(values.entries.iter().map(
+        use starlark::values::dict::DictRef;
+        let coerced_values = if let Some(dict_ref) = DictRef::from_value(values) {
+            CoercedAttr::Dict(DictLiteral(ArcSlice::from_iter(dict_ref.iter().map(
                 |(k, v)| {
+                    let k_str = if let Some(s) = k.unpack_str() {
+                        s.to_owned()
+                    } else {
+                        format!("{}", k)
+                    };
+                    let v_str = if let Some(s) = v.unpack_str() {
+                        s.to_owned()
+                    } else {
+                        format!("{}", v)
+                    };
                     (
-                        CoercedAttr::String(StringLiteral(ArcStr::from(*k))),
-                        CoercedAttr::String(StringLiteral(ArcStr::from(*v))),
+                        CoercedAttr::String(StringLiteral(ArcStr::from(k_str.as_str()))),
+                        CoercedAttr::String(StringLiteral(ArcStr::from(v_str.as_str()))),
                     )
                 },
             ))))
+        } else {
+            CoercedAttr::Dict(DictLiteral(ArcSlice::default()))
         };
 
         let vis_strings = extract_visibility_strings(visibility);

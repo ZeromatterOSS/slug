@@ -83,9 +83,17 @@ impl CoercedAttrExr for CoercedAttr {
 
                         let mut default = None;
                         for (k, v) in dict.iter() {
-                            let k = k
-                                .unpack_str()
-                                .ok_or_else(|| SelectError::KeyNotString(k.to_repr()))?;
+                            // Accept both string keys and Label() objects as select() keys.
+                            // BazelLabel objects (type "Label") display as the full label string.
+                            let k_buf;
+                            let k = if let Some(s) = k.unpack_str() {
+                                s
+                            } else if k.get_type() == "Label" {
+                                k_buf = format!("{}", k);
+                                &k_buf
+                            } else {
+                                return Err(SelectError::KeyNotString(k.to_repr()).into());
+                            };
                             let v = match default_attr {
                                 Some(default_attr) if v.is_none() => default_attr.clone(),
                                 _ => CoercedAttr::coerce(attr, configurable, ctx, v, default_attr)?,
