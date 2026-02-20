@@ -94,6 +94,7 @@ pub fn analyze_native_rule(
         NativeRuleKind::CcBinary => create_cc_analysis_result(target),
         NativeRuleKind::CcTest => create_cc_analysis_result(target),
         NativeRuleKind::TestSuite => create_minimal_analysis_result(target),
+        NativeRuleKind::Toolchain => create_minimal_analysis_result(target),
     }
 }
 

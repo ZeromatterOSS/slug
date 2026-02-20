@@ -140,6 +140,13 @@ fn expand_argfiles_with_context(
                 if flagfile.is_empty() {
                     return Err(ArgExpansionError::MissingFlagFilePathInArgfile.into());
                 }
+                // Bazel-style external repo target patterns start with '@' and contain '//'
+                // (e.g. @rules_cc//cc:defs.bzl, @repo//:target).
+                // These are NOT argfiles; pass them through unchanged.
+                if flagfile.contains("//") {
+                    expanded_args.push(next_arg.to_owned());
+                    continue;
+                }
                 // TODO: We want to detect cyclic inclusion
                 resolve_and_expand_argfile(expanded_args, flagfile, context, cwd)?;
             }

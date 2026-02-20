@@ -113,4 +113,33 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
             .name()
             .to_string())
     }
+
+    /// Returns a list of the direct subpackages of the current package.
+    ///
+    /// Bazel built-in function that returns a sorted list of all subpackage paths
+    /// (relative to the current BUILD file's package) that are immediate children.
+    ///
+    /// Example:
+    /// ```python
+    /// # In //foo/BUILD.bazel, with subpackages foo/bar and foo/baz:
+    /// subpackages(include = ["**"])  # returns ["bar", "baz"]
+    /// ```
+    ///
+    /// See: https://bazel.build/reference/be/functions#subpackages
+    fn subpackages<'v>(
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        include: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        exclude: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = false)] allow_empty: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<ValueOfUnchecked<'v, UnpackList<String>>> {
+        let _ = (include, exclude, allow_empty);
+        let extra = ModuleInternals::from_context(eval, "subpackages")?;
+        // Return direct subpackage paths relative to this package.
+        // In Bazel, subpackages() returns strings like "bar", "baz" (just the last path component
+        // or the package-relative path to the subpackage).
+        let res = extra.sub_packages().map(|p| p.as_str());
+        Ok(eval.heap().alloc_typed_unchecked(AllocList(res)).cast())
+    }
 }

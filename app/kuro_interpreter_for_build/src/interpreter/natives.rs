@@ -395,48 +395,7 @@ pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
-    /// Declares a toolchain for use by rules that support toolchain resolution.
-    ///
-    /// This is a Bazel built-in function for declaring toolchains. In Kuro,
-    /// this is currently a no-op stub - toolchain resolution is not yet implemented.
-    ///
-    /// Example:
-    /// ```python
-    /// toolchain(
-    ///     name = "cc_toolchain",
-    ///     toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
-    ///     toolchain = ":cc_compiler",
-    /// )
-    /// ```
-    ///
-    /// See: https://bazel.build/reference/be/platforms-and-toolchains#toolchain
-    fn toolchain<'v>(
-        #[starlark(require = named)] name: &str,
-        #[starlark(require = named)] toolchain_type: &str,
-        #[starlark(require = named)] toolchain: &str,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        exec_compatible_with: UnpackListOrTuple<String>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        target_compatible_with: UnpackListOrTuple<String>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        target_settings: UnpackListOrTuple<String>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        visibility: UnpackListOrTuple<String>,
-    ) -> starlark::Result<NoneType> {
-        // TODO(toolchains): Implement toolchain registration and resolution.
-        // Currently a no-op - Kuro doesn't yet support Bazel-style toolchains.
-        let _ = (
-            name,
-            toolchain_type,
-            toolchain,
-            exec_compatible_with,
-            target_compatible_with,
-            target_settings,
-            visibility,
-        );
-        Ok(NoneType)
-    }
-
+    // Note: toolchain() is implemented in native_rules.rs as a proper native rule
     // Note: alias() is implemented in native_rules.rs as a proper native rule
 
     /// Groups a set of files under a single name for convenience.

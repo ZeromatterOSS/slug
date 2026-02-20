@@ -78,6 +78,8 @@ pub enum NativeRuleKind {
     CcTest,
     #[display("test_suite")]
     TestSuite,
+    #[display("toolchain")]
+    Toolchain,
 }
 
 impl NativeRuleKind {
@@ -97,6 +99,7 @@ impl NativeRuleKind {
             NativeRuleKind::CcBinary => "cc_binary",
             NativeRuleKind::CcTest => "cc_test",
             NativeRuleKind::TestSuite => "test_suite",
+            NativeRuleKind::Toolchain => "toolchain",
         }
     }
 }

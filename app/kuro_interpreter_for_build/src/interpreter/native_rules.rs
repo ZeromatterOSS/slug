@@ -293,6 +293,45 @@ mod rule_defs {
         })
     });
 
+    /// Creates the AttributeSpec for toolchain.
+    /// Note: exec_compatible_with and target_compatible_with are internal attributes
+    /// and are NOT added here (they're already included automatically).
+    fn toolchain_attributes() -> AttributeSpec {
+        let toolchain_type_attr = Attribute::new(
+            None, // required
+            "The toolchain_type this toolchain satisfies",
+            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+        );
+        let toolchain_impl_attr = Attribute::new(
+            None, // required
+            "The toolchain implementation target",
+            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+        );
+
+        AttributeSpec::from(
+            vec![
+                ("toolchain_type".to_owned(), toolchain_type_attr),
+                ("toolchain".to_owned(), toolchain_impl_attr),
+            ],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("toolchain attributes should be valid")
+    }
+
+    /// The Rule definition for toolchain.
+    /// toolchain registers a toolchain implementation for a toolchain_type + platform.
+    pub static TOOLCHAIN_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: toolchain_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::Toolchain),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+        })
+    });
+
     /// The Rule definition for toolchain_type.
     /// toolchain_type is a simple marker target with no special attributes.
     pub static TOOLCHAIN_TYPE_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
@@ -1539,6 +1578,81 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             let _ = internals.record(target_node);
         }
 
+        Ok(NoneType)
+    }
+
+    /// Registers a toolchain implementation.
+    ///
+    /// A toolchain() target registers a specific toolchain for a toolchain_type.
+    /// The toolchain resolution system selects the appropriate toolchain based on
+    /// exec_compatible_with and target_compatible_with platform constraints.
+    ///
+    /// Example:
+    /// ```python
+    /// toolchain(
+    ///     name = "cc_toolchain_linux",
+    ///     toolchain_type = "@rules_cc//cc:toolchain_type",
+    ///     toolchain = ":cc_toolchain",
+    ///     exec_compatible_with = ["@platforms//os:linux"],
+    ///     target_compatible_with = ["@platforms//os:linux"],
+    /// )
+    /// ```
+    ///
+    /// See: https://bazel.build/reference/be/platforms-and-toolchains#toolchain
+    fn toolchain<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named)] toolchain_type: Value<'v>,
+        #[starlark(require = named)] toolchain: Value<'v>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        exec_compatible_with: UnpackListOrTuple<Value<'v>>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        target_compatible_with: UnpackListOrTuple<Value<'v>>,
+        // target_settings: config_setting labels that must match for this toolchain to be selected
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        target_settings: UnpackListOrTuple<Value<'v>>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        tags: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] testonly: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = "")] deprecation: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let _ = (
+            tags,
+            testonly,
+            deprecation,
+            target_settings,
+            exec_compatible_with,
+            target_compatible_with,
+        );
+        let internals = ModuleInternals::from_context(eval, "toolchain")?;
+        let coercion_ctx = internals.attr_coercion_context();
+
+        let dep_type = AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY);
+        let coerced_toolchain_type =
+            dep_type.coerce(AttrIsConfigurable::No, coercion_ctx, toolchain_type)?;
+        let coerced_toolchain = dep_type.coerce(AttrIsConfigurable::No, coercion_ctx, toolchain)?;
+
+        // Note: exec_compatible_with and target_compatible_with are internal attributes
+        // already present in the rule's AttributeSpec. We do not pass them as user attrs here;
+        // they use their empty-list defaults. Toolchain resolution is not yet implemented.
+        let target_node = create_native_target_node(
+            rule_defs::TOOLCHAIN_RULE.clone(),
+            internals.package(),
+            name,
+            vec![
+                ("toolchain_type".to_owned(), coerced_toolchain_type),
+                ("toolchain".to_owned(), coerced_toolchain),
+            ],
+            &extract_visibility_strings(visibility),
+            &internals.default_visibility(),
+        )?;
+
+        internals.record(target_node)?;
         Ok(NoneType)
     }
 
