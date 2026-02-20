@@ -55,6 +55,7 @@ use kuro_execute::execute::request::OutputType;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use kuro_node::attrs::attr_type::list::ListLiteral;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
+use kuro_node::attrs::configured_attr::ConfiguredAttr;
 use kuro_node::attrs::inspect_options::AttrInspectOptions;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
 use kuro_node::rule_type::NativeRuleKind;
@@ -607,24 +608,23 @@ fn analyze_alias(
     }
 }
 
-/// Extract source artifacts from a list `CoercedAttr` that may contain `SourceFile` entries.
-/// Handles `CoercedAttr::OneOf(SourceFile, _)` which is produced by `one_of([dep, source])`.
-fn collect_source_files_from_attr(
-    attr: &CoercedAttr,
+/// Collect source file artifacts from a CONFIGURED attr (with select() already resolved).
+fn collect_source_files_from_configured_attr(
+    attr: &ConfiguredAttr,
     pkg: &kuro_core::package::PackageLabel,
     heap: &FrozenHeap,
     out: &mut Vec<FrozenValue>,
 ) {
     match attr {
-        CoercedAttr::List(ListLiteral(items)) => {
+        ConfiguredAttr::List(ListLiteral(items)) => {
             for item in items.iter() {
-                collect_source_files_from_attr(item, pkg, heap, out);
+                collect_source_files_from_configured_attr(item, pkg, heap, out);
             }
         }
-        CoercedAttr::OneOf(inner, _) => {
-            collect_source_files_from_attr(inner, pkg, heap, out);
+        ConfiguredAttr::OneOf(inner, _) => {
+            collect_source_files_from_configured_attr(inner, pkg, heap, out);
         }
-        CoercedAttr::SourceFile(coerced_path) => {
+        ConfiguredAttr::SourceFile(coerced_path) => {
             for path in coerced_path.inputs() {
                 let source_artifact = SourceArtifact::new(SourcePath::new(pkg.dupe(), path.dupe()));
                 let artifact = Artifact::from(source_artifact);
@@ -652,11 +652,15 @@ fn analyze_filegroup(
     let mut source_outputs: Vec<FrozenValue> = Vec::new();
 
     let pkg = target.pkg();
-    let target_node = configured_node.to_owned();
-    let target_ref = target_node.target_node().as_ref();
 
-    if let Some(srcs_attr) = target_ref.attr_or_none("srcs", AttrInspectOptions::All) {
-        collect_source_files_from_attr(srcs_attr.value, &pkg, &heap, &mut source_outputs);
+    // Use configured node to resolve select() expressions in srcs.
+    if let Some(srcs_attr) = configured_node.get("srcs", AttrInspectOptions::All) {
+        collect_source_files_from_configured_attr(
+            &srcs_attr.value,
+            &pkg,
+            &heap,
+            &mut source_outputs,
+        );
     }
 
     if dep_analysis.is_empty() {

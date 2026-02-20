@@ -65,9 +65,9 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 **Phase 7a.2: Platform Rules (Critical for Toolchains)**
 - [x] Implement `constraint_setting` rule
 - [x] Implement `constraint_value` rule
-- [ ] Implement `platform` rule
-- [ ] Implement `toolchain` rule
-- [ ] Implement `toolchain_type` rule
+- [x] Implement `platform` rule (produces PlatformInfo with merged constraints from constraint_values deps)
+- [ ] Implement `toolchain` rule (currently no-op stub in natives.rs)
+- [x] Implement `toolchain_type` rule (minimal stub, create_minimal_analysis_result)
 
 **Phase 7a.3: Missing Rules**
 - [x] Implement `config_setting` rule (critical for `select()`)
@@ -77,10 +77,10 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 
 ### Success Criteria (Phase 7a)
 
-- [ ] All native rules available in BUILD files without `load()`
-- [ ] `select()` works with `config_setting`
+- [x] All native rules available in BUILD files without `load()`
+- [x] `select()` works with `config_setting` (fixed: filegroup srcs now accepts select(), analyze_filegroup uses configured attrs to resolve selectors)
 - [ ] Platform/toolchain rules work for rules_cc toolchain resolution
-- [ ] Bazel BUILD files using native rules parse correctly
+- [x] Bazel BUILD files using native rules parse correctly
 
 ---
 

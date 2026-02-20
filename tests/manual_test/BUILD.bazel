@@ -140,9 +140,18 @@ platform(
     constraint_values = [":test_macos"],
 )
 
-# Note: select() with config_setting requires a configured platform.
-# With <unspecified> platform, select() is unsupported.
-# To test select() end-to-end, add a platform() target and set it via --target-platforms.
+# select() test: uses config_setting + platform for conditional deps.
+# Test with: kuro build //:select_test --target-platforms=//:linux_platform
+# Expected: on linux_platform, selects hello.c; on macos_platform, selects lib.rs
+# The "//conditions:default" arm enables building without a specific platform.
+filegroup(
+    name = "select_test",
+    srcs = select({
+        "//:is_linux": ["hello.c"],
+        "//:is_macos": ["lib.rs"],
+        "//conditions:default": [],
+    }),
+)
 
 # =============================================================================
 # Phase 10: rules_rust integration test

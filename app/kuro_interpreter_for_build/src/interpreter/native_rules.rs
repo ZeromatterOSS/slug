@@ -882,10 +882,8 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
     /// See: https://bazel.build/reference/be/general#filegroup
     fn filegroup<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        srcs: UnpackListOrTuple<Value<'v>>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        data: UnpackListOrTuple<Value<'v>>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] data: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
@@ -903,18 +901,26 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let internals = ModuleInternals::from_context(eval, "filegroup")?;
         let coercion_ctx = internals.attr_coercion_context();
 
-        // Coerce srcs and data
+        // Coerce srcs and data - accept both lists and select() expressions
         let srcs_attr_type = AttrType::list(AttrType::one_of(vec![
             AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
             AttrType::source(false),
         ]));
         let data_attr_type = srcs_attr_type.clone();
 
-        let srcs_value = eval.heap().alloc(srcs.items);
+        let srcs_value = if srcs.is_none() {
+            eval.heap().alloc(Vec::<Value>::new())
+        } else {
+            srcs
+        };
         let coerced_srcs =
             srcs_attr_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, srcs_value)?;
 
-        let data_value = eval.heap().alloc(data.items);
+        let data_value = if data.is_none() {
+            eval.heap().alloc(Vec::<Value>::new())
+        } else {
+            data
+        };
         let coerced_data =
             data_attr_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, data_value)?;
 
