@@ -39,11 +39,20 @@ pub struct StarlarkAttribute {
     inner: Attribute,
     /// True if this is an `attr.output()` attribute (Bazel output file declaration).
     pub is_output: bool,
+    /// True if the default was auto-injected by Bazel compatibility code (not user-provided).
+    /// When true, the default is omitted from the repr (e.g., `attrs.string()` not
+    /// `attrs.string(default="")`).
+    pub implicit_default: bool,
 }
 
 impl std::fmt::Display for StarlarkAttribute {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self.inner, f)
+        if self.implicit_default {
+            // Auto-injected default: omit it from repr to match Bazel behavior
+            self.inner.coercer().fmt_with_default(f, None)
+        } else {
+            std::fmt::Display::fmt(&self.inner, f)
+        }
     }
 }
 
@@ -67,6 +76,7 @@ impl StarlarkAttribute {
         Self {
             inner: attr,
             is_output: false,
+            implicit_default: false,
         }
     }
 
@@ -74,6 +84,17 @@ impl StarlarkAttribute {
         Self {
             inner: attr,
             is_output: true,
+            implicit_default: false,
+        }
+    }
+
+    /// Create an attribute whose default was auto-injected by Bazel compatibility (not user-provided).
+    /// The default is omitted from `repr()` to match Bazel behavior.
+    pub fn new_with_implicit_default(attr: Attribute) -> Self {
+        Self {
+            inner: attr,
+            is_output: false,
+            implicit_default: true,
         }
     }
 

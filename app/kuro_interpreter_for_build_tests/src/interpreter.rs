@@ -405,11 +405,16 @@ fn test_package_import() -> kuro_error::Result<()> {
         json!({
                 "DEFAULT": {
                     "__type__": "root//include.bzl:export_file",
+                    "applicable_licenses": [],
                     "compatible_with": [],
                     "default_target_platform": null,
+                    "deprecation": null,
                     "exec_compatible_with": [],
+                    "features": [],
                     "name": "DEFAULT",
+                    "tags": [],
                     "target_compatible_with": [],
+                    "testonly": false,
                     "modifiers": [],
                     "tests": [],
                     "visibility": [],

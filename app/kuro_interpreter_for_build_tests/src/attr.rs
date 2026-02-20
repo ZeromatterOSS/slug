@@ -126,28 +126,17 @@ fn attr_label_works() -> kuro_error::Result<()> {
         "#
     ))?;
 
+    // In Bazel, relative label defaults in bzl files are valid - they resolve relative to the bzl
+    // file's package. Both ":reltarget" and "notatarget" (bare name) are treated as relative targets.
     let mut t = Tester::new().unwrap();
-    t.run_starlark_bzl_test_expecting_error(
-        indoc!(
-            r#"
-        def test():
-            attr.label(default="notatarget")
-        "#
-        ),
-        "Invalid target pattern",
-    );
-
-    // Relative targets are disallowed; there is no build file for them to be relative to
-    let mut t = Tester::new().unwrap();
-    t.run_starlark_bzl_test_expecting_error(
-        indoc!(
-            r#"
+    t.run_starlark_bzl_test(indoc!(
+        r#"
         def test():
             attr.label(default=":reltarget")
+            attr.label(default="notatarget")
         "#
-        ),
-        "Must be absolute",
-    );
+    ))
+    .unwrap();
     Ok(())
 }
 

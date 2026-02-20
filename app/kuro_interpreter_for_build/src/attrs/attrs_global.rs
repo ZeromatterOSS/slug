@@ -832,17 +832,15 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
     ) -> starlark::Result<StarlarkAttribute> {
         let _unused = values;
         // Bazel semantics: if mandatory = False (default) and no default, use empty string
+        let implicit = default.is_none() && !mandatory;
         let effective_default = match (default, mandatory) {
             (Some(d), _) => Some(d),
             (None, false) => Some(eval.heap().alloc("")),
             (None, true) => None,
         };
-        Ok(Attribute::attr(
-            eval,
-            effective_default,
-            doc,
-            AttrType::string(),
-        )?)
+        let mut attr = Attribute::attr(eval, effective_default, doc, AttrType::string())?;
+        attr.implicit_default = implicit;
+        Ok(attr)
     }
 
     /// Takes an int from the user, supplies an int to the rule.
@@ -862,17 +860,15 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // TODO(bazel): Enforce values constraint during coercion
         let _unused = values;
         // Bazel semantics: if mandatory = False (default) and no default, use 0
+        let implicit = default.is_none() && !mandatory;
         let effective_default = match (default, mandatory) {
             (Some(d), _) => Some(d),
             (None, false) => Some(eval.heap().alloc(0)),
             (None, true) => None,
         };
-        Ok(Attribute::attr(
-            eval,
-            effective_default,
-            doc,
-            AttrType::int(),
-        )?)
+        let mut attr = Attribute::attr(eval, effective_default, doc, AttrType::int())?;
+        attr.implicit_default = implicit;
+        Ok(attr)
     }
 
     /// Takes a boolean from the user, supplies a boolean to the rule.
@@ -884,17 +880,15 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
         // Bazel semantics: if mandatory = False (default) and no default, use False
+        let implicit = default.is_none() && !mandatory;
         let effective_default = match (default, mandatory) {
             (Some(d), _) => Some(d),
             (None, false) => Some(eval.heap().alloc(false)),
             (None, true) => None,
         };
-        Ok(Attribute::attr(
-            eval,
-            effective_default,
-            doc,
-            AttrType::bool(),
-        )?)
+        let mut attr = Attribute::attr(eval, effective_default, doc, AttrType::bool())?;
+        attr.implicit_default = implicit;
+        Ok(attr)
     }
 
     /// Takes a target label from the user (e.g., "//pkg:target") and supplies a
@@ -1019,9 +1013,12 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         };
 
         // Create attribute with aspects attached (Phase 8c)
+        let implicit = default.is_none() && !mandatory;
         let base_attr = Attribute::attr(eval, effective_default, doc, coercer)?;
         Ok(if aspect_types.is_empty() {
-            base_attr
+            let mut attr = base_attr;
+            attr.implicit_default = implicit;
+            attr
         } else {
             StarlarkAttribute::new(base_attr.clone_attribute().with_aspects(aspect_types))
         })
@@ -1135,9 +1132,12 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         let coercer = AttrType::list(inner);
 
         // Create attribute with aspects attached (Phase 8c)
+        let implicit = default.is_none() && !mandatory;
         let base_attr = Attribute::attr(eval, effective_default, doc, coercer)?;
         Ok(if aspect_types.is_empty() {
-            base_attr
+            let mut attr = base_attr;
+            attr.implicit_default = implicit;
+            attr
         } else {
             StarlarkAttribute::new(base_attr.clone_attribute().with_aspects(aspect_types))
         })
@@ -1161,8 +1161,11 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
             (None, false) => Some(eval.heap().alloc(Vec::<Value>::new())),
             (None, true) => None,
         };
+        let implicit = default.is_none() && !mandatory;
         let coercer = AttrType::list(AttrType::string());
-        Ok(Attribute::attr(eval, effective_default, doc, coercer)?)
+        let mut attr = Attribute::attr(eval, effective_default, doc, coercer)?;
+        attr.implicit_default = implicit;
+        Ok(attr)
     }
 
     /// Takes a list of integers from the user.
@@ -1183,8 +1186,11 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
             (None, false) => Some(eval.heap().alloc(Vec::<Value>::new())),
             (None, true) => None,
         };
+        let implicit = default.is_none() && !mandatory;
         let coercer = AttrType::list(AttrType::int());
-        Ok(Attribute::attr(eval, effective_default, doc, coercer)?)
+        let mut attr = Attribute::attr(eval, effective_default, doc, coercer)?;
+        attr.implicit_default = implicit;
+        Ok(attr)
     }
 
     /// Takes a dict with string keys and string values.
@@ -1206,8 +1212,11 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
             ),
             (None, true) => None,
         };
+        let implicit = default.is_none() && !mandatory;
         let coercer = AttrType::dict(AttrType::string(), AttrType::string(), false);
-        Ok(Attribute::attr(eval, effective_default, doc, coercer)?)
+        let mut attr = Attribute::attr(eval, effective_default, doc, coercer)?;
+        attr.implicit_default = implicit;
+        Ok(attr)
     }
 
     /// Takes a dict with string keys and list of string values.
