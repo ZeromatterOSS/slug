@@ -172,13 +172,14 @@ fn analyze_genrule(
     // 2) DefaultInfo.default_outputs from dep_analysis entries
     let mut inputs: Vec<ArtifactGroup> = Vec::new();
 
-    if let Some(srcs_attr) = target_ref.attr_or_none("srcs", AttrInspectOptions::All) {
-        collect_artifact_groups_from_attr(srcs_attr.value, &pkg, &mut inputs);
+    // Use configured node to resolve select() expressions in srcs/tools.
+    if let Some(srcs_attr) = configured_node.get("srcs", AttrInspectOptions::All) {
+        collect_artifact_groups_from_configured_attr(&srcs_attr.value, &pkg, &mut inputs);
     }
 
     // Also collect from tools attr (these are executables needed by the command)
-    if let Some(tools_attr) = target_ref.attr_or_none("tools", AttrInspectOptions::All) {
-        collect_artifact_groups_from_attr(tools_attr.value, &pkg, &mut inputs);
+    if let Some(tools_attr) = configured_node.get("tools", AttrInspectOptions::All) {
+        collect_artifact_groups_from_configured_attr(&tools_attr.value, &pkg, &mut inputs);
     }
 
     // Add DefaultInfo outputs from dep_analysis (label deps in srcs/tools)
@@ -263,6 +264,32 @@ fn collect_artifact_groups_from_attr(
             collect_artifact_groups_from_attr(inner, pkg, out);
         }
         CoercedAttr::SourceFile(coerced_path) => {
+            for path in coerced_path.inputs() {
+                let source_artifact = SourceArtifact::new(SourcePath::new(pkg.dupe(), path.dupe()));
+                out.push(ArtifactGroup::Artifact(Artifact::from(source_artifact)));
+            }
+        }
+        // Label deps are resolved via dep_analysis, not here
+        _ => {}
+    }
+}
+
+/// Collect ArtifactGroups from a CONFIGURED attr (with select() already resolved).
+fn collect_artifact_groups_from_configured_attr(
+    attr: &ConfiguredAttr,
+    pkg: &kuro_core::package::PackageLabel,
+    out: &mut Vec<ArtifactGroup>,
+) {
+    match attr {
+        ConfiguredAttr::List(ListLiteral(items)) => {
+            for item in items.iter() {
+                collect_artifact_groups_from_configured_attr(item, pkg, out);
+            }
+        }
+        ConfiguredAttr::OneOf(inner, _) => {
+            collect_artifact_groups_from_configured_attr(inner, pkg, out);
+        }
+        ConfiguredAttr::SourceFile(coerced_path) => {
             for path in coerced_path.inputs() {
                 let source_artifact = SourceArtifact::new(SourcePath::new(pkg.dupe(), path.dupe()));
                 out.push(ArtifactGroup::Artifact(Artifact::from(source_artifact)));
