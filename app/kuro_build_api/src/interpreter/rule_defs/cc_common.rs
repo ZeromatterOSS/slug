@@ -2180,10 +2180,6 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] unsupported_features: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<FeatureConfiguration> {
-        eprintln!(
-            "[cc_common.configure_features] called with ctx={}, cc_toolchain={}",
-            ctx, cc_toolchain
-        );
         // TODO(cc_common): Properly process features from toolchain and config
         // For now, return a default feature configuration
         Ok(FeatureConfiguration::default())
@@ -2261,14 +2257,6 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             );
         }
 
-        // Debug logging
-        eprintln!(
-            "[cc_common.compile] name={}, srcs={}, srcs.is_none()={}",
-            name,
-            srcs,
-            srcs.is_none()
-        );
-
         // Collect source files to compile
         let mut object_files: Vec<Value<'v>> = Vec::new();
         let mut pic_object_files: Vec<Value<'v>> = Vec::new();
@@ -2276,12 +2264,6 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // Get the declare_file method from actions
         let declare_file_method = actions.get_attr("declare_file", heap).ok().flatten();
         let run_method = actions.get_attr("run", heap).ok().flatten();
-
-        eprintln!(
-            "[cc_common.compile] declare_file_method={:?}, run_method={:?}",
-            declare_file_method.map(|v| v.to_string()),
-            run_method.map(|v| v.to_string())
-        );
 
         // Register include directories from compilation_contexts (deps' contexts)
         if !compilation_contexts.is_none() {
@@ -2311,13 +2293,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         }
 
         // Handle strip_include_prefix - register the resolved directory as an include path
-        eprintln!(
-            "[cc_common.compile] strip_include_prefix={}, is_none={}",
-            strip_include_prefix,
-            strip_include_prefix.is_none()
-        );
         if let Some(strip_prefix) = strip_include_prefix.unpack_str() {
-            eprintln!("[cc_common.compile] strip_prefix={}", strip_prefix);
             if !strip_prefix.is_empty() {
                 // strip_include_prefix is relative to the repo root, e.g. "/third_party/utf8_range"
                 // We need to determine the repo name from the source paths
@@ -2352,13 +2328,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // Process source files if provided
         // srcs is a list of (Artifact, Label) tuples from cc_helper.get_srcs()
         if !srcs.is_none() {
-            eprintln!("[cc_common.compile] Processing srcs...");
             // Try to iterate over srcs
             if let Ok(iter) = srcs.iterate(heap) {
                 let items: Vec<_> = iter.collect();
-                eprintln!("[cc_common.compile] srcs has {} items", items.len());
                 for src_tuple in items {
-                    eprintln!("[cc_common.compile] Processing src_tuple: {}", src_tuple);
                     // Extract the artifact from the (Artifact, Label) tuple
                     // Try tuple index first, then fall back to treating it as artifact directly
                     let src = src_tuple
