@@ -1208,10 +1208,8 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] cmd_ps: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         outs: UnpackListOrTuple<String>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        srcs: UnpackListOrTuple<Value<'v>>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        tools: UnpackListOrTuple<Value<'v>>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] tools: Value<'v>,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         toolchains: UnpackListOrTuple<Value<'v>>,
         #[starlark(require = named, default = false)] executable: bool,
@@ -1264,21 +1262,29 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
                 .map(|s| CoercedAttr::String(StringLiteral(ArcStr::from(s.as_str())))),
         )));
 
-        // Coerce srcs
+        // Coerce srcs - accept both lists and select() expressions
         let srcs_attr_type = AttrType::list(AttrType::one_of(vec![
             AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
             AttrType::source(false),
         ]));
-        let srcs_value = eval.heap().alloc(srcs.items);
+        let srcs_value = if srcs.is_none() {
+            eval.heap().alloc(Vec::<Value>::new())
+        } else {
+            srcs
+        };
         let coerced_srcs =
             srcs_attr_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, srcs_value)?;
 
-        // Coerce tools
+        // Coerce tools - accept both lists and select() expressions
         let tools_attr_type = AttrType::list(AttrType::one_of(vec![
             AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
             AttrType::source(false),
         ]));
-        let tools_value = eval.heap().alloc(tools.items);
+        let tools_value = if tools.is_none() {
+            eval.heap().alloc(Vec::<Value>::new())
+        } else {
+            tools
+        };
         let coerced_tools =
             tools_attr_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, tools_value)?;
 
