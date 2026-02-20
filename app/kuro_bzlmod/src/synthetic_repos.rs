@@ -1096,9 +1096,17 @@ pub fn materialize_synthetic_repos(
             if let Some(parent) = full_path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            let mut file = fs::File::create(&full_path)
-                .with_context(|| format!("Failed to create file: {:?}", full_path))?;
-            file.write_all(content.as_bytes())?;
+            // Skip writing if content is unchanged to avoid spurious mtime updates.
+            // Mtime changes trigger "File changed" cache invalidation on every build.
+            let should_write = match fs::read_to_string(&full_path) {
+                Ok(existing) => existing != *content,
+                Err(_) => true,
+            };
+            if should_write {
+                let mut file = fs::File::create(&full_path)
+                    .with_context(|| format!("Failed to create file: {:?}", full_path))?;
+                file.write_all(content.as_bytes())?;
+            }
         }
 
         paths.push(repo_path);

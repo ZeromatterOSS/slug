@@ -689,8 +689,9 @@ impl MvsResolver {
                     .map(|(v, _)| v.to_string())
                     .unwrap_or_default();
 
-                // Log warning but continue - resolve by keeping highest version
-                tracing::warn!(
+                // Log at debug level - this is an intentional resolution behavior.
+                // Bazel would fail here, but we resolve by selecting the highest version.
+                tracing::debug!(
                     "Compatibility level conflict for module '{}': \
                      version {} has compatibility_level={}, \
                      version {} has compatibility_level={}. \
