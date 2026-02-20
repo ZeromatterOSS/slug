@@ -78,6 +78,8 @@ struct ProviderCodegen {
     span: proc_macro2::Span,
     input: syn::ItemStruct,
     args: InternalProviderArgs,
+    /// Names of fields that have `#[provider(skip)]`, excluded from Display/Serialize.
+    skip_fields: std::collections::HashSet<String>,
 }
 
 impl ProviderCodegen {
@@ -86,15 +88,34 @@ impl ProviderCodegen {
     /// This modifies the original input and removes any instances of `#[provider()]` macros
     /// on fields of the provided structs, and saves them into `field_attr_providers`.
     fn new(mut input: syn::ItemStruct, args: InternalProviderArgs) -> syn::Result<Self> {
+        let mut skip_fields = std::collections::HashSet::new();
         if let Fields::Named(fields_named) = &mut input.fields {
             for field in fields_named.named.iter_mut() {
-                field.attrs = field.attrs.clone();
+                // Check for `#[provider(skip)]` BEFORE stripping the attribute.
+                let has_provider_skip = field.attrs.iter().any(|attr| {
+                    if attr.path().is_ident("provider") {
+                        // Check `#[provider(skip)]` — parse the args as a Path
+                        if let Ok(syn::Meta::Path(path)) = attr.parse_args::<syn::Meta>() {
+                            return path.is_ident("skip");
+                        }
+                    }
+                    false
+                });
+                if has_provider_skip {
+                    if let Some(ident) = &field.ident {
+                        skip_fields.insert(ident.to_string());
+                    }
+                }
+                // Strip `#[provider(...)]` attributes from fields so they don't cause
+                // "cannot find attribute" errors in the emitted struct definition.
+                field.attrs.retain(|attr| !attr.path().is_ident("provider"));
             }
         };
         Ok(Self {
             span: input.ident.span(),
             input,
             args,
+            skip_fields,
         })
     }
 
@@ -138,6 +159,39 @@ impl ProviderCodegen {
 
     fn field_names(&self) -> syn::Result<Vec<syn::Ident>> {
         Ok(self.fields()?.into_map(|f| f.name))
+    }
+
+    /// Returns field names that should appear in Display repr and JSON serialization.
+    /// Fields with `#[provider(skip)]` attribute are excluded.
+    fn visible_field_names(&self) -> syn::Result<Vec<syn::Ident>> {
+        Ok(self.visible_fields()?.into_map(|f| f.name))
+    }
+
+    /// Returns fields that should appear in Display repr and JSON serialization.
+    /// Fields with `#[provider(skip)]` attribute are excluded.
+    fn visible_fields(&self) -> syn::Result<Vec<Field>> {
+        match &self.input.fields {
+            syn::Fields::Named(fields) => Ok(fields
+                .named
+                .iter()
+                .filter(|f| !self.is_id_field(f) && !self.is_skip_field(f))
+                .map(|f| self.field(f))
+                .collect::<syn::Result<Vec<_>>>()?),
+            _ => Err(syn::Error::new_spanned(
+                &self.input,
+                "providers only support named fields",
+            )),
+        }
+    }
+
+    /// Returns true if this field was marked with `#[provider(skip)]`,
+    /// meaning it should not appear in the provider's Display repr or JSON serialization.
+    fn is_skip_field(&self, field: &syn::Field) -> bool {
+        if let Some(ident) = &field.ident {
+            self.skip_fields.contains(&ident.to_string())
+        } else {
+            false
+        }
     }
 
     /// Parse the "doc" attribute and return a tokenstream that is either None if "doc" is not
@@ -337,7 +391,7 @@ impl ProviderCodegen {
     fn impl_display(&self) -> syn::Result<syn::Item> {
         let gen_name = &self.input.ident;
         let name_str = self.name_str()?;
-        let field_names = self.field_names()?;
+        let field_names = self.visible_field_names()?;
         Ok(syn::parse_quote_spanned! { self.span=>
             impl<V: starlark::values::ValueLifetimeless> std::fmt::Display for #gen_name<V> {
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -419,7 +473,7 @@ impl ProviderCodegen {
 
     fn impl_serializable_value(&self) -> syn::Result<syn::Item> {
         let gen_name = &self.input.ident;
-        let field_names = self.field_names()?;
+        let field_names = self.visible_field_names()?;
         let field_len = field_names.len();
         Ok(syn::parse_quote_spanned! { self.span=>
             impl<'v, V: starlark::values::ValueLike<'v>> kuro_build_api::__derive_refs::serde::Serialize

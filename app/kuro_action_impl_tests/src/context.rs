@@ -198,6 +198,9 @@ fn declare_output_dotdot() -> kuro_error::Result<()> {
 
 #[test]
 fn declare_output_require_bound() -> kuro_error::Result<()> {
+    // In Bazel semantics, passing a declared artifact as an input to an action is
+    // valid at analysis time (the artifact would be produced by another action at
+    // build time). Buck2 required "binding" at analysis time but Bazel does not.
     let content = indoc!(
         r#"
          def test(c):
@@ -207,9 +210,10 @@ fn declare_output_require_bound() -> kuro_error::Result<()> {
          "#
     );
 
-    let expect = "must be bound by now";
     run_ctx_test(content, |ret| match ret {
-        Err(e) if e.to_string().contains(expect) => Ok(()),
-        _ => panic!("Expected a specific failure containing `{expect}`, got {ret:?}"),
+        Ok(_) => Ok(()),
+        Err(e) => {
+            panic!("Expected success (Bazel allows unbound artifacts as inputs), got error: {e}")
+        }
     })
 }

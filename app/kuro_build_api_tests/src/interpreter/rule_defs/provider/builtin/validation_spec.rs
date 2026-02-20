@@ -122,7 +122,7 @@ fn test_validation_failure() -> kuro_error::Result<()> {
         expect_error(
             tester.run_starlark_bzl_test(test),
             test,
-            "Expected type `Artifact` but got `str`",
+            "Expected type `File` but got `str`",
         );
     }
     {

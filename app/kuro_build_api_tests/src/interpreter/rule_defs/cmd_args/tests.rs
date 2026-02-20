@@ -96,7 +96,7 @@ fn stringifies_correctly() -> kuro_error::Result<()> {
     expect_error(
         tester.run_starlark_bzl_test(contents),
         contents,
-        "Expected `Artifact | CellPath | CellRoot",
+        "CellPath | CellRoot | File",
     );
 
     Ok(())
@@ -253,12 +253,12 @@ fn command_line_builder() -> kuro_error::Result<()> {
     expect_error(
         tester.run_starlark_bzl_test(content_invalid_type_1),
         content_invalid_type_1,
-        "Expected `Artifact | CellPath | CellRoot",
+        "CellPath | CellRoot | File",
     );
     expect_error(
         tester.run_starlark_bzl_test(content_invalid_type_3),
         content_invalid_type_3,
-        "Expected `Artifact | CellPath | CellRoot",
+        "CellPath | CellRoot | File",
     );
 
     Ok(())

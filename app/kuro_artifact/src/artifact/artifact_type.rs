@@ -850,8 +850,8 @@ mod tests {
 
     #[test]
     fn test_short_path() -> kuro_error::Result<()> {
-        let target =
-            ConfiguredTargetLabel::testing_parse("cell//pkg:foo", ConfigurationData::testing_new());
+        let cfg = ConfigurationData::testing_new();
+        let target = ConfiguredTargetLabel::testing_parse("cell//pkg:foo", cfg.dupe());
 
         let artifact =
             BuildArtifact::testing_new(target.dupe(), "foo/bar.cpp", ActionIndex::new(0));
@@ -863,16 +863,23 @@ mod tests {
         );
         let hidden = Artifact::new(artifact, ThinArcS::from(ForwardRelativePath::empty()), 1);
 
+        // with_full_path returns the full buck-out path for Bazel compatibility:
+        // buck-out/v2/gen/<cell>/<cfg_hash>/<pkg>/__<target>__/<artifact_path>
+        let cfg_hash = cfg.output_hash().as_str().to_owned();
+        let expected_full = format!("buck-out/v2/gen/cell/{}/pkg/__foo__/foo/bar.cpp", cfg_hash);
         full.get_path()
-            .with_full_path(|p| assert_eq!(p, "foo/bar.cpp"));
+            .with_full_path(|p| assert_eq!(p, expected_full.as_str()));
 
+        // with_short_path returns just the artifact-relative path (no buck-out prefix)
         full.get_path()
             .with_short_path(|p| assert_eq!(p, "foo/bar.cpp"));
 
+        // hidden artifacts share the same full path
         hidden
             .get_path()
-            .with_full_path(|p| assert_eq!(p, "foo/bar.cpp"));
+            .with_full_path(|p| assert_eq!(p, expected_full.as_str()));
 
+        // hidden short_path strips the first component
         hidden
             .get_path()
             .with_short_path(|p| assert_eq!(p, "bar.cpp"));

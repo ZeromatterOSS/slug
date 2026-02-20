@@ -80,7 +80,7 @@ fn test_validation_1() {
     expect_error(
         tester.run_starlark_bzl_test(test),
         test,
-        "Expected type `Artifact | CellPath | CellRoot",
+        "CellPath | CellRoot | File",
     );
 }
 

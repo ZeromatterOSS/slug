@@ -61,7 +61,7 @@ fn declaring_artifacts() -> kuro_error::Result<()> {
         )?;
         declared1
             .get_path()
-            .with_full_path(|p| assert_eq!(p, buckout1.path()));
+            .with_short_path(|p| assert_eq!(p, buckout1.path()));
 
         let out2 = ForwardRelativePathBuf::unchecked_new("bar2.out".into());
         let buckout2 = BuildArtifactPath::new(base, out2.clone(), BuckOutPathKind::default());
@@ -75,7 +75,7 @@ fn declaring_artifacts() -> kuro_error::Result<()> {
         )?;
         declared2
             .get_path()
-            .with_full_path(|p| assert_eq!(p, buckout2.path()));
+            .with_short_path(|p| assert_eq!(p, buckout2.path()));
 
         if actions
             .declare_artifact(

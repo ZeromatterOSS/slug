@@ -31,28 +31,28 @@ fn source_artifact() -> kuro_error::Result<()> {
 
                 assert_eq("<source foo/bar/baz/quz.h>", repr(a1))
                 assert_eq("quz.h", a1.basename)
-                assert_eq("baz/quz.h", a1.short_path)
-                assert_eq(".h", a1.extension)
+                assert_eq("foo/bar/baz/quz.h", a1.short_path)
+                assert_eq("h", a1.extension)
                 assert_eq(True, a1.is_source)
                 assert_eq(None, a1.owner)
 
                 assert_eq("<source foo/bar/baz/file1>", repr(a2))
                 assert_eq("file1", a2.basename)
-                assert_eq("baz/file1", a2.short_path)
+                assert_eq("foo/bar/baz/file1", a2.short_path)
                 assert_eq("", a2.extension)
                 assert_eq(True, a2.is_source)
                 assert_eq(None, a2.owner)
 
                 assert_eq("<source foo/bar/baz/quz.cpp>", repr(a3))
                 assert_eq("quz.cpp", a3.basename)
-                assert_eq("baz/quz.cpp", a3.short_path)
-                assert_eq(".cpp", a3.extension)
+                assert_eq("foo/bar/baz/quz.cpp", a3.short_path)
+                assert_eq("cpp", a3.extension)
                 assert_eq(True, a3.is_source)
                 assert_eq(None, a3.owner)
 
                 assert_eq("<source foo/bar/baz/file2>", repr(a4))
                 assert_eq("file2", a4.basename)
-                assert_eq("baz/file2", a4.short_path)
+                assert_eq("foo/bar/baz/file2", a4.short_path)
                 assert_eq("", a4.extension)
                 assert_eq(True, a4.is_source)
                 assert_eq(None, a4.owner)
@@ -97,7 +97,7 @@ fn bound_artifact() -> kuro_error::Result<()> {
                 assert_eq_ignore_hash("<build artifact baz/quz.h bound to root//foo:bar (<testing>#<HASH>)>", repr(a1))
                 assert_eq("quz.h", a1.basename)
                 assert_eq("baz/quz.h", a1.short_path)
-                assert_eq(".h", a1.extension)
+                assert_eq("h", a1.extension)
                 assert_eq(False, a1.is_source)
                 assert_eq("bar", a1.owner.name)
 
@@ -111,7 +111,7 @@ fn bound_artifact() -> kuro_error::Result<()> {
                 assert_eq_ignore_hash("<build artifact baz/quz.cpp bound to root//foo:bar (<testing>#<HASH>)>", repr(a3))
                 assert_eq("quz.cpp", a3.basename)
                 assert_eq("baz/quz.cpp", a3.short_path)
-                assert_eq(".cpp", a3.extension)
+                assert_eq("cpp", a3.extension)
                 assert_eq(False, a3.is_source)
                 assert_eq("bar", a3.owner.name)
 
@@ -157,7 +157,7 @@ fn declared_artifact() -> kuro_error::Result<()> {
 
                 assert_eq("<build artifact baz/quz.cpp>", repr(a1))
                 assert_eq("quz.cpp", a1.basename)
-                assert_eq(".cpp", a1.extension)
+                assert_eq("cpp", a1.extension)
                 assert_eq(False, a1.is_source)
                 assert_eq(None, a1.owner)
 
@@ -197,7 +197,7 @@ fn output_artifact() -> kuro_error::Result<()> {
 
                 assert_eq("<output artifact for baz/quz.cpp>", repr(a1o))
                 assert_eq("quz.cpp", a1o.basename)
-                assert_eq(".cpp", a1o.extension)
+                assert_eq("cpp", a1o.extension)
                 assert_eq(False, a1o.is_source)
                 assert_eq(None, a1o.owner)
 
@@ -245,7 +245,7 @@ fn declared_bound() -> kuro_error::Result<()> {
                 assert_eq_ignore_hash("<build artifact baz/quz.h bound to root//foo:bar (<testing>#<HASH>)>", repr(a1))
                 assert_eq("quz.h", a1.basename)
                 assert_eq("baz/quz.h", a1.short_path)
-                assert_eq(".h", a1.extension)
+                assert_eq("h", a1.extension)
                 assert_eq(False, a1.is_source)
                 assert_eq("bar", a1.owner.name)
 
@@ -259,7 +259,7 @@ fn declared_bound() -> kuro_error::Result<()> {
                 assert_eq_ignore_hash("<build artifact baz/quz.cpp bound to root//foo:bar (<testing>#<HASH>)>", repr(a3))
                 assert_eq("quz.cpp", a3.basename)
                 assert_eq("baz/quz.cpp", a3.short_path)
-                assert_eq(".cpp", a3.extension)
+                assert_eq("cpp", a3.extension)
                 assert_eq(False, a3.is_source)
                 assert_eq("bar", a3.owner.name)
 
@@ -292,23 +292,23 @@ fn project_declared_artifact() -> kuro_error::Result<()> {
                 source = source_artifact("foo/bar", "src").project("baz.cpp")
                 assert_eq("<source foo/bar/src/baz.cpp>", repr(source))
                 assert_eq("baz.cpp", source.basename)
-                assert_eq(".cpp", source.extension)
+                assert_eq("cpp", source.extension)
 
                 bound = bound_artifact("//foo:bar", "baz").project("quz.h")
                 assert_eq_ignore_hash("<build artifact baz/quz.h bound to root//foo:bar (<testing>#<HASH>)>", repr(bound))
                 assert_eq("quz.h", bound.basename)
-                assert_eq(".h", bound.extension)
+                assert_eq("h", bound.extension)
 
                 bound = declared_bound_artifact("//foo:bar", "out").project("baz.o")
                 assert_eq_ignore_hash("<build artifact out/baz.o bound to root//foo:bar (<testing>#<HASH>)>", repr(bound))
                 assert_eq("baz.o", bound.basename)
-                assert_eq(".o", bound.extension)
+                assert_eq("o", bound.extension)
 
                 unbound = declared_artifact("out").project("qux.so")
                 assert_eq("<build artifact out/qux.so>", repr(unbound))
                 assert_eq("<output artifact for out/qux.so>", repr(unbound.as_output()))
                 assert_eq("qux.so", unbound.basename)
-                assert_eq(".so", unbound.extension)
+                assert_eq("so", unbound.extension)
             "#
         ))?;
     Ok(())

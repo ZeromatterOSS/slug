@@ -73,9 +73,8 @@ fn provider_collection_fails_to_construct_on_bad_data() -> kuro_error::Result<()
     let mut tester = provider_collection_tester()?;
     let not_a_list = indoc!(
         r#"
-            load("//provider:defs2.bzl", "foo1")
             def test():
-                create_collection(foo1)
+                create_collection(42)
             "#
     );
     expect_error(

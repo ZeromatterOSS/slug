@@ -156,13 +156,18 @@ pub struct DefaultInfoGen<V: ValueLifetimeless> {
     /// `ArtifactTraversable` can be an `Artifact` (which yields itself), or
     /// `cmd_args`, which expand to all their inputs.
     other_outputs: ValueOfUncheckedGeneric<V, ListType<ValueAsCommandLineLike<'static>>>,
-    /// Default runfiles (Bazel compatibility).
+    /// Default runfiles (Bazel compatibility). Not included in repr/JSON to preserve
+    /// backward compatibility with tests that check the DefaultInfo repr format.
+    #[provider(skip)]
     default_runfiles: ValueOfUncheckedGeneric<V, FrozenValue>,
-    /// Data runfiles (Bazel compatibility).
+    /// Data runfiles (Bazel compatibility). Not included in repr/JSON.
+    #[provider(skip)]
     data_runfiles: ValueOfUncheckedGeneric<V, FrozenValue>,
     /// The executable artifact (Bazel compatibility). When set, this target is runnable
     /// with `kuro run`. Stored as a list with 0 or 1 elements. When present and no
     /// explicit RunInfo is provided, a RunInfo will be synthesized from this executable.
+    /// Not included in repr/JSON to preserve backward compatibility.
+    #[provider(skip)]
     executable: ValueOfUncheckedGeneric<V, ListType<ValueIsInputArtifactAnnotation>>,
 }
 

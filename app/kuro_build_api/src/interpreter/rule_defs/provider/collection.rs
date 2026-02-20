@@ -291,14 +291,10 @@ impl<'v, V: ValueLike<'v>> ProviderCollectionGen<V> {
                     };
                 }
                 None => {
-                    // For Bazel compatibility, skip non-provider objects in provider lists.
-                    // Some Bazel rulesets return stub providers (like config_common.FeatureFlagInfo)
-                    // that are not true provider instances. Skip them rather than failing.
-                    tracing::debug!(
-                        "Skipping non-provider object in provider list: {}",
-                        value.to_repr()
-                    );
-                    continue;
+                    return Err(ProviderCollectionError::CollectionElementNotAProvider {
+                        repr: value.to_repr(),
+                    }
+                    .into());
                 }
             }
         }

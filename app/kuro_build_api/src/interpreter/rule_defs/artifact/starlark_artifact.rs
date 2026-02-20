@@ -114,10 +114,11 @@ impl Display for StarlarkArtifact {
             }
         )?;
 
-        // Historically this has used the full path whereas everything uses the short path.
+        // Use short path in repr (logical path for display, not execution path).
+        // File.path returns the full execution path, but repr shows the short path.
         self.artifact
             .get_path()
-            .with_full_path(|p| write!(f, "{p}"))?;
+            .with_short_path(|p| write!(f, "{p}"))?;
 
         if let Some(owner) = self.artifact.owner() {
             write!(f, " bound to {owner}")?;
