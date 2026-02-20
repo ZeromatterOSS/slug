@@ -110,14 +110,14 @@ native.depset_from_transitive_set(t, order = "default")
 
 ### Verification Criteria
 
-- [ ] `kuro build //...` works on a project using rules_cc
-- [ ] `kuro build //...` works on a project using rules_rust
+- [x] `kuro build //...` works on a project using rules_cc
+- [x] `kuro build //...` works on a project using rules_rust
 - [x] `kuro build //...` works on a project using rules_python
-- [ ] `kuro build //...` works on a project using rules_oci
-- [ ] `kuro run //:target` executes binaries
-- [ ] `kuro query //...` returns dependency information
-- [ ] BCR modules are fetched and cached correctly
-- [ ] Lockfile (MODULE.bazel.lock) is generated and respected
+- [x] `kuro build //...` works on a project using rules_oci
+- [x] `kuro run //:target` executes binaries (verified: hello_rust_bin prints "Hello, Kuro!")
+- [x] `kuro query //...` returns dependency information
+- [x] BCR modules are fetched and cached correctly
+- [x] Lockfile (MODULE.bazel.lock) is generated and respected
 - [ ] Sandboxed builds catch undeclared dependencies
 - [ ] Cross-platform builds work (Linux, Windows, macOS)
 
@@ -332,9 +332,9 @@ Quick reference to all phases and their locations:
 
 | Phase | Title                   | Status          |
 | ----- | ----------------------- | --------------- |
-| 7a    | Bazel Native Rules      | [ ] Not Started |
+| 7a    | Bazel Native Rules      | [~] Partial (constraint_setting/value, config_setting, platform, toolchain_type done; platform() now produces PlatformInfo) |
 | 7b    | Bazel Global Functions  | [ ] Not Started |
-| 7c    | Bazel Top-Level Modules | [ ] Not Started |
+| 7c    | Bazel Top-Level Modules | [~] Partial (config module done, platform_common partial) |
 | 7d    | Buck2-Specific Removal  | [ ] Not Started |
 
 ### Aspects (Phases 8a-8d) - [Sub-plan](./kuro-bazel-subplans/06-aspects.md)

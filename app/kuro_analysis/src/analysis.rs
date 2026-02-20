@@ -13,5 +13,6 @@ pub mod aspect_deferred_key;
 pub mod aspect_key;
 pub mod calculation;
 pub mod env;
+pub mod genrule_action;
 pub mod native_rule_analysis;
 mod plugins;

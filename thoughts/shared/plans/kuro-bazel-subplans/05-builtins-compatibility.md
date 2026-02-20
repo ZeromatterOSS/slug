@@ -34,7 +34,7 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 | `label_flag` | Label-typed build setting | ✓ Implemented (native) | `native_rules.rs`, `native_rule_analysis.rs` |
 | `filegroup` | Groups files under single label | ✓ Exists | `prelude/filegroup.bzl` |
 | `genquery` | Runs query language, outputs results | Not implemented | TBD |
-| `genrule` | Generic build rule using shell | ✓ Exists | `prelude/genrule.bzl` |
+| `genrule` | Generic build rule using shell | ✓ Implemented (native, with GenruleAction) | `native_rules.rs`, `native_rule_analysis.rs`, `genrule_action.rs` |
 | `starlark_doc_extract` | Extracts docs from .bzl files | Not implemented | Low priority |
 | `test_suite` | Defines collections of tests | ✓ Exists | `prelude/test_suite.bzl` |
 

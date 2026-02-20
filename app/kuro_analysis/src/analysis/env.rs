@@ -130,8 +130,7 @@ fn maybe_inject_test_info<'v>(
                 // Create ExternalRunnerTestInfo with the executable as command
                 let test_type = heap.alloc_str("custom").to_value();
                 let command = heap.alloc(vec![exe]);
-                let test_info =
-                    create_external_runner_test_info_for_bazel_test(test_type, command);
+                let test_info = create_external_runner_test_info_for_bazel_test(test_type, command);
                 let test_info_value = heap.alloc(test_info);
 
                 // Create new list with test_info appended

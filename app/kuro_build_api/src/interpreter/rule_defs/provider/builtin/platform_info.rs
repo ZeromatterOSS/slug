@@ -13,10 +13,15 @@ use std::fmt::Debug;
 use allocative::Allocative;
 use kuro_build_api_derive::internal_provider;
 use kuro_core::configuration::data::ConfigurationData;
+use kuro_core::provider::label::ProvidersLabel;
+use kuro_core::target::label::label::TargetLabel;
 use starlark::any::ProvidesStaticType;
 use starlark::coerce::Coerce;
 use starlark::environment::GlobalsBuilder;
 use starlark::values::Freeze;
+use starlark::values::FrozenHeap;
+use starlark::values::FrozenValue;
+use starlark::values::FrozenValueOfUnchecked;
 use starlark::values::Heap;
 use starlark::values::StringValue;
 use starlark::values::Trace;
@@ -67,6 +72,27 @@ impl<'v> PlatformInfo<'v> {
         Ok(PlatformInfoGen {
             label: label.to_value_of_unchecked().cast(),
             configuration: ValueOfUnchecked::<FrozenConfigurationInfo>::new(configuration),
+        })
+    }
+}
+
+impl FrozenPlatformInfo {
+    /// Create a frozen PlatformInfo for a native `platform()` rule.
+    ///
+    /// Takes the platform label string and constraint pairs collected from
+    /// `constraint_values` deps (and parent platforms), and produces a frozen
+    /// `PlatformInfo` value ready for inclusion in a provider collection.
+    pub fn for_native_platform(
+        label_str: &str,
+        constraint_pairs: &[(TargetLabel, ProvidersLabel)],
+        heap: &FrozenHeap,
+    ) -> FrozenValue {
+        let label_frozen = heap.alloc_str(label_str).to_frozen_value();
+        let config_info =
+            FrozenConfigurationInfo::for_native_config_setting(constraint_pairs, heap);
+        heap.alloc(PlatformInfoGen::<FrozenValue> {
+            label: FrozenValueOfUnchecked::new(label_frozen),
+            configuration: FrozenValueOfUnchecked::new(config_info),
         })
     }
 }

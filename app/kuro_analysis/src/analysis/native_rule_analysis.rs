@@ -15,14 +15,20 @@
 //! packages like @platforms.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use dupe::Dupe;
+use kuro_artifact::actions::key::ActionIndex;
+use kuro_artifact::actions::key::ActionKey;
 use kuro_artifact::artifact::artifact_type::Artifact;
+use kuro_artifact::artifact::build_artifact::BuildArtifact;
 use kuro_artifact::artifact::source_artifact::SourceArtifact;
+use kuro_build_api::actions::RegisteredAction;
 use kuro_build_api::actions::registry::RecordedActions;
 use kuro_build_api::analysis::AnalysisResult;
 use kuro_build_api::analysis::registry::FrozenAnalysisValueStorage;
 use kuro_build_api::analysis::registry::RecordedAnalysisValues;
+use kuro_build_api::artifact_groups::ArtifactGroup;
 use kuro_build_api::dynamic::storage::DYNAMIC_LAMBDA_PARAMS_STORAGES;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
 use kuro_build_api::interpreter::rule_defs::cc_common::CcInfoInstanceStub;
@@ -33,13 +39,20 @@ use kuro_build_api::interpreter::rule_defs::provider::FrozenBuiltinProviderLike;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::configuration_info::FrozenConfigurationInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::FrozenDefaultInfo;
+use kuro_build_api::interpreter::rule_defs::provider::builtin::platform_info::FrozenPlatformInfo;
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::deferred::key::DeferredHolderKey;
+use kuro_core::execution_types::executor_config::CommandExecutorConfig;
+use kuro_core::fs::buck_out_path::BuckOutPathKind;
+use kuro_core::fs::buck_out_path::BuildArtifactPath;
 use kuro_core::package::source_path::SourcePath;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
+use kuro_error::BuckErrorContext;
 use kuro_error::internal_error;
+use kuro_execute::execute::request::OutputType;
+use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use kuro_node::attrs::attr_type::list::ListLiteral;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::inspect_options::AttrInspectOptions;
@@ -51,6 +64,8 @@ use starlark::values::FrozenValueTyped;
 use starlark::values::OwnedFrozenValue;
 use starlark::values::any_complex::StarlarkAnyComplex;
 use starlark_map::small_map::SmallMap;
+
+use crate::analysis::genrule_action::GenruleAction;
 
 /// Analyze a native rule target and return the analysis result.
 pub fn analyze_native_rule(
@@ -72,12 +87,188 @@ pub fn analyze_native_rule(
         }
         NativeRuleKind::ToolchainType => create_minimal_analysis_result(target),
         NativeRuleKind::PackageGroup => create_minimal_analysis_result(target),
-        NativeRuleKind::Genrule => create_minimal_analysis_result(target),
-        NativeRuleKind::Platform => create_minimal_analysis_result(target),
+        NativeRuleKind::Genrule => analyze_genrule(target, configured_node, dep_analysis),
+        NativeRuleKind::Platform => analyze_platform(target, dep_analysis),
         NativeRuleKind::CcLibrary => create_cc_analysis_result(target),
         NativeRuleKind::CcBinary => create_cc_analysis_result(target),
         NativeRuleKind::CcTest => create_cc_analysis_result(target),
         NativeRuleKind::TestSuite => create_minimal_analysis_result(target),
+    }
+}
+
+/// Analyze a genrule target.
+///
+/// Genrules run a shell command to produce output files. This function:
+/// 1. Reads the `cmd`, `outs`, and `srcs` attributes from the target
+/// 2. Creates `BuildArtifact`s for each output file
+/// 3. Collects input `ArtifactGroup`s from source files and dep analysis
+/// 4. Registers a `GenruleAction` that executes the shell command
+/// 5. Returns `DefaultInfo` with the output artifacts
+fn analyze_genrule(
+    target: &ConfiguredTargetLabel,
+    configured_node: ConfiguredTargetNodeRef<'_>,
+    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+) -> kuro_error::Result<AnalysisResult> {
+    let target_node = configured_node.to_owned();
+    let target_ref = target_node.target_node().as_ref();
+    let pkg = target.pkg();
+
+    // Read cmd attribute
+    let cmd = if let Some(cmd_attr) = target_ref.attr_or_none("cmd", AttrInspectOptions::All) {
+        match cmd_attr.value {
+            CoercedAttr::String(s) => s.0.as_str().to_owned(),
+            _ => String::new(),
+        }
+    } else {
+        String::new()
+    };
+
+    // Read outs attribute → list of output file name strings
+    let out_names: Vec<String> =
+        if let Some(outs_attr) = target_ref.attr_or_none("outs", AttrInspectOptions::All) {
+            match outs_attr.value {
+                CoercedAttr::List(ListLiteral(items)) => items
+                    .iter()
+                    .filter_map(|item| {
+                        if let CoercedAttr::String(s) = item {
+                            Some(s.0.as_str().to_owned())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect(),
+                CoercedAttr::String(s) => vec![s.0.as_str().to_owned()],
+                _ => vec![],
+            }
+        } else {
+            vec![]
+        };
+
+    // Create a single ActionKey for this genrule (action index 0)
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+    let action_key = ActionKey::new(self_key.dupe(), ActionIndex::new(0));
+
+    // Create BuildArtifact for each output file
+    let mut output_artifacts: Vec<BuildArtifact> = Vec::with_capacity(out_names.len());
+    let heap = FrozenHeap::new();
+    let mut output_starlark: Vec<FrozenValue> = Vec::with_capacity(out_names.len());
+
+    for out_name in &out_names {
+        let path = BuildArtifactPath::new(
+            BaseDeferredKey::TargetLabel(target.dupe()),
+            ForwardRelativePathBuf::new(out_name.clone())
+                .with_buck_error_context(|| format!("Invalid genrule output path: {}", out_name))?,
+            BuckOutPathKind::Configuration,
+        );
+        let ba = BuildArtifact::new(path, action_key.dupe(), OutputType::File)?;
+        let starlark_ba = heap.alloc_simple(StarlarkArtifact::new(Artifact::from(ba.dupe())));
+        output_starlark.push(starlark_ba);
+        output_artifacts.push(ba);
+    }
+
+    // Collect input ArtifactGroups:
+    // 1) Source files from the `srcs` attr
+    // 2) DefaultInfo.default_outputs from dep_analysis entries
+    let mut inputs: Vec<ArtifactGroup> = Vec::new();
+
+    if let Some(srcs_attr) = target_ref.attr_or_none("srcs", AttrInspectOptions::All) {
+        collect_artifact_groups_from_attr(srcs_attr.value, &pkg, &mut inputs);
+    }
+
+    // Also collect from tools attr (these are executables needed by the command)
+    if let Some(tools_attr) = target_ref.attr_or_none("tools", AttrInspectOptions::All) {
+        collect_artifact_groups_from_attr(tools_attr.value, &pkg, &mut inputs);
+    }
+
+    // Add DefaultInfo outputs from dep_analysis (label deps in srcs/tools)
+    for (_dep_label, dep_result) in &dep_analysis {
+        if let Ok(providers_ref) = dep_result.providers() {
+            let collection: &FrozenProviderCollection = providers_ref.value().as_ref();
+            if let Some(default_info) = collection.builtin_provider::<FrozenDefaultInfo>() {
+                for starlark_artifact in default_info.default_outputs() {
+                    inputs.push(ArtifactGroup::Artifact(starlark_artifact.artifact()));
+                }
+            }
+        }
+    }
+
+    // Create the genrule action
+    let genrule_action = GenruleAction::new(cmd, inputs, output_artifacts);
+
+    // Register the action
+    let registered_action = Arc::new(RegisteredAction::new(
+        action_key.dupe(),
+        Box::new(genrule_action),
+        CommandExecutorConfig::testing_local(),
+    ));
+    let mut recorded_actions = RecordedActions::new(1);
+    recorded_actions.insert(action_key, registered_action);
+
+    // Build DefaultInfo with output artifacts
+    let default_info = FrozenDefaultInfo::with_outputs(&heap, output_starlark);
+
+    let providers = SmallMap::from_iter([(
+        DefaultInfoCallable::provider_id().dupe(),
+        default_info.to_frozen_value(),
+    )]);
+
+    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+        heap.alloc(FrozenProviderCollection::new(providers)),
+    )?;
+
+    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+        value: FrozenAnalysisValueStorage::new_native(
+            self_key.dupe(),
+            DYNAMIC_LAMBDA_PARAMS_STORAGES
+                .get()
+                .unwrap()
+                .new_frozen_dynamic_lambda_params_storage(),
+            Some(provider_collection),
+        ),
+    });
+
+    let heap_ref = heap.into_ref();
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
+
+    let recorded_values =
+        RecordedAnalysisValues::new_native(self_key, Some(analysis_storage), recorded_actions);
+
+    Ok(AnalysisResult::new(
+        recorded_values,
+        None,
+        HashMap::new(),
+        1, // 1 action registered
+        out_names.len() as u64,
+        None,
+    ))
+}
+
+/// Collect ArtifactGroups from a CoercedAttr that may contain source files.
+/// Source file entries become `ArtifactGroup::Artifact(SourceArtifact)`.
+/// Label deps are NOT collected here (they come from dep_analysis instead).
+fn collect_artifact_groups_from_attr(
+    attr: &CoercedAttr,
+    pkg: &kuro_core::package::PackageLabel,
+    out: &mut Vec<ArtifactGroup>,
+) {
+    match attr {
+        CoercedAttr::List(ListLiteral(items)) => {
+            for item in items.iter() {
+                collect_artifact_groups_from_attr(item, pkg, out);
+            }
+        }
+        CoercedAttr::OneOf(inner, _) => {
+            collect_artifact_groups_from_attr(inner, pkg, out);
+        }
+        CoercedAttr::SourceFile(coerced_path) => {
+            for path in coerced_path.inputs() {
+                let source_artifact = SourceArtifact::new(SourcePath::new(pkg.dupe(), path.dupe()));
+                out.push(ArtifactGroup::Artifact(Artifact::from(source_artifact)));
+            }
+        }
+        // Label deps are resolved via dep_analysis, not here
+        _ => {}
     }
 }
 
@@ -602,6 +793,106 @@ fn create_cc_analysis_result(target: &ConfiguredTargetLabel) -> kuro_error::Resu
         ),
         (CcInfoProvider::provider_id().dupe(), cc_info),
     ]);
+
+    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+        heap.alloc(FrozenProviderCollection::new(providers)),
+    )?;
+
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+
+    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+        value: FrozenAnalysisValueStorage::new_native(
+            self_key.dupe(),
+            DYNAMIC_LAMBDA_PARAMS_STORAGES
+                .get()
+                .unwrap()
+                .new_frozen_dynamic_lambda_params_storage(),
+            Some(provider_collection),
+        ),
+    });
+
+    let heap_ref = heap.into_ref();
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
+
+    let recorded_values = RecordedAnalysisValues::new_native(
+        self_key,
+        Some(analysis_storage),
+        RecordedActions::new(0),
+    );
+
+    Ok(AnalysisResult::new(
+        recorded_values,
+        None,
+        HashMap::new(),
+        0,
+        0,
+        None,
+    ))
+}
+
+/// Analyze a `platform()` target.
+///
+/// Collects `ConfigurationInfo` providers from all `constraint_values` deps and parent
+/// platform deps, merges their constraint pairs, and produces a `PlatformInfo` provider
+/// containing the platform's label and the merged configuration.
+///
+/// The `PlatformInfo` provider is what Bazel uses to resolve toolchain selection and
+/// `select()` matching against platform constraints.
+fn analyze_platform(
+    target: &ConfiguredTargetLabel,
+    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+) -> kuro_error::Result<AnalysisResult> {
+    let heap = FrozenHeap::new();
+
+    // Create DefaultInfo (empty)
+    let default_info = FrozenDefaultInfo::testing_empty(&heap);
+
+    // Collect constraint pairs from all deps.
+    // constraint_value deps expose ConfigurationInfo with their single constraint pair.
+    // parent platform deps expose PlatformInfo whose configuration also has constraint pairs.
+    let mut all_constraint_pairs = Vec::new();
+    for (_dep_label, dep_result) in &dep_analysis {
+        if let Ok(providers) = dep_result.providers() {
+            // Collect from ConfigurationInfo (provided by constraint_value and config_setting deps)
+            if let Some(config_info) = providers
+                .value()
+                .builtin_provider::<FrozenConfigurationInfo>()
+            {
+                let config_data = config_info.to_config_setting_data();
+                for (ck, cv) in config_data.constraints {
+                    all_constraint_pairs.push((ck.key.dupe(), cv.0.dupe()));
+                }
+            }
+            // Also collect from PlatformInfo (provided by parent platform deps)
+            if let Some(platform_info) = providers.value().builtin_provider::<FrozenPlatformInfo>()
+            {
+                if let Ok(config_data) = platform_info.to_configuration() {
+                    if let Ok(data) = config_data.data() {
+                        for (ck, cv) in &data.constraints {
+                            all_constraint_pairs.push((ck.key.dupe(), cv.0.dupe()));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // The platform label is the unconfigured target label string.
+    let label_str = target.unconfigured().to_string();
+
+    // Create PlatformInfo with the merged constraint configuration.
+    let platform_info =
+        FrozenPlatformInfo::for_native_platform(&label_str, &all_constraint_pairs, &heap);
+
+    let mut providers = SmallMap::from_iter([(
+        DefaultInfoCallable::provider_id().dupe(),
+        default_info.to_frozen_value(),
+    )]);
+    providers.insert(
+        FrozenPlatformInfo::builtin_provider_id().dupe(),
+        platform_info,
+    );
 
     let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
         heap.alloc(FrozenProviderCollection::new(providers)),

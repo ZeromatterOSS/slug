@@ -129,6 +129,17 @@ config_setting(
     constraint_values = [":test_macos"],
 )
 
+# Platform target for testing platform() rule with PlatformInfo provider.
+platform(
+    name = "linux_platform",
+    constraint_values = [":test_linux"],
+)
+
+platform(
+    name = "macos_platform",
+    constraint_values = [":test_macos"],
+)
+
 # Note: select() with config_setting requires a configured platform.
 # With <unspecified> platform, select() is unsupported.
 # To test select() end-to-end, add a platform() target and set it via --target-platforms.
@@ -222,4 +233,21 @@ oci_image(
 filegroup(
     name = "test_repo_usage",
     srcs = ["@my_test_repo//:empty"],
+)
+
+# =============================================================================
+# Phase 14: genrule integration test
+# =============================================================================
+genrule(
+    name = "hello_genrule",
+    srcs = ["hello.c"],
+    outs = ["hello_genrule_out.txt"],
+    cmd = "echo 'Generated from $(SRCS)' > $(OUTS)",
+)
+
+genrule(
+    name = "hello_genrule_cp",
+    srcs = ["hello.c"],
+    outs = ["hello_copy.c"],
+    cmd = "cp $< $@",
 )
