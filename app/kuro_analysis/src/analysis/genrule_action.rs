@@ -43,6 +43,8 @@ use sorted_vector_map::SortedVectorMap;
 /// This action runs a bash command to produce genrule output files.
 /// Make variables like `$(SRCS)`, `$(OUTS)`, `$@`, `$<`, `$^` are expanded
 /// at execution time using the actual artifact paths.
+/// `$(location label)`, `$(locations label)`, `$(execpath label)`, and
+/// `$(execpaths label)` are also expanded using dep artifact paths.
 #[derive(Debug, Allocative)]
 pub struct GenruleAction {
     /// The shell command template with unexpanded make variables.
@@ -51,20 +53,42 @@ pub struct GenruleAction {
     inputs: Vec<ArtifactGroup>,
     /// Output build artifacts (one per entry in genrule's `outs`).
     outputs: Vec<BuildArtifact>,
+    /// Location mappings: (normalized_label, artifacts) for $(location label) expansion.
+    /// The normalized_label is a string key used to match $(location <key>) patterns.
+    /// Each entry stores the artifact groups for the matching dependency.
+    location_mappings: Vec<(String, Vec<ArtifactGroup>)>,
 }
 
 impl GenruleAction {
-    pub fn new(cmd: String, inputs: Vec<ArtifactGroup>, outputs: Vec<BuildArtifact>) -> Self {
+    pub fn new(
+        cmd: String,
+        inputs: Vec<ArtifactGroup>,
+        outputs: Vec<BuildArtifact>,
+        location_mappings: Vec<(String, Vec<ArtifactGroup>)>,
+    ) -> Self {
         Self {
             cmd,
             inputs,
             outputs,
+            location_mappings,
         }
     }
 }
 
 /// Expand genrule make variables using resolved absolute paths.
-fn expand_genrule_cmd(cmd: &str, srcs: &[String], outs: &[String]) -> String {
+///
+/// Handles:
+/// - `$(SRCS)` / `$(OUTS)` / `$@` / `$<` / `$^` / `$(@D)` - standard Make variables
+/// - `$(location label)` - first output path of label
+/// - `$(locations label)` - space-separated output paths of label
+/// - `$(execpath label)` - alias for $(location label)
+/// - `$(execpaths label)` - alias for $(locations label)
+fn expand_genrule_cmd(
+    cmd: &str,
+    srcs: &[String],
+    outs: &[String],
+    locations: &[(String, Vec<String>)],
+) -> String {
     let srcs_str = srcs.join(" ");
     let outs_str = outs.join(" ");
     let first_out = outs.first().map(|s| s.as_str()).unwrap_or("");
@@ -95,7 +119,103 @@ fn expand_genrule_cmd(cmd: &str, srcs: &[String], outs: &[String]) -> String {
     cmd = cmd.replace("$<", first_src);
     cmd = cmd.replace("$^", &srcs_str);
 
+    // Expand $(location ...) and related patterns.
+    // We do a single-pass scan to handle all variants consistently.
+    cmd = expand_location_patterns(&cmd, locations);
+
     cmd
+}
+
+/// Expand $(location label), $(locations label), $(execpath label), $(execpaths label).
+///
+/// For each `$(location key)` pattern, looks up `key` in the `locations` mapping
+/// and replaces with the first resolved path.
+/// For `$(locations key)`, replaces with space-separated list of all paths.
+fn expand_location_patterns(cmd: &str, locations: &[(String, Vec<String>)]) -> String {
+    if locations.is_empty() || !cmd.contains("$(location") && !cmd.contains("$(execpath") {
+        return cmd.to_owned();
+    }
+
+    let mut result = String::with_capacity(cmd.len());
+    let mut remaining = cmd;
+
+    while let Some(start) = remaining.find("$(") {
+        result.push_str(&remaining[..start]);
+        let after_paren = &remaining[start + 2..]; // after "$("
+
+        // Try each keyword variant
+        let (keyword, multi) = if after_paren.starts_with("locations ") {
+            ("locations ", true)
+        } else if after_paren.starts_with("location ") {
+            ("location ", false)
+        } else if after_paren.starts_with("execpaths ") {
+            ("execpaths ", true)
+        } else if after_paren.starts_with("execpath ") {
+            ("execpath ", false)
+        } else {
+            // Not a location pattern - keep the "$(" and continue
+            result.push_str("$(");
+            remaining = &remaining[start + 2..];
+            continue;
+        };
+
+        let label_start = keyword.len();
+        let label_rest = &after_paren[label_start..];
+
+        if let Some(end) = label_rest.find(')') {
+            let label = label_rest[..end].trim();
+            let expansion = resolve_location(label, multi, locations);
+            result.push_str(&expansion);
+            // Advance past "$(" + keyword + label + ")"
+            remaining = &remaining[start + 2 + label_start + end + 1..];
+        } else {
+            // Malformed pattern — keep as-is and skip past "$("
+            result.push_str("$(");
+            remaining = &remaining[start + 2..];
+        }
+    }
+
+    result.push_str(remaining);
+    result
+}
+
+/// Resolve a label to its file path(s) from the location mappings.
+///
+/// Matches the label against each key in the mappings using:
+/// 1. Exact match
+/// 2. Target-name match (after the last ':')
+fn resolve_location(label: &str, multi: bool, locations: &[(String, Vec<String>)]) -> String {
+    // Normalize: strip leading "@" repo prefix for simple matching,
+    // or use suffix after ':'
+    let label_name = label.rsplit(':').next().unwrap_or(label);
+
+    for (key, paths) in locations {
+        // Exact match
+        if key == label {
+            return if multi {
+                paths.join(" ")
+            } else {
+                paths.first().cloned().unwrap_or_default()
+            };
+        }
+        // Name-only match (key name suffix == label name suffix)
+        let key_name = key.rsplit(':').next().unwrap_or(key.as_str());
+        if key_name == label_name {
+            return if multi {
+                paths.join(" ")
+            } else {
+                paths.first().cloned().unwrap_or_default()
+            };
+        }
+    }
+
+    // No match found — leave unexpanded (emit a warning via the original text)
+    // This is better than silently producing wrong output.
+    if multi {
+        format!("$(locations {})", label)
+    } else {
+        format!("$(location {})", label)
+    }
 }
 
 #[async_trait]
@@ -105,7 +225,16 @@ impl Action for GenruleAction {
     }
 
     fn inputs(&self) -> kuro_error::Result<Cow<'_, [ArtifactGroup]>> {
-        Ok(Cow::Borrowed(&self.inputs))
+        // Include both regular inputs and location mapping artifacts.
+        // If there are no location mappings, return a borrowed slice for efficiency.
+        if self.location_mappings.is_empty() {
+            return Ok(Cow::Borrowed(&self.inputs));
+        }
+        let mut all = self.inputs.clone();
+        for (_, ags) in &self.location_mappings {
+            all.extend_from_slice(ags);
+        }
+        Ok(Cow::Owned(all))
     }
 
     fn outputs(&self) -> Cow<'_, [BuildArtifact]> {
@@ -157,8 +286,31 @@ impl Action for GenruleAction {
             outs_abs_paths.push(abs.to_string());
         }
 
+        // Resolve location mapping artifact paths for $(location ...) expansion
+        let mut location_resolved: Vec<(String, Vec<String>)> =
+            Vec::with_capacity(self.location_mappings.len());
+        for (label_key, ags) in &self.location_mappings {
+            let mut paths: Vec<String> = Vec::new();
+            for ag in ags {
+                let values = ctx.artifact_values(ag);
+                for (artifact, value) in values.iter() {
+                    let content_hash: Option<ContentBasedPathHash> =
+                        if artifact.has_content_based_path() {
+                            Some(value.content_based_path_hash())
+                        } else {
+                            None
+                        };
+                    let proj_rel = artifact.resolve_path(ctx.fs(), content_hash.as_ref())?;
+                    let abs = ctx.fs().fs().resolve(&proj_rel);
+                    paths.push(abs.to_string());
+                }
+            }
+            location_resolved.push((label_key.clone(), paths));
+        }
+
         // Expand make variables in the command
-        let expanded_cmd = expand_genrule_cmd(&self.cmd, &srcs_abs_paths, &outs_abs_paths);
+        let expanded_cmd =
+            expand_genrule_cmd(&self.cmd, &srcs_abs_paths, &outs_abs_paths, &location_resolved);
 
         // Build CommandExecutionPaths for the action executor
         let ce_inputs: Vec<CommandExecutionInput> = self

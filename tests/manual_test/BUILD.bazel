@@ -261,6 +261,15 @@ genrule(
     cmd = "cp $< $@",
 )
 
+# Test $(location :target) and $(execpath :target) expansion in genrule cmd.
+# The cmd uses $(location :hello_genrule_cp) to reference the output of another genrule.
+genrule(
+    name = "hello_genrule_location",
+    srcs = [":hello_genrule_cp"],
+    outs = ["hello_location_out.txt"],
+    cmd = "echo 'location=$(location :hello_genrule_cp) execpath=$(execpath :hello_genrule_cp)' > $(OUTS)",
+)
+
 # =============================================================================
 # Phase 7a: sh_binary/sh_test/sh_library test
 # =============================================================================

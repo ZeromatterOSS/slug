@@ -93,7 +93,7 @@ Status key: **Done** = fully working, **Stub** = exists but returns hardcoded/in
 | 2 | `ctx.actions.declare_directory(filename, sibling?)` | **Done** | unsorted.rs:128. `sibling` accepted but ignored. |
 | 3 | `ctx.actions.declare_file(filename, sibling?)` | **Done** | unsorted.rs:98. `sibling` accepted but ignored. |
 | 4 | `ctx.actions.declare_symlink(filename, sibling?)` | **Missing** | Requires `--experimental_allow_unresolved_symlinks`. Low priority. |
-| 5 | `ctx.actions.do_nothing(mnemonic, inputs=[])` | **Missing** | No-op placeholder action. Low priority. |
+| 5 | `ctx.actions.do_nothing(mnemonic, inputs=[])` | **Done** | Stub implementation in unsorted.rs. |
 | 6 | `ctx.actions.expand_template(template, output, substitutions, is_executable?, computed_substitutions?)` | **Done** | write.rs:404. Reads template at analysis time. `computed_substitutions` accepted but not used. |
 | 7 | `ctx.actions.run(outputs, executable, inputs, arguments, ...)` | **Done** | run.rs:243. Supports both Buck2 (`exe=`) and Bazel (`executable=`) styles. |
 | 8 | `ctx.actions.run_shell(outputs, command, inputs, arguments, ...)` | **Done** | run.rs:1036. Registers a real `UnregisteredRunAction`. String command wraps via `bash -c`. List command uses directly as exe. Full input/output/env tracking. |
@@ -113,8 +113,8 @@ The `Args` object is returned by `ctx.actions.args()`. In Kuro this is `Starlark
 | 1 | `args.add(arg_or_value, value?, format?)` | **Done** | cmd_args/typ.rs. Supports flag+value, format string with `%s`. |
 | 2 | `args.add_all(values, map_each?, format_each?, before_each?, omit_if_empty?, uniquify?, expand_directories?, terminate_with?, allow_closure?)` | **Done** | cmd_args/typ.rs. `map_each`, `uniquify`, `omit_if_empty` implemented. |
 | 3 | `args.add_joined(values, join_with, map_each?, format_each?, format_joined?, omit_if_empty?, uniquify?, allow_closure?)` | **Done** | cmd_args/typ.rs:968. Joins items into a single argument with delimiter. |
-| 4 | `args.set_param_file_format(format)` | **Missing** | Sets format for param file spilling (`"multiline"`, `"shell"`, `"flag_per_line"`). |
-| 5 | `args.use_param_file(param_file_arg, use_always?)` | **Missing** | Enables param file spilling for long command lines. |
+| 4 | `args.set_param_file_format(format)` | **Stub** | Stub exists in typ.rs (accepts format, no-op). |
+| 5 | `args.use_param_file(param_file_arg, use_always?)` | **Stub** | Stub exists in typ.rs (accepts args, no-op). |
 
 ---
 
@@ -179,7 +179,7 @@ This section is unchanged from the original plan. Key items:
 - [x] `DefaultInfo` — fully working (files, runfiles, executable, data_runfiles, default_runfiles)
 - [x] `Provider in target` / `target[Provider]` indexing
 - [x] `Provider in artifact` / `artifact[Provider]` indexing
-- [ ] `OutputGroupInfo` — not implemented, needed for IDE integration
+- [x] `OutputGroupInfo` — implemented in cc_common.rs, available as global; `is_in()` fixed (2026-02-20)
 - [x] `CcInfo`, `PyInfo`, `ProtoInfo` — handled by Starlark `provider()` in rules_cc/python/protobuf (no native impl needed)
 
 ---

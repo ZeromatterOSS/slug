@@ -201,8 +201,12 @@ fn analyze_genrule(
         }
     }
 
+    // Build location mappings for $(location label) / $(execpath label) expansion.
+    // These map each referenced label to its dep's output artifacts.
+    let location_mappings = build_location_mappings(&cmd, &dep_analysis);
+
     // Create the genrule action
-    let genrule_action = GenruleAction::new(cmd, inputs, output_artifacts);
+    let genrule_action = GenruleAction::new(cmd, inputs, output_artifacts, location_mappings);
 
     // Register the action
     let registered_action = Arc::new(RegisteredAction::new(
@@ -251,6 +255,76 @@ fn analyze_genrule(
         out_names.len() as u64,
         None,
     ))
+}
+
+/// Extract all unique labels from $(location label), $(locations label),
+/// $(execpath label), and $(execpaths label) patterns in a genrule cmd.
+fn extract_location_labels(cmd: &str) -> Vec<String> {
+    let mut labels: Vec<String> = Vec::new();
+    let mut remaining = cmd;
+    while let Some(start) = remaining.find("$(") {
+        let after_paren = &remaining[start + 2..];
+        let keyword_len = if after_paren.starts_with("locations ")
+            || after_paren.starts_with("execpaths ")
+        {
+            10usize
+        } else if after_paren.starts_with("location ") || after_paren.starts_with("execpath ") {
+            9usize
+        } else {
+            remaining = &remaining[start + 2..];
+            continue;
+        };
+        let label_rest = &after_paren[keyword_len..];
+        if let Some(end) = label_rest.find(')') {
+            let label = label_rest[..end].trim().to_owned();
+            if !labels.contains(&label) {
+                labels.push(label);
+            }
+            remaining = &remaining[start + 2 + keyword_len + end + 1..];
+        } else {
+            remaining = &remaining[start + 2..];
+        }
+    }
+    labels
+}
+
+/// Build location mappings for $(location label) expansion in genrule.
+///
+/// For each label referenced by a `$(location ...)` pattern in the cmd,
+/// finds the matching dep in dep_analysis and collects its output artifacts.
+/// Returns `Vec<(label_key, Vec<ArtifactGroup>)>` for use in GenruleAction.
+fn build_location_mappings(
+    cmd: &str,
+    dep_analysis: &[(&ConfiguredTargetLabel, AnalysisResult)],
+) -> Vec<(String, Vec<ArtifactGroup>)> {
+    let labels = extract_location_labels(cmd);
+    if labels.is_empty() {
+        return Vec::new();
+    }
+    let mut mappings: Vec<(String, Vec<ArtifactGroup>)> = Vec::new();
+    for label in &labels {
+        let label_name = label.rsplit(':').next().unwrap_or(label.as_str());
+        let mut found_artifacts: Vec<ArtifactGroup> = Vec::new();
+        for (dep_label, dep_result) in dep_analysis {
+            let dep_str = dep_label.unconfigured().to_string();
+            let dep_name = dep_str.rsplit(':').next().unwrap_or(dep_str.as_str());
+            // Match on exact string (e.g. "//pkg:target") or name suffix (e.g. ":target")
+            if dep_str == *label || dep_name == label_name {
+                if let Ok(providers_ref) = dep_result.providers() {
+                    let collection: &FrozenProviderCollection = providers_ref.value().as_ref();
+                    if let Some(default_info) = collection.builtin_provider::<FrozenDefaultInfo>() {
+                        for starlark_artifact in default_info.default_outputs() {
+                            found_artifacts
+                                .push(ArtifactGroup::Artifact(starlark_artifact.artifact()));
+                        }
+                    }
+                }
+                break;
+            }
+        }
+        mappings.push((label.clone(), found_artifacts));
+    }
+    mappings
 }
 
 /// Collect ArtifactGroups from a CoercedAttr that may contain source files.

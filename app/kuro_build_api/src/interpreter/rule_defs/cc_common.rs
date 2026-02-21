@@ -3717,11 +3717,11 @@ where
         self.groups.to_value().at(key.to_value(), heap).ok()
     }
 
-    // Support 'in' operator - note: cannot use heap here, so we iterate the dict keys
+    // Support 'in' operator: `"key" in output_group_info`
+    // Delegates to the underlying groups dict.
     fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
-        // Always return true for now - proper implementation would need heap
-        // This is used for `"key" in output_group_info` checks
-        Ok(true)
+        // self.groups.to_value().is_in(other) checks "is other in groups dict"
+        self.groups.to_value().is_in(other)
     }
 
     fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {

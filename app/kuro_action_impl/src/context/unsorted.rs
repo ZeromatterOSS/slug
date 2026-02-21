@@ -314,4 +314,20 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
         let _ = this;
         Ok(eval.heap().alloc_typed(StarlarkCmdArgs::default()))
     }
+
+    /// Bazel-compatible: create a no-op placeholder action.
+    ///
+    /// `ctx.actions.do_nothing(mnemonic, inputs=[])` creates an action that
+    /// does nothing. Used in rules that conditionally produce outputs.
+    /// In Kuro, this is a stub — the mnemonic and inputs are ignored.
+    fn do_nothing<'v>(
+        this: &AnalysisActions<'v>,
+        #[starlark(require = named)] mnemonic: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        inputs: starlark::values::Value<'v>,
+    ) -> starlark::Result<starlark::values::none::NoneType> {
+        let _ = (this, mnemonic, inputs);
+        // TODO(actions): Register a real no-op action instead of being a stub.
+        Ok(starlark::values::none::NoneType)
+    }
 }
