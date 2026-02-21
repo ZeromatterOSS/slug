@@ -1112,7 +1112,9 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                 }
                 register_external_include_dir(inc_dir);
             }
-            // Also add "external/<repo>/" for direct includes
+            // Also add "external/<repo>/" for direct includes and "external/" for
+            // repo-name-prefixed includes (e.g., `#include "rules_cc/cc/..."` in
+            // rules_cc source files).
             if src_path_str.starts_with("external/") {
                 if let Some(second_slash) = src_path_str[9..].find('/') {
                     let repo_dir = &src_path_str[..9 + second_slash];
@@ -1122,6 +1124,14 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                     }
                     register_external_include_dir(repo_dir);
                 }
+                // Add the parent "external/" directory so that includes with the
+                // repo name as a prefix (e.g., `#include "rules_cc/cc/runfiles/runfiles.h"`)
+                // resolve correctly. In Bazel's execroot, the external repo name maps to
+                // the repo root, and "external/" acts as the lookup parent.
+                if seen_include_dirs.insert("external/".to_owned()) {
+                    args_vec.push(heap.alloc_str("-isystemexternal/").to_value());
+                }
+                register_external_include_dir("external/");
             }
             // Register source file's parent directory as an include path.
             // Uses -idirafter (via include_flag_for_dir) for deep paths to avoid
@@ -3097,6 +3107,19 @@ where
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct CcToolchainInfoProvider;
 
+impl CcToolchainInfoProvider {
+    /// Get the static provider ID for CcToolchainInfo.
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "CcToolchainInfo".to_owned(),
+            })
+        })
+    }
+}
+
 impl Display for CcToolchainInfoProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<provider CcToolchainInfo>")
@@ -3105,8 +3128,18 @@ impl Display for CcToolchainInfoProvider {
 
 starlark_simple_value!(CcToolchainInfoProvider);
 
+impl ProviderCallableLike for CcToolchainInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
 #[starlark_value(type = "CcToolchainInfo")]
-impl<'v> StarlarkValue<'v> for CcToolchainInfoProvider {}
+impl<'v> StarlarkValue<'v> for CcToolchainInfoProvider {
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
 
 // ============================================================================
 // CcInfo provider - C++ compilation/linking information

@@ -53,13 +53,18 @@ use starlark::values::starlark_value_as_type::StarlarkValueAsType;
 use starlark::values::structs::StructRef;
 use starlark::values::type_repr::StarlarkTypeRepr;
 
+use std::sync::Arc;
+
+use kuro_core::provider::id::ProviderId;
 use crate::analysis::anon_promises_dyn::RunAnonPromisesAccessor;
 use crate::analysis::registry::AnalysisRegistry;
 use crate::deferred::calculation::GET_PROMISED_ARTIFACT;
 use crate::interpreter::rule_defs::bazel_label::BazelLabel;
+use crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider;
 use crate::interpreter::rule_defs::fragments::ConfigurationFragments;
 use crate::interpreter::rule_defs::fragments::CppFragment;
 use crate::interpreter::rule_defs::plugins::AnalysisPlugins;
+use crate::interpreter::rule_defs::provider::ProviderLike;
 
 /// Functions to allow users to interact with the Actions registry.
 ///
@@ -1364,11 +1369,25 @@ impl std::fmt::Display for CcToolchainInfoStub {
 
 starlark::starlark_simple_value!(CcToolchainInfoStub);
 
+impl<'v> ProviderLike<'v> for CcToolchainInfoStub {
+    fn id(&self) -> &Arc<ProviderId> {
+        CcToolchainInfoProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, starlark::values::Value<'v>)> {
+        vec![]
+    }
+}
+
 #[starlark::values::starlark_value(type = "CcToolchainInfo")]
 impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
     fn get_methods() -> Option<&'static Methods> {
         static RES: MethodsStatic = MethodsStatic::new();
         RES.methods(cc_toolchain_info_stub_methods)
+    }
+
+    fn provide(&'v self, demand: &mut starlark::values::Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
     }
 
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {

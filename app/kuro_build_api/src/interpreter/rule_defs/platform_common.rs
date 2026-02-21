@@ -546,6 +546,19 @@ where
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct TemplateVariableInfoCallable;
 
+impl TemplateVariableInfoCallable {
+    /// Get the static provider ID for TemplateVariableInfo.
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "TemplateVariableInfo".to_owned(),
+            })
+        })
+    }
+}
+
 impl Display for TemplateVariableInfoCallable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<provider TemplateVariableInfo>")
@@ -553,6 +566,12 @@ impl Display for TemplateVariableInfoCallable {
 }
 
 starlark_simple_value!(TemplateVariableInfoCallable);
+
+impl ProviderCallableLike for TemplateVariableInfoCallable {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
 
 #[starlark_value(type = "TemplateVariableInfo")]
 impl<'v> StarlarkValue<'v> for TemplateVariableInfoCallable {
@@ -602,6 +621,10 @@ impl<'v> StarlarkValue<'v> for TemplateVariableInfoCallable {
             variables: template_vars,
         }))
     }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
 }
 
 /// An instance of TemplateVariableInfo with the actual variable values.
@@ -618,11 +641,25 @@ impl Display for TemplateVariableInfoInstance {
 
 starlark_simple_value!(TemplateVariableInfoInstance);
 
+impl<'v> ProviderLike<'v> for TemplateVariableInfoInstance {
+    fn id(&self) -> &Arc<ProviderId> {
+        TemplateVariableInfoCallable::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        vec![]
+    }
+}
+
 #[starlark_value(type = "TemplateVariableInfo")]
 impl<'v> StarlarkValue<'v> for TemplateVariableInfoInstance {
     fn get_methods() -> Option<&'static Methods> {
         static RES: MethodsStatic = MethodsStatic::new();
         RES.methods(template_variable_info_instance_methods)
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
     }
 }
 
