@@ -149,12 +149,16 @@ fn generate_bazel_features_version_repo() -> SyntheticRepo {
         format!("version = \"{}\"\n", KURO_BAZEL_VERSION),
     );
 
-    // BUILD.bazel - exports the .bzl file
+    // BUILD.bazel - exports the .bzl file and provides :version target for bzl_library deps
     files.insert(
         "BUILD.bazel".to_string(),
         r#"exports_files(["version.bzl"])
 
-# Note: bzl_library is from bazel_skylib, but we skip it for simplicity
+filegroup(
+    name = "version",
+    srcs = ["version.bzl"],
+    visibility = ["//visibility:public"],
+)
 "#
         .to_string(),
     );
@@ -204,10 +208,16 @@ globals = struct(
 
     files.insert("globals.bzl".to_string(), globals_content.to_string());
 
-    // BUILD.bazel - exports the .bzl file
+    // BUILD.bazel - exports the .bzl file and provides :globals target for bzl_library deps
     files.insert(
         "BUILD.bazel".to_string(),
         r#"exports_files(["globals.bzl"])
+
+filegroup(
+    name = "globals",
+    srcs = ["globals.bzl"],
+    visibility = ["//visibility:public"],
+)
 "#
         .to_string(),
     );
