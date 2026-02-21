@@ -665,6 +665,20 @@ mod rule_defs {
             is_test: false,
         })
     });
+
+    /// The Rule definition for cc_libc_top_alias.
+    /// This is a Bazel internal rule used by rules_cc to alias the libc top directory.
+    /// It's a simple stub with no extra attributes beyond name/visibility.
+    pub static CC_LIBC_TOP_ALIAS_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: constraint_setting_attributes(), // Same as constraint_setting - just name + visibility
+            rule_type: RuleType::Native(NativeRuleKind::CcLibcTopAlias),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+        })
+    });
 }
 
 /// Bazel-style visibility constants
@@ -1888,6 +1902,36 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             internals.package(),
             name,
             vec![("tests".to_owned(), coerced_tests)],
+            &extract_visibility_strings(visibility),
+            &internals.default_visibility(),
+        )?;
+
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+
+    /// Stub for Bazel's cc_libc_top_alias rule used internally by rules_cc.
+    ///
+    /// `cc_libc_top_alias` creates an alias to the libc top directory for toolchain
+    /// configuration. In practice it's a no-op stub that produces empty DefaultInfo.
+    ///
+    /// See: rules_cc/cc/BUILD for usage context.
+    fn cc_libc_top_alias<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] extra_kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let _ = extra_kwargs;
+        let internals = ModuleInternals::from_context(eval, "cc_libc_top_alias")?;
+
+        let target_node = create_native_target_node(
+            rule_defs::CC_LIBC_TOP_ALIAS_RULE.clone(),
+            internals.package(),
+            name,
+            vec![],
             &extract_visibility_strings(visibility),
             &internals.default_visibility(),
         )?;

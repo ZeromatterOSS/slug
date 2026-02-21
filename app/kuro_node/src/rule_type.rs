@@ -86,6 +86,8 @@ pub enum NativeRuleKind {
     ShTest,
     #[display("sh_library")]
     ShLibrary,
+    #[display("cc_libc_top_alias")]
+    CcLibcTopAlias,
 }
 
 impl NativeRuleKind {
@@ -109,6 +111,7 @@ impl NativeRuleKind {
             NativeRuleKind::ShBinary => "sh_binary",
             NativeRuleKind::ShTest => "sh_test",
             NativeRuleKind::ShLibrary => "sh_library",
+            NativeRuleKind::CcLibcTopAlias => "cc_libc_top_alias",
         }
     }
 }

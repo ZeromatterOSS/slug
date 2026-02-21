@@ -100,6 +100,7 @@ pub fn analyze_native_rule(
         NativeRuleKind::ShLibrary => analyze_sh_library(target, configured_node, dep_analysis),
         NativeRuleKind::ShBinary => analyze_sh_binary(target, configured_node),
         NativeRuleKind::ShTest => analyze_sh_test(target, configured_node),
+        NativeRuleKind::CcLibcTopAlias => create_minimal_analysis_result(target),
     }
 }
 

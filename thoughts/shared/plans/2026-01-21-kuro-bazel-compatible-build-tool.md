@@ -308,8 +308,8 @@ Quick reference to all phases and their locations:
 | 4b    | bzlmod - Local Dependencies      | [x] Complete                                  |
 | 4c    | bzlmod - BCR Integration         | [x] Complete                                  |
 | 4d    | bzlmod - Resolution and Lockfile | [x] Complete                                  |
-| 5     | Module Extensions                | [ ] Partial (parsing done, execution pending) |
-| 5b    | bzlmod Build Integration         | [ ] In Progress                               |
+| 5     | Module Extensions                | [x] Complete (see 02-bzlmod.md phases 5-5e)   |
+| 5b    | bzlmod Build Integration         | [x] Complete                                  |
 | 5c    | Bundle @bazel_tools Repository   | [x] Bundled (file loading blocked by APIs)    |
 
 ### Rule Primitives (Phases 6a, 6c) - [Sub-plan](./kuro-bazel-subplans/03-rule-primitives.md)
@@ -332,7 +332,7 @@ Quick reference to all phases and their locations:
 
 | Phase | Title                   | Status          |
 | ----- | ----------------------- | --------------- |
-| 7a    | Bazel Native Rules      | [~] Partial (constraint_setting/value, config_setting, platform, toolchain_type done; platform() now produces PlatformInfo) |
+| 7a    | Bazel Native Rules      | [~] Partial (constraint_setting/value, config_setting, platform, toolchain_type, cc_libc_top_alias done; platform() now produces PlatformInfo) |
 | 7b    | Bazel Global Functions  | [ ] Not Started |
 | 7c    | Bazel Top-Level Modules | [~] Partial (config module done, platform_common partial) |
 | 7d    | Buck2-Specific Removal  | [ ] Not Started |
