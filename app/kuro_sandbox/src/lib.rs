@@ -67,9 +67,10 @@ mod linux {
         unsafe {
             cmd.pre_exec(move || {
                 if let Err(e) = setup_sandbox(&output_dirs) {
-                    // Log the error but don't fail - sandbox failure shouldn't block builds
-                    // unless --sandbox_failure_is_error is set (future work)
-                    tracing::warn!("Sandbox setup failed (continuing without sandbox): {}", e);
+                    // Write error directly to stderr (tracing is not available in pre_exec).
+                    // Continue without isolation rather than blocking the build.
+                    let msg = format!("[kuro-sandbox] setup failed (continuing): {}\n", e);
+                    let _ = libc::write(2, msg.as_ptr() as *const libc::c_void, msg.len());
                 }
                 Ok(())
             });
@@ -77,7 +78,11 @@ mod linux {
     }
 
     fn setup_sandbox(output_dirs: &[PathBuf]) -> io::Result<()> {
-        // Step 1: Create new user namespace + mount namespace.
+        // Step 1: Get real UID/GID BEFORE unshare (after unshare they become 65534/nobody)
+        let uid = unsafe { libc::getuid() };
+        let gid = unsafe { libc::getgid() };
+
+        // Step 2: Create new user namespace + mount namespace.
         // CLONE_NEWUSER: allows unprivileged namespace creation; UID 0 in namespace = real UID
         // CLONE_NEWNS: creates a new mount namespace isolated from the parent
         let ret = unsafe { libc::unshare(libc::CLONE_NEWUSER | libc::CLONE_NEWNS) };
@@ -85,17 +90,13 @@ mod linux {
             return Err(io::Error::last_os_error());
         }
 
-        // Step 2: Set up UID/GID mappings for the user namespace.
-        // Map UID 0 in namespace -> our real UID; required before mounting.
-        let uid = unsafe { libc::getuid() };
-        let gid = unsafe { libc::getgid() };
-
+        // Step 3: Set up UID/GID mappings for the user namespace.
         // Must write "deny" to setgroups before writing gid_map (kernel requirement)
         std::fs::write("/proc/self/setgroups", "deny")?;
         std::fs::write("/proc/self/uid_map", format!("0 {uid} 1\n"))?;
         std::fs::write("/proc/self/gid_map", format!("0 {gid} 1\n"))?;
 
-        // Step 3: Make all inherited mounts MS_SLAVE so our mount changes
+        // Step 4: Make all inherited mounts MS_SLAVE so our mount changes
         // don't propagate back to the parent namespace.
         let root_cstr = CString::new("/").unwrap();
         let ret = unsafe {
@@ -111,7 +112,7 @@ mod linux {
             return Err(io::Error::last_os_error());
         }
 
-        // Step 4: Bind-mount root onto itself, then remount as read-only.
+        // Step 5: Bind-mount root onto itself, then remount as read-only.
         // This makes the entire filesystem read-only within this namespace.
         // Two-step: first bind-mount (to get a new mount entry), then remount rdonly.
         let ret = unsafe {
@@ -126,6 +127,7 @@ mod linux {
         if ret < 0 {
             return Err(io::Error::last_os_error());
         }
+
         let ret = unsafe {
             libc::mount(
                 root_cstr.as_ptr(),
@@ -139,7 +141,7 @@ mod linux {
             return Err(io::Error::last_os_error());
         }
 
-        // Step 5: For each output directory, create a writable bind mount on top
+        // Step 6: For each output directory, create a writable bind mount on top
         // of the read-only root. This "punches holes" for declared outputs.
         for output_dir in output_dirs {
             if !output_dir.exists() {
@@ -157,7 +159,7 @@ mod linux {
             }
         }
 
-        // Step 6: Mount a fresh tmpfs on /tmp so actions can use it as scratch space.
+        // Step 7: Mount a fresh tmpfs on /tmp so actions can use it as scratch space.
         // (Even though /tmp is already accessible, making it a fresh tmpfs ensures
         // the action can write there and doesn't see other processes' tmp files.)
         let tmp_cstr = CString::new("/tmp").unwrap();

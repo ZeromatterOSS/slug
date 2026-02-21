@@ -371,7 +371,7 @@ Quick reference to all phases and their locations:
 
 | Phase | Title                              | Status          |
 | ----- | ---------------------------------- | --------------- |
-| 16    | Local Build Isolation (Sandboxing) | [ ] Not Started |
+| 16    | Local Build Isolation (Sandboxing) | [x] Functional (Linux: user+mount namespaces, root read-only, output dirs writable, --nosandbox flag; 2026-02-20) |
 | 17    | Platform Support                   | [ ] Not Started |
 | 18    | Query Commands + Test Runner       | [x] Functional (deps, rdeps, allpaths, somepath, kind, attr, filter, buildfiles, tests; --output=label/json/build/graph; kuro test //... runs 4 tests) |
 

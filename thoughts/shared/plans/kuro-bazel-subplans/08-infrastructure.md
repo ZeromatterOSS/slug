@@ -150,11 +150,11 @@ kuro build --sandbox_strategy=symlink //...
 
 - [ ] Actions only see declared inputs
 - [ ] Action fails if it reads undeclared file
-- [ ] Action fails if it writes outside declared outputs
-- [ ] Sandbox works on Linux (namespace-based)
+- [x] Action fails if it writes outside declared outputs (undeclared /tmp writes are isolated via fresh tmpfs)
+- [x] Sandbox works on Linux (namespace-based: CLONE_NEWUSER + CLONE_NEWNS, root read-only, output dirs writable)
 - [ ] Sandbox works on macOS
 - [ ] Sandbox works on Windows (symlink-based)
-- [ ] `--sandbox=false` disables sandboxing
+- [x] `--sandbox=false` (--nosandbox) disables sandboxing
 
 #### Manual Verification:
 

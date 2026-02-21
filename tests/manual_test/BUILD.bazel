@@ -278,3 +278,16 @@ sh_library(
     name = "hello_sh_lib",
     srcs = ["hello.sh"],
 )
+
+# =============================================================================
+# Phase 16: sandbox write isolation test
+# This genrule writes outside its declared outputs. With --sandbox enabled,
+# the write to /tmp/kuro_sandbox_write_test.txt should be isolated (not visible
+# on the host filesystem after the build, because /tmp is a fresh tmpfs).
+# Without --sandbox (--nosandbox), the file IS created on the host.
+# =============================================================================
+genrule(
+    name = "sandbox_write_test",
+    outs = ["sandbox_write_out.txt"],
+    cmd = "echo 'hello' > /tmp/kuro_sandbox_write_test.txt && echo 'done' > $@",
+)
