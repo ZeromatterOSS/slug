@@ -102,6 +102,7 @@ use kuro_resource_control::CommandType;
 use kuro_resource_control::action_cgroups::ActionCgroupSession;
 use kuro_resource_control::memory_tracker::MemoryTrackerHandle;
 use kuro_resource_control::path::CgroupPathBuf;
+use kuro_sandbox::SandboxSpec;
 use kuro_util::process::background_command;
 use kuro_util::time_span::TimeSpan;
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -189,11 +190,25 @@ impl LocalExecutor {
         disable_miniperf: bool,
         cgroup: Option<CgroupPathBuf>,
         freeze_rx: impl ActionFreezeEventReceiver,
+        sandbox: Option<SandboxSpec>,
     ) -> impl futures::future::Future<Output = kuro_error::Result<CommandResult>> + Send + 'a {
         async move {
             let working_directory = self.root.join_cow(working_directory);
 
-            match &self.forkserver {
+            // When sandbox is active, bypass the forkserver and use direct process spawning.
+            // The sandbox relies on pre_exec hooks (Linux namespaces) which are only available
+            // in the direct spawn path, not via the forkserver's gRPC protocol.
+            let effective_forkserver = if sandbox.is_some() {
+                #[cfg(unix)]
+                {
+                    tracing::debug!("Sandbox enabled: bypassing forkserver to apply sandbox");
+                }
+                &ForkserverAccess::None
+            } else {
+                &self.forkserver
+            };
+
+            match effective_forkserver {
                 #[cfg(unix)]
                 ForkserverAccess::Client(forkserver) => {
                     unix::exec_via_forkserver(
@@ -223,6 +238,11 @@ impl LocalExecutor {
                         env,
                         env_inheritance,
                     );
+
+                    // Apply filesystem sandbox if requested.
+                    if let Some(sandbox_spec) = sandbox {
+                        kuro_sandbox::apply_sandbox(&mut cmd, sandbox_spec);
+                    }
 
                     let alive = liveliness_observer
                         .while_alive()
@@ -260,6 +280,7 @@ impl LocalExecutor {
         env: &[(&str, StrOrOsStr<'_>)],
         cgroup: Option<CgroupPathBuf>,
         freeze_rx: impl ActionFreezeEventReceiver,
+        sandbox: Option<SandboxSpec>,
     ) -> Result<
         (
             TimeSpan,
@@ -352,6 +373,7 @@ impl LocalExecutor {
                         request.disable_miniperf(),
                         cgroup,
                         freeze_rx,
+                        sandbox,
                     )
                     .await
                 };
@@ -381,6 +403,7 @@ impl LocalExecutor {
         args: &[String],
         worker: Option<&WorkerHandle>,
         env: &[(&str, StrOrOsStr<'_>)],
+        sandbox: Option<SandboxSpec>,
     ) -> Result<
         (
             TimeSpan,
@@ -468,6 +491,7 @@ impl LocalExecutor {
                     env,
                     cgroup_session.as_ref().map(|s| s.path.clone()),
                     freeze_rx,
+                    sandbox.clone(),
                 )
                 .await;
 
@@ -664,6 +688,30 @@ impl LocalExecutor {
             },
         };
 
+        // Build sandbox spec if sandboxing is enabled.
+        // Collect the output directories that need to be writable in the sandbox.
+        let sandbox = if self.knobs.sandbox_enabled {
+            let output_dirs: Vec<_> = request
+                .outputs()
+                .filter_map(|output| {
+                    output
+                        .resolve(
+                            &self.artifact_fs,
+                            Some(&ContentBasedPathHash::for_output_artifact()),
+                        )
+                        .ok()
+                        .and_then(|resolved| {
+                            resolved
+                                .path_to_create()
+                                .map(|p| self.artifact_fs.fs().resolve(p).as_path().to_owned())
+                        })
+                })
+                .collect();
+            Some(SandboxSpec { output_dirs })
+        } else {
+            None
+        };
+
         let (time_span, start_time, res, manager) = match self
             .exec_with_resource_control(
                 action_digest,
@@ -675,6 +723,7 @@ impl LocalExecutor {
                 args,
                 worker.as_deref(),
                 &env,
+                sandbox,
             )
             .await
         {

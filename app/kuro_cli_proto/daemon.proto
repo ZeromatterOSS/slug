@@ -436,6 +436,11 @@ message CommonBuildOptions {
   /// Materializes outputs for failed actions which ran on RE.
   bool materialize_failed_outputs = 20;
 
+  /// Enable filesystem sandboxing for local actions.
+  /// When true, actions run in a mount namespace where the filesystem is
+  /// read-only except for declared output directories.
+  optional bool sandbox_enabled = 21;
+
   // These should possibly be deleted and never become real options. Let's not
   // pollute the low ids (and then forever need a comment about them). The only
   // one of these that might stick around is print_build_report, it's unclear if

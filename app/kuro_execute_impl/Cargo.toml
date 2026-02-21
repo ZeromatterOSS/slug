@@ -37,6 +37,7 @@ allocative = { workspace = true }
 
 kuro_action_metadata_proto = { workspace = true }
 kuro_build_signals = { workspace = true }
+kuro_sandbox = { workspace = true }
 kuro_cli_proto = { workspace = true }
 kuro_common = { workspace = true }
 kuro_core = { workspace = true }

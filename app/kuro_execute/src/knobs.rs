@@ -17,6 +17,11 @@ use dupe::Dupe;
 pub struct ExecutorGlobalKnobs {
     pub enable_miniperf: bool,
 
+    /// Whether to enable filesystem sandboxing for local action execution.
+    /// When enabled, actions run in a mount namespace where the filesystem is
+    /// read-only except for declared output directories.
+    pub sandbox_enabled: bool,
+
     /// Whether to emit action keys to execution logs (thos are pretty verbose and omitted by
     /// default).
     pub log_action_keys: bool,

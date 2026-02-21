@@ -13,11 +13,13 @@ use std::cell::RefMut;
 use std::convert::Infallible;
 use std::fmt;
 use std::fmt::Formatter;
+use std::sync::Arc;
 
 use allocative::Allocative;
 use derive_more::Display;
 use dice::DiceComputations;
 use futures::FutureExt;
+use kuro_core::provider::id::ProviderId;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::ProvidersName;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
@@ -53,9 +55,6 @@ use starlark::values::starlark_value_as_type::StarlarkValueAsType;
 use starlark::values::structs::StructRef;
 use starlark::values::type_repr::StarlarkTypeRepr;
 
-use std::sync::Arc;
-
-use kuro_core::provider::id::ProviderId;
 use crate::analysis::anon_promises_dyn::RunAnonPromisesAccessor;
 use crate::analysis::registry::AnalysisRegistry;
 use crate::deferred::calculation::GET_PROMISED_ARTIFACT;

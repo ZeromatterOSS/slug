@@ -2645,8 +2645,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 }
             };
 
-        let is_compile =
-            action_name.contains("compile") && !action_name.contains("preprocess");
+        let is_compile = action_name.contains("compile") && !action_name.contains("preprocess");
         let is_static_lib = action_name.contains("static-library");
         let is_dynamic_lib = action_name.contains("dynamic-library");
         let is_link = action_name.contains("link") && !action_name.contains("compile");

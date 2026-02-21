@@ -451,6 +451,10 @@ impl<'a> ServerCommandContext<'a> {
                 .build_options
                 .as_ref()
                 .is_some_and(|opts| opts.materialize_failed_outputs),
+            sandbox_cli_override: self
+                .build_options
+                .as_ref()
+                .and_then(|opts| opts.sandbox_enabled),
             profile_event_listener: self
                 .starlark_profiling_manager
                 .profile_event_listener
@@ -561,6 +565,8 @@ struct DiceCommandUpdater<'s, 'a: 's> {
     keep_going: bool,
     materialize_failed_inputs: bool,
     materialize_failed_outputs: bool,
+    /// CLI override for sandbox: Some(true/false) from --sandbox/--nosandbox, None to use buckconfig.
+    sandbox_cli_override: Option<bool>,
     interpreter_platform: InterpreterHostPlatform,
     interpreter_architecture: InterpreterHostArchitecture,
     interpreter_xcode_version: Option<XcodeVersionInfo>,
@@ -705,11 +711,23 @@ impl DiceCommandUpdater<'_, '_> {
             })?
             .map(Duration::from_secs);
 
+        let sandbox_enabled_from_config = root_config
+            .parse::<bool>(BuckconfigKeyRef {
+                section: "sandbox",
+                property: "enabled",
+            })?
+            .unwrap_or(false);
+        // CLI flag (--sandbox/--nosandbox) overrides buckconfig setting.
+        let sandbox_enabled = self
+            .sandbox_cli_override
+            .unwrap_or(sandbox_enabled_from_config);
+
         let executor_global_knobs = ExecutorGlobalKnobs {
             enable_miniperf,
             log_action_keys,
             re_cancel_on_estimated_queue_time_exceeds,
             re_fallback_on_estimated_queue_time_exceeds,
+            sandbox_enabled,
         };
 
         let host_sharing_broker =

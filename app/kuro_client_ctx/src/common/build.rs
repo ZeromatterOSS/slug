@@ -186,6 +186,17 @@ pub struct CommonBuildOptions {
     /// Materializes outputs (if present) for failed actions which ran on RE
     #[clap(long)]
     materialize_failed_outputs: bool,
+
+    /// Enable filesystem sandboxing for local actions.
+    /// When enabled, actions run in an isolated mount namespace where the filesystem
+    /// is read-only except for declared output directories. Overrides [sandbox] enabled
+    /// in .buckconfig. Currently only supported on Linux (no-op on other platforms).
+    #[clap(long, overrides_with = "nosandbox")]
+    sandbox: bool,
+
+    /// Disable filesystem sandboxing (overrides --sandbox and [sandbox] enabled in .buckconfig).
+    #[clap(long, overrides_with = "sandbox")]
+    nosandbox: bool,
 }
 
 impl CommonBuildOptions {
@@ -254,6 +265,15 @@ impl CommonBuildOptions {
             unstable_include_package_project_relative_paths,
             unstable_include_artifact_hash_information,
             unstable_streaming_build_report_filename,
+            // If --sandbox or --nosandbox was given, send explicit override.
+            // Otherwise None means "use server config ([sandbox] enabled)".
+            sandbox_enabled: if self.sandbox {
+                Some(true)
+            } else if self.nosandbox {
+                Some(false)
+            } else {
+                None
+            },
         }
     }
 }
