@@ -139,6 +139,21 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
                 }
             }
             None | Some(BaseDeferredKey::AnonTarget(_) | BaseDeferredKey::BxlLabel(_)) => {
+                // For source files, construct a label from the source path info.
+                // This is needed so that artifact.owner.workspace_root works in rules_cc
+                // (cc_compilation_helper.bzl checks artifact.owner.workspace_root for
+                // external cell source files).
+                if let Some((package, name_str)) = this.source_path_info() {
+                    if let Ok(target_name) = TargetNameRef::new(&name_str) {
+                        let target_label = TargetLabel::new(package, target_name);
+                        let configured = target_label.configure(ConfigurationData::unbound());
+                        let providers_label =
+                            ConfiguredProvidersLabel::new(configured, ProvidersName::Default);
+                        return Ok(NoneOr::Other(StarlarkConfiguredProvidersLabel::new(
+                            providers_label,
+                        )));
+                    }
+                }
                 Ok(NoneOr::None)
             }
         }

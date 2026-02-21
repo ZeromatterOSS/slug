@@ -223,6 +223,7 @@ pub const DEPRECATION_ATTRIBUTE: InternalAttribute = InternalAttribute {
 
 /// Bazel-compatible `features` attribute.
 /// A list of feature strings to enable/disable for this target.
+/// In Bazel, `features` is configurable (supports `select()`).
 pub const FEATURES_ATTRIBUTE: InternalAttribute = InternalAttribute {
     id: AttributeId(13),
     name: "features",
@@ -233,7 +234,7 @@ pub const FEATURES_ATTRIBUTE: InternalAttribute = InternalAttribute {
             AttrType::list(AttrType::string()),
         )
     },
-    is_configurable: AttrIsConfigurable::No,
+    is_configurable: AttrIsConfigurable::Yes,
 };
 
 /// Bazel-compatible `applicable_licenses` attribute.

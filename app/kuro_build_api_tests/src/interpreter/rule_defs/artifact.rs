@@ -34,28 +34,30 @@ fn source_artifact() -> kuro_error::Result<()> {
                 assert_eq("foo/bar/baz/quz.h", a1.short_path)
                 assert_eq("h", a1.extension)
                 assert_eq(True, a1.is_source)
-                assert_eq(None, a1.owner)
+                # Bazel-compatible: source files have an owner label (the implicit
+                # source file target). owner.workspace_root is "" for main repo.
+                assert_eq("", a1.owner.workspace_root)
 
                 assert_eq("<source foo/bar/baz/file1>", repr(a2))
                 assert_eq("file1", a2.basename)
                 assert_eq("foo/bar/baz/file1", a2.short_path)
                 assert_eq("", a2.extension)
                 assert_eq(True, a2.is_source)
-                assert_eq(None, a2.owner)
+                assert_eq("", a2.owner.workspace_root)
 
                 assert_eq("<source foo/bar/baz/quz.cpp>", repr(a3))
                 assert_eq("quz.cpp", a3.basename)
                 assert_eq("foo/bar/baz/quz.cpp", a3.short_path)
                 assert_eq("cpp", a3.extension)
                 assert_eq(True, a3.is_source)
-                assert_eq(None, a3.owner)
+                assert_eq("", a3.owner.workspace_root)
 
                 assert_eq("<source foo/bar/baz/file2>", repr(a4))
                 assert_eq("file2", a4.basename)
                 assert_eq("foo/bar/baz/file2", a4.short_path)
                 assert_eq("", a4.extension)
                 assert_eq(True, a4.is_source)
-                assert_eq(None, a4.owner)
+                assert_eq("", a4.owner.workspace_root)
 
                 # Validate that attrs are setup properly
                 for a in (a1, a2, a3, a4):

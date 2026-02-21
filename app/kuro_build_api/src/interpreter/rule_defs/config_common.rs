@@ -21,8 +21,12 @@
 
 use std::fmt;
 use std::fmt::Display;
+use std::sync::Arc;
+use std::sync::OnceLock;
 
 use allocative::Allocative;
+use kuro_core::provider::id::ProviderId;
+use kuro_interpreter::types::provider::callable::ProviderCallableLike;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -30,15 +34,15 @@ use starlark::environment::MethodsStatic;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
+use starlark::values::Demand;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
-use starlark::values::dict::Dict;
-use starlark::values::none::NoneOr;
 use starlark::values::starlark_value;
-use starlark_map::small_map::SmallMap;
+
+use crate::interpreter::rule_defs::provider::ProviderLike;
 
 // ============================================================================
 // ConfigCommonModule - The main config_common namespace
@@ -72,8 +76,6 @@ impl<'v> StarlarkValue<'v> for ConfigCommonModule {
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            // Stub provider callable for feature flags - returns a callable
-            // that creates struct-like objects with the given kwargs.
             "FeatureFlagInfo" => Some(heap.alloc(FeatureFlagInfoProvider)),
             _ => None,
         }
@@ -81,40 +83,117 @@ impl<'v> StarlarkValue<'v> for ConfigCommonModule {
 }
 
 // ============================================================================
-// FeatureFlagInfoProvider - Stub provider for config_common.FeatureFlagInfo
+// FeatureFlagInfo - Provider for feature flags (config_common.FeatureFlagInfo)
 // ============================================================================
 
-/// A stub callable provider for config_common.FeatureFlagInfo.
-/// When called, returns a struct with the provided fields (e.g., value).
+/// The callable provider type for config_common.FeatureFlagInfo.
+/// When called as `config_common.FeatureFlagInfo(value = ...)`, creates a
+/// FeatureFlagInfoInstance.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct FeatureFlagInfoProvider;
 
+impl FeatureFlagInfoProvider {
+    /// Get the static provider ID for FeatureFlagInfo.
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "FeatureFlagInfo".to_owned(),
+            })
+        })
+    }
+}
+
 impl Display for FeatureFlagInfoProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "FeatureFlagInfo")
+        write!(f, "<provider FeatureFlagInfo>")
     }
 }
 
 starlark_simple_value!(FeatureFlagInfoProvider);
 
+impl ProviderCallableLike for FeatureFlagInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
 #[starlark_value(type = "FeatureFlagInfo")]
 impl<'v> StarlarkValue<'v> for FeatureFlagInfoProvider {
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+
     fn invoke(
         &self,
         _me: Value<'v>,
         args: &starlark::eval::Arguments<'v, '_>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // Create a simple struct from the kwargs.
-        // FeatureFlagInfo(value = "foo") -> struct(value = "foo")
         let heap = eval.heap();
         let kwargs = args.names_map()?;
-        let mut entries = SmallMap::new();
-        for (name, value) in kwargs.iter_hashed() {
-            let key: Value<'v> = heap.alloc(name.key().as_str());
-            entries.insert_hashed(key.get_hashed()?, *value);
+        // Extract the `value` kwarg and convert it to a string representation.
+        // FeatureFlagInfo is primarily used for string/bool/int build settings.
+        let value_str = kwargs
+            .iter()
+            .find(|(k, _)| k.as_str() == "value")
+            .map(|(_, v)| {
+                if let Some(s) = v.unpack_str() {
+                    s.to_owned()
+                } else {
+                    format!("{v}")
+                }
+            })
+            .unwrap_or_default();
+        Ok(heap.alloc(FeatureFlagInfoInstance { value: value_str }))
+    }
+}
+
+/// A FeatureFlagInfo provider instance created by `config_common.FeatureFlagInfo(value = ...)`.
+///
+/// This provider is produced by feature flag rules (like `string_flag`, `bool_flag`)
+/// and consumed by `config_setting` targets using `flag_values`.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct FeatureFlagInfoInstance {
+    value: String,
+}
+
+impl Display for FeatureFlagInfoInstance {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "FeatureFlagInfo(value=\"{}\")", self.value)
+    }
+}
+
+starlark_simple_value!(FeatureFlagInfoInstance);
+
+impl<'v> ProviderLike<'v> for FeatureFlagInfoInstance {
+    fn id(&self) -> &Arc<ProviderId> {
+        FeatureFlagInfoProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        // Items() needs Value<'v> but we only store String; return empty for now.
+        // Field access is handled via get_attr() which has a heap available.
+        vec![]
+    }
+}
+
+#[starlark_value(type = "FeatureFlagInfo")]
+impl<'v> StarlarkValue<'v> for FeatureFlagInfoInstance {
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "value" => Some(heap.alloc(self.value.clone())),
+            _ => None,
         }
-        Ok(heap.alloc(Dict::new(entries)))
+    }
+
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        attribute == "value"
     }
 }
 

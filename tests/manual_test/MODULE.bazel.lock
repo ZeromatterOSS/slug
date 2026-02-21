@@ -3,6 +3,102 @@
   "registryFileHashes": {},
   "selectedYankedVersions": {},
   "moduleExtensions": {
+    "//python/extensions:python.bzl%python": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-kN8AaZBDfC4KuowNYBwiSyBXFGQKOLqVKzrwQv9bw04=",
+        "usagesDigest": "sha256-X9zYZIRFAeE2bEfX/D0m9hcP564V3LC+2E9XM9+7xfk=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//python/dist:system_python.bzl%system_python_extension": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-aJRrfIjc79TRyDft90ijUgq6tcW/u8IflSrbELtKJUg=",
+        "usagesDigest": "sha256-8dfz5XjHIkYFbFmdTy8FMrCIxGoBtl5PEHJjgzaGoXY=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//private:extensions.bzl%version_extension": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-MI+r/Hb11CFy2VpXcMb9wifsZ4fwZDR5xYosTp8ez4E=",
+        "usagesDigest": "sha256-g7odpjyP17m4cdGeS/bn7qujCiO2P020c27ahq4kHPA=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//bazel/private:prebuilt_protoc_extension.bzl%protoc": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-DZrEIAE+pe/T4sbqefgeeIAE4bZe4EBurUhRay2OUa8=",
+        "usagesDigest": "sha256-w6YA6Qu+xga7gzwtTTHPQhJuSeGGDL3D/dPOMH1kVmg=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "@rules_bazel_integration_test//:extensions.bzl%bazel_binaries": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-p1RqA+78yiyEzpYU/3D4LeconvG7iat8bD729ZNYiZQ=",
+        "usagesDigest": "sha256-NCqYcJm5srWffkPw7hiFh3kUh20FvO1a/iXLVG7ZWwI=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//test:repositories.bzl%test_repositories_ext": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-rRskszeaWkASykbGWk9HQVduf1OTY1hB7cj3RQHFLPI=",
+        "usagesDigest": "sha256-Gdh0ac5UW2yTlMvitTWRx4usC4509cK+1nIHYZiZXuE=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "@build_bazel_apple_support//crosstool:setup.bzl%apple_cc_configure_extension": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-SKR4bWKsvuc6zZVqeM6SVVRoskvmFCOxdXvdD1ueCb8=",
+        "usagesDigest": "sha256-r/dmuXV+mxwCWEw9oUNZafk07JRVJ0SfusvNDbh0Cfs=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//python/private:internal_dev_deps.bzl%internal_dev_deps": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-ENFwfJmIVw3j1I+Gs3FJq4BKUpzJSq2cRz9bwf0luSU=",
+        "usagesDigest": "sha256-D4rsLxPgMaNIInt3407TFS2VSbkQt5ftbcYzX7VhlPs=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//python/uv:uv.bzl%uv": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-GaDFi4MtzHrJTLsz5uyKBaLorRU9GX4IOHVBlFROLck=",
+        "usagesDigest": "sha256-2/dTpAPjb5z/y3kpwcSTqPqU37IVWwhhqn8a1okXHMM=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//cc:extensions.bzl%compatibility_proxy": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-paDx7Xl9dOclbuBQsHmF7pLOiXGY+UF7PUkEN6Eub1E=",
+        "usagesDigest": "sha256-Vs5MBW3jZzR+Q6ZqnzFiiDW17MA69U5u7rgJyo5KBDg=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "@rules_ruby//ruby:extensions.bzl%ruby": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-XFkNRdefDTCYIxSkNEjMa1AhHoPCMAdfzZ8yp+BUSGo=",
+        "usagesDigest": "sha256-ozqAUnttlXPjHRMQjUHZzrBWCnS5uBsde7yDb3foZ4Y=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "@rules_java//java:extensions.bzl%toolchains": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-gINb05gMqwEH6LdERYxP/Jvl0JqwoNlCD+lsiiLZtBc=",
+        "usagesDigest": "sha256-A47YO8jMaEP/7EmhDdVcHj/+DjZt4DXBGApRmZr0ldQ=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
     "//:test_repo_ext.bzl%repo_ext": {
       "general": {
         "bzlTransitiveDigest": "sha256-zHw7iCvojoUjLvUY2czSFgfm5KDfpujM9fIcgOCw63M=",
@@ -16,6 +112,246 @@
             }
           }
         }
+      }
+    },
+    "@aspect_bazel_lib//lib:extensions.bzl%ext": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-zwHBP9zaG2PialFEY0PoASidfcFd3oEPvuNp5eTYZqY=",
+        "usagesDigest": "sha256-CGKkFC+CWvAzAlCu9jQPWaLCV/7rE7sOpYwEe3KG9Uo=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//:fake_fuchsia_sdk.bzl%fuchsia_sdk": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-R+MWEhZrq2is1KQ5Ir4X6Rfvo26M0DCo7xtx39Iqb+I=",
+        "usagesDigest": "sha256-uH91cDlKQgW8c3YLHlc3clqiW30SVD0SwWPl2cw/L6E=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//python/extensions:pip.bzl%pip": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-tvHrWsvVn+iTVyyPNRbWR7OoPE+fOwnGiPZIaRBfOZM=",
+        "usagesDigest": "sha256-0rMGLygmpJMGgkV0//vzRF7okapcYHa7nNC9chHHofk=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//host:extension.bzl%host_platform": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-PjTviMLm/yska2BJQONmL8Fp1hiRRRWfoSM5U5KEgw8=",
+        "usagesDigest": "sha256-YwUeR/VFU/IJ+kUwkIuC88Vzfg5nRqwcOM/06kB9Btw=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//apple:apple.bzl%provisioning_profile_repository_extension": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-Xrof2LvYM7ACrQ0/opK88IA0QFC0tUgd6BQ0Zphg4nE=",
+        "usagesDigest": "sha256-Z4kPrk08sfqqBcI1xTquI/+ndXDMLj49u96HwF14ntM=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//rust:extensions.bzl%rust": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-bd6xTFYaIrXbGjihpeabBE7RJBBjXrpmXUe6NswNi2Y=",
+        "usagesDigest": "sha256-Le3pdtLRvQC6XMNbxAkyDB/I2FfhQvZPwOT3J19av6A=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "@rules_rust//crate_universe:extension.bzl%crate": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-uknfUOhWSLfFySYM1zEAdUlO8MdA7D5hLOCRkKOlb9c=",
+        "usagesDigest": "sha256-cYeMaMDXMTZl57ECFt+T+IcxqixMBtLIY91iJcYmEDc=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "@rules_python//python/extensions:pip.bzl%pip": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-RU2f9osAU7ZSFhzDcaGdS/4xY/gX6QA0binK8yGaB8g=",
+        "usagesDigest": "sha256-n2hJRxQCAmD0q1bp0oalSgRebFinSWVNHInhrWPvAVg=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//swift:extensions.bzl%non_module_deps": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-1bIuotjuuOpm/+KDBhaErWtH26PaBeIoTZzyD+GS3i8=",
+        "usagesDigest": "sha256-bHzMaRCHFJ1rF9EgFiuHrZ13YA17OZoqvAmhLlpM+No=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//cc:extensions.bzl%cc_configure_extension": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-0FUn+FkUyCDgJFzuvbdye9opQVXc3XtkTQmCtDeotrQ=",
+        "usagesDigest": "sha256-l9PwyEFNC+inUkmZMjZ82zBR/V1AKjJDrKh2OenIHu4=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//java:extensions.bzl%toolchains": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-uuFvYW8NajSJz7f2LRisIC6d2zZ40vDM+l767Jtg0tc=",
+        "usagesDigest": "sha256-glqJf4Zuxhh/IpZK8HpVTVHl7xzvgzYyJT+N8bdRtK8=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "@bazel_tools//tools/android:android_extensions.bzl%remote_android_tools_extensions": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-NFqaLOJnFeWONYkSqS5+TUD5zMiqSaP5zVJ5u6AkoWc=",
+        "usagesDigest": "sha256-lO/WTxJZimqa+9thipq/6nz/60weV0H6iMFP1opUCwc=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//oci:extensions.bzl%oci": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-B3GOytY2hd731thp4DyiWVr4IO6g/1yId4XFiFfi3UU=",
+        "usagesDigest": "sha256-Tdt9pfJrfHWyqYH0bQ9mkIukE5EF/EN06F/3F2V6Z/k=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//python/extensions:config.bzl%config": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-sheRKz8gjlmpZsZNcdxiqrxTSNj0IdoeVSp/CgEbfX0=",
+        "usagesDigest": "sha256-zPJoXAQpPaJrRgBQ8QZuLuaL3t59v443JkKg2CQ1onk=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//crate_universe/private/module_extensions:cargo_bazel_bootstrap.bzl%cargo_bazel_bootstrap": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-+UKUmrrDIWrDEjFOSkx2UCyKJ+JhctUm+p744LmVeig=",
+        "usagesDigest": "sha256-9qjY1kT9Wy7/dTDY/MJ7A5yiQjKOk+Rd4mITik6Ze0s=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "@gazelle//:extensions.bzl%go_deps": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-1yXSd/zcRtbUjVLnX1yLDiMTVfwFtFyaE7qkBetrM28=",
+        "usagesDigest": "sha256-AoiTT3ZO8/9iTQdEZSJ2JFnrI4by4aTHUgVe/AzKcs8=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "@rules_jvm_external//:extensions.bzl%maven": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-7LjNDpEvpY+ybK5Rqf5E9z54WZY7yc7RN/Zm0SnvtdE=",
+        "usagesDigest": "sha256-yePJ9MlqZTZbP0PRWANC+lBMzm4UtLL7FAvgXiw3PuM=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "@rules_cc//cc:extensions.bzl%cc_configure_extension": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-XjMFk9UrjHpznGj+pfY/O73eLDks99PoP61Zn9l26uE=",
+        "usagesDigest": "sha256-MNNn3Myvn9mA8eztzjmLwin6yXXBhfJMCTbR/r+98Mc=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//apple:extensions.bzl%non_module_deps": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-h2ghWytY4W9hqs9U5Tej3+jASCe6XlJcRRB3rhyDMkQ=",
+        "usagesDigest": "sha256-2nKU2p4fGt3MkmekZr76L0LadZNmqYQNRa8Pp47n3uw=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//python/dist:python_downloads.bzl%python_headers": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-fVaesVDvo1Qr95dCkl9oaCG6EMskoWVGgBCi5KMzRj8=",
+        "usagesDigest": "sha256-DqQSXTISTyGK/xOMVXgH1LvtNCcalvSYcv18+PtpSQI=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//src/main/starlark/core/repositories:bzlmod_setup.bzl%rules_kotlin_extensions": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-3JtB8SiHoopEuE2ZGRcdlO4fqBiQnFWXIc1aMHCaHXc=",
+        "usagesDigest": "sha256-1sIq04F6NHHRIfHCqv29OnwTgbbiDbbzUWylWueoJLs=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//shell/private/extensions:sh_configure.bzl%sh_configure": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-BovvqNfope3RdnEueFMEniN+7rCkiC/dVMJAT9G5HGw=",
+        "usagesDigest": "sha256-ZZlz9/C3XlijB/xjct/rmRx5stCH0kUSNawtibSOtEk=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//java:rules_java_deps.bzl%compatibility_proxy": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-1B2fsMoo44+tR81kJmV6alldmuHOsygj2QkKJMTEf2A=",
+        "usagesDigest": "sha256-t3WOPM3I1JIyJojOZtrzebGiMDuE9xnc/nBDBevFL7U=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//toolchains/rpm:rpmbuild_configure.bzl%find_system_rpmbuild_bzlmod": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-s1OfklXDU3tgjyBYA4Mlz7aB09vqWwJnUtu9IO3SKck=",
+        "usagesDigest": "sha256-lcnmjo7Mn7oW29mqB0EedhD/Gpq5/OsVf67Jce/Uuco=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "@rules_foreign_cc//foreign_cc:extensions.bzl%ext": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-FuK3QoyS+c3+0b6TewDZnEppwSqdSiw9EKYv9cxAgfs=",
+        "usagesDigest": "sha256-J2u8IicI2wuPbzPm0TVR6TDW95kqhMsk+l2KtINIyc4=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//crosstool:setup.bzl%apple_cc_configure_extension": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-/P2Piib/TNYdvXvVzaQQ0Bu2F6TvvTV/YqPN4L9ioCw=",
+        "usagesDigest": "sha256-GvjaWfx/+XjtbWNa7bI3+h+U0zEeR56hZ2cN+aMsIEU=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//rust/private:extensions.bzl%i": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-HYiVPzhOTkiOEyyje6ZTHp5486eOdFV0nJ42L/2osf4=",
+        "usagesDigest": "sha256-nbTltwQzq6NNXv6+np5q5CuJW7BEryvo1n+Cd4Vbeig=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//fuzzing/private:extensions.bzl%non_module_dependencies": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-z5Z4smHu9iwTix9RFL4ivBcn3u/Vf8RK/AJ/s2z90qk=",
+        "usagesDigest": "sha256-GFlaHgyTf2VTjxXkLVJQ24+g0u6lXGTt9DmaFLYnwzU=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    "//:internal_configure.bzl%internal_configure_extension": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-NXuAOCb5qtM4TlA9au++ukEmEUceU/UEDYRXUrCIRjg=",
+        "usagesDigest": "sha256-/1XyXkZMiBkWDO3EU6haPSRfkaCZ9954ifPcijvgHTI=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
+      }
+    },
+    ":extensions.bzl%maven": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-2Mjx31IQSBTwRxM4FFWLBHiY8gAX25pH+C/z9cwpA58=",
+        "usagesDigest": "sha256-r1369FurZCGsrPj+kLaL5y5Yn4j8GSzeTqAbiPz2d7A=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {}
       }
     }
   },
