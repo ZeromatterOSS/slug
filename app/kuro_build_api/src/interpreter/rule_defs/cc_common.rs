@@ -261,7 +261,7 @@ where
 #[repr(C)]
 pub struct CcToolchainVariablesGen<V: ValueLifetimeless> {
     /// The original variables dict
-    vars: V,
+    pub(crate) vars: V,
 }
 
 starlark_complex_value!(pub CcToolchainVariables);
@@ -1345,15 +1345,32 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(default = NoneType)] second_override: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // For now, return the last non-None variables (last one wins)
-        // TODO(cc_common): Implement proper merging of variables
-        if !second_override.is_none() {
-            Ok(second_override)
-        } else if !first_override.is_none() {
-            Ok(first_override)
-        } else {
-            Ok(base)
+        let heap = eval.heap();
+        let mut merged: SmallMap<Value<'v>, Value<'v>> = SmallMap::new();
+
+        // Merge all variable dicts: base + first_override + second_override (later values override)
+        for vars_val in [base, first_override, second_override] {
+            if vars_val.is_none() {
+                continue;
+            }
+            // Try to downcast to CcToolchainVariables and iterate its inner dict
+            if let Some(cv) = vars_val.downcast_ref::<CcToolchainVariablesGen<Value<'v>>>() {
+                let inner = cv.vars;
+                if !inner.is_none() {
+                    if let Some(dict_ref) = DictRef::from_value(inner) {
+                        for (k, v) in dict_ref.iter() {
+                            if let Ok(hashed) = k.get_hashed() {
+                                merged.insert_hashed(hashed, v);
+                            }
+                        }
+                    }
+                }
+            }
+            // If it's not a CcToolchainVariables (e.g., empty depset from _build_variables), skip
         }
+
+        let merged_dict = heap.alloc(Dict::new(merged));
+        Ok(heap.alloc(CcToolchainVariablesGen { vars: merged_dict }))
     }
 
     /// Gets the rule context from an actions object.
@@ -2596,8 +2613,224 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] variables: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // TODO(cc_common): Generate actual command line from feature config
-        Ok(eval.heap().alloc(AllocList::EMPTY))
+        let heap = eval.heap();
+        let mut args: Vec<Value<'v>> = Vec::new();
+
+        // Helper to get a variable value from CcToolchainVariables or dict
+        let get_var = |key: &str| -> Option<Value<'v>> {
+            if let Ok(Some(v)) = variables.get_attr(key, heap) {
+                return Some(v);
+            }
+            if let Some(dict_ref) = DictRef::from_value(variables) {
+                return dict_ref.get_str(key);
+            }
+            None
+        };
+
+        // Helper to iterate a value that may be a depset or list
+        let iterate_value =
+            |val: Value<'v>, eval_ref: &mut Evaluator<'v, '_, '_>| -> Vec<Value<'v>> {
+                let h = eval_ref.heap();
+                if let Ok(Some(to_list_method)) = val.get_attr("to_list", h) {
+                    if let Ok(list_val) = eval_ref.eval_function(to_list_method, &[], &[]) {
+                        if let Ok(iter) = list_val.iterate(h) {
+                            return iter.collect();
+                        }
+                    }
+                }
+                if let Ok(iter) = val.iterate(h) {
+                    iter.collect()
+                } else {
+                    Vec::new()
+                }
+            };
+
+        let is_compile =
+            action_name.contains("compile") && !action_name.contains("preprocess");
+        let is_static_lib = action_name.contains("static-library");
+        let is_dynamic_lib = action_name.contains("dynamic-library");
+        let is_link = action_name.contains("link") && !action_name.contains("compile");
+
+        // Helper to get string from a value (string or File with .path)
+        let get_str_val = |v: Value<'v>| -> Option<String> {
+            if let Some(s) = v.unpack_str() {
+                return Some(s.to_owned());
+            }
+            if let Ok(Some(path_val)) = v.get_attr("path", heap) {
+                if let Some(path_str) = path_val.unpack_str() {
+                    return Some(path_str.to_owned());
+                }
+            }
+            None
+        };
+
+        // --- Link/Archive actions ---
+        if is_link {
+            // Get the output path (used for -o or rcs)
+            let output_path = get_var("output_execpath").and_then(|v| get_str_val(v));
+
+            if is_static_lib {
+                // ar archiver: rcs <output> (object files added separately by Starlark code)
+                args.push(heap.alloc_str("rcs").to_value());
+                if let Some(ref path) = output_path {
+                    args.push(heap.alloc_str(path).to_value());
+                }
+            } else if is_dynamic_lib {
+                args.push(heap.alloc_str("-shared").to_value());
+                args.push(heap.alloc_str("-fPIC").to_value());
+                if let Some(ref path) = output_path {
+                    args.push(heap.alloc_str("-o").to_value());
+                    args.push(heap.alloc_str(path).to_value());
+                }
+            } else {
+                // Executable link
+                if let Some(ref path) = output_path {
+                    args.push(heap.alloc_str("-o").to_value());
+                    args.push(heap.alloc_str(path).to_value());
+                }
+            }
+
+            // User link flags
+            if let Some(user_flags) = get_var("user_link_flags") {
+                if !user_flags.is_none() {
+                    for flag in iterate_value(user_flags, eval) {
+                        if let Some(s) = flag.unpack_str() {
+                            if !s.is_empty() {
+                                args.push(heap.alloc_str(s).to_value());
+                            }
+                        }
+                    }
+                }
+            }
+
+            return Ok(heap.alloc(args));
+        }
+
+        // --- Compile actions below ---
+
+        // -fPIC if pic variable is set
+        if get_var("pic").is_some() {
+            args.push(heap.alloc_str("-fPIC").to_value());
+        }
+
+        // -c flag for compile (not link) actions
+        if is_compile {
+            args.push(heap.alloc_str("-c").to_value());
+        }
+
+        // Source file
+        if let Some(source) = get_var("source_file") {
+            if !source.is_none() {
+                if let Some(s) = source.unpack_str() {
+                    args.push(heap.alloc_str(s).to_value());
+                } else if let Ok(Some(path_val)) = source.get_attr("path", heap) {
+                    if let Some(path_str) = path_val.unpack_str() {
+                        args.push(heap.alloc_str(path_str).to_value());
+                    } else {
+                        args.push(path_val);
+                    }
+                } else {
+                    args.push(source);
+                }
+            }
+        }
+
+        // Output file: -o <output>
+        if let Some(output) = get_var("output_file") {
+            if !output.is_none() {
+                args.push(heap.alloc_str("-o").to_value());
+                if let Some(s) = output.unpack_str() {
+                    args.push(heap.alloc_str(s).to_value());
+                } else if let Ok(Some(path_val)) = output.get_attr("path", heap) {
+                    if let Some(path_str) = path_val.unpack_str() {
+                        args.push(heap.alloc_str(path_str).to_value());
+                    } else {
+                        args.push(path_val);
+                    }
+                } else {
+                    args.push(output);
+                }
+            }
+        }
+
+        // User compile flags
+        if let Some(user_flags) = get_var("user_compile_flags") {
+            if !user_flags.is_none() {
+                for flag in iterate_value(user_flags, eval) {
+                    if let Some(s) = flag.unpack_str() {
+                        if !s.is_empty() {
+                            args.push(heap.alloc_str(s).to_value());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Include paths: -I<path>
+        if let Some(includes) = get_var("include_paths") {
+            if !includes.is_none() {
+                for inc in iterate_value(includes, eval) {
+                    if let Some(s) = inc.unpack_str() {
+                        if !s.is_empty() {
+                            args.push(heap.alloc_str(&format!("-I{}", s)).to_value());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Quote include paths: -iquote <path>
+        if let Some(quote_includes) = get_var("quote_include_paths") {
+            if !quote_includes.is_none() {
+                for inc in iterate_value(quote_includes, eval) {
+                    if let Some(s) = inc.unpack_str() {
+                        if !s.is_empty() {
+                            args.push(heap.alloc_str("-iquote").to_value());
+                            args.push(heap.alloc_str(s).to_value());
+                        }
+                    }
+                }
+            }
+        }
+
+        // System include paths: -isystem<path>
+        if let Some(system_includes) = get_var("system_include_paths") {
+            if !system_includes.is_none() {
+                for inc in iterate_value(system_includes, eval) {
+                    if let Some(s) = inc.unpack_str() {
+                        if !s.is_empty() {
+                            args.push(heap.alloc_str(&format!("-isystem{}", s)).to_value());
+                        }
+                    }
+                }
+            }
+        }
+
+        // External include paths (treated as system includes)
+        if let Some(ext_includes) = get_var("external_include_paths") {
+            if !ext_includes.is_none() {
+                for inc in iterate_value(ext_includes, eval) {
+                    if let Some(s) = inc.unpack_str() {
+                        if !s.is_empty() {
+                            args.push(heap.alloc_str(&format!("-isystem{}", s)).to_value());
+                        }
+                    }
+                }
+            }
+        }
+
+        // Preprocessor defines: -D<define>
+        if let Some(defines) = get_var("preprocessor_defines") {
+            if !defines.is_none() {
+                for def in iterate_value(defines, eval) {
+                    if let Some(s) = def.unpack_str() {
+                        args.push(heap.alloc_str(&format!("-D{}", s)).to_value());
+                    }
+                }
+            }
+        }
+
+        Ok(heap.alloc(args))
     }
 
     /// Gets environment variables for an action.
