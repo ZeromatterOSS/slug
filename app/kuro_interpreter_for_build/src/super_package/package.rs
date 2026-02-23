@@ -11,6 +11,7 @@
 use kuro_core::cells::CellAliasResolver;
 use kuro_core::cells::CellResolver;
 use kuro_core::cells::name::CellName;
+use kuro_core::package::PackageLabel;
 use kuro_core::pattern::pattern::ParsedPattern;
 use kuro_node::visibility::VisibilityPattern;
 use kuro_node::visibility::VisibilitySpecification;
@@ -41,6 +42,7 @@ fn parse_visibility(
     cell_name: CellName,
     cell_resolver: &CellResolver,
     cell_alias_resolver: &CellAliasResolver,
+    current_package: Option<&PackageLabel>,
 ) -> kuro_error::Result<VisibilitySpecification> {
     let mut builder = VisibilityWithinViewBuilder::with_capacity(patterns.len());
     for pattern in patterns {
@@ -50,21 +52,73 @@ fn parse_visibility(
         } else if pattern == BAZEL_VISIBILITY_PRIVATE {
             // //visibility:private means no visibility - skip this entry
             continue;
-        } else if pattern.contains("__subpackages__") || pattern.contains("__pkg__") {
-            // TODO(bazel-compat): Implement proper Bazel subpackages/pkg visibility.
-            // For now, treat these as public visibility.
-            builder.add_public();
-        } else if pattern.starts_with(':') {
-            // Relative pattern like ":package_group_name" - skip for now.
-            // TODO(bazel-compat): Resolve package_group references in visibility.
-            builder.add_public();
         } else {
-            builder.add(VisibilityPattern(ParsedPattern::parse_precise(
-                pattern,
+            // Normalize special Bazel visibility patterns before parsing:
+            //   :__pkg__          -> //current/pkg: (matches all targets in current package)
+            //   :__subpackages__  -> //current/pkg/... (current pkg + subpackages)
+            //   //pkg:__pkg__     -> //pkg: (matches all targets in exact package)
+            //   //pkg:__subpackages__ -> //pkg/... (recursive)
+            //   :group_name       -> treat as public (package_group lookup not implemented)
+            let normalized: Option<String> = if pattern == ":__pkg__" {
+                // Relative pattern - requires current package context
+                // :__pkg__ -> //pkg: (all targets in current package, same cell)
+                current_package.map(|pkg| {
+                    let cell_path = pkg.as_cell_path();
+                    format!("//{}:", cell_path.path())
+                })
+            } else if pattern == ":__subpackages__" {
+                // Relative pattern - requires current package context
+                // :__subpackages__ -> //pkg/... (current pkg + subpackages, same cell)
+                current_package.map(|pkg| {
+                    let cell_path = pkg.as_cell_path();
+                    let path = cell_path.path();
+                    if path.is_empty() {
+                        "//...".to_owned()
+                    } else {
+                        format!("//{}/...", path)
+                    }
+                })
+            } else if pattern.starts_with(':') {
+                // Relative package_group reference (":group_name") - treat as public
+                // since we'd need to resolve the package_group target to check membership.
+                builder.add_public();
+                continue;
+            } else if pattern.ends_with(":__pkg__") {
+                // //some/pkg:__pkg__ -> //some/pkg: (all targets in that exact package)
+                Some(pattern.trim_end_matches("__pkg__").to_owned())
+            } else if pattern.ends_with(":__subpackages__") {
+                // //some/pkg:__subpackages__ -> //some/pkg/... (recursive)
+                let base = pattern.trim_end_matches(":__subpackages__");
+                Some(format!("{}/...", base))
+            } else {
+                Some(pattern.clone())
+            };
+
+            let normalized = match normalized {
+                Some(n) => n,
+                None => {
+                    // Relative pattern without package context - treat as public
+                    builder.add_public();
+                    continue;
+                }
+            };
+
+            // Tolerate unresolvable visibility entries (e.g., unknown cell aliases,
+            // package_group refs). Being more permissive is safe.
+            match ParsedPattern::parse_precise(
+                &normalized,
                 cell_name,
                 cell_resolver,
                 cell_alias_resolver,
-            )?));
+            ) {
+                Ok(parsed) => {
+                    builder.add(VisibilityPattern(parsed));
+                }
+                Err(_) => {
+                    // Skip entries that can't be resolved
+                    continue;
+                }
+            }
         }
     }
     Ok(builder.build_visibility())
@@ -124,11 +178,16 @@ pub(crate) fn register_package_function(globals: &mut GlobalsBuilder) {
             return Ok(NoneType);
         }
         if !visibility.items.is_empty() {
+            let current_package = build_context
+                .base_path()
+                .ok()
+                .and_then(|p| PackageLabel::from_cell_path(p.as_ref()).ok());
             let vis = parse_visibility(
                 &visibility.items,
                 build_context.cell_info().name().name(),
                 build_context.cell_info().cell_resolver(),
                 build_context.cell_info().cell_alias_resolver(),
+                current_package.as_ref(),
             )?;
             if let Ok(internals) =
                 crate::interpreter::module_internals::ModuleInternals::from_context(
@@ -191,11 +250,16 @@ pub(crate) fn register_package_function(globals: &mut GlobalsBuilder) {
         match build_context.additional.require_package_file("package") {
             Ok(package_file_eval_ctx) => {
                 // PACKAGE file context - use Buck2 semantics
+                let current_package = build_context
+                    .base_path()
+                    .ok()
+                    .and_then(|p| PackageLabel::from_cell_path(p.as_ref()).ok());
                 let visibility = parse_visibility(
                     &visibility.items,
                     build_context.cell_info().name().name(),
                     build_context.cell_info().cell_resolver(),
                     build_context.cell_info().cell_alias_resolver(),
+                    current_package.as_ref(),
                 )?;
                 let within_view = parse_within_view(
                     &within_view.items,
@@ -221,11 +285,16 @@ pub(crate) fn register_package_function(globals: &mut GlobalsBuilder) {
                 // BUILD file context - use Bazel semantics
                 // Set the default visibility if specified
                 if !default_visibility.items.is_empty() {
+                    let current_package = build_context
+                        .base_path()
+                        .ok()
+                        .and_then(|p| PackageLabel::from_cell_path(p.as_ref()).ok());
                     let visibility = parse_visibility(
                         &default_visibility.items,
                         build_context.cell_info().name().name(),
                         build_context.cell_info().cell_resolver(),
                         build_context.cell_info().cell_alias_resolver(),
+                        current_package.as_ref(),
                     )?;
                     // Get the ModuleInternals to set the BUILD file's default visibility
                     if let Ok(internals) =

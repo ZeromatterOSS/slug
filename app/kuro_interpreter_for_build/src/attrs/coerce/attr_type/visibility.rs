@@ -94,9 +94,30 @@ pub(crate) fn parse_visibility_with_view(
         } else if item == ":__pkg__" || item == ":__subpackages__" {
             // Relative Bazel visibility patterns (without //pkg prefix).
             // :__pkg__ = current package only, :__subpackages__ = current package + subpackages.
-            // TODO(bazel-compat): Implement proper scoped visibility.
-            // For now, treat as public to unblock builds.
-            builder.add_public();
+            // Resolve the current package by coercing a dummy label in the same package.
+            let normalized_opt = ctx.coerce_providers_label(":__v__").ok().map(|dummy| {
+                let pkg = dummy.target().pkg();
+                let cell_path = pkg.as_cell_path();
+                let path_str = cell_path.path().as_str();
+                if item == ":__pkg__" {
+                    // :__pkg__ -> //pkg: (all targets in exact package)
+                    format!("//{}:", path_str)
+                } else {
+                    // :__subpackages__ -> //pkg/... (recursive)
+                    if path_str.is_empty() {
+                        "//...".to_owned()
+                    } else {
+                        format!("//{}/...", path_str)
+                    }
+                }
+            });
+            match normalized_opt {
+                Some(normalized) => match ctx.coerce_target_pattern(&normalized) {
+                    Ok(pattern) => builder.add(VisibilityPattern(pattern)),
+                    Err(_) => builder.add_public(),
+                },
+                None => builder.add_public(),
+            }
         } else {
             // Handle Bazel's special package patterns:
             // - //pkg:__pkg__ means only that exact package can see this target
