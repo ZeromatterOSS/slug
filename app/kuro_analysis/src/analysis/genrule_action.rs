@@ -309,8 +309,12 @@ impl Action for GenruleAction {
         }
 
         // Expand make variables in the command
-        let expanded_cmd =
-            expand_genrule_cmd(&self.cmd, &srcs_abs_paths, &outs_abs_paths, &location_resolved);
+        let expanded_cmd = expand_genrule_cmd(
+            &self.cmd,
+            &srcs_abs_paths,
+            &outs_abs_paths,
+            &location_resolved,
+        );
 
         // Build CommandExecutionPaths for the action executor
         let ce_inputs: Vec<CommandExecutionInput> = self

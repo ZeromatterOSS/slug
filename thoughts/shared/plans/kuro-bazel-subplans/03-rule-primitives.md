@@ -359,13 +359,13 @@ These are needed to move from synthetic repos to actual `repository_rule()` exec
 - [x] `Provider in target/artifact` and `target[Provider]` indexing work (implemented)
 - [x] `ctx.runfiles()` collects runfiles (implemented)
 - [x] `depset()` global function works (implemented)
-- [ ] `ctx.actions.run_shell()` registers and executes real shell actions
-- [ ] `ctx.expand_location()` resolves `$(location ...)` templates
-- [ ] `args.add_joined()` joins items with delimiter
-- [ ] `args.use_param_file()` / `set_param_file_format()` support param files
-- [ ] `ctx.info_file` / `ctx.version_file` return real File objects
-- [ ] `ctx.features` / `ctx.disabled_features` read from rule attributes
-- [ ] `ctx.package_relative_label()` resolves strings to Labels
+- [x] `ctx.actions.run_shell()` registers and executes real shell actions (implemented, handles string and list `command` params, Bazel `arguments` $0/$1/... behavior)
+- [x] `ctx.expand_location()` resolves `$(location ...)` templates (implemented in context.rs)
+- [x] `args.add_joined()` joins items with delimiter (implemented in cmd_args/typ.rs, 1-arg and 2-arg forms)
+- [x] `args.use_param_file()` / `set_param_file_format()` support param files (implemented in cmd_args/typ.rs)
+- [x] `ctx.info_file` / `ctx.version_file` return path strings as stubs (sufficient for rules_rust build stamping)
+- [x] `ctx.features` / `ctx.disabled_features` read from rule `features` attribute (implemented in context.rs)
+- [x] `ctx.package_relative_label()` resolves strings to Labels (implemented in context.rs)
 
 #### Phase 6c — Automated Verification:
 
@@ -388,7 +388,7 @@ These are needed to move from synthetic repos to actual `repository_rule()` exec
 - [x] rules_rust rust_library/rust_binary build successfully (verified)
 - [x] rules_python py_library/py_binary/py_test build successfully (verified)
 - [x] protobuf proto_library + cc_proto_library build successfully (verified)
-- [ ] rules_oci oci_image builds (requires run_shell + repository_ctx)
+- [x] rules_oci oci_image builds — **verified 2026-02-19**: `kuro build //:hello_bin_image` works end-to-end
 - [x] rules_pkg pkg_tar builds (pkg_tar works 2026-02-19)
 
 ---

@@ -264,16 +264,15 @@ fn extract_location_labels(cmd: &str) -> Vec<String> {
     let mut remaining = cmd;
     while let Some(start) = remaining.find("$(") {
         let after_paren = &remaining[start + 2..];
-        let keyword_len = if after_paren.starts_with("locations ")
-            || after_paren.starts_with("execpaths ")
-        {
-            10usize
-        } else if after_paren.starts_with("location ") || after_paren.starts_with("execpath ") {
-            9usize
-        } else {
-            remaining = &remaining[start + 2..];
-            continue;
-        };
+        let keyword_len =
+            if after_paren.starts_with("locations ") || after_paren.starts_with("execpaths ") {
+                10usize
+            } else if after_paren.starts_with("location ") || after_paren.starts_with("execpath ") {
+                9usize
+            } else {
+                remaining = &remaining[start + 2..];
+                continue;
+            };
         let label_rest = &after_paren[keyword_len..];
         if let Some(end) = label_rest.find(')') {
             let label = label_rest[..end].trim().to_owned();
