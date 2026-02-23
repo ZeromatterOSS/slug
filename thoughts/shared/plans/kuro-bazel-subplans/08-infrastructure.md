@@ -148,8 +148,8 @@ kuro build --sandbox_strategy=symlink //...
 
 #### Automated Verification:
 
-- [ ] Actions only see declared inputs
-- [ ] Action fails if it reads undeclared file
+- [x] Actions only see declared inputs (buck-out input isolation via staging dir + bind mounts; 2026-02-23)
+- [ ] Action fails if it reads undeclared file (infrastructure in place; needs manual verification)
 - [x] Action fails if it writes outside declared outputs (undeclared /tmp writes are isolated via fresh tmpfs)
 - [x] Sandbox works on Linux (namespace-based: CLONE_NEWUSER + CLONE_NEWNS, root read-only, output dirs writable)
 - [ ] Sandbox works on macOS

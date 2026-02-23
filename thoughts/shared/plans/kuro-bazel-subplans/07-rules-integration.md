@@ -550,11 +550,11 @@ use_repo(pip, "pip")
 
 #### Automated Verification:
 
-- [ ] `kuro build //:hello_py_lib` analyzes py_library via Starlark rules
-- [ ] `kuro build //:hello_py_bin` creates executable Python binary
-- [ ] `kuro run //:hello_py_bin` executes Python
-- [ ] `kuro test //:hello_py_test` runs test
-- [ ] `enable_pystar = True` path works (NOT native.py_library fallback)
+- [x] `kuro build //:hello_py_lib` analyzes py_library via Starlark rules
+- [x] `kuro build //:hello_py_bin` creates executable Python binary
+- [x] `kuro run //:hello_py_bin` executes Python (prints "Hello, Kuro!")
+- [x] `kuro test //:hello_py_test` runs test (2 tests passed)
+- [x] `enable_pystar = True` path works (NOT native.py_library fallback)
 
 #### Manual Verification:
 

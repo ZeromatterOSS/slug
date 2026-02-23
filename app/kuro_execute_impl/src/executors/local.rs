@@ -78,6 +78,7 @@ use kuro_execute::execute::request::CommandExecutionOutput;
 use kuro_execute::execute::request::CommandExecutionOutputRef;
 use kuro_execute::execute::request::CommandExecutionRequest;
 use kuro_execute::execute::request::ExecutorPreference;
+use kuro_execute::execute::request::ParamFileFormat;
 use kuro_execute::execute::result::CommandExecutionMetadata;
 use kuro_execute::execute::result::CommandExecutionResult;
 use kuro_execute::knobs::ExecutorGlobalKnobs;
@@ -708,20 +709,109 @@ impl LocalExecutor {
                 })
                 .collect();
 
-            // TODO(sandbox-input-isolation): Implement buck-out input isolation.
-            // The approach requires a full exec-root strategy (like Bazel's) where:
-            // - Declared inputs are symlinked into a sandbox exec root
-            // - Outputs are written to the exec root and then moved to real buck-out
-            // Currently, only output isolation is implemented (write-only restriction).
-            // Input files field is provided for future use when isolation is enabled.
+            // Collect declared inputs from buck-out for input isolation.
+            // This restricts actions to only see declared build artifacts in buck-out,
+            // catching undeclared dependency reads (e.g., accidentally reading a sibling
+            // action's output that wasn't declared as a dep).
+            //
+            // Source files (in the project root) remain accessible via the real filesystem.
+            // Only files under buck-out are subject to input isolation.
+            let buck_out_root_abs = self
+                .artifact_fs
+                .fs()
+                .resolve(self.artifact_fs.buck_out_path_resolver().root())
+                .as_path()
+                .to_owned();
+
+            let mut input_files = Vec::new();
+            for input in request.inputs() {
+                if let CommandExecutionInput::Artifact(group) = input {
+                    for (artifact, _value) in group.iter() {
+                        if let Ok(rel_path) = artifact
+                            .resolve_configuration_hash_path(&self.artifact_fs)
+                        {
+                            let abs = self
+                                .artifact_fs
+                                .fs()
+                                .resolve(&rel_path)
+                                .as_path()
+                                .to_owned();
+                            if abs.starts_with(&buck_out_root_abs) {
+                                input_files.push(abs);
+                            }
+                        }
+                    }
+                }
+            }
+
             Some(SandboxSpec {
                 output_dirs,
-                input_files: Vec::new(),
-                buck_out_root: None,
+                input_files,
+                buck_out_root: Some(buck_out_root_abs),
             })
         } else {
             None
         };
+
+        // Optionally write args to a param file and replace command line.
+        // This supports Bazel's args.use_param_file() for very long argument lists.
+        let param_args_replaced: Option<Vec<String>> = if let Some(pf) = request.param_file() {
+            let exe_len = request.exe().len();
+            let param_args = &args[exe_len..];
+            let needs_param_file = pf.use_always || {
+                let total: usize = param_args.iter().map(|s| s.len() + 1).sum();
+                total > 32768
+            };
+            if needs_param_file {
+                let param_dir = scratch_path
+                    .0
+                    .as_ref()
+                    .map(|sp| self.artifact_fs.fs().resolve(sp).as_path().to_owned())
+                    .unwrap_or_else(std::env::temp_dir);
+                let param_path = param_dir.join("kuro-params");
+
+                let content = match pf.format {
+                    ParamFileFormat::Shell => param_args
+                        .iter()
+                        .map(|s| {
+                            // Simple shell quoting: wrap in single quotes, escape internal '
+                            let mut q = String::from("'");
+                            q.push_str(&s.replace('\'', "'\\''"));
+                            q.push('\'');
+                            q
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                    ParamFileFormat::Multiline | ParamFileFormat::FlagPerLine => {
+                        param_args.join("\n")
+                    }
+                };
+
+                match std::fs::write(&param_path, content) {
+                    Ok(()) => {
+                        let param_file_arg = pf
+                            .param_file_arg
+                            .replace("%s", &param_path.to_string_lossy());
+                        let mut new_args: Vec<String> = args[..exe_len].to_vec();
+                        new_args.push(param_file_arg);
+                        Some(new_args)
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to write param file {}: {}; using full args",
+                            param_path.display(),
+                            e
+                        );
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let effective_args: &[String] = param_args_replaced.as_deref().unwrap_or(args);
 
         let (time_span, start_time, res, manager) = match self
             .exec_with_resource_control(
@@ -731,7 +821,7 @@ impl LocalExecutor {
                 cancellations,
                 liveliness_observer,
                 &scratch_path,
-                args,
+                effective_args,
                 worker.as_deref(),
                 &env,
                 sandbox,

@@ -405,6 +405,32 @@ pub struct CommandExecutionRequest {
     run_action_key: Option<String>,
 
     is_test: bool,
+
+    /// Param file spec: if set, args may be written to a file and replaced with a single arg.
+    param_file: Option<ParamFileSpec>,
+}
+
+/// Format for entries in a param file.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ParamFileFormat {
+    /// One argument per line.
+    #[default]
+    Multiline,
+    /// Flag name and value on separate lines (functionally same as Multiline for Kuro).
+    FlagPerLine,
+    /// Shell-quoted arguments, one per line.
+    Shell,
+}
+
+/// Specification for writing command-line arguments to a param file.
+#[derive(Clone, Debug)]
+pub struct ParamFileSpec {
+    /// Template argument to pass on the command line, e.g. `@%s` → `@/path/to/params`.
+    pub param_file_arg: String,
+    /// If true, always use a param file regardless of argument length.
+    pub use_always: bool,
+    /// Format for param file entries.
+    pub format: ParamFileFormat,
 }
 
 impl CommandExecutionRequest {
@@ -441,6 +467,7 @@ impl CommandExecutionRequest {
             outputs_for_error_handler: Vec::new(),
             run_action_key: None,
             is_test: false,
+            param_file: None,
         }
     }
 
@@ -720,6 +747,15 @@ impl CommandExecutionRequest {
 
     pub fn is_test(&self) -> bool {
         self.is_test
+    }
+
+    pub fn with_param_file(mut self, spec: Option<ParamFileSpec>) -> Self {
+        self.param_file = spec;
+        self
+    }
+
+    pub fn param_file(&self) -> Option<&ParamFileSpec> {
+        self.param_file.as_ref()
     }
 }
 

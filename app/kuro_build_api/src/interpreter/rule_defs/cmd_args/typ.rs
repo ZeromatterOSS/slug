@@ -89,11 +89,51 @@ use crate::interpreter::rule_defs::cmd_args::traits::WriteToFileMacroVisitor;
 use crate::interpreter::rule_defs::cmd_args::value::CommandLineArg;
 use crate::interpreter::rule_defs::cmd_args::value::FrozenCommandLineArg;
 
+/// Format for param file entries (used during Starlark evaluation).
+#[derive(Debug, Clone, Copy, Dupe, Default, Trace, Freeze, Allocative)]
+pub enum ParamFileFormat {
+    #[default]
+    Multiline,
+    FlagPerLine,
+    Shell,
+}
+
+/// Param file configuration. Stored as plain Rust types (not Starlark values)
+/// since param_file_arg is always a string literal set at analysis time.
+#[derive(Debug, Clone, Trace, Allocative)]
+pub(crate) struct ParamFileData {
+    pub(crate) param_file_arg: String,
+    pub(crate) use_always: bool,
+    pub(crate) format: ParamFileFormat,
+}
+
+/// Frozen param file configuration (same as ParamFileData since it contains no Starlark values).
+#[derive(Debug, Allocative, Clone)]
+pub struct FrozenParamFileData {
+    pub param_file_arg: String,
+    pub use_always: bool,
+    pub format: ParamFileFormat,
+}
+
+impl Freeze for ParamFileData {
+    type Frozen = FrozenParamFileData;
+    fn freeze(self, _freezer: &Freezer) -> FreezeResult<FrozenParamFileData> {
+        Ok(FrozenParamFileData {
+            param_file_arg: self.param_file_arg,
+            use_always: self.use_always,
+            format: self.format,
+        })
+    }
+}
+
 #[derive(Debug, kuro_error::Error)]
 pub enum CommandLineError {
     #[error("Artifact(s) {0:?} cannot be used with ignore_artifacts as they are content-based")]
     #[kuro(input)]
     ContentBasedIgnoreArtifacts(IndexSet<String>),
+    #[error("Unknown param file format `{0}`. Expected one of: multiline, flag_per_line, shell")]
+    #[kuro(input)]
+    UnknownParamFileFormat(String),
 }
 
 /// Fields of `cmd_args`. Abstract mutable and frozen versions.
@@ -179,6 +219,7 @@ impl<'v, F: Fields<'v>> FieldsRef<'v, F> {
                 .0
                 .options()
                 .map(|x| Box::new(x.to_command_line_options().to_owned())),
+            param_file: None, // param_file is not copied (it's a top-level property)
         }))
     }
 
@@ -384,6 +425,7 @@ pub struct StarlarkCommandLineData<'v> {
     items: Vec<CommandLineArg<'v>>,
     hidden: Vec<CommandLineArg<'v>>,
     options: Option<Box<CommandLineOptions<'v>>>,
+    param_file: Option<Box<ParamFileData>>,
 }
 
 #[derive(Debug, Default, Clone, Trace, ProvidesStaticType, Allocative)]
@@ -404,6 +446,7 @@ pub struct FrozenStarlarkCmdArgs {
     items: ThinBoxSliceFrozenValue<'static>,
     hidden: ThinBoxSliceFrozenValue<'static>,
     options: FrozenCommandLineOptions,
+    param_file: Option<Box<FrozenParamFileData>>,
 }
 
 impl Serialize for FrozenStarlarkCmdArgs {
@@ -492,8 +535,8 @@ impl<'v, A: Fields<'v>, B: Fields<'v>> Fields<'v> for Either<A, B> {
 }
 
 // These types show up a lot in the frozen heaps, so make sure they don't regress
-assert_eq_size!(StarlarkCmdArgs<'static>, [usize; 8]);
-assert_eq_size!(FrozenStarlarkCmdArgs, [usize; 3]);
+assert_eq_size!(StarlarkCmdArgs<'static>, [usize; 9]);
+assert_eq_size!(FrozenStarlarkCmdArgs, [usize; 4]);
 assert_eq_size!(CommandLineOptions<'static>, [usize; 10]);
 
 impl<'v> Display for StarlarkCmdArgs<'v> {
@@ -518,6 +561,17 @@ impl<'v> StarlarkCommandLineData<'v> {
         }
         self.options.as_mut().unwrap()
     }
+
+    fn param_file_mut(&mut self, arg: &str) -> &mut ParamFileData {
+        if self.param_file.is_none() {
+            self.param_file = Some(Box::new(ParamFileData {
+                param_file_arg: arg.to_owned(),
+                use_always: false,
+                format: ParamFileFormat::default(),
+            }));
+        }
+        self.param_file.as_mut().unwrap()
+    }
 }
 
 impl<'v> StarlarkCmdArgs<'v> {
@@ -533,6 +587,10 @@ impl FrozenStarlarkCmdArgs {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.items.is_empty()
+    }
+
+    pub fn param_file(&self) -> Option<&FrozenParamFileData> {
+        self.param_file.as_deref()
     }
 }
 
@@ -558,13 +616,15 @@ impl<'v> StarlarkValue<'v> for StarlarkCmdArgs<'v> {
             items,
             hidden,
             options,
+            param_file,
         } = &*self.0.borrow();
-        if items.is_empty() && hidden.is_empty() && options.is_none() {
+        if items.is_empty() && hidden.is_empty() && options.is_none() && param_file.is_none() {
             static EMPTY: AllocStaticSimple<FrozenStarlarkCmdArgs> =
                 AllocStaticSimple::alloc(FrozenStarlarkCmdArgs {
                     items: ThinBoxSliceFrozenValue::empty(),
                     hidden: ThinBoxSliceFrozenValue::empty(),
                     options: FrozenCommandLineOptions::empty(),
+                    param_file: None,
                 });
             Some(Ok(EMPTY.unpack().to_frozen_value()))
         } else {
@@ -675,6 +735,7 @@ impl<'v> Freeze for StarlarkCmdArgs<'v> {
             items,
             hidden,
             options,
+            param_file,
         } = self.0.into_inner();
 
         let items = ThinBoxSliceFrozenValue::from_iter(
@@ -692,11 +753,19 @@ impl<'v> Freeze for StarlarkCmdArgs<'v> {
         let options = options
             .try_map(|options| (*options).freeze(freezer))?
             .unwrap_or_default();
+        let param_file = param_file.map(|pf| {
+            Box::new(FrozenParamFileData {
+                param_file_arg: pf.param_file_arg,
+                use_always: pf.use_always,
+                format: pf.format,
+            })
+        });
 
         Ok(FrozenStarlarkCmdArgs {
             items,
             hidden,
             options,
+            param_file,
         })
     }
 }
@@ -1076,24 +1145,60 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
         Ok(this)
     }
 
-    /// Bazel-compatible: set the param file format.
+    /// Set the format for entries in a param file.
+    ///
+    /// Supported formats:
+    /// - `"multiline"`: one argument per line (default)
+    /// - `"flag_per_line"`: flag name and value on separate lines
+    /// - `"shell"`: shell-quoted arguments
     fn set_param_file_format<'v>(
-        this: StarlarkCommandLineMut<'v>,
-        #[starlark(require = pos)] _format: &str,
+        mut this: StarlarkCommandLineMut<'v>,
+        #[starlark(require = pos)] format: &str,
     ) -> starlark::Result<StarlarkCommandLineMut<'v>> {
-        // Stub: param file format is not used in Kuro
+        let fmt = match format {
+            "multiline" => ParamFileFormat::Multiline,
+            "flag_per_line" => ParamFileFormat::FlagPerLine,
+            "shell" => ParamFileFormat::Shell,
+            other => {
+                let e: kuro_error::Error =
+                    CommandLineError::UnknownParamFileFormat(other.to_owned()).into();
+                return Err(e.into());
+            }
+        };
+        if let Some(pf) = this.borrow.param_file.as_mut() {
+            pf.format = fmt;
+        }
+        // If no param_file has been set yet, format setting is ignored (Bazel behavior)
         Ok(this)
     }
 
-    /// Bazel-compatible: use a param file for the arguments.
+    /// Configure this `cmd_args` to use a param file for arguments.
+    ///
+    /// When the argument list is long (or when `use_always=True`), the arguments will be
+    /// written to a temporary file and replaced on the command line with a single argument
+    /// derived from `param_file_arg` (where `%s` is replaced by the file path).
+    ///
+    /// Example:
+    /// ```python
+    /// args = cmd_args()
+    /// args.use_param_file("@%s", use_always=True)
+    /// ```
     fn use_param_file<'v>(
-        this: StarlarkCommandLineMut<'v>,
-        #[starlark(require = pos, default = "")] _param_file_arg: &str,
+        mut this: StarlarkCommandLineMut<'v>,
+        #[starlark(require = pos, default = "")] positional_param_file_arg: &str,
         #[starlark(require = named, default = "")] param_file_arg: &str,
         #[starlark(require = named, default = false)] use_always: bool,
     ) -> starlark::Result<StarlarkCommandLineMut<'v>> {
-        let _ = (param_file_arg, use_always);
-        // Stub: param files not yet supported
+        // Accept param_file_arg as either positional or named
+        let arg = if !positional_param_file_arg.is_empty() {
+            positional_param_file_arg
+        } else {
+            param_file_arg
+        };
+        if !arg.is_empty() {
+            let pf = this.borrow.param_file_mut(arg);
+            pf.use_always = use_always;
+        }
         Ok(this)
     }
 

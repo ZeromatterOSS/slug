@@ -118,7 +118,7 @@ native.depset_from_transitive_set(t, order = "default")
 - [x] `kuro query //...` returns dependency information
 - [x] BCR modules are fetched and cached correctly
 - [x] Lockfile (MODULE.bazel.lock) is generated and respected
-- [ ] Sandboxed builds catch undeclared dependencies
+- [x] Sandboxed builds catch undeclared dependencies (buck-out input isolation implemented; 2026-02-23)
 - [ ] Cross-platform builds work (Linux, Windows, macOS)
 
 ## What We're NOT Doing
