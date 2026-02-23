@@ -707,7 +707,18 @@ impl LocalExecutor {
                         })
                 })
                 .collect();
-            Some(SandboxSpec { output_dirs })
+
+            // TODO(sandbox-input-isolation): Implement buck-out input isolation.
+            // The approach requires a full exec-root strategy (like Bazel's) where:
+            // - Declared inputs are symlinked into a sandbox exec root
+            // - Outputs are written to the exec root and then moved to real buck-out
+            // Currently, only output isolation is implemented (write-only restriction).
+            // Input files field is provided for future use when isolation is enabled.
+            Some(SandboxSpec {
+                output_dirs,
+                input_files: Vec::new(),
+                buck_out_root: None,
+            })
         } else {
             None
         };
