@@ -20,3 +20,9 @@ pub static FROZEN_RULE_GET_IMPL: LateBinding<fn(FrozenValue) -> kuro_error::Resu
 pub static FROZEN_PROMISE_ARTIFACT_MAPPINGS_GET_IMPL: LateBinding<
     fn(FrozenValue) -> kuro_error::Result<SmallMap<FrozenStringValue, FrozenValue>>,
 > = LateBinding::new("FROZEN_PROMISE_ARTIFACT_MAPPINGS_GET_IMPL");
+
+/// Get `rule(outputs={...})` patterns from a frozen rule callable.
+/// Returns a list of (name, pattern) pairs, e.g. [("output", "%{name}.binpb")].
+pub static FROZEN_RULE_GET_OUTPUTS: LateBinding<
+    fn(FrozenValue) -> kuro_error::Result<Vec<(String, String)>>,
+> = LateBinding::new("FROZEN_RULE_GET_OUTPUTS");

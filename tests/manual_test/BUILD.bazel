@@ -156,7 +156,7 @@ filegroup(
 # =============================================================================
 # Phase 10: rules_rust integration test
 # =============================================================================
-load("@rules_rust//rust:defs.bzl", "rust_library", "rust_binary")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_binary", "rust_test")
 
 rust_library(
     name = "hello_rust_lib",
@@ -168,6 +168,12 @@ rust_binary(
     name = "hello_rust_bin",
     srcs = ["main.rs"],
     deps = [":hello_rust_lib"],
+    edition = "2021",
+)
+
+rust_test(
+    name = "hello_rust_test",
+    srcs = ["lib.rs"],
     edition = "2021",
 )
 
@@ -198,6 +204,21 @@ py_test(
 # =============================================================================
 # Phase 12: protobuf integration test
 # =============================================================================
+# =============================================================================
+# Protoc with Python generator - used as the proto_compiler for py_proto_library.
+# Lighter-weight than the full @protobuf//:protoc (no C++/Java/Rust generators).
+# =============================================================================
+cc_binary(
+    name = "protoc_with_python",
+    srcs = ["protoc_with_python_main.cc"],
+    deps = [
+        "@protobuf//src/google/protobuf/compiler:command_line_interface",
+        "@protobuf//src/google/protobuf/compiler/python:python",
+        "@abseil-cpp//absl/log:initialize",
+        "@protobuf//src/google/protobuf:port",
+    ],
+)
+
 load("@protobuf//bazel:proto_library.bzl", "proto_library")
 
 proto_library(
@@ -208,6 +229,12 @@ proto_library(
 load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 cc_proto_library(
     name = "hello_cc_proto",
+    deps = [":hello_proto"],
+)
+
+load("@protobuf//bazel:py_proto_library.bzl", "py_proto_library")
+py_proto_library(
+    name = "hello_py_proto",
     deps = [":hello_proto"],
 )
 

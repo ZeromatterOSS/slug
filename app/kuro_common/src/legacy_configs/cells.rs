@@ -674,6 +674,12 @@ impl BuckConfigBasedCells {
                                 // This enables external tools and build actions to access files directly
                                 let external_base_dir =
                                     project_root.root().as_path().join("bazel-external");
+                                // Also create symlinks in buck-out/v2/external_cells/bzlmod/ for
+                                // build action source resolution (recreated after kuro clean)
+                                let buck_out_external_cells_dir = project_root
+                                    .root()
+                                    .as_path()
+                                    .join("buck-out/v2/external_cells/bzlmod");
                                 for (module_name, module_info) in &resolved_graph.modules {
                                     // Skip root module and local overrides
                                     if module_name == &parsed.module.name
@@ -704,6 +710,23 @@ impl BuckConfigBasedCells {
                                                     e
                                                 );
                                             }
+                                        }
+
+                                        // Also create buck-out/v2/external_cells/bzlmod/ symlink
+                                        // so that build action command lines can reference source
+                                        // files at their resolved paths (re-created after clean)
+                                        let buck_out_link = buck_out_external_cells_dir
+                                            .join(module_name)
+                                            .join(&module_info.version);
+                                        if let Err(e) = ensure_symlink(&buck_out_link, source_path)
+                                        {
+                                            tracing::warn!(
+                                                "Failed to create external_cells symlink for \
+                                                 {}@{}: {}",
+                                                module_name,
+                                                module_info.version,
+                                                e
+                                            );
                                         }
                                     }
                                 }

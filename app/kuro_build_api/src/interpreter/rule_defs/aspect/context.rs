@@ -258,17 +258,25 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Returns the bin_dir for output artifacts.
+    ///
+    /// In aspect context, this includes the `__target__` prefix to match where
+    /// declared artifacts are actually placed. This allows Bazel-compatible rules
+    /// like `py_proto_library` that compute output paths via
+    /// `ctx.bin_dir.path + "/" + proto_root` to produce paths that match the
+    /// declared artifact locations.
     #[starlark(attribute)]
     fn bin_dir<'v>(this: RefAspectContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc("buck-out/v2/gen"))
+        use crate::interpreter::rule_defs::context::CtxDirRoot;
+        let path = bin_dir_path_for_aspect(this.0.label);
+        Ok(heap.alloc(CtxDirRoot { path }))
     }
 
     /// Returns the genfiles_dir (same as bin_dir in Kuro).
     #[starlark(attribute)]
     fn genfiles_dir<'v>(this: RefAspectContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc("buck-out/v2/gen"))
+        use crate::interpreter::rule_defs::context::CtxDirRoot;
+        let path = bin_dir_path_for_aspect(this.0.label);
+        Ok(heap.alloc(CtxDirRoot { path }))
     }
 
     /// Whether the target platform has a given constraint.
@@ -295,6 +303,51 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
     fn coverage_instrumented<'v>(this: RefAspectContext<'v>) -> starlark::Result<bool> {
         let _ = this;
         Ok(false)
+    }
+
+    /// Returns the workspace name (cell name) for this target.
+    ///
+    /// In Bazel, `ctx.workspace_name` returns the workspace name (e.g., "protobuf").
+    /// For the root workspace it returns the root module name.
+    #[starlark(attribute)]
+    fn workspace_name<'v>(
+        this: RefAspectContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let cell_name = this
+            .0
+            .label
+            .label()
+            .target()
+            .pkg()
+            .cell_name()
+            .as_str()
+            .to_owned();
+        Ok(heap.alloc_str(&cell_name).to_value())
+    }
+}
+
+/// Computes the bin_dir path for an aspect context.
+///
+/// Unlike rule analysis (which returns `buck-out/v2/gen/<cell>/<cfg_hash>`),
+/// this includes the `__target__` prefix so that Bazel rules which compute
+/// output directories via `ctx.bin_dir.path + "/" + proto_root` produce paths
+/// matching where `ctx.actions.declare_file()` places artifacts.
+///
+/// Format: `buck-out/v2/gen/<cell>/<cfg_hash>[/<pkg>]/__<target>__`
+fn bin_dir_path_for_aspect(label: ValueTyped<'_, StarlarkConfiguredProvidersLabel>) -> String {
+    let target = label.label().target();
+    let cell_name = target.pkg().cell_name().as_str();
+    let cfg_hash = label.label().cfg().output_hash().as_str();
+    let pkg_path = target.pkg().cell_relative_path().as_str();
+    let target_name = target.name().as_str();
+    // Escape '=' signs the same way as BaseDeferredKey::make_hashed_path.
+    let escaped_name = target_name.replace('=', "_eqsb_");
+    let target_seg = format!("__{escaped_name}__");
+    if pkg_path.is_empty() {
+        format!("buck-out/v2/gen/{cell_name}/{cfg_hash}/{target_seg}")
+    } else {
+        format!("buck-out/v2/gen/{cell_name}/{cfg_hash}/{pkg_path}/{target_seg}")
     }
 }
 

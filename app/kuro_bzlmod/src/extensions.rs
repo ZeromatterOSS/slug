@@ -135,7 +135,20 @@ pub fn aggregate_extensions(
             let ext_id = usage.extension_id();
 
             let agg = aggregated.entry(ext_id.clone()).or_insert_with(|| {
-                AggregatedExtension::new(&usage.extension_bzl_file, &usage.extension_name)
+                // If the bzl file path is relative (starts with //), expand it with the
+                // declaring module's cell name so the executor can load the right file.
+                // e.g., "//java:rules_java_deps.bzl" from "rules_java" module
+                //     → "@rules_java//java:rules_java_deps.bzl"
+                let resolved_bzl_file =
+                    if usage.extension_bzl_file.starts_with("//") && !module_name.is_empty() {
+                        format!("@{}{}", module_name, usage.extension_bzl_file)
+                    } else {
+                        usage.extension_bzl_file.clone()
+                    };
+                let mut ext = AggregatedExtension::new(&resolved_bzl_file, &usage.extension_name);
+                // Keep the original (relative) id for lockfile correlation
+                ext.extension_id = ext_id.clone();
+                ext
             });
 
             // Add tags from this module

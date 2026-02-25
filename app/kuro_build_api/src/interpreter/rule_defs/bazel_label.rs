@@ -17,6 +17,10 @@
 use std::fmt;
 
 use allocative::Allocative;
+use starlark::environment::Methods;
+use starlark::environment::MethodsBuilder;
+use starlark::environment::MethodsStatic;
+use starlark::starlark_module;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
@@ -49,12 +53,55 @@ impl fmt::Display for BazelLabel {
 
 starlark::starlark_simple_value!(BazelLabel);
 
+#[starlark_module]
+fn bazel_label_methods(builder: &mut MethodsBuilder) {
+    /// Resolve a label string relative to this label's repository and package.
+    ///
+    /// In Bazel: `Label("@repo//pkg:target").relative(":other")` → `@repo//pkg:other`
+    fn relative<'v>(this: &BazelLabel, label: &str) -> starlark::Result<BazelLabel> {
+        let resolved = resolve_relative_label(&this.workspace_name, &this.package, label);
+        Ok(BazelLabel::parse(&resolved))
+    }
+}
+
+/// Resolve a label string relative to a given repository and package.
+pub(crate) fn resolve_relative_label(workspace_name: &str, package: &str, label: &str) -> String {
+    if label.starts_with('@') || label.starts_with("//") {
+        // Absolute label - return as-is (possibly prepend repo if starts with //)
+        if label.starts_with("//") && !workspace_name.is_empty() {
+            // "//pkg:target" relative to "@repo" → "@repo//pkg:target"
+            format!("@{}{}", workspace_name, label)
+        } else {
+            label.to_owned()
+        }
+    } else if let Some(target) = label.strip_prefix(':') {
+        // ":target" → "@repo//pkg:target"
+        if workspace_name.is_empty() {
+            format!("//{}:{}", package, target)
+        } else {
+            format!("@{}//{}:{}", workspace_name, package, target)
+        }
+    } else {
+        // Bare label - treat as target within same package
+        if workspace_name.is_empty() {
+            format!("//{}:{}", package, label)
+        } else {
+            format!("@{}//{}:{}", workspace_name, package, label)
+        }
+    }
+}
+
 #[starlark_value(type = "Label")]
 impl<'v> StarlarkValue<'v> for BazelLabel {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(bazel_label_methods)
+    }
+
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
-            "name" | "package" | "workspace_name" | "workspace_root" | "relative"
+            "name" | "package" | "workspace_name" | "workspace_root"
         )
     }
 
@@ -64,10 +111,6 @@ impl<'v> StarlarkValue<'v> for BazelLabel {
             "package" => Some(heap.alloc(self.package.as_str())),
             "workspace_name" => Some(heap.alloc(self.workspace_name.as_str())),
             "workspace_root" => Some(heap.alloc("")),
-            "relative" => {
-                // Return the full label string as a fallback
-                Some(heap.alloc(self.full.as_str()))
-            }
             _ => None,
         }
     }

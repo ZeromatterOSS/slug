@@ -18,6 +18,7 @@ use allocative::Allocative;
 use dupe::Dupe;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::cells::cell_path::CellPath;
+use kuro_core::cells::is_root_cell_name;
 use kuro_core::configuration::transition::id::TransitionId;
 use kuro_core::package::source_path::SourcePathRef;
 use kuro_core::plugins::PluginKind;
@@ -58,6 +59,7 @@ use crate::nodes::attributes::TYPE;
 use crate::package::Package;
 use crate::rule::Rule;
 use crate::rule_type::RuleType;
+use crate::visibility::VisibilityPatternList;
 use crate::visibility::VisibilitySpecification;
 
 /// Describes a target including its name, type, and the values that the user provided.
@@ -293,7 +295,24 @@ impl TargetNode {
         if self.label().pkg().cell_name() != target.pkg().cell_name() {
             return Ok(true);
         }
-        Ok(self.visibility()?.0.matches_target(target))
+        // For external (non-root) cells, skip intra-cell visibility enforcement.
+        // External modules from the registry are pre-validated; their internal
+        // visibility constraints are for their own development workflow. In Bazel,
+        // implicit deps from rule definitions bypass visibility (they are checked
+        // against the rule definition's package, not the BUILD file's package).
+        // Since kuro doesn't track dep origin, we approximate by skipping
+        // intra-cell visibility for all external modules.
+        let cell_name = self.label().pkg().cell_name();
+        if !is_root_cell_name(cell_name.as_str()) {
+            return Ok(true);
+        }
+        let vis = self.visibility()?;
+        // For root-cell targets with no explicit visibility (DEFAULT = empty list),
+        // allow same-cell access. This handles private tools without visibility.
+        if matches!(&vis.0, VisibilityPatternList::List(l) if l.is_empty()) {
+            return Ok(true);
+        }
+        Ok(vis.0.matches_target(target))
     }
 
     /// Returns an iterator of all attributes.

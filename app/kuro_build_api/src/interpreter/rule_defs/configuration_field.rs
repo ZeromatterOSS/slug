@@ -70,10 +70,7 @@ pub fn register_configuration_field(globals: &mut GlobalsBuilder) {
     ///
     /// Returns:
     ///     A reference to the configuration value.
-    fn configuration_field(
-        #[starlark(require = named)] fragment: &str,
-        #[starlark(require = named)] name: &str,
-    ) -> starlark::Result<ConfigurationFieldRef> {
+    fn configuration_field(fragment: &str, name: &str) -> starlark::Result<ConfigurationFieldRef> {
         // TODO: Implement actual configuration fragment support
         Ok(ConfigurationFieldRef {
             fragment: fragment.to_owned(),

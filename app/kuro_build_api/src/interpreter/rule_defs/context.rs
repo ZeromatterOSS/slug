@@ -192,6 +192,9 @@ pub struct AnalysisContext<'v> {
     /// Cached outputs for Bazel-compatible ctx.outputs access.
     /// This is computed lazily on first access and cached thereafter.
     outputs: RefCell<Option<Value<'v>>>,
+    /// Implicit output patterns from `rule(outputs={...})`.
+    /// Each pair is (name, pattern) where pattern may contain `%{name}`.
+    rule_outputs: Vec<(String, String)>,
 }
 
 impl<'v> Display for AnalysisContext<'v> {
@@ -216,6 +219,7 @@ impl<'v> AnalysisContext<'v> {
         plugins: Option<ValueTypedComplex<'v, AnalysisPlugins<'v>>>,
         registry: AnalysisRegistry<'v>,
         digest_config: DigestConfig,
+        rule_outputs: Vec<(String, String)>,
     ) -> Self {
         Self {
             attrs,
@@ -228,6 +232,7 @@ impl<'v> AnalysisContext<'v> {
             label,
             plugins,
             outputs: RefCell::new(None),
+            rule_outputs,
         }
     }
 
@@ -238,6 +243,7 @@ impl<'v> AnalysisContext<'v> {
         plugins: Option<ValueTypedComplex<'v, AnalysisPlugins<'v>>>,
         registry: AnalysisRegistry<'v>,
         digest_config: DigestConfig,
+        rule_outputs: Vec<(String, String)>,
     ) -> ValueTyped<'v, AnalysisContext<'v>> {
         let label = label.map(|label| {
             heap.alloc_typed(StarlarkConfiguredProvidersLabel::new(
@@ -245,7 +251,15 @@ impl<'v> AnalysisContext<'v> {
             ))
         });
 
-        let analysis_context = Self::new(heap, attrs, label, plugins, registry, digest_config);
+        let analysis_context = Self::new(
+            heap,
+            attrs,
+            label,
+            plugins,
+            registry,
+            digest_config,
+            rule_outputs,
+        );
         heap.alloc_typed(analysis_context)
     }
 
@@ -417,7 +431,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             .0
             .label
             .as_ref()
-            .map(|l| l.label().name().to_string())
+            .map(|l| l.label().target().name().as_str().to_owned())
             .unwrap_or_else(|| "output".to_string());
 
         let outputs_value = heap.alloc(CtxOutputs {
@@ -425,6 +439,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             actions: this.0.actions,
             declared: RefCell::new(SmallMap::new()),
             target_name,
+            rule_outputs: this.0.rule_outputs.clone(),
         });
 
         // Cache the result
@@ -1073,7 +1088,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
 ///
 /// In Kuro, the output path is `buck-out/v2/gen/<cell>/<cfg_hash>`.
 /// Falls back to `buck-out/v2/gen` if no label is available.
-fn bin_dir_path_from_label(
+pub fn bin_dir_path_from_label(
     label: Option<
         starlark::values::ValueTyped<
             '_,
@@ -1160,9 +1175,10 @@ pub struct CtxOutputs<'v> {
     /// Cache of already-declared artifacts: attr_name → StarlarkDeclaredArtifact
     declared: RefCell<SmallMap<String, Value<'v>>>,
     /// Target name for pattern-based output expansion (e.g., "hello_bin" → "hello_bin.stripped")
-    /// Used for `rule(outputs={...})` patterns that aren't stored in attrs.
-    /// TODO(outputs): Replace with proper rule(outputs=...) parameter threading.
     target_name: String,
+    /// Implicit output patterns from `rule(outputs={...})`.
+    /// Each pair is (name, pattern) where `%{name}` is substituted with `target_name`.
+    rule_outputs: Vec<(String, String)>,
 }
 
 impl<'v> std::fmt::Display for CtxOutputs<'v> {
@@ -1190,7 +1206,11 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
                 return true;
             }
         }
-        // Check well-known rule(outputs={...}) pattern names
+        // Check rule(outputs={...}) pattern names from the rule definition
+        if self.rule_outputs.iter().any(|(k, _)| k == attribute) {
+            return true;
+        }
+        // Check well-known fallback pattern names
         matches!(attribute, "stripped_binary" | "dwp_file" | "executable")
     }
 
@@ -1202,7 +1222,8 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
 
         // Determine the filename for this output attribute.
         // Case 1: attr.output() - the attribute value in attrs is the filename string
-        // Case 2: rule(outputs={...}) pattern - expand well-known patterns using target name
+        // Case 2: rule(outputs={...}) pattern - expand using target name
+        // Case 3: well-known fallback patterns
         let filename_owned: String;
         let filename: &str = if let Some(v) = self
             .attrs
@@ -1213,9 +1234,12 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
         {
             filename_owned = v;
             &filename_owned
+        } else if let Some((_, pattern)) = self.rule_outputs.iter().find(|(k, _)| k == attribute) {
+            // Expand %{name} substitution pattern from rule(outputs={...})
+            filename_owned = pattern.replace("%{name}", &self.target_name);
+            &filename_owned
         } else {
-            // Fallback: expand common rule(outputs={...}) patterns using target name.
-            // TODO(outputs): Replace with proper rule(outputs={...}) parameter threading.
+            // Fallback: expand well-known patterns using target name.
             filename_owned = match attribute {
                 "stripped_binary" => format!("{}.stripped", self.target_name),
                 "dwp_file" => format!("{}.dwp", self.target_name),
@@ -2258,7 +2282,7 @@ impl<'v> StarlarkValue<'v> for CtxExecutableStub {
 /// a `path` attribute containing the directory path string.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct CtxDirRoot {
-    path: String,
+    pub path: String,
 }
 
 impl std::fmt::Display for CtxDirRoot {

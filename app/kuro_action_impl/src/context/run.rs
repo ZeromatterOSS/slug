@@ -460,7 +460,17 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
                 // In Bazel, `executable` is prepended to `arguments` to form the command.
                 match executable.into_option() {
                     Some(exec_val) => {
-                        let starlark_exe = StarlarkCmdArgs::try_from_value(exec_val)?;
+                        // Bazel compat: if exec_val is a FilesToRunProvider-like struct
+                        // (with an `executable` field), extract the actual executable artifact.
+                        // This handles patterns like: executable = dep.files_to_run
+                        // or executable = proto_lang_toolchain_info.proto_compiler
+                        let actual_exec = exec_val
+                            .get_attr("executable", eval.heap())
+                            .ok()
+                            .flatten()
+                            .filter(|v| !v.is_none())
+                            .unwrap_or(exec_val);
+                        let starlark_exe = StarlarkCmdArgs::try_from_value(actual_exec)?;
                         starlark_exe.visit_artifacts(&mut artifact_visitor)?;
                         (starlark_exe, None, None)
                     }
@@ -910,6 +920,21 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             shadowed_action,
         );
 
+        // Bazel-compat: when identifier is not provided and a mnemonic was used (Bazel-style),
+        // auto-generate an identifier from the first output's path. This disambiguates multiple
+        // same-category actions in rules like proto_library that compile many .proto files.
+        let effective_identifier = identifier.into_option().or_else(|| {
+            if effective_category.as_str() != "action" {
+                artifacts.declared_outputs.iter().next().map(|output| {
+                    output
+                        .get_path()
+                        .with_short_path(|p| heap.alloc_str(p.as_str()))
+                })
+            } else {
+                None
+            }
+        });
+
         let starlark_values = heap.alloc_complex(StarlarkRunActionValues {
             exe: heap.alloc_typed(starlark_exe),
             args: heap.alloc_typed(starlark_args),
@@ -920,7 +945,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
                 CategoryRef::new(effective_category.as_str())?;
                 effective_category
             },
-            identifier: identifier.into_option(),
+            identifier: effective_identifier,
             outputs_for_error_handler: outputs_for_error_handler.items,
             // Bazel compatibility: track extra input artifacts from the `inputs` parameter
             bazel_inputs: collected_bazel_inputs,

@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use dupe::Dupe;
 use kuro_core::plugins::PluginKindSet;
+use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_core::target::name::TargetNameRef;
 use kuro_node::attrs::attr::Attribute;
@@ -1497,13 +1498,27 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         internals.record(target_node)?;
 
         // In Bazel, each genrule output in `outs` is a separate target.
-        // Register each output as a filegroup target so other rules can reference them.
+        // Register each output as a filegroup target that forwards to the genrule.
+        // This allows other rules to depend on specific genrule outputs by name,
+        // and the filegroup's DefaultInfo.files will contain the genrule's artifacts.
+        let genrule_label = ProvidersLabel::default_for(TargetLabel::new(
+            internals.package().buildfile_path.package().dupe(),
+            TargetNameRef::new(name)?,
+        ));
+        // The filegroup srcs attr is `list(one_of(dep(), source()))`.
+        // When manually creating a CoercedAttr::Dep and putting it in a one_of list,
+        // we must wrap it in CoercedAttr::OneOf(value, index) where index=0 means
+        // the first one_of variant (dep()). Otherwise pack() fails with type mismatch.
+        let genrule_dep_attr = CoercedAttr::OneOf(Box::new(CoercedAttr::Dep(genrule_label)), 0);
+        let srcs_attr = CoercedAttr::List(ListLiteral(ArcSlice::from_iter(std::iter::once(
+            genrule_dep_attr,
+        ))));
         for out_name in &outs.items {
             let out_target = create_native_target_node(
                 rule_defs::FILEGROUP_RULE.clone(),
                 internals.package(),
                 out_name,
-                vec![],
+                vec![("srcs".to_owned(), srcs_attr.clone())],
                 &vis_strings,
                 &default_vis,
             )?;

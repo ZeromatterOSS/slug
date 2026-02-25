@@ -24,6 +24,7 @@ use crate::attrs::coerce::error::CoercionError;
 pub(crate) mod attrs_global;
 pub mod coerce;
 pub(crate) mod starlark_attribute;
+pub use attrs_global::resolve_configuration_field_to_label;
 pub use starlark_attribute::StarlarkAttribute;
 
 #[derive(Debug, kuro_error::Error)]

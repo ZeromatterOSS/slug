@@ -43,6 +43,7 @@ pub fn init_late_bindings() {
         plugins::init_plugin_kind_from_value_impl();
         rule::init_frozen_rule_get_impl();
         rule::init_frozen_promise_artifact_mappings_get_impl();
+        rule::init_frozen_rule_get_outputs();
         module_extension_executor_impl::init_module_extension_executor();
         starlark_repo_rule_executor_impl::init_starlark_repo_rule_executor();
     });

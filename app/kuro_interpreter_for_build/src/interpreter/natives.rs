@@ -571,7 +571,11 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
     /// Note: Currently returns minimal information (name and kind). Full attribute
     /// introspection may be added in a future version.
     fn existing_rules<'v>(eval: &mut Evaluator<'v, '_, '_>) -> starlark::Result<Value<'v>> {
-        let internals = ModuleInternals::from_context(eval, "native.existing_rules")?;
+        // When called outside a BUILD file (e.g., from a module extension via maybe()),
+        // return an empty dict so that maybe() always proceeds to create the repo.
+        let Ok(internals) = ModuleInternals::from_context(eval, "native.existing_rules") else {
+            return Ok(eval.heap().alloc(AllocDict(SmallMap::<&str, Value>::new())));
+        };
         let target_names = internals.get_target_names();
 
         let heap = eval.heap();
@@ -599,7 +603,10 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
         name: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneOr<Value<'v>>> {
-        let internals = ModuleInternals::from_context(eval, "native.existing_rule")?;
+        // When called outside a BUILD file context, return None (repo doesn't exist yet).
+        let Ok(internals) = ModuleInternals::from_context(eval, "native.existing_rule") else {
+            return Ok(NoneOr::None);
+        };
 
         if !internals.target_exists(name) {
             return Ok(NoneOr::None);

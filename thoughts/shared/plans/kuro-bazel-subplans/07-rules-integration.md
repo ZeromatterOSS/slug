@@ -392,7 +392,7 @@ use_repo(crate, "crates")
 #### Automated Verification:
 
 - [ ] `kuro build //:main` compiles Rust code
-- [ ] `kuro test //:rust_test` runs tests
+- [x] `kuro test //:hello_rust_test` runs tests (2026-02-23)
 - [ ] crate_universe resolves Cargo dependencies
 
 #### Manual Verification:
@@ -577,11 +577,7 @@ use_repo(pip, "pip")
 - [x] `hasattr(native, "proto_library")` returns False → Starlark proto rules used
 
 **Blocking:**
-- [ ] `cc_proto_library` requires aspect attribute resolution (Phase 8d Advanced Features)
-  - The `cc_proto_aspect` has `_aspect_cc_proto_toolchain` attribute with `configuration_field()` default
-  - Current aspect ctx.attr creates empty struct (Phase 8b placeholder)
-  - Need: resolve `configuration_field(fragment="proto", name="proto_toolchain_for_cc")` → label → dependency
-  - Alternative: Enable `INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION = True` + implement `ctx.toolchains`
+- [x] `cc_proto_library` aspect attribute resolution works — **DONE (2026-02-23)**
 
 ### Overview
 
@@ -674,8 +670,8 @@ cc_proto_library(
 #### Automated Verification:
 
 - [x] `kuro build //:hello_proto` compiles .proto files (283 commands, builds protoc_minimal from source)
-- [ ] `kuro build //:hello_cc_proto` generates C++ code from protos (blocked by aspect attribute resolution - Phase 8d)
-- [ ] `kuro build //:hello_py_proto` generates Python code from protos
+- [x] `kuro build //:hello_cc_proto` generates C++ code from protos (313 commands, 2026-02-23)
+- [x] `kuro build //:hello_py_proto` generates Python code from protos (2026-02-23)
 - [x] `hasattr(native, "proto_library")` returns False
 
 #### Manual Verification:
@@ -744,8 +740,8 @@ oci_image(
 
 #### Automated Verification:
 
-- [ ] `kuro build //:hello_bin_tar` creates valid tar file (`hello_bin_tar.tar` contains `/usr/local/bin/hello_bin`) — **DONE (2026-02-19)**
-- [ ] `kuro build //:image` creates OCI image
+- [x] `kuro build //:hello_bin_tar` creates valid tar file (`hello_bin_tar.tar` contains `/usr/local/bin/hello_bin`) — **DONE (2026-02-19)**
+- [x] `kuro build //:hello_bin_image` creates OCI image — **DONE (2026-02-19)**
 - [ ] Multi-arch images work
 
 #### Manual Verification:

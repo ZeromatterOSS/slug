@@ -453,6 +453,11 @@ pub(crate) async fn gather_deps(
     #[derive(Default)]
     struct Traversal {
         deps: OrderedMap<ConfiguredProvidersLabel, SmallSet<PluginKindSet>>,
+        /// Deps that come from implicit attributes (names starting with `_`).
+        /// In Bazel, implicit attrs bypass visibility checks.
+        implicit_deps: SmallSet<ConfiguredProvidersLabel>,
+        /// Set to true while traversing an implicit attribute.
+        current_implicit: bool,
         exec_deps: SmallMap<ConfiguredProvidersLabel, CheckVisibility>,
         toolchain_deps: SmallSet<TargetConfiguredTargetLabel>,
         plugin_lists: PluginLists,
@@ -461,6 +466,9 @@ pub(crate) async fn gather_deps(
     impl ConfiguredAttrTraversal for Traversal {
         fn dep(&mut self, dep: &ConfiguredProvidersLabel) -> kuro_error::Result<()> {
             self.deps.entry(dep.dupe()).or_insert_with(SmallSet::new);
+            if self.current_implicit {
+                self.implicit_deps.insert(dep.dupe());
+            }
             Ok(())
         }
 
@@ -473,6 +481,9 @@ pub(crate) async fn gather_deps(
                 .entry(dep.dupe())
                 .or_insert_with(SmallSet::new)
                 .insert(plugin_kinds.dupe());
+            if self.current_implicit {
+                self.implicit_deps.insert(dep.dupe());
+            }
             Ok(())
         }
 
@@ -498,9 +509,12 @@ pub(crate) async fn gather_deps(
 
     let mut traversal = Traversal::default();
     for a in target_node.attrs(AttrInspectOptions::All) {
+        // Implicit attributes (names starting with `_`) bypass visibility checks in Bazel.
+        traversal.current_implicit = a.name.starts_with('_');
         let configured_attr = a.configure(attr_cfg_ctx)?;
         configured_attr.traverse(target_node.label().pkg(), &mut traversal)?;
     }
+    traversal.current_implicit = false;
 
     // Phase 8c: Collect aspects that need to be applied to dependencies
     let mut aspect_keys = Vec::new();
@@ -591,11 +605,17 @@ pub(crate) async fn gather_deps(
         .await;
 
     let mut plugin_lists = traversal.plugin_lists;
+    let implicit_deps = traversal.implicit_deps;
     let mut deps = Vec::new();
     let mut errors_and_incompats = ErrorsAndIncompatibilities::default();
-    for (res, (_, plugin_kind_sets)) in dep_results.into_iter().zip(traversal.deps) {
-        let Some(dep) = errors_and_incompats.unpack_dep(target_label, res, CheckVisibility::Yes)
-        else {
+    for (res, (label, plugin_kind_sets)) in dep_results.into_iter().zip(traversal.deps) {
+        // Implicit attrs (starting with `_`) bypass visibility checks, matching Bazel semantics.
+        let visibility = if implicit_deps.contains(&label) {
+            CheckVisibility::No
+        } else {
+            CheckVisibility::Yes
+        };
+        let Some(dep) = errors_and_incompats.unpack_dep(target_label, res, visibility) else {
             continue;
         };
 

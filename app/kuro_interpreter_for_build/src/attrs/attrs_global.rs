@@ -74,7 +74,10 @@ enum AttrError {
 /// In Bazel, `configuration_field(fragment="proto", name="proto_toolchain_for_cc")` reads
 /// a value from the command-line configuration. Kuro doesn't have these flags, so we
 /// map known fields to their well-known label targets.
-fn resolve_configuration_field_to_label(fragment: &str, name: &str) -> Option<&'static str> {
+///
+/// Used both during attr coercion (for default value resolution) and during aspect
+/// attribute pre-analysis in `kuro_analysis::analysis::aspect_calculation`.
+pub fn resolve_configuration_field_to_label(fragment: &str, name: &str) -> Option<&'static str> {
     match (fragment, name) {
         ("proto", "proto_toolchain_for_cc") => Some("@bazel_tools//tools/proto:cc_toolchain"),
         ("proto", "proto_toolchain_for_java") => Some("@bazel_tools//tools/proto:java_toolchain"),
@@ -82,7 +85,10 @@ fn resolve_configuration_field_to_label(fragment: &str, name: &str) -> Option<&'
             Some("@bazel_tools//tools/proto:javalite_toolchain")
         }
         ("proto", "proto_compiler") => {
-            Some("@protobuf//src/google/protobuf/compiler:protoc_minimal")
+            // Use a genrule copy of the system protoc (supports --python_out, --java_out, etc.)
+            // Note: cc_toolchain overrides this via protoc_minimal_do_not_use attr, so cc compilation
+            // still uses protoc_minimal. Only toolchains without that override (python, etc.) use this.
+            Some("@bazel_tools//tools/proto:system_protoc")
         }
         _ => None,
     }
@@ -996,20 +1002,29 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // Build the coercer based on cfg and allow_files
         // IMPORTANT: Try dep first, then source. Both accept label strings like ":foo",
         // but deps (targets) should take precedence over source files.
+        //
+        // Bazel compat: for allow_single_file=True attributes, skip providers enforcement.
+        // These are file attributes - callers use ctx.file.<attr> to get the artifact,
+        // not ctx.attr.<attr>[SomeProvider]. The providers= constraint is advisory.
+        let effective_providers = if allow_single_file_bool {
+            ProviderIdSet::EMPTY
+        } else {
+            required_providers
+        };
         let coercer = if accept_files {
             let dep_type = if is_exec {
-                AttrType::exec_dep(required_providers)
+                AttrType::exec_dep(effective_providers)
             } else {
-                AttrType::dep(required_providers, PluginKindSet::EMPTY)
+                AttrType::dep(effective_providers, PluginKindSet::EMPTY)
             };
             AttrType::one_of(vec![
                 dep_type,
                 AttrType::source(false), // allow_directory = false
             ])
         } else if is_exec {
-            AttrType::exec_dep(required_providers)
+            AttrType::exec_dep(effective_providers)
         } else {
-            AttrType::dep(required_providers, PluginKindSet::EMPTY)
+            AttrType::dep(effective_providers, PluginKindSet::EMPTY)
         };
 
         // Create attribute with aspects attached (Phase 8c)

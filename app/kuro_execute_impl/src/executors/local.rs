@@ -727,8 +727,8 @@ impl LocalExecutor {
             for input in request.inputs() {
                 if let CommandExecutionInput::Artifact(group) = input {
                     for (artifact, _value) in group.iter() {
-                        if let Ok(rel_path) = artifact
-                            .resolve_configuration_hash_path(&self.artifact_fs)
+                        if let Ok(rel_path) =
+                            artifact.resolve_configuration_hash_path(&self.artifact_fs)
                         {
                             let abs = self
                                 .artifact_fs

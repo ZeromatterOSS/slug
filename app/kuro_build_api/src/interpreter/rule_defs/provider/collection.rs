@@ -248,6 +248,13 @@ impl<'v, V: ValueLike<'v>> ProviderCollectionGen<V> {
         // Sometimes we might have a resolved promise here, in which case see through that
         value = StarlarkPromise::get_recursive(value);
 
+        // Bazel compat: rule implementations that return None (no explicit return statement)
+        // are treated as returning an empty provider list. The caller is responsible for
+        // injecting DefaultInfo if needed.
+        if value.is_none() {
+            return Ok(SmallMap::new());
+        }
+
         let list = match ListRef::from_value(value) {
             Some(v) => v,
             None => {

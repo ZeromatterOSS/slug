@@ -25,6 +25,7 @@ use kuro_core::cells::CellResolver;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::cells::cell_path_with_allowed_relative_dir::CellPathWithAllowedRelativeDir;
 use kuro_core::cells::name::CellName;
+use kuro_core::cells::paths::CellRelativePath;
 use kuro_core::cells::paths::CellRelativePathBuf;
 use kuro_core::package::PackageLabel;
 use kuro_core::package::package_relative_path::PackageRelativePath;
@@ -37,6 +38,8 @@ use kuro_core::pattern::pattern_type::TargetPatternExtra;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::soft_error;
 use kuro_core::target::label::interner::ConcurrentTargetLabelInterner;
+use kuro_core::target::label::label::TargetLabel;
+use kuro_core::target::name::TargetNameRef;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::coerced_path::CoercedDirectory;
 use kuro_node::attrs::coerced_path::CoercedPath;
@@ -70,6 +73,45 @@ enum BuildAttrCoercionContextError {
         "Directory `{1}` of package `{0}` may not cover any subpackages, but includes subpackage `{2}`."
     )]
     SourceDirectoryIncludesSubPackage(PackageLabel, String, PackageRelativePathBuf),
+}
+
+/// Try to construct a placeholder `ProvidersLabel` for a label with an unknown cell alias.
+///
+/// Parses `@cell_alias//pkg/path:target` format manually, bypassing the alias resolver.
+/// This allows BUILD files to load even when a referenced cell is not registered (e.g.,
+/// `dev_dependency` cells from upstream modules that are not available in user projects).
+/// The placeholder label will only fail when that specific target is analyzed.
+///
+/// Returns `None` if the string cannot be parsed as an `@`-prefixed label.
+fn try_make_placeholder_label(value: &str) -> Option<ProvidersLabel> {
+    let stripped = value.strip_prefix('@')?;
+    let sep_idx = stripped.find("//")?;
+    let cell_alias = &stripped[..sep_idx];
+    if cell_alias.is_empty() {
+        return None;
+    }
+    let rest = &stripped[sep_idx + 2..];
+
+    let (package_path, target_name) = if let Some(colon_idx) = rest.find(':') {
+        let pkg = &rest[..colon_idx];
+        let tgt = &rest[colon_idx + 1..];
+        if tgt.is_empty() {
+            return None;
+        }
+        (pkg, tgt)
+    } else if rest.is_empty() {
+        // "@repo//" → "@repo//:repo"
+        ("", cell_alias)
+    } else {
+        // "@repo//pkg" → infer target from last path component
+        let last = rest.rsplit('/').next()?;
+        (rest, last)
+    };
+
+    let cell_name = CellName::unchecked_new(cell_alias).ok()?;
+    let pkg = PackageLabel::new(cell_name, CellRelativePath::unchecked_new(package_path)).ok()?;
+    let target = TargetLabel::new(pkg, TargetNameRef::unchecked_new(target_name));
+    Some(ProvidersLabel::default_for(target))
 }
 
 /// An incomplete attr coercion context. Will be replaced with a real one later.
@@ -266,6 +308,19 @@ impl BuildAttrCoercionContext {
                 }
             },
             Err(_first_err) => {
+                // Bazel-compatible: if the value looks like an absolute label with a cell
+                // reference (e.g., "@com_google_absl_py//absl/testing:parameterized"),
+                // create a placeholder label using an unchecked cell name. This lets BUILD
+                // files containing targets with dev_dependency references (cells not available
+                // in downstream projects) load successfully. Those specific targets will still
+                // fail at analysis time, but other targets in the same package (e.g.,
+                // python_toolchain) can be analyzed.
+                if value.starts_with('@') && value.contains("//") {
+                    if let Some(placeholder) = try_make_placeholder_label(value) {
+                        return Ok(placeholder);
+                    }
+                }
+
                 // Bazel-compatible: bare target names (e.g., "foo_bar") resolve relative to
                 // the current package. Try prepending ":" if the original parse failed.
                 // But skip this for bare names that are known source files in the package,

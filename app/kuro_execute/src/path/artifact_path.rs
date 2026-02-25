@@ -14,6 +14,7 @@ use std::hash::Hash;
 
 use either::Either;
 use gazebo::cell::ARef;
+use kuro_core::cells::is_root_cell_name;
 use kuro_core::content_hash::ContentBasedPathHash;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::fs::artifact_path_resolver::ArtifactFs;
@@ -71,24 +72,69 @@ impl ArtifactPath<'_> {
                     Some(p) => p,
                     None => ForwardRelativePath::empty(),
                 };
-                f(path)
+                // Bazel-compatible short_path for generated files:
+                // For files in main repo: "pkg/artifact" or just "artifact" at root
+                // For files in external repos: "../repo/pkg/artifact"
+                // Extract owning target's cell and package to construct the prefix.
+                let target_opt = match buck_out.owner().owner() {
+                    BaseDeferredKey::TargetLabel(target) => Some(target.clone()),
+                    BaseDeferredKey::Aspect(aspect_key) => aspect_key.configured_label(),
+                    _ => None,
+                };
+                if let Some(target) = target_opt {
+                    let cell_name = target.pkg().cell_name();
+                    let pkg_rel = target.pkg().cell_relative_path().as_str();
+                    if is_root_cell_name(cell_name.as_str()) {
+                        // Main repo: prepend package path if non-empty
+                        if pkg_rel.is_empty() {
+                            f(path)
+                        } else {
+                            let with_pkg = ForwardRelativePathBuf::unchecked_new(format!(
+                                "{}/{}",
+                                pkg_rel,
+                                path.as_str()
+                            ));
+                            f(with_pkg.as_ref())
+                        }
+                    } else {
+                        // External repo: "../repo/pkg/artifact"
+                        let with_prefix =
+                            ForwardRelativePathBuf::unchecked_new(if pkg_rel.is_empty() {
+                                format!("../{}/{}", cell_name.as_str(), path.as_str())
+                            } else {
+                                format!("../{}/{}/{}", cell_name.as_str(), pkg_rel, path.as_str())
+                            });
+                        f(with_prefix.as_ref())
+                    }
+                } else {
+                    f(path)
+                }
             }
             Either::Right(source) => {
                 // Bazel-compatible short_path for source files:
-                // Returns the full cell-relative path (pkg/subpkg/file.py).
-                // For files in external repos accessed from a different workspace,
-                // Bazel uses "../repo/pkg/file.py" but we use the cell-relative path
-                // since pkg_path already encodes the package structure.
+                // For files in the main repo: returns the cell-relative path (e.g., src/foo.proto)
+                // For files in external repos: returns "../repo_name/path" (e.g., ../protobuf/src/foo.proto)
+                // This matches Bazel's File.short_path semantics exactly.
                 let pkg_path: &ForwardRelativePath = source.package().cell_relative_path().as_ref();
                 let file_rel: &ForwardRelativePath = source.path().as_ref();
-                // Construct the full cell-relative path: pkg/private/tar/build_tar.py
+                let cell_name = source.package().cell_name();
                 let base = pkg_path.join(file_rel);
                 let full = base.join(self.projected_path);
                 let path = match full.strip_prefix_components(self.hidden_components_count) {
                     Some(p) => p,
                     None => ForwardRelativePath::empty(),
                 };
-                f(path)
+                if is_root_cell_name(cell_name.as_str()) {
+                    f(path)
+                } else {
+                    // External repo: prepend "../repo_name/"
+                    let with_prefix = ForwardRelativePathBuf::unchecked_new(format!(
+                        "../{}/{}",
+                        cell_name.as_str(),
+                        path.as_str()
+                    ));
+                    f(with_prefix.as_ref())
+                }
             }
         }
     }

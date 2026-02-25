@@ -49,6 +49,7 @@ use kuro_interpreter::print_handler::EventDispatcherPrintHandler;
 use kuro_interpreter::soft_error::KuroStarlarkSoftErrorHandler;
 use kuro_interpreter::types::rule::FROZEN_PROMISE_ARTIFACT_MAPPINGS_GET_IMPL;
 use kuro_interpreter::types::rule::FROZEN_RULE_GET_IMPL;
+use kuro_interpreter_for_build::rule::FrozenStarlarkRuleCallable;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
 use kuro_node::rule_type::StarlarkRuleType;
 use starlark::environment::FrozenModule;
@@ -271,6 +272,12 @@ pub trait RuleSpec: Sync {
         &self,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> kuro_error::Result<SmallMap<String, Value<'v>>>;
+
+    /// Returns the implicit output patterns from `rule(outputs={...})`.
+    /// Each pair is (name, pattern) where pattern may contain `%{name}`.
+    fn rule_outputs(&self) -> Vec<(String, String)> {
+        Vec::new()
+    }
 }
 
 /// Container for the environment that analysis implementation functions should run in
@@ -401,6 +408,7 @@ async fn run_analysis_with_env_underlying(
                 Some(plugins.into()),
                 registry,
                 dice.global_data().get_digest_config(),
+                analysis_env.rule_spec.rule_outputs(),
             );
 
             let list_res = analysis_env.rule_spec.invoke(&mut eval, ctx)?;
@@ -535,6 +543,7 @@ pub fn get_user_defined_rule_spec(
     struct Impl {
         module: FrozenModule,
         name: String,
+        implicit_rule_outputs: Vec<(String, String)>,
     }
 
     impl RuleSpec for Impl {
@@ -553,10 +562,26 @@ pub fn get_user_defined_rule_spec(
         ) -> kuro_error::Result<SmallMap<String, Value<'v>>> {
             promise_artifact_mappings(eval, &self.module, &self.name)
         }
+
+        fn rule_outputs(&self) -> Vec<(String, String)> {
+            self.implicit_rule_outputs.clone()
+        }
     }
+
+    // Extract rule(outputs={...}) patterns from the frozen callable.
+    let implicit_rule_outputs = if let Ok((val, _)) = module.get_any_visibility(&rule_type.name) {
+        if let Ok(typed) = val.downcast::<FrozenStarlarkRuleCallable>() {
+            typed.as_ref().rule_outputs().to_vec()
+        } else {
+            Vec::new()
+        }
+    } else {
+        Vec::new()
+    };
 
     Impl {
         module,
         name: rule_type.name.clone(),
+        implicit_rule_outputs,
     }
 }

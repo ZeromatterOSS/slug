@@ -296,6 +296,51 @@ fn dependency_methods(builder: &mut MethodsBuilder) {
                 format!("Error accessing dependencies of `{}`", this.label)
             })?)
     }
+
+    /// Returns a `FilesToRunProvider` for this dependency (Bazel-compatible).
+    ///
+    /// `dep.files_to_run` in Bazel returns a provider with `executable` (the target's
+    /// binary) and `runfiles_manifest`. Used to pass tools to `ctx.actions.run()`.
+    #[starlark(attribute)]
+    fn files_to_run<'v>(this: &Dependency<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        // Find executable by checking all providers for an "executable" attribute,
+        // then fall back to first default output.
+        let executable = this
+            .provider_collection
+            .providers
+            .values()
+            .copied()
+            .find_map(|fv: FrozenValue| {
+                fv.to_value()
+                    .get_attr("executable", heap)
+                    .ok()
+                    .flatten()
+                    .filter(|v| !v.is_none())
+            })
+            .or_else(|| {
+                // Fall back: iterate default_outputs if available
+                this.provider_collection
+                    .providers
+                    .values()
+                    .copied()
+                    .find_map(|fv: FrozenValue| {
+                        let outputs_val =
+                            fv.to_value().get_attr("default_outputs", heap).ok()??;
+                        if let Ok(iter) = outputs_val.iterate(heap) {
+                            iter.into_iter().next()
+                        } else {
+                            None
+                        }
+                    })
+            })
+            .unwrap_or_else(Value::new_none);
+
+        // Return as a Starlark struct so it can be frozen automatically.
+        Ok(heap.alloc(starlark::values::structs::AllocStruct([
+            ("executable", executable),
+            ("runfiles_manifest", Value::new_none()),
+        ])))
+    }
 }
 
 #[starlark_module]

@@ -30,18 +30,16 @@ use kuro_interpreter::load_module::InterpreterCalculation;
 use kuro_interpreter::paths::module::StarlarkModulePath;
 use kuro_interpreter::types::provider::callable::ValueAsProviderCallableLike;
 use kuro_interpreter_for_build::aspect::FrozenStarlarkAspectCallable;
+use kuro_interpreter_for_build::attrs::resolve_configuration_field_to_label;
 use kuro_node::aspect_type::StarlarkAspectType;
 use kuro_node::bzl_or_bxl_path::BzlOrBxlPath;
 use starlark::values::OwnedFrozenValueTyped;
+use tracing::debug;
 
 use super::aspect_key::AspectKey;
 use super::aspect_key::AspectValue;
 use super::calculation::AnalysisKey;
 
-/// Map a configuration_field(fragment, name) to a well-known label string.
-///
-/// In Bazel, configuration_field() reads from command-line flags. Since Kuro
-/// doesn't have these flags, we map known fields to their default label values.
 /// Parse a label string and analyze the target via DICE to get its providers.
 ///
 /// Used to resolve aspect attribute defaults (e.g., configuration_field targets).
@@ -112,20 +110,6 @@ async fn parse_and_analyze_label(
         .require_compatible()?;
 
     Ok((configured_label, analysis_result.providers()?.to_owned()))
-}
-
-fn resolve_configuration_field_to_label(fragment: &str, name: &str) -> Option<&'static str> {
-    match (fragment, name) {
-        ("proto", "proto_toolchain_for_cc") => Some("@bazel_tools//tools/proto:cc_toolchain"),
-        ("proto", "proto_toolchain_for_java") => Some("@bazel_tools//tools/proto:java_toolchain"),
-        ("proto", "proto_toolchain_for_javalite") => {
-            Some("@bazel_tools//tools/proto:javalite_toolchain")
-        }
-        ("proto", "proto_compiler") => {
-            Some("@protobuf//src/google/protobuf/compiler:protoc_minimal")
-        }
-        _ => None,
-    }
 }
 
 #[async_trait]
@@ -564,8 +548,8 @@ async fn execute_aspect(
     };
 
     // Resolve aspect attribute dependencies (async - before Starlark eval)
-    // For each aspect attr with a configuration_field() default, map to a label,
-    // analyze the target, and collect providers for ctx.attr resolution.
+    // For each aspect attr with a configuration_field() default or a regular
+    // label default, analyze the target and collect providers for ctx.attr resolution.
     let aspect_attr_deps: HashMap<
         String,
         (
@@ -573,6 +557,8 @@ async fn execute_aspect(
             kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue,
         ),
     > = {
+        use kuro_node::attrs::coerced_attr::CoercedAttr;
+
         let mut attr_deps = HashMap::new();
         let aspect_attrs = aspect.as_ref().attrs();
 
@@ -584,10 +570,40 @@ async fn execute_aspect(
                         Ok((resolved_label, providers)) => {
                             attr_deps.insert(attr_name.clone(), (resolved_label, providers));
                         }
-                        Err(_e) => {
-                            // Resolution failed - aspect may not use this attr
+                        Err(e) => {
+                            debug!(attr = %attr_name, label = %label_str, error = ?e,
+                                "aspect configuration_field attr resolution failed; aspect may not use this attr");
                         }
                     }
+                }
+            } else if let Some(default) = starlark_attr.default() {
+                // Also resolve regular label (CoercedAttr::Dep) defaults.
+                // e.g., _aspect_proto_toolchain = attr.label(default = "//python:python_toolchain")
+                if let CoercedAttr::Dep(providers_label) = default.as_ref() {
+                    let configured_label =
+                        providers_label.target().configure(target.cfg().dupe());
+                    match ctx.compute(&AnalysisKey(configured_label.dupe())).await {
+                        Ok(Ok(result)) => {
+                            if let Ok(analysis) = result.require_compatible() {
+                                if let Ok(providers) = analysis.providers() {
+                                    attr_deps.insert(
+                                        attr_name.clone(),
+                                        (configured_label, providers.to_owned()),
+                                    );
+                                }
+                            }
+                        }
+                        Ok(Err(e)) => {
+                            debug!(attr = %attr_name, label = %configured_label, error = ?e,
+                                "aspect label default analysis failed; aspect may not use this attr");
+                        }
+                        Err(e) => {
+                            debug!(attr = %attr_name, label = %configured_label, error = ?e,
+                                "aspect label default DICE compute failed; aspect may not use this attr");
+                        }
+                    }
+                } else {
+                    // Default is not a label dep, skip
                 }
             }
         }

@@ -301,8 +301,12 @@ pub fn register_select(globals: &mut GlobalsBuilder) {
 
     fn select<'v>(
         #[starlark(require = pos)] d: Value<'v>,
+        // Bazel-compatible: no_match_error is shown when no condition matches.
+        // We accept but ignore it for now.
+        #[starlark(require = named, default = "")] no_match_error: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkSelector<'v>> {
+        let _ = no_match_error;
         // Normalize dict keys: Label() objects (BazelLabel type) should be converted
         // to strings, since select() keys are always label strings.
         // In Bazel, `select({Label("//foo:bar"): val})` is common and valid.

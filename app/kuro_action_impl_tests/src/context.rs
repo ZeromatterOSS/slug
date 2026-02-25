@@ -89,6 +89,7 @@ fn run_ctx_test(
         Some(plugins),
         registry,
         DigestConfig::testing_default(),
+        vec![],
     ));
 
     let returned = eval.eval_function(test_function, &[ctx], &[]);

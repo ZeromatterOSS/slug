@@ -25,6 +25,7 @@ use kuro_interpreter::late_binding_ty::TransitionReprLate;
 use kuro_interpreter::starlark_promise::StarlarkPromise;
 use kuro_interpreter::types::rule::FROZEN_PROMISE_ARTIFACT_MAPPINGS_GET_IMPL;
 use kuro_interpreter::types::rule::FROZEN_RULE_GET_IMPL;
+use kuro_interpreter::types::rule::FROZEN_RULE_GET_OUTPUTS;
 use kuro_interpreter::types::transition::transition_id_from_value;
 use kuro_node::attrs::attr::Attribute;
 use kuro_node::attrs::attr_type::AttrType;
@@ -72,6 +73,7 @@ use starlark::values::Trace;
 use starlark::values::UnpackValue;
 use starlark::values::Value;
 use starlark::values::ValueOfUnchecked;
+use starlark::values::dict::DictRef;
 use starlark::values::dict::UnpackDictEntries;
 use starlark::values::list::ListType;
 use starlark::values::list::UnpackList;
@@ -136,6 +138,10 @@ pub struct StarlarkRuleCallable<'v> {
     /// Names of attributes that are `attr.output()` type.
     /// Used to register output file labels for Bazel-compatible dep resolution.
     output_attr_names: Vec<String>,
+    /// Rule-level output declarations from `rule(outputs={...})`.
+    /// Maps output attribute name → file name pattern (e.g., "output" → "%{name}.binpb").
+    /// `%{name}` in patterns is substituted with the target name at analysis time.
+    rule_outputs: Vec<(String, String)>,
 }
 
 /// Mappings of promise artifact name to the starlark function that will produce it, for anon targets.
@@ -207,6 +213,7 @@ impl<'v> StarlarkRuleCallable<'v> {
         uses_plugins: Vec<PluginKind>,
         artifact_promise_mappings: Option<ArtifactPromiseMappings<'v>>,
         is_test: bool,
+        rule_outputs: Vec<(String, String)>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> kuro_error::Result<StarlarkRuleCallable<'v>> {
         let build_context = BuildContext::from_context(eval)?;
@@ -308,6 +315,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             artifact_promise_mappings,
             is_test,
             output_attr_names,
+            rule_outputs,
         })
     }
 
@@ -336,7 +344,8 @@ impl<'v> StarlarkRuleCallable<'v> {
                     .map(|(k, v)| (*k, v.0))
                     .collect::<SmallMap<_, _>>(),
             }),
-            false, // anon rules are never test rules
+            false,      // anon rules are never test rules
+            Vec::new(), // anon rules have no rule_outputs
             eval,
         )
     }
@@ -516,6 +525,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
             ignore_attrs_for_profiling: self.ignore_attrs_for_profiling,
             artifact_promise_mappings,
             output_attr_names: self.output_attr_names,
+            rule_outputs: self.rule_outputs,
         })
     }
 }
@@ -537,6 +547,8 @@ pub struct FrozenStarlarkRuleCallable {
     /// Names of `attr.output()` attributes. Used to register output file labels for
     /// Bazel-compatible output file label resolution.
     output_attr_names: Vec<String>,
+    /// Rule-level output declarations from `rule(outputs={...})`.
+    rule_outputs: Vec<(String, String)>,
 }
 starlark_simple_value!(FrozenStarlarkRuleCallable);
 
@@ -564,6 +576,13 @@ pub(crate) fn init_frozen_promise_artifact_mappings_get_impl() {
     })
 }
 
+pub(crate) fn init_frozen_rule_get_outputs() {
+    FROZEN_RULE_GET_OUTPUTS.init(|rule| {
+        let rule = unpack_frozen_rule(rule)?;
+        Ok(rule.rule_outputs.clone())
+    })
+}
+
 impl FrozenStarlarkRuleCallable {
     pub fn rule_type(&self) -> &Arc<StarlarkRuleType> {
         &self.rule_type
@@ -575,6 +594,10 @@ impl FrozenStarlarkRuleCallable {
 
     pub fn artifact_promise_mappings(&self) -> &Option<FrozenArtifactPromiseMappings> {
         &self.artifact_promise_mappings
+    }
+
+    pub fn rule_outputs(&self) -> &Vec<(String, String)> {
+        &self.rule_outputs
     }
 }
 
@@ -792,7 +815,6 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         // TODO(bazel): Use the subrules parameter for subrule composition
         // TODO(bazel): Use the initializer parameter for pre-analysis attribute validation
         // TODO(bazel): Use the exec_groups parameter for execution groups
-        // TODO(bazel): Use the outputs parameter for implicit outputs
         // TODO(bazel): Use the executable parameter
         let _unused = (
             provides,
@@ -801,10 +823,27 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             subrules,
             initializer,
             exec_groups,
-            outputs,
             executable,
             extra_kwargs,
         );
+
+        // Extract rule(outputs={...}) patterns.
+        // Each key→value pair maps an output name to a template like "%{name}.binpb".
+        let rule_outputs: Vec<(String, String)> = if let Some(outputs_val) = outputs {
+            if let Some(dict) = DictRef::from_value(outputs_val) {
+                dict.iter()
+                    .filter_map(|(k, v)| {
+                        let key = k.unpack_str()?.to_owned();
+                        let val = v.unpack_str()?.to_owned();
+                        Some((key, val))
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
 
         // When build_setting is specified, add build_setting_default as an implicit attribute.
         // In Bazel, rules with build_setting automatically accept build_setting_default.
@@ -933,6 +972,7 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
                 .collect(),
             None,
             test,
+            rule_outputs,
             eval,
         )?)
     }

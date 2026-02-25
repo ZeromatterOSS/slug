@@ -144,7 +144,7 @@ def FindModuleSpace(main_rel_path):
       runfiles_dir = runfiles_manifest_file[:-9]
   # Be defensive: the runfiles dir should contain our main entry point. If
   # it doesn't, then it must not be our runfiles directory.
-  if runfiles_dir and os.path.exists(os.path.join(runfiles_dir, main_rel_path)):
+  if runfiles_dir and os.path.exists(os.path.normpath(os.path.join(runfiles_dir, main_rel_path))):
     return runfiles_dir
 
   stub_filename = sys.argv[0]
@@ -550,6 +550,12 @@ def Main():
   new_env['PYTHONSAFEPATH'] = '1'
 
   main_filename = os.path.join(module_space, main_rel_path)
+  # Normalize the path lexically to resolve any "../" components before os.path.exists()
+  # This is needed because rules_python generates paths like
+  # "workspace_name/../workspace_name/path" for external repos, and when
+  # workspace_name is a symlink, os.path.exists() follows the symlink before
+  # applying "../", resulting in "file not found" even when the file exists.
+  main_filename = os.path.normpath(main_filename)
   main_filename = GetWindowsPathWithUNCPrefix(main_filename)
   assert os.path.exists(main_filename), \
          'Cannot exec() %r: file not found.' % main_filename

@@ -87,17 +87,24 @@ pub fn get_external_include_dirs() -> Vec<String> {
 /// Choose the appropriate include flag for a directory path.
 ///
 /// - Repo roots (`external/repo`) use `-isystem` (searched before standard system dirs)
-/// - Deep subdirs (`external/repo/a/b/...`) use `-idirafter` (searched AFTER standard
-///   system dirs) to prevent files like `endian.h` in `absl/base/internal/` from
+/// - One level below repo root (`external/repo/src`) use `-isystem` too — needed for
+///   repos that use `strip_include_prefix = "/src"` (like protobuf).
+/// - Deep subdirs (`external/repo/a/b/...`, depth>=2) use `-idirafter` (searched AFTER
+///   standard system dirs) to prevent files like `endian.h` in `absl/base/internal/` from
 ///   shadowing `/usr/include/endian.h`
 /// - Non-external dirs use `-I`
+///
+/// IMPORTANT: Uses non-empty path segment counting to correctly handle trailing slashes.
+/// e.g. `external/protobuf/src/` has depth=1 (one segment "src"), NOT depth=2.
 fn include_flag_for_dir(dir: &str) -> String {
     if dir.starts_with("external/") || dir.starts_with("bazel-out/") {
-        // Count path components after "external/<repo>/"
+        // Count non-empty path components after "external/<repo>/"
         if dir.starts_with("external/") {
             if let Some(second_slash) = dir[9..].find('/') {
                 let after_repo = &dir[9 + second_slash..];
-                let depth = after_repo.chars().filter(|c| *c == '/').count();
+                // Count non-empty segments to handle trailing slashes correctly.
+                // e.g. "/src/" has 1 non-empty segment ("src"), not 2 slashes.
+                let depth = after_repo.split('/').filter(|s| !s.is_empty()).count();
                 if depth >= 2 {
                     // Deep subdir: use -idirafter to avoid shadowing system headers
                     return format!("-idirafter{}", dir);
@@ -108,6 +115,28 @@ fn include_flag_for_dir(dir: &str) -> String {
     } else {
         format!("-I{}", dir)
     }
+}
+
+/// Normalize a `buck-out/v2/external_cells/bzlmod/<name>/<version>/...` path to
+/// the equivalent `external/<name>/...` path for include path computation.
+///
+/// This is needed because source artifacts from external bzlmod cells use the
+/// full `buck-out/v2/external_cells/` path, but `external/<name>` is a symlink
+/// to the same location and is the canonical form for include paths.
+fn normalize_external_cells_path(path: &str) -> Option<String> {
+    let prefix = "buck-out/v2/external_cells/bzlmod/";
+    if !path.starts_with(prefix) {
+        return None;
+    }
+    let rest = &path[prefix.len()..];
+    // rest = "<name>/<version>/..."
+    let name_end = rest.find('/')?;
+    let name = &rest[..name_end];
+    let after_name = &rest[name_end + 1..];
+    // Skip the version component
+    let version_end = after_name.find('/')?;
+    let after_version = &after_name[version_end + 1..];
+    Some(format!("external/{}/{}", name, after_version))
 }
 
 // ============================================================================
@@ -1103,9 +1132,22 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             .flatten()
             .and_then(|v| v.unpack_str())
         {
+            // Normalize buck-out/v2/external_cells/bzlmod/<name>/<version>/... paths to
+            // external/<name>/... for include path computation. This ensures that the same
+            // include path logic applies whether the source is referenced via the symlink
+            // (external/<name>/...) or the raw buck-out path.
+            let normalized_src_path;
+            let effective_src_path: &str =
+                if let Some(norm) = normalize_external_cells_path(src_path_str) {
+                    normalized_src_path = norm;
+                    &normalized_src_path
+                } else {
+                    src_path_str
+                };
+
             // For external repo sources with /src/ dir, add as include path
-            if let Some(ext_idx) = src_path_str.find("/src/") {
-                let inc_dir = &src_path_str[..ext_idx + 5];
+            if let Some(ext_idx) = effective_src_path.find("/src/") {
+                let inc_dir = &effective_src_path[..ext_idx + 5];
                 if seen_include_dirs.insert(inc_dir.to_string()) {
                     let flag = include_flag_for_dir(inc_dir);
                     args_vec.push(heap.alloc_str(&flag).to_value());
@@ -1115,9 +1157,9 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             // Also add "external/<repo>/" for direct includes and "external/" for
             // repo-name-prefixed includes (e.g., `#include "rules_cc/cc/..."` in
             // rules_cc source files).
-            if src_path_str.starts_with("external/") {
-                if let Some(second_slash) = src_path_str[9..].find('/') {
-                    let repo_dir = &src_path_str[..9 + second_slash];
+            if effective_src_path.starts_with("external/") {
+                if let Some(second_slash) = effective_src_path[9..].find('/') {
+                    let repo_dir = &effective_src_path[..9 + second_slash];
                     if seen_include_dirs.insert(repo_dir.to_string()) {
                         let flag = include_flag_for_dir(repo_dir);
                         args_vec.push(heap.alloc_str(&flag).to_value());
@@ -1136,11 +1178,11 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             // Register source file's parent directory as an include path.
             // Uses -idirafter (via include_flag_for_dir) for deep paths to avoid
             // shadowing system headers.
-            if src_path_str.starts_with("external/") {
-                if let Some(second_slash) = src_path_str[9..].find('/') {
+            if effective_src_path.starts_with("external/") {
+                if let Some(second_slash) = effective_src_path[9..].find('/') {
                     let repo_end = 9 + second_slash;
-                    if let Some(last_slash) = src_path_str.rfind('/') {
-                        let src_dir = &src_path_str[..last_slash];
+                    if let Some(last_slash) = effective_src_path.rfind('/') {
+                        let src_dir = &effective_src_path[..last_slash];
                         let depth = src_dir[repo_end..].matches('/').count();
                         if depth >= 1 && depth <= 3 {
                             register_external_include_dir(src_dir);
@@ -1155,6 +1197,30 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             if seen_include_dirs.insert(include_dir.clone()) {
                 let flag = include_flag_for_dir(&include_dir);
                 args_vec.push(heap.alloc_str(&flag).to_value());
+            }
+        }
+
+        // Add preprocessor defines from cc_compilation_context: -D<define>
+        // In Bazel, `defines` are transitive (propagated to all dependents).
+        // `local_defines` are not propagated but still apply to this target.
+        if !cc_compilation_context.is_none() {
+            for attr_name in &["defines", "local_defines"] {
+                if let Ok(Some(defines_val)) = cc_compilation_context.get_attr(attr_name, heap) {
+                    if !defines_val.is_none() {
+                        let mut elements = Vec::new();
+                        crate::interpreter::rule_defs::depset::collect_depset_elements(
+                            defines_val,
+                            &mut elements,
+                            heap,
+                        );
+                        for elem in &elements {
+                            let def = elem.to_str();
+                            if !def.is_empty() {
+                                args_vec.push(heap.alloc_str(&format!("-D{}", def)).to_value());
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -2330,12 +2396,21 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                             let src = src_tuple
                                 .at(heap.alloc(0i32).to_value(), heap)
                                 .unwrap_or(src_tuple);
-                            if let Some(src_path) = src
+                            if let Some(src_path_raw) = src
                                 .get_attr("path", heap)
                                 .ok()
                                 .flatten()
                                 .and_then(|v| v.unpack_str())
                             {
+                                // Normalize buck-out/v2/external_cells/... to external/...
+                                let normalized;
+                                let src_path: &str =
+                                    if let Some(n) = normalize_external_cells_path(src_path_raw) {
+                                        normalized = n;
+                                        &normalized
+                                    } else {
+                                        src_path_raw
+                                    };
                                 if src_path.starts_with("external/") {
                                     if let Some(second_slash) = src_path[9..].find('/') {
                                         let repo = &src_path[..9 + second_slash];
@@ -3832,7 +3907,7 @@ fn testing_methods(builder: &mut MethodsBuilder) {
     /// Returns None for now - proper implementation would return a TestEnvironment provider.
     fn TestEnvironment<'v>(
         this: &TestingModule,
-        #[starlark(require = named)] environment: Option<Value<'v>>,
+        environment: Option<Value<'v>>,
         #[starlark(require = named)] inherited_environment: Option<Value<'v>>,
     ) -> starlark::Result<NoneType> {
         let _unused = (this, environment, inherited_environment);
