@@ -32,6 +32,7 @@ use kuro_client::commands::profile::ProfileCommand;
 use kuro_client::commands::query::aquery::AqueryCommand;
 use kuro_client::commands::query::cquery::CqueryCommand;
 use kuro_client::commands::query::uquery::UqueryCommand;
+use kuro_client::commands::info::InfoCommand;
 use kuro_client::commands::root::RootCommand;
 use kuro_client::commands::run::RunCommand;
 use kuro_client::commands::server::ServerCommand;
@@ -347,6 +348,8 @@ pub(crate) enum CommandKind {
     Kill(KillCommand),
     Killall(KillallCommand),
     Root(RootCommand),
+    /// Print workspace build information (Bazel `bazel info` compatibility)
+    Info(InfoCommand),
     /// Alias for `uquery`.
     Query(UqueryCommand),
     Run(RunCommand),
@@ -511,6 +514,7 @@ impl CommandKind {
             CommandKind::Killall(cmd) => command_ctx.exec(cmd, matches, events_ctx),
             CommandKind::Clean(cmd) => cmd.exec(matches, command_ctx, events_ctx),
             CommandKind::Root(cmd) => cmd.exec(matches, command_ctx).into(),
+            CommandKind::Info(cmd) => cmd.exec(matches, command_ctx).into(),
             CommandKind::Query(cmd) => {
                 kuro_client_ctx::eprintln!(
                     "WARNING: \"kuro query\" is an alias for \"kuro uquery\". Consider using \"kuro cquery\" or \"kuro uquery\" explicitly."
@@ -560,6 +564,7 @@ impl CommandKind {
             CommandKind::Killall(cmd) => cmd.logging_name(),
             CommandKind::Clean(cmd) => cmd.command_name(),
             CommandKind::Root(_) => "root",
+            CommandKind::Info(_) => "info",
             CommandKind::Query(cmd) => cmd.logging_name(),
             CommandKind::Server(cmd) => cmd.logging_name(),
             CommandKind::Status(_) => "status",
