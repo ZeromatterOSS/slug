@@ -317,13 +317,45 @@ fn normalize_flag(arg: &str) -> String {
     format!("{}{}", normalized_flag, value_part)
 }
 
-/// Normalize all args: convert Bazel underscore flags to hyphen flags.
+/// Normalize all args: convert Bazel underscore flags to hyphen flags, and
+/// strip Bazel-only transitional flags that kuro doesn't understand.
 ///
-/// This is called for both command-line args (before clap) and for bazelrc
-/// flags (before injection). Bazel treats `--flag_name` and `--flag-name`
-/// as equivalent; kuro uses hyphens.
+/// Bazel treats `--flag_name` and `--flag-name` as equivalent; kuro uses hyphens.
+///
+/// Transitional flags like `--incompatible_*` and `--noincompatible_*` are Bazel
+/// migration flags that enable future-default behavior. Kuro already implements
+/// current Bazel semantics, so these are silently stripped.
 pub fn normalize_args(args: Vec<String>) -> Vec<String> {
-    args.into_iter().map(|a| normalize_flag(&a)).collect()
+    args.into_iter()
+        .filter(|a| !is_bazel_transitional_flag(a))
+        .map(|a| normalize_flag(&a))
+        .collect()
+}
+
+/// Returns true for Bazel-only transitional flags that kuro should silently ignore.
+///
+/// These include:
+/// - `--incompatible_*` / `--noincompatible_*`: Bazel migration flags
+/// - `--legacy_*` / `--nolegacy_*`: Legacy behavior toggles
+/// - `--experimental_*` / `--noexperimental_*`: Experimental features
+fn is_bazel_transitional_flag(arg: &str) -> bool {
+    // Must start with -- (long flag)
+    let flag_name = if let Some(stripped) = arg.strip_prefix("--") {
+        stripped
+    } else {
+        return false;
+    };
+    // Get just the flag name part (before =)
+    let flag_name = flag_name.split('=').next().unwrap_or(flag_name);
+    // Strip leading "no" prefix for boolean flags
+    let base = flag_name.strip_prefix("no").unwrap_or(flag_name);
+    // Check against transitional prefixes
+    base.starts_with("incompatible_")
+        || base.starts_with("incompatible-")
+        || base.starts_with("legacy_")
+        || base.starts_with("legacy-")
+        || base.starts_with("experimental_")
+        || base.starts_with("experimental-")
 }
 
 /// Inject flags from `.bazelrc` files into the args list.
@@ -545,5 +577,46 @@ mod tests {
         assert_eq!(normalize_flag("--keep-going"), "--keep-going");
         // No underscores → unchanged
         assert_eq!(normalize_flag("--verbose"), "--verbose");
+    }
+
+    #[test]
+    fn test_is_bazel_transitional_flag() {
+        // incompatible_* flags are stripped
+        assert!(is_bazel_transitional_flag(
+            "--incompatible_enable_cc_toolchain_resolution"
+        ));
+        assert!(is_bazel_transitional_flag(
+            "--incompatible-enable-cc-toolchain-resolution"
+        ));
+        assert!(is_bazel_transitional_flag(
+            "--noincompatible_enable_cc_toolchain_resolution"
+        ));
+        // legacy_* flags are stripped
+        assert!(is_bazel_transitional_flag("--legacy_whole_archive"));
+        assert!(is_bazel_transitional_flag("--nolegacy_whole_archive"));
+        // experimental_* flags are stripped
+        assert!(is_bazel_transitional_flag(
+            "--experimental_cc_implementation_deps"
+        ));
+        // Normal flags are NOT stripped
+        assert!(!is_bazel_transitional_flag("--keep-going"));
+        assert!(!is_bazel_transitional_flag("--verbose_failures"));
+        assert!(!is_bazel_transitional_flag("--jobs=8"));
+        assert!(!is_bazel_transitional_flag("//my:target"));
+        assert!(!is_bazel_transitional_flag("-c"));
+    }
+
+    #[test]
+    fn test_normalize_args_strips_transitional() {
+        let args = vec![
+            "kuro".to_owned(),
+            "build".to_owned(),
+            "--incompatible_enable_cc_toolchain_resolution".to_owned(),
+            "--keep_going".to_owned(),
+            "--noincompatible_use_toolchain_transition".to_owned(),
+            "//...".to_owned(),
+        ];
+        let result = normalize_args(args);
+        assert_eq!(result, vec!["kuro", "build", "--keep-going", "//..."]);
     }
 }

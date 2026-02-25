@@ -138,7 +138,11 @@ fn maybe_inject_test_info<'v>(
                     .map(|s| heap.alloc_str(s.as_str()).to_value())
                     .collect();
                 let labels_value = heap.alloc(labels);
-                let test_info = create_external_runner_test_info_for_bazel_test(test_type, command, labels_value);
+                let test_info = create_external_runner_test_info_for_bazel_test(
+                    test_type,
+                    command,
+                    labels_value,
+                );
                 let test_info_value = heap.alloc(test_info);
 
                 // Create new list with test_info appended

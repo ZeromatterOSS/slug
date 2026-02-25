@@ -98,7 +98,7 @@ If include patterns are present, regardless of whether exclude patterns are pres
         value_name = "TAGS",
         help = "Comma-separated list of test tags to filter on (Bazel compatibility). \
 Positive tags include only matching tests; prefix with '-' to exclude. \
-Example: --test_tag_filters=small,-slow (include 'small', exclude 'slow')",
+Example: --test_tag_filters=small,-slow (include 'small', exclude 'slow')"
     )]
     test_tag_filters: Option<String>,
 
@@ -164,11 +164,7 @@ Example: --test_tag_filters=small,-slow (include 'small', exclude 'slow')",
     /// Examples:
     ///   kuro test //foo:bar --test_filter=MyClass.TestMethod
     ///   kuro test //foo:bar --test_filter=test_
-    #[clap(
-        long = "test_filter",
-        alias = "test-filter",
-        value_name = "PATTERN"
-    )]
+    #[clap(long = "test_filter", alias = "test-filter", value_name = "PATTERN")]
     test_filter: Option<String>,
 
     /// Additional arguments passed to the test executor.
@@ -205,6 +201,48 @@ Example: --test_tag_filters=small,-slow (include 'small', exclude 'slow')",
     // ignored. only for e2e tests. compatibility with v1.
     #[clap(long = "xml", hide = true)]
     _xml: Option<String>,
+
+    // ---- Bazel compatibility flags (accepted, some are no-ops) ----
+    /// Control test output verbosity (Bazel compatibility).
+    ///
+    /// Bazel's --test_output controls whether test stdout/stderr is shown:
+    /// - `summary`: Show only test status and timing (default)
+    /// - `errors`: Show output for failed tests only
+    /// - `all`: Show output for all tests
+    /// - `short`: Show first few lines for failed tests
+    /// - `streamed`: Stream all output in real-time
+    ///
+    /// Accepted for compatibility. Kuro passes output via the test executor args.
+    #[clap(
+        long = "test-output",
+        alias = "test_output",
+        hide = true,
+        value_name = "MODE"
+    )]
+    test_output: Option<String>,
+
+    /// Control test summary format (Bazel compatibility).
+    ///
+    /// Accepted for compatibility with Bazel's --test_summary flag.
+    #[clap(
+        long = "test-summary",
+        alias = "test_summary",
+        hide = true,
+        value_name = "FORMAT"
+    )]
+    test_summary: Option<String>,
+
+    /// Per-test timeout in seconds (Bazel compatibility).
+    ///
+    /// Accepted for compatibility with Bazel's --test_timeout flag.
+    /// Sets the maximum time each test is allowed to run.
+    #[clap(
+        long = "test-timeout",
+        alias = "test_timeout",
+        hide = true,
+        value_name = "SECONDS"
+    )]
+    test_timeout: Option<u32>,
 
     #[clap(flatten)]
     build_opts: CommonBuildOptions,

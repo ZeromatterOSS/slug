@@ -22,8 +22,14 @@ use kuro_common::argv::SanitizedArgv;
 const INFO_KEYS: &[(&str, &str)] = &[
     ("workspace", "Absolute path to the workspace root"),
     ("output_base", "Absolute path to the base output directory"),
-    ("execution_root", "Absolute path to the execution root (buck-out/v2)"),
-    ("bazel-bin", "Absolute path to the bazel-bin convenience directory"),
+    (
+        "execution_root",
+        "Absolute path to the execution root (buck-out/v2)",
+    ),
+    (
+        "bazel-bin",
+        "Absolute path to the bazel-bin convenience directory",
+    ),
     ("bazel-testlogs", "Absolute path to the test logs directory"),
     ("release", "Version info for this Kuro release"),
 ];
@@ -62,7 +68,10 @@ impl InfoCommand {
                     .join("v2")
                     .to_string_lossy()
                     .into_owned(),
-                "bazel-bin" => project_root.join("bazel-bin").to_string_lossy().into_owned(),
+                "bazel-bin" => project_root
+                    .join("bazel-bin")
+                    .to_string_lossy()
+                    .into_owned(),
                 "bazel-testlogs" => project_root
                     .join("bazel-testlogs")
                     .to_string_lossy()

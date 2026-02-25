@@ -268,6 +268,67 @@ pub struct CommonBuildConfigurationOptions {
         ignore_case = true
     )]
     pub compilation_mode: Option<String>,
+
+    // ---- Bazel compatibility flags (accepted, some are no-ops) ----
+    /// Enable ANSI color output (Bazel compatibility).
+    ///
+    /// Accepted for compatibility with Bazel's --color flag.
+    /// Use `--console` to control Kuro's output style.
+    #[clap(long = "color", hide = true, value_name = "yes|no|auto")]
+    pub color: Option<String>,
+
+    /// Show progress (Bazel compatibility).
+    ///
+    /// Accepted for compatibility with Bazel's --show_progress flag.
+    #[clap(long = "show-progress", alias = "show_progress", hide = true)]
+    pub show_progress: bool,
+
+    /// Set per-action execution strategy (Bazel compatibility).
+    ///
+    /// Format: --strategy=MNEMONIC=STRATEGY (e.g., CppCompile=remote).
+    /// Accepted for compatibility with Bazel's --strategy flag.
+    #[clap(long = "strategy", hide = true, value_name = "MNEMONIC=STRATEGY")]
+    pub strategy: Vec<String>,
+
+    /// Set execution strategy for genrule actions (Bazel compatibility).
+    ///
+    /// Accepted for compatibility with Bazel's --genrule_strategy flag.
+    #[clap(
+        long = "genrule-strategy",
+        alias = "genrule_strategy",
+        hide = true,
+        value_name = "STRATEGY"
+    )]
+    pub genrule_strategy: Vec<String>,
+
+    /// Remote execution options (Bazel compatibility).
+    ///
+    /// Accepted for compatibility with Bazel's --remote_* flags.
+    /// These are currently accepted but not applied.
+    #[clap(
+        long = "remote-executor",
+        alias = "remote_executor",
+        hide = true,
+        value_name = "HOST:PORT"
+    )]
+    pub remote_executor: Option<String>,
+
+    #[clap(
+        long = "remote-cache",
+        alias = "remote_cache",
+        hide = true,
+        value_name = "URL"
+    )]
+    pub remote_cache: Option<String>,
+
+    /// Maximum number of remote execution retries (Bazel compatibility).
+    #[clap(
+        long = "remote-retries",
+        alias = "remote_retries",
+        hide = true,
+        value_name = "N"
+    )]
+    pub remote_retries: Option<u32>,
 }
 
 impl CommonBuildConfigurationOptions {
@@ -383,6 +444,13 @@ impl CommonBuildConfigurationOptions {
             preemptible: Some(PreemptibleWhen::Never),
             exit_when: None,
             compilation_mode: None,
+            color: None,
+            show_progress: false,
+            strategy: vec![],
+            genrule_strategy: vec![],
+            remote_executor: None,
+            remote_cache: None,
+            remote_retries: None,
         };
         &DEFAULT
     }
@@ -399,6 +467,13 @@ impl CommonBuildConfigurationOptions {
             preemptible: Some(PreemptibleWhen::OnDifferentState),
             exit_when: None,
             compilation_mode: None,
+            color: None,
+            show_progress: false,
+            strategy: vec![],
+            genrule_strategy: vec![],
+            remote_executor: None,
+            remote_cache: None,
+            remote_retries: None,
         };
         &OPTS
     }

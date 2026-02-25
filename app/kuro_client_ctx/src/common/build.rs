@@ -95,7 +95,12 @@ pub struct CommonBuildOptions {
 
     /// Number of threads to use during execution (default is # cores)
     // TODO(cjhopman): This only limits the threads used for action execution and it doesn't work correctly with concurrent commands.
-    #[clap(short = 'j', long = "num-threads", value_name = "THREADS")]
+    #[clap(
+        short = 'j',
+        long = "num-threads",
+        alias = "jobs",  // Bazel compatibility: --jobs=N
+        value_name = "THREADS"
+    )]
     pub num_threads: Option<u32>,
 
     /// Enable only local execution. Will reject actions that cannot execute locally.
@@ -160,13 +165,15 @@ pub struct CommonBuildOptions {
     /// `--keep-going` changes the behavior of buck to not only wait on `:bar` once one dependency
     /// of `:foo` has failed, but to additionally attempt to build other dependencies of `:foo` if
     /// possible.
-    #[clap(long, group = "fail-when")]
+    // Alias fail_fast for Bazel compatibility (Bazel uses underscores; both forms are accepted).
+    #[clap(long, alias = "fail_fast", group = "fail-when")]
     fail_fast: bool,
 
     /// If Buck hits an error, continue doing as much work as possible before exiting.
     ///
     /// See `--fail-fast` for more details.
-    #[clap(long, group = "fail-when")]
+    // Alias keep_going for Bazel compatibility (Bazel uses underscores; both forms are accepted).
+    #[clap(long, alias = "keep_going", group = "fail-when")]
     keep_going: bool,
 
     /// If target is missing, then skip building instead of throwing error.
@@ -197,6 +204,46 @@ pub struct CommonBuildOptions {
     /// Disable filesystem sandboxing (overrides --sandbox and [sandbox] enabled in .buckconfig).
     #[clap(long, overrides_with = "sandbox")]
     nosandbox: bool,
+
+    // ---- Bazel compatibility flags (accepted, some are no-ops) ----
+    /// Print the full build command when an action fails (Bazel compatibility).
+    ///
+    /// Accepted for compatibility with Bazel's --verbose_failures flag.
+    /// Kuro already prints failure details; this flag is accepted but currently
+    /// does not change the output format.
+    #[clap(long = "verbose-failures", alias = "verbose_failures", hide = true)]
+    pub verbose_failures: bool,
+
+    /// Set user-defined build variables (Bazel compatibility).
+    ///
+    /// Values are in KEY=VALUE format. Accepted for compatibility with Bazel's
+    /// --define flag. Can be used with config_setting(define_values = {...}).
+    /// Currently accepted but not yet wired to select() evaluation.
+    #[clap(long = "define", hide = true, value_name = "KEY=VALUE")]
+    pub define: Vec<String>,
+
+    /// Pass environment variable to build actions (Bazel compatibility).
+    ///
+    /// Values are in NAME or NAME=VALUE format. Accepted for compatibility with
+    /// Bazel's --action_env flag. Currently accepted but not propagated to actions.
+    #[clap(
+        long = "action-env",
+        alias = "action_env",
+        hide = true,
+        value_name = "NAME[=VALUE]"
+    )]
+    pub action_env: Vec<String>,
+
+    /// Pass environment variable to host actions (Bazel compatibility).
+    ///
+    /// Accepted for compatibility with Bazel's --host_action_env flag.
+    #[clap(
+        long = "host-action-env",
+        alias = "host_action_env",
+        hide = true,
+        value_name = "NAME[=VALUE]"
+    )]
+    pub host_action_env: Vec<String>,
 }
 
 impl CommonBuildOptions {

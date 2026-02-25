@@ -430,11 +430,7 @@ fn create_bazel_bin_symlinks(
     for target in build_targets {
         for output in &target.outputs {
             // Only create symlinks for default_info outputs
-            if !output
-                .providers
-                .as_ref()
-                .map_or(false, |p| p.default_info)
-            {
+            if !output.providers.as_ref().map_or(false, |p| p.default_info) {
                 continue;
             }
 
