@@ -335,7 +335,7 @@ Quick reference to all phases and their locations:
 | 7a    | Bazel Native Rules      | [~] Partial (constraint_setting/value, config_setting, platform, toolchain_type, cc_libc_top_alias done; platform() now produces PlatformInfo) |
 | 7b    | Bazel Global Functions  | [ ] Not Started |
 | 7c    | Bazel Top-Level Modules | [~] Partial (config module done, platform_common partial) |
-| 7d    | Buck2-Specific Removal  | [ ] Not Started |
+| 7d    | Buck2-Specific Removal  | [~] Partial (read_config/read_root_config error with message; oncall/read_oncall/load_symbols removed; soft_error already errors; 2026-02-24) |
 
 ### Aspects (Phases 8a-8d) - [Sub-plan](./kuro-bazel-subplans/06-aspects.md)
 

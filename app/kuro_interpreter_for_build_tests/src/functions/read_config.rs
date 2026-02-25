@@ -8,27 +8,30 @@
  * above-listed licenses.
  */
 
-use indoc::indoc;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
 
 #[test]
-fn test_read_config() -> kuro_error::Result<()> {
+fn test_read_config_not_supported() -> kuro_error::Result<()> {
     let mut tester = Tester::new().unwrap();
-    tester.run_starlark_test(indoc!(
+    tester.run_starlark_test_expecting_error(
         r#"
-            def test():
-                assert_eq("default", read_config("missing_section", "key", "default"))
-                assert_eq("default", read_config("section", "missing_key", "default"))
-                assert_eq(1, read_config("section", "missing_key", 1))
-                assert_eq(None, read_config("section", "missing_key", None))
+def test():
+    read_config("section", "key")
+"#,
+        "Buck2-specific function not available in Bazel-compatible mode",
+    );
+    Ok(())
+}
 
-                assert_eq("value", read_config("section", "key", "default"))
-                assert_eq("value", read_config("section", "key"))
-
-                assert_eq("1", read_config("section", "other"))
-                assert_eq("hello world!", read_config("section", "multiline"))
-                assert_eq("okay", read_config("config", "key"))
-            "#
-    ))?;
+#[test]
+fn test_read_root_config_not_supported() -> kuro_error::Result<()> {
+    let mut tester = Tester::new().unwrap();
+    tester.run_starlark_test_expecting_error(
+        r#"
+def test():
+    read_root_config("section", "key")
+"#,
+        "Buck2-specific function not available in Bazel-compatible mode",
+    );
     Ok(())
 }

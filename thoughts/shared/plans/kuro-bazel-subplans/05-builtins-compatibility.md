@@ -374,10 +374,10 @@ Per 04-prelude-architecture.md, these language-specific directories should be re
 ### Implementation Strategy
 
 **Phase 7d.1: Immediate Removals**
-- [ ] Remove `read_config()`, `read_root_config()` (or make them error with migration message)
-- [ ] Remove `oncall()`, `read_oncall()`
-- [ ] Remove `load_symbols()`
-- [ ] Verify `soft_error()` already errors in OSS
+- [x] Remove `read_config()`, `read_root_config()` (changed to error with Bazel migration message; 2026-02-24)
+- [x] Remove `oncall()`, `read_oncall()` (removed from register_module_natives; 2026-02-24)
+- [x] Remove `load_symbols()` (changed to error with migration message; 2026-02-24)
+- [x] Verify `soft_error()` already errors in OSS (confirmed: handle_soft_error returns Err when is_open_source=true)
 
 **Phase 7d.2: Deprecation Warnings**
 - [ ] Add deprecation warning to `attrs.*` functions (suggest `attr.*`)
@@ -390,7 +390,9 @@ Per 04-prelude-architecture.md, these language-specific directories should be re
 
 ### Success Criteria (Phase 7d)
 
-- [ ] `read_config()` removed or errors with clear migration message
+- [x] `read_config()`, `read_root_config()` error with clear migration message (2026-02-24)
+- [x] `oncall()`, `read_oncall()`, `load_symbols()` removed (2026-02-24)
+- [x] `soft_error()` already errors in OSS (confirmed)
 - [ ] `attrs.*` emits deprecation warning
 - [ ] Prelude reduced to core + extensions
 - [ ] No Buck2-specific functions pollute Bazel-style BUILD files

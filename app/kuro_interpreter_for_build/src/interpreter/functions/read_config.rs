@@ -9,65 +9,51 @@
  */
 
 use starlark::environment::GlobalsBuilder;
-use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::values::StringValue;
-use starlark::values::StringValueLike;
 use starlark::values::Value;
 use starlark::values::none::NoneOr;
 
-use crate::interpreter::build_context::BuildContext;
+const READ_CONFIG_ERROR: &str = "read_config() is a Buck2-specific function not available in \
+    Bazel-compatible mode. Use MODULE.bazel for dependency configuration, \
+    select() for platform-conditional attributes, or module_extension() for \
+    custom configuration. See https://bazel.build/external/module for details.";
+
+const READ_ROOT_CONFIG_ERROR: &str = "read_root_config() is a Buck2-specific function not \
+    available in Bazel-compatible mode. Use MODULE.bazel for dependency configuration, \
+    select() for platform-conditional attributes, or module_extension() for \
+    custom configuration. See https://bazel.build/external/module for details.";
 
 #[starlark_module]
 pub(crate) fn register_read_config(globals: &mut GlobalsBuilder) {
-    /// Read a configuration from the nearest enclosing `.buckconfig`
-    /// of the `BUCK` file that started evaluation of this code.
+    /// Buck2-specific function not available in Bazel-compatible mode.
     ///
-    /// As an example, if you have a `.buckconfig` of:
-    ///
-    /// ```toml
-    /// [package_options]
-    /// compile = super_fast
-    /// ```
-    ///
-    /// Then you would get the following results:
-    ///
-    /// ```python
-    /// read_config("package_options", "compile") == "super_fast"
-    /// read_config("package_options", "linker") == None
-    /// read_config("package_options", "linker", "a_default") == "a_default"
-    /// ```
-    ///
-    /// In general the use of `.buckconfig` is discouraged in favour of `select`,
-    /// but it can still be useful.
-    #[starlark(speculative_exec_safe)]
+    /// In Bazel, configuration is handled through:
+    /// - `MODULE.bazel` for dependency configuration
+    /// - `select()` for platform-conditional attributes
+    /// - `module_extension()` for custom configuration
     fn read_config<'v>(
-        section: StringValue,
-        key: StringValue,
-        default: Option<Value<'v>>,
-        eval: &mut Evaluator<'v, '_, '_>,
+        _section: StringValue,
+        _key: StringValue,
+        _default: Option<Value<'v>>,
     ) -> starlark::Result<Value<'v>> {
-        let buckconfigs = &BuildContext::from_context(eval)?.buckconfigs;
-        match buckconfigs.current_cell_get(section, key, eval)? {
-            Some(v) => Ok(v.to_value()),
-            None => Ok(default.unwrap_or_else(Value::new_none)),
-        }
+        Err(kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", READ_CONFIG_ERROR).into())
     }
 
-    /// Like `read_config` but the project root `.buckconfig` is always consulted,
-    /// regardless of the cell of the originating `BUCK` file.
-    #[starlark(speculative_exec_safe)]
+    /// Buck2-specific function not available in Bazel-compatible mode.
+    ///
+    /// In Bazel, configuration is handled through:
+    /// - `MODULE.bazel` for dependency configuration
+    /// - `select()` for platform-conditional attributes
+    /// - `module_extension()` for custom configuration
     fn read_root_config<'v>(
-        #[starlark(require = pos)] section: StringValue,
-        #[starlark(require = pos)] key: StringValue,
-        // Unlike `read_config` we only allow string or `None` as default.
-        #[starlark(require = pos, default = NoneOr::None)] default: NoneOr<StringValue<'v>>,
-        eval: &mut Evaluator<'v, '_, '_>,
+        #[starlark(require = pos)] _section: StringValue,
+        #[starlark(require = pos)] _key: StringValue,
+        #[starlark(require = pos, default = NoneOr::None)] _default: NoneOr<StringValue<'v>>,
     ) -> starlark::Result<NoneOr<StringValue<'v>>> {
-        let buckconfigs = &BuildContext::from_context(eval)?.buckconfigs;
-        match buckconfigs.root_cell_get(section, key, eval)? {
-            Some(v) => Ok(NoneOr::Other(v.to_string_value())),
-            None => Ok(default),
-        }
+        Err(
+            kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", READ_ROOT_CONFIG_ERROR)
+                .into(),
+        )
     }
 }

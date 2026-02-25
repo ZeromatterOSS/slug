@@ -8,25 +8,17 @@
  * above-listed licenses.
  */
 
-use kuro_core::bzl::ImportPath;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
 
 #[test]
-fn test_load_symbols() -> kuro_error::Result<()> {
+fn test_load_symbols_not_supported() -> kuro_error::Result<()> {
     let mut t = Tester::new()?;
-    let defines = ImportPath::testing_new("root//pkg:test.bzl");
-    t.add_import(
-        &defines,
+    t.run_starlark_test_expecting_error(
         r#"
-y = 2
-load_symbols({'x': 1, 'z': 3})
-"#,
-    )?;
-    t.run_starlark_test(
-        r#"
-load("@root//pkg:test.bzl", "x", "y", "z")
 def test():
-    assert_eq(x + y + z, 6)"#,
-    )?;
+    load_symbols({'x': 1})
+"#,
+        "Buck2-specific function not available in Bazel-compatible mode",
+    );
     Ok(())
 }

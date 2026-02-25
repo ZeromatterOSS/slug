@@ -12,7 +12,6 @@ use dupe::Dupe;
 use gazebo::prelude::SliceExt;
 use indoc::indoc;
 use kuro_build_api::interpreter::rule_defs::provider::registration::register_builtin_providers;
-use kuro_build_api::interpreter::rule_defs::register_rule_defs;
 use kuro_common::legacy_configs::cells::BuckConfigBasedCells;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
 use kuro_common::legacy_configs::configs::testing::TestConfigParserFileOps;
@@ -481,84 +480,6 @@ fn test_builtins() -> kuro_error::Result<()> {
             "#
         ),
         "The attribute `kuro_fail` is not available",
-    );
-    Ok(())
-}
-
-#[test]
-fn test_oncall() -> kuro_error::Result<()> {
-    let mut tester = Tester::new().unwrap();
-    tester.additional_globals(register_rule_defs);
-    tester.run_starlark_test(indoc!(
-        r#"
-            def _impl(ctx):
-                pass
-            export_file = rule(impl=_impl, attrs = {})
-
-            def test():
-                oncall("valid")
-                export_file(name = "rule_name")
-            "#
-    ))?;
-    tester.run_starlark_test(indoc!(
-        r#"
-            def _impl(ctx):
-                pass
-            export_file = rule(impl=_impl, attrs = {})
-
-            def test():
-                oncall("valid")
-                if read_oncall() != "valid":
-                    fail("oncall should be set to valid")
-                export_file(name = "rule_name")
-                if read_oncall() != "valid":
-                    fail("oncall should be set to valid and targets set")
-            "#
-    ))?;
-    tester.run_starlark_test(indoc!(
-        r#"
-            def _impl(ctx):
-                pass
-            export_file = rule(impl=_impl, attrs = {})
-
-            def test():
-                if read_oncall() != None:
-                    fail("oncall should be None if never set")
-            "#
-    ))?;
-    tester.run_starlark_test_expecting_error(
-        indoc!(
-            r#"
-            def test():
-                oncall("valid")
-                oncall("twice")
-            "#
-        ),
-        "more than once",
-    );
-    tester.run_starlark_test_expecting_error(
-        indoc!(
-            r#"
-            def _impl(ctx):
-                pass
-            export_file = rule(impl=_impl, attrs = {})
-
-            def test():
-                export_file(name = "rule_name")
-                oncall("failure after")
-            "#
-        ),
-        "after one or more targets",
-    );
-    tester.run_starlark_test_expecting_error(
-        indoc!(
-            r#"
-            def test():
-                read_oncall()
-                oncall("valid")
-            "#
-        ),
-        "after calling `read_oncall`",
     );
     Ok(())
 }

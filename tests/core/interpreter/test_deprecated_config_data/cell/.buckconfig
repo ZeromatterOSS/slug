@@ -1,6 +1,0 @@
-[repositories]
-    root = ..
-[buildfile]
-    name = BUILD.bazel
-[deprecated_config]
-    other.config2 = Please use other.config3

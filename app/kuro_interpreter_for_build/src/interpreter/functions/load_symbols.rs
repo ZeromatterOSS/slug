@@ -10,27 +10,21 @@
 
 use starlark::collections::SmallMap;
 use starlark::environment::GlobalsBuilder;
-use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::values::Value;
 use starlark::values::none::NoneType;
 
+const LOAD_SYMBOLS_ERROR: &str = "load_symbols() is a Buck2-specific function not available in \
+    Bazel-compatible mode. Use top-level variable assignments and load() statements to \
+    export symbols from .bzl files.";
+
 #[starlark_module]
 pub(crate) fn register_load_symbols(builder: &mut GlobalsBuilder) {
-    /// Used in a `.bzl` file to set exported symbols. In most cases just defining
-    /// the symbol as a top-level binding is sufficient, but sometimes the names
-    /// might be programatically generated.
+    /// Buck2-specific function not available in Bazel-compatible mode.
     ///
-    /// It is undefined behaviour if you try and use any of the symbols exported
-    /// here later in the same module, or if they overlap with existing definitions.
-    /// This function should be used rarely.
-    fn load_symbols<'v>(
-        symbols: SmallMap<&'v str, Value<'v>>,
-        eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<NoneType> {
-        for (k, v) in symbols.into_iter() {
-            eval.set_module_variable_at_some_point(k, v)?;
-        }
-        Ok(NoneType)
+    /// In Bazel, use top-level variable assignments and `load()` statements
+    /// to export symbols from .bzl files.
+    fn load_symbols<'v>(_symbols: SmallMap<&'v str, Value<'v>>) -> starlark::Result<NoneType> {
+        Err(kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", LOAD_SYMBOLS_ERROR).into())
     }
 }
