@@ -155,6 +155,22 @@ Example: --test_tag_filters=small,-slow (include 'small', exclude 'slow')",
     #[clap(long)]
     test_executor_stderr: Option<OutputDestinationArg>,
 
+    /// Filter tests matching a regex pattern (Bazel compatibility).
+    ///
+    /// Sets TESTBRIDGE_TEST_ONLY=<pattern> in the test environment. Test
+    /// frameworks (e.g., gtest, pytest, cargo test) read this variable to
+    /// filter which tests to run. Equivalent to Bazel's --test_filter flag.
+    ///
+    /// Examples:
+    ///   kuro test //foo:bar --test_filter=MyClass.TestMethod
+    ///   kuro test //foo:bar --test_filter=test_
+    #[clap(
+        long = "test_filter",
+        alias = "test-filter",
+        value_name = "PATTERN"
+    )]
+    test_filter: Option<String>,
+
     /// Additional arguments passed to the test executor.
     ///
     /// Test executor is expected to have `--env` flag to pass environment variables.
@@ -233,6 +249,15 @@ impl StreamingCommand for TestCommand {
             }
         }
 
+        // Bazel --test_filter=REGEX compat: set TESTBRIDGE_TEST_ONLY env var so test
+        // frameworks can filter individual test cases. We inject it as --env to the
+        // test executor so the internal test runner passes it to the test binary.
+        let mut test_executor_args = self.test_executor_args;
+        if let Some(filter) = self.test_filter {
+            test_executor_args.insert(0, "--env".to_owned());
+            test_executor_args.insert(1, format!("TESTBRIDGE_TEST_ONLY={filter}"));
+        }
+
         let response = buckd
             .with_flushing()
             .test(
@@ -240,7 +265,7 @@ impl StreamingCommand for TestCommand {
                     context: Some(context),
                     target_patterns: self.patterns.clone(),
                     target_cfg: Some(self.target_cfg.target_cfg()),
-                    test_executor_args: self.test_executor_args,
+                    test_executor_args,
                     excluded_labels,
                     included_labels,
                     always_exclude: self.always_exclude,
