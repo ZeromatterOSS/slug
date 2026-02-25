@@ -23,6 +23,7 @@ use kuro_client::commands::ctargets::ConfiguredTargetsCommand;
 use kuro_client::commands::expand_external_cell::ExpandExternalCellsCommand;
 use kuro_client::commands::explain::ExplainCommand;
 use kuro_client::commands::help_env::HelpEnvCommand;
+use kuro_client::commands::info::InfoCommand;
 use kuro_client::commands::init::InitCommand;
 use kuro_client::commands::install::InstallCommand;
 use kuro_client::commands::kill::KillCommand;
@@ -32,7 +33,6 @@ use kuro_client::commands::profile::ProfileCommand;
 use kuro_client::commands::query::aquery::AqueryCommand;
 use kuro_client::commands::query::cquery::CqueryCommand;
 use kuro_client::commands::query::uquery::UqueryCommand;
-use kuro_client::commands::info::InfoCommand;
 use kuro_client::commands::root::RootCommand;
 use kuro_client::commands::run::RunCommand;
 use kuro_client::commands::server::ServerCommand;
@@ -42,6 +42,7 @@ use kuro_client::commands::targets::TargetsCommand;
 use kuro_client::commands::test::TestCommand;
 use kuro_client_ctx::argfiles::expand_argv;
 use kuro_client_ctx::bazelrc::inject_bazelrc_args;
+use kuro_client_ctx::bazelrc::normalize_args;
 use kuro_client_ctx::client_ctx::BuckSubcommand;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
 use kuro_client_ctx::client_metadata::ClientMetadata;
@@ -222,18 +223,15 @@ pub fn exec(process: ProcessContext<'_>) -> ExitResult {
     // Inject .bazelrc flags before argfile expansion. The bazelrc flags are
     // inserted after the subcommand, so explicit command-line flags take precedence.
     // Pass through `--nobazelrc` / `--bazelrc=none` by scanning raw args early.
-    let raw_args = inject_bazelrc_args(
+    // Also normalize underscore-style Bazel flags (--keep_going) to hyphen-style
+    // kuro flags (--keep-going) so both forms are accepted transparently.
+    let raw_args = normalize_args(inject_bazelrc_args(
         process.shared.args.to_vec(),
         project_root.as_deref(),
-    );
+    ));
 
-    let expanded_args = expand_argv(
-        arg0_override,
-        raw_args,
-        &mut immediate_config,
-        &cwd,
-    )
-    .buck_error_context("Error expanding argsfiles")?;
+    let expanded_args = expand_argv(arg0_override, raw_args, &mut immediate_config, &cwd)
+        .buck_error_context("Error expanding argsfiles")?;
 
     let argv = Argv {
         argv: process.shared.args.to_vec(),

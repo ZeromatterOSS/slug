@@ -33,7 +33,8 @@
 //! Named configs (`build:myconfig --flag`) are collected but only applied when
 //! `--config=myconfig` is present in the args.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 
 /// Known kuro subcommands (used to find injection point in argv).
 static KNOWN_COMMANDS: &[&str] = &[
@@ -284,6 +285,47 @@ fn find_active_configs(args: &[String]) -> Vec<String> {
     configs
 }
 
+/// Normalize a Bazel-style flag argument to kuro-compatible form.
+///
+/// Bazel allows both `--keep_going` and `--keep-going` interchangeably.
+/// Kuro's clap flags use hyphens, so we normalize underscores → hyphens
+/// in the flag name part (before any `=` sign).
+///
+/// Only normalizes `--long_flags`, not values, short flags, or bare args.
+///
+/// Examples:
+/// - `--keep_going` → `--keep-going`
+/// - `--test_output=all` → `--test-output=all`
+/// - `-c opt` → unchanged (short flag)
+/// - `//my:target` → unchanged (not a flag)
+fn normalize_flag(arg: &str) -> String {
+    // Only process long flags with underscores
+    if !arg.starts_with("--") || !arg.contains('_') {
+        return arg.to_owned();
+    }
+    // Don't normalize single-element args that look like `--` (separator)
+    if arg == "--" {
+        return arg.to_owned();
+    }
+    // Split on = to get flag name and value parts
+    let (flag_part, value_part) = match arg.find('=') {
+        Some(pos) => (&arg[..pos], &arg[pos..]),
+        None => (arg, ""),
+    };
+    // Replace underscores with hyphens in the flag name only
+    let normalized_flag = flag_part.replace('_', "-");
+    format!("{}{}", normalized_flag, value_part)
+}
+
+/// Normalize all args: convert Bazel underscore flags to hyphen flags.
+///
+/// This is called for both command-line args (before clap) and for bazelrc
+/// flags (before injection). Bazel treats `--flag_name` and `--flag-name`
+/// as equivalent; kuro uses hyphens.
+pub fn normalize_args(args: Vec<String>) -> Vec<String> {
+    args.into_iter().map(|a| normalize_flag(&a)).collect()
+}
+
 /// Inject flags from `.bazelrc` files into the args list.
 ///
 /// Returns the modified args. If bazelrc loading is disabled via `--nobazelrc`
@@ -315,9 +357,7 @@ pub fn inject_bazelrc_args(mut args: Vec<String>, project_root: Option<&Path>) -
         .iter()
         .enumerate()
         .skip(1) // skip argv[0]
-        .find(|(_, a)| {
-            !a.starts_with('-') && KNOWN_COMMANDS.contains(&a.as_str())
-        })
+        .find(|(_, a)| !a.starts_with('-') && KNOWN_COMMANDS.contains(&a.as_str()))
         .map(|(i, _)| i);
 
     let (command_name, insert_pos) = match cmd_pos {
@@ -441,16 +481,10 @@ mod tests {
     #[test]
     fn test_flags_for_command() {
         let mut data = BazelRcData::default();
-        data.entries.push((
-            "common".to_owned(),
-            None,
-            vec!["--verbose".to_owned()],
-        ));
-        data.entries.push((
-            "build".to_owned(),
-            None,
-            vec!["--jobs=4".to_owned()],
-        ));
+        data.entries
+            .push(("common".to_owned(), None, vec!["--verbose".to_owned()]));
+        data.entries
+            .push(("build".to_owned(), None, vec!["--jobs=4".to_owned()]));
         data.entries.push((
             "test".to_owned(),
             None,
@@ -467,11 +501,8 @@ mod tests {
     #[test]
     fn test_flags_for_named_config() {
         let mut data = BazelRcData::default();
-        data.entries.push((
-            "build".to_owned(),
-            None,
-            vec!["--jobs=4".to_owned()],
-        ));
+        data.entries
+            .push(("build".to_owned(), None, vec!["--jobs=4".to_owned()]));
         data.entries.push((
             "build".to_owned(),
             Some("opt".to_owned()),
@@ -496,5 +527,23 @@ mod tests {
             }
             _ => panic!("Expected Flags variant"),
         }
+    }
+
+    #[test]
+    fn test_normalize_flag() {
+        // Underscore flags get normalized
+        assert_eq!(normalize_flag("--keep_going"), "--keep-going");
+        assert_eq!(normalize_flag("--test_output=all"), "--test-output=all");
+        assert_eq!(normalize_flag("--num_threads=4"), "--num-threads=4");
+        // Short flags unchanged
+        assert_eq!(normalize_flag("-c"), "-c");
+        // Separator unchanged
+        assert_eq!(normalize_flag("--"), "--");
+        // Bare args unchanged
+        assert_eq!(normalize_flag("//my:target"), "//my:target");
+        // Already hyphenated unchanged
+        assert_eq!(normalize_flag("--keep-going"), "--keep-going");
+        // No underscores → unchanged
+        assert_eq!(normalize_flag("--verbose"), "--verbose");
     }
 }
