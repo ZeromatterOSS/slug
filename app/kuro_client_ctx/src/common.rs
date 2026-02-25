@@ -250,6 +250,24 @@ pub struct CommonBuildConfigurationOptions {
     /// Whether to proceed with or fail this invocation based on the daemon state.
     #[clap(long, ignore_case = true, value_enum)]
     pub exit_when: Option<ExitWhen>,
+
+    /// Compilation mode (Bazel compatibility).
+    ///
+    /// Controls optimization level for the build. Accepted values:
+    /// - `fastbuild` (default): No optimizations, enables assertions
+    /// - `dbg`: Full debug info, no optimization
+    /// - `opt`: Maximum optimization, no debug info
+    ///
+    /// Note: Equivalent to Bazel's --compilation_mode flag. Currently accepted
+    /// for compatibility but does not yet affect C++ compiler flags.
+    #[clap(
+        long = "compilation_mode",
+        alias = "compilation-mode",
+        hide = true,
+        value_name = "MODE",
+        ignore_case = true
+    )]
+    pub compilation_mode: Option<String>,
 }
 
 impl CommonBuildConfigurationOptions {
@@ -364,6 +382,7 @@ impl CommonBuildConfigurationOptions {
             exit_when_different_state: false,
             preemptible: Some(PreemptibleWhen::Never),
             exit_when: None,
+            compilation_mode: None,
         };
         &DEFAULT
     }
@@ -379,6 +398,7 @@ impl CommonBuildConfigurationOptions {
             exit_when_different_state: false,
             preemptible: Some(PreemptibleWhen::OnDifferentState),
             exit_when: None,
+            compilation_mode: None,
         };
         &OPTS
     }
@@ -641,7 +661,9 @@ impl<'a> BuckArgMatches<'a> {
                                 v.split_once("=").unwrap().1.to_owned(),
                             ))
                         }
-                        v if v.starts_with("--target-platforms=") || v.starts_with("--platforms=") => {
+                        v if v.starts_with("--target-platforms=")
+                            || v.starts_with("--platforms=") =>
+                        {
                             Some(RepresentativeConfigFlagSource::TargetPlatforms(
                                 v.split_once("=").unwrap().1.to_owned(),
                             ))
