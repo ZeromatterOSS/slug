@@ -95,7 +95,7 @@ pub fn analyze_native_rule(
         NativeRuleKind::CcLibrary => create_cc_analysis_result(target),
         NativeRuleKind::CcBinary => create_cc_analysis_result(target),
         NativeRuleKind::CcTest => create_cc_analysis_result(target),
-        NativeRuleKind::TestSuite => create_minimal_analysis_result(target),
+        NativeRuleKind::TestSuite => analyze_test_suite(target, dep_analysis),
         NativeRuleKind::Toolchain => create_minimal_analysis_result(target),
         NativeRuleKind::ShLibrary => analyze_sh_library(target, configured_node, dep_analysis),
         NativeRuleKind::ShBinary => analyze_sh_binary(target, configured_node),
@@ -1089,6 +1089,19 @@ fn analyze_sh_library(
     )]);
 
     make_native_analysis_result(target, heap, providers, 0)
+}
+
+/// Analyze a `test_suite` target.
+///
+/// A test_suite groups multiple test targets under a single label.
+/// The constituent tests are stored in the internal TESTS_ATTRIBUTE (ID 8) as labels,
+/// so node.tests() returns them for expansion by the test runner (kuro test).
+/// The test_suite itself produces no build artifacts.
+fn analyze_test_suite(
+    target: &ConfiguredTargetLabel,
+    _dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+) -> kuro_error::Result<AnalysisResult> {
+    create_minimal_analysis_result(target)
 }
 
 /// Analyze an `sh_binary` target.

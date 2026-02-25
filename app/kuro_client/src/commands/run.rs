@@ -273,8 +273,7 @@ impl StreamingCommand for RunCommand {
                         if workspace_name != "_main" {
                             let main_link = format!("{}/{}", runfiles_dir, "_main");
                             if !std::path::Path::new(&main_link).exists() {
-                                let _ =
-                                    std::os::unix::fs::symlink(workspace_name, &main_link);
+                                let _ = std::os::unix::fs::symlink(workspace_name, &main_link);
                             }
                         }
                     }

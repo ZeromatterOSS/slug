@@ -51,6 +51,22 @@ pub fn is_generated_target(node: TargetNodeRef) -> bool {
     false
 }
 
+/// Returns true if a target has `tags = ["manual"]`.
+///
+/// In Bazel, targets with `tags = ["manual"]` are excluded from wildcard patterns
+/// like `//...` or `:all`. They must be referenced explicitly.
+fn has_manual_tag(node: TargetNodeRef) -> bool {
+    if let Some(tags) = node.attr_or_none("tags", AttrInspectOptions::All) {
+        if let CoercedAttr::List(tags) = tags.value {
+            return tags.iter().any(|tag| match tag {
+                CoercedAttr::String(tag) => ***tag == *"manual",
+                _ => false,
+            });
+        }
+    }
+    false
+}
+
 #[derive(Debug, kuro_error::Error)]
 // WARN: CI uses this message to filter targets
 // If you change this message, please also update https://fburl.com/code/z0azzcc3
@@ -334,6 +350,10 @@ impl EvaluationResult {
             PackageSpec::All() => {
                 let mut label_to_node = BTreeMap::new();
                 for target_info in self.targets().values() {
+                    // Bazel: targets with tags = ["manual"] are excluded from wildcard patterns.
+                    if has_manual_tag(target_info) {
+                        continue;
+                    }
                     label_to_node.insert(
                         (target_info.label().name().to_owned(), T::default()),
                         target_info.to_owned(),

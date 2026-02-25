@@ -36,7 +36,7 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 | `genquery` | Runs query language, outputs results | Not implemented | TBD |
 | `genrule` | Generic build rule using shell | ✓ Implemented (native, with GenruleAction) | `native_rules.rs`, `native_rule_analysis.rs`, `genrule_action.rs` |
 | `starlark_doc_extract` | Extracts docs from .bzl files | Not implemented | Low priority |
-| `test_suite` | Defines collections of tests | ✓ Exists | `prelude/test_suite.bzl` |
+| `test_suite` | Defines collections of tests | ✓ Implemented (native, TESTS_ATTRIBUTE, expansion works) | `native_rules.rs`, `native_rule_analysis.rs` |
 
 #### Platform & Toolchain Rules
 
@@ -59,8 +59,8 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 ### Implementation Strategy
 
 **Phase 7a.1: Verify Existing Rules**
-- [ ] Verify `alias`, `filegroup`, `genrule`, `test_suite`, `sh_binary`, `sh_test` match Bazel API
-- [ ] Update attribute names/semantics if different
+- [x] Verify `alias`, `filegroup`, `genrule`, `test_suite`, `sh_binary`, `sh_test` match Bazel API (2026-02-25)
+- [x] Update attribute names/semantics if different (done: test_suite uses TESTS_ATTRIBUTE label list for node.tests() expansion)
 
 **Phase 7a.2: Platform Rules (Critical for Toolchains)**
 - [x] Implement `constraint_setting` rule
@@ -211,16 +211,16 @@ These modules must be available as globals in .bzl files.
 
 | Function | Description | Kuro Status |
 |----------|-------------|-------------|
-| `config.bool()` | Boolean build setting | Not implemented |
-| `config.int()` | Integer build setting | Not implemented |
-| `config.string()` | String build setting | Not implemented |
-| `config.string_list()` | String list setting | Not implemented |
-| `config.string_set()` | String set setting | Not implemented |
-| `config.exec()` | Execution transition | ✓ Stub |
-| `config.target()` | No-op target transition | Not implemented |
-| `config.none()` | Remove all configuration | Not implemented |
+| `config.bool()` | Boolean build setting | ✓ Implemented |
+| `config.int()` | Integer build setting | ✓ Implemented |
+| `config.string()` | String build setting | ✓ Implemented |
+| `config.string_list()` | String list setting | ✓ Implemented |
+| `config.string_set()` | String set setting | Not implemented (low priority) |
+| `config.exec()` | Execution transition | ✓ Implemented |
+| `config.target()` | No-op target transition | ✓ Implemented |
+| `config.none()` | Remove all configuration | ✓ Implemented |
 
-**Status**: Mostly not implemented (needed for toolchain resolution)
+**Status**: Fully implemented (config.rs)
 
 ### Module: `platform_common`
 
@@ -285,9 +285,9 @@ These modules must be available as globals in .bzl files.
 ### Implementation Strategy
 
 **Phase 7c.1: Critical Modules (blocks rules_cc)**
-- [ ] Implement `config` module fully
-- [ ] Implement `platform_common` module
-- [ ] Complete `cc_common` beyond stubs
+- [x] Implement `config` module fully (2026-02-25: all methods done in config.rs)
+- [x] Implement `platform_common` module (ConstraintSettingInfo, ConstraintValueInfo, PlatformInfo, ToolchainInfo, TemplateVariableInfo all work)
+- [x] Complete `cc_common` beyond stubs (rules_cc builds work: cc_library, cc_binary, cc_test, cc_proto_library)
 
 **Phase 7c.2: Supporting Modules**
 - [ ] Implement `testing.analysis_test()`

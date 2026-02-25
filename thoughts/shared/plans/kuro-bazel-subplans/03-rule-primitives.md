@@ -75,8 +75,8 @@ Status key: **Done** = fully working, **Stub** = exists but returns hardcoded/in
 |---|---|---|---|---|
 | 1 | `ctx.coverage_instrumented(target?)` | `bool` | **Stub** | Always returns `False` (context.rs:750) |
 | 2 | `ctx.expand_location(input, targets=[])` | `string` | **Done** | Expands `$(location ...)` templates (context.rs). Resolves `$(location :label)` and `$(locations :label)` from provided `targets` list. |
-| 3 | `ctx.expand_make_variables(attr, cmd, subs)` | `string` | **Missing** | Deprecated in Bazel. Expands `$(VAR)` Make variables. |
-| 4 | `ctx.package_relative_label(input)` | `Label` | **Missing** | Converts string to Label relative to BUILD package. |
+| 3 | `ctx.expand_make_variables(attr, cmd, subs)` | `string` | **Done** | Expands `$(VAR)` Make variables from additional_substitutions dict. Used by genrule (context.rs:866). |
+| 4 | `ctx.package_relative_label(input)` | `Label` | **Done** | Converts string to Label relative to BUILD package (context.rs:920). |
 | 5 | `ctx.resolve_command(...)` | `tuple` | **Missing** | Experimental. Low priority. |
 | 6 | `ctx.resolve_tools(tools=[])` | `tuple` | **Missing** | Returns depset of tool files + runfiles. |
 | 7 | `ctx.runfiles(files, transitive_files, ...)` | `runfiles` | **Done** | Implemented (context.rs:762) |

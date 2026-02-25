@@ -18,7 +18,8 @@ const HELP_HEADING: &str = "Target Configuration Options";
 pub struct TargetCfgOptions {
     #[clap(
         long = "target-platforms",
-        help = "Configuration target (one) to use to configure targets",
+        alias = "platforms",
+        help = "Configuration target (one) to use to configure targets (Bazel: --platforms)",
         num_args = 1,
         value_name = "PLATFORM"
     )]
@@ -38,6 +39,7 @@ pub struct TargetCfgUnusedOptions {
     /// This option is not used.
     #[clap(
         long = "target-platforms",
+        alias = "platforms",
         num_args = 1,
         hide = true,
         value_name = "PLATFORM"

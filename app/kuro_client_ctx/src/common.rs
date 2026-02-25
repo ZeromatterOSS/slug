@@ -616,7 +616,7 @@ impl<'a> BuckArgMatches<'a> {
                             state = State::Matched("-m");
                             None
                         }
-                        "--target-platforms" => {
+                        "--target-platforms" | "--platforms" => {
                             state = State::Matched("--target-platforms");
                             None
                         }
@@ -641,7 +641,7 @@ impl<'a> BuckArgMatches<'a> {
                                 v.split_once("=").unwrap().1.to_owned(),
                             ))
                         }
-                        v if v.starts_with("--target-platforms=") => {
+                        v if v.starts_with("--target-platforms=") || v.starts_with("--platforms=") => {
                             Some(RepresentativeConfigFlagSource::TargetPlatforms(
                                 v.split_once("=").unwrap().1.to_owned(),
                             ))

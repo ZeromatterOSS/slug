@@ -573,7 +573,10 @@ mod rule_defs {
     });
 
     fn test_suite_attributes() -> AttributeSpec {
-        // `tests` is an internal attribute (ID 8), so we don't add it as a user attribute.
+        // `tests` is an internal attribute (ID 8) with type AttrType::list(AttrType::label()).
+        // We populate it by passing ("tests", coerced_label_list) to create_native_target_node,
+        // which finds "tests" via attr_specs() (internal attrs are always included) and stores it.
+        // node.tests() then reads TESTS_ATTRIBUTE (ID 8) and returns the test labels for expansion.
         AttributeSpec::from(vec![], false, &RuleIncomingTransition::None)
             .expect("test_suite attributes should be valid")
     }
@@ -1908,9 +1911,13 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let internals = ModuleInternals::from_context(eval, "test_suite")?;
         let coercion_ctx = internals.attr_coercion_context();
 
-        let dep_type = AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY));
+        // Coerce tests as a label list (matching TESTS_ATTRIBUTE type: AttrType::list(AttrType::label())).
+        // This stores the tests in the internal TESTS_ATTRIBUTE (ID 8) via create_native_target_node,
+        // which makes node.tests() return them correctly for test suite expansion in the test runner.
+        let label_list_type = AttrType::list(AttrType::label());
         let tests_val = eval.heap().alloc(tests.items);
-        let coerced_tests = dep_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, tests_val)?;
+        let coerced_tests =
+            label_list_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, tests_val)?;
 
         let target_node = create_native_target_node(
             rule_defs::TEST_SUITE_RULE.clone(),

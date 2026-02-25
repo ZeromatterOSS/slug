@@ -327,3 +327,33 @@ genrule(
     outs = ["sandbox_write_out.txt"],
     cmd = "echo 'hello' > /tmp/kuro_sandbox_write_test.txt && echo 'done' > $@",
 )
+
+# =============================================================================
+# test_suite: groups tests for expansion by kuro test
+# =============================================================================
+test_suite(
+    name = "all_cc_tests",
+    tests = [
+        ":hello_test",
+        ":hello_test_dynamic",
+    ],
+)
+
+test_suite(
+    name = "all_tests",
+    tests = [
+        ":all_cc_tests",
+        ":hello_sh_test",
+        ":hello_rust_test",
+        ":hello_py_test",
+    ],
+)
+
+# This target should be excluded from //... due to tags = ["manual"].
+# It will fail if built/run, verifying that it is correctly excluded.
+cc_binary(
+    name = "manual_only_binary",
+    srcs = ["main.c"],
+    deps = [":hello_lib"],
+    tags = ["manual"],
+)
