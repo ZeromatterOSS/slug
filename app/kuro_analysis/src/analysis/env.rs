@@ -79,6 +79,7 @@ use crate::attrs::resolve::node_to_attrs_struct::node_to_attrs_struct;
 fn maybe_inject_test_info<'v>(
     heap: Heap<'v>,
     list_res: Value<'v>,
+    tags: &[String],
 ) -> kuro_error::Result<Value<'v>> {
     // Handle struct(providers=[...]) pattern from legacy Bazel rules
     let (actual_list_res, is_struct) = if ListRef::from_value(list_res).is_none() {
@@ -128,10 +129,16 @@ fn maybe_inject_test_info<'v>(
     if let Some(di_value) = default_info_value {
         if let Ok(Some(exe)) = di_value.get_attr("executable", heap) {
             if !exe.is_none() {
-                // Create ExternalRunnerTestInfo with the executable as command
+                // Create ExternalRunnerTestInfo with the executable as command.
+                // Propagate Bazel tags as labels for test filtering (--include/--exclude).
                 let test_type = heap.alloc_str("custom").to_value();
                 let command = heap.alloc(vec![exe]);
-                let test_info = create_external_runner_test_info_for_bazel_test(test_type, command);
+                let labels: Vec<Value<'v>> = tags
+                    .iter()
+                    .map(|s| heap.alloc_str(s.as_str()).to_value())
+                    .collect();
+                let labels_value = heap.alloc(labels);
+                let test_info = create_external_runner_test_info_for_bazel_test(test_type, command, labels_value);
                 let test_info_value = heap.alloc(test_info);
 
                 // Create new list with test_info appended
@@ -425,8 +432,29 @@ async fn run_analysis_with_env_underlying(
 
         // For Bazel test rules (rule(test=True)), auto-inject ExternalRunnerTestInfo
         // if the implementation returned DefaultInfo(executable=...) but no ExternalRunnerTestInfo.
+        // Propagate the Bazel `tags` attribute as ExternalRunnerTestInfo labels so that
+        // `kuro test --include=small` works for Bazel tests tagged with `tags = ["small"]`.
         let list_res = if node.is_test() {
-            maybe_inject_test_info(env.heap(), list_res)?
+            use kuro_node::attrs::configured_attr::ConfiguredAttr;
+            use kuro_node::attrs::inspect_options::AttrInspectOptions;
+            let tags: Vec<String> = if let Some(attr) = node.get("tags", AttrInspectOptions::All) {
+                if let ConfiguredAttr::List(list) = attr.value {
+                    list.iter()
+                        .filter_map(|item| {
+                            if let ConfiguredAttr::String(s) = item {
+                                Some(s.0.as_str().to_owned())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect()
+                } else {
+                    vec![]
+                }
+            } else {
+                vec![]
+            };
+            maybe_inject_test_info(env.heap(), list_res, &tags)?
         } else {
             list_res
         };

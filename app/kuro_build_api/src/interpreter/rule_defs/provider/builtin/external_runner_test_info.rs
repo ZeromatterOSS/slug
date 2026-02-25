@@ -542,12 +542,13 @@ pub fn create_frozen_sh_test_info(
 pub fn create_external_runner_test_info_for_bazel_test<'v>(
     test_type: Value<'v>,
     command: Value<'v>,
+    labels: Value<'v>,
 ) -> ExternalRunnerTestInfo<'v> {
     ExternalRunnerTestInfo {
         test_type: ValueOfUnchecked::new(test_type),
         command: ValueOfUnchecked::new(command),
         env: ValueOfUnchecked::new(Value::new_none()),
-        labels: ValueOfUnchecked::new(Value::new_none()),
+        labels: ValueOfUnchecked::new(labels),
         contacts: ValueOfUnchecked::new(Value::new_none()),
         use_project_relative_paths: ValueOfUnchecked::new(Value::new_none()),
         run_from_project_root: ValueOfUnchecked::new(Value::new_none()),

@@ -99,6 +99,7 @@ cc_test(
     srcs = ["hello_test.c"],
     deps = [":hello_lib"],
     linkstatic = True,
+    tags = ["small"],
 )
 
 # Test dynamic linking (linkstatic=False is cc_test default)

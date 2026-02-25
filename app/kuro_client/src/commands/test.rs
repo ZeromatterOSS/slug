@@ -93,6 +93,16 @@ If include patterns are present, regardless of whether exclude patterns are pres
     include: Vec<String>,
 
     #[clap(
+        long = "test_tag_filters",
+        alias = "test-tag-filters",
+        value_name = "TAGS",
+        help = "Comma-separated list of test tags to filter on (Bazel compatibility). \
+Positive tags include only matching tests; prefix with '-' to exclude. \
+Example: --test_tag_filters=small,-slow (include 'small', exclude 'slow')",
+    )]
+    test_tag_filters: Option<String>,
+
+    #[clap(
         long = "always-exclude",
         alias = "always_exclude",
         help = "Whether to always exclude if the label appears in `exclude`, regardless of which appears first"
@@ -205,6 +215,24 @@ impl StreamingCommand for TestCommand {
         events_ctx: &mut EventsCtx,
     ) -> ExitResult {
         let context = ctx.client_context(matches, &self)?;
+
+        // Bazel --test_tag_filters=tag1,tag2,-tag3 compat: split positive/negative entries.
+        let mut excluded_labels = self.exclude;
+        let mut included_labels = self.include;
+        if let Some(tag_filters) = self.test_tag_filters {
+            for tag in tag_filters.split(',') {
+                let tag = tag.trim();
+                if tag.is_empty() {
+                    continue;
+                }
+                if let Some(neg) = tag.strip_prefix('-') {
+                    excluded_labels.push(neg.to_owned());
+                } else {
+                    included_labels.push(tag.to_owned());
+                }
+            }
+        }
+
         let response = buckd
             .with_flushing()
             .test(
@@ -213,8 +241,8 @@ impl StreamingCommand for TestCommand {
                     target_patterns: self.patterns.clone(),
                     target_cfg: Some(self.target_cfg.target_cfg()),
                     test_executor_args: self.test_executor_args,
-                    excluded_labels: self.exclude,
-                    included_labels: self.include,
+                    excluded_labels,
+                    included_labels,
                     always_exclude: self.always_exclude,
                     build_filtered_targets: self.build_filtered_targets,
                     // we don't currently have a different flag for this, so just use the build one.
