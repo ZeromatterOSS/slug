@@ -256,8 +256,8 @@ impl StreamingCommand for BuildCommand {
                         test_info: self.test_info() as i32,
                     }),
                     response_options: Some(ResponseOptions {
-                        return_outputs: self.show_output.format().is_some()
-                            || self.output_path.is_some(),
+                        // Always request outputs so we can create bazel-bin symlinks.
+                        return_outputs: true,
                     }),
                     build_opts: Some(self.build_opts.to_proto()),
                     final_artifact_materializations: self.materializations.to_proto() as i32,
@@ -328,6 +328,16 @@ impl StreamingCommand for BuildCommand {
                 )
                 .await
                 .buck_error_context("Error requesting specific output path for --out")?;
+            }
+
+            // Create bazel-bin convenience symlinks for Bazel compatibility.
+            // Mirrors Bazel's behavior: bazel-bin/<pkg>/<artifact> → buck-out/v2/gen/...
+            if let Err(e) = create_bazel_bin_symlinks(
+                ctx.paths()?.project_root().root().as_path(),
+                &response.build_targets,
+            ) {
+                // Non-fatal: don't fail build if symlinks can't be created (e.g., on Windows)
+                tracing::debug!("Failed to create bazel-bin symlinks: {}", e);
             }
 
             ExitResult::success()
@@ -402,6 +412,116 @@ pub(crate) fn print_outputs(
     }
 
     print.finish()
+}
+
+/// Create `bazel-bin/<pkg>/<artifact>` symlinks after a successful build, mirroring Bazel's
+/// convenience symlink behavior.  Only creates symlinks for `default_info` outputs from the
+/// main repo (not external cells), and skips non-Unix platforms.
+///
+/// Output path format: `buck-out/v2/gen/<cell>/<cfg_hash>[/<pkg>/...]/__<target>__/<artifact>`
+/// Symlink target:     `bazel-bin[/<pkg>]/<artifact>` → relative path to actual output
+#[cfg(unix)]
+fn create_bazel_bin_symlinks(
+    project_root: &std::path::Path,
+    build_targets: &[BuildTarget],
+) -> kuro_error::Result<()> {
+    let bazel_bin = project_root.join("bazel-bin");
+
+    for target in build_targets {
+        for output in &target.outputs {
+            // Only create symlinks for default_info outputs
+            if !output
+                .providers
+                .as_ref()
+                .map_or(false, |p| p.default_info)
+            {
+                continue;
+            }
+
+            // Parse: buck-out/v2/gen/<cell>/<cfg_hash>[/<pkg>/...]/__<target>__/<artifact...>
+            let components: Vec<&str> = output.path.split('/').collect();
+
+            // Minimum: ["buck-out","v2","gen","<cell>","<cfg_hash>","__target__","<artifact>"]
+            if components.len() < 7
+                || components[0] != "buck-out"
+                || components[1] != "v2"
+                || components[2] != "gen"
+            {
+                continue;
+            }
+
+            // Skip external cell outputs (e.g. buck-out/v2/gen/rules_cc/...)
+            // Only process main repo outputs where outputs are most useful.
+            // Heuristic: the cell name matches the last component of the project root dir name.
+            // More precisely: skip paths with "external" or those under bzlmod external cells.
+            let cell = components[3];
+            if cell.contains("__") || cell == "external" {
+                continue;
+            }
+
+            // Find the __<target>__ component (starts at index 5 after cell + cfg_hash)
+            let target_dir_offset = components[5..]
+                .iter()
+                .position(|c| c.starts_with("__") && c.ends_with("__") && c.len() > 4);
+            let target_dir_idx = match target_dir_offset {
+                Some(i) => i + 5,
+                None => continue,
+            };
+
+            // Package path: components between cfg_hash (index 4) and __target__ (target_dir_idx)
+            let pkg_components = &components[5..target_dir_idx];
+            // Artifact path: components after __target__
+            let artifact_components = &components[target_dir_idx + 1..];
+
+            if artifact_components.is_empty() {
+                continue;
+            }
+
+            // Construct bazel-bin/<pkg>/<artifact> path
+            let mut bazel_path = bazel_bin.clone();
+            for comp in pkg_components {
+                bazel_path = bazel_path.join(comp);
+            }
+            for comp in artifact_components {
+                bazel_path = bazel_path.join(comp);
+            }
+
+            // Create parent directories
+            if let Some(parent) = bazel_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+
+            // Compute relative symlink target from the symlink's location to the project root,
+            // then append the buck-out relative path.
+            // Depth = 1 (bazel-bin/) + pkg_components.len() + artifact dir components
+            let dir_depth = 1 + pkg_components.len() + artifact_components.len().saturating_sub(1);
+            let rel_target = format!("{}{}", "../".repeat(dir_depth), output.path);
+
+            // Remove existing symlink/file before creating new one
+            if bazel_path.symlink_metadata().is_ok() {
+                std::fs::remove_file(&bazel_path).ok();
+            }
+
+            std::os::unix::fs::symlink(&rel_target, &bazel_path).with_buck_error_context(|| {
+                format!(
+                    "Creating bazel-bin symlink {} -> {}",
+                    bazel_path.display(),
+                    rel_target
+                )
+            })?;
+        }
+    }
+
+    Ok(())
+}
+
+/// No-op on non-Unix platforms.
+#[cfg(not(unix))]
+fn create_bazel_bin_symlinks(
+    _project_root: &std::path::Path,
+    _build_targets: &[BuildTarget],
+) -> kuro_error::Result<()> {
+    Ok(())
 }
 
 #[cfg(test)]
