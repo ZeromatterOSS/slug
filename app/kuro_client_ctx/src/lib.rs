@@ -16,6 +16,7 @@
 #![feature(used_with_arg)]
 
 pub mod argfiles;
+pub mod bazelrc;
 pub mod client_cpu_tracker;
 pub mod client_ctx;
 pub mod client_metadata;

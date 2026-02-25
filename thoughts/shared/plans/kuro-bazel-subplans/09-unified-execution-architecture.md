@@ -577,22 +577,27 @@ Move build configuration from `.buckconfig` to `.bazelrc` and/or `MODULE.bazel` 
 
 ### Implementation
 
-This phase is lower priority than 9a-9d and can be deferred. The key actions:
-
-- [ ] Implement `.bazelrc` parser (INI-like with `command --flag=value` syntax)
-- [ ] Map `.bazelrc` flags to internal config keys
-- [ ] Support `import` and `try-import` directives
-- [ ] Keep `.buckconfig` as fallback for Kuro-specific settings
-- [ ] Document which settings go where
+- [x] Implement `.bazelrc` parser (INI-like with `command --flag=value` syntax) — `app/kuro_client_ctx/src/bazelrc.rs`
+- [x] Support `common` and per-command flag sections
+- [x] Support `import` and `try-import` directives
+- [x] Support named configs (`build:opt --flag`, applied with `--config=opt`)
+- [x] Load `~/.bazelrc` (user-level) and `<workspace>/.bazelrc` (workspace-level)
+- [x] Inject flags right after subcommand (lower precedence than command-line flags)
+- [x] Support `--nobazelrc` and `--bazelrc=none` to disable loading
+- [x] Support `--bazelrc=PATH` (recognized by clap as startup flag)
+- [x] Keep `.buckconfig` as fallback for Kuro-specific settings (unchanged)
 
 ### Success Criteria (9e)
 
 **Automated:**
-- [ ] `cargo build -p kuro` succeeds
-- [ ] `.bazelrc` with `build --jobs=4` is respected
+- [x] `cargo build -p kuro` succeeds
+- [x] 9 unit tests in `bazelrc::tests` pass
+- [x] `.bazelrc` with `build --verbose=2` causes verbose build output
 
 **Manual:**
-- [ ] Verify `.bazelrc` flags take effect
+- [x] Verify `.bazelrc` flags take effect (`build --verbose=2` shows per-action lines)
+- [x] Verify `--nobazelrc` disables loading (build output less verbose)
+- [x] Verify `--bazelrc=none` also disables loading
 - [ ] Verify Kuro-specific settings still work from `.buckconfig` fallback
 
 ---

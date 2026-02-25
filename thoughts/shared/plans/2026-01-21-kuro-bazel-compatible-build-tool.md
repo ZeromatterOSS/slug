@@ -354,7 +354,7 @@ Quick reference to all phases and their locations:
 | 9b    | Pre-Computed Canonical Names       | [x] Complete (pre_compute_extension_repo_cells) |
 | 9c    | DICE-Only Extension Execution      | [x] Complete (sync executor removed) |
 | 9d    | .buckconfig Elimination for Cells  | [x] Complete (cells from MODULE.bazel only) |
-| 9e    | Configuration Migration (.bazelrc) | [ ] Deferred (lower priority) |
+| 9e    | Configuration Migration (.bazelrc) | [x] Complete (bazelrc parser + injection; 2026-02-25) |
 | 9f    | Cleanup and Unification            | [x] Complete (dead code removed) |
 
 ### Rules Integration (Phases 10-14) - [Sub-plan](./kuro-bazel-subplans/07-rules-integration.md)

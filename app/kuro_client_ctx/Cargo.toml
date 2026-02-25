@@ -19,6 +19,7 @@ crossterm = { workspace = true }
 csv = { workspace = true }
 derivative = { workspace = true }
 derive_more = { workspace = true }
+dirs = { workspace = true }
 dupe = { workspace = true }
 fbinit = { workspace = true }
 fs4 = { workspace = true }

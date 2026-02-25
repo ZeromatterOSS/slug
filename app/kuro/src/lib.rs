@@ -41,6 +41,7 @@ use kuro_client::commands::subscribe::SubscribeCommand;
 use kuro_client::commands::targets::TargetsCommand;
 use kuro_client::commands::test::TestCommand;
 use kuro_client_ctx::argfiles::expand_argv;
+use kuro_client_ctx::bazelrc::inject_bazelrc_args;
 use kuro_client_ctx::client_ctx::BuckSubcommand;
 use kuro_client_ctx::client_ctx::ClientCommandContext;
 use kuro_client_ctx::client_metadata::ClientMetadata;
@@ -147,6 +148,20 @@ struct BeforeSubcommandOptions {
     #[clap(skip)] // @oss-enable
     // @oss-disable: #[clap(long)]
     help_wrapper: bool,
+
+    /// Disable loading of .bazelrc files (Bazel compatibility).
+    ///
+    /// When set, kuro will not load ~/.bazelrc or <workspace>/.bazelrc.
+    /// Equivalent to Bazel's --nobazelrc startup option.
+    #[clap(long, global(true), hide(true))]
+    nobazelrc: bool,
+
+    /// Path to a .bazelrc file to load instead of the default locations,
+    /// or "none" to disable .bazelrc loading entirely (Bazel compatibility).
+    ///
+    /// Equivalent to Bazel's --bazelrc startup option.
+    #[clap(long, global(true), hide(true), value_name = "PATH")]
+    bazelrc: Option<String>,
 }
 
 #[rustfmt::skip] // Formatting in internal and in OSS versions disagree after oss markers applied.
@@ -197,9 +212,24 @@ pub fn exec(process: ProcessContext<'_>) -> ExitResult {
     let cwd = process.shared.working_dir.clone();
     let mut immediate_config = ImmediateConfigContext::new(&cwd);
     let arg0_override = kuro_env!("BUCK2_ARG0")?;
+
+    // Find the project root early so we can load .bazelrc from the workspace.
+    // This mirrors Bazel's behavior: .bazelrc files are read before argument expansion.
+    let project_root = kuro_common::invocation_roots::find_invocation_roots(&cwd)
+        .ok()
+        .map(|roots| roots.project_root.root().as_path().to_path_buf());
+
+    // Inject .bazelrc flags before argfile expansion. The bazelrc flags are
+    // inserted after the subcommand, so explicit command-line flags take precedence.
+    // Pass through `--nobazelrc` / `--bazelrc=none` by scanning raw args early.
+    let raw_args = inject_bazelrc_args(
+        process.shared.args.to_vec(),
+        project_root.as_deref(),
+    );
+
     let expanded_args = expand_argv(
         arg0_override,
-        process.shared.args.to_vec(),
+        raw_args,
         &mut immediate_config,
         &cwd,
     )
