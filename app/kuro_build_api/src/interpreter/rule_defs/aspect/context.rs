@@ -305,25 +305,49 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
         Ok(false)
     }
 
-    /// Returns the workspace name (cell name) for this target.
+    /// Returns the list of aspect IDs applied to the target being analyzed.
     ///
-    /// In Bazel, `ctx.workspace_name` returns the workspace name (e.g., "protobuf").
-    /// For the root workspace it returns the root module name.
+    /// In Bazel, this returns a list of string IDs for all aspects applied to this target.
+    /// Aspects can use this to detect transitive application.
+    #[starlark(attribute)]
+    fn aspect_ids<'v>(this: RefAspectContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        // TODO(aspect_ids): Return actual aspect IDs when available.
+        // Currently returns empty list as a stub.
+        use starlark::values::list::AllocList;
+        Ok(heap.alloc(AllocList::EMPTY))
+    }
+
+    /// Returns the package path for the target being analyzed.
+    ///
+    /// In Bazel, `ctx.build_file_path` returns the path to the BUILD file.
+    #[starlark(attribute)]
+    fn build_file_path<'v>(
+        this: RefAspectContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let label = this.0.label;
+        let pkg = label.label().target().pkg();
+        let path = format!("{}/BUILD.bazel", pkg.cell_relative_path().as_str());
+        Ok(heap.alloc_str(&path).to_value())
+    }
+
+    /// Returns the workspace name for this target.
+    ///
+    /// In Bazel with bzlmod:
+    /// - Root module targets return `"_main"` (Bazel standard for root workspace)
+    /// - External module targets return the module's apparent name (cell name)
     #[starlark(attribute)]
     fn workspace_name<'v>(
         this: RefAspectContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let cell_name = this
-            .0
-            .label
-            .label()
-            .target()
-            .pkg()
-            .cell_name()
-            .as_str()
-            .to_owned();
-        Ok(heap.alloc_str(&cell_name).to_value())
+        let cell_name = this.0.label.label().target().pkg().cell_name().as_str();
+        if kuro_core::cells::is_root_cell_name(cell_name) {
+            Ok(heap.alloc_str("_main").to_value())
+        } else {
+            Ok(heap.alloc_str(cell_name).to_value())
+        }
     }
 }
 

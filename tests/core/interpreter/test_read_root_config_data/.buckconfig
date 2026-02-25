@@ -1,0 +1,8 @@
+[repositories]
+    test_read_root_config = .
+    prelude = .
+    other = other
+[buildfile]
+    name = BUILD.bazel
+[unlike]
+    harsh = regular

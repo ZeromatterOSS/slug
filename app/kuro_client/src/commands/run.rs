@@ -267,6 +267,16 @@ impl StreamingCommand for RunCommand {
                                 }
                             }
                         }
+                        // Bazel bzlmod compatibility: also expose workspace as "_main" symlink.
+                        // Bazel rules (e.g., rules_python) use ctx.workspace_name="_main" for root
+                        // module targets, so the bootstrap scripts look for files under "_main/".
+                        if workspace_name != "_main" {
+                            let main_link = format!("{}/{}", runfiles_dir, "_main");
+                            if !std::path::Path::new(&main_link).exists() {
+                                let _ =
+                                    std::os::unix::fs::symlink(workspace_name, &main_link);
+                            }
+                        }
                     }
                 }
             }

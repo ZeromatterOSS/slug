@@ -592,18 +592,26 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// Workspace name (Bazel-compatible).
     ///
     /// Returns the name of the current workspace/module from MODULE.bazel.
+    ///
+    /// In Bazel with bzlmod:
+    /// - Root module targets return `"_main"` (Bazel standard for root workspace)
+    /// - External module targets return the module's apparent name (cell name)
+    ///
     /// Returns an empty string if the workspace name is not available.
     #[starlark(attribute)]
     fn workspace_name<'v>(
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // Return the cell name as the workspace name.
-        // In Bazel, workspace_name comes from module(name=...) in MODULE.bazel.
-        // In Kuro, this corresponds to the cell name.
         if let Some(label) = this.0.label {
             let cell_name = label.label().target().pkg().cell_name().as_str();
-            Ok(heap.alloc_str(cell_name).to_value())
+            // In Bazel with bzlmod, the root module is known as "_main".
+            // External modules use their apparent name (cell name).
+            if kuro_core::cells::is_root_cell_name(cell_name) {
+                Ok(heap.alloc_str("_main").to_value())
+            } else {
+                Ok(heap.alloc_str(cell_name).to_value())
+            }
         } else {
             Ok(heap.alloc_str("").to_value())
         }

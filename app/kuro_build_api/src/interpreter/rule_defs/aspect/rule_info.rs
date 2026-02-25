@@ -42,6 +42,9 @@ use starlark::values::type_repr::StarlarkTypeRepr;
 /// Accessed via `ctx.rule` in aspect implementations. Provides:
 /// - `ctx.rule.kind` - The kind of rule (e.g., "cc_library", "py_binary")
 /// - `ctx.rule.attr` - The rule's resolved attributes
+/// - `ctx.rule.files` - Struct of file lists for label/label_list attrs
+/// - `ctx.rule.file` - Struct of single files for single-file label attrs
+/// - `ctx.rule.executable` - Struct of executables for executable label attrs
 #[derive(Debug, ProvidesStaticType, Trace, NoSerialize, Allocative)]
 pub struct AspectRuleInfo<'v> {
     /// Rule type name (e.g., "cc_library", "py_binary")
@@ -109,6 +112,54 @@ fn aspect_rule_info_methods(builder: &mut MethodsBuilder) {
         this: RefAspectRuleInfo<'v>,
     ) -> starlark::Result<ValueOfUnchecked<'v, StructRef<'static>>> {
         Ok(this.0.attr)
+    }
+
+    /// Files from the rule's label/label_list attributes, as lists of File objects.
+    ///
+    /// For each label or label_list attribute, `ctx.rule.files.<attr>` returns a list of
+    /// File objects (extracted from DefaultInfo.default_outputs of each dependency).
+    ///
+    /// Example:
+    /// ```python
+    /// def _my_aspect_impl(target, ctx):
+    ///     src_files = ctx.rule.files.srcs  # list of File objects
+    /// ```
+    #[starlark(attribute)]
+    fn files<'v>(this: RefAspectRuleInfo<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        use crate::interpreter::rule_defs::context::CtxFiles;
+        Ok(heap.alloc(CtxFiles::new(this.0.attr)))
+    }
+
+    /// A single file from a label attribute.
+    ///
+    /// For each `attr.label(allow_single_file=True)` attribute, `ctx.rule.file.<attr>`
+    /// returns the single File object.
+    ///
+    /// Example:
+    /// ```python
+    /// def _my_aspect_impl(target, ctx):
+    ///     template = ctx.rule.file.template  # single File object
+    /// ```
+    #[starlark(attribute)]
+    fn file<'v>(this: RefAspectRuleInfo<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        use crate::interpreter::rule_defs::context::CtxFile;
+        Ok(heap.alloc(CtxFile::new(this.0.attr)))
+    }
+
+    /// Executable files from executable label attributes.
+    ///
+    /// For each `attr.label(executable=True)` attribute, `ctx.rule.executable.<attr>`
+    /// returns the executable File object.
+    ///
+    /// Example:
+    /// ```python
+    /// def _my_aspect_impl(target, ctx):
+    ///     tool = ctx.rule.executable.tool  # executable File object
+    /// ```
+    #[starlark(attribute)]
+    fn executable<'v>(this: RefAspectRuleInfo<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        use crate::interpreter::rule_defs::context::CtxExecutable;
+        Ok(heap.alloc(CtxExecutable::new(this.0.attr)))
     }
 }
 

@@ -34,14 +34,25 @@ use kuro_execute::execute::request::OutputType;
 use relative_path::RelativePathBuf;
 use sha1::Digest;
 use sha1::Sha1;
+use starlark::any::ProvidesStaticType;
+use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
+use starlark::environment::MethodsStatic;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
+use starlark::typing::Ty;
 use starlark::values::AllocValue;
+use starlark::values::Heap;
+use starlark::values::NoSerialize;
+use starlark::values::StarlarkValue;
 use starlark::values::UnpackValue;
+use starlark::values::Value;
+use starlark::values::ValueLike;
 use starlark::values::ValueOf;
 use starlark::values::ValueTyped;
 use starlark::values::none::NoneOr;
+use starlark::values::none::NoneType;
+use starlark::values::starlark_value;
 use starlark::values::type_repr::StarlarkTypeRepr;
 use starlark_map::small_set::SmallSet;
 
@@ -107,8 +118,181 @@ impl<'v> CommandLineArtifactVisitor<'v> for CommandLineInputVisitor {
     }
 }
 
+/// A TemplateDict for use with `ctx.actions.expand_template(computed_substitutions=...)`.
+///
+/// Created via `ctx.actions.template_dict()`. Accumulates key-value substitution pairs
+/// that are lazily computed and applied when `expand_template` runs.
+///
+/// Example:
+/// ```python
+/// d = ctx.actions.template_dict()
+/// d.add("{VERSION}", "1.2.3")
+/// d.add_joined("{FLAGS}", feature_flags, join_with = ",")
+/// ctx.actions.expand_template(
+///     template = tmpl,
+///     output = out,
+///     computed_substitutions = d,
+/// )
+/// ```
+#[derive(Debug, ProvidesStaticType, NoSerialize, allocative::Allocative)]
+pub struct StarlarkTemplateDict {
+    /// Accumulated substitution pairs: (pattern, replacement)
+    entries: std::cell::RefCell<Vec<(String, String)>>,
+}
+
+unsafe impl<'v> starlark::values::Trace<'v> for StarlarkTemplateDict {
+    fn trace(&mut self, _tracer: &starlark::values::Tracer<'v>) {}
+}
+
+/// Wrapper for unpacking StarlarkTemplateDict from a Value in starlark_module methods.
+struct RefTemplateDict<'v>(&'v StarlarkTemplateDict);
+
+impl<'v> StarlarkTypeRepr for RefTemplateDict<'v> {
+    type Canonical = <StarlarkTemplateDict as StarlarkTypeRepr>::Canonical;
+
+    fn starlark_type_repr() -> Ty {
+        StarlarkTemplateDict::starlark_type_repr()
+    }
+}
+
+impl<'v> UnpackValue<'v> for RefTemplateDict<'v> {
+    type Error = std::convert::Infallible;
+
+    fn unpack_value_impl(value: Value<'v>) -> Result<Option<Self>, Self::Error> {
+        let Some(td) = value.downcast_ref::<StarlarkTemplateDict>() else {
+            return Ok(None);
+        };
+        Ok(Some(RefTemplateDict(td)))
+    }
+}
+
+impl std::fmt::Display for StarlarkTemplateDict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<template_dict>")
+    }
+}
+
+impl StarlarkTemplateDict {
+    pub fn new() -> Self {
+        Self {
+            entries: std::cell::RefCell::new(Vec::new()),
+        }
+    }
+
+    /// Apply all accumulated substitutions to the given content.
+    pub fn apply_to(&self, mut content: String) -> String {
+        for (key, val) in self.entries.borrow().iter() {
+            content = content.replace(key.as_str(), val.as_str());
+        }
+        content
+    }
+}
+
+impl<'v> AllocValue<'v> for StarlarkTemplateDict {
+    fn alloc_value(self, heap: Heap<'v>) -> Value<'v> {
+        heap.alloc_complex_no_freeze(self)
+    }
+}
+
+/// Methods for StarlarkTemplateDict (accessed via `template_dict.<method>`).
+#[starlark_module]
+fn template_dict_methods(builder: &mut MethodsBuilder) {
+    /// Adds a static key-value substitution.
+    ///
+    /// `key` is the pattern to find in the template; `value` is the replacement.
+    fn add<'v>(this: RefTemplateDict<'v>, key: &str, value: &str) -> starlark::Result<NoneType> {
+        this.0
+            .entries
+            .borrow_mut()
+            .push((key.to_owned(), value.to_owned()));
+        Ok(NoneType)
+    }
+
+    /// Adds a substitution by joining multiple values from a list or depset.
+    ///
+    /// `key` is the pattern; `values` is a list/depset of items; `join_with` is the separator.
+    /// Optional `map_each` transforms each item before joining.
+    fn add_joined<'v>(
+        this: RefTemplateDict<'v>,
+        key: &str,
+        values: Value<'v>,
+        #[starlark(require = named)] join_with: &str,
+        #[starlark(require = named, default = NoneType)] map_each: Value<'v>,
+        #[starlark(require = named, default = false)] omit_if_empty: bool,
+        #[starlark(require = named, default = false)] uniquify: bool,
+        #[starlark(require = named, default = false)] allow_closure: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let _ = allow_closure;
+        // Collect items from the values (handles list, depset, or single value)
+        let items: Vec<Value<'v>> = if let Ok(iter) = values.iterate(eval.heap()) {
+            iter.collect()
+        } else {
+            vec![values]
+        };
+
+        let mut string_values: Vec<String> = Vec::new();
+        for item in items {
+            let item_str = if !map_each.is_none() {
+                // Apply map_each callback to transform the item
+                let result = eval.eval_function(map_each, &[item], &[])?;
+                if result.is_none() {
+                    continue;
+                }
+                result.to_str()
+            } else {
+                item.to_str()
+            };
+            string_values.push(item_str);
+        }
+
+        if uniquify {
+            let mut seen = std::collections::HashSet::new();
+            string_values.retain(|s| seen.insert(s.clone()));
+        }
+
+        if omit_if_empty && string_values.is_empty() {
+            return Ok(NoneType);
+        }
+
+        let joined = string_values.join(join_with);
+        this.0.entries.borrow_mut().push((key.to_owned(), joined));
+        Ok(NoneType)
+    }
+}
+
+#[starlark_value(type = "template_dict")]
+impl<'v> StarlarkValue<'v> for StarlarkTemplateDict {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(template_dict_methods)
+    }
+}
+
 #[starlark_module]
 pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
+    /// Creates a new TemplateDict for use with `expand_template(computed_substitutions=...)`.
+    ///
+    /// A TemplateDict accumulates key-value substitution pairs via `add()` and `add_joined()`.
+    ///
+    /// Example:
+    /// ```python
+    /// d = ctx.actions.template_dict()
+    /// d.add("{VERSION}", "1.2.3")
+    /// ctx.actions.expand_template(
+    ///     template = tmpl,
+    ///     output = out,
+    ///     computed_substitutions = d,
+    /// )
+    /// ```
+    fn template_dict<'v>(
+        this: &AnalysisActions<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        Ok(eval.heap().alloc(StarlarkTemplateDict::new()))
+    }
+
     /// Returns an `artifact` whose contents are `content` written as a JSON value.
     ///
     /// * `output`: can be a string, or an existing artifact created with `declare_output`
@@ -551,6 +735,13 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
                         content = content.replace(k, v);
                     }
                 }
+            }
+        }
+
+        // Apply computed_substitutions from a TemplateDict object
+        if !computed_substitutions.is_none() {
+            if let Some(tdict) = computed_substitutions.downcast_ref::<StarlarkTemplateDict>() {
+                content = tdict.apply_to(content);
             }
         }
 

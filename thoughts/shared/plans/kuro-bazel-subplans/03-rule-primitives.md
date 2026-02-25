@@ -63,9 +63,9 @@ Status key: **Done** = fully working, **Stub** = exists but returns hardcoded/in
 | 18 | `ctx.toolchains` | `ToolchainContext` | **Stub** | Returns `ToolchainsStub` with hardcoded cc/rust/python detection (context.rs:387) |
 | 19 | `ctx.var` | `dict[str,str]` | **Stub** | `CtxVarDict` stub (context.rs:698) |
 | 20 | `ctx.version_file` | `File` | **Stub** | Returns string `"bazel-out/volatile-status.txt"` (context.rs:646). Should return a real `File` object. |
-| 21 | `ctx.workspace_name` | `string` | **Done** | Returns cell name (context.rs:595). In Bazel with bzlmod this is always `"_main"`. |
-| — | `ctx.aspect_ids` | `list[str]` | **Missing** | Aspect-only. List of applied aspect IDs. |
-| — | `ctx.rule` | `rule_attributes` | **Missing** | Aspect-only. Rule attrs of the target an aspect is applied to. |
+| 21 | `ctx.workspace_name` | `string` | **Done** | Returns `"_main"` for root cell, cell name for external cells (context.rs:602). Runfiles also create `_main` symlink (run.rs). |
+| — | `ctx.aspect_ids` | `list[str]` | **Done** | Aspect-only. Returns `[]` stub in AspectContext (aspect/context.rs). |
+| — | `ctx.rule` | `rule_attributes` | **Done** | Aspect-only. `AspectRuleInfo` with `kind`, `attr`, `files`, `file`, `executable` (aspect/rule_info.rs). |
 | — | `ctx.split_attr` | `struct` | **Missing** | For config transition attributes. Low priority. |
 | — | `ctx.super` | callable | **Missing** | Experimental rule inheritance. Very low priority. |
 
@@ -94,11 +94,11 @@ Status key: **Done** = fully working, **Stub** = exists but returns hardcoded/in
 | 3 | `ctx.actions.declare_file(filename, sibling?)` | **Done** | unsorted.rs:98. `sibling` accepted but ignored. |
 | 4 | `ctx.actions.declare_symlink(filename, sibling?)` | **Missing** | Requires `--experimental_allow_unresolved_symlinks`. Low priority. |
 | 5 | `ctx.actions.do_nothing(mnemonic, inputs=[])` | **Done** | Stub implementation in unsorted.rs. |
-| 6 | `ctx.actions.expand_template(template, output, substitutions, is_executable?, computed_substitutions?)` | **Done** | write.rs:404. Reads template at analysis time. `computed_substitutions` accepted but not used. |
+| 6 | `ctx.actions.expand_template(template, output, substitutions, is_executable?, computed_substitutions?)` | **Done** | write.rs:404. Reads template at analysis time. `computed_substitutions` now applied via `StarlarkTemplateDict`. |
 | 7 | `ctx.actions.run(outputs, executable, inputs, arguments, ...)` | **Done** | run.rs:243. Supports both Buck2 (`exe=`) and Bazel (`executable=`) styles. |
 | 8 | `ctx.actions.run_shell(outputs, command, inputs, arguments, ...)` | **Done** | run.rs:1036. Registers a real `UnregisteredRunAction`. String command wraps via `bash -c`. List command uses directly as exe. Full input/output/env tracking. |
 | 9 | `ctx.actions.symlink(output, target_file?, target_path?, is_executable?, ...)` | **Done** | copy.rs:153. Bazel-compatible named parameters. |
-| 10 | `ctx.actions.template_dict()` | **Missing** | Returns `TemplateDict` for lazy computed substitutions in `expand_template`. Low priority. |
+| 10 | `ctx.actions.template_dict()` | **Done** | `StarlarkTemplateDict` in write.rs. Supports `add(key, value)` and `add_joined(key, values, join_with)`. |
 | 11 | `ctx.actions.write(output, content, is_executable?)` | **Done** | write.rs:201 |
 | — | `ctx.actions.map_directory(...)` | **Missing** | Experimental directory mapping. Very low priority. |
 

@@ -22,14 +22,14 @@ root = gh_facebook_kuro_shims_meta
 # we vendor the shim directory, common.buckconfig won't show up in the
 # vendored .buckconfig.d directory.
 # When the shim cell is no longer vendored in individual projects, this
-# duplication cam be removed.
+# duplication can be removed.
 [cells]
-prelude = prelude
+# prelude = prelude  # DISABLED: Phase 8c-interim
 none = none
 
 [cell_aliases]
-config = prelude
-ovr_config = prelude
+# config = prelude  # DISABLED: Phase 8c-interim
+# ovr_config = prelude  # DISABLED: Phase 8c-interim
 bazel_skylib = gh_facebook_kuro_shims_meta
 buck = gh_facebook_kuro_shims_meta
 fbcode = gh_facebook_kuro_shims_meta
@@ -39,7 +39,7 @@ shim = gh_facebook_kuro_shims_meta
 toolchains = gh_facebook_kuro_shims_meta
 
 [external_cells]
-prelude = bundled
+# prelude = bundled  # DISABLED: Phase 8c-interim
 
 [parser]
 target_platform_detector_spec = target:root//...->prelude//platforms:default target:shim//...->prelude//platforms:default
