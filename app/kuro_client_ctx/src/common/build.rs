@@ -244,6 +244,61 @@ pub struct CommonBuildOptions {
         value_name = "NAME[=VALUE]"
     )]
     pub host_action_env: Vec<String>,
+
+    /// Enable build stamping (Bazel compatibility).
+    ///
+    /// When enabled, Bazel embeds build information (timestamp, version, etc.)
+    /// via ctx.info_file and ctx.version_file. Accepted for compatibility.
+    #[clap(long = "stamp", hide = true, overrides_with = "nostamp")]
+    pub stamp: bool,
+
+    /// Disable build stamping (Bazel compatibility). This is the default.
+    ///
+    /// Accepted for compatibility with Bazel's --nostamp flag.
+    #[clap(long = "nostamp", hide = true, overrides_with = "stamp")]
+    pub nostamp: bool,
+
+    /// Number of jobs for remote execution (Bazel compatibility).
+    ///
+    /// This is distinct from `--jobs`/`--num-threads`. In Bazel, `--jobs`
+    /// controls local parallelism while this controls RE concurrency.
+    /// Accepted for compatibility.
+    #[clap(
+        long = "remote-num-threads",
+        alias = "remote_num_threads",
+        hide = true,
+        value_name = "N"
+    )]
+    pub remote_num_threads: Option<u32>,
+
+    /// Use aspect-like flag (Bazel compatibility).
+    ///
+    /// Accepted for compatibility with Bazel's --aspects flag. In Bazel, this
+    /// applies aspects to all targets. Currently accepted but not implemented.
+    #[clap(long = "aspects", hide = true, value_name = "ASPECT_LABEL")]
+    pub aspects: Vec<String>,
+
+    /// Set toolchain type for execution (Bazel compatibility).
+    ///
+    /// Accepted for compatibility with Bazel's --extra_toolchains flag.
+    #[clap(
+        long = "extra-toolchains",
+        alias = "extra_toolchains",
+        hide = true,
+        value_name = "TOOLCHAIN_LABEL"
+    )]
+    pub extra_toolchains: Vec<String>,
+
+    /// Set execution platforms (Bazel compatibility).
+    ///
+    /// Accepted for compatibility with Bazel's --extra_execution_platforms flag.
+    #[clap(
+        long = "extra-execution-platforms",
+        alias = "extra_execution_platforms",
+        hide = true,
+        value_name = "PLATFORM_LABEL"
+    )]
+    pub extra_execution_platforms: Vec<String>,
 }
 
 impl CommonBuildOptions {
