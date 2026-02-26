@@ -4,12 +4,10 @@ module(
 )
 
 # Working: bazel_skylib loads simple .bzl files correctly
-# DISABLED Phase 8c-interim
-# bazel_dep(name = "bazel_skylib", version = "1.5.0")
+bazel_dep(name = "bazel_skylib", version = "1.5.0")
 
 # bazel_features provides version comparison utilities
-# DISABLED Phase 8c-interim
-# bazel_dep(name = "bazel_features", version = "1.39.0")
+bazel_dep(name = "bazel_features", version = "1.39.0")
 
 # rules_cc dependency - Phase 8f verified loading works
 # Requires manual symlinks: ln -sf ~/.cache/kuro/.../source bazel-external/{module}/{version}

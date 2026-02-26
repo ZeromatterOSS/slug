@@ -402,3 +402,42 @@ genrule(
         "//conditions:default": "echo 'not_x86_64' > $@",
     }),
 )
+
+# =============================================================================
+# Phase 15: bazel_skylib integration test
+# Verifies that bazel_skylib loads and its rules work correctly.
+# =============================================================================
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+
+write_file(
+    name = "skylib_write_test",
+    out = "skylib_written.txt",
+    content = ["Hello from bazel_skylib write_file!"],
+)
+
+copy_file(
+    name = "skylib_copy_test",
+    src = ":skylib_write_test",
+    out = "skylib_copied.txt",
+)
+
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+# Test selects.config_setting_group for OR conditions
+selects.config_setting_group(
+    name = "is_linux_or_x86",
+    match_any = [
+        ":is_linux_platforms",
+        ":is_x86_64",
+    ],
+)
+
+genrule(
+    name = "test_skylib_selects",
+    outs = ["skylib_selects_out.txt"],
+    cmd = select({
+        ":is_linux_or_x86": "echo 'linux_or_x86' > $@",
+        "//conditions:default": "echo 'other' > $@",
+    }),
+)

@@ -366,6 +366,7 @@ Quick reference to all phases and their locations:
 | 12    | rules_python Integration | [x] Complete (rules_python 1.8.0, enable_pystar=True, py_library + py_binary + py_test) |
 | 13    | protobuf Integration     | [x] Complete (proto_library + cc_proto_library build end-to-end, 313 commands) |
 | 14    | rules_oci Integration    | [x] Complete (rules_pkg/pkg_tar + oci_image build end-to-end 2026-02-19)                |
+| 15    | bazel_skylib Integration | [x] Complete (bazel_skylib 1.5.0: copy_file, write_file, selects.config_setting_group work; 2026-02-26) |
 
 ### Infrastructure (Phases 16-18) - [Sub-plan](./kuro-bazel-subplans/08-infrastructure.md)
 

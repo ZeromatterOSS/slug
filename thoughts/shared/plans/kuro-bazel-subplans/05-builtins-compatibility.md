@@ -389,8 +389,8 @@ Per 04-prelude-architecture.md, these language-specific directories should be re
 - [x] Simplify `prelude/native.bzl`: removed 11 language-specific load()s and ~350 lines of Meta-internal macro stubs (android, apple, cxx, erlang, python, rust, kotlin); reduced from 576→40 lines (2026-02-25)
 - [x] Simplify `prelude/rules.bzl`: removed `APPLE_PLATFORMS_KEY` injection that added unused `_apple_platforms` attr to every rule (2026-02-25)
 - [x] Remove language-specific dirs from `prelude/user/all.bzl` (android/user, cxx/user, xcode) - done 2026-02-25
-- [ ] Remove language-specific rules from `prelude/rules_impl.bzl` (blocks directory deletion)
-- [ ] Remove unused prelude directories: android/, apple/, cxx/, erlang/, go_bootstrap/, haskell/, java/, kotlin/, python/, rust/, csharp/, ocaml/, julia/, js/, lua/
+- [x] Remove `rules.bzl` load from `prelude/native.bzl` (2026-02-26): Buck2 language-specific rules (android, apple, cxx, erlang, etc.) are no longer loaded at startup. `native` struct is now `__kuro_builtins__ + user_rules` only. All 356 build targets and 5 tests pass.
+- [ ] Remove unused prelude directories: android/, apple/, cxx/, erlang/, go_bootstrap/, haskell/, java/, kotlin/, python/, rust/, csharp/, ocaml/, julia/, js/, lua/ (directories still exist but are no longer loaded)
 - [ ] Keep core infrastructure: `prelude.bzl`, `native.bzl`, `rules.bzl`, etc.
 - [ ] Keep BXL support files: `prelude/bxl/`
 
