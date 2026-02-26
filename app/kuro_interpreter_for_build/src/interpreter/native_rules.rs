@@ -259,10 +259,23 @@ mod rule_defs {
             AttrType::dict(AttrType::string(), AttrType::string(), false),
         );
 
+        // flag_values: dict mapping build setting label strings to expected string values.
+        // Keys are stored as strings (not deps) to avoid hard errors when the referenced
+        // flag target doesn't exist (e.g., bazel_tools//tools/cpp:compiler). The
+        // check_config_setting_flag_values function gracefully handles missing targets.
+        let flag_values_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::Dict(
+                DictLiteral(ArcSlice::default()),
+            ))),
+            "A dictionary of build setting labels to expected values",
+            AttrType::dict(AttrType::string(), AttrType::string(), false),
+        );
+
         AttributeSpec::from(
             vec![
                 ("constraint_values".to_owned(), constraint_values_attr),
                 ("values".to_owned(), values_attr),
+                ("flag_values".to_owned(), flag_values_attr),
             ],
             false,
             &RuleIncomingTransition::None,
@@ -1301,14 +1314,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         features: UnpackListOrTuple<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _unused = (
-            define_values,
-            flag_values,
-            tags,
-            testonly,
-            deprecation,
-            features,
-        );
+        let _unused = (define_values, tags, testonly, deprecation, features);
         let internals = ModuleInternals::from_context(eval, "config_setting")?;
         let coercion_ctx = internals.attr_coercion_context();
 
@@ -1352,6 +1358,36 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             CoercedAttr::Dict(DictLiteral(ArcSlice::default()))
         };
 
+        // Coerce the flag_values dict: keys are build setting labels (coerced as deps),
+        // values are expected string values. Keys may be Label() objects or label strings.
+        let coerced_flag_values = if let Some(dict_ref) = DictRef::from_value(flag_values) {
+            let pairs: Vec<(CoercedAttr, CoercedAttr)> = dict_ref
+                .iter()
+                .map(|(k, v)| {
+                    // Key is a label (possibly a Label() object or a string).
+                    // Store as a string to avoid hard errors when the flag target
+                    // doesn't exist (e.g., bazel_tools//tools/cpp:compiler).
+                    let k_str = if let Some(s) = k.unpack_str() {
+                        s.to_owned()
+                    } else {
+                        format!("{}", k)
+                    };
+                    let v_str = if let Some(s) = v.unpack_str() {
+                        s.to_owned()
+                    } else {
+                        format!("{}", v)
+                    };
+                    Ok((
+                        CoercedAttr::String(StringLiteral(ArcStr::from(k_str.as_str()))),
+                        CoercedAttr::String(StringLiteral(ArcStr::from(v_str.as_str()))),
+                    ))
+                })
+                .collect::<kuro_error::Result<Vec<_>>>()?;
+            CoercedAttr::Dict(DictLiteral(ArcSlice::from_iter(pairs)))
+        } else {
+            CoercedAttr::Dict(DictLiteral(ArcSlice::default()))
+        };
+
         let vis_strings = extract_visibility_strings(visibility);
         let target_node = create_native_target_node(
             rule_defs::CONFIG_SETTING_RULE.clone(),
@@ -1360,6 +1396,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             vec![
                 ("constraint_values".to_owned(), coerced_list),
                 ("values".to_owned(), coerced_values),
+                ("flag_values".to_owned(), coerced_flag_values),
             ],
             &vis_strings,
             &internals.default_visibility(),

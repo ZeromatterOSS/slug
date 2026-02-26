@@ -80,10 +80,7 @@ fn imp() -> io::Result<()> {
     // that uses the auto-detected host OS/CPU constraints.
     // This mirrors what Bazel's auto-generated @local_config_platform//:host provides.
     let build_content = "load(\":constraints.bzl\", \"HOST_CONSTRAINTS\")\n\nplatform(\n    name = \"host\",\n    constraint_values = HOST_CONSTRAINTS,\n)\n";
-    std::fs::write(
-        local_config_platform_out.join("BUILD.bazel"),
-        build_content,
-    )?;
+    std::fs::write(local_config_platform_out.join("BUILD.bazel"), build_content)?;
 
     write_include_file(
         &local_config_platform_out,

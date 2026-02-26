@@ -76,6 +76,7 @@ pub fn analyze_native_rule(
     configured_node: ConfiguredTargetNodeRef<'_>,
     kind: &NativeRuleKind,
     dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+    flag_values_match: bool,
 ) -> kuro_error::Result<AnalysisResult> {
     match kind {
         NativeRuleKind::ConstraintSetting => analyze_constraint_setting(target, configured_node),
@@ -86,7 +87,7 @@ pub fn analyze_native_rule(
         NativeRuleKind::Alias => analyze_alias(target, dep_analysis),
         NativeRuleKind::LabelFlag => analyze_label_flag(target, dep_analysis), // dep_analysis is empty (build_setting_default is a string, not a dep)
         NativeRuleKind::ConfigSetting => {
-            analyze_config_setting(target, configured_node, dep_analysis)
+            analyze_config_setting(target, configured_node, dep_analysis, flag_values_match)
         }
         NativeRuleKind::ToolchainType => create_minimal_analysis_result(target),
         NativeRuleKind::PackageGroup => create_minimal_analysis_result(target),
@@ -678,10 +679,14 @@ fn check_values_match_defaults(configured_node: ConfiguredTargetNodeRef<'_>) -> 
 /// Analyze a config_setting target.
 /// Creates a ConfigurationInfo provider by merging constraint data from all
 /// constraint_value deps. This allows `select()` to match against the config_setting.
+///
+/// `flag_values_match` indicates whether all `flag_values` entries match their
+/// `build_setting_default` values (pre-computed asynchronously in `calculation.rs`).
 fn analyze_config_setting(
     target: &ConfiguredTargetLabel,
     configured_node: ConfiguredTargetNodeRef<'_>,
     dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+    flag_values_match: bool,
 ) -> kuro_error::Result<AnalysisResult> {
     let heap = FrozenHeap::new();
 
@@ -689,6 +694,9 @@ fn analyze_config_setting(
     let default_info = FrozenDefaultInfo::testing_empty(&heap);
 
     // Collect constraint pairs from each constraint_value dep's ConfigurationInfo.
+    // Note: flag_values deps also appear in dep_analysis, but they don't contribute
+    // ConfigurationInfo (they're build setting targets, not constraint_value targets),
+    // so they are naturally skipped by this loop.
     let mut all_constraint_pairs = Vec::new();
     for (_dep_label, dep_result) in &dep_analysis {
         if let Ok(providers) = dep_result.providers() {
@@ -704,12 +712,18 @@ fn analyze_config_setting(
         }
     }
 
-    // If no real constraint pairs found (flag_values/values only), check
-    // whether the `values` attribute references Bazel flags with known defaults.
-    // If all values match their defaults, the config_setting should match
-    // (empty constraint set = matches everything). Otherwise, add a sentinel
-    // that will never match any real platform configuration.
-    if all_constraint_pairs.is_empty() {
+    // If flag_values don't match build_setting_defaults, this config_setting should
+    // not match in the default configuration (no CLI flag overrides). Add a sentinel
+    // constraint that never matches any real platform.
+    if !flag_values_match {
+        let sentinel_setting = target.unconfigured().dupe();
+        let sentinel_value = ProvidersLabel::default_for(target.unconfigured().dupe());
+        all_constraint_pairs.push((sentinel_setting, sentinel_value));
+    } else if all_constraint_pairs.is_empty() {
+        // No constraint_values and flag_values match (or empty) - check Bazel built-in
+        // flag values against known defaults.
+        // If all match their defaults, the config_setting matches everything (empty
+        // constraint set). Otherwise, add a sentinel.
         let values_match_defaults = check_values_match_defaults(configured_node);
 
         if !values_match_defaults {
@@ -1246,8 +1260,7 @@ fn analyze_sh_test(
         let di = FrozenDefaultInfo::with_executable(&heap, first_src);
         // Command uses bash as interpreter so the script doesn't need +x bits.
         let bash_str = heap.alloc("bash");
-        let cmd_list =
-            heap.alloc(starlark::values::list::AllocList([bash_str, first_src]));
+        let cmd_list = heap.alloc(starlark::values::list::AllocList([bash_str, first_src]));
         (di, cmd_list)
     } else {
         let di = FrozenDefaultInfo::testing_empty(&heap);

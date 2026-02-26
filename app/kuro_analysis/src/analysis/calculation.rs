@@ -29,11 +29,13 @@ use kuro_build_api::deferred::calculation::DeferredHolder;
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 use kuro_build_api::keep_going::KeepGoing;
 use kuro_build_signals::env::WaitingData;
+use kuro_common::dice::cells::HasCellResolver;
 use kuro_core::configuration::compatibility::MaybeCompatible;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::deferred::key::DeferredHolderKey;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
+use kuro_core::target::label::label::TargetLabel;
 use kuro_data::ToProtoMessage;
 use kuro_data::error::ErrorTag;
 use kuro_error::BuckErrorContext;
@@ -51,11 +53,13 @@ use kuro_interpreter::starlark_profiler::config::GetStarlarkProfilerInstrumentat
 use kuro_interpreter::starlark_profiler::data::StarlarkProfileDataAndStats;
 use kuro_interpreter::starlark_profiler::mode::StarlarkProfileMode;
 use kuro_node::attrs::attr_type::query::ResolvedQueryLiterals;
+use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::inspect_options::AttrInspectOptions;
 use kuro_node::bzl_or_bxl_path::BzlOrBxlPath;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
 use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
+use kuro_node::nodes::frontend::TargetGraphCalculation;
 use kuro_node::rule_type::NativeRuleKind;
 use kuro_node::rule_type::RuleType;
 use kuro_node::rule_type::StarlarkRuleType;
@@ -221,6 +225,93 @@ pub async fn get_dep_analysis<'v>(
         .boxed()
     })
     .await
+}
+
+/// Check whether all `flag_values` entries in a `config_setting` target match their
+/// `build_setting_default` attribute values. This is used to determine whether the
+/// config_setting should match in the absence of CLI flag overrides.
+///
+/// Returns `true` if all flag values match (or if `flag_values` is empty), `false` otherwise.
+/// Returns `false` (conservative: no match) if a flag target can't be found or read.
+async fn check_config_setting_flag_values(
+    configured_node: ConfiguredTargetNodeRef<'_>,
+    ctx: &mut DiceComputations<'_>,
+) -> kuro_error::Result<bool> {
+    let target_node = configured_node.to_owned();
+    let target_ref = target_node.target_node().as_ref();
+
+    let flag_values_attr = match target_ref.attr_or_none("flag_values", AttrInspectOptions::All) {
+        Some(attr) => attr,
+        None => return Ok(true), // No flag_values attr → vacuously matches
+    };
+
+    let pairs = match &flag_values_attr.value {
+        CoercedAttr::Dict(d) => d.0.clone(),
+        _ => return Ok(true), // Not a dict → vacuously matches
+    };
+
+    if pairs.is_empty() {
+        return Ok(true); // Empty flag_values → vacuously matches
+    }
+
+    // Get cell resolver and alias resolver for label parsing
+    let cell_resolver = ctx.get_cell_resolver().await?;
+    // Use the config_setting's cell for relative label resolution
+    let config_setting_cell = target_ref.label().pkg().cell_name();
+    let cell_alias_resolver = ctx.get_cell_alias_resolver(config_setting_cell).await?;
+
+    for (key, expected_value) in pairs.iter() {
+        let label_str = match key {
+            CoercedAttr::String(s) => s.0.as_str().to_owned(),
+            _ => return Ok(false), // Unexpected key type → conservative: no match
+        };
+
+        let expected_str = match expected_value {
+            CoercedAttr::String(s) => s.0.as_str().to_owned(),
+            _ => return Ok(false), // Unexpected value type → conservative: no match
+        };
+
+        // Parse the label string into a TargetLabel.
+        let flag_target_label = match TargetLabel::parse(
+            &label_str,
+            config_setting_cell,
+            &cell_resolver,
+            &cell_alias_resolver,
+        ) {
+            Ok(label) => label,
+            Err(_) => return Ok(false), // Can't parse label → conservative: no match
+        };
+
+        // Look up the flag target's TargetNode to read its build_setting_default.
+        // If the target doesn't exist (e.g., bazel_tools//tools/cpp:compiler), treat
+        // as no match (conservative behavior, same as before flag_values support).
+        let flag_node = match ctx.get_target_node(&flag_target_label).await {
+            Ok(node) => node,
+            Err(_) => return Ok(false), // Target not found → conservative: no match
+        };
+
+        let default_val =
+            match flag_node.attr_or_none("build_setting_default", AttrInspectOptions::All) {
+                Some(attr) => match &attr.value {
+                    CoercedAttr::String(s) => s.0.as_str().to_owned(),
+                    CoercedAttr::Bool(b) => {
+                        if b.0 {
+                            "True".to_owned()
+                        } else {
+                            "False".to_owned()
+                        }
+                    }
+                    _ => return Ok(false), // Can't read default → conservative: no match
+                },
+                None => return Ok(false), // No build_setting_default → conservative: no match
+            };
+
+        if default_val != expected_str {
+            return Ok(false); // Mismatch → config_setting doesn't match in default config
+        }
+    }
+
+    Ok(true) // All flag_values match their build_setting_defaults
 }
 
 /// Compute aspect results for dependencies that have aspects attached via attributes.
@@ -462,6 +553,14 @@ async fn get_analysis_result_inner(
             // that are required for Bazel compatibility with BCR packages like @platforms.
             let dep_analysis = get_dep_analysis(configured_node, ctx).await?;
 
+            // For config_setting, pre-compute whether flag_values match their build_setting_defaults.
+            // This must be done asynchronously (DICE lookup) before the sync analyze_native_rule call.
+            let flag_values_match = if matches!(kind, NativeRuleKind::ConfigSetting) {
+                check_config_setting_flag_values(configured_node, ctx).await?
+            } else {
+                true // irrelevant for non-config_setting rules
+            };
+
             let now = TimeSpan::start_now();
             let (res, spans) = record_root_spans(|| {
                 let result = crate::analysis::native_rule_analysis::analyze_native_rule(
@@ -469,6 +568,7 @@ async fn get_analysis_result_inner(
                     configured_node,
                     kind,
                     dep_analysis,
+                    flag_values_match,
                 )?;
                 Ok(MaybeCompatible::Compatible(result))
             });

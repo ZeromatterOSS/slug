@@ -30,7 +30,7 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 | Rule | Description | Kuro Status | Location |
 |------|-------------|-------------|----------|
 | `alias` | Creates alternative name for target | ✓ Implemented (native + prelude) | `native_rules.rs`, `prelude/alias.bzl` |
-| `config_setting` | Matches configuration for `select()` | ✓ Implemented (native, with ConfigurationInfo) | `native_rules.rs`, `native_rule_analysis.rs` |
+| `config_setting` | Matches configuration for `select()` | ✓ Implemented (native, with ConfigurationInfo, flag_values support; 2026-02-26) | `native_rules.rs`, `native_rule_analysis.rs`, `calculation.rs` |
 | `label_flag` | Label-typed build setting | ✓ Implemented (native) | `native_rules.rs`, `native_rule_analysis.rs` |
 | `filegroup` | Groups files under single label | ✓ Exists (native + bazel_tools Starlark impl) | `native_rules.rs`, `bazel_tools/tools/build_rules/filegroup.bzl` |
 | `genquery` | Runs query language, outputs results | ✓ Stub (creates empty output via GenruleAction "touch $@"; 2026-02-25) | `native_rules.rs`, `native_rule_analysis.rs` |
@@ -81,6 +81,7 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 
 - [x] All native rules available in BUILD files without `load()`
 - [x] `select()` works with `config_setting` (fixed: filegroup srcs now accepts select(), analyze_filegroup uses configured attrs to resolve selectors)
+- [x] `flag_values` attribute supported in `config_setting` (2026-02-26: string-based storage with graceful fallback to no-match for missing flag targets; DICE-async lookup in calculation.rs)
 - [x] Platform/toolchain rules work for rules_cc toolchain resolution (via ToolchainsStub; rules_cc works end-to-end)
 - [x] Bazel BUILD files using native rules parse correctly
 
@@ -387,7 +388,7 @@ Per 04-prelude-architecture.md, these language-specific directories should be re
 **Phase 7d.3: Prelude Cleanup**
 - [x] Simplify `prelude/native.bzl`: removed 11 language-specific load()s and ~350 lines of Meta-internal macro stubs (android, apple, cxx, erlang, python, rust, kotlin); reduced from 576→40 lines (2026-02-25)
 - [x] Simplify `prelude/rules.bzl`: removed `APPLE_PLATFORMS_KEY` injection that added unused `_apple_platforms` attr to every rule (2026-02-25)
-- [ ] Remove language-specific dirs from `prelude/user/all.bzl` (android/user, cxx/user, xcode)
+- [x] Remove language-specific dirs from `prelude/user/all.bzl` (android/user, cxx/user, xcode) - done 2026-02-25
 - [ ] Remove language-specific rules from `prelude/rules_impl.bzl` (blocks directory deletion)
 - [ ] Remove unused prelude directories: android/, apple/, cxx/, erlang/, go_bootstrap/, haskell/, java/, kotlin/, python/, rust/, csharp/, ocaml/, julia/, js/, lua/
 - [ ] Keep core infrastructure: `prelude.bzl`, `native.bzl`, `rules.bzl`, etc.
