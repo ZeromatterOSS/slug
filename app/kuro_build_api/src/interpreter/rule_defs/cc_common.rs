@@ -29,6 +29,7 @@ use std::sync::OnceLock;
 use allocative::Allocative;
 use kuro_core::provider::id::ProviderId;
 use kuro_interpreter::types::provider::callable::ProviderCallableLike;
+use kuro_util::late_binding::LateBinding;
 use starlark::coerce::Coerce;
 use starlark::collections::SmallMap;
 use starlark::collections::StarlarkHasher;
@@ -36,11 +37,15 @@ use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
+use starlark::eval::Arguments;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
 use starlark::values::Demand;
 use starlark::values::Freeze;
+use starlark::values::FreezeResult;
+use starlark::values::Freezer;
+use starlark::values::FrozenValue;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
@@ -3915,12 +3920,294 @@ fn testing_methods(builder: &mut MethodsBuilder) {
     }
 
     /// ExecutionInfo provider for specifying execution requirements.
-    /// This is a stub that returns a sentinel value so version checks
-    /// like `testing.ExecutionInfo == testing.ExecutionInfo` evaluate to True.
+    ///
+    /// `testing.ExecutionInfo` is a provider callable. Usage:
+    /// ```python
+    /// return [testing.ExecutionInfo(requirements = {"no-remote": "1"})]
+    /// ```
+    /// See: https://bazel.build/rules/lib/providers/ExecutionInfo
     #[starlark(attribute)]
-    fn ExecutionInfo<'v>(this: &TestingModule) -> starlark::Result<&'static str> {
-        let _unused = this;
-        Ok("ExecutionInfo")
+    fn ExecutionInfo(this: &TestingModule) -> starlark::Result<ExecutionInfoProvider> {
+        let _ = this;
+        Ok(ExecutionInfoProvider)
+    }
+
+    /// Creates an analysis test rule or registers an analysis test target.
+    ///
+    /// In Bazel, `testing.analysis_test(implementation, attrs, ...)` creates a
+    /// rule for analysis-time tests. When called with `name` and `attr_values`,
+    /// it also registers the target.
+    ///
+    /// Typical usage (bazel_skylib analysistest.make pattern):
+    /// ```python
+    /// # In .bzl file - returns a callable rule:
+    /// my_test = testing.analysis_test(implementation = _impl, attrs = {...})
+    ///
+    /// # In BUILD file - registers a test target:
+    /// my_test(name = "my_test", target_under_test = ":some_target")
+    /// ```
+    ///
+    /// See: https://bazel.build/rules/lib/builtins/testing#analysis_test
+    fn analysis_test<'v>(
+        this: &TestingModule,
+        #[starlark(require = named)] implementation: Value<'v>,
+        #[starlark(require = named, default = NoneType)] name: Value<'v>,
+        #[starlark(kwargs)] _kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        if let Some(name_str) = name.unpack_str() {
+            // Called with name= directly - register the target
+            if let Ok(register) = ANALYSIS_TEST_REGISTER.get() {
+                register(eval, name_str)?;
+            }
+            return Ok(Value::new_none());
+        }
+        // No name provided - return a callable that registers a target when called
+        Ok(eval.heap().alloc(AnalysisTestCallable { implementation }))
+    }
+}
+
+// ============================================================================
+// ExecutionInfo - Provider for specifying test execution requirements
+// ============================================================================
+
+/// ExecutionInfo provider callable.
+///
+/// `testing.ExecutionInfo` is a provider callable that specifies execution
+/// requirements for tests. Rules return instances of this provider to declare
+/// that their tests need specific execution environment settings.
+///
+/// Reference: https://bazel.build/rules/lib/providers/ExecutionInfo
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct ExecutionInfoProvider;
+
+impl ExecutionInfoProvider {
+    /// Get the static provider ID for ExecutionInfo.
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "ExecutionInfo".to_owned(),
+            })
+        })
+    }
+}
+
+impl Display for ExecutionInfoProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<provider ExecutionInfo>")
+    }
+}
+
+starlark_simple_value!(ExecutionInfoProvider);
+
+impl ProviderCallableLike for ExecutionInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
+#[starlark_value(type = "ExecutionInfo")]
+impl<'v> StarlarkValue<'v> for ExecutionInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        use starlark::values::dict::AllocDict;
+        // Extract requirements kwarg, default to empty dict
+        let kwargs = args.names_map()?;
+        let requirements = kwargs
+            .iter()
+            .find_map(|(k, v)| {
+                if k.as_str() == "requirements" {
+                    Some(*v)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| {
+                eval.heap()
+                    .alloc(AllocDict(std::iter::empty::<(&str, Value)>()))
+            });
+        Ok(eval.heap().alloc(ExecutionInfoInstance { requirements }))
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+/// An instance of ExecutionInfo created by `testing.ExecutionInfo(requirements = {...})`.
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    starlark::values::Trace,
+    starlark::coerce::Coerce,
+    starlark::values::Freeze
+)]
+#[repr(C)]
+pub struct ExecutionInfoInstanceGen<V: ValueLifetimeless> {
+    /// Requirements dict mapping string keys to string values.
+    requirements: V,
+}
+
+starlark_complex_value!(pub ExecutionInfoInstance);
+
+impl<V: ValueLifetimeless> Display for ExecutionInfoInstanceGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ExecutionInfo(...)")
+    }
+}
+
+impl<'v, V: ValueLike<'v>> ProviderLike<'v> for ExecutionInfoInstanceGen<V>
+where
+    Self: fmt::Debug,
+{
+    fn id(&self) -> &Arc<ProviderId> {
+        ExecutionInfoProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        vec![("requirements", self.requirements.to_value())]
+    }
+}
+
+#[starlark_value(type = "ExecutionInfo")]
+impl<'v, V: ValueLike<'v> + 'v> StarlarkValue<'v> for ExecutionInfoInstanceGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    type Canonical = ExecutionInfoInstance<'v>;
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
+    }
+
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "requirements" => Some(self.requirements.to_value()),
+            _ => None,
+        }
+    }
+
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "requirements")
+    }
+}
+
+// ============================================================================
+// ANALYSIS_TEST_REGISTER - Late binding for registering analysis test targets
+// ============================================================================
+
+/// Late binding for the function that registers a native analysis test target.
+/// Initialized in kuro_interpreter_for_build to avoid circular dependency.
+/// Signature: (eval, target_name) -> starlark::Result<NoneType>
+pub static ANALYSIS_TEST_REGISTER: LateBinding<
+    for<'v, 'a, 'e> fn(&mut Evaluator<'v, 'a, 'e>, &str) -> starlark::Result<NoneType>,
+> = LateBinding::new("ANALYSIS_TEST_REGISTER");
+
+#[derive(Debug, kuro_error::Error)]
+#[kuro(tag = Input)]
+enum AnalysisTestError {
+    #[error("analysis_test_rule can only be invoked after the module is frozen")]
+    InvokedBeforeFreezing,
+    #[error("analysis_test requires a 'name' argument")]
+    MissingName,
+    #[error("analysis_test 'name' argument must be a string")]
+    NameNotString,
+}
+
+// ============================================================================
+// AnalysisTestCallable - Returned by testing.analysis_test() when no name given
+// ============================================================================
+
+/// A callable that, when invoked with name=..., registers a native analysis test target.
+/// Returned by testing.analysis_test() when no `name` argument is provided.
+#[derive(Debug, ProvidesStaticType, Trace, NoSerialize, Allocative)]
+pub struct AnalysisTestCallable<'v> {
+    /// The Starlark implementation function (stored for potential future use).
+    implementation: Value<'v>,
+}
+
+impl<'v> Display for AnalysisTestCallable<'v> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<analysis_test_rule>")
+    }
+}
+
+impl<'v> starlark::values::AllocValue<'v> for AnalysisTestCallable<'v> {
+    fn alloc_value(self, heap: starlark::values::Heap<'v>) -> Value<'v> {
+        heap.alloc_complex(self)
+    }
+}
+
+impl<'v> Freeze for AnalysisTestCallable<'v> {
+    type Frozen = FrozenAnalysisTestCallable;
+
+    fn freeze(self, freezer: &Freezer) -> FreezeResult<FrozenAnalysisTestCallable> {
+        Ok(FrozenAnalysisTestCallable {
+            implementation: self.implementation.freeze(freezer)?,
+        })
+    }
+}
+
+#[starlark_value(type = "analysis_test_rule")]
+impl<'v> StarlarkValue<'v> for AnalysisTestCallable<'v> {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        _args: &Arguments<'v, '_>,
+        _eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        Err(kuro_error::Error::from(AnalysisTestError::InvokedBeforeFreezing).into())
+    }
+}
+
+/// Frozen version of AnalysisTestCallable.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct FrozenAnalysisTestCallable {
+    /// The frozen Starlark implementation function.
+    implementation: FrozenValue,
+}
+
+impl Display for FrozenAnalysisTestCallable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<analysis_test_rule>")
+    }
+}
+
+starlark_simple_value!(FrozenAnalysisTestCallable);
+
+#[starlark_value(type = "analysis_test_rule")]
+impl<'v> StarlarkValue<'v> for FrozenAnalysisTestCallable {
+    type Canonical = AnalysisTestCallable<'v>;
+
+    /// Called when this analysis_test_rule callable is invoked in a BUILD file.
+    /// Parses the `name` argument and delegates to ANALYSIS_TEST_REGISTER.
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        // Find `name` in the named arguments
+        let named = args.names_map()?;
+        let name_str = named
+            .iter()
+            .find_map(|(k, v)| if k.as_str() == "name" { Some(*v) } else { None })
+            .ok_or_else(|| kuro_error::Error::from(AnalysisTestError::MissingName))?
+            .unpack_str()
+            .ok_or_else(|| kuro_error::Error::from(AnalysisTestError::NameNotString))?;
+        if let Ok(register) = ANALYSIS_TEST_REGISTER.get() {
+            register(eval, name_str)?;
+        }
+        Ok(Value::new_none())
     }
 }
 

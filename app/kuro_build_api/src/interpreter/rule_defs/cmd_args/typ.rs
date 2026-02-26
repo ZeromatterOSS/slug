@@ -949,7 +949,7 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] omit_if_empty: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkCommandLineMut<'v>> {
-        let _ = (expand_directories, terminate_with, allow_closure);
+        let _ = (expand_directories, allow_closure);
         let heap = eval.heap();
         // If values is None, nothing to add
         if values.is_none() {
@@ -1006,7 +1006,9 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
             mapped_items
         };
 
-        if omit_if_empty && final_items.is_empty() {
+        let items_were_added = !final_items.is_empty();
+
+        if omit_if_empty && !items_were_added {
             return Ok(this);
         }
 
@@ -1028,6 +1030,15 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
                 this.borrow.add_value(item)?;
             }
         }
+
+        // Add terminate_with string after the last item, if provided and items were added
+        if items_were_added {
+            if let Some(term_str) = terminate_with.unpack_str() {
+                let s = heap.alloc_str(term_str).to_value();
+                this.borrow.add_value(s)?;
+            }
+        }
+
         Ok(this)
     }
 

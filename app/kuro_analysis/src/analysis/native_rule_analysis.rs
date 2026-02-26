@@ -101,6 +101,8 @@ pub fn analyze_native_rule(
         NativeRuleKind::ShBinary => analyze_sh_binary(target, configured_node),
         NativeRuleKind::ShTest => analyze_sh_test(target, configured_node),
         NativeRuleKind::CcLibcTopAlias => create_minimal_analysis_result(target),
+        NativeRuleKind::AnalysisTest => analyze_analysis_test(target),
+        NativeRuleKind::Genquery => analyze_genquery(target),
     }
 }
 
@@ -1186,6 +1188,115 @@ fn analyze_sh_test(
     ]);
 
     make_native_analysis_result(target, heap, providers, 0)
+}
+
+/// Analyze an `analysis_test` target created by `testing.analysis_test()`.
+///
+/// Analysis tests have no build actions - they pass by virtue of completing
+/// analysis without errors. We produce an empty DefaultInfo and a
+/// ExternalRunnerTestInfo with an empty command, which the test runner treats
+/// as a passing test.
+fn analyze_analysis_test(target: &ConfiguredTargetLabel) -> kuro_error::Result<AnalysisResult> {
+    let heap = FrozenHeap::new();
+    let default_info = FrozenDefaultInfo::testing_empty(&heap);
+    let empty_list = heap.alloc(starlark::values::list::AllocList::EMPTY);
+    let test_info = create_frozen_sh_test_info(&heap, empty_list);
+    let test_info_fv = heap.alloc(test_info);
+
+    let providers = SmallMap::from_iter([
+        (
+            DefaultInfoCallable::provider_id().dupe(),
+            default_info.to_frozen_value(),
+        ),
+        (
+            FrozenExternalRunnerTestInfo::builtin_provider_id().dupe(),
+            test_info_fv,
+        ),
+    ]);
+
+    make_native_analysis_result(target, heap, providers, 0)
+}
+
+/// Analyze a `genquery` target.
+///
+/// genquery runs a Bazel query expression and writes the results to an output file.
+/// This is a stub implementation: it declares an output file (named after the target)
+/// and registers an action that creates an empty file. Full query execution would
+/// require integrating with the Kuro query engine at build time.
+///
+/// In Bazel: `genquery(name="deps", expression="deps(//foo:bar)", scope=["//foo:bar"])`
+/// produces a file `deps` containing one label per line.
+fn analyze_genquery(target: &ConfiguredTargetLabel) -> kuro_error::Result<AnalysisResult> {
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+    let action_key = ActionKey::new(self_key.dupe(), ActionIndex::new(0));
+
+    // The output file is named after the rule (same as the target name)
+    let output_name = target.name().as_str().to_owned();
+    let path = BuildArtifactPath::new(
+        BaseDeferredKey::TargetLabel(target.dupe()),
+        ForwardRelativePathBuf::new(output_name.clone())
+            .with_buck_error_context(|| format!("Invalid genquery output path: {}", output_name))?,
+        BuckOutPathKind::Configuration,
+    );
+    let output_artifact = BuildArtifact::new(path, action_key.dupe(), OutputType::File)?;
+
+    let heap = FrozenHeap::new();
+    let starlark_output = heap.alloc_simple(StarlarkArtifact::new(Artifact::from(
+        output_artifact.dupe(),
+    )));
+
+    // Register an action that creates an empty output file (stub implementation).
+    // A real implementation would run the query and write results.
+    let genrule_action = GenruleAction::new(
+        "touch \"$@\"".to_owned(),
+        vec![],
+        vec![output_artifact],
+        vec![],
+    );
+    let registered_action = Arc::new(RegisteredAction::new(
+        action_key.dupe(),
+        Box::new(genrule_action),
+        CommandExecutorConfig::testing_local(),
+    ));
+    let mut recorded_actions = RecordedActions::new(1);
+    recorded_actions.insert(action_key, registered_action);
+
+    let default_info = FrozenDefaultInfo::with_outputs(&heap, vec![starlark_output]);
+    let providers = SmallMap::from_iter([(
+        DefaultInfoCallable::provider_id().dupe(),
+        default_info.to_frozen_value(),
+    )]);
+
+    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+        heap.alloc(FrozenProviderCollection::new(providers)),
+    )?;
+
+    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+        value: FrozenAnalysisValueStorage::new_native(
+            self_key.dupe(),
+            DYNAMIC_LAMBDA_PARAMS_STORAGES
+                .get()
+                .unwrap()
+                .new_frozen_dynamic_lambda_params_storage(),
+            Some(provider_collection),
+        ),
+    });
+
+    let heap_ref = heap.into_ref();
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
+
+    let recorded_values =
+        RecordedAnalysisValues::new_native(self_key, Some(analysis_storage), recorded_actions);
+
+    Ok(AnalysisResult::new(
+        recorded_values,
+        None,
+        HashMap::new(),
+        1, // 1 action registered
+        1, // 1 declared artifact
+        None,
+    ))
 }
 
 /// Build a `AnalysisResult` from a FrozenHeap + providers map.

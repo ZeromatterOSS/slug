@@ -45,18 +45,18 @@ Status key: **Done** = fully working, **Stub** = exists but returns hardcoded/in
 |---|---|---|---|---|
 | 1 | `ctx.actions` | `actions` | **Done** | `AnalysisActions` sub-object |
 | 2 | `ctx.attr` | `struct` | **Done** | Alias for `ctx.attrs` (context.rs:355) |
-| 3 | `ctx.bin_dir` | `root` | **Stub** | Hardcoded `"bazel-out/k8-fastbuild/bin"` (context.rs:614). Needs to derive from actual configuration. |
+| 3 | `ctx.bin_dir` | `root` | **Done** | Derives `buck-out/v2/gen/<cell>/<cfg_hash>` from configured target label (context.rs:628). |
 | 4 | `ctx.build_file_path` | `string` | **Stub** | Derives from label string (context.rs:567). Deprecated in Bazel — low priority to improve. |
 | 5 | `ctx.build_setting_value` | varies | **Done** | Reads from attrs (context.rs:711) |
 | 6 | `ctx.configuration` | `configuration` | **Stub** | Returns `BuildConfigurationStub` (context.rs:510). Needs real config. |
-| 7 | `ctx.disabled_features` | `list[str]` | **Stub** | Returns `[]` (context.rs:495) |
+| 7 | `ctx.disabled_features` | `list[str]` | **Done** | Reads `features` attr, returns items with `-` prefix stripped (context.rs:480). |
 | 8 | `ctx.exec_groups` | `ExecGroupCollection` | **Stub** | Returns `ExecGroupsDict` stub (context.rs:677) |
 | 9 | `ctx.executable` | `struct` | **Done** | `CtxExecutable` (context.rs:552) |
-| 10 | `ctx.features` | `list[str]` | **Stub** | Returns `[]` (context.rs:483) |
+| 10 | `ctx.features` | `list[str]` | **Done** | Reads `features` attr, returns items without `-` prefix (context.rs:459). |
 | 11 | `ctx.file` | `struct` | **Done** | `CtxFile` (context.rs:537) |
 | 12 | `ctx.files` | `struct` | **Done** | `CtxFiles` (context.rs:523) |
 | 13 | `ctx.fragments` | `fragments` | **Stub** | Returns `ConfigurationFragments::default()` (context.rs:368). Has `ctx.fragments.cpp` sub-stub. |
-| 14 | `ctx.genfiles_dir` | `root` | **Stub** | Hardcoded `"bazel-out/k8-fastbuild/genfiles"` (context.rs:628) |
+| 14 | `ctx.genfiles_dir` | `root` | **Done** | Same as bin_dir (no separate genfiles dir in Kuro, context.rs:641). |
 | 15 | `ctx.info_file` | `File` | **Stub** | Returns string `"bazel-out/stable-status.txt"` (context.rs:658). Should return a real `File` object. |
 | 16 | `ctx.label` | `Label` | **Done** | `StarlarkConfiguredProvidersLabel` (context.rs:331) |
 | 17 | `ctx.outputs` | `structure` | **Stub** | Hardcodes 3 artifacts: stripped_binary, executable, dwp_file (context.rs:403). Doesn't read from rule `outputs={}`. Deprecated in Bazel. |
@@ -73,14 +73,14 @@ Status key: **Done** = fully working, **Stub** = exists but returns hardcoded/in
 
 | # | Bazel Method | Returns | Kuro Status | Notes |
 |---|---|---|---|---|
-| 1 | `ctx.coverage_instrumented(target?)` | `bool` | **Stub** | Always returns `False` (context.rs:750) |
+| 1 | `ctx.coverage_instrumented(target?)` | `bool` | **Stub** | Always returns `False` (context.rs) |
 | 2 | `ctx.expand_location(input, targets=[])` | `string` | **Done** | Expands `$(location ...)` templates (context.rs). Resolves `$(location :label)` and `$(locations :label)` from provided `targets` list. |
 | 3 | `ctx.expand_make_variables(attr, cmd, subs)` | `string` | **Done** | Expands `$(VAR)` Make variables from additional_substitutions dict. Used by genrule (context.rs:866). |
 | 4 | `ctx.package_relative_label(input)` | `Label` | **Done** | Converts string to Label relative to BUILD package (context.rs:920). |
 | 5 | `ctx.resolve_command(...)` | `tuple` | **Missing** | Experimental. Low priority. |
-| 6 | `ctx.resolve_tools(tools=[])` | `tuple` | **Missing** | Returns depset of tool files + runfiles. |
+| 6 | `ctx.resolve_tools(tools=[])` | `tuple` | **Done** | Returns (list of DefaultInfo files, empty manifests) from tool deps (context.rs:956). |
 | 7 | `ctx.runfiles(files, transitive_files, ...)` | `runfiles` | **Done** | Implemented (context.rs:762) |
-| 8 | `ctx.target_platform_has_constraint(cv)` | `bool` | **Stub** | Always returns `False` (context.rs:817) |
+| 8 | `ctx.target_platform_has_constraint(cv)` | `bool` | **Done** | Checks host platform OS/CPU against @platforms// constraint labels (context.rs). Returns true for matching linux/macos/windows + x86_64/aarch64 constraints. (2026-02-25) |
 | — | `ctx.created_actions()` | `Actions` | **Missing** | Testing-only (`_skylark_testable=True`). Very low priority. |
 
 ---
@@ -111,7 +111,7 @@ The `Args` object is returned by `ctx.actions.args()`. In Kuro this is `Starlark
 | # | Bazel Method | Kuro Status | Notes |
 |---|---|---|---|
 | 1 | `args.add(arg_or_value, value?, format?)` | **Done** | cmd_args/typ.rs. Supports flag+value, format string with `%s`. |
-| 2 | `args.add_all(values, map_each?, format_each?, before_each?, omit_if_empty?, uniquify?, expand_directories?, terminate_with?, allow_closure?)` | **Done** | cmd_args/typ.rs. `map_each`, `uniquify`, `omit_if_empty` implemented. |
+| 2 | `args.add_all(values, map_each?, format_each?, before_each?, omit_if_empty?, uniquify?, expand_directories?, terminate_with?, allow_closure?)` | **Done** | cmd_args/typ.rs. `map_each`, `uniquify`, `omit_if_empty`, `terminate_with`, `before_each`, `format_each` implemented. `expand_directories` accepted but no-op. |
 | 3 | `args.add_joined(values, join_with, map_each?, format_each?, format_joined?, omit_if_empty?, uniquify?, allow_closure?)` | **Done** | cmd_args/typ.rs:968. Joins items into a single argument with delimiter. |
 | 4 | `args.set_param_file_format(format)` | **Stub** | Stub exists in typ.rs (accepts format, no-op). |
 | 5 | `args.use_param_file(param_file_arg, use_always?)` | **Stub** | Stub exists in typ.rs (accepts args, no-op). |

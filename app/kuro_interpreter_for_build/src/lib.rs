@@ -46,5 +46,6 @@ pub fn init_late_bindings() {
         rule::init_frozen_rule_get_outputs();
         module_extension_executor_impl::init_module_extension_executor();
         starlark_repo_rule_executor_impl::init_starlark_repo_rule_executor();
+        interpreter::native_rules::init_analysis_test_register();
     });
 }

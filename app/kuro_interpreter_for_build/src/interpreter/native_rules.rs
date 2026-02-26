@@ -23,6 +23,7 @@ use kuro_core::target::label::label::TargetLabel;
 use kuro_core::target::name::TargetNameRef;
 use kuro_node::attrs::attr::Attribute;
 use kuro_node::attrs::attr_type::AttrType;
+use kuro_node::attrs::attr_type::bool::BoolLiteral;
 use kuro_node::attrs::attr_type::list::ListLiteral;
 use kuro_node::attrs::attr_type::string::StringLiteral;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
@@ -677,6 +678,68 @@ mod rule_defs {
         Arc::new(Rule {
             attributes: constraint_setting_attributes(), // Same as constraint_setting - just name + visibility
             rule_type: RuleType::Native(NativeRuleKind::CcLibcTopAlias),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+        })
+    });
+
+    /// The Rule definition for analysis_test.
+    /// Created by `testing.analysis_test()` - an analysis-time test with no build actions.
+    pub static ANALYSIS_TEST_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: constraint_setting_attributes(), // Minimal: just name + visibility
+            rule_type: RuleType::Native(NativeRuleKind::AnalysisTest),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: true,
+        })
+    });
+
+    /// Attributes for the genquery rule.
+    fn genquery_attributes() -> AttributeSpec {
+        let expression_attr = Attribute::new(None, "Query expression to run", AttrType::string());
+        let scope_attr = Attribute::new(
+            None,
+            "Labels of targets that bound the universe of targets the query is allowed to access",
+            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
+        );
+        let opts_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
+            "Query options (e.g. --output=label)",
+            AttrType::list(AttrType::string()),
+        );
+        let strict_attr = {
+            let v = Arc::new(CoercedAttr::Bool(BoolLiteral(true)));
+            Attribute::new(
+                Some(v),
+                "Fail if targets outside scope are referenced",
+                AttrType::bool(),
+            )
+        };
+
+        AttributeSpec::from(
+            vec![
+                ("expression".to_owned(), expression_attr),
+                ("scope".to_owned(), scope_attr),
+                ("opts".to_owned(), opts_attr),
+                ("strict".to_owned(), strict_attr),
+            ],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("genquery attributes should be valid")
+    }
+
+    /// The Rule definition for genquery.
+    pub static GENQUERY_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: genquery_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::Genquery),
             rule_kind: RuleKind::Normal,
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
@@ -1961,4 +2024,61 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         internals.record(target_node)?;
         Ok(NoneType)
     }
+
+    /// Bazel's genquery rule: runs a query and writes results to an output file.
+    ///
+    /// This is a stub implementation that creates an empty output file. Full query
+    /// execution would require integrating with the Kuro query engine at build time.
+    ///
+    /// See: https://bazel.build/reference/be/general#genquery
+    fn genquery<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named)] expression: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] scope: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] opts: Value<'v>,
+        #[starlark(require = named, default = true)] strict: bool,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] extra_kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let _ = (expression, scope, opts, strict, extra_kwargs);
+        let internals = ModuleInternals::from_context(eval, "genquery")?;
+
+        let target_node = create_native_target_node(
+            rule_defs::GENQUERY_RULE.clone(),
+            internals.package(),
+            name,
+            vec![],
+            &extract_visibility_strings(visibility),
+            &internals.default_visibility(),
+        )?;
+
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+}
+
+/// Initialize the ANALYSIS_TEST_REGISTER late binding.
+///
+/// Called from `kuro_interpreter_for_build::init_late_bindings()`.
+/// This bridges the circular dependency: `kuro_build_api` defines `ANALYSIS_TEST_REGISTER`
+/// but can't depend on `kuro_interpreter_for_build` (which has `ModuleInternals`).
+/// We initialize the binding here instead.
+pub fn init_analysis_test_register() {
+    use kuro_build_api::interpreter::rule_defs::cc_common::ANALYSIS_TEST_REGISTER;
+    ANALYSIS_TEST_REGISTER.init(|eval, name| {
+        let internals = ModuleInternals::from_context(eval, "testing.analysis_test")?;
+        let target_node = create_native_target_node(
+            rule_defs::ANALYSIS_TEST_RULE.clone(),
+            internals.package(),
+            name,
+            vec![],
+            &[],
+            &internals.default_visibility(),
+        )?;
+        internals.record(target_node)?;
+        Ok(NoneType)
+    });
 }
