@@ -123,14 +123,24 @@ fn analyze_genrule(
     let target_ref = target_node.target_node().as_ref();
     let pkg = target.pkg();
 
-    // Read cmd attribute
-    let cmd = if let Some(cmd_attr) = target_ref.attr_or_none("cmd", AttrInspectOptions::All) {
-        match cmd_attr.value {
-            CoercedAttr::String(s) => s.0.as_str().to_owned(),
-            _ => String::new(),
+    // Read cmd and cmd_bash from CONFIGURED node (resolves select() expressions).
+    // On Unix, prefer cmd_bash if non-empty (Bazel-compatible).
+    let read_configured_string = |attr_name: &str| -> String {
+        if let Some(attr) = configured_node.get(attr_name, AttrInspectOptions::All) {
+            match attr.value {
+                ConfiguredAttr::String(s) => s.0.as_str().to_owned(),
+                _ => String::new(),
+            }
+        } else {
+            String::new()
         }
+    };
+    let cmd_raw = read_configured_string("cmd");
+    let cmd_bash_raw = read_configured_string("cmd_bash");
+    let cmd = if !cmd_bash_raw.is_empty() && cfg!(unix) {
+        cmd_bash_raw
     } else {
-        String::new()
+        cmd_raw
     };
 
     // Read outs attribute → list of output file name strings

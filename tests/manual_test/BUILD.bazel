@@ -358,3 +358,47 @@ cc_binary(
     deps = [":hello_lib"],
     tags = ["manual"],
 )
+
+# =============================================================================
+# Test select() in genrule cmd attribute
+# =============================================================================
+genrule(
+    name = "test_select_cmd",
+    outs = ["select_cmd.txt"],
+    cmd = select({
+        ":is_linux": "echo 'linux_genrule' > $@",
+        "//conditions:default": "echo 'default_genrule' > $@",
+    }),
+)
+
+# =============================================================================
+# Phase 17: Host platform test - @platforms//os:linux should match on Linux
+# =============================================================================
+config_setting(
+    name = "is_linux_platforms",
+    constraint_values = ["@platforms//os:linux"],
+)
+
+genrule(
+    name = "test_host_platform",
+    outs = ["host_platform_out.txt"],
+    cmd = select({
+        ":is_linux_platforms": "echo 'on_linux' > $@",
+        "//conditions:default": "echo 'not_linux' > $@",
+    }),
+)
+
+# CPU constraint test
+config_setting(
+    name = "is_x86_64",
+    constraint_values = ["@platforms//cpu:x86_64"],
+)
+
+genrule(
+    name = "test_cpu_platform",
+    outs = ["cpu_platform_out.txt"],
+    cmd = select({
+        ":is_x86_64": "echo 'on_x86_64' > $@",
+        "//conditions:default": "echo 'not_x86_64' > $@",
+    }),
+)

@@ -152,3 +152,13 @@ async def test_sh_test_runs(buck: Buck) -> None:
 async def test_test_suite_builds(buck: Buck) -> None:
     """test_suite() can group tests and builds successfully."""
     await buck.build("//:all_sh_tests")
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_genrule_select_cmd(buck: Buck) -> None:
+    """genrule cmd attribute accepts select() expressions."""
+    result = await buck.build("//:genrule_select_cmd")
+    output = result.get_build_report().output_for_target("//:genrule_select_cmd")
+    content = output.read_text().strip()
+    # With //conditions:default, the default branch is always selected
+    assert content == "selected_default"

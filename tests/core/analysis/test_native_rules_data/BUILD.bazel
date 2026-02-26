@@ -128,6 +128,14 @@ genrule(
     cmd = "echo $(location :defs.bzl) > $@",
 )
 
+genrule(
+    name = "genrule_select_cmd",
+    outs = ["genrule_select_cmd.txt"],
+    cmd = select({
+        "//conditions:default": "echo 'selected_default' > $@",
+    }),
+)
+
 # === sh_binary test ===
 
 sh_binary(
@@ -147,4 +155,18 @@ sh_test(
 test_suite(
     name = "all_sh_tests",
     tests = [":hello_sh_test"],
+)
+
+# === genrule with tools ===
+
+sh_binary(
+    name = "echo_tool",
+    srcs = ["hello.sh"],
+)
+
+genrule(
+    name = "genrule_with_tool",
+    outs = ["genrule_with_tool.txt"],
+    tools = [":echo_tool"],
+    cmd = "bash $(location :echo_tool) > $@",
 )

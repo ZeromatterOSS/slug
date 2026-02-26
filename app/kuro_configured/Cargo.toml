@@ -17,6 +17,7 @@ dupe = { workspace = true }
 gazebo = { workspace = true }
 ref-cast = { workspace = true }
 starlark_map = { workspace = true }
+tracing = { workspace = true }
 
 kuro_analysis = { workspace = true }
 kuro_build_api = { workspace = true }

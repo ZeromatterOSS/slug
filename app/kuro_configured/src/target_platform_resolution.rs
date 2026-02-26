@@ -20,10 +20,14 @@ use dupe::Dupe;
 use kuro_common::dice::cells::HasCellResolver;
 use kuro_common::legacy_configs::dice::HasLegacyConfigs;
 use kuro_common::legacy_configs::key::BuckconfigKeyRef;
+use kuro_core::cells::name::CellName;
+use kuro_core::cells::paths::CellRelativePath;
 use kuro_core::configuration::data::ConfigurationData;
 use kuro_core::global_cfg_options::GlobalCfgOptions;
+use kuro_core::package::PackageLabel;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_core::target::label::label::TargetLabel;
+use kuro_core::target::name::TargetNameRef;
 use kuro_core::target::target_configured_target_label::TargetConfiguredTargetLabel;
 use kuro_error::BuckErrorContext;
 use kuro_node::cfg_constructor::CFG_CONSTRUCTOR_CALCULATION_IMPL;
@@ -104,7 +108,25 @@ async fn get_default_platform(
             .await
             .map_err(kuro_error::Error::from);
     }
-    // TODO(cjhopman): This needs to implement buck1's approach to determining target platform, it's currently missing the fallback to buckconfig parser.target_platform.
+
+    // In Bazel/bzlmod mode, @local_config_platform//:host is auto-registered as the
+    // host platform with detected OS/CPU constraints. Use it as the default target platform
+    // so that select() expressions with @platforms// constraints work correctly.
+    let resolver = ctx.get_cell_resolver().await?;
+    let lcp_cell = CellName::unchecked_new("local_config_platform")?;
+    if resolver.get(lcp_cell).is_ok() {
+        let pkg = PackageLabel::new(lcp_cell, CellRelativePath::empty())?;
+        let lcp_label = TargetLabel::new(pkg, TargetNameRef::new("host")?);
+        match get_platform_configuration(ctx, &lcp_label).await {
+            Ok(cfg) => return Ok(cfg),
+            Err(e) => {
+                tracing::debug!(
+                    "Could not load @local_config_platform//:host as default platform: {e}"
+                );
+            }
+        }
+    }
+
     Ok(ConfigurationData::unspecified())
 }
 

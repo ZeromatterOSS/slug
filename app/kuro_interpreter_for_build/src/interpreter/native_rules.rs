@@ -348,13 +348,21 @@ mod rule_defs {
     });
 
     /// Creates the AttributeSpec for genrule.
-    /// genrule has cmd, outs, srcs, tools attributes.
+    /// genrule has cmd, cmd_bash, outs, srcs, tools attributes.
     fn genrule_attributes() -> AttributeSpec {
         let cmd_attr = Attribute::new(
             Some(Arc::new(CoercedAttr::String(StringLiteral(ArcStr::from(
                 "",
             ))))),
             "The command to run",
+            AttrType::string(),
+        );
+
+        let cmd_bash_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::String(StringLiteral(ArcStr::from(
+                "",
+            ))))),
+            "Bash-specific command (preferred over cmd on Unix)",
             AttrType::string(),
         );
 
@@ -391,6 +399,7 @@ mod rule_defs {
         AttributeSpec::from(
             vec![
                 ("cmd".to_owned(), cmd_attr),
+                ("cmd_bash".to_owned(), cmd_bash_attr),
                 ("outs".to_owned(), outs_attr),
                 ("srcs".to_owned(), srcs_attr),
                 ("tools".to_owned(), tools_attr),
@@ -1458,8 +1467,10 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
     /// See: https://bazel.build/reference/be/general#genrule
     fn genrule<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = "")] cmd: &str,
-        #[starlark(require = named, default = "")] cmd_bash: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] cmd: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] cmd_bash: Value<
+            'v,
+        >,
         #[starlark(require = named, default = "")] cmd_bat: &str,
         #[starlark(require = named, default = "")] cmd_ps: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
@@ -1507,16 +1518,22 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let internals = ModuleInternals::from_context(eval, "genrule")?;
         let coercion_ctx = internals.attr_coercion_context();
 
-        // On Unix, prefer cmd_bash if provided (Bazel-compatible: cmd_bash runs on bash).
-        // On Windows, cmd_bat or cmd_ps would be preferred (not yet implemented).
-        let effective_cmd = if !cmd_bash.is_empty() && cfg!(unix) {
-            cmd_bash
+        // Coerce cmd and cmd_bash as configurable strings (both support select())
+        let cmd_attr_type = AttrType::string();
+        let cmd_value = if cmd.is_none() {
+            eval.heap().alloc("")
         } else {
             cmd
         };
+        let coerced_cmd = cmd_attr_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, cmd_value)?;
 
-        // Coerce cmd
-        let coerced_cmd = CoercedAttr::String(StringLiteral(ArcStr::from(effective_cmd)));
+        let cmd_bash_value = if cmd_bash.is_none() {
+            eval.heap().alloc("")
+        } else {
+            cmd_bash
+        };
+        let coerced_cmd_bash =
+            cmd_attr_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, cmd_bash_value)?;
 
         // Coerce outs
         let coerced_outs = CoercedAttr::List(ListLiteral(ArcSlice::from_iter(
@@ -1560,6 +1577,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             name,
             vec![
                 ("cmd".to_owned(), coerced_cmd),
+                ("cmd_bash".to_owned(), coerced_cmd_bash),
                 ("outs".to_owned(), coerced_outs),
                 ("srcs".to_owned(), coerced_srcs),
                 ("tools".to_owned(), coerced_tools),
