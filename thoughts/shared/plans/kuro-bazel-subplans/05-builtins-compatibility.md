@@ -390,9 +390,9 @@ Per 04-prelude-architecture.md, these language-specific directories should be re
 - [x] Simplify `prelude/rules.bzl`: removed `APPLE_PLATFORMS_KEY` injection that added unused `_apple_platforms` attr to every rule (2026-02-25)
 - [x] Remove language-specific dirs from `prelude/user/all.bzl` (android/user, cxx/user, xcode) - done 2026-02-25
 - [x] Remove `rules.bzl` load from `prelude/native.bzl` (2026-02-26): Buck2 language-specific rules (android, apple, cxx, erlang, etc.) are no longer loaded at startup. `native` struct is now `__kuro_builtins__ + user_rules` only. All 356 build targets and 5 tests pass.
-- [ ] Remove unused prelude directories: android/, apple/, cxx/, erlang/, go_bootstrap/, haskell/, java/, kotlin/, python/, rust/, csharp/, ocaml/, julia/, js/, lua/ (directories still exist but are no longer loaded)
-- [ ] Keep core infrastructure: `prelude.bzl`, `native.bzl`, `rules.bzl`, etc.
-- [ ] Keep BXL support files: `prelude/bxl/`
+- [x] Remove unused prelude directories: android/, apple/, cxx/, erlang/, go_bootstrap/, go/, haskell/, java/, kotlin/, python/, python_bootstrap/, rust/, csharp/, ocaml/, julia/, js/, lua/, aosp/, linking/ - DONE 2026-02-26; 732 files removed, ~124k lines. Simplified rules_impl.bzl to core-only. All 358 targets + 5 tests pass.
+- [x] Keep core infrastructure: `prelude.bzl`, `native.bzl`, `rules.bzl`, `rules_impl.bzl` (simplified to core rules)
+- [x] Keep BXL support files: `prelude/bxl/`
 
 ### Success Criteria (Phase 7d)
 
@@ -400,8 +400,8 @@ Per 04-prelude-architecture.md, these language-specific directories should be re
 - [x] `oncall()`, `read_oncall()`, `load_symbols()` removed (2026-02-24)
 - [x] `soft_error()` already errors in OSS (confirmed)
 - [x] `attrs.*` emits deprecation warning (2026-02-25)
-- [ ] Prelude reduced to core + extensions
-- [ ] No Buck2-specific functions pollute Bazel-style BUILD files
+- [x] Prelude reduced to core + extensions (2026-02-26: 15+ language dirs removed, rules_impl.bzl simplified)
+- [x] No Buck2-specific functions pollute Bazel-style BUILD files (2026-02-26: native.bzl only exposes __kuro_builtins__ which contains Bazel-compatible rules)
 
 ---
 

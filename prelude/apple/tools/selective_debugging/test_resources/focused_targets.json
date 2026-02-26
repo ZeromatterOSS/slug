@@ -1,5 +1,0 @@
-{
-    "targets": [
-        "//fbobjc/kuro/samples/focused_debugging:Foo"
-    ]
-}
