@@ -53,7 +53,7 @@ Instead, Kuro should:
 - [x] `cc_common.link()` / shared - creates shared library (.so) with `-shared` flag
 
 **Blocking:**
-- [ ] Transitive dependency resolution - rules_cc depends on `protobuf` (via `repo_name = "com_google_protobuf"`) and `platforms`, which aren't being resolved
+- [x] Transitive dependency resolution - resolved: protobuf + cc_proto_library build end-to-end (313 commands; 2026-02-26)
 
 **Completed (2026-02-04):**
 - [x] `repo_name` aliasing in bzlmod - `bazel_dep(..., repo_name = "alias")` now creates cell aliases correctly

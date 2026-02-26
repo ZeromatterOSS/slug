@@ -624,11 +624,26 @@ fn analyze_label_flag(
 
 /// Returns the default value for known Bazel command-line flags.
 /// Used for evaluating config_setting with `values` attribute.
+/// These are the default values when no CLI flag overrides them.
+/// Reference: https://bazel.build/reference/command-line-reference
 fn bazel_flag_default(flag: &str) -> Option<&'static str> {
     match flag {
+        // Proto-related flags (used by protobuf)
         "strict_public_imports" => Some("off"),
         "strict_proto_deps" => Some("off"),
-        // Add more known flag defaults as needed
+        // Build mode flags
+        "compilation_mode" => Some("fastbuild"),
+        // Java-related flags
+        "java_base" => Some("//tools/jdk:current_java_toolchain"),
+        // C++ flags
+        "cpu" => None, // Platform-dependent, don't assume default
+        // Test-related
+        "test_lang_filters" => Some(""),
+        // Linker
+        "linkopt" => Some(""),
+        // Coverage
+        "collect_code_coverage" => Some("false"),
+        "instrumentation_filter" => Some(""),
         _ => None,
     }
 }

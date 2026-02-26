@@ -12,7 +12,6 @@
 # This is kuro's shim import. Any public symbols here will be available within
 # **all** interpreted files.
 
-load("@prelude//user:all.bzl", _user_rules = "rules")
 load("@prelude//utils:buckconfig.bzl", _read_config = "read_config_with_logging", _read_root_config = "read_root_config_with_logging", log_buckconfigs = "LOG_BUCKCONFIGS")
 
 def __struct_to_dict(s):
@@ -30,6 +29,5 @@ __overridden_builtins__ = {
 
 __shimmed_native__ = __struct_to_dict(__kuro_builtins__)
 __shimmed_native__.update(__overridden_builtins__)
-__shimmed_native__.update(_user_rules)
 
 native = struct(**__shimmed_native__)
