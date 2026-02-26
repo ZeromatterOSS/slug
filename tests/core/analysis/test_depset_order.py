@@ -46,3 +46,19 @@ async def test_depset_order_mismatch(buck: Buck) -> None:
         buck.build("//:mismatch"),
         stderr_regex="transitive elements must all have the same order",
     )
+
+
+@buck_test(data_dir="test_depset_order_data")
+async def test_depset_cross_rule_traversal(buck: Buck) -> None:
+    """Depsets passed through providers can be traversed in consumer rules.
+
+    This tests the critical fix for FrozenLiveDepset.direct/transitive
+    attributes which allows depset.to_list() to work on frozen depsets
+    received via providers from other rules.
+    """
+    result = await buck.build("//:depset_consumer")
+    output = result.get_build_report().output_for_target("//:depset_consumer")
+
+    content = output.read_text().strip().splitlines()
+    # All items from the transitive depset chain should be present
+    assert set(content) == {"item_a1", "item_a2", "item_b1", "item_c1"}

@@ -1490,7 +1490,6 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let _unused = (
-            cmd_bash,
             cmd_bat,
             cmd_ps,
             toolchains,
@@ -1508,8 +1507,16 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let internals = ModuleInternals::from_context(eval, "genrule")?;
         let coercion_ctx = internals.attr_coercion_context();
 
+        // On Unix, prefer cmd_bash if provided (Bazel-compatible: cmd_bash runs on bash).
+        // On Windows, cmd_bat or cmd_ps would be preferred (not yet implemented).
+        let effective_cmd = if !cmd_bash.is_empty() && cfg!(unix) {
+            cmd_bash
+        } else {
+            cmd
+        };
+
         // Coerce cmd
-        let coerced_cmd = CoercedAttr::String(StringLiteral(ArcStr::from(cmd)));
+        let coerced_cmd = CoercedAttr::String(StringLiteral(ArcStr::from(effective_cmd)));
 
         // Coerce outs
         let coerced_outs = CoercedAttr::List(ListLiteral(ArcSlice::from_iter(

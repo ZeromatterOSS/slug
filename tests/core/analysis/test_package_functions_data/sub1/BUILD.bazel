@@ -1,0 +1,6 @@
+load("//defs.bzl", "write_value")
+
+write_value(
+    name = "sub1_target",
+    value = "sub1",
+)

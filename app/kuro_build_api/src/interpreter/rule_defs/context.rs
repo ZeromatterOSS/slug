@@ -1106,11 +1106,12 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         if let Ok(iter) = targets.iterate(heap) {
             for dep_val in iter {
                 let (dep_label, paths) = if let Some(dep) = dep_val.downcast_ref::<Dependency>() {
-                    let label_str = dep.label().label().to_string();
+                    // Use unconfigured label for matching (avoids " (<cfg>)" suffix in comparison)
+                    let label_str = dep.label().label().unconfigured().to_string();
                     let paths = collect_output_paths(dep.provider_collection());
                     (label_str, paths)
                 } else if let Some(dep) = dep_val.downcast_ref::<FrozenDependency>() {
-                    let label_str = dep.label().label().to_string();
+                    let label_str = dep.label().label().unconfigured().to_string();
                     let paths = collect_output_paths(dep.provider_collection());
                     (label_str, paths)
                 } else {

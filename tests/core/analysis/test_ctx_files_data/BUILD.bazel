@@ -1,0 +1,50 @@
+load(
+    ":defs.bzl",
+    "collect_from_deps",
+    "expand_location_rule",
+    "single_file_from_dep",
+    "single_file_rule",
+    "source_lib",
+)
+
+# === source library producing multiple files ===
+
+source_lib(name = "my_lib")
+
+single_file_rule(name = "single_dep")
+
+# === ctx.files.deps collects flat list of files from deps ===
+
+collect_from_deps(
+    name = "files_from_lib",
+    deps = [":my_lib"],
+)
+
+collect_from_deps(
+    name = "files_from_multiple",
+    deps = [":my_lib", ":single_dep"],
+)
+
+collect_from_deps(
+    name = "files_from_source",
+    deps = ["defs.bzl", "MODULE.bazel"],
+)
+
+# === ctx.file.dep gets single file from label dep ===
+
+single_file_from_dep(
+    name = "single_from_dep",
+    dep = ":single_dep",
+)
+
+single_file_from_dep(
+    name = "single_from_source",
+    dep = "defs.bzl",
+)
+
+# === ctx.expand_location expands $(location :target) ===
+
+expand_location_rule(
+    name = "expand_location",
+    dep = ":single_dep",
+)

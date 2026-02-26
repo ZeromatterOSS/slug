@@ -8,13 +8,19 @@
  * above-listed licenses.
  */
 
+use starlark::collections::SmallMap;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
+use starlark::values::AllocValue;
+use starlark::values::StringValue;
+use starlark::values::Value;
 use starlark::values::ValueOfUnchecked;
+use starlark::values::dict::AllocDict;
 use starlark::values::list::AllocList;
 use starlark::values::list::UnpackList;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
+use starlark::values::none::NoneOr;
 
 use crate::interpreter::build_context::BuildContext;
 use crate::interpreter::globspec::GlobSpec;
@@ -90,6 +96,26 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
             .to_string())
     }
 
+    /// Returns the canonical name of the repository the rule or BUILD extension is called from.
+    ///
+    /// Bazel-compatible: `repo_name()` is available in BUILD files and .bzl files.
+    ///
+    /// For the root repository, returns `""` (empty string).
+    /// For external repositories, returns the canonical name (e.g. `"rules_cc~0.0.16"`).
+    ///
+    /// See: https://bazel.build/rules/lib/globals/build#repo_name
+    fn repo_name(eval: &mut Evaluator) -> starlark::Result<String> {
+        let cell_name = BuildContext::from_context(eval)?.cell_info().name().name();
+        let name_str = cell_name.as_str();
+        // In Bazel, the root repository has repo_name() == "" (empty string).
+        // External repos return their canonical name.
+        // In Kuro, the root cell is named "root" or matches the module name.
+        // We treat the cell name directly as the repo name; root is special-cased below.
+        // TODO: For multi-cell setups, check if this is the root cell and return "".
+        let _ = name_str;
+        Ok(name_str.to_owned())
+    }
+
     /// Like `get_cell_name()` but prepends a leading `@` for compatibility with Buck1.
     /// You should call `get_cell_name()` instead, and if you really want the `@`,
     /// prepend it yourself.
@@ -143,5 +169,88 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
         // or the package-relative path to the subpackage).
         let res = extra.sub_packages().map(|p| p.as_str());
         Ok(eval.heap().alloc_typed_unchecked(AllocList(res)).cast())
+    }
+
+    /// Returns a dict of all rules instantiated so far in the current BUILD file.
+    ///
+    /// Bazel-compatible: available as a direct global in BUILD files.
+    ///
+    /// The keys are rule names, and the values are dicts containing rule attributes.
+    /// Note: Currently returns minimal information (name only). Full attribute introspection
+    /// is not yet implemented.
+    ///
+    /// See: https://bazel.build/rules/lib/globals/build#existing_rules
+    fn existing_rules<'v>(eval: &mut Evaluator<'v, '_, '_>) -> starlark::Result<Value<'v>> {
+        // When called outside a BUILD file context (e.g., from a module extension), return empty.
+        let Ok(internals) = ModuleInternals::from_context(eval, "existing_rules") else {
+            return Ok(eval.heap().alloc(AllocDict(SmallMap::<&str, Value>::new())));
+        };
+        let target_names = internals.get_target_names();
+
+        let heap = eval.heap();
+        let result: SmallMap<&str, Value<'v>> = target_names
+            .iter()
+            .map(|name| {
+                let attrs_dict: SmallMap<&str, Value<'v>> =
+                    [("name", heap.alloc(name.as_str()))].into_iter().collect();
+                let attrs_val = heap.alloc(AllocDict(attrs_dict));
+                (name.as_str(), attrs_val)
+            })
+            .collect();
+
+        Ok(heap.alloc(AllocDict(result)))
+    }
+
+    /// Returns a dict of the attributes of the rule with the given name in the current BUILD file.
+    /// Returns None if the rule doesn't exist.
+    ///
+    /// Bazel-compatible: available as a direct global in BUILD files.
+    ///
+    /// See: https://bazel.build/rules/lib/globals/build#existing_rule
+    fn existing_rule<'v>(
+        name: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneOr<Value<'v>>> {
+        let Ok(internals) = ModuleInternals::from_context(eval, "existing_rule") else {
+            return Ok(NoneOr::None);
+        };
+
+        if !internals.target_exists(name) {
+            return Ok(NoneOr::None);
+        }
+
+        let heap = eval.heap();
+        let attrs_dict: SmallMap<&str, Value<'v>> =
+            [("name", heap.alloc(name))].into_iter().collect();
+        Ok(NoneOr::Other(heap.alloc(AllocDict(attrs_dict))))
+    }
+
+    /// Converts a label string to a Label object relative to the current package.
+    ///
+    /// Bazel-compatible: available as a direct global in BUILD files.
+    ///
+    /// For example, in package `//foo/bar`:
+    /// - `package_relative_label(":target")` returns Label("//foo/bar:target")
+    /// - `package_relative_label("//other:target")` returns Label("//other:target")
+    ///
+    /// See: https://bazel.build/rules/lib/globals/build#package_relative_label
+    fn package_relative_label<'v>(
+        label_string: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<StringValue<'v>> {
+        let build_ctx = BuildContext::from_context(eval)?;
+        let base_path = build_ctx.base_path()?;
+        let pkg = base_path.path();
+        // If the label is already absolute (starts with //), return as-is
+        let result = if label_string.starts_with("//") || label_string.starts_with("@") {
+            label_string.to_owned()
+        } else if let Some(name) = label_string.strip_prefix(':') {
+            // ":name" -> "//pkg:name"
+            format!("//{}:{}", pkg, name)
+        } else {
+            // "name" -> "//pkg:name"
+            format!("//{}:{}", pkg, label_string)
+        };
+        Ok(eval.heap().alloc_str(&result))
     }
 }

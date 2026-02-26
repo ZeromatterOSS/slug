@@ -14,3 +14,146 @@ args_builder = rule(
     implementation = _args_builder_impl,
     attrs = {},
 )
+
+
+def _args_terminate_with_impl(ctx):
+    out = ctx.actions.declare_file("args_terminate.txt")
+
+    args = ctx.actions.args()
+    args.add_all(["a", "b", "c"], terminate_with = "END")
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_terminate_with = rule(
+    implementation = _args_terminate_with_impl,
+    attrs = {},
+)
+
+
+def _args_before_each_impl(ctx):
+    out = ctx.actions.declare_file("args_before_each.txt")
+
+    args = ctx.actions.args()
+    args.add_all(["a", "b"], before_each = "--flag")
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_before_each = rule(
+    implementation = _args_before_each_impl,
+    attrs = {},
+)
+
+
+def _args_format_each_impl(ctx):
+    out = ctx.actions.declare_file("args_format_each.txt")
+
+    args = ctx.actions.args()
+    args.add_all(["foo", "bar"], format_each = "--lib=%s")
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_format_each = rule(
+    implementation = _args_format_each_impl,
+    attrs = {},
+)
+
+
+def _to_upper(s):
+    return s.upper()
+
+
+def _args_map_each_impl(ctx):
+    out = ctx.actions.declare_file("args_map_each.txt")
+
+    args = ctx.actions.args()
+    args.add_all(["hello", "world"], map_each = _to_upper)
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_map_each = rule(
+    implementation = _args_map_each_impl,
+    attrs = {},
+)
+
+
+def _args_uniquify_impl(ctx):
+    out = ctx.actions.declare_file("args_uniquify.txt")
+
+    args = ctx.actions.args()
+    args.add_all(["a", "b", "a", "c", "b"], uniquify = True)
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_uniquify = rule(
+    implementation = _args_uniquify_impl,
+    attrs = {},
+)
+
+
+def _args_omit_if_empty_impl(ctx):
+    out = ctx.actions.declare_file("args_omit_if_empty.txt")
+
+    # With omit_if_empty=True (default), empty list adds nothing
+    args = ctx.actions.args()
+    args.add("before")
+    args.add_all([], omit_if_empty = True)
+    args.add("after")
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_omit_if_empty = rule(
+    implementation = _args_omit_if_empty_impl,
+    attrs = {},
+)
+
+
+def _args_output_artifact_impl(ctx):
+    out = ctx.actions.declare_file("output_artifact_test.txt")
+
+    src = ctx.file.src
+
+    args = ctx.actions.args()
+    # Test that format= works with artifact paths
+    args.add(src, format = "--input=%s")
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_output_artifact = rule(
+    implementation = _args_output_artifact_impl,
+    attrs = {
+        "src": attr.label(allow_single_file = True),
+    },
+)
+
+
+def _output_artifact_in_relative_to_impl(ctx):
+    source = ctx.file.source
+    out = ctx.actions.declare_file("relative_to_test.txt")
+
+    args = ctx.actions.args()
+    args.add(source)
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+output_artifact_in_relative_to = rule(
+    implementation = _output_artifact_in_relative_to_impl,
+    attrs = {
+        "source": attr.label(allow_single_file = True),
+    },
+)

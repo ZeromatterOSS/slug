@@ -205,7 +205,29 @@ fn analyze_genrule(
 
     // Build location mappings for $(location label) / $(execpath label) expansion.
     // These map each referenced label to its dep's output artifacts.
-    let location_mappings = build_location_mappings(&cmd, &dep_analysis);
+    let mut location_mappings = build_location_mappings(&cmd, &dep_analysis);
+
+    // Also build location mappings for source files referenced in $(location ...).
+    // Source files (e.g. "defs.bzl" in srcs) can be referenced as $(location :defs.bzl).
+    if let Some(srcs_attr) = configured_node.get("srcs", AttrInspectOptions::All) {
+        let source_mappings = build_source_file_location_mappings(&srcs_attr.value, &pkg);
+        // Add source mappings for labels not already resolved via dep_analysis.
+        // If a key exists in location_mappings but with empty artifacts, replace it.
+        for (label, artifacts) in source_mappings {
+            if artifacts.is_empty() {
+                continue;
+            }
+            let existing = location_mappings.iter_mut().find(|(k, _)| k == &label);
+            if let Some((_, existing_arts)) = existing {
+                // Replace empty dep_analysis entry with source file artifacts
+                if existing_arts.is_empty() {
+                    *existing_arts = artifacts;
+                }
+            } else {
+                location_mappings.push((label, artifacts));
+            }
+        }
+    }
 
     // Create the genrule action
     let genrule_action = GenruleAction::new(cmd, inputs, output_artifacts, location_mappings);
@@ -326,6 +348,54 @@ fn build_location_mappings(
         mappings.push((label.clone(), found_artifacts));
     }
     mappings
+}
+
+/// Build location mappings for source files in genrule srcs.
+///
+/// For `$(location :file.txt)` patterns, the label `:file.txt` refers to a source file
+/// rather than a dep target. This function extracts such source files from the `srcs`
+/// ConfiguredAttr and maps them by their file name (e.g. `":defs.bzl"` → SourceArtifact).
+fn build_source_file_location_mappings(
+    attr: &ConfiguredAttr,
+    pkg: &kuro_core::package::PackageLabel,
+) -> Vec<(String, Vec<ArtifactGroup>)> {
+    let mut result: Vec<(String, Vec<ArtifactGroup>)> = Vec::new();
+    collect_source_file_location_mappings_recursive(attr, pkg, &mut result);
+    result
+}
+
+fn collect_source_file_location_mappings_recursive(
+    attr: &ConfiguredAttr,
+    pkg: &kuro_core::package::PackageLabel,
+    out: &mut Vec<(String, Vec<ArtifactGroup>)>,
+) {
+    match attr {
+        ConfiguredAttr::List(ListLiteral(items)) => {
+            for item in items.iter() {
+                collect_source_file_location_mappings_recursive(item, pkg, out);
+            }
+        }
+        ConfiguredAttr::OneOf(inner, _) => {
+            collect_source_file_location_mappings_recursive(inner, pkg, out);
+        }
+        ConfiguredAttr::SourceFile(coerced_path) => {
+            // The "label" for a source file is ":filename" (colon + last path component)
+            let file_path = coerced_path.path();
+            let filename = file_path
+                .as_str()
+                .rsplit('/')
+                .next()
+                .unwrap_or(file_path.as_str());
+            let label_key = format!(":{}", filename);
+            let source_artifact =
+                SourceArtifact::new(SourcePath::new(pkg.dupe(), file_path.clone()));
+            out.push((
+                label_key,
+                vec![ArtifactGroup::Artifact(Artifact::from(source_artifact))],
+            ));
+        }
+        _ => {}
+    }
 }
 
 /// Collect ArtifactGroups from a CoercedAttr that may contain source files.
@@ -1164,8 +1234,10 @@ fn analyze_sh_test(
 
     let (default_info, test_command_fv) = if let Some(&first_src) = source_outputs.first() {
         let di = FrozenDefaultInfo::with_executable(&heap, first_src);
-        // Command is a list containing the script path
-        let cmd_list = heap.alloc(starlark::values::list::AllocList([first_src]));
+        // Command uses bash as interpreter so the script doesn't need +x bits.
+        let bash_str = heap.alloc("bash");
+        let cmd_list =
+            heap.alloc(starlark::values::list::AllocList([bash_str, first_src]));
         (di, cmd_list)
     } else {
         let di = FrozenDefaultInfo::testing_empty(&heap);

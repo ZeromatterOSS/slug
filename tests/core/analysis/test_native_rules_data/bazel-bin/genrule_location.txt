@@ -1,0 +1,1 @@
+../buck-out/v2/gen/native_rules_test/1ef78538d8598cb2/__genrule_location__/genrule_location.txt

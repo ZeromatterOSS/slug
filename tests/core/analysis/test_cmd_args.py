@@ -19,3 +19,74 @@ async def test_ctx_actions_args_builder(buck: Buck) -> None:
 
     content = output.read_text().strip().splitlines()
     assert content == ["one", "two", "three", "four,five"]
+
+
+@buck_test(data_dir="test_cmd_args_data")
+async def test_args_add_all_terminate_with(buck: Buck) -> None:
+    """args.add_all with terminate_with appends a final element after the list."""
+    result = await buck.build("//:args_terminate_with")
+    output = result.get_build_report().output_for_target("//:args_terminate_with")
+
+    content = output.read_text().strip().splitlines()
+    assert content == ["a", "b", "c", "END"]
+
+
+@buck_test(data_dir="test_cmd_args_data")
+async def test_args_add_all_before_each(buck: Buck) -> None:
+    """args.add_all with before_each prepends a string before each element."""
+    result = await buck.build("//:args_before_each")
+    output = result.get_build_report().output_for_target("//:args_before_each")
+
+    content = output.read_text().strip().splitlines()
+    assert content == ["--flag", "a", "--flag", "b"]
+
+
+@buck_test(data_dir="test_cmd_args_data")
+async def test_args_add_all_format_each(buck: Buck) -> None:
+    """args.add_all with format_each applies a format string to each element."""
+    result = await buck.build("//:args_format_each")
+    output = result.get_build_report().output_for_target("//:args_format_each")
+
+    content = output.read_text().strip().splitlines()
+    assert content == ["--lib=foo", "--lib=bar"]
+
+
+@buck_test(data_dir="test_cmd_args_data")
+async def test_args_add_all_map_each(buck: Buck) -> None:
+    """args.add_all with map_each applies a Starlark function to each element."""
+    result = await buck.build("//:args_map_each")
+    output = result.get_build_report().output_for_target("//:args_map_each")
+
+    content = output.read_text().strip().splitlines()
+    assert content == ["HELLO", "WORLD"]
+
+
+@buck_test(data_dir="test_cmd_args_data")
+async def test_args_add_all_uniquify(buck: Buck) -> None:
+    """args.add_all with uniquify=True deduplicates the list while preserving order."""
+    result = await buck.build("//:args_uniquify")
+    output = result.get_build_report().output_for_target("//:args_uniquify")
+
+    content = output.read_text().strip().splitlines()
+    assert content == ["a", "b", "c"]
+
+
+@buck_test(data_dir="test_cmd_args_data")
+async def test_args_add_all_omit_if_empty(buck: Buck) -> None:
+    """args.add_all with omit_if_empty=True adds nothing for an empty list."""
+    result = await buck.build("//:args_omit_if_empty")
+    output = result.get_build_report().output_for_target("//:args_omit_if_empty")
+
+    content = output.read_text().strip().splitlines()
+    assert content == ["before", "after"]
+
+
+@buck_test(data_dir="test_cmd_args_data")
+async def test_args_add_format_with_artifact(buck: Buck) -> None:
+    """args.add with format= applies a format string to an artifact path."""
+    result = await buck.build("//:args_output_artifact")
+    output = result.get_build_report().output_for_target("//:args_output_artifact")
+
+    content = output.read_text().strip()
+    assert content.startswith("--input=")
+    assert "defs.bzl" in content

@@ -1,0 +1,39 @@
+load(":defs.bzl", "collect_files", "write_value")
+
+# === package_name() test ===
+write_value(
+    name = "package_name_test",
+    value = package_name(),
+)
+
+# === subpackages() test ===
+write_value(
+    name = "subpackages_test",
+    value = str(subpackages(include = ["**"])),
+)
+
+# === exports_files() test ===
+exports_files(["defs.bzl"])
+
+collect_files(
+    name = "collect_exported",
+    deps = [":defs.bzl"],
+)
+
+# === repo_name() test ===
+write_value(
+    name = "repo_name_test",
+    value = repo_name(),
+)
+
+# === existing_rules() test ===
+write_value(
+    name = "existing_rules_test",
+    value = str(sorted(existing_rules().keys())),
+)
+
+# === package_relative_label() test ===
+write_value(
+    name = "package_relative_label_test",
+    value = package_relative_label(":package_name_test"),
+)

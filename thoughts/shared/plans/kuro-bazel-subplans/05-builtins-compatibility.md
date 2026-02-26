@@ -34,7 +34,7 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 | `label_flag` | Label-typed build setting | ✓ Implemented (native) | `native_rules.rs`, `native_rule_analysis.rs` |
 | `filegroup` | Groups files under single label | ✓ Exists (native + bazel_tools Starlark impl) | `native_rules.rs`, `bazel_tools/tools/build_rules/filegroup.bzl` |
 | `genquery` | Runs query language, outputs results | ✓ Stub (creates empty output via GenruleAction "touch $@"; 2026-02-25) | `native_rules.rs`, `native_rule_analysis.rs` |
-| `genrule` | Generic build rule using shell | ✓ Implemented (native, with GenruleAction) | `native_rules.rs`, `native_rule_analysis.rs`, `genrule_action.rs` |
+| `genrule` | Generic build rule using shell | ✓ Implemented (native, with GenruleAction; cmd_bash preferred on Unix; $(location :file) works for source files; 2026-02-25) | `native_rules.rs`, `native_rule_analysis.rs`, `genrule_action.rs` |
 | `starlark_doc_extract` | Extracts docs from .bzl files | Not implemented | Low priority |
 | `test_suite` | Defines collections of tests | ✓ Implemented (native, TESTS_ATTRIBUTE, expansion works) | `native_rules.rs`, `native_rule_analysis.rs` |
 
@@ -118,21 +118,21 @@ These functions must be available in all .bzl files without any `load()` stateme
 | Function | Description | Kuro Status | Location |
 |----------|-------------|-------------|----------|
 | `depset` | Creates depset | ✓ Available | |
-| `existing_rule` | Retrieves rule instance | ✓ Implemented | `natives.rs` |
-| `existing_rules` | Returns all rules in package | ✓ Implemented | `natives.rs` |
-| `exports_files` | Marks files as exported | Needs verification | |
-| `glob` | Returns files matching patterns | ✓ Implemented | `natives.rs` |
+| `existing_rule` | Retrieves rule instance | ✓ Implemented | `path.rs` (direct BUILD global + `natives.rs`) |
+| `existing_rules` | Returns all rules in package | ✓ Implemented | `path.rs` (direct BUILD global + `natives.rs`) |
+| `exports_files` | Marks files as exported | ✓ Implemented (2026-02-25) | `native_rules.rs` |
+| `glob` | Returns files matching patterns | ✓ Implemented | `path.rs` |
 | `module_name` | Returns module name | ✓ Implemented | `natives.rs` |
 | `module_version` | Returns module version | ✓ Implemented | `natives.rs` |
 | `package` | Declares package metadata | ✓ Implemented | `package.rs` |
 | `package_default_visibility` | Returns default visibility | ✓ Implemented | `package.rs` |
-| `package_group` | Defines package set for visibility | Needs implementation | |
-| `package_name` | Returns package name | ✓ Implemented | `natives.rs` |
-| `package_relative_label` | Converts string to Label | ✓ Implemented | `natives.rs` |
-| `repo_name` | Returns canonical repo name | ✓ Implemented | `natives.rs` |
-| `repository_name` | Deprecated variant | ✓ Implemented | `natives.rs` |
+| `package_group` | Defines package set for visibility | ✓ Registered (visibility enforcement unverified) | `native_rules.rs` |
+| `package_name` | Returns package name | ✓ Implemented | `path.rs` |
+| `package_relative_label` | Converts string to Label | ✓ Implemented (2026-02-25) | `path.rs` (direct BUILD global) |
+| `repo_name` | Returns canonical repo name | ✓ Implemented (2026-02-25) | `path.rs` (direct BUILD global) |
+| `repository_name` | Deprecated variant | ✓ Implemented | `path.rs` |
 | `select` | Configurable attributes | ✓ Implemented | |
-| `subpackages` | Lists direct subpackages | Not implemented | |
+| `subpackages` | Lists direct subpackages | ✓ Implemented (2026-02-25) | `path.rs` |
 
 ### Implementation Strategy
 

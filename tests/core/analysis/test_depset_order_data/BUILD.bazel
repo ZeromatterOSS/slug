@@ -1,4 +1,11 @@
-load(":defs.bzl", "depset_default_infer_rule", "depset_mismatch_rule", "depset_order_rule")
+load(
+    ":defs.bzl",
+    "depset_consumer",
+    "depset_default_infer_rule",
+    "depset_mismatch_rule",
+    "depset_order_rule",
+    "depset_producer",
+)
 
 package(default_visibility = ["//visibility:public"])
 
@@ -28,4 +35,14 @@ depset_default_infer_rule(
 
 depset_mismatch_rule(
     name = "mismatch",
+)
+
+# Cross-rule depset traversal
+depset_producer(
+    name = "depset_producer",
+)
+
+depset_consumer(
+    name = "depset_consumer",
+    dep = ":depset_producer",
 )

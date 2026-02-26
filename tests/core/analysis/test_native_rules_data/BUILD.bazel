@@ -1,0 +1,150 @@
+load(":defs.bzl", "collect_files", "select_value", "write_list")
+
+# === filegroup tests ===
+
+filegroup(
+    name = "source_files",
+    srcs = [
+        "defs.bzl",
+        "MODULE.bazel",
+    ],
+)
+
+collect_files(
+    name = "collected_filegroup",
+    deps = [":source_files"],
+)
+
+# === alias tests ===
+
+write_list(
+    name = "original",
+    items = ["hello", "world"],
+)
+
+alias(
+    name = "aliased",
+    actual = ":original",
+)
+
+# === select() with //conditions:default ===
+
+select_value(
+    name = "select_default",
+    value = select({
+        "//conditions:default": "default_value",
+    }),
+)
+
+# === constraint_setting + constraint_value + config_setting ===
+
+constraint_setting(name = "my_setting")
+
+constraint_value(
+    name = "my_value_a",
+    constraint_setting = ":my_setting",
+)
+
+constraint_value(
+    name = "my_value_b",
+    constraint_setting = ":my_setting",
+)
+
+config_setting(
+    name = "config_a",
+    constraint_values = [":my_value_a"],
+)
+
+config_setting(
+    name = "config_b",
+    constraint_values = [":my_value_b"],
+)
+
+select_value(
+    name = "select_with_constraint",
+    value = select({
+        ":config_a": "config_a_selected",
+        ":config_b": "config_b_selected",
+        "//conditions:default": "default_selected",
+    }),
+)
+
+# === platform definition (using local constraint settings) ===
+
+constraint_setting(name = "os")
+
+constraint_value(
+    name = "linux",
+    constraint_setting = ":os",
+)
+
+constraint_value(
+    name = "macos",
+    constraint_setting = ":os",
+)
+
+platform(
+    name = "linux_platform",
+    constraint_values = [":linux"],
+)
+
+platform(
+    name = "macos_platform",
+    constraint_values = [":macos"],
+)
+
+# === genrule tests ===
+
+genrule(
+    name = "genrule_basic",
+    outs = ["genrule_basic.txt"],
+    cmd = "echo 'hello from genrule' > $@",
+)
+
+genrule(
+    name = "genrule_srcs",
+    srcs = ["defs.bzl"],
+    outs = ["genrule_srcs.txt"],
+    cmd = "echo $(SRCS) > $@",
+)
+
+genrule(
+    name = "genrule_multi_outs",
+    outs = ["multi_a.txt", "multi_b.txt"],
+    cmd = "echo 'a' > $(@D)/multi_a.txt && echo 'b' > $(@D)/multi_b.txt",
+)
+
+genrule(
+    name = "genrule_cmd_bash",
+    outs = ["genrule_cmd_bash.txt"],
+    cmd = "echo 'generic' > $@",
+    cmd_bash = "echo 'from_bash' > $@",
+)
+
+genrule(
+    name = "genrule_location",
+    srcs = ["defs.bzl"],
+    outs = ["genrule_location.txt"],
+    cmd = "echo $(location :defs.bzl) > $@",
+)
+
+# === sh_binary test ===
+
+sh_binary(
+    name = "hello_sh",
+    srcs = ["hello.sh"],
+)
+
+# === sh_test test ===
+
+sh_test(
+    name = "hello_sh_test",
+    srcs = ["hello.sh"],
+)
+
+# === test_suite test ===
+
+test_suite(
+    name = "all_sh_tests",
+    tests = [":hello_sh_test"],
+)
