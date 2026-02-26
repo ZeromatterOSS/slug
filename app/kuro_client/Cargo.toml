@@ -43,6 +43,8 @@ kuro_core = { workspace = true }
 kuro_data = { workspace = true }
 kuro_error = { workspace = true }
 kuro_event_log = { workspace = true }
+kuro_event_observer = { workspace = true }
+kuro_events = { workspace = true }
 kuro_fs = { workspace = true }
 kuro_query_parser = { workspace = true }
 kuro_subscription_proto = { workspace = true }

@@ -30,6 +30,10 @@ pub struct Config {
     /// Available as a workaround for when test features are available.
     #[clap(long, num_args=1.., allow_hyphen_values = true)]
     pub test_arg: Vec<String>,
+
+    /// Ignored flag for compatibility with Buck2 test framework.
+    #[clap(long, hide = true)]
+    run_disabled: bool,
 }
 
 /// Uiltity that can be used to parse Env values from CLI arguments.

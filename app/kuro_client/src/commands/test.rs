@@ -8,6 +8,9 @@
  * above-listed licenses.
  */
 
+use std::path::PathBuf;
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use kuro_cli_proto::CounterWithExamples;
 use kuro_cli_proto::TestRequest;
@@ -31,16 +34,100 @@ use kuro_client_ctx::output_destination_arg::OutputDestinationArg;
 use kuro_client_ctx::path_arg::PathArg;
 use kuro_client_ctx::stdio::eprint_line;
 use kuro_client_ctx::streaming::StreamingCommand;
+use kuro_client_ctx::subscribers::subscriber::EventSubscriber;
 use kuro_client_ctx::subscribers::superconsole::test::TestCounterColumn;
 use kuro_client_ctx::subscribers::superconsole::test::span_from_build_failure_count;
 use kuro_error::BuckErrorContext;
 use kuro_error::ErrorTag;
 use kuro_error::ExitCode;
 use kuro_error::kuro_error;
+use kuro_event_observer::unpack_event::unpack_event;
 use kuro_fs::fs_util;
 use kuro_fs::working_dir::AbsWorkingDir;
 use superconsole::Line;
 use superconsole::Span;
+
+/// Writes JUnit-compatible XML test results for e2e test framework compatibility.
+///
+/// The `kuro test --xml <path>` flag triggers collection of test result events
+/// and writes them to the specified XML file when finalized.
+struct XmlTestResultWriter {
+    xml_path: PathBuf,
+    results: Vec<(String, String, String)>, // (name, status, result_type)
+}
+
+impl XmlTestResultWriter {
+    fn new(xml_path: impl Into<PathBuf>) -> Self {
+        Self {
+            xml_path: xml_path.into(),
+            results: Vec::new(),
+        }
+    }
+}
+
+#[async_trait]
+impl EventSubscriber for XmlTestResultWriter {
+    fn name(&self) -> &'static str {
+        "xml-test-result-writer"
+    }
+
+    async fn handle_events(
+        &mut self,
+        events: &[Arc<kuro_events::BuckEvent>],
+    ) -> kuro_error::Result<()> {
+        for event in events {
+            if let Ok(kuro_event_observer::unpack_event::UnpackedBuckEvent::Instant(
+                _,
+                _,
+                kuro_data::instant_event::Data::TestResult(result),
+            )) = unpack_event(event)
+            {
+                let status_enum = kuro_data::TestStatus::try_from(result.status)
+                    .unwrap_or(kuro_data::TestStatus::Unknown);
+                let (status_str, type_str) = match status_enum {
+                    kuro_data::TestStatus::Pass => ("pass", "SUCCESS"),
+                    kuro_data::TestStatus::Fail => ("fail", "FAILURE"),
+                    kuro_data::TestStatus::Fatal => ("fail", "FAILURE"),
+                    kuro_data::TestStatus::Timeout => ("fail", "FAILURE"),
+                    kuro_data::TestStatus::InfraFailure => ("fail", "FAILURE"),
+                    kuro_data::TestStatus::Skip => ("skip", "EXCLUDED"),
+                    kuro_data::TestStatus::Omitted => ("skip", "EXCLUDED"),
+                    _ => ("fail", "FAILURE"),
+                };
+                let name = result
+                    .name
+                    .replace('&', "&amp;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;")
+                    .replace('"', "&quot;");
+                self.results
+                    .push((name, status_str.to_owned(), type_str.to_owned()));
+            }
+        }
+        Ok(())
+    }
+
+    async fn finalize(&mut self) -> kuro_error::Result<()> {
+        if self.results.is_empty() {
+            // Write an empty-but-valid XML file so the test framework doesn't error.
+            let xml = "<results>\n  <testsuite/>\n</results>\n";
+            std::fs::write(&self.xml_path, xml)
+                .buck_error_context("Failed to write XML test results")?;
+            return Ok(());
+        }
+        let mut xml = String::from("<results>\n  <testsuite>\n");
+        for (name, status, result_type) in &self.results {
+            xml.push_str(&format!(
+                "    <testresult name=\"{}\" status=\"{}\" type=\"{}\"/>\n",
+                name, status, result_type
+            ));
+        }
+        xml.push_str("  </testsuite>\n</results>\n");
+        std::fs::write(&self.xml_path, xml)
+            .buck_error_context("Failed to write XML test results")?;
+        Ok(())
+    }
+}
 
 use crate::commands::build::print_build_result;
 
@@ -198,9 +285,9 @@ Example: --test_tag_filters=small,-slow (include 'small', exclude 'slow')"
     #[clap(long = "deep", hide = true)]
     _deep: bool,
 
-    // ignored. only for e2e tests. compatibility with v1.
+    /// Write test results to XML file (JUnit format for e2e test framework compatibility).
     #[clap(long = "xml", hide = true)]
-    _xml: Option<String>,
+    xml: Option<String>,
 
     // ---- Bazel compatibility flags (accepted, some are no-ops) ----
     /// Control test output verbosity (Bazel compatibility).
@@ -476,5 +563,13 @@ impl StreamingCommand for TestCommand {
 
     fn starlark_opts(&self) -> &CommonStarlarkOptions {
         &self.common_opts.starlark_opts
+    }
+
+    fn extra_subscribers(&self) -> Vec<Box<dyn EventSubscriber>> {
+        if let Some(xml_path) = &self.xml {
+            vec![Box::new(XmlTestResultWriter::new(xml_path))]
+        } else {
+            vec![]
+        }
     }
 }
