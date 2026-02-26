@@ -385,7 +385,11 @@ Per 04-prelude-architecture.md, these language-specific directories should be re
 - [ ] Document `ctx.attr` as preferred over `ctx.attrs`
 
 **Phase 7d.3: Prelude Cleanup**
-- [ ] Remove unused prelude directories (per 04-prelude-architecture.md)
+- [x] Simplify `prelude/native.bzl`: removed 11 language-specific load()s and ~350 lines of Meta-internal macro stubs (android, apple, cxx, erlang, python, rust, kotlin); reduced from 576→40 lines (2026-02-25)
+- [x] Simplify `prelude/rules.bzl`: removed `APPLE_PLATFORMS_KEY` injection that added unused `_apple_platforms` attr to every rule (2026-02-25)
+- [ ] Remove language-specific dirs from `prelude/user/all.bzl` (android/user, cxx/user, xcode)
+- [ ] Remove language-specific rules from `prelude/rules_impl.bzl` (blocks directory deletion)
+- [ ] Remove unused prelude directories: android/, apple/, cxx/, erlang/, go_bootstrap/, haskell/, java/, kotlin/, python/, rust/, csharp/, ocaml/, julia/, js/, lua/
 - [ ] Keep core infrastructure: `prelude.bzl`, `native.bzl`, `rules.bzl`, etc.
 - [ ] Keep BXL support files: `prelude/bxl/`
 
@@ -418,21 +422,24 @@ Per 04-prelude-architecture.md, these language-specific directories should be re
 ## Success Criteria Summary
 
 ### Phase 7a (Native Rules)
-- [ ] All Bazel native rules available without `load()`
-- [ ] Platform/toolchain rules work
+- [x] All Bazel native rules available without `load()` (2026-02-25: alias, config_setting, filegroup, genrule, platform, constraint_setting/value, sh_binary/library/test, test_suite, toolchain/type, label_flag all work)
+- [x] Platform/toolchain rules work (2026-02-25: constraint_setting, constraint_value, platform, config_setting all work; rules_cc toolchain works end-to-end)
+- [x] genrule improvements: cmd_bash preferred on Unix, $(location :file) works for source files in srcs (2026-02-25)
+- [x] sh_test uses bash interpreter so scripts don't need +x bit (2026-02-25)
 
 ### Phase 7b (Global Functions)
-- [ ] All global functions match Bazel signatures
-- [ ] `package_group` visibility works
+- [x] All global functions match Bazel signatures (2026-02-25: audited against Bazel docs)
+- [x] repo_name(), existing_rule(), existing_rules(), package_relative_label() available as direct BUILD globals (2026-02-25)
+- [ ] `package_group` visibility works (registered but full visibility enforcement not yet verified)
 
 ### Phase 7c (Modules)
-- [ ] `config` module fully implemented
-- [ ] `platform_common` module implemented
-- [ ] All module methods match Bazel documentation
+- [x] `config` module fully implemented (config.rs)
+- [x] `platform_common` module implemented (ConstraintSettingInfo, ConstraintValueInfo, PlatformInfo, ToolchainInfo, TemplateVariableInfo)
+- [x] All module methods match Bazel documentation (verified: cc_common, config, platform_common, testing, coverage_common)
 
 ### Phase 7d (Buck2 Removal)
-- [ ] Buck2-specific functions removed/deprecated
-- [ ] Prelude cleaned up
+- [x] Buck2-specific functions removed/deprecated (read_config/read_root_config errors; oncall/load_symbols removed; attrs.* deprecated)
+- [ ] Prelude cleaned up (not yet started)
 - [ ] Clear migration path documented
 
 ---
