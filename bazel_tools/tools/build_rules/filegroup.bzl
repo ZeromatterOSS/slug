@@ -23,38 +23,18 @@ def _filegroup_impl(ctx):
 
     Returns DefaultInfo with all the source files as outputs.
     """
-    # Collect all files from srcs
-    files = []
-    for src in ctx.attrs.srcs:
-        # src could be a source file or a target producing files
-        if hasattr(src, "default_outputs"):
-            # It's a target with DefaultInfo
-            files.extend(src.default_outputs)
-        elif hasattr(src, "short_path"):
-            # It's a source artifact
-            files.append(src)
-        else:
-            # Try to get it as an artifact
-            files.append(src)
-
-    # Also include any data files
-    for data in ctx.attrs.data:
-        if hasattr(data, "default_outputs"):
-            files.extend(data.default_outputs)
-        elif hasattr(data, "short_path"):
-            files.append(data)
-        else:
-            files.append(data)
+    # Use ctx.files.srcs to get flat list of File objects from both source files and targets
+    files = ctx.files.srcs + ctx.files.data
 
     return [
-        DefaultInfo(default_outputs = files),
+        DefaultInfo(files = depset(files)),
     ]
 
 filegroup = rule(
     implementation = _filegroup_impl,
     attrs = {
-        "srcs": attrs.list(attrs.source(), default = []),
-        "data": attrs.list(attrs.source(), default = []),
+        "srcs": attr.label_list(allow_files = True, default = []),
+        "data": attr.label_list(allow_files = True, default = []),
         # visibility is an internal attribute - don't define it explicitly
     },
 )

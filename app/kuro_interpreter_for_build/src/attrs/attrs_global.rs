@@ -57,6 +57,23 @@ use crate::plugins::PluginKindArg;
 
 const OPTION_NONE_EXPLANATION: &str = "`None` as an attribute value always picks the default. For `attrs.option`, if the default isn't `None`, there is no way to express `None`.";
 
+/// Emits a deprecation warning for `attrs.*` usage (at most once per process).
+///
+/// The `attrs.*` namespace is Buck2-specific. Bazel uses `attr.*` (singular).
+/// This warning helps users migrating from Buck2 to adopt the Bazel-compatible API.
+fn warn_attrs_deprecated() {
+    use std::sync::OnceLock;
+    static WARNED: OnceLock<()> = OnceLock::new();
+    WARNED.get_or_init(|| {
+        tracing::warn!(
+            "The `attrs.*` namespace is Buck2-specific and deprecated in Kuro. \
+             Please use `attr.*` (Bazel-compatible) instead. \
+             For example: `attr.string()` instead of `attrs.string()`, \
+             `attr.label_list()` instead of `attrs.list(attrs.dep())`."
+        );
+    });
+}
+
 #[derive(kuro_error::Error, Debug)]
 #[kuro(input)]
 enum AttrError {
@@ -354,6 +371,7 @@ fn attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] doc: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
+        warn_attrs_deprecated();
         let _unused = validate;
         Ok(Attribute::attr(eval, default, doc, AttrType::string())?)
     }
@@ -365,6 +383,7 @@ fn attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] doc: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
+        warn_attrs_deprecated();
         let coercer = AttrType::list(inner.coercer_for_inner()?);
         Ok(Attribute::attr(eval, default, doc, coercer)?)
     }
@@ -518,6 +537,7 @@ fn attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] doc: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
+        warn_attrs_deprecated();
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
         let plugin_kinds = match pulls_and_pushes_plugins {
             Either::Right(_) => PluginKindSet::ALL,
@@ -786,6 +806,7 @@ fn attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] doc: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
+        warn_attrs_deprecated();
         Ok(Attribute::attr(
             eval,
             default,
