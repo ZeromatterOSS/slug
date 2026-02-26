@@ -14,23 +14,20 @@ from buck2.tests.e2e_util.api.buck import Buck
 from buck2.tests.e2e_util.buck_workspace import buck_test
 
 
-@buck_test()
+@buck_test(data_dir="test_bazel_dep_data")
 async def test_bazel_dep_basic(buck: Buck) -> None:
     """Verify bazel_dep() directives are collected."""
     # Test that bazel_dep() directive is parsed correctly
-    result = await buck.audit_cell()
-    assert result.returncode == 0
+    await buck.audit("cell")
 
 
-@buck_test()
+@buck_test(data_dir="test_bazel_dep_data")
 async def test_bazel_dep_with_repo_name(buck: Buck) -> None:
     """Verify repo_name override in bazel_dep() works."""
-    result = await buck.audit_cell()
-    assert result.returncode == 0
+    await buck.audit("cell")
 
 
-@buck_test()
+@buck_test(data_dir="test_bazel_dep_data")
 async def test_bazel_dep_dev_dependency(buck: Buck) -> None:
     """Verify dev_dependency flag in bazel_dep() is parsed."""
-    result = await buck.audit_cell()
-    assert result.returncode == 0
+    await buck.audit("cell")

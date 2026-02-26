@@ -14,7 +14,7 @@ from buck2.tests.e2e_util.asserts import expect_failure
 from buck2.tests.e2e_util.buck_workspace import buck_test
 
 
-@buck_test()
+@buck_test(data_dir="test_lint_and_typecheck_data")
 async def test_lint_fails(buck: Buck) -> None:
     await expect_failure(
         buck.starlark("lint", "bad_warning.bzl"),
@@ -22,7 +22,7 @@ async def test_lint_fails(buck: Buck) -> None:
     )
 
 
-@buck_test()
+@buck_test(data_dir="test_lint_and_typecheck_data")
 async def test_typecheck_fails(buck: Buck) -> None:
     await buck.starlark("typecheck", "good.bzl")
     await expect_failure(

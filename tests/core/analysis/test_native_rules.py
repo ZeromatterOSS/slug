@@ -107,11 +107,10 @@ async def test_genrule_srcs_expansion(buck: Buck) -> None:
 async def test_genrule_multi_outputs(buck: Buck) -> None:
     """genrule with multiple outs uses $(@D) to write to output directory."""
     result = await buck.build("//:genrule_multi_outs")
-    # Each output is a separate filegroup target
-    a_out = result.get_build_report().output_for_target("//:multi_a.txt")
-    b_out = result.get_build_report().output_for_target("//:multi_b.txt")
-    assert a_out.read_text().strip() == "a"
-    assert b_out.read_text().strip() == "b"
+    outputs = result.get_build_report().outputs_for_target("//:genrule_multi_outs")
+    by_name = {p.name: p for p in outputs}
+    assert by_name["multi_a.txt"].read_text().strip() == "a"
+    assert by_name["multi_b.txt"].read_text().strip() == "b"
 
 
 @buck_test(data_dir="test_native_rules_data")
@@ -145,7 +144,8 @@ async def test_sh_binary_builds(buck: Buck) -> None:
 async def test_sh_test_runs(buck: Buck) -> None:
     """sh_test() runs successfully using bash as interpreter."""
     result = await buck.test("//:hello_sh_test")
-    assert result.get_tests().is_success()
+    assert result.get_success_count() > 0
+    assert result.get_failure_count() == 0
 
 
 @buck_test(data_dir="test_native_rules_data")

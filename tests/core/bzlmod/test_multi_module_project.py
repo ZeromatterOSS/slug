@@ -14,40 +14,34 @@ from buck2.tests.e2e_util.api.buck import Buck
 from buck2.tests.e2e_util.buck_workspace import buck_test
 
 
-@buck_test()
+@buck_test(data_dir="test_multi_module_project_data")
 async def test_multiple_local_modules_recognized(buck: Buck) -> None:
     """Verify that multiple local_path_override() calls are parsed correctly."""
-    result = await buck.audit_cell()
-
-    assert result.returncode == 0
+    result = await buck.audit("cell")
 
     # Check that all cells are recognized
     output = result.stdout
-    assert "root" in output
+    assert "multi_module_root" in output
     assert "lib_a" in output
     assert "lib_b" in output
 
 
-@buck_test()
+@buck_test(data_dir="test_multi_module_project_data")
 async def test_each_local_module_has_own_module_bazel(buck: Buck) -> None:
     """Verify that each local module's MODULE.bazel is found."""
     # Query cells to verify both local modules are visible
-    result = await buck.audit_cell()
-
-    assert result.returncode == 0
+    result = await buck.audit("cell")
 
     # Both local modules should be in the output
     assert "lib_a" in result.stdout
     assert "lib_b" in result.stdout
 
 
-@buck_test()
+@buck_test(data_dir="test_multi_module_project_data")
 async def test_targets_in_both_local_modules(buck: Buck) -> None:
     """Verify that targets can be queried from both local modules."""
     # Query lib_a
-    result_a = await buck.targets("lib_a//...")
-    assert result_a.returncode == 0
+    await buck.targets("lib_a//...")
 
     # Query lib_b
-    result_b = await buck.targets("lib_b//...")
-    assert result_b.returncode == 0
+    await buck.targets("lib_b//...")

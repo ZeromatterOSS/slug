@@ -8,11 +8,15 @@
 
 # pyre-strict
 
-
+import pytest
 from buck2.tests.e2e_util.api.buck import Buck
 from buck2.tests.e2e_util.buck_workspace import buck_test
 
 
-@buck_test()
+@pytest.mark.skip(
+    reason="Uses nano_prelude (Meta-internal Buck2 feature). "
+    "Requires NANO_PRELUDE env var and TemplatePlaceholderInfo provider."
+)
+@buck_test(data_dir="test_template_placeholder_data")
 async def test_template_placeholder(buck: Buck) -> None:
     await buck.build("root//...")
