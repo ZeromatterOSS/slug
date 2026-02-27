@@ -1,3 +1,5 @@
+load("@//:defs.bzl", "stub")
+
 stub(
     name = "dep_incompatible",
     default_target_platform = "//:platform",

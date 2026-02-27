@@ -1,4 +1,5 @@
 load(":alias.bzl", "alias")
+load(":defs.bzl", "trivial_build")
 
 platform(
     name = "ppp",

@@ -1,3 +1,5 @@
+load(":defs.bzl", "trivial_build")
+
 platform(
     name = "platform",
 )

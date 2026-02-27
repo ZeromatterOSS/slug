@@ -1,1 +1,3 @@
-trivial_build(name = "test")
+load("//:defs.bzl", "stub")
+
+stub(name = "test")

@@ -1,3 +1,5 @@
-trivial_build(
+genrule(
     name = "target",
+    outs = ["out.txt"],
+    cmd = "echo target > $@",
 )

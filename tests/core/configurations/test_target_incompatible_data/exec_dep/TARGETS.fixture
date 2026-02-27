@@ -1,4 +1,4 @@
-load("@//:defs.bzl", "transitioned_stub")
+load("@//:defs.bzl", "stub", "transitioned_stub")
 
 constraint_setting(name = "exec_setting")
 

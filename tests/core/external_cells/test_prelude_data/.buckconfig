@@ -3,12 +3,7 @@
   prelude = prelude
 
 [cell_aliases]
-  ovr_config = prelude
-  # Just have to exist, not actually used for this test
-  toolchains = root
-  fbsource = root
-  fbcode = root
-  buck = root
+  prelude = prelude
 
 [external_cells]
   prelude = bundled

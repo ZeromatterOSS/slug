@@ -1,4 +1,4 @@
-load(":defs.bzl", "run_python", "transitioned")
+load(":defs.bzl", "run_python", "stub", "transitioned")
 
 run_python(
     name = "print_animal_hello",

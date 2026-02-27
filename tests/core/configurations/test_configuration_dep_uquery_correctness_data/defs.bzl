@@ -52,3 +52,15 @@ incoming_transition_alias_vnew = rule(
     attrs = {},
     supports_incoming_transition = True,
 )
+
+def _stub_impl(_ctx):
+    return [DefaultInfo()]
+
+stub = rule(
+    impl = _stub_impl,
+    attrs = {
+        "configured_deps": attrs.list(attrs.configured_dep(), default = []),
+        "deps": attr.label_list(default = []),
+        "labels": attr.string_list(default = []),
+    },
+)

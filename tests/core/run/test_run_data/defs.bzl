@@ -6,10 +6,15 @@
 # of this source tree. You may select, at your option, one of the
 # above-listed licenses.
 
+def _stub_impl(ctx):
+    return [DefaultInfo()]
+
+stub = rule(impl = _stub_impl, attrs = {})
+
 def _run_python(ctx):
     return [
         DefaultInfo(),
-        RunInfo(args = cmd_args("fbpython", "-c", ctx.attrs.script)),
+        RunInfo(args = cmd_args("python3", "-c", ctx.attrs.script)),
     ]
 
 run_python = rule(

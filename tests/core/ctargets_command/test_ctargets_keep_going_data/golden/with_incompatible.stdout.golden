@@ -7,7 +7,7 @@
   },
   {
     "buck.target":"root//a:target1",
-    "buck.type":"nano_prelude//stub_rules.bzl:stub",
+    "buck.type":"root//defs.bzl:stub",
     "buck.deps":[],
     "buck.inputs":[],
     "buck.package":"root//a",

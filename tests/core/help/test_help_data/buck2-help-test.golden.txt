@@ -11,8 +11,7 @@ Arguments:
   [TEST_EXECUTOR_ARGS]...
           Additional arguments passed to the test executor.
 
-          Test executor is expected to have `--env` flag to pass environment variables. Can be used
-          like this:
+          Test executor is expected to have `--env` flag to pass environment variables. Can be used like this:
 
           kuro test //foo:bar -- --env PRIVATE_KEY=123
 
@@ -21,61 +20,60 @@ Options:
           Labels on targets to exclude from tests
 
       --include <INCLUDE>...
-          Labels on targets to include from tests. Prefixing with `!` means to exclude. First match
-          wins unless overridden by `always-exclude` flag.
-          If include patterns are present, regardless of whether exclude patterns are present, then
-          all targets are by default excluded unless explicitly included.
+          Labels on targets to include from tests. Prefixing with `!` means to exclude. First match wins unless overridden by `always-exclude` flag.
+          If include patterns are present, regardless of whether exclude patterns are present, then all targets are by default excluded unless explicitly included.
+
+      --test_tag_filters <TAGS>
+          Comma-separated list of test tags to filter on (Bazel compatibility). Positive tags include only matching tests; prefix with '-' to exclude. Example: --test_tag_filters=small,-slow (include 'small', exclude 'slow')
 
       --always-exclude
-          Whether to always exclude if the label appears in `exclude`, regardless of which appears
-          first
+          Whether to always exclude if the label appears in `exclude`, regardless of which appears first
 
       --build-filtered
           Whether to build tests that are excluded via labels.
 
       --unstable-allow-compatible-tests-on-re
-          Will allow tests that are compatible with RE (setup to run from the repo root and use
-          relative paths) to run from RE
+          Will allow tests that are compatible with RE (setup to run from the repo root and use relative paths) to run from RE
 
       --unstable-allow-all-tests-on-re
-          Will run tests to on RE even if they are missing required settings (running from the root
-          + relative paths). Those required settings just get overridden
+          Will run tests to on RE even if they are missing required settings (running from the root + relative paths). Those required settings just get overridden
 
       --test-executor-stdout <TEST_EXECUTOR_STDOUT>
           Writes the test executor stdout to the provided path
 
           --test-executor-stdout=- will write to stdout
 
-          --test-executor-stdout=FILEPATH will write to the provided filepath, overwriting the
-          current file if it exists
+          --test-executor-stdout=FILEPATH will write to the provided filepath, overwriting the current file if it exists
 
           By default the test executor's stdout stream is captured
 
       --ignore-tests-attribute
-          Normally testing will follow the `tests` attribute of all targets, to find their
-          associated tests. When passed, this flag will disable that, and only run the directly
-          supplied targets
+          Normally testing will follow the `tests` attribute of all targets, to find their associated tests. When passed, this flag will disable that, and only run the directly supplied targets
 
       --test-executor-stderr <TEST_EXECUTOR_STDERR>
           Writes the test executor stderr to the provided path
 
           --test-executor-stderr=- will write to stderr
 
-          --test-executor-stderr=FILEPATH will write to the provided filepath, overwriting the
-          current file if it exists
+          --test-executor-stderr=FILEPATH will write to the provided filepath, overwriting the current file if it exists
 
           By default test executor's stderr stream is captured
 
+      --test_filter <PATTERN>
+          Filter tests matching a regex pattern (Bazel compatibility).
+
+          Sets TESTBRIDGE_TEST_ONLY=<pattern> in the test environment. Test frameworks (e.g., gtest, pytest, cargo test) read this variable to filter which tests to run. Equivalent to Bazel's --test_filter flag.
+
+          Examples: kuro test //foo:bar --test_filter=MyClass.TestMethod kuro test //foo:bar --test_filter=test_
+
       --build-default-info
-          Also build DefaultInfo provider, which is what `kuro build` command builds (this is not
-          the default)
+          Also build DefaultInfo provider, which is what `kuro build` command builds (this is not the default)
 
       --skip-default-info
           Do not build DefaultInfo provider (this is the default)
 
       --build-run-info
-          Also build RunInfo provider, which builds artifacts needed for `kuro run` (this is not
-          the default)
+          Also build RunInfo provider, which builds artifacts needed for `kuro run` (this is not the default)
 
       --skip-run-info
           Do not build RunInfo provider (this is the default)
@@ -83,14 +81,12 @@ Options:
       --build-report <PATH>
           Print a build report
 
-          `--build-report=-` will print the build report to stdout `--build-report=<filepath>` will
-          write the build report to the file
+          `--build-report=-` will print the build report to stdout `--build-report=<filepath>` will write the build report to the file
 
       --enable-optional-validations <VALIDATION_NAMES>
           Comma separated list of validation names to run that are marked optional.
 
-          By default, validations marked as optional are skipped. This option overrides the
-          behaviour and executes those validations.
+          By default, validations marked as optional are skipped. This option overrides the behaviour and executes those validations.
 
       --build-report-options <BUILD_REPORT_OPTIONS>
           Comma separated list of build report options.
@@ -99,14 +95,12 @@ Options:
 
           `fill-out-failures`: fill out failures the same way Buck1 would.
 
-          `package-project-relative-paths`: emit the project-relative path of packages for the
-          targets that were built.
+          `package-project-relative-paths`: emit the project-relative path of packages for the targets that were built.
 
       --streaming-build-report <PATH>
           Stream intermediary build reports to a file in json lines format.
 
-          Each output materialization will trigger a new build report which will be written to the
-          file as a single line json.
+          Each output materialization will trigger a new build report which will be written to the file as a single line json.
 
   -j, --num-threads <THREADS>
           Number of threads to use during execution (default is # cores)
@@ -120,12 +114,10 @@ Options:
           Enable only remote execution. Will reject actions that cannot execute remotely
 
       --prefer-local
-          Enable hybrid execution. Will prefer executing actions that can execute locally on the
-          local host
+          Enable hybrid execution. Will prefer executing actions that can execute locally on the local host
 
       --prefer-remote
-          Enable hybrid execution. Will prefer executing actions that can execute remotely on RE and
-          will avoid racing local and remote execution
+          Enable hybrid execution. Will prefer executing actions that can execute remotely on RE and will avoid racing local and remote execution
 
           [env: BUCK_PREFER_REMOTE=]
 
@@ -133,47 +125,29 @@ Options:
           Experimental: Disable all execution
 
       --no-remote-cache
-          Do not perform remote cache queries or cache writes. If remote execution is enabled, the
-          RE service might still deduplicate actions, so for e.g. benchmarking, using a random
-          isolation dir is preferred
+          Do not perform remote cache queries or cache writes. If remote execution is enabled, the RE service might still deduplicate actions, so for e.g. benchmarking, using a random isolation dir is preferred
 
           [env: BUCK_OFFLINE_BUILD=]
 
       --write-to-cache-anyway
-          Could be used to enable the action cache writes on the RE worker when no_remote_cache is
-          specified
+          Could be used to enable the action cache writes on the RE worker when no_remote_cache is specified
 
       --eager-dep-files
-          Process dep files when they are generated (i.e. after running a command that produces dep
-          files), rather than when they are used (i.e. before re-running a command that previously
-          produced dep files). Use this when debugging commands that produce dep files. Note that
-          commands that previously produced dep files will not re-run: only dep files produced
-          during this command will be eagerly loaded
+          Process dep files when they are generated (i.e. after running a command that produces dep files), rather than when they are used (i.e. before re-running a command that previously produced dep files). Use this when debugging commands that produce dep files. Note that commands that previously produced dep files will not re-run: only dep files produced during this command will be eagerly loaded
 
       --upload-all-actions
-          Uploads every action to the RE service, regardless of whether the action needs to execute
-          on RE.
+          Uploads every action to the RE service, regardless of whether the action needs to execute on RE.
 
-          This is useful when debugging builds and trying to inspect actions which executed
-          remotely. It's possible that the action result is cached but the action itself has
-          expired. In this case, downloading the action itself would fail. Enabling this option
-          would unconditionally upload all actions, thus you will not hit any expiration issues.
+          This is useful when debugging builds and trying to inspect actions which executed remotely. It's possible that the action result is cached but the action itself has expired. In this case, downloading the action itself would fail. Enabling this option would unconditionally upload all actions, thus you will not hit any expiration issues.
 
       --fail-fast
           If Buck hits an error, do as little work as possible before exiting.
 
-          To illustrate the effect of this flag, consider an invocation of `build :foo :bar`. The
-          default behavior of buck is to do enough work to get a result for the builds of each of
-          `:foo` and `:bar`, and no more. This means that buck will continue to complete the build
-          of `:bar` after the build of `:foo` has failed; however, once one dependency of `:foo` has
-          failed, other dependencies will be cancelled unless they are needed by `:bar`.
+          To illustrate the effect of this flag, consider an invocation of `build :foo :bar`. The default behavior of buck is to do enough work to get a result for the builds of each of `:foo` and `:bar`, and no more. This means that buck will continue to complete the build of `:bar` after the build of `:foo` has failed; however, once one dependency of `:foo` has failed, other dependencies will be cancelled unless they are needed by `:bar`.
 
-          This flag changes the behavior of buck to not wait on `:bar` to complete once `:foo` has
-          failed. Generally, this flag only has an effect on builds that specify multiple targets.
+          This flag changes the behavior of buck to not wait on `:bar` to complete once `:foo` has failed. Generally, this flag only has an effect on builds that specify multiple targets.
 
-          `--keep-going` changes the behavior of buck to not only wait on `:bar` once one dependency
-          of `:foo` has failed, but to additionally attempt to build other dependencies of `:foo` if
-          possible.
+          `--keep-going` changes the behavior of buck to not only wait on `:bar` once one dependency of `:foo` has failed, but to additionally attempt to build other dependencies of `:foo` if possible.
 
       --keep-going
           If Buck hits an error, continue doing as much work as possible before exiting.
@@ -184,9 +158,7 @@ Options:
           If target is missing, then skip building instead of throwing error
 
       --skip-incompatible-targets
-          If target is incompatible with the specified configuration, skip building instead of
-          throwing error. This does not apply to targets specified with glob patterns `/...` or `:`
-          which are skipped unconditionally
+          If target is incompatible with the specified configuration, skip building instead of throwing error. This does not apply to targets specified with glob patterns `/...` or `:` which are skipped unconditionally
 
       --materialize-failed-inputs
           Materializes inputs for failed actions which ran on RE
@@ -194,32 +166,32 @@ Options:
       --materialize-failed-outputs
           Materializes outputs (if present) for failed actions which ran on RE
 
+      --sandbox
+          Enable filesystem sandboxing for local actions. When enabled, actions run in an isolated mount namespace where the filesystem is read-only except for declared output directories. Overrides [sandbox] enabled in .buckconfig. Currently only supported on Linux (no-op on other platforms)
+
+      --nosandbox
+          Disable filesystem sandboxing (overrides --sandbox and [sandbox] enabled in .buckconfig)
+
   -h, --help
           Print help (see a summary with '-h')
 
 Target Configuration Options:
       --target-platforms <PLATFORM>
-          Configuration target (one) to use to configure targets
+          Configuration target (one) to use to configure targets (Bazel: --platforms)
 
   -m, --modifier <VALUE>
-          A configuration modifier to configure all targets on the command line. This may be a
-          constraint value target.
+          A configuration modifier to configure all targets on the command line. This may be a constraint value target.
 
       --overall-timeout <TIMEOUT>
-          How long to run the command for. If the timeout is exceeded, Kuro will exit as quickly as
-          possible and not run further builds or tests.
+          How long to run the command for. If the timeout is exceeded, Kuro will exit as quickly as possible and not run further builds or tests.
 
-          In-flight builds and tests will be cancelled. The test orchestrator, if there is one, will
-          be allowed to shut down gracefully.
+          In-flight builds and tests will be cancelled. The test orchestrator, if there is one, will be allowed to shut down gracefully.
 
-          The exit code for builds will be a user error, for tests it is controlled by the test
-          orchestrator (which normally should report zero for this).
+          The exit code for builds will be a user error, for tests it is controlled by the test orchestrator (which normally should report zero for this).
 
-          The format is a concatenation of time spans (separated by spaces). Each time span is an
-          integer number and a suffix.
+          The format is a concatenation of time spans (separated by spaces). Each time span is an integer number and a suffix.
 
-          Relevant supported suffixes: seconds, second, sec, s, minutes, minute, min, m, hours,
-          hour, hr, h
+          Relevant supported suffixes: seconds, second, sec, s, minutes, minute, min, m, hours, hour, hr, h
 
           For example: `5m 10s`, `500s`.
 
@@ -240,86 +212,53 @@ Buckconfig Options:
           Value must be formatted as: version-build (e.g., 14.3.0-14C18 or 14.1-14B47b)
 
       --reuse-current-config
-          Re-uses any `--config` values (inline or via modefiles) if there's a previous command,
-          otherwise the flag is ignored.
+          Re-uses any `--config` values (inline or via modefiles) if there's a previous command, otherwise the flag is ignored.
 
-          If there is a previous command and `--reuse-current-config` is set, then the old config is
-          used, ignoring any overrides.
+          If there is a previous command and `--reuse-current-config` is set, then the old config is used, ignoring any overrides.
 
-          If there is no previous command but the flag was set, then the flag is ignored, the
-          command behaves as if the flag was not set at all.
+          If there is no previous command but the flag was set, then the flag is ignored, the command behaves as if the flag was not set at all.
 
       --preemptible <PREEMPTIBLE>
-          Used to configure when this command could be preempted by another command for the same
-          isolation dir.
+          Used to configure when this command could be preempted by another command for the same isolation dir.
 
-          Normally, when you run two commands - from different terminals, say - kuro will attempt
-          to run them in parallel. However, if the two commands are based on different state, that
-          is they either have different configs or different filesystem states, kuro cannot run
-          them in parallel. The default behavior in this case is to block the second command until
-          the first completes.
+          Normally, when you run two commands - from different terminals, say - kuro will attempt to run them in parallel. However, if the two commands are based on different state, that is they either have different configs or different filesystem states, kuro cannot run them in parallel. The default behavior in this case is to block the second command until the first completes.
 
           Possible values:
-          - never:            (default) When another command starts that cannot run in parallel with
-            this one, block that command
-          - always:           When another command starts, interrupt this command, *even if they
-            could run in parallel*. There is no good reason to use this other than that it provides
-            slightly nicer superconsole output
-          - ondifferentstate: When another command starts that cannot run in parallel with this one,
-            interrupt this command
+          - never:            (default) When another command starts that cannot run in parallel with this one, block that command
+          - always:           When another command starts, interrupt this command, *even if they could run in parallel*. There is no good reason to use this other than that it provides slightly nicer superconsole output
+          - ondifferentstate: When another command starts that cannot run in parallel with this one, interrupt this command
 
       --exit-when <EXIT_WHEN>
           Whether to proceed with or fail this invocation based on the daemon state
 
           Possible values:
           - never:          (default) Execute this command normally
-          - differentstate: Fail this command if another command is already running with a different
-            state
-          - notidle:        Fail this command if another command is already running (regardless of
-            daemon state)
+          - differentstate: Fail this command if another command is already running with a different state
+          - notidle:        Fail this command if another command is already running (regardless of daemon state)
 
 Starlark Options:
       --disable-starlark-types
           Disable runtime type checking in Starlark interpreter.
 
-          This option is not stable, and can be used only locally to diagnose evaluation performance
-          problems.
+          This option is not stable, and can be used only locally to diagnose evaluation performance problems.
 
       --stack
           Record or show target call stacks.
 
           Starlark call stacks will be included in duplicate targets error.
 
-          If a command outputs targets (like `targets` command), starlark call stacks will be
-          printed after the targets.
+          If a command outputs targets (like `targets` command), starlark call stacks will be printed after the targets.
 
       --profile-patterns <PROFILE_PATTERNS>
-          Enables profiling for all evaluations whose evaluation identifier matches one of the
-          provided patterns.
+          Enables profiling for all evaluations whose evaluation identifier matches one of the provided patterns.
 
-          Some examples identifiers: analysis/cell//kuro/app/kuro_action_impl:kuro_action_impl
-          (cfg:linux-x86_64#27ac5723e0c99706) load/cell//build_defs/json.bzl
-          load/prelude//playground/test.bxl load/cell//build_defs/json.bzl@other_cell
-          load_buildfile/fbcode//third-party-buck/platform010/build/ncurses
-          load_packagefile/fbcode//cli/rust/cli_delegate anon_analysis/anon//:_anon_link_rule (anon:
-          766183dc9b6f680a) (fbcode//kuro/platform/execution:linux-x86_64#08961b14cfb182aa)
-          bxl/prelude//playground/test.bxl:playground
+          Some examples identifiers: analysis/cell//kuro/app/kuro_action_impl:kuro_action_impl (cfg:linux-x86_64#27ac5723e0c99706) load/cell//build_defs/json.bzl load/prelude//playground/test.bxl load/cell//build_defs/json.bzl@other_cell load_buildfile/fbcode//third-party-buck/platform010/build/ncurses load_packagefile/fbcode//cli/rust/cli_delegate anon_analysis/anon//:_anon_link_rule (anon: 766183dc9b6f680a) (fbcode//kuro/platform/execution:linux-x86_64#08961b14cfb182aa) bxl/prelude//playground/test.bxl:playground
 
-          You can pass `--profile-patterns=.*` to enable no-op profiling for everything
-          (additionally pass `--profile-patterns-mode=none` to use no-op profiling to just get a
-          list of all the identifiers).
+          You can pass `--profile-patterns=.*` to enable no-op profiling for everything (additionally pass `--profile-patterns-mode=none` to use no-op profiling to just get a list of all the identifiers).
 
-          The profile results will be written to individual .profile files in
-          `<ROOT_OUTPUT>/<data+time>-<uuid>/` where ROOT_OUTPUT comes from the
-          --profile-patterns-output flag. In that directory there will also be a file listing all
-          the identifiers that were profiled.
+          The profile results will be written to individual .profile files in `<ROOT_OUTPUT>/<data+time>-<uuid>/` where ROOT_OUTPUT comes from the --profile-patterns-output flag. In that directory there will also be a file listing all the identifiers that were profiled.
 
-          Enabling/disabling profiling of an evaluation will invalidate the results of that
-          evaluation and it will be recomputed. In some cases, this will cause other work to also
-          need to be redone (for example, invalidating the result of loading PACKAGE files causes
-          all consumers to be recomputed). But if you keep profiling options consistent between
-          commands, only the work that is otherwise invalidated will be redone (and only for those
-          would profiling results be created).
+          Enabling/disabling profiling of an evaluation will invalidate the results of that evaluation and it will be recomputed. In some cases, this will cause other work to also need to be redone (for example, invalidating the result of loading PACKAGE files causes all consumers to be recomputed). But if you keep profiling options consistent between commands, only the work that is otherwise invalidated will be redone (and only for those would profiling results be created).
 
           You must also pass --profile-patterns-mode and --profile-patterns-output.
 
@@ -331,16 +270,11 @@ Starlark Options:
 
           Memory profiling modes have suffixes either `-allocated` or `-retained`.
 
-          `-retained` means memory kept in frozen starlark heaps after analysis completes.
-          `-retained` does not work when profiling loading, because no memory is retained after
-          loading and frozen heap is not even created. This is probably what you want when profiling
-          analysis.
+          `-retained` means memory kept in frozen starlark heaps after analysis completes. `-retained` does not work when profiling loading, because no memory is retained after loading and frozen heap is not even created. This is probably what you want when profiling analysis.
 
           `-allocated` means allocated memory, including memory which is later garbage collected.
 
-          [possible values: time-flame, heap-allocated, heap-retained, heap-flame-allocated,
-          heap-flame-retained, heap-summary-allocated, heap-summary-retained, statement, bytecode,
-          bytecode-pairs, typecheck, coverage, none]
+          [possible values: time-flame, heap-allocated, heap-retained, heap-flame-allocated, heap-flame-retained, heap-summary-allocated, heap-summary-retained, statement, bytecode, bytecode-pairs, typecheck, coverage, none]
 
 Console Options:
       --console <super|simple|...>
@@ -355,11 +289,9 @@ Console Options:
 
           Accepts a comma-separated list of superconsole components to add. Possible values are:
 
-          dice - shows information about evaluated dice nodes debugevents - shows information about
-          the flow of events from buckd
+          dice - shows information about evaluated dice nodes debugevents - shows information about the flow of events from buckd
 
-          These components can be turned on/off interactively. Press 'h' for help when superconsole
-          is active.
+          These components can be turned on/off interactively. Press 'h' for help when superconsole is active.
 
           Possible values:
           - dice
@@ -380,22 +312,16 @@ Event Log Options:
           Write command invocation id into this file
 
       --unstable-write-invocation-record <PATH>
-          Write the invocation record (as JSON) to this path. No guarantees whatsoever are made
-          regarding the stability of the format
+          Write the invocation record (as JSON) to this path. No guarantees whatsoever are made regarding the stability of the format
 
       --command-report-path <PATH>
-          Write the command report to this path. A command report is always written to
-          `buck-out/v2/<uuid>/command_report` even without this flag
+          Write the command report to this path. A command report is always written to `buck-out/v2/<uuid>/command_report` even without this flag
 
 Universal Options:
       --isolation-dir <ISOLATION_DIR>
-          The name of the directory that Kuro creates within buck-out for writing outputs and
-          daemon information. If one is not provided, Kuro creates a directory with the default
-          name.
+          The name of the directory that Kuro creates within buck-out for writing outputs and daemon information. If one is not provided, Kuro creates a directory with the default name.
 
-          Instances of Kuro share a daemon if and only if their isolation directory is identical.
-          The isolation directory also influences the output paths provided by Kuro, and as a
-          result using a non-default isolation dir will cause cache misses (and slower builds).
+          Instances of Kuro share a daemon if and only if their isolation directory is identical. The isolation directory also influences the output paths provided by Kuro, and as a result using a non-default isolation dir will cause cache misses (and slower builds).
 
           [env: BUCK_ISOLATION_DIR=]
           [default: v2]
@@ -403,12 +329,9 @@ Universal Options:
   -v, --verbose <VERBOSITY>
           How verbose buck should be while logging.
 
-          Values: 0 = Quiet, errors only; 1 = Show status. Default; 2 = more info about errors; 3 =
-          more info about everything; 4 = more info about everything + stderr;
+          Values: 0 = Quiet, errors only; 1 = Show status. Default; 2 = more info about errors; 3 = more info about everything; 4 = more info about everything + stderr;
 
-          It can be combined with specific log items (stderr, full_failed_command, commands,
-          actions, status, stats, success) to fine-tune the verbosity of the log. Example usage
-          "-v=1,stderr"
+          It can be combined with specific log items (stderr, full_failed_command, commands, actions, status, stats, success) to fine-tune the verbosity of the log. Example usage "-v=1,stderr"
 
           [default: 1]
 
@@ -416,6 +339,4 @@ Universal Options:
           The oncall executing this command
 
       --client-metadata <CLIENT_METADATA>
-          Metadata key-value pairs to inject into Kuro's logging. Client metadata must be of the
-          form `key=value`, where `key` is a snake_case identifier, and will be sent to backend
-          datasets
+          Metadata key-value pairs to inject into Kuro's logging. Client metadata must be of the form `key=value`, where `key` is a snake_case identifier, and will be sent to backend datasets

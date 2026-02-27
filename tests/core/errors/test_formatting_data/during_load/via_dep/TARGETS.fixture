@@ -1,3 +1,5 @@
+load("//stub.bzl", "stub")
+
 stub(
     name = "via_dep",
     deps = ["//during_load:get"],

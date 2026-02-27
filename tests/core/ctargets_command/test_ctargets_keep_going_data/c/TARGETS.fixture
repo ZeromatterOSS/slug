@@ -1,3 +1,5 @@
+load("//:defs.bzl", "stub")
+
 # Package c: Targets for testing transitive incompatibility with keep-going
 
 # Simple good targets

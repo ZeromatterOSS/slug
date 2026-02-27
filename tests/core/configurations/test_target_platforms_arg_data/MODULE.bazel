@@ -1,0 +1,6 @@
+module(name = "root")
+
+local_path_override(
+    module_name = "subcell",
+    path = "subcell",
+)

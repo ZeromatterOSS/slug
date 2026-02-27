@@ -29,8 +29,7 @@ Options:
           [default: 1.0]
 
       --seek <SEEK>
-          Skip to the given number of seconds after the start of the command before starting the
-          replay
+          Skip to the given number of seconds after the start of the command before starting the replay
 
           [default: 0.0]
 
@@ -53,11 +52,9 @@ Console Options:
 
           Accepts a comma-separated list of superconsole components to add. Possible values are:
 
-          dice - shows information about evaluated dice nodes debugevents - shows information about
-          the flow of events from buckd
+          dice - shows information about evaluated dice nodes debugevents - shows information about the flow of events from buckd
 
-          These components can be turned on/off interactively. Press 'h' for help when superconsole
-          is active.
+          These components can be turned on/off interactively. Press 'h' for help when superconsole is active.
 
           Possible values:
           - dice
@@ -72,13 +69,9 @@ Console Options:
 
 Universal Options:
       --isolation-dir <ISOLATION_DIR>
-          The name of the directory that Kuro creates within buck-out for writing outputs and
-          daemon information. If one is not provided, Kuro creates a directory with the default
-          name.
+          The name of the directory that Kuro creates within buck-out for writing outputs and daemon information. If one is not provided, Kuro creates a directory with the default name.
 
-          Instances of Kuro share a daemon if and only if their isolation directory is identical.
-          The isolation directory also influences the output paths provided by Kuro, and as a
-          result using a non-default isolation dir will cause cache misses (and slower builds).
+          Instances of Kuro share a daemon if and only if their isolation directory is identical. The isolation directory also influences the output paths provided by Kuro, and as a result using a non-default isolation dir will cause cache misses (and slower builds).
 
           [env: BUCK_ISOLATION_DIR=]
           [default: v2]
@@ -86,12 +79,9 @@ Universal Options:
   -v, --verbose <VERBOSITY>
           How verbose buck should be while logging.
 
-          Values: 0 = Quiet, errors only; 1 = Show status. Default; 2 = more info about errors; 3 =
-          more info about everything; 4 = more info about everything + stderr;
+          Values: 0 = Quiet, errors only; 1 = Show status. Default; 2 = more info about errors; 3 = more info about everything; 4 = more info about everything + stderr;
 
-          It can be combined with specific log items (stderr, full_failed_command, commands,
-          actions, status, stats, success) to fine-tune the verbosity of the log. Example usage
-          "-v=1,stderr"
+          It can be combined with specific log items (stderr, full_failed_command, commands, actions, status, stats, success) to fine-tune the verbosity of the log. Example usage "-v=1,stderr"
 
           [default: 1]
 
@@ -99,6 +89,4 @@ Universal Options:
           The oncall executing this command
 
       --client-metadata <CLIENT_METADATA>
-          Metadata key-value pairs to inject into Kuro's logging. Client metadata must be of the
-          form `key=value`, where `key` is a snake_case identifier, and will be sent to backend
-          datasets
+          Metadata key-value pairs to inject into Kuro's logging. Client metadata must be of the form `key=value`, where `key` is a snake_case identifier, and will be sent to backend datasets

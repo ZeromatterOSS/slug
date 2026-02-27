@@ -3,6 +3,7 @@
 # AnalysisActions
 ## AnalysisActions.anon\_target
 ## AnalysisActions.anon\_targets
+## AnalysisActions.args
 ## AnalysisActions.artifact\_tag
 ## AnalysisActions.assert\_has\_content\_based\_path
 ## AnalysisActions.assert\_short\_path
@@ -10,8 +11,12 @@
 ## AnalysisActions.copied\_dir
 ## AnalysisActions.copy\_dir
 ## AnalysisActions.copy\_file
+## AnalysisActions.declare\_directory
+## AnalysisActions.declare\_file
 ## AnalysisActions.declare\_output
+## AnalysisActions.declare\_shareable\_artifact
 ## AnalysisActions.digest\_config
+## AnalysisActions.do\_nothing
 ## AnalysisActions.download\_file
 ## AnalysisActions.dynamic\_output
 ## AnalysisActions.dynamic\_output\_new
@@ -20,9 +25,13 @@
 # Step 1: Define the implementation function
 # Step 2: Create a factory
 # Step 3 & 4: Use it in a rule or bxl script
+## AnalysisActions.expand\_template
 ## AnalysisActions.run
+## AnalysisActions.run\_shell
+## AnalysisActions.symlink
 ## AnalysisActions.symlink\_file
 ## AnalysisActions.symlinked\_dir
+## AnalysisActions.template\_dict
 ## AnalysisActions.tset
 ## AnalysisActions.write
 ## AnalysisActions.write\_json

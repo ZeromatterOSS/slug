@@ -1,4 +1,4 @@
-load(":defs.bzl", "incoming_edge_transition_stub")
+load(":defs.bzl", "incoming_edge_transition_stub", "stub", "stub_toolchain")
 
 # These tests reproduce the exact behavior of which "dependencies" are evaluated
 # in different situations when performing configuration.

@@ -1,20 +1,13 @@
-[buildfile]
-name=TARGETS.fixture
-
 [cells]
-root = .
-nano_prelude = nano_prelude
-
-[cell_aliases]
-prelude = nano_prelude
+  root = .
 
 [external_cells]
-nano_prelude = bundled
+  prelude = bundled
 
-[build]
-execution_platforms = root//exec_dep:execution_platforms
+[buildfile]
+  name = TARGETS.fixture
 
 [kuro]
-error_on_dep_only_incompatible = \
+  error_on_dep_only_incompatible = \
     //dep_incompatible:dep_incompatible_conf1, \
     //dep_incompatible:dep_incompatible_conf2

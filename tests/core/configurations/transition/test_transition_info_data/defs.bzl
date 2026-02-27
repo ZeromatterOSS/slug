@@ -73,3 +73,15 @@ stub_with_incoming_transition = rule(
     },
     supports_incoming_transition = True,
 )
+
+def _stub_impl(_ctx):
+    return [DefaultInfo()]
+
+stub = rule(
+    impl = _stub_impl,
+    attrs = {
+        "configured_deps": attrs.list(attrs.configured_dep(), default = []),
+        "deps": attrs.list(attrs.dep(), default = []),
+        "labels": attrs.list(attrs.string(), default = []),
+    },
+)

@@ -1,0 +1,35 @@
+# This file is @generated, regenerate by re-running test with `-- --env BUCK2_UPDATE_GOLDEN=1` appended to the test command
+
+# native
+## alias
+## bazel\_version
+## cc\_binary
+## cc\_libc\_top\_alias
+## cc\_library
+## cc\_test
+## cc\_toolchain
+## cc\_toolchain\_suite
+## config\_setting
+## constraint\_setting
+## constraint\_value
+## depset\_from\_transitive\_set
+## existing\_rule
+## existing\_rules
+## exports\_files
+## filegroup
+## genquery
+## genrule
+## glob
+## label\_flag
+## package\_group
+## package\_name
+## package\_relative\_label
+## platform
+## repository\_name
+## sh\_binary
+## sh\_library
+## sh\_test
+## test\_suite
+## toolchain
+## toolchain\_type
+## transitive\_set\_from\_depset

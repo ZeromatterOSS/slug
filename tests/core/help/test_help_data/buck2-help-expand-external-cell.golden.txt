@@ -4,11 +4,9 @@ Expand the contents of an external cell into the repo.
 
 The contents are placed at the path you specified for this cell in your buckconfig.
 
-If you additionally remove the entry from the `external_cells` section of your buckconfig, you can
-edit the files directly in the repo and see those edits reflected in your build.
+If you additionally remove the entry from the `external_cells` section of your buckconfig, you can edit the files directly in the repo and see those edits reflected in your build.
 
-Note that this creates a point-in-time snapshot. The files in the repo will not be updated if you eg
-change the git commit of the cell in the future.
+Note that this creates a point-in-time snapshot. The files in the repo will not be updated if you eg change the git commit of the cell in the future.
 
 Usage: kuro expand-external-cell [OPTIONS] [CELLS]...
 
@@ -25,13 +23,9 @@ Options:
 
 Universal Options:
       --isolation-dir <ISOLATION_DIR>
-          The name of the directory that Kuro creates within buck-out for writing outputs and
-          daemon information. If one is not provided, Kuro creates a directory with the default
-          name.
+          The name of the directory that Kuro creates within buck-out for writing outputs and daemon information. If one is not provided, Kuro creates a directory with the default name.
 
-          Instances of Kuro share a daemon if and only if their isolation directory is identical.
-          The isolation directory also influences the output paths provided by Kuro, and as a
-          result using a non-default isolation dir will cause cache misses (and slower builds).
+          Instances of Kuro share a daemon if and only if their isolation directory is identical. The isolation directory also influences the output paths provided by Kuro, and as a result using a non-default isolation dir will cause cache misses (and slower builds).
 
           [env: BUCK_ISOLATION_DIR=]
           [default: v2]
@@ -39,12 +33,9 @@ Universal Options:
   -v, --verbose <VERBOSITY>
           How verbose buck should be while logging.
 
-          Values: 0 = Quiet, errors only; 1 = Show status. Default; 2 = more info about errors; 3 =
-          more info about everything; 4 = more info about everything + stderr;
+          Values: 0 = Quiet, errors only; 1 = Show status. Default; 2 = more info about errors; 3 = more info about everything; 4 = more info about everything + stderr;
 
-          It can be combined with specific log items (stderr, full_failed_command, commands,
-          actions, status, stats, success) to fine-tune the verbosity of the log. Example usage
-          "-v=1,stderr"
+          It can be combined with specific log items (stderr, full_failed_command, commands, actions, status, stats, success) to fine-tune the verbosity of the log. Example usage "-v=1,stderr"
 
           [default: 1]
 
@@ -52,6 +43,4 @@ Universal Options:
           The oncall executing this command
 
       --client-metadata <CLIENT_METADATA>
-          Metadata key-value pairs to inject into Kuro's logging. Client metadata must be of the
-          form `key=value`, where `key` is a snake_case identifier, and will be sent to backend
-          datasets
+          Metadata key-value pairs to inject into Kuro's logging. Client metadata must be of the form `key=value`, where `key` is a snake_case identifier, and will be sent to backend datasets

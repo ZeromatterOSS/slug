@@ -6,11 +6,8 @@ BUCK2_CLIENT_METADATA                   String
 BUCK2_DEBUG_RAWOUTPUT_CHUNK_SIZE        usize                 DEFAULT_CHUNK_SIZE
 BUCK2_DICE_DUMP_ON_PANIC                bool                  false
 BUCK2_DICE_SNAPSHOT_INTERVAL_MS         u64                   500
-BUCK2_DISABLE_EDEN_HEALTH_CHECK         bool                  false
 BUCK2_DISABLE_FILE_ATTR                 bool                  false
 BUCK2_DISABLE_MACOS_QOS                 bool                  false
-BUCK2_EDEN_SEMAPHORE                    usize                 DEFAULT_MAX_OUTSTANDING_REQUESTS
-BUCK2_ENABLE_EDEN_THRIFT_READ           bool                  false
 BUCK2_HARD_ERROR                        String
 BUCK2_INSTALLER_SEND_TIMEOUT_S          u64
 BUCK2_INSTALLER_TIMEOUT_S               u64
@@ -22,8 +19,6 @@ BUCK2_MAX_BLOCKING_THREADS              usize
 BUCK2_PARANOID_PATH                     String
 BUCK2_RE_DOWNLOAD_CONCURRENCY           usize                 256
 BUCK2_RUNTIME_THREADS                   usize
-BUCK2_SCRIBE_CATEGORY                   String
-BUCK2_TEST_BLOCK_ON_UPLOAD              bool                  false
 BUCK2_TEST_TPX_USE_TCP                  bool                  false
 BUCK2_WATCHMAN_TIMEOUT                  u64                   57
 BUCKD_STARTUP_INIT_TIMEOUT              u64
@@ -43,13 +38,3 @@ CI                                      bool                  false
 DICE_DETECT_CYCLES_UNSTABLE             DetectCycles
 ENFORCE_DISPATCHER_SET                  bool                  false
 FORCE_WANT_RESTART                      bool                  false
-SANDCASTLE                              String
-SANDCASTLE_ALIAS                        String
-SANDCASTLE_ID                           String
-SANDCASTLE_INSTANCE_ID                  u64
-SANDCASTLE_JOB_INFO                     String
-SANDCASTLE_SCHEDULE_TYPE                String
-SANDCASTLE_TYPE                         String
-SCHEDULE_TYPE                           String
-SKYCASTLE_WORKFLOW_ALIAS                String
-SKYCASTLE_WORKFLOW_RUN_ID               String

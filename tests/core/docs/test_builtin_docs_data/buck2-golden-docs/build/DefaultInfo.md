@@ -7,6 +7,10 @@
 # Builds just 'foo' binary. The strip command is never invoked.
 # builds the 'foo' binary, because it is needed by the 'strip' command. Ensures that
 # both the stripped binary and the debug symbols are built.
+## DefaultInfo.data\_runfiles
 ## DefaultInfo.default\_outputs
+## DefaultInfo.default\_runfiles
+## DefaultInfo.executable
+## DefaultInfo.files
 ## DefaultInfo.other\_outputs
 ## DefaultInfo.sub\_targets

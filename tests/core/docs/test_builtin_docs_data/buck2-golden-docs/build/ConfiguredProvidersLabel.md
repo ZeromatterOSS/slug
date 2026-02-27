@@ -11,3 +11,5 @@
 ## ConfiguredProvidersLabel.project\_root
 ## ConfiguredProvidersLabel.raw\_target
 ## ConfiguredProvidersLabel.sub\_target
+## ConfiguredProvidersLabel.workspace\_name
+## ConfiguredProvidersLabel.workspace\_root

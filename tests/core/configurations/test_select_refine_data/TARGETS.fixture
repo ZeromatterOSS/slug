@@ -1,3 +1,5 @@
+load(":defs.bzl", "stub")
+
 constraint_setting(
     name = "quality",
 )

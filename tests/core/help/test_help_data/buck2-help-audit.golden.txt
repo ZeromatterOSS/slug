@@ -8,10 +8,8 @@ Commands:
   cell                           Query information about the [cells] list in .buckconfig.
   file-package                   Map file paths to fully qualified package names.
   classpath                      Prints out a target's classpaths if it has one.
-                                     This command is deprecated and currently available for
-                                     compatibility with buck1.
-                                     We will replace this command with something that can audit the
-                                     entire `TemplatePlaceholderInfo` in the future.
+                                     This command is deprecated and currently available for compatibility with buck1.
+                                     We will replace this command with something that can audit the entire `TemplatePlaceholderInfo` in the future.
   config                         buck audit config
   configurations                 prints the constraints for configuration IDs
   includes                       list build file extensions imported at parse time.
@@ -20,17 +18,12 @@ Commands:
   subtargets                     Print all subtargets
   analysis-queries               buck audit analysis resolving query attrs
   execution-platform-resolution  prints out information about execution platform resolution
-  visibility                     Verify the visibility for transitive deps of the specified
-                                 target(s) on the unconfigured target graph
+  visibility                     Verify the visibility for transitive deps of the specified target(s) on the unconfigured target graph
   starlark                       Debug Starlark interpreter
   dep-files                      prints out the select files for a command
   deferred-materializer          Access and interact with the deferred materializer
-  output                         Query the action that produced the output artifact. Does not
-                                 support BXL, test, scratch, or anon artifacts. If the configuration
-                                 hash of the output path does not match the current platform
-                                 configuration, the unconfigured target label will be returned.
-  parse                          Parses the buck-out path into parts that may be useful (ex: config
-                                 hash, file path to artifact).
+  output                         Query the action that produced the output artifact. Does not support BXL, test, scratch, or anon artifacts. If the configuration hash of the output path does not match the current platform configuration, the unconfigured target label will be returned.
+  parse                          Parses the buck-out path into parts that may be useful (ex: config hash, file path to artifact).
   package-values                 Inspect package values
   help                           Print this message or the help of the given subcommand(s)
 
@@ -40,13 +33,9 @@ Options:
 
 Universal Options:
       --isolation-dir <ISOLATION_DIR>
-          The name of the directory that Kuro creates within buck-out for writing outputs and
-          daemon information. If one is not provided, Kuro creates a directory with the default
-          name.
+          The name of the directory that Kuro creates within buck-out for writing outputs and daemon information. If one is not provided, Kuro creates a directory with the default name.
 
-          Instances of Kuro share a daemon if and only if their isolation directory is identical.
-          The isolation directory also influences the output paths provided by Kuro, and as a
-          result using a non-default isolation dir will cause cache misses (and slower builds).
+          Instances of Kuro share a daemon if and only if their isolation directory is identical. The isolation directory also influences the output paths provided by Kuro, and as a result using a non-default isolation dir will cause cache misses (and slower builds).
 
           [env: BUCK_ISOLATION_DIR=]
           [default: v2]
@@ -54,12 +43,9 @@ Universal Options:
   -v, --verbose <VERBOSITY>
           How verbose buck should be while logging.
 
-          Values: 0 = Quiet, errors only; 1 = Show status. Default; 2 = more info about errors; 3 =
-          more info about everything; 4 = more info about everything + stderr;
+          Values: 0 = Quiet, errors only; 1 = Show status. Default; 2 = more info about errors; 3 = more info about everything; 4 = more info about everything + stderr;
 
-          It can be combined with specific log items (stderr, full_failed_command, commands,
-          actions, status, stats, success) to fine-tune the verbosity of the log. Example usage
-          "-v=1,stderr"
+          It can be combined with specific log items (stderr, full_failed_command, commands, actions, status, stats, success) to fine-tune the verbosity of the log. Example usage "-v=1,stderr"
 
           [default: 1]
 
@@ -67,6 +53,4 @@ Universal Options:
           The oncall executing this command
 
       --client-metadata <CLIENT_METADATA>
-          Metadata key-value pairs to inject into Kuro's logging. Client metadata must be of the
-          form `key=value`, where `key` is a snake_case identifier, and will be sent to backend
-          datasets
+          Metadata key-value pairs to inject into Kuro's logging. Client metadata must be of the form `key=value`, where `key` is a snake_case identifier, and will be sent to backend datasets

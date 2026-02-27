@@ -4,6 +4,7 @@ load(
     "incoming_transition_alias_vnew",
     "outgoing_transition_alias",
     "outgoing_transition_alias_vnew",
+    "stub",
     "stub_configuration",
 )
 

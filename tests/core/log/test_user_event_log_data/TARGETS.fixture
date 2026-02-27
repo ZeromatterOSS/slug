@@ -1,1 +1,4 @@
-execution_platforms(name = "execution_platforms")
+platform(
+    name = "execution_platforms",
+    constraint_values = [],
+)

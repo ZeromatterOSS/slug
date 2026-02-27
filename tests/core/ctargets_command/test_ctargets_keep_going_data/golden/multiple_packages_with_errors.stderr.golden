@@ -1,8 +1,8 @@
 # This file is @generated, regenerate by re-running test with `-- --env BUCK2_UPDATE_GOLDEN=1` appended to the test command
 
-[<TIMESTAMP>] Starting new buck2 daemon...
-[<TIMESTAMP>] Connected to new buck2 daemon.
-[<TIMESTAMP>] Buck UI: https://www.internalfb.com/buck2/<UUID>
+[<TIMESTAMP>] Starting new kuro daemon...
+[<TIMESTAMP>] Connected to new kuro daemon.
+[<TIMESTAMP>] Build ID: <UUID>
 [<TIMESTAMP>] Error parsing root//b
 [<TIMESTAMP>] Error evaluating build file: `root//b:TARGETS.fixture`
 [<TIMESTAMP>]

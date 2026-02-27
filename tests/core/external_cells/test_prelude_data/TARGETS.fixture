@@ -2,15 +2,14 @@ platform(
     name = "platform",
 )
 
-export_file(
+genrule(
     name = "gen",
-    src = "src.txt",
-    mode = "copy",
-    default_target_platform = ":platform",
+    srcs = ["src.txt"],
+    outs = ["gen.txt"],
+    cmd = "cp $< $@",
 )
 
 alias(
     name = "gen_alias",
     actual = ":gen",
-    default_target_platform = ":platform",
 )

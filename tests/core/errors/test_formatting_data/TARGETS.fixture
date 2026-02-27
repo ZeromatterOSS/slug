@@ -1,4 +1,5 @@
 load(":defs.bzl", "action_fail")
+load(":stub.bzl", "stub")
 
 action_fail(
     name = "action_fail",

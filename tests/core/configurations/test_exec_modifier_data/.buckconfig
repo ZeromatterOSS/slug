@@ -1,18 +1,12 @@
-[buildfile]
-name=TARGETS.fixture
-
-[repositories]
-root = .
-prelude = prelude
-
-[cell_aliases]
-fbsource = root
-fbcode = root
-ovr_config = prelude
-toolchains = prelude
+[cells]
+  root = .
+  prelude = prelude
 
 [external_cells]
-prelude = bundled
+  prelude = bundled
+
+[buildfile]
+  name = TARGETS.fixture
 
 [build]
-execution_platforms = root//cfg:execution_platforms
+  execution_platforms = root//cfg:execution_platforms

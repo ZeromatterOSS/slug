@@ -1,3 +1,4 @@
+load(":defs.bzl", "stub")
 load(":subtarget_alias.bzl", "subtarget_alias")
 
 platform(

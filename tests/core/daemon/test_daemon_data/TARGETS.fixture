@@ -1,1 +1,5 @@
-trivial_build(name = "rule")
+genrule(
+    name = "rule",
+    outs = ["out.txt"],
+    cmd = "echo rule > $@",
+)

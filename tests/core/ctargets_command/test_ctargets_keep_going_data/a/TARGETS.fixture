@@ -1,3 +1,5 @@
+load("//:defs.bzl", "stub")
+
 # Package a: Good targets that should configure successfully
 stub(
     name = "target1",

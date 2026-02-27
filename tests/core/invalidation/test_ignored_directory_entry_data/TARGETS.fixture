@@ -1,1 +1,5 @@
-stub(name = "stub")
+genrule(
+    name = "stub",
+    outs = ["stub.txt"],
+    cmd = "echo stub > $@",
+)

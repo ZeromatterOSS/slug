@@ -1,3 +1,5 @@
+load("//:defs.bzl", "stub")
+
 stub(name = "ddd")
 
 stub(name = "test", deps = [":ddd"])

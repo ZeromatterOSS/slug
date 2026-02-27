@@ -3,7 +3,13 @@
 # OutputArtifact
 ## OutputArtifact.as\_input
 ## OutputArtifact.basename
+## OutputArtifact.dirname
+## OutputArtifact.executable
 ## OutputArtifact.extension
+## OutputArtifact.is\_directory
 ## OutputArtifact.is\_source
+## OutputArtifact.label
 ## OutputArtifact.owner
+## OutputArtifact.path
+## OutputArtifact.root
 ## OutputArtifact.short\_path

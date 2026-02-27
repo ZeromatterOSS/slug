@@ -3,6 +3,8 @@ platform(
     constraint_values = [],
 )
 
-trivial_build(
+genrule(
     name = "existing",
+    outs = ["out.txt"],
+    cmd = "echo existing > $@",
 )

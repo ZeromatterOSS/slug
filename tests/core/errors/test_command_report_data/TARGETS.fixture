@@ -1,4 +1,10 @@
-trivial_build(name = "build_success")
+load(":defs.bzl", "fail_build")
+
+genrule(
+    name = "build_success",
+    outs = ["out.txt"],
+    cmd = "echo success > $@",
+)
 
 fail_build(name = "fail1")
 fail_build(name = "fail2")

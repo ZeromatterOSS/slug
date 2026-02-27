@@ -1,3 +1,5 @@
+load(":defs.bzl", "stub")
+
 config_setting(
     name = "cs",
     values = {
