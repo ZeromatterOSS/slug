@@ -59,7 +59,6 @@ use crate::nodes::attributes::TYPE;
 use crate::package::Package;
 use crate::rule::Rule;
 use crate::rule_type::RuleType;
-use crate::visibility::VisibilityPatternList;
 use crate::visibility::VisibilitySpecification;
 
 /// Describes a target including its name, type, and the values that the user provided.
@@ -307,11 +306,6 @@ impl TargetNode {
             return Ok(true);
         }
         let vis = self.visibility()?;
-        // For root-cell targets with no explicit visibility (DEFAULT = empty list),
-        // allow same-cell access. This handles private tools without visibility.
-        if matches!(&vis.0, VisibilityPatternList::List(l) if l.is_empty()) {
-            return Ok(true);
-        }
         Ok(vis.0.matches_target(target))
     }
 

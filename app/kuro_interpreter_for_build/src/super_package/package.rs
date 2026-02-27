@@ -249,13 +249,20 @@ pub(crate) fn register_package_function(globals: &mut GlobalsBuilder) {
         // Try to get PACKAGE file context - if it fails, we're in a BUILD file
         match build_context.additional.require_package_file("package") {
             Ok(package_file_eval_ctx) => {
-                // PACKAGE file context - use Buck2 semantics
+                // PACKAGE file context - use Buck2 semantics.
+                // Support both Buck2-style `visibility=` and Bazel-style `default_visibility=`
+                // as aliases for each other in PACKAGE files.
+                let vis_items: Vec<String> = if !visibility.items.is_empty() {
+                    visibility.items.clone()
+                } else {
+                    default_visibility.items.clone()
+                };
                 let current_package = build_context
                     .base_path()
                     .ok()
                     .and_then(|p| PackageLabel::from_cell_path(p.as_ref()).ok());
                 let visibility = parse_visibility(
-                    &visibility.items,
+                    &vis_items,
                     build_context.cell_info().name().name(),
                     build_context.cell_info().cell_resolver(),
                     build_context.cell_info().cell_alias_resolver(),
