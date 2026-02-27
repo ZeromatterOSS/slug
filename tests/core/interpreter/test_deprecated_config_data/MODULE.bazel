@@ -1,1 +1,6 @@
-module(name = "test_root")
+module(name = "root")
+
+local_path_override(
+    module_name = "cell",
+    path = "cell",
+)

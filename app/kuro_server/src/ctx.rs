@@ -57,6 +57,7 @@ use kuro_cli_proto::client_context::HostPlatformOverride;
 use kuro_cli_proto::client_context::PreemptibleWhen;
 use kuro_cli_proto::common_build_options::ExecutionStrategy;
 use kuro_cli_proto::config_override::ConfigType;
+use kuro_common::dice::cells::SetCellResolver;
 use kuro_common::dice::cycles::CycleDetectorAdapter;
 use kuro_common::dice::cycles::PairDiceCycleDetector;
 use kuro_common::file_ops::io::initialize_read_dir_cache;
@@ -518,6 +519,7 @@ impl ServerCommandContext<'_> {
                     config_paths: HashSet::new(),
                     external_data: (*dice_ctx.get_injected_external_buckconfig_data().await?)
                         .clone(),
+                    is_bzlmod: new_configs.is_bzlmod,
                 })
             } else {
                 // If there is no previous command but the flag was set, then the flag is ignored,
@@ -588,6 +590,7 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
     ) -> kuro_error::Result<(DiceTransactionUpdater, UserComputationData)> {
         let existing_state = &mut ctx.existing_state().await.clone();
         let cells_and_configs = self.cmd_ctx.load_new_configs(existing_state).await?;
+        let is_bzlmod = cells_and_configs.is_bzlmod;
         let cell_resolver = cells_and_configs.cell_resolver;
 
         let configuror = BuildInterpreterConfiguror::new(
@@ -624,6 +627,7 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
             self.cmd_ctx.disable_starlark_types,
             self.cmd_ctx.unstable_typecheck,
         )?;
+        ctx.set_is_bzlmod(is_bzlmod)?;
 
         early_timings.start_span(FILE_WATCHER_WAIT.to_owned());
         let (ctx, mergebase) = self

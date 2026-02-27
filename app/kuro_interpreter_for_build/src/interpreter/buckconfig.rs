@@ -170,6 +170,36 @@ impl<'a> LegacyBuckConfigsForStarlark<'a> {
         // `StringValue` caches the hashes.
         self.get_impl(section.get_hashed_str(), key.get_hashed_str(), true, eval)
     }
+
+    /// Look up a buckconfig entry for the current cell, returning owned data.
+    /// Unlike `current_cell_get`, this doesn't need an `Evaluator` reference,
+    /// allowing callers to hold a BuildContext borrow in a separate scope.
+    pub(crate) fn lookup_current(
+        &self,
+        section: &str,
+        key: &str,
+    ) -> kuro_error::Result<Option<Arc<str>>> {
+        let mut inner = self.inner.borrow_mut();
+        inner
+            .configs_view
+            .read_current_cell_config(BuckconfigKeyRef {
+                section,
+                property: key,
+            })
+    }
+
+    /// Look up a buckconfig entry for the root cell, returning owned data.
+    pub(crate) fn lookup_root(
+        &self,
+        section: &str,
+        key: &str,
+    ) -> kuro_error::Result<Option<Arc<str>>> {
+        let mut inner = self.inner.borrow_mut();
+        inner.configs_view.read_root_cell_config(BuckconfigKeyRef {
+            section,
+            property: key,
+        })
+    }
 }
 
 pub(crate) struct ConfigsOnDiceViewForStarlark<'a, 'd> {

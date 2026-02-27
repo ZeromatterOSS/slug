@@ -236,6 +236,9 @@ pub struct BuckConfigBasedCells {
     pub root_config: LegacyBuckConfig,
     pub config_paths: HashSet<ConfigPath>,
     pub external_data: ExternalBuckconfigData,
+    /// True when MODULE.bazel is present - all cell resolution is done via bzlmod.
+    /// Per-cell .buckconfig [repository_aliases] sections are ignored in this mode.
+    pub is_bzlmod: bool,
 }
 
 /// Result of bzlmod dependency resolution.
@@ -295,10 +298,20 @@ impl BuckConfigBasedCells {
         )
         .await?;
 
+        // In bzlmod mode, all cell aliases come from MODULE.bazel.
+        // Per-cell .buckconfig [repository_aliases] are irrelevant and must be skipped,
+        // since they may reference cell names (like "root") that don't exist in bzlmod.
+        let cell_aliases: Box<dyn Iterator<Item = (NonEmptyCellAlias, NonEmptyCellAlias)>> =
+            if self.is_bzlmod {
+                Box::new(std::iter::empty())
+            } else {
+                Box::new(BuckConfigBasedCells::get_cell_aliases_from_config(&config)?)
+            };
+
         CellAliasResolver::new_for_non_root_cell(
             cell_name,
             self.cell_resolver.root_cell_cell_alias_resolver(),
-            BuckConfigBasedCells::get_cell_aliases_from_config(&config)?,
+            cell_aliases,
         )
     }
 
@@ -580,6 +593,7 @@ impl BuckConfigBasedCells {
                 external_path_configs: started_parse,
                 args: processed_config_args,
             },
+            is_bzlmod: has_module_bazel,
         })
     }
 

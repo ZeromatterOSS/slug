@@ -43,12 +43,18 @@ pub trait HasCellResolver {
         &mut self,
         dir: &ProjectRelativePath,
     ) -> kuro_error::Result<CellAliasResolver>;
+
+    /// Returns true if the project uses bzlmod (MODULE.bazel present).
+    async fn is_bzlmod(&mut self) -> kuro_error::Result<bool>;
 }
 
 pub trait SetCellResolver {
     fn set_cell_resolver(&mut self, cell_resolver: CellResolver) -> kuro_error::Result<()>;
 
     fn set_none_cell_resolver(&mut self) -> kuro_error::Result<()>;
+
+    /// Set whether the project uses bzlmod (MODULE.bazel present).
+    fn set_is_bzlmod(&mut self, is_bzlmod: bool) -> kuro_error::Result<()>;
 }
 
 #[derive(Clone, Dupe, Display, Debug, Eq, Hash, PartialEq, Allocative)]
@@ -64,6 +70,22 @@ impl InjectedKey for CellResolverKey {
             (None, None) => true,
             (_, _) => false,
         }
+    }
+
+    fn invalidation_source_priority() -> InvalidationSourcePriority {
+        InvalidationSourcePriority::Ignored
+    }
+}
+
+#[derive(Clone, Dupe, Display, Debug, Eq, Hash, PartialEq, Allocative)]
+#[display("{:?}", self)]
+struct IsBzlmodKey;
+
+impl InjectedKey for IsBzlmodKey {
+    type Value = bool;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
     }
 
     fn invalidation_source_priority() -> InvalidationSourcePriority {
@@ -97,6 +119,10 @@ impl HasCellResolver for DiceComputations<'_> {
         let cell = self.get_cell_resolver().await?.find(dir);
         self.get_cell_alias_resolver(cell).await
     }
+
+    async fn is_bzlmod(&mut self) -> kuro_error::Result<bool> {
+        Ok(self.compute(&IsBzlmodKey).await?)
+    }
 }
 
 /// Only used for cell alias resolvers parsed within dice, currently those for external cells
@@ -115,16 +141,30 @@ impl Key for CellAliasResolverKey {
         let resolver = ctx.get_cell_resolver().await?;
         let root_aliases = resolver.root_cell_cell_alias_resolver();
         let config = ctx.get_legacy_config_for_cell(self.0).await?;
+        let is_bzlmod = ctx.is_bzlmod().await?;
+
         // Cell alias resolvers that are parsed within dice differ from those outside of dice in
         // that they cannot create new cells, and so respect only their `cell_aliases` section, not
         // their `cells` section. This is the expected behavior for external cells, moving other
         // cell resolver parsing into dice would require this code to be adjusted.
-        CellAliasResolver::new_for_non_root_cell(
-            self.0,
-            root_aliases,
-            BuckConfigBasedCells::get_cell_aliases_from_config(&config)?,
-        )
-        .map_err(Into::into)
+        //
+        // In bzlmod mode, all cell aliases come from MODULE.bazel. Per-cell .buckconfig
+        // [repository_aliases] may reference cell names that don't exist in bzlmod, so skip them.
+        let cell_aliases: Box<
+            dyn Iterator<
+                Item = (
+                    kuro_core::cells::alias::NonEmptyCellAlias,
+                    kuro_core::cells::alias::NonEmptyCellAlias,
+                ),
+            >,
+        > = if is_bzlmod {
+            Box::new(std::iter::empty())
+        } else {
+            Box::new(BuckConfigBasedCells::get_cell_aliases_from_config(&config)?)
+        };
+
+        CellAliasResolver::new_for_non_root_cell(self.0, root_aliases, cell_aliases)
+            .map_err(Into::into)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -142,5 +182,9 @@ impl SetCellResolver for DiceTransactionUpdater {
 
     fn set_none_cell_resolver(&mut self) -> kuro_error::Result<()> {
         Ok(self.changed_to(vec![(CellResolverKey, None)])?)
+    }
+
+    fn set_is_bzlmod(&mut self, is_bzlmod: bool) -> kuro_error::Result<()> {
+        Ok(self.changed_to(vec![(IsBzlmodKey, is_bzlmod)])?)
     }
 }

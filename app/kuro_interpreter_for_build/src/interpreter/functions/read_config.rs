@@ -9,51 +9,63 @@
  */
 
 use starlark::environment::GlobalsBuilder;
+use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::values::StringValue;
 use starlark::values::Value;
 use starlark::values::none::NoneOr;
 
-const READ_CONFIG_ERROR: &str = "read_config() is a Buck2-specific function not available in \
-    Bazel-compatible mode. Use MODULE.bazel for dependency configuration, \
-    select() for platform-conditional attributes, or module_extension() for \
-    custom configuration. See https://bazel.build/external/module for details.";
-
-const READ_ROOT_CONFIG_ERROR: &str = "read_root_config() is a Buck2-specific function not \
-    available in Bazel-compatible mode. Use MODULE.bazel for dependency configuration, \
-    select() for platform-conditional attributes, or module_extension() for \
-    custom configuration. See https://bazel.build/external/module for details.";
+use crate::interpreter::build_context::BuildContext;
 
 #[starlark_module]
 pub(crate) fn register_read_config(globals: &mut GlobalsBuilder) {
-    /// Buck2-specific function not available in Bazel-compatible mode.
+    /// Read a buckconfig value for the current cell.
     ///
-    /// In Bazel, configuration is handled through:
-    /// - `MODULE.bazel` for dependency configuration
-    /// - `select()` for platform-conditional attributes
-    /// - `module_extension()` for custom configuration
+    /// Returns the string value if found, or `default` (None by default) if not found.
     fn read_config<'v>(
-        _section: StringValue,
-        _key: StringValue,
-        _default: Option<Value<'v>>,
+        #[starlark(require = pos)] section: StringValue<'v>,
+        #[starlark(require = pos)] key: StringValue<'v>,
+        #[starlark(require = pos, default = NoneOr::None)] default: NoneOr<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        Err(kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", READ_CONFIG_ERROR).into())
+        // Limit the scope of build_context borrow so eval can be used after
+        let value = {
+            let build_ctx = BuildContext::from_context(eval)?;
+            build_ctx
+                .buckconfigs
+                .lookup_current(section.as_str(), key.as_str())?
+        };
+        match value {
+            Some(v) => Ok(eval.heap().alloc(v.as_ref())),
+            None => match default {
+                NoneOr::None => Ok(Value::new_none()),
+                NoneOr::Other(v) => Ok(v),
+            },
+        }
     }
 
-    /// Buck2-specific function not available in Bazel-compatible mode.
+    /// Read a buckconfig value from the root cell's config.
     ///
-    /// In Bazel, configuration is handled through:
-    /// - `MODULE.bazel` for dependency configuration
-    /// - `select()` for platform-conditional attributes
-    /// - `module_extension()` for custom configuration
+    /// Returns the string value if found, or `default` (None by default) if not found.
     fn read_root_config<'v>(
-        #[starlark(require = pos)] _section: StringValue,
-        #[starlark(require = pos)] _key: StringValue,
-        #[starlark(require = pos, default = NoneOr::None)] _default: NoneOr<StringValue<'v>>,
+        #[starlark(require = pos)] section: StringValue<'v>,
+        #[starlark(require = pos)] key: StringValue<'v>,
+        #[starlark(require = pos, default = NoneOr::None)] default: NoneOr<StringValue<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneOr<StringValue<'v>>> {
-        Err(
-            kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", READ_ROOT_CONFIG_ERROR)
-                .into(),
-        )
+        // Limit the scope of build_context borrow so eval can be used after
+        let value = {
+            let build_ctx = BuildContext::from_context(eval)?;
+            build_ctx
+                .buckconfigs
+                .lookup_root(section.as_str(), key.as_str())?
+        };
+        match value {
+            Some(v) => Ok(NoneOr::Other(eval.heap().alloc_str(v.as_ref()))),
+            None => match default {
+                NoneOr::None => Ok(NoneOr::None),
+                NoneOr::Other(v) => Ok(NoneOr::Other(v)),
+            },
+        }
     }
 }

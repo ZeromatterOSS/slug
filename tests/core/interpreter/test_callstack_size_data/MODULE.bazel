@@ -1,1 +1,11 @@
-module(name = "test_root")
+module(name = "root")
+
+local_path_override(
+    module_name = "bad",
+    path = "bad",
+)
+
+local_path_override(
+    module_name = "good",
+    path = "good",
+)
