@@ -1,0 +1,2 @@
+load(":defs.bzl", "both_params_rule")
+both_params_rule(name = "both_params")

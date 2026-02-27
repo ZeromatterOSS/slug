@@ -23,14 +23,14 @@ async def test_build_bazel_takes_precedence_over_build(buck: Buck) -> None:
     - When both BUILD.bazel and BUILD exist, BUILD.bazel should be used
     - When only BUILD exists, it should be used as fallback
     """
-    # Initially, only BUILD.bazel exists - it should be used
+    # Initially, BUILD.bazel exists alongside BUILD - BUILD.bazel should take precedence
     output = await buck.build("//:")
     assert "AAA from BUILD.bazel" in output.stderr
-    assert "AAA from BUILD" not in output.stderr
+    assert "BBB from BUILD fallback" not in output.stderr
 
     # Delete BUILD.bazel - now BUILD should be used as fallback
     os.unlink(buck.cwd / "BUILD.bazel")
 
     output = await buck.build("//:")
     assert "AAA from BUILD.bazel" not in output.stderr
-    assert "AAA from BUILD" in output.stderr
+    assert "BBB from BUILD fallback" in output.stderr

@@ -1,0 +1,2 @@
+load(":defs.bzl", "no_impl_rule")
+no_impl_rule(name = "no_impl")

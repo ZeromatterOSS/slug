@@ -22,22 +22,20 @@ from buck2.tests.e2e_util.buck_workspace import buck_test
 @buck_test()
 async def test_rule_with_implementation_parameter(buck: Buck) -> None:
     """Test that rule() works with Bazel-style `implementation` parameter."""
-    output = await buck.build("//:bazel_style")
-    assert output.returncode == 0
+    await buck.build("//:bazel_style")
 
 
 @buck_test()
 async def test_rule_with_impl_parameter(buck: Buck) -> None:
     """Test that rule() works with Kuro-style `impl` parameter."""
-    output = await buck.build("//:kuro_style")
-    assert output.returncode == 0
+    await buck.build("//:kuro_style")
 
 
 @buck_test()
 async def test_rule_with_both_impl_and_implementation_fails(buck: Buck) -> None:
     """Test that rule() fails when both `impl` and `implementation` are specified."""
     await expect_failure(
-        buck.uquery("//:both_params", "--console=none"),
+        buck.uquery("//error_both:both_params", "--console=none"),
         stderr_regex="Cannot specify both `impl` and `implementation` in rule",
     )
 
@@ -46,6 +44,6 @@ async def test_rule_with_both_impl_and_implementation_fails(buck: Buck) -> None:
 async def test_rule_without_implementation_fails(buck: Buck) -> None:
     """Test that rule() fails when neither `impl` nor `implementation` is specified."""
     await expect_failure(
-        buck.uquery("//:no_impl", "--console=none"),
+        buck.uquery("//error_no_impl:no_impl", "--console=none"),
         stderr_regex="Missing `implementation` function in rule",
     )

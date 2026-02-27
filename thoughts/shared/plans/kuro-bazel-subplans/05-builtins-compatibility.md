@@ -440,7 +440,7 @@ Per 04-prelude-architecture.md, these language-specific directories should be re
 
 ### Phase 7d (Buck2 Removal)
 - [x] Buck2-specific functions removed/deprecated (read_config/read_root_config errors; oncall/load_symbols removed; attrs.* deprecated)
-- [ ] Prelude cleaned up (not yet started)
+- [x] Prelude cleaned up (2026-02-26: 15+ language dirs removed, rules_impl.bzl simplified to core rules only)
 - [ ] Clear migration path documented
 
 ---

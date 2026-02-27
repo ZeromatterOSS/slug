@@ -10,13 +10,6 @@ kuro_style_rule(
     name = "kuro_style",
 )
 
-# Error case targets - loaded from separate files to isolate errors
-# These are in separate .bzl files so we can test the specific error
-
-# For testing both params error:
-# load(":error_both.bzl", "both_params_rule")
-# both_params_rule(name = "both_params")
-
-# For testing no impl error:
-# load(":error_no_impl.bzl", "no_impl_rule")
-# no_impl_rule(name = "no_impl")
+# Error case targets are in separate packages to avoid contaminating root BUILD file:
+# //error_both:both_params
+# //error_no_impl:no_impl

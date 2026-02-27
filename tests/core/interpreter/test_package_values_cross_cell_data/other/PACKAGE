@@ -1,0 +1,2 @@
+write_package_value("aaa.bbb", "ccc")
+write_package_value("xxx.yyy", "zzz")

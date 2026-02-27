@@ -1,0 +1,3 @@
+# This PACKAGE file intentionally does NOT call package() to test that
+# visibility is inherited from the parent PACKAGE file (a/PACKAGE).
+write_package_value("nested.marker", True)
