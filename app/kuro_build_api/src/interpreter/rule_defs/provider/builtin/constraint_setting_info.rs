@@ -48,7 +48,7 @@ use crate as kuro_build_api;
 #[internal_provider(constraint_info_creator)]
 #[derive(Clone, Debug, Trace, Coerce, Freeze, ProvidesStaticType, Allocative)]
 #[repr(C)]
-pub(crate) struct ConstraintSettingInfoGen<V: ValueLifetimeless> {
+pub struct ConstraintSettingInfoGen<V: ValueLifetimeless> {
     label: ValueOfUncheckedGeneric<V, StarlarkTargetLabel>,
     // TODO(nero): Remove NoneOr when we migrate to unified constraint
     default: ValueOfUncheckedGeneric<V, NoneOr<StarlarkProvidersLabel>>,
@@ -99,7 +99,7 @@ impl<'v> ConstraintSettingInfo<'v> {
 impl FrozenConstraintSettingInfo {
     /// Create a frozen ConstraintSettingInfo on the given frozen heap.
     /// Used for native rule analysis (config_setting, constraint_value).
-    pub(crate) fn create_on_frozen_heap(
+    pub fn create_on_frozen_heap(
         label: kuro_core::target::label::label::TargetLabel,
         heap: &FrozenHeap,
     ) -> FrozenValue {

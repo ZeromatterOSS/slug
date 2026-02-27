@@ -121,50 +121,10 @@ fn exec_impl(
     set_up_project(&absolute, git, !cmd.no_prelude)
 }
 
-fn initialize_buckconfig(repo_root: &AbsPath, prelude: bool, git: bool) -> kuro_error::Result<()> {
+fn initialize_buckconfig(repo_root: &AbsPath, _prelude: bool, git: bool) -> kuro_error::Result<()> {
     let mut buckconfig = std::fs::File::create(repo_root.join(".buckconfig"))?;
     writeln!(buckconfig, "[cells]")?;
     writeln!(buckconfig, "  root = .")?;
-
-    // Add additional configs that depend on prelude / no-prelude mode
-    if prelude {
-        writeln!(buckconfig, "  prelude = prelude")?;
-        writeln!(buckconfig, "  toolchains = toolchains")?;
-        writeln!(buckconfig, "  none = none")?;
-        writeln!(buckconfig)?;
-        writeln!(buckconfig, "[cell_aliases]")?;
-        writeln!(buckconfig, "  config = prelude")?;
-        writeln!(buckconfig, "  ovr_config = prelude")?;
-        writeln!(buckconfig, "  fbcode = none")?;
-        writeln!(buckconfig, "  fbsource = none")?;
-        writeln!(buckconfig, "  fbcode_macros = none")?;
-        writeln!(buckconfig, "  buck = none")?;
-        writeln!(buckconfig)?;
-        writeln!(
-            buckconfig,
-            "# Uses a copy of the prelude bundled with the kuro binary. You can alternatively delete this"
-        )?;
-        writeln!(
-            buckconfig,
-            "# section and vendor a copy of the prelude to the `prelude` directory of your project."
-        )?;
-        writeln!(buckconfig, "[external_cells]")?;
-        writeln!(buckconfig, "  prelude = bundled")?;
-        writeln!(buckconfig)?;
-        writeln!(buckconfig, "[parser]")?;
-        writeln!(
-            buckconfig,
-            "  target_platform_detector_spec = target:root//...->prelude//platforms:default \\
-    target:prelude//...->prelude//platforms:default \\
-    target:toolchains//...->prelude//platforms:default"
-        )?;
-        writeln!(buckconfig)?;
-        writeln!(buckconfig, "[build]")?;
-        writeln!(
-            buckconfig,
-            "  execution_platforms = prelude//platforms:default"
-        )?;
-    }
 
     if git {
         writeln!(buckconfig)?;
@@ -200,8 +160,8 @@ fn initialize_root_build(repo_root: &AbsPath, prelude: bool) -> kuro_error::Resu
         writeln!(build)?;
         writeln!(build, "genrule(")?;
         writeln!(build, "    name = \"hello_world\",")?;
-        writeln!(build, "    out = \"out.txt\",")?;
-        writeln!(build, "    cmd = \"echo BUILT BY KURO> $OUT\",")?;
+        writeln!(build, "    outs = [\"out.txt\"],")?;
+        writeln!(build, "    cmd = \"echo BUILT BY KURO> $@\",")?;
         writeln!(build, ")")?;
     }
     // TODO: Add a doc pointers for rules
@@ -219,6 +179,11 @@ fn set_up_gitignore(repo_root: &AbsPath) -> kuro_error::Result<()> {
 
 fn set_up_buckroot(repo_root: &AbsPath) -> kuro_error::Result<()> {
     fs_util::write(repo_root.join(".buckroot"), "")?;
+    Ok(())
+}
+
+fn initialize_module_bazel(repo_root: &AbsPath) -> kuro_error::Result<()> {
+    fs_util::write(repo_root.join("MODULE.bazel"), "module(name = \"root\")\n")?;
     Ok(())
 }
 
@@ -249,12 +214,9 @@ fn set_up_project(repo_root: &AbsPath, git: bool, prelude: bool) -> kuro_error::
     }
 
     initialize_buckconfig(repo_root, prelude, git)?;
-    if prelude {
-        let toolchains = repo_root.join("toolchains");
-        if !toolchains.exists() {
-            fs_util::create_dir(&toolchains)?;
-            initialize_toolchains_build(&toolchains)?;
-        }
+    // Generate MODULE.bazel to enable bzlmod mode
+    if !repo_root.join("MODULE.bazel").exists() {
+        initialize_module_bazel(repo_root)?;
     }
     // Create BUILD.bazel if neither BUILD.bazel nor BUILD exists
     if !repo_root.join("BUILD.bazel").exists() && !repo_root.join("BUILD").exists() {

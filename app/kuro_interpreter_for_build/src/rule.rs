@@ -259,13 +259,13 @@ impl<'v> StarlarkRuleCallable<'v> {
                 // In Bazel compat mode, some transitions are stubbed as None
                 if cfg.is_none() {
                     RuleIncomingTransition::None
-                } else if cfg.get_type() == "config_transition" || cfg.get_type() == "Transition" {
-                    // Bazel config.target() / config.exec() / transition() are no-ops in Kuro.
+                } else if cfg.get_type() == "config_transition" {
+                    // Bazel config.target() / config.exec() are no-ops in Kuro.
                     // config.target() = use target configuration (the default).
                     // config.exec() = use exec configuration (not yet implemented).
-                    // transition() = custom configuration transition (not yet implemented).
                     RuleIncomingTransition::None
                 } else {
+                    // transition() objects are implemented in kuro - apply them.
                     RuleIncomingTransition::Fixed(transition_id_from_value(cfg)?)
                 }
             }

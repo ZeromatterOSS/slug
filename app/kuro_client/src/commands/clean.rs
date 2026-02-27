@@ -223,7 +223,7 @@ async fn clean(
         console.print_stderr(
             "Tip: Use Ctrl-Z to put this in the background, or run in a new terminal.",
         )?;
-        console.print_stderr("You can run other kuro commands while this completes.")?;
+        console.print_stderr("You can run other buck2 commands while this completes.")?;
 
         // Delete the moved directory
         let trash_target_normalized = AbsNormPathBuf::new(trash_target.to_path_buf())?;

@@ -114,8 +114,9 @@ const TEST_CELL: BundledCell = BundledCell {
 pub const fn get_bundled_data() -> &'static [BundledCell] {
     // bazel_tools is required for rules_cc (references @bazel_tools//tools/cpp:...)
     // local_config_platform provides HOST_CONSTRAINTS for the current platform
-    // prelude removed - Kuro doesn't need buck2 compatibility
-    &[BAZEL_TOOLS, LOCAL_CONFIG_PLATFORM, TEST_CELL]
+    // prelude is included for legacy (non-bzlmod) projects that reference it via
+    // [external_cells] prelude = bundled in .buckconfig
+    &[PRELUDE, BAZEL_TOOLS, LOCAL_CONFIG_PLATFORM, TEST_CELL]
 }
 
 #[cfg(test)]

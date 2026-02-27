@@ -52,13 +52,13 @@ pub struct ChromeTraceCommand {
 
     /// The path to read the event log from.
     #[clap(
-        long,
+        long = "path",
         help = "A path to an event-log file to read from. Only works for log files with a single command in them. If no event-log is passed, the most recent one will be used.",
         value_name = "PATH",
         // Hide because `event_log` below subsumes this.
         hide = true
     )]
-    pub path: Option<PathArg>,
+    pub path_flag: Option<PathArg>,
 
     #[clap(flatten)]
     pub(crate) event_log: EventLogOptions,
@@ -1036,7 +1036,7 @@ impl BuckSubcommand for ChromeTraceCommand {
         _events_ctx: &mut EventsCtx,
     ) -> ExitResult {
         // For backward compatibility, use the path field if it's set
-        let log = if let Some(path) = self.path {
+        let log = if let Some(path) = self.path_flag {
             EventLogPathBuf::infer(path.resolve(&ctx.working_dir))?
         } else {
             self.event_log.get(&ctx).await?

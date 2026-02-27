@@ -92,6 +92,10 @@ pub enum NativeRuleKind {
     AnalysisTest,
     #[display("genquery")]
     Genquery,
+    #[display("execution_platform")]
+    ExecutionPlatform,
+    #[display("execution_platforms")]
+    ExecutionPlatforms,
 }
 
 impl NativeRuleKind {
@@ -118,6 +122,8 @@ impl NativeRuleKind {
             NativeRuleKind::CcLibcTopAlias => "cc_libc_top_alias",
             NativeRuleKind::AnalysisTest => "analysis_test",
             NativeRuleKind::Genquery => "genquery",
+            NativeRuleKind::ExecutionPlatform => "execution_platform",
+            NativeRuleKind::ExecutionPlatforms => "execution_platforms",
         }
     }
 }

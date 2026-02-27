@@ -221,9 +221,15 @@ pub fn handle_soft_error(
     // @oss-disable: let is_open_source = false;
     let is_open_source = true; // @oss-enable
     if is_open_source {
-        // We don't log these, and we have no legacy users, and they might not upgrade that often,
-        // so lets just break open source things immediately.
-        return Err(err);
+        // In OSS, promote soft errors to hard errors unless BUCK2_HARD_ERROR is explicitly
+        // set to a value that disables hard errors (e.g., "false").
+        // This allows tests with allow_soft_errors=True to work correctly.
+        let explicitly_disabled = matches!(kuro_hard_error_env(), Ok(Some(v)) if v == "false");
+        if !explicitly_disabled {
+            // We don't log these, and we have no legacy users, and they might not upgrade that often,
+            // so lets just break open source things immediately.
+            return Err(err);
+        }
     }
 
     Ok(err)

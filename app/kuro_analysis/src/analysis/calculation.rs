@@ -30,6 +30,8 @@ use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProvider
 use kuro_build_api::keep_going::KeepGoing;
 use kuro_build_signals::env::WaitingData;
 use kuro_common::dice::cells::HasCellResolver;
+use kuro_common::legacy_configs::dice::HasLegacyConfigs;
+use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_core::configuration::compatibility::MaybeCompatible;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::deferred::key::DeferredHolderKey;
@@ -314,6 +316,67 @@ async fn check_config_setting_flag_values(
     Ok(true) // All flag_values match their build_setting_defaults
 }
 
+/// Check whether all `values` entries in a `config_setting` target match the current buckconfig.
+/// The `values` dict uses `"section.property": "expected_value"` format (buckconfig key-value).
+///
+/// Returns `true` if all values match (or if `values` is empty), `false` otherwise.
+async fn check_config_setting_values(
+    configured_node: ConfiguredTargetNodeRef<'_>,
+    ctx: &mut DiceComputations<'_>,
+) -> kuro_error::Result<bool> {
+    let target_node = configured_node.to_owned();
+    let target_ref = target_node.target_node().as_ref();
+
+    let values_attr = match target_ref.attr_or_none("values", AttrInspectOptions::All) {
+        Some(attr) => attr,
+        None => return Ok(true), // No values attr → vacuously matches
+    };
+
+    let pairs = match &values_attr.value {
+        CoercedAttr::Dict(d) => d.0.clone(),
+        _ => return Ok(true), // Not a dict → vacuously matches
+    };
+
+    if pairs.is_empty() {
+        return Ok(true); // Empty values dict → vacuously matches
+    }
+
+    let config_setting_cell = target_ref.label().pkg().cell_name();
+
+    for (key, expected_value) in pairs.iter() {
+        let key_str = match key {
+            CoercedAttr::String(s) => s.0.as_str().to_owned(),
+            _ => return Ok(false), // Unexpected key type
+        };
+
+        let expected_str = match expected_value {
+            CoercedAttr::String(s) => s.0.as_str().to_owned(),
+            _ => return Ok(false), // Unexpected value type
+        };
+
+        // Parse "section.property" format
+        let dot_pos = match key_str.find('.') {
+            Some(pos) => pos,
+            None => return Ok(false), // Not a valid buckconfig key
+        };
+        let section = &key_str[..dot_pos];
+        let property = &key_str[dot_pos + 1..];
+
+        let actual_value = ctx
+            .get_legacy_config_property(config_setting_cell, BuckconfigKeyRef { section, property })
+            .await?;
+
+        match actual_value {
+            Some(v) if v.as_ref() == expected_str.as_str() => {
+                // This key matches
+            }
+            _ => return Ok(false), // Mismatch or not set
+        }
+    }
+
+    Ok(true) // All values match
+}
+
 /// Compute aspect results for dependencies that have aspects attached via attributes.
 ///
 /// This scans the target's attributes for those with `aspects` (e.g.,
@@ -553,12 +616,15 @@ async fn get_analysis_result_inner(
             // that are required for Bazel compatibility with BCR packages like @platforms.
             let dep_analysis = get_dep_analysis(configured_node, ctx).await?;
 
-            // For config_setting, pre-compute whether flag_values match their build_setting_defaults.
+            // For config_setting, pre-compute whether flag_values and values match.
             // This must be done asynchronously (DICE lookup) before the sync analyze_native_rule call.
-            let flag_values_match = if matches!(kind, NativeRuleKind::ConfigSetting) {
-                check_config_setting_flag_values(configured_node, ctx).await?
+            let (flag_values_match, values_match) = if matches!(kind, NativeRuleKind::ConfigSetting)
+            {
+                let fv = check_config_setting_flag_values(configured_node, ctx).await?;
+                let vm = check_config_setting_values(configured_node, ctx).await?;
+                (fv, vm)
             } else {
-                true // irrelevant for non-config_setting rules
+                (true, true) // irrelevant for non-config_setting rules
             };
 
             let now = TimeSpan::start_now();
@@ -569,6 +635,7 @@ async fn get_analysis_result_inner(
                     kind,
                     dep_analysis,
                     flag_values_match,
+                    values_match,
                 )?;
                 Ok(MaybeCompatible::Compatible(result))
             });

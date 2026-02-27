@@ -33,16 +33,23 @@ use kuro_build_api::dynamic::storage::DYNAMIC_LAMBDA_PARAMS_STORAGES;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
 use kuro_build_api::interpreter::rule_defs::cc_common::CcInfoInstanceStub;
 use kuro_build_api::interpreter::rule_defs::cc_common::CcInfoProvider;
-use kuro_build_api::interpreter::rule_defs::platform_common::ConstraintValueInfoInstance;
-use kuro_build_api::interpreter::rule_defs::platform_common::ConstraintValueInfoProvider;
+use kuro_build_api::interpreter::rule_defs::platform_common::ConstraintSettingInfoProvider;
 use kuro_build_api::interpreter::rule_defs::provider::FrozenBuiltinProviderLike;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::configuration_info::FrozenConfigurationInfo;
+use kuro_build_api::interpreter::rule_defs::provider::builtin::constraint_setting_info::FrozenConstraintSettingInfo;
+use kuro_build_api::interpreter::rule_defs::provider::builtin::constraint_value_info::FrozenConstraintValueInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::FrozenDefaultInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::external_runner_test_info::FrozenExternalRunnerTestInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::external_runner_test_info::create_frozen_sh_test_info;
+use kuro_build_api::interpreter::rule_defs::command_executor_config::StarlarkCommandExecutorConfig;
+use kuro_build_api::interpreter::rule_defs::provider::builtin::execution_platform_info::ExecutionPlatformInfoGen;
+use kuro_build_api::interpreter::rule_defs::provider::builtin::execution_platform_info::FrozenExecutionPlatformInfo;
+use kuro_build_api::interpreter::rule_defs::provider::builtin::execution_platform_registration_info::ExecutionPlatformRegistrationInfoGen;
+use kuro_build_api::interpreter::rule_defs::provider::builtin::execution_platform_registration_info::FrozenExecutionPlatformRegistrationInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::platform_info::FrozenPlatformInfo;
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
+use kuro_interpreter::types::target_label::StarlarkTargetLabel;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::deferred::key::DeferredHolderKey;
 use kuro_core::execution_types::executor_config::CommandExecutorConfig;
@@ -63,8 +70,10 @@ use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
 use kuro_node::rule_type::NativeRuleKind;
 use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
+use starlark::values::FrozenValueOfUnchecked;
 use starlark::values::FrozenValueTyped;
 use starlark::values::OwnedFrozenValue;
+use starlark::values::list::AllocList;
 use starlark::values::any_complex::StarlarkAnyComplex;
 use starlark_map::small_map::SmallMap;
 
@@ -77,6 +86,7 @@ pub fn analyze_native_rule(
     kind: &NativeRuleKind,
     dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
     flag_values_match: bool,
+    values_match: bool,
 ) -> kuro_error::Result<AnalysisResult> {
     match kind {
         NativeRuleKind::ConstraintSetting => analyze_constraint_setting(target, configured_node),
@@ -87,7 +97,7 @@ pub fn analyze_native_rule(
         NativeRuleKind::Alias => analyze_alias(target, dep_analysis),
         NativeRuleKind::LabelFlag => analyze_label_flag(target, dep_analysis), // dep_analysis is empty (build_setting_default is a string, not a dep)
         NativeRuleKind::ConfigSetting => {
-            analyze_config_setting(target, configured_node, dep_analysis, flag_values_match)
+            analyze_config_setting(target, dep_analysis, flag_values_match, values_match)
         }
         NativeRuleKind::ToolchainType => create_minimal_analysis_result(target),
         NativeRuleKind::PackageGroup => create_minimal_analysis_result(target),
@@ -104,6 +114,8 @@ pub fn analyze_native_rule(
         NativeRuleKind::CcLibcTopAlias => create_minimal_analysis_result(target),
         NativeRuleKind::AnalysisTest => analyze_analysis_test(target),
         NativeRuleKind::Genquery => analyze_genquery(target),
+        NativeRuleKind::ExecutionPlatform => analyze_execution_platform(target, dep_analysis),
+        NativeRuleKind::ExecutionPlatforms => analyze_execution_platforms(target, dep_analysis),
     }
 }
 
@@ -464,13 +476,60 @@ fn collect_artifact_groups_from_configured_attr(
 }
 
 /// Analyze a constraint_setting target.
-/// For now, returns just DefaultInfo. Full ConstraintSettingInfo support
-/// can be added later when the infrastructure is in place.
+/// Returns DefaultInfo and ConstraintSettingInfo so that
+/// `refs.x[ConstraintSettingInfo]` works in configuration transitions.
 fn analyze_constraint_setting(
     target: &ConfiguredTargetLabel,
     _configured_node: ConfiguredTargetNodeRef<'_>,
 ) -> kuro_error::Result<AnalysisResult> {
-    create_minimal_analysis_result(target)
+    let heap = FrozenHeap::new();
+    let default_info = FrozenDefaultInfo::testing_empty(&heap);
+    let constraint_setting_info =
+        FrozenConstraintSettingInfo::create_on_frozen_heap(target.unconfigured().dupe(), &heap);
+
+    let providers = SmallMap::from_iter([
+        (
+            DefaultInfoCallable::provider_id().dupe(),
+            default_info.to_frozen_value(),
+        ),
+        (
+            ConstraintSettingInfoProvider::provider_id().dupe(),
+            constraint_setting_info,
+        ),
+    ]);
+    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+        heap.alloc(FrozenProviderCollection::new(providers)),
+    )?;
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+        value: FrozenAnalysisValueStorage::new_native(
+            self_key.dupe(),
+            DYNAMIC_LAMBDA_PARAMS_STORAGES
+                .get()
+                .unwrap()
+                .new_frozen_dynamic_lambda_params_storage(),
+            Some(provider_collection),
+        ),
+    });
+
+    let heap_ref = heap.into_ref();
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
+
+    let recorded_values = RecordedAnalysisValues::new_native(
+        self_key,
+        Some(analysis_storage),
+        RecordedActions::new(0),
+    );
+
+    Ok(AnalysisResult::new(
+        recorded_values,
+        None,
+        HashMap::new(),
+        0,
+        0,
+        None,
+    ))
 }
 
 /// Analyze a constraint_value target.
@@ -489,17 +548,18 @@ fn analyze_constraint_value(
 
     // Extract constraint_setting label from dep_analysis.
     // constraint_value has exactly one dep: its constraint_setting.
-    let constraint_setting_label = if !dep_analysis.is_empty() {
-        dep_analysis[0].0.unconfigured().to_string()
+    let cs_target_label = if !dep_analysis.is_empty() {
+        dep_analysis[0].0.unconfigured().dupe()
     } else {
-        String::new()
+        target.unconfigured().dupe()
     };
 
-    // Create ConstraintValueInfo with the target's label
-    let constraint_value_info = heap.alloc(ConstraintValueInfoInstance {
-        constraint_setting_label,
-        label: target.unconfigured().to_string(),
-    });
+    // Create the real FrozenConstraintSettingInfo and FrozenConstraintValueInfo so that
+    // transition functions can access `.setting.label` on the ConstraintValueInfo instance.
+    let frozen_cs_info = FrozenConstraintSettingInfo::create_on_frozen_heap(cs_target_label, &heap);
+    let cv_providers_label = ProvidersLabel::default_for(target.unconfigured().dupe());
+    let constraint_value_info =
+        FrozenConstraintValueInfo::create_on_frozen_heap(frozen_cs_info, cv_providers_label, &heap);
 
     // Create ConfigurationInfo with one constraint pair (cs→cv)
     // so that config_setting can merge constraints from deps.
@@ -509,7 +569,7 @@ fn analyze_constraint_value(
             default_info.to_frozen_value(),
         ),
         (
-            ConstraintValueInfoProvider::provider_id().dupe(),
+            FrozenConstraintValueInfo::builtin_provider_id().dupe(),
             constraint_value_info,
         ),
     ]);
@@ -623,73 +683,6 @@ fn analyze_label_flag(
 }
 
 /// Returns the default value for known Bazel command-line flags.
-/// Used for evaluating config_setting with `values` attribute.
-/// These are the default values when no CLI flag overrides them.
-/// Reference: https://bazel.build/reference/command-line-reference
-fn bazel_flag_default(flag: &str) -> Option<&'static str> {
-    match flag {
-        // Proto-related flags (used by protobuf)
-        "strict_public_imports" => Some("off"),
-        "strict_proto_deps" => Some("off"),
-        // Build mode flags
-        "compilation_mode" => Some("fastbuild"),
-        // Java-related flags
-        "java_base" => Some("//tools/jdk:current_java_toolchain"),
-        // C++ flags
-        "cpu" => None, // Platform-dependent, don't assume default
-        // Test-related
-        "test_lang_filters" => Some(""),
-        // Linker
-        "linkopt" => Some(""),
-        // Coverage
-        "collect_code_coverage" => Some("false"),
-        "instrumentation_filter" => Some(""),
-        _ => None,
-    }
-}
-
-/// Check if a config_setting's `values` attribute entries all match known Bazel defaults.
-/// Returns true if either:
-/// - The `values` attribute is empty (no flag-based constraints)
-/// - All flag values match their known Bazel defaults
-/// Returns false if any flag is unknown or its value doesn't match the default.
-fn check_values_match_defaults(configured_node: ConfiguredTargetNodeRef<'_>) -> bool {
-    // Try to read the `values` attribute from the unconfigured target node
-    let target_node = configured_node.to_owned();
-    let target_ref = target_node.target_node().as_ref();
-
-    if let Some(values_attr) = target_ref.attr_or_none("values", AttrInspectOptions::All) {
-        match values_attr.value {
-            CoercedAttr::Dict(dict_lit) => {
-                if dict_lit.0.is_empty() {
-                    // Empty values dict - no flag constraints
-                    return false;
-                }
-                // Check each flag:value pair against known defaults
-                for (key, value) in dict_lit.0.iter() {
-                    if let (CoercedAttr::String(k), CoercedAttr::String(v)) = (key, value) {
-                        match bazel_flag_default(k.0.as_str()) {
-                            Some(default_val) if v.0.as_str().eq_ignore_ascii_case(default_val) => {
-                                // This entry matches the default
-                            }
-                            _ => {
-                                // Unknown flag or value doesn't match default
-                                return false;
-                            }
-                        }
-                    } else {
-                        return false;
-                    }
-                }
-                // All entries matched their defaults
-                true
-            }
-            _ => false,
-        }
-    } else {
-        false
-    }
-}
 
 /// Analyze a config_setting target.
 /// Creates a ConfigurationInfo provider by merging constraint data from all
@@ -697,11 +690,13 @@ fn check_values_match_defaults(configured_node: ConfiguredTargetNodeRef<'_>) -> 
 ///
 /// `flag_values_match` indicates whether all `flag_values` entries match their
 /// `build_setting_default` values (pre-computed asynchronously in `calculation.rs`).
+/// `values_match` indicates whether all `values` entries (buckconfig key-value pairs) match
+/// the current buckconfig (pre-computed asynchronously in `calculation.rs`).
 fn analyze_config_setting(
     target: &ConfiguredTargetLabel,
-    configured_node: ConfiguredTargetNodeRef<'_>,
     dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
     flag_values_match: bool,
+    values_match: bool,
 ) -> kuro_error::Result<AnalysisResult> {
     let heap = FrozenHeap::new();
 
@@ -727,27 +722,16 @@ fn analyze_config_setting(
         }
     }
 
-    // If flag_values don't match build_setting_defaults, this config_setting should
-    // not match in the default configuration (no CLI flag overrides). Add a sentinel
-    // constraint that never matches any real platform.
-    if !flag_values_match {
+    // If flag_values or values don't match, this config_setting should not match.
+    // Add a sentinel constraint that never matches any real platform.
+    if !flag_values_match || !values_match {
         let sentinel_setting = target.unconfigured().dupe();
         let sentinel_value = ProvidersLabel::default_for(target.unconfigured().dupe());
         all_constraint_pairs.push((sentinel_setting, sentinel_value));
-    } else if all_constraint_pairs.is_empty() {
-        // No constraint_values and flag_values match (or empty) - check Bazel built-in
-        // flag values against known defaults.
-        // If all match their defaults, the config_setting matches everything (empty
-        // constraint set). Otherwise, add a sentinel.
-        let values_match_defaults = check_values_match_defaults(configured_node);
-
-        if !values_match_defaults {
-            let sentinel_setting = target.unconfigured().dupe();
-            let sentinel_value = ProvidersLabel::default_for(target.unconfigured().dupe());
-            all_constraint_pairs.push((sentinel_setting, sentinel_value));
-        }
-        // If values match defaults, leave constraint pairs empty → matches everything
     }
+    // Otherwise (flag_values and values both match), leave all_constraint_pairs as-is.
+    // If empty → config_setting matches everything (no constraints).
+    // If non-empty → config_setting matches when the platform has those constraints.
 
     // Create merged ConfigurationInfo with all constraint pairs
     let config_info =
@@ -1448,6 +1432,165 @@ fn make_native_analysis_result(
         None,
         HashMap::new(),
         num_actions,
+        0,
+        None,
+    ))
+}
+
+/// Analyze an execution_platform target.
+/// Returns DefaultInfo + ExecutionPlatformInfo derived from the `platform` dep.
+fn analyze_execution_platform(
+    target: &ConfiguredTargetLabel,
+    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+) -> kuro_error::Result<AnalysisResult> {
+    let heap = FrozenHeap::new();
+
+    // Extract constraint data from the `platform` dep's PlatformInfo
+    let mut constraint_pairs: Vec<(
+        kuro_core::target::label::label::TargetLabel,
+        kuro_core::provider::label::ProvidersLabel,
+    )> = Vec::new();
+
+    for (_dep_label, dep_result) in &dep_analysis {
+        if let Ok(providers) = dep_result.providers() {
+            if let Some(platform_info) = providers.value().builtin_provider::<FrozenPlatformInfo>()
+            {
+                if let Ok(config_data) = platform_info.to_configuration() {
+                    if let Ok(data) = config_data.data() {
+                        for (ck, cv) in &data.constraints {
+                            constraint_pairs.push((ck.key.dupe(), cv.0.dupe()));
+                        }
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    let default_info = FrozenDefaultInfo::testing_empty(&heap);
+
+    // Create ExecutionPlatformInfo from constraint data
+    let exec_platform_info = FrozenExecutionPlatformInfo::for_native_execution_platform(
+        target.unconfigured().dupe(),
+        &constraint_pairs,
+        &heap,
+    );
+
+    let mut providers = SmallMap::from_iter([(
+        DefaultInfoCallable::provider_id().dupe(),
+        default_info.to_frozen_value(),
+    )]);
+    providers.insert(
+        FrozenExecutionPlatformInfo::builtin_provider_id().dupe(),
+        exec_platform_info,
+    );
+
+    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+        heap.alloc(FrozenProviderCollection::new(providers)),
+    )?;
+
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+
+    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+        value: FrozenAnalysisValueStorage::new_native(
+            self_key.dupe(),
+            DYNAMIC_LAMBDA_PARAMS_STORAGES
+                .get()
+                .unwrap()
+                .new_frozen_dynamic_lambda_params_storage(),
+            Some(provider_collection),
+        ),
+    });
+
+    let heap_ref = heap.into_ref();
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
+
+    let recorded_values = RecordedAnalysisValues::new_native(
+        self_key,
+        Some(analysis_storage),
+        RecordedActions::new(0),
+    );
+
+    Ok(AnalysisResult::new(
+        recorded_values,
+        None,
+        HashMap::new(),
+        0,
+        0,
+        None,
+    ))
+}
+
+/// Analyze an execution_platforms target.
+/// Returns DefaultInfo + ExecutionPlatformRegistrationInfo with the actual platforms.
+fn analyze_execution_platforms(
+    target: &ConfiguredTargetLabel,
+    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+) -> kuro_error::Result<AnalysisResult> {
+    let heap = FrozenHeap::new();
+
+    let default_info = FrozenDefaultInfo::testing_empty(&heap);
+
+    // Collect ExecutionPlatformInfo frozen values from each dep by importing dep heaps
+    let mut platform_frozen_values: Vec<FrozenValue> = Vec::new();
+    for (_dep_label, dep_result) in &dep_analysis {
+        if let Ok(providers) = dep_result.providers() {
+            // Import dep heap into our heap so we can reference values from it
+            let imported = providers.add_heap_ref(&heap);
+            if let Some(typed) = imported.builtin_provider_value::<FrozenExecutionPlatformInfo>() {
+                platform_frozen_values.push(typed.to_frozen_value());
+            }
+        }
+    }
+
+    // Build ExecutionPlatformRegistrationInfo with the collected platforms
+    let registration_info = FrozenExecutionPlatformRegistrationInfo::create_with_platforms(
+        platform_frozen_values,
+        &heap,
+    );
+
+    let mut providers = SmallMap::from_iter([(
+        DefaultInfoCallable::provider_id().dupe(),
+        default_info.to_frozen_value(),
+    )]);
+    providers.insert(
+        FrozenExecutionPlatformRegistrationInfo::builtin_provider_id().dupe(),
+        registration_info,
+    );
+
+    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+        heap.alloc(FrozenProviderCollection::new(providers)),
+    )?;
+
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+
+    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+        value: FrozenAnalysisValueStorage::new_native(
+            self_key.dupe(),
+            DYNAMIC_LAMBDA_PARAMS_STORAGES
+                .get()
+                .unwrap()
+                .new_frozen_dynamic_lambda_params_storage(),
+            Some(provider_collection),
+        ),
+    });
+
+    let heap_ref = heap.into_ref();
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
+
+    let recorded_values = RecordedAnalysisValues::new_native(
+        self_key,
+        Some(analysis_storage),
+        RecordedActions::new(0),
+    );
+
+    Ok(AnalysisResult::new(
+        recorded_values,
+        None,
+        HashMap::new(),
+        0,
         0,
         None,
     ))

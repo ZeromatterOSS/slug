@@ -494,6 +494,50 @@ mod rule_defs {
         })
     });
 
+    pub static EXECUTION_PLATFORM_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        let platform_attr = Attribute::new(
+            None, // required, no default
+            "The platform target for this execution platform",
+            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+        );
+        Arc::new(Rule {
+            attributes: AttributeSpec::from(
+                vec![("platform".to_owned(), platform_attr)],
+                false,
+                &RuleIncomingTransition::None,
+            )
+            .expect("execution_platform attributes should be valid"),
+            rule_type: RuleType::Native(NativeRuleKind::ExecutionPlatform),
+            rule_kind: RuleKind::Configuration,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+        })
+    });
+
+    pub static EXECUTION_PLATFORMS_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        let platforms_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
+            "The list of execution platform targets",
+            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
+        );
+        Arc::new(Rule {
+            attributes: AttributeSpec::from(
+                vec![("platforms".to_owned(), platforms_attr)],
+                false,
+                &RuleIncomingTransition::None,
+            )
+            .expect("execution_platforms attributes should be valid"),
+            rule_type: RuleType::Native(NativeRuleKind::ExecutionPlatforms),
+            rule_kind: RuleKind::Configuration,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+        })
+    });
+
     /// Creates the AttributeSpec for native cc rules (cc_library, cc_binary, cc_test).
     fn cc_rule_attributes() -> AttributeSpec {
         let deps_attr = Attribute::new(
@@ -1731,6 +1775,68 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             &internals.default_visibility(),
         )?;
 
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+
+    /// Native execution_platform rule.
+    fn execution_platform<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] platform: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] _kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let internals = ModuleInternals::from_context(eval, "execution_platform")?;
+        let coercion_ctx = internals.attr_coercion_context();
+        let mut attrs = vec![];
+        if !platform.is_none() {
+            let dep_type = AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY);
+            let coerced = dep_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, platform)?;
+            attrs.push(("platform".to_owned(), coerced));
+        }
+        let target_node = create_native_target_node(
+            rule_defs::EXECUTION_PLATFORM_RULE.clone(),
+            internals.package(),
+            name,
+            attrs,
+            &extract_visibility_strings(visibility),
+            &internals.default_visibility(),
+        )?;
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+
+    /// Native execution_platforms rule.
+    fn execution_platforms<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        platforms: UnpackListOrTuple<Value<'v>>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] _kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let internals = ModuleInternals::from_context(eval, "execution_platforms")?;
+        let coercion_ctx = internals.attr_coercion_context();
+        let platforms_val = eval.heap().alloc(platforms.items);
+        let platforms_type =
+            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY));
+        let coerced_platforms =
+            platforms_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, platforms_val)?;
+        let target_node = create_native_target_node(
+            rule_defs::EXECUTION_PLATFORMS_RULE.clone(),
+            internals.package(),
+            name,
+            vec![("platforms".to_owned(), coerced_platforms)],
+            &extract_visibility_strings(visibility),
+            &internals.default_visibility(),
+        )?;
         internals.record(target_node)?;
         Ok(NoneType)
     }

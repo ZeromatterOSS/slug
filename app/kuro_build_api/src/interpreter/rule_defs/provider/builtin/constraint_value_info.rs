@@ -106,7 +106,7 @@ impl FrozenConstraintValueInfo {
     ///
     /// `setting_frozen` should be a FrozenValue containing a FrozenConstraintSettingInfo.
     /// `label` is the ProvidersLabel for this constraint value target.
-    pub(crate) fn create_on_frozen_heap(
+    pub fn create_on_frozen_heap(
         setting_frozen: FrozenValue,
         label: kuro_core::provider::label::ProvidersLabel,
         heap: &FrozenHeap,

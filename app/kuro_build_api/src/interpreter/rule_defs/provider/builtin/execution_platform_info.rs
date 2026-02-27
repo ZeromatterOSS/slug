@@ -58,6 +58,39 @@ pub struct ExecutionPlatformInfoGen<V: ValueLifetimeless> {
     executor_config: ValueOfUncheckedGeneric<V, StarlarkCommandExecutorConfig>,
 }
 
+impl FrozenExecutionPlatformInfo {
+    /// Create a FrozenExecutionPlatformInfo for use in native execution_platform analysis.
+    ///
+    /// Builds an ExecutionPlatformInfo from a target label, constraint pairs, and a local executor.
+    pub fn for_native_execution_platform(
+        label: kuro_core::target::label::label::TargetLabel,
+        constraint_pairs: &[(
+            kuro_core::target::label::label::TargetLabel,
+            kuro_core::provider::label::ProvidersLabel,
+        )],
+        heap: &starlark::values::FrozenHeap,
+    ) -> starlark::values::FrozenValue {
+        use std::sync::Arc;
+
+        use starlark::values::FrozenValueOfUnchecked;
+
+        use crate::interpreter::rule_defs::provider::builtin::configuration_info::FrozenConfigurationInfo;
+
+        let label_value = heap.alloc(StarlarkTargetLabel::new(label));
+        let config_value =
+            FrozenConfigurationInfo::for_native_config_setting(constraint_pairs, heap);
+        let exec_config_value = heap.alloc(StarlarkCommandExecutorConfig(
+            kuro_core::execution_types::executor_config::CommandExecutorConfig::testing_local(),
+        ));
+
+        heap.alloc(ExecutionPlatformInfoGen::<starlark::values::FrozenValue> {
+            label: FrozenValueOfUnchecked::new(label_value),
+            configuration: FrozenValueOfUnchecked::new(config_value),
+            executor_config: FrozenValueOfUnchecked::new(exec_config_value),
+        })
+    }
+}
+
 impl<'v, V: ValueLike<'v>> ExecutionPlatformInfoGen<V> {
     pub fn to_execution_platform(&self) -> kuro_error::Result<ExecutionPlatform> {
         self.to_execution_platform_with_marker(None)

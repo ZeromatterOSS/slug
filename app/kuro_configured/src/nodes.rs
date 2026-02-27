@@ -1334,14 +1334,14 @@ async fn check_error_on_incompatible_dep(
     if check_target_enabled_for_config(
         ctx,
         target_label,
-        "kuro",
+        "buck2",
         "error_on_dep_only_incompatible_excluded",
     )
     .await?
     {
         return Ok(false);
     }
-    check_target_enabled_for_config(ctx, target_label, "kuro", "error_on_dep_only_incompatible")
+    check_target_enabled_for_config(ctx, target_label, "buck2", "error_on_dep_only_incompatible")
         .await
 }
 

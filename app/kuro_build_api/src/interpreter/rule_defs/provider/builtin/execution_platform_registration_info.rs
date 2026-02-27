@@ -72,6 +72,39 @@ pub struct ExecutionPlatformRegistrationInfoGen<V: ValueLifetimeless> {
 }
 
 impl FrozenExecutionPlatformRegistrationInfo {
+    /// Create a FrozenExecutionPlatformRegistrationInfo with the given platform FrozenValues.
+    ///
+    /// Each value in `platforms` should be a `FrozenExecutionPlatformInfo`.
+    pub fn create_with_platforms(
+        platforms: Vec<starlark::values::FrozenValue>,
+        heap: &starlark::values::FrozenHeap,
+    ) -> starlark::values::FrozenValue {
+        use starlark::values::FrozenValueOfUnchecked;
+        use starlark::values::list::AllocList;
+        let platforms_list = heap.alloc(AllocList(platforms.into_iter()));
+        heap.alloc(
+            ExecutionPlatformRegistrationInfoGen::<starlark::values::FrozenValue> {
+                platforms: FrozenValueOfUnchecked::new(platforms_list),
+                fallback: FrozenValueOfUnchecked::new(starlark::values::FrozenValue::new_none()),
+                exec_marker_constraint: FrozenValueOfUnchecked::new(
+                    starlark::values::FrozenValue::new_none(),
+                ),
+            },
+        )
+    }
+
+    /// Create a FrozenExecutionPlatformRegistrationInfo with empty platforms (no-op stub).
+    pub fn create_empty_on_frozen_heap(heap: &starlark::values::FrozenHeap) -> FrozenValue {
+        use starlark::values::FrozenValueOfUnchecked;
+        use starlark::values::list::AllocList;
+        let empty_list = heap.alloc(AllocList(std::iter::empty::<FrozenValue>()));
+        heap.alloc(ExecutionPlatformRegistrationInfoGen::<FrozenValue> {
+            platforms: FrozenValueOfUnchecked::new(empty_list),
+            fallback: FrozenValueOfUnchecked::new(FrozenValue::new_none()),
+            exec_marker_constraint: FrozenValueOfUnchecked::new(FrozenValue::new_none()),
+        })
+    }
+
     // TODO(cjhopman): If we impl this on the non-frozen one, we can check validity when constructed rather than only when used.
     pub fn platforms(
         &self,
