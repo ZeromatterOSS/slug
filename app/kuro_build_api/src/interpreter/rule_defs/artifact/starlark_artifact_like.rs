@@ -59,6 +59,17 @@ pub trait StarlarkArtifactLike<'v>: Display {
         f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
     ) -> kuro_error::Result<StringValue<'v>>;
 
+    /// Returns the display path for str()/repr() in Starlark.
+    /// For source files: cell-relative path (e.g., "artifacts/DATA").
+    /// For build artifacts: same as short_path.
+    fn with_display_path(
+        &self,
+        f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
+    ) -> kuro_error::Result<StringValue<'v>> {
+        // Default: same as short_path (overridden for source artifacts)
+        self.with_short_path(f)
+    }
+
     /// Returns the full path of the artifact (execution path for Bazel compatibility).
     fn with_full_path(
         &self,

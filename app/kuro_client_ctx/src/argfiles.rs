@@ -141,11 +141,16 @@ fn expand_argfiles_with_context(
                     return Err(ArgExpansionError::MissingFlagFilePathInArgfile.into());
                 }
                 // Bazel-style external repo target patterns start with '@' and contain '//'
-                // (e.g. @rules_cc//cc:defs.bzl, @repo//:target).
+                // followed by a target name with ':' (e.g. @rules_cc//cc:defs.bzl, @repo//:target).
+                // Cell-qualified argfiles use @cell//path or @//path (no ':' after '//').
                 // These are NOT argfiles; pass them through unchanged.
-                if flagfile.contains("//") {
-                    expanded_args.push(next_arg.to_owned());
-                    continue;
+                if let Some((_cell, after_slash)) = flagfile.split_once("//") {
+                    if after_slash.contains(':') {
+                        // Bazel external repo target pattern (has ':' after '//'), not an argfile
+                        expanded_args.push(next_arg.to_owned());
+                        continue;
+                    }
+                    // Cell-qualified argfile path (no ':'), handle as argfile
                 }
                 // TODO: We want to detect cyclic inclusion
                 resolve_and_expand_argfile(expanded_args, flagfile, context, cwd)?;

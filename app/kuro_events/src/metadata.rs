@@ -200,7 +200,12 @@ pub fn username() -> kuro_error::Result<Option<String>> {
     }
     #[cfg(not(fbcode_build))]
     {
-        Ok::<Option<String>, kuro_error::Error>(None)
+        // Use standard OS username from environment variables.
+        // USER is standard on Unix; USERNAME is standard on Windows.
+        let user = std::env::var("USER")
+            .or_else(|_| std::env::var("USERNAME"))
+            .ok();
+        Ok(user)
     }
 }
 

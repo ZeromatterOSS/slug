@@ -12,22 +12,12 @@
 # This is kuro's shim import. Any public symbols here will be available within
 # **all** interpreted files.
 
-load("@prelude//utils:buckconfig.bzl", _read_config = "read_config_with_logging", _read_root_config = "read_root_config_with_logging", log_buckconfigs = "LOG_BUCKCONFIGS")
-
 def __struct_to_dict(s):
     vals = {}
     for name in dir(s):
         vals[name] = getattr(s, name)
     return vals
 
-# When buckconfig logging is enabled (Meta-internal), override read_config/read_root_config
-# with versions that log their usage. In OSS this is always empty.
-__overridden_builtins__ = {
-    "read_config": _read_config,
-    "read_root_config": _read_root_config,
-} if log_buckconfigs else {}
-
 __shimmed_native__ = __struct_to_dict(__kuro_builtins__)
-__shimmed_native__.update(__overridden_builtins__)
 
 native = struct(**__shimmed_native__)

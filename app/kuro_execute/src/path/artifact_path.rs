@@ -72,54 +72,19 @@ impl ArtifactPath<'_> {
                     Some(p) => p,
                     None => ForwardRelativePath::empty(),
                 };
-                // Bazel-compatible short_path for generated files:
-                // For files in main repo: "pkg/artifact" or just "artifact" at root
-                // For files in external repos: "../repo/pkg/artifact"
-                // Extract owning target's cell and package to construct the prefix.
-                let target_opt = match buck_out.owner().owner() {
-                    BaseDeferredKey::TargetLabel(target) => Some(target.clone()),
-                    BaseDeferredKey::Aspect(aspect_key) => aspect_key.configured_label(),
-                    _ => None,
-                };
-                if let Some(target) = target_opt {
-                    let cell_name = target.pkg().cell_name();
-                    let pkg_rel = target.pkg().cell_relative_path().as_str();
-                    if is_root_cell_name(cell_name.as_str()) {
-                        // Main repo: prepend package path if non-empty
-                        if pkg_rel.is_empty() {
-                            f(path)
-                        } else {
-                            let with_pkg = ForwardRelativePathBuf::unchecked_new(format!(
-                                "{}/{}",
-                                pkg_rel,
-                                path.as_str()
-                            ));
-                            f(with_pkg.as_ref())
-                        }
-                    } else {
-                        // External repo: "../repo/pkg/artifact"
-                        let with_prefix =
-                            ForwardRelativePathBuf::unchecked_new(if pkg_rel.is_empty() {
-                                format!("../{}/{}", cell_name.as_str(), path.as_str())
-                            } else {
-                                format!("../{}/{}/{}", cell_name.as_str(), pkg_rel, path.as_str())
-                            });
-                        f(with_prefix.as_ref())
-                    }
-                } else {
-                    f(path)
-                }
+                // Buck2 semantics: short_path for generated files is just the artifact's
+                // own relative path within the rule's artifact namespace (no package prefix).
+                // e.g., ctx.actions.write("my_output", "") -> short_path = "my_output"
+                f(path)
             }
             Either::Right(source) => {
-                // Bazel-compatible short_path for source files:
-                // For files in the main repo: returns the cell-relative path (e.g., src/foo.proto)
-                // For files in external repos: returns "../repo_name/path" (e.g., ../protobuf/src/foo.proto)
-                // This matches Bazel's File.short_path semantics exactly.
-                let pkg_path: &ForwardRelativePath = source.package().cell_relative_path().as_ref();
+                // Buck2 semantics: short_path for source files is the path relative to the
+                // package directory (NOT the full cell-relative path).
+                // e.g., source file at pkg/dir1/file.txt -> short_path = "dir1/file.txt"
+                // This matches how Buck2 uses short_path as a dictionary key for symlinked_dir etc.
                 let file_rel: &ForwardRelativePath = source.path().as_ref();
                 let cell_name = source.package().cell_name();
-                let base = pkg_path.join(file_rel);
-                let full = base.join(self.projected_path);
+                let full = file_rel.join(self.projected_path);
                 let path = match full.strip_prefix_components(self.hidden_components_count) {
                     Some(p) => p,
                     None => ForwardRelativePath::empty(),
@@ -127,7 +92,70 @@ impl ArtifactPath<'_> {
                 if is_root_cell_name(cell_name.as_str()) {
                     f(path)
                 } else {
-                    // External repo: prepend "../repo_name/"
+                    // External repo: prepend "../repo_name/pkg_rel/"
+                    let pkg_path: &ForwardRelativePath =
+                        source.package().cell_relative_path().as_ref();
+                    let cell_rel_path = if pkg_path.is_empty() {
+                        path.as_str().to_owned()
+                    } else {
+                        format!("{}/{}", pkg_path.as_str(), path.as_str())
+                    };
+                    let with_prefix = ForwardRelativePathBuf::unchecked_new(format!(
+                        "../{}/{}",
+                        cell_name.as_str(),
+                        cell_rel_path
+                    ));
+                    f(with_prefix.as_ref())
+                }
+            }
+        }
+    }
+
+    /// Returns the display path of the artifact (for str() / repr() in Starlark).
+    /// For build artifacts: same as short_path.
+    /// For source files: the cell-relative path (e.g., "artifacts/DATA" for pkg artifacts, file DATA).
+    /// This matches Buck2 Display semantics: `<source artifacts/DATA>`.
+    pub fn with_display_path<F, T>(&self, f: F) -> T
+    where
+        for<'b> F: FnOnce(&'b ForwardRelativePath) -> T,
+    {
+        match self.base_path.as_ref() {
+            Either::Left(_) => {
+                // For build artifacts, display is same as short_path
+                self.with_short_path(f)
+            }
+            Either::Right(source) => {
+                // For source files, display uses the cell-relative path
+                // e.g., file "artifacts/DATA" in package "artifacts" -> "artifacts/DATA"
+                let pkg_path: &ForwardRelativePath =
+                    source.package().cell_relative_path().as_ref();
+                let file_rel: &ForwardRelativePath = source.path().as_ref();
+                let cell_name = source.package().cell_name();
+                if pkg_path.is_empty() {
+                    // Root package
+                    let full = file_rel.join(self.projected_path);
+                    let path = match full.strip_prefix_components(self.hidden_components_count) {
+                        Some(p) => p,
+                        None => ForwardRelativePath::empty(),
+                    };
+                    f(path)
+                } else if is_root_cell_name(cell_name.as_str()) {
+                    // Main repo: use cell-relative path (package/file)
+                    let base = pkg_path.join(file_rel);
+                    let full = base.join(self.projected_path);
+                    let path = match full.strip_prefix_components(self.hidden_components_count) {
+                        Some(p) => p,
+                        None => ForwardRelativePath::empty(),
+                    };
+                    f(path)
+                } else {
+                    // External repo: "../repo_name/pkg/file"
+                    let base = pkg_path.join(file_rel);
+                    let full = base.join(self.projected_path);
+                    let path = match full.strip_prefix_components(self.hidden_components_count) {
+                        Some(p) => p,
+                        None => ForwardRelativePath::empty(),
+                    };
                     let with_prefix = ForwardRelativePathBuf::unchecked_new(format!(
                         "../{}/{}",
                         cell_name.as_str(),

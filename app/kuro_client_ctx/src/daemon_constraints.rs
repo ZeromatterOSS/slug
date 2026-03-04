@@ -50,8 +50,11 @@ pub fn version() -> String {
 /// after themselves.
 pub fn user_version() -> kuro_error::Result<Option<String>> {
     // This shouldn't really be necessary, but we used to check it so we'll keep it for now.
+    // Note: empty string is treated as not set (test harnesses set SANDCASTLE_ID="" to unset it).
     if let Some(id) = kuro_env!("SANDCASTLE_ID", applicability = internal)? {
-        return Ok(Some(id.to_owned()));
+        if !id.is_empty() {
+            return Ok(Some(id.to_owned()));
+        }
     }
     // The `ci_identifiers` function reports better identifiers earlier, so taking the first one is
     // enough

@@ -1431,11 +1431,20 @@ async fn get_dep_only_incompatible_custom_soft_error(
             let root_cell = cell_resolver.root_cell();
             let alias_resolver = ctx.get_cell_alias_resolver(root_cell).await?;
             let root_conf = ctx.get_legacy_root_config_on_dice().await?;
-            let Some(target) = root_conf.view(&mut ctx).parse::<String>(BuckconfigKeyRef {
-                section: "kuro",
+            // Check "buck2" section first (for Buck2 compatibility), then "kuro" section
+            let target = root_conf.view(&mut ctx).parse::<String>(BuckconfigKeyRef {
+                section: "buck2",
                 property: "dep_only_incompatible_info",
-            })?
-            else {
+            })?;
+            let target = if let Some(t) = target {
+                Some(t)
+            } else {
+                root_conf.view(&mut ctx).parse::<String>(BuckconfigKeyRef {
+                    section: "kuro",
+                    property: "dep_only_incompatible_info",
+                })?
+            };
+            let Some(target) = target else {
                 return Ok(None);
             };
             let target =

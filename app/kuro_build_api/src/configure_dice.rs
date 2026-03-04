@@ -55,7 +55,7 @@ pub async fn configure_dice_for_buck(
     let invalidation_tracking_enabled = match root_config {
         Some(c) => c
             .parse::<RolloutPercentage>(BuckconfigKeyRef {
-                section: "kuro",
+                section: "buck2",
                 property: "invalidation_tracking_enabled",
             })?
             .is_some_and(|v| v.roll()),

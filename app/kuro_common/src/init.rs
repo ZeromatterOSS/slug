@@ -510,8 +510,14 @@ impl DaemonStartupConfig {
                 .unwrap_or(Some(0)),
             daemon_buster: config
                 .get(BuckconfigKeyRef {
-                    section: "kuro",
+                    section: "buck2",
                     property: "daemon_buster",
+                })
+                .or_else(|| {
+                    config.get(BuckconfigKeyRef {
+                        section: "kuro",
+                        property: "daemon_buster",
+                    })
                 })
                 .map(ToOwned::to_owned),
             digest_algorithms: config

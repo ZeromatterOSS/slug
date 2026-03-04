@@ -76,7 +76,7 @@ impl KuroTestRunner {
         let run_verdict = receiver
             .map(|spec| async move {
                 let name = format!(
-                    "{}//{}:{}",
+                    "{}//{}:{} - main",
                     spec.target.cell, spec.target.package, spec.target.target
                 );
                 let target_handle = spec.target.handle.to_owned();

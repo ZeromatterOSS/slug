@@ -347,7 +347,14 @@ impl CommonBuildConfigurationOptions {
             name: &str,
             matches: BuckArgMatches<'a>,
         ) -> kuro_error::Result<impl Iterator<Item = (usize, &'a T)> + use<'a, T>> {
-            let indices = matches.inner.indices_of(name);
+            // Skip calling indices_of when collection is empty: the argument may not
+            // be registered in the current command (e.g., `complete`), and clap 4
+            // panics with "is not an id of an argument" for unregistered argument ids.
+            let indices = if collection.is_empty() {
+                None
+            } else {
+                matches.inner.indices_of(name)
+            };
             let indices = indices.unwrap_or_default();
             if indices.len() != collection.len() {
                 return Err(kuro_error::Error::from(IndicesLengthMismatchError {

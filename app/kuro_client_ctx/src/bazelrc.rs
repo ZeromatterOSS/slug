@@ -325,11 +325,23 @@ fn normalize_flag(arg: &str) -> String {
 /// Transitional flags like `--incompatible_*` and `--noincompatible_*` are Bazel
 /// migration flags that enable future-default behavior. Kuro already implements
 /// current Bazel semantics, so these are silently stripped.
+///
+/// NOTE: normalization stops after `--`. Everything after `--` is passed to a
+/// subcommand (e.g., BXL script args) and must be preserved verbatim.
 pub fn normalize_args(args: Vec<String>) -> Vec<String> {
-    args.into_iter()
-        .filter(|a| !is_bazel_transitional_flag(a))
-        .map(|a| normalize_flag(&a))
-        .collect()
+    let mut result = Vec::with_capacity(args.len());
+    let mut past_separator = false;
+    for arg in args {
+        if past_separator {
+            result.push(arg);
+        } else if arg == "--" {
+            past_separator = true;
+            result.push(arg);
+        } else if !is_bazel_transitional_flag(&arg) {
+            result.push(normalize_flag(&arg));
+        }
+    }
+    result
 }
 
 /// Returns true for Bazel-only transitional flags that kuro should silently ignore.

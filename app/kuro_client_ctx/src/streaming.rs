@@ -340,6 +340,6 @@ fn should_handle_build_graph_stats<T: StreamingCommand>(cmd: &T) -> bool {
     // Currently, we only care about graph size info in BuildResponse which build command produces
     cmd.build_config_opts()
         .config_values
-        .contains(&"kuro.log_configured_graph_size=true".to_owned())
+        .contains(&"buck2.log_configured_graph_size=true".to_owned())
         && cmd.logging_name() == "build"
 }

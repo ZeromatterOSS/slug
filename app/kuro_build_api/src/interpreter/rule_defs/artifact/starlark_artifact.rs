@@ -114,11 +114,11 @@ impl Display for StarlarkArtifact {
             }
         )?;
 
-        // Use short path in repr (logical path for display, not execution path).
-        // File.path returns the full execution path, but repr shows the short path.
+        // Use display path in repr: cell-relative for source files, short_path for build artifacts.
+        // e.g., source file "artifacts/DATA" -> "<source artifacts/DATA>"
         self.artifact
             .get_path()
-            .with_short_path(|p| write!(f, "{p}"))?;
+            .with_display_path(|p| write!(f, "{p}"))?;
 
         if let Some(owner) = self.artifact.owner() {
             write!(f, " bound to {owner}")?;
@@ -167,6 +167,13 @@ impl<'v> StarlarkArtifactLike<'v> for StarlarkArtifact {
         f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
     ) -> kuro_error::Result<StringValue<'v>> {
         Ok(self.artifact.get_path().with_short_path(f))
+    }
+
+    fn with_display_path(
+        &self,
+        f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
+    ) -> kuro_error::Result<StringValue<'v>> {
+        Ok(self.artifact.get_path().with_display_path(f))
     }
 
     fn with_full_path(

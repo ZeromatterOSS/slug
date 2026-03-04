@@ -211,7 +211,7 @@ async fn build(
         .parse_legacy_config_property(
             cell_resolver.root_cell(),
             BuckconfigKeyRef {
-                section: "kuro",
+                section: "buck2",
                 property: "log_configured_graph_size",
             },
         )
@@ -222,7 +222,7 @@ async fn build(
         .parse_legacy_config_property(
             cell_resolver.root_cell(),
             BuckconfigKeyRef {
-                section: "kuro",
+                section: "buck2",
                 property: "log_configured_graph_sketch",
             },
         )
@@ -233,7 +233,7 @@ async fn build(
         .parse_legacy_config_property(
             cell_resolver.root_cell(),
             BuckconfigKeyRef {
-                section: "kuro",
+                section: "buck2",
                 property: "log_total_configured_graph_sketch",
             },
         )
@@ -244,7 +244,7 @@ async fn build(
         .parse_legacy_config_property(
             cell_resolver.root_cell(),
             BuckconfigKeyRef {
-                section: "kuro",
+                section: "buck2",
                 property: "log_configured_graph_unconfigured_sketch",
             },
         )
@@ -255,7 +255,7 @@ async fn build(
         .parse_legacy_config_property(
             cell_resolver.root_cell(),
             BuckconfigKeyRef {
-                section: "kuro",
+                section: "buck2",
                 property: "log_total_configured_graph_unconfigured_sketch",
             },
         )
@@ -266,7 +266,7 @@ async fn build(
         .parse_legacy_config_property(
             cell_resolver.root_cell(),
             BuckconfigKeyRef {
-                section: "kuro",
+                section: "buck2",
                 property: "log_total_per_configuration_sketch",
             },
         )
@@ -327,7 +327,7 @@ async fn build(
         .parse_legacy_config_property(
             cell_resolver.root_cell(),
             BuckconfigKeyRef {
-                section: "kuro",
+                section: "buck2",
                 property: "detailed_aggregated_metrics",
             },
         )
