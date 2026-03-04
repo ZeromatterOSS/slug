@@ -3,7 +3,7 @@
 {
   "error_category": "USER",
   "failures": {
-    "root//terminal_colors:terminal_colors": "Action failed: root//terminal_colors:terminal_colors (<unspecified>) (run)\nRemote command returned non-zero exit code 1\nRemote action, reproduce with: `frecli cas download-action <DIGEST>`\nStdout:\nHello\nStderr: <empty>\n"
+    "root//terminal_colors:terminal_colors": "Action failed: root//terminal_colors:terminal_colors (<unspecified>) (run out.txt)\nLocal command returned non-zero exit code 1\nLocal command: env --chdir=\"$(kuro root --kind project)\" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/run/out.txt' bash -c \"echo -e \\\"\\\\033[31mHello\\\\033[0m\\\" && false\"\nStdout:\nHello\nStderr: <empty>\n"
   },
   "results": {
     "root//terminal_colors:terminal_colors": {
@@ -21,7 +21,7 @@
                 },
                 "name": {
                   "category": "run",
-                  "identifier": ""
+                  "identifier": "out.txt"
                 },
                 "stderr_content": "<STRING_HASH>",
                 "stdout_content": "<STRING_HASH>"
@@ -49,8 +49,8 @@
   "strings": {
     "<STRING_HASH>": "",
     "<STRING_HASH>": "\u001b[31mHello\u001b[0m\n",
-    "<STRING_HASH>": "Action failed: root//terminal_colors:terminal_colors (<unspecified>) (run)\nRemote command returned non-zero exit code 1\nRemote action, reproduce with: `frecli cas download-action <DIGEST>`\nStdout:\nHello\nStderr: <empty>\n",
-    "<STRING_HASH>": "Remote command returned non-zero exit code 1"
+    "<STRING_HASH>": "Action failed: root//terminal_colors:terminal_colors (<unspecified>) (run out.txt)\nLocal command returned non-zero exit code 1\nLocal command: env --chdir=\"$(kuro root --kind project)\" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/run/out.txt' bash -c \"echo -e \\\"\\\\033[31mHello\\\\033[0m\\\" && false\"\nStdout:\nHello\nStderr: <empty>\n",
+    "<STRING_HASH>": "Local command returned non-zero exit code 1"
   },
   "success": false,
   "truncated": false

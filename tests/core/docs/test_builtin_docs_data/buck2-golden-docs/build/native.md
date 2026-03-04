@@ -13,6 +13,8 @@
 ## constraint\_setting
 ## constraint\_value
 ## depset\_from\_transitive\_set
+## execution\_platform
+## execution\_platforms
 ## existing\_rule
 ## existing\_rules
 ## exports\_files

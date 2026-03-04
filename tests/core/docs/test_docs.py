@@ -42,7 +42,6 @@ async def test_prelude_docs(buck: Buck) -> None:
     )
 
 
-@pytest.mark.xfail(reason="until we ban non .bzl paths, this would be valid")
 @buck_test()
 async def test_docs_fail_with_invalid_patterns(buck: Buck) -> None:
     await expect_failure(

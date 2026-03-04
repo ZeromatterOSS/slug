@@ -25,6 +25,7 @@ stub = rule(
     impl = _stub_impl,
     attrs = {
         "deps": attr.label_list(default = []),
+        "exec_deps": attr.label_list(cfg = "exec", default = []),
     },
 )
 

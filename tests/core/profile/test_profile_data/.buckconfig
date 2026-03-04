@@ -6,3 +6,6 @@
 
 [buildfile]
   name = TARGETS.fixture
+
+[build]
+  execution_platforms = root//:execution_platforms

@@ -17,8 +17,8 @@ def _get_tagged_artifacts(ctx, dep_file: Artifact, used_files: list[Artifact], u
     return (tag, tagged_used_files, tagged_unused_files, tagged_dep_file)
 
 def _with_two_dep_files_impl(ctx):
-    allow_dep_file_cache_upload = read_config("test", "allow_dep_file_cache_upload") in ["true", "True"]
-    allow_cache_upload = read_config("test", "allow_cache_upload") in ["true", "True"]
+    allow_dep_file_cache_upload = False
+    allow_cache_upload = False
 
     out = ctx.actions.declare_output(ctx.attrs.out_name, has_content_based_path = True)
 

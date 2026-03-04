@@ -43,7 +43,7 @@
               "cause_index": 1,
               "error_tags": [
                 "ANALYSIS",
-                "STARLARK_VALUE"
+                "INPUT"
               ],
               "message_content": "<STRING_HASH>"
             }

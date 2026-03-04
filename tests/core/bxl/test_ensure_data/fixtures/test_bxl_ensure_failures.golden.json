@@ -33,7 +33,7 @@
             },
             "name": {
               "category": "run",
-              "identifier": ""
+              "identifier": "out.txt"
             },
             "stderr_content": "<STRING_HASH>",
             "stdout_content": "<STRING_HASH>"
@@ -50,9 +50,9 @@
   },
   "strings": {
     "<STRING_HASH>": "",
-    "<STRING_HASH>": "Action failed: root//build:fail (<unspecified>) (run)\nRemote command returned non-zero exit code 127\nRemote action, reproduce with: `frecli cas download-action <DIGEST>`\nStdout: <empty>\nStderr:\nError while resolving command \"exit\": cannot find binary path\n",
-    "<STRING_HASH>": "Error while resolving command \"exit\": cannot find binary path\n",
-    "<STRING_HASH>": "Remote command returned non-zero exit code 127",
+    "<STRING_HASH>": "Action failed: root//build:fail (<unspecified>) (run out.txt)\nLocal command returned non-zero exit code <no exit code>\nLocal command: env --chdir=\"$(kuro root --kind project)\" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/run/out.txt' exit 1\nStdout: <empty>\nStderr:\nSpawning executable `exit` failed: Failed to spawn a process\n",
+    "<STRING_HASH>": "Local command returned non-zero exit code <no exit code>",
+    "<STRING_HASH>": "Spawning executable `exit` failed: Failed to spawn a process",
     "<STRING_HASH>": "fail to build"
   },
   "success": false,

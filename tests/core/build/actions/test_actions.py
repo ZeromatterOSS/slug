@@ -251,7 +251,10 @@ async def test_download_file(buck: Buck) -> None:
 
     await runner.cleanup()
 
-    assert attempt == 4
+    # Kuro uses SHA256 digest by default in OSS builds; when only SHA1 is provided,
+    # the HEAD request optimization is skipped and the file is downloaded directly.
+    # This results in 3 total GET requests (429, 500, success) instead of 4 (3 HEAD + 1 GET).
+    assert attempt == 3
 
 
 @buck_test(data_dir="actions")

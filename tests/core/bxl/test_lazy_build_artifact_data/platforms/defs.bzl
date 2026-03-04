@@ -16,12 +16,8 @@ def _execution_platform(ctx):
         ),
         executor_config = CommandExecutorConfig(
             local_enabled = True,
-            remote_enabled = True,
-            remote_cache_enabled = True,
-            remote_execution_properties = {
-                "platform": "linux-remote-execution",
-            },
-            remote_execution_use_case = "kuro-testing",
+            remote_enabled = False,
+            remote_cache_enabled = False,
         ),
     )
 

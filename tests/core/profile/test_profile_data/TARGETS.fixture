@@ -1,0 +1,14 @@
+platform(
+    name = "local_platform",
+    constraint_values = [],
+)
+
+execution_platform(
+    name = "local_execution_platform",
+    platform = ":local_platform",
+)
+
+execution_platforms(
+    name = "execution_platforms",
+    platforms = [":local_execution_platform"],
+)

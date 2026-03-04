@@ -495,3 +495,33 @@ The `bazel_dep(..., repo_name="alias")` pattern creates cell aliases that allow 
 4. Passed to `CellsAggregator::new()` for cell resolver registration
 
 Example aliases created: `com_google_protobuf -> protobuf`, `com_google_absl -> abseil-cpp`
+
+---
+
+## Test Suite TODO (as of 2026-03-03)
+
+Current status: **852 pass, 155 skip** in `tests/core/`.
+
+### Potentially Fixable Skips
+
+These SKIP_TESTS entries could be fixed with code changes:
+
+1. **`test_what_materialized_*`** (3 tests in `test_log/`) - "Materializations not tracked for local execution". Would need to implement materialization event tracking for local builds (currently only tracked for RE).
+
+2. **`test_local_incompatible`** (in `test_error_categorization.py`) - Error message format differs: kuro says "The desired execution strategy is incompatible" vs Buck2's "Incompatible executor preferences". Could update kuro's error message to match.
+
+3. **`test_attr_default_coercion.py`** (in collect_ignore) - kuro doesn't validate label defaults at rule definition time. Could add validation in `AttrType::Label` coercion for default values.
+
+4. **Source location tests** (7 tests in `test_error_categorization.py`) - Tests check for `buck2_*` crate paths in error source locations. Could be fixed by renaming internal crates or by updating golden files (but requires accepting kuro-specific error output).
+
+### Investigate Further
+
+- `test_build_file_race` - "Build fails unexpectedly in kuro (file locking behavior differs)". Worth investigating if this is a real correctness issue.
+- `test_paranoid_enable_disable` / `test_noop` - Only need `execution_platforms` data dir (no RE). Could create the data dir by symlinking/copying from `tests/core/executor/test_hybrid_executor_data/`.
+
+### Already Investigated - Not Fixable Without Major Work
+
+- RE-dependent tests (~80): hybrid executor, cache uploads, dep files remote
+- Eden/cgroup tests (~20): require EdenFS or Linux cgroups
+- Buck2 modifier syntax (~40): `?modifier` target syntax not part of Bazel
+- Meta-internal tests: manifold HTTP, BUCK2_TEST_* env vars, native.constraint rule

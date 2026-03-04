@@ -44,6 +44,8 @@
 ## depset
 ## dynamic\_actions
 ## exec\_group
+## execution\_platform
+## execution\_platforms
 ## existing\_rule
 ## existing\_rules
 ## exports\_files

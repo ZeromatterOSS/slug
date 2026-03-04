@@ -1,5 +1,3 @@
-load("@nano_prelude//prelude.bzl", "execution_platform", "execution_platforms", "platform")
-
 platform(
     name = "target",
 )

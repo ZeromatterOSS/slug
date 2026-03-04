@@ -352,11 +352,13 @@ async def test_build_offline(buck: Buck) -> None:
     out = await read_what_ran(buck)
 
     executors = {line["identity"]: line["reproducer"]["executor"] for line in out}
+    # Kuro auto-generates action identifiers from the first output path when
+    # no explicit identifier is provided, so actions show "(head out)" / "(cp out)"
     expected = {
-        "root//executor_threshold_tests:big (<unspecified>) (head)": "Local",
-        "root//executor_threshold_tests:cp_big (<unspecified>) (cp)": "Local",
-        "root//executor_threshold_tests:small (<unspecified>) (head)": "Local",
-        "root//executor_threshold_tests:cp_small (<unspecified>) (cp)": "Local",
+        "root//executor_threshold_tests:big (<unspecified>) (head out)": "Local",
+        "root//executor_threshold_tests:cp_big (<unspecified>) (cp out)": "Local",
+        "root//executor_threshold_tests:small (<unspecified>) (head out)": "Local",
+        "root//executor_threshold_tests:cp_small (<unspecified>) (cp out)": "Local",
     }
     assert executors == expected
 

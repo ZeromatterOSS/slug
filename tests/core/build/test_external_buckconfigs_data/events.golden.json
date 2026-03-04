@@ -4,7 +4,7 @@
   {
     "key": "file_watcher",
     "origin": "tmp-path/extra.bcfg",
-    "section": "kuro",
+    "section": "buck2",
     "value": "fs_hash_crawler"
   },
   {

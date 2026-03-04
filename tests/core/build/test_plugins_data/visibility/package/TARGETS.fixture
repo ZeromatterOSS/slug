@@ -8,4 +8,5 @@ nop(
 plugin_dep(
     name = "unhidden",
     actual = ":hidden",
+    visibility = ["PUBLIC"],
 )

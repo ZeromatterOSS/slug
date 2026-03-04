@@ -14,7 +14,7 @@ def _normal_impl(ctx):
         "build",
         "root//:trivial",
         "-c",
-        "nested.kuro_path=" + ctx.attrs.kuro_path,
+        "nested.buck2_path=" + ctx.attrs.kuro_path,
         "--out",
         out.as_output(),
     )
@@ -56,7 +56,7 @@ subprocess.run([buck_path, "debug", "trace-io", "enable"])
         "build",
         "root//:trivial",
         "-c",
-        "nested.kuro_path=" + ctx.attrs.kuro_path,
+        "nested.buck2_path=" + ctx.attrs.kuro_path,
         "--out",
         nested_out.as_output(),
         hidden = trace_out,
@@ -64,7 +64,7 @@ subprocess.run([buck_path, "debug", "trace-io", "enable"])
     ctx.actions.run(
         nested_cmd,
         local_only = True,
-        category = "run",
+        category = "nested_run",
     )
     return [DefaultInfo(default_output = nested_out)]
 
