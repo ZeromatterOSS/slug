@@ -502,17 +502,22 @@ Example aliases created: `com_google_protobuf -> protobuf`, `com_google_absl -> 
 
 Current status: **852 pass, 155 skip** in `tests/core/`.
 
+### Fixed (2026-03-03)
+
+- **Source location tests + `test_local_incompatible`** (6 tests in `test_error_categorization.py`) - Fixed by:
+  1. Updating test assertions to use `kuro_*` crate paths instead of `buck2_*`
+  2. Updating `KURO` vs `BUCK2` source area
+  3. For `test_local_incompatible`: changed `get_command_executor` to return `Err(IncompatibleExecutorPreferences)` instead of `None`, and updated `category_key` assertion to `"IncompatibleExecutorPreferences"` (Input tag is "hidden" so type name is used)
+  4. Fixed `kuro_client` Windows build error (unix-only symlink calls in `run.rs`)
+  5. Added `.exe` extension support for kuro binary path detection in conftest.py
+
 ### Potentially Fixable Skips
 
 These SKIP_TESTS entries could be fixed with code changes:
 
 1. **`test_what_materialized_*`** (3 tests in `test_log/`) - "Materializations not tracked for local execution". Would need to implement materialization event tracking for local builds (currently only tracked for RE).
 
-2. **`test_local_incompatible`** (in `test_error_categorization.py`) - Error message format differs: kuro says "The desired execution strategy is incompatible" vs Buck2's "Incompatible executor preferences". Could update kuro's error message to match.
-
-3. **`test_attr_default_coercion.py`** (in collect_ignore) - kuro doesn't validate label defaults at rule definition time. Could add validation in `AttrType::Label` coercion for default values.
-
-4. **Source location tests** (7 tests in `test_error_categorization.py`) - Tests check for `buck2_*` crate paths in error source locations. Could be fixed by renaming internal crates or by updating golden files (but requires accepting kuro-specific error output).
+2. **`test_attr_default_coercion.py`** (in collect_ignore) - kuro doesn't validate label defaults at rule definition time. Could add validation in `AttrType::Label` coercion for default values.
 
 ### Investigate Further
 

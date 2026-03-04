@@ -43,6 +43,7 @@ use kuro_execute::execute::prepared::NoOpCommandOptionalExecutor;
 use kuro_execute::execute::prepared::PreparedCommandExecutor;
 use kuro_execute::execute::prepared::PreparedCommandOptionalExecutor;
 use kuro_execute::execute::request::ExecutorPreference;
+use kuro_execute::execute::request::IncompatibleExecutorPreferences;
 use kuro_execute::knobs::ExecutorGlobalKnobs;
 use kuro_execute::materialize::materializer::Materializer;
 use kuro_execute::re::manager::ManagedRemoteExecutionClient;
@@ -248,7 +249,11 @@ impl HasCommandExecutor for CommandExecutorFactory {
             Executor::None => None,
             Executor::Local(local) => {
                 if self.strategy.ban_local() {
-                    None
+                    return Err(IncompatibleExecutorPreferences {
+                        a: ExecutorPreference::LocalRequired,
+                        b: ExecutorPreference::RemoteRequired,
+                    }
+                    .into());
                 } else {
                     Some(CommandExecutorResponse {
                         executor: Arc::new(local_executor_new(local)),

@@ -101,9 +101,9 @@ pub enum OutputCreationBehavior {
 #[derive(Debug, kuro_error::Error)]
 #[error("Incompatible executor preferences: `{}` & `{}`", a, b)]
 #[kuro(input)]
-struct IncompatibleExecutorPreferences {
-    a: ExecutorPreference,
-    b: ExecutorPreference,
+pub struct IncompatibleExecutorPreferences {
+    pub a: ExecutorPreference,
+    pub b: ExecutorPreference,
 }
 
 #[derive(Copy, Clone, Dupe, Display, Debug, Allocative)]

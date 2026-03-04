@@ -262,7 +262,10 @@ impl StreamingCommand for RunCommand {
                                     }
                                     let target = format!("{}/{}", ws_dir, name_str);
                                     if !std::path::Path::new(&target).exists() {
+                                        #[cfg(unix)]
                                         let _ = std::os::unix::fs::symlink(entry.path(), &target);
+                                        #[cfg(windows)]
+                                        let _ = std::os::windows::fs::symlink_dir(entry.path(), &target);
                                     }
                                 }
                             }
@@ -273,7 +276,10 @@ impl StreamingCommand for RunCommand {
                         if workspace_name != "_main" {
                             let main_link = format!("{}/{}", runfiles_dir, "_main");
                             if !std::path::Path::new(&main_link).exists() {
+                                #[cfg(unix)]
                                 let _ = std::os::unix::fs::symlink(workspace_name, &main_link);
+                                #[cfg(windows)]
+                                let _ = std::os::windows::fs::symlink_dir(workspace_name, &main_link);
                             }
                         }
                     }

@@ -138,18 +138,12 @@ SKIP_TESTS = {
     # Require Meta-internal tooling or unimplemented features
     "test_client_metadata_debug": "kuro debug allocator-stats not implemented for Cargo builds",
     # test_error_categorization.py tests that check Buck2-specific source locations or require RE
-    "test_action_error": "Checks buck2_build_api source location path (kuro uses kuro_build_api)",
-    "test_bad_url": "Checks buck2_http source location path (kuro uses kuro_http)",
     "test_buck2_fail": "Requires --remote-only Remote Execution (RE)",
-    "test_starlark_fail_error_categorization": "Checks Buck2-specific source location in errors",
-    "test_starlark_parse_error_categorization": "Checks Buck2-specific source location in errors",
-    "test_starlark_scope_error_categorization": "Checks Buck2-specific source location in errors",
     "test_targets_error_categorization": "Checks Buck2-specific source location in errors",
     "test_daemon_abort": "Checks Buck2-specific crash signal output format",
     "test_build_file_race": "Build fails unexpectedly in kuro (file locking behavior differs)",
     "test_download_failure": "Requires --remote-only Remote Execution (RE) and BUCK2_TEST_FAIL_RE_DOWNLOADS",
     "test_re_execute_failure": "Requires Remote Execution (RE) for re-execute failure testing",
-    "test_local_incompatible": "Checks for 'Incompatible executor preferences' message (kuro has different format)",
     # command_report tests requiring Meta-internal env vars or features
     "test_command_report_watchman_error": "Requires Watchman integration",
     "test_command_report_init_daemon_error": "Requires BUCK2_TEST_INIT_DAEMON_ERROR (Meta-internal)",
@@ -327,8 +321,10 @@ SKIP_TESTS = {
 REPO_ROOT = TESTS_DIR.parent
 KURO_BIN = REPO_ROOT / "kuro"
 if not KURO_BIN.exists():
-    # Try cargo debug build location
-    KURO_BIN = REPO_ROOT / "target" / "debug" / "kuro"
+    # Try cargo debug build location (Windows uses .exe extension)
+    _kuro_exe = REPO_ROOT / "target" / "debug" / "kuro.exe"
+    _kuro_no_ext = REPO_ROOT / "target" / "debug" / "kuro"
+    KURO_BIN = _kuro_exe if _kuro_exe.exists() else _kuro_no_ext
 
 os.environ.setdefault("TEST_EXECUTABLE", str(KURO_BIN))
 
