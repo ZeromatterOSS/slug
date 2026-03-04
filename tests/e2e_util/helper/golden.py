@@ -167,11 +167,19 @@ def sanitize_hashes(s: str) -> str:
     # characters... and that's hard to fix because we don't allow changes to
     # change action digests.
     s = re.sub(r"\b[0-9a-f]{12,16}\b", "<HASH>", s)
-    # And action digests
-    return re.sub(r"\b[0-9a-f]{40}:[0-9]{1,3}\b", "<DIGEST>", s)
+    # And action digests (SHA1: 40 chars, SHA256: 64 chars)
+    s = re.sub(r"\b[0-9a-f]{40}:[0-9]{1,}\b", "<DIGEST>", s)
+    return re.sub(r"\b[0-9a-f]{64}:[0-9]{1,}\b", "<DIGEST>", s)
 
 
 def sanitize_stderr(s: str) -> str:
+    # Remove tracing log lines (e.g., WARN/INFO/DEBUG lines from kuro's tracing output)
+    # These look like: [TIMESTAMP] [2m2026-...Z[0m [33m WARN[0m [2mkuro_...[0m...
+    # The inner ANSI timestamp also contains a timestamp; strip the whole line
+    # Match lines that start with a timestamp bracket and contain WARN/INFO/DEBUG/ERROR
+    s = re.sub(r"^\[.{29}\].*? (WARN|INFO|DEBUG|ERROR).+$", "", s, flags=re.MULTILINE)
+    # Also handle after timestamp replacement
+    s = re.sub(r"^\[<TIMESTAMP>\].*? (WARN|INFO|DEBUG|ERROR).+$", "", s, flags=re.MULTILINE)
     # Remove all timestamps
     s = re.sub(r"\[.{29}\]", "[<TIMESTAMP>]", s)
     # Remove all UUIDs
