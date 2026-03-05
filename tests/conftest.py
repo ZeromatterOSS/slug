@@ -57,8 +57,7 @@ collect_ignore = [
     # These tests require kuro to support the `?modifier` target syntax which is Buck2-specific
     # and not part of Bazel's target language
     # NOTE: test_error_categorization.py partially works - failing tests added to SKIP_TESTS
-    # Paranoid mode - Buck2-specific conservative RE caching feature
-    "core/build/test_paranoid.py",                            # Requires execution_platforms test data and Buck2 paranoid RE mode
+    # NOTE: test_paranoid.py: test_noop passes; RE/paranoid-specific tests added to SKIP_TESTS below
     # NOTE: test_external_buckconfigs.py: all 4 tests pass with the fixed golden file
     # Meta-internal unified constraint rule (native.constraint, native.platform)
     "core/configurations/test_unified_constraint.py",         # Uses Meta-internal native.constraint rule
@@ -218,6 +217,10 @@ SKIP_TESTS = {
     "test_cli_configured_target_modifiers_flag": "Uses Buck2-specific --modifier flag",
     "test_cli_target_fails_with_question_mark_modifier_syntax": "Uses Buck2-specific ?modifier target syntax",
     "test_cli_configured_target_fails_with_global_modifiers": "Uses Buck2-specific --modifier flag",
+    # Paranoid mode tests (test_paranoid.py) - Buck2-specific RE caching feature
+    "test_paranoid_ignores_preferences": "Requires RE and Buck2 paranoid mode (BUCK_PARANOID env var)",
+    "test_paranoid_ignores_low_pass_filter": "Requires RE and Buck2 paranoid low-pass filter feature",
+    "test_paranoid_enable_disable": "Requires buck.debug('paranoid') command (Buck2-specific) and asyncio.sleep(15)",
     # Debug commands requiring external tools
     "test_thread_dump": "Requires LLDB which is not available in this environment",
     # Materializer tests requiring RE or Meta-internal HTTP downloads (interncache-all.fbcdn.net)

@@ -500,7 +500,7 @@ Example aliases created: `com_google_protobuf -> protobuf`, `com_google_absl -> 
 
 ## Test Suite TODO (as of 2026-03-03)
 
-Current status: **852 pass, 155 skip** in `tests/core/`.
+Current status: **853 pass, 155 skip** in `tests/core/` (updated 2026-03-04).
 
 ### Fixed (2026-03-03)
 
@@ -522,7 +522,8 @@ These SKIP_TESTS entries could be fixed with code changes:
 ### Investigate Further
 
 - `test_build_file_race` - "Build fails unexpectedly in kuro (file locking behavior differs)". Worth investigating if this is a real correctness issue.
-- `test_paranoid_enable_disable` / `test_noop` - Only need `execution_platforms` data dir (no RE). Could create the data dir by symlinking/copying from `tests/core/executor/test_hybrid_executor_data/`.
+- ~~**`test_noop`** in `test_paranoid.py` - Only needed `execution_platforms` data dir. Created minimal buck project at `tests/core/build/test_paranoid_data/execution_platforms/` with `.buckconfig`, `.buckroot`, `TARGETS.fixture`. Removed file from `collect_ignore`; added RE/paranoid-specific tests to `SKIP_TESTS`.~~ **FIXED**: `test_noop` now passes; `test_paranoid_enable_disable` skipped (uses `buck.debug("paranoid")` - Buck2-specific).
+- `test_paranoid_enable_disable` - Requires `buck.debug("paranoid", ...)` command - Buck2-specific conservative RE caching. Not fixable without RE/paranoid mode implementation.
 
 ### Already Investigated - Not Fixable Without Major Work
 
