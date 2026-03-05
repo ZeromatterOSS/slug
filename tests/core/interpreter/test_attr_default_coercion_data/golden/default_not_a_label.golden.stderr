@@ -1,6 +1,6 @@
 # This file is @generated, regenerate by re-running test with `-- --env BUCK2_UPDATE_GOLDEN=1` appended to the test command
 
-Command failed:
+Command failed: 
 Error evaluating expression:
     root//:
     ^-----^
@@ -12,7 +12,7 @@ Caused by:
     2: Traceback (most recent call last):
          * error_rule.bzl:17, in <module>
              "someattr": attr.label(default = "notaproperlabel"),
-
+       
        error: Error coercing "notaproperlabel"
          --> error_rule.bzl:17:21
           |
@@ -20,4 +20,4 @@ Caused by:
           |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           |
     3: Invalid target pattern `notaproperlabel` is not allowed
-    4: Expected pattern to contain `:`, trailing `/...` or literal `...`.
+    4: Must be absolute. Starting with either `//` for a cell alias or `:` for a relative target.

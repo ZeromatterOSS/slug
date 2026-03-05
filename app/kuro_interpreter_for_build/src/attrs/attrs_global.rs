@@ -207,17 +207,16 @@ impl AttributeExt for Attribute {
                     // without a BuildContext), fall back to None default. The rule will
                     // re-coerce the default from BUILD file context when instantiated.
                     match attr_coercion_context_for_bzl(eval) {
-                        Err(_) => Some(Arc::new(kuro_node::attrs::coerced_attr::CoercedAttr::None)),
+                        Err(_) => {
+                            // If we can't get a coercion context (e.g., standalone/sync evaluator
+                            // without a BuildContext), fall back to None default. The rule will
+                            // re-coerce the default from BUILD file context when instantiated.
+                            Some(Arc::new(kuro_node::attrs::coerced_attr::CoercedAttr::None))
+                        },
                         Ok(coerce_ctx) => {
                             match coercer.coerce(AttrIsConfigurable::Yes, &coerce_ctx, x) {
                                 Ok(coerced) => Some(Arc::new(coerced)),
-                                Err(_) => {
-                                    // Coercion failed (e.g., bare filename like "LICENSE").
-                                    // Fall back to None - the rule will re-coerce from BUILD context.
-                                    Some(Arc::new(
-                                        kuro_node::attrs::coerced_attr::CoercedAttr::None,
-                                    ))
-                                }
+                                Err(e) => return Err(e.into()),
                             }
                         }
                     }
@@ -257,7 +256,8 @@ pub(crate) fn attr_coercion_context_for_bzl<'v>(
                 // It is OK to not deduplicate because we don't coerce a lot of labels in bzl files.
                 Arc::new(ConcurrentTargetLabelInterner::default()),
                 CellPathWithAllowedRelativeDir::backwards_relative_not_supported(bzl_cell_path),
-            ));
+            )
+            .with_strict_label_parsing());
         }
     }
 
@@ -267,7 +267,8 @@ pub(crate) fn attr_coercion_context_for_bzl<'v>(
         build_context.cell_info().cell_alias_resolver().dupe(),
         // It is OK to not deduplicate because we don't coerce a lot of labels in bzl files.
         Arc::new(ConcurrentTargetLabelInterner::default()),
-    ))
+    )
+    .with_strict_label_parsing())
 }
 
 pub(crate) fn init_coerce_providers_label_for_bzl() {

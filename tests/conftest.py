@@ -49,8 +49,6 @@ collect_ignore = [
     "core/interpreter/test_peak_allocated_bytes_exceeds_limit.py",  # Meta-internal
     "core/interpreter/test_prelude_typecheck.py",           # Meta-internal typecheck infra
     "core/interpreter/test_unstable_typecheck.py",          # Meta-internal typecheck infra
-    # Buck2-specific behavior (not needed for Bazel compatibility)
-    "core/interpreter/test_attr_default_coercion.py",      # Tests Buck2-strict label validation
     # Meta-internal tests requiring NANO_PRELUDE env var or fbpython
     # NOTE: test_audit_output.py, test_audit_configurations.py, test_audit_deferred_materializer.py,
     # and test_audit_execution_platform_resolution.py now work with our NANO_PRELUDE setup.

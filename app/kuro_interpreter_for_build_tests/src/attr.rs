@@ -126,17 +126,26 @@ fn attr_label_works() -> kuro_error::Result<()> {
         "#
     ))?;
 
-    // In Bazel, relative label defaults in bzl files are valid - they resolve relative to the bzl
-    // file's package. Both ":reltarget" and "notatarget" (bare name) are treated as relative targets.
+    // In Bazel/Buck2, relative label defaults using ":" prefix are valid.
+    // Bare names without ":" are NOT valid (requires explicit ":" or "//" prefix).
     let mut t = Tester::new().unwrap();
     t.run_starlark_bzl_test(indoc!(
         r#"
         def test():
             attr.label(default=":reltarget")
-            attr.label(default="notatarget")
         "#
     ))
     .unwrap();
+    // Bare names (no ":" prefix) should fail with a pattern parse error.
+    t.run_starlark_bzl_test_expecting_error(
+        indoc!(
+            r#"
+            def test():
+                attr.label(default="notatarget")
+            "#
+        ),
+        "Invalid target pattern",
+    );
     Ok(())
 }
 

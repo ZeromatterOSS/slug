@@ -517,7 +517,7 @@ These SKIP_TESTS entries could be fixed with code changes:
 
 1. **`test_what_materialized_*`** (3 tests in `test_log/`) - "Materializations not tracked for local execution". Would need to implement materialization event tracking for local builds (currently only tracked for RE).
 
-2. **`test_attr_default_coercion.py`** (in collect_ignore) - kuro doesn't validate label defaults at rule definition time. Could add validation in `AttrType::Label` coercion for default values.
+2. ~~**`test_attr_default_coercion.py`** (in collect_ignore) - kuro doesn't validate label defaults at rule definition time. Could add validation in `AttrType::Label` coercion for default values.~~ **FIXED**: Added `strict_label_parsing` mode to `BuildAttrCoercionContext` - bare names without `:` or `//` now fail at bzl evaluation time. Moved from `collect_ignore` to active tests.
 
 ### Investigate Further
 

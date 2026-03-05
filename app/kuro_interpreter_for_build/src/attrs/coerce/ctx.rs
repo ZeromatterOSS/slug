@@ -151,6 +151,10 @@ pub struct BuildAttrCoercionContext {
     /// Populated when a target with `attr.output()` attributes is recorded.
     /// Allows other targets to reference output files by bare filename as deps.
     output_file_registry: RefCell<HashMap<String, String>>,
+    /// When true, disables the Bazel-compatible bare-name fallback in label coercion
+    /// (e.g., `"foo"` → `":foo"`). Used during bzl file evaluation where label defaults
+    /// must be explicit (containing `:` or `//`), matching Bazel's strict validation.
+    strict_label_parsing: bool,
 }
 
 impl Debug for BuildAttrCoercionContext {
@@ -185,7 +189,15 @@ impl BuildAttrCoercionContext {
             dict_interner: AttrCoercionInterner::new(),
             select_interner: AttrCoercionInterner::new(),
             output_file_registry: RefCell::new(HashMap::new()),
+            strict_label_parsing: false,
         }
+    }
+
+    /// Enable strict label parsing mode, which disables the bare-name-to-`:name` fallback.
+    /// Use this when creating a coercion context for bzl file evaluation (attr defaults).
+    pub fn with_strict_label_parsing(mut self) -> Self {
+        self.strict_label_parsing = true;
+        self
     }
 
     /// Register an output file label for Bazel-compatible output file reference resolution.
@@ -307,7 +319,7 @@ impl BuildAttrCoercionContext {
                     );
                 }
             },
-            Err(_first_err) => {
+            Err(first_err) => {
                 // Bazel-compatible: if the value looks like an absolute label with a cell
                 // reference (e.g., "@com_google_absl_py//absl/testing:parameterized"),
                 // create a placeholder label using an unchecked cell name. This lets BUILD
@@ -340,6 +352,11 @@ impl BuildAttrCoercionContext {
                 } else {
                     false
                 };
+                if is_bare_name && self.strict_label_parsing {
+                    // In strict mode (bzl file attr defaults), bare names are not valid.
+                    // Propagate the original parse error to get the standard error message.
+                    return Err(first_err);
+                }
                 if is_bare_name && !is_source_file {
                     // Bazel-compatible: check if this bare name is a known output file
                     // from another target in this package (declared with attr.output()).
