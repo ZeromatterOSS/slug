@@ -112,8 +112,6 @@ _WINDOWS_SKIP_TESTS = {
     "test_cancellation_bxl": "Windows subprocess does not support signal.SIGINT",
     # Uses 'ln -s' to create symlinks, which is not available on Windows
     "test_hash_all_commands_key_change_deps": "Uses 'ln -s' Unix symlink command (not available on Windows)",
-    # Windows file locking: kuro produces different error tag than IO_MATERIALIZER_FILE_BUSY
-    "test_build_file_race": "Windows: kuro produces different error tag than IO_MATERIALIZER_FILE_BUSY",
 }
 
 # Individual test functions to skip (mapped to [test_file_path, test_function_name])
@@ -165,7 +163,6 @@ SKIP_TESTS = {
     "test_buck2_fail": "Requires --remote-only Remote Execution (RE)",
     "test_targets_error_categorization": "Checks Buck2-specific source location in errors",
     "test_daemon_abort": "Checks Buck2-specific crash signal output format",
-    # test_build_file_race is in _WINDOWS_SKIP_TESTS (Windows-only issue)
     "test_download_failure": "Requires --remote-only Remote Execution (RE) and BUCK2_TEST_FAIL_RE_DOWNLOADS",
     "test_re_execute_failure": "Requires Remote Execution (RE) for re-execute failure testing",
     # command_report tests requiring Meta-internal env vars or features

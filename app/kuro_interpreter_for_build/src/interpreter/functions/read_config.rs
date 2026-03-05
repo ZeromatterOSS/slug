@@ -25,7 +25,7 @@ pub(crate) fn register_read_config(globals: &mut GlobalsBuilder) {
     fn read_config<'v>(
         #[starlark(require = pos)] section: StringValue<'v>,
         #[starlark(require = pos)] key: StringValue<'v>,
-        #[starlark(require = pos, default = NoneOr::None)] default: NoneOr<Value<'v>>,
+        #[starlark(default = NoneOr::None)] default: NoneOr<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         // Limit the scope of build_context borrow so eval can be used after
@@ -50,7 +50,7 @@ pub(crate) fn register_read_config(globals: &mut GlobalsBuilder) {
     fn read_root_config<'v>(
         #[starlark(require = pos)] section: StringValue<'v>,
         #[starlark(require = pos)] key: StringValue<'v>,
-        #[starlark(require = pos, default = NoneOr::None)] default: NoneOr<StringValue<'v>>,
+        #[starlark(default = NoneOr::None)] default: NoneOr<StringValue<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneOr<StringValue<'v>>> {
         // Limit the scope of build_context borrow so eval can be used after
