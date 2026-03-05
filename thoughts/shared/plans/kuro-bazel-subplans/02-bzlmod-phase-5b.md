@@ -57,7 +57,7 @@ Bridge the gap between bzlmod module resolution and Kuro's build system. This ph
 
 - [x] `@bazel_skylib//:defs.bzl` loads successfully after bzlmod resolution
 - [x] `@rules_cc//cc:defs.bzl` loads after fetching from BCR - **COMPLETE**
-- [ ] `@local_module//:target` works with local_path_override
+- [x] `@local_module//:target` works with local_path_override (2026-03-05: verified via test_local_path_override.py - 3/3 tests pass)
 - [x] Repo aliasing works: `bazel_dep(name="foo", repo_name="bar")` makes `@bar` available
 - [x] Transitive repo_name aliases created via `collect_transitive_repo_aliases()`
 - [ ] Extension-generated repos accessible via `@repo_name//:target`
