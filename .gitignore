@@ -15,3 +15,9 @@ bazel-external
 # Claude Code ctags index
 .claude/tags
 kuro
+
+# Python bytecode and test caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
