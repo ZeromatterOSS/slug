@@ -87,6 +87,21 @@ collect_ignore = [
     "core/resource_control/test_hybrid_execution_resource_control.py",  # Requires cgroup + RE
     "core/resource_control/test_instruction_count.py",         # Requires cgroup instruction counting
     "core/resource_control/test_memory_reporting.py",          # Requires cgroup memory reporting
+
+    # tests/e2e/ - Meta-internal inplace tests requiring real workspace or non-existent test data
+    # These tests use @buck_test(inplace=True/False) which conflicts with our isolated mode,
+    # and their test data directories (e.g. bxl/simple) don't exist in the OSS repo.
+    str(TESTS_DIR / "e2e"),
+
+    # Template files in e2e_util - these are not standalone tests, they are templates
+    # meant to be injected/copied as test scripts via bxl_test/check_dependencies_test rules.
+    str(TESTS_DIR / "buck2" / "tests" / "e2e_util" / "test_bxl_template.py"),
+    str(TESTS_DIR / "buck2" / "tests" / "e2e_util" / "test_bxl_check_dependencies_template.py"),
+    str(TESTS_DIR / "e2e_util" / "test_bxl_template.py"),
+    str(TESTS_DIR / "e2e_util" / "test_bxl_check_dependencies_template.py"),
+
+    # Manual tests - standalone scripts with different import structure
+    str(TESTS_DIR / "manual_test"),
 ]
 
 # Tests to skip specifically on Windows (platform limitation)
