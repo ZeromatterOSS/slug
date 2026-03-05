@@ -84,6 +84,14 @@ impl EventSubscriber for XmlTestResultWriter {
             {
                 let status_enum = kuro_data::TestStatus::try_from(result.status)
                     .unwrap_or(kuro_data::TestStatus::Unknown);
+                // Listing results are metadata, not test executions — skip them.
+                if matches!(
+                    status_enum,
+                    kuro_data::TestStatus::ListingSuccess
+                        | kuro_data::TestStatus::ListingFailed
+                ) {
+                    continue;
+                }
                 let (status_str, type_str) = match status_enum {
                     kuro_data::TestStatus::Pass => ("pass", "SUCCESS"),
                     kuro_data::TestStatus::Fail => ("fail", "FAILURE"),
