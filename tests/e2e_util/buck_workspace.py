@@ -252,7 +252,18 @@ async def _get_common_dir() -> Path:
     """
     # Check if mkscratch is available, fall back to tempfile.gettempdir() if not
     if shutil.which("mkscratch") is None:
-        return Path(tempfile.gettempdir())
+        tmpdir = Path(tempfile.gettempdir())
+        # On Windows, the TEMP/TMP env vars may use 8.3 short path names (e.g.,
+        # "WALTER~1" instead of "Walter Gray").  8.3 short names may be disabled
+        # on the system, causing shutil.copytree to fail with [WinError 3].
+        # Resolve to the long-form path using the Windows API.
+        if sys.platform == "win32":
+            import ctypes
+
+            buf = ctypes.create_unicode_buffer(32768)
+            if ctypes.windll.kernel32.GetLongPathNameW(str(tmpdir), buf, 32768):
+                tmpdir = Path(buf.value)
+        return tmpdir
 
     # Need to use `--hash` over `--subdir` here because the tmp path would be too long and
     # Eden would fail with `Socket path too large to fit into sockaddr_un` otherwise
@@ -408,7 +419,14 @@ def _copytree(
         s = src / item
         d = dst / item
         if os.path.isdir(s):
-            shutil.copytree(s, d, symlinks, ignore, dirs_exist_ok=True)
+            shutil.copytree(
+                s,
+                d,
+                symlinks,
+                ignore,
+                dirs_exist_ok=True,
+                ignore_dangling_symlinks=True,
+            )
         else:
             shutil.copy2(s, d)
 

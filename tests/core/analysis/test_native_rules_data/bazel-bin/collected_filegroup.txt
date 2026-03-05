@@ -1,1 +1,0 @@
-../buck-out/v2/gen/native_rules_test/1ef78538d8598cb2/__collected_filegroup__/collected_filegroup.txt

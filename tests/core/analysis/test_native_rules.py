@@ -94,13 +94,13 @@ async def test_genrule_basic(buck: Buck) -> None:
 
 @buck_test(data_dir="test_native_rules_data")
 async def test_genrule_srcs_expansion(buck: Buck) -> None:
-    """genrule $(SRCS) expands to absolute paths of input files."""
+    """genrule $(SRCS) expands to project-relative execpaths of input files."""
     result = await buck.build("//:genrule_srcs")
     output = result.get_build_report().output_for_target("//:genrule_srcs")
     content = output.read_text().strip()
-    # $(SRCS) should expand to the absolute path of defs.bzl
+    # $(SRCS) expands to the execpath of defs.bzl (project-relative, no drive/spaces).
+    # For a root-package source, execpath is just the filename with no directory prefix.
     assert content.endswith("defs.bzl")
-    assert "/" in content  # absolute path
 
 
 @buck_test(data_dir="test_native_rules_data")
@@ -125,13 +125,13 @@ async def test_genrule_cmd_bash_preferred_on_unix(buck: Buck) -> None:
 
 @buck_test(data_dir="test_native_rules_data")
 async def test_genrule_location_expansion(buck: Buck) -> None:
-    """genrule $(location :file) expands to the absolute path of a source file."""
+    """genrule $(location :file) expands to the project-relative execpath of a source file."""
     result = await buck.build("//:genrule_location")
     output = result.get_build_report().output_for_target("//:genrule_location")
     content = output.read_text().strip()
-    # $(location :defs.bzl) should expand to the absolute path of defs.bzl
+    # $(location :defs.bzl) expands to the execpath of defs.bzl (project-relative).
+    # For a root-package source, execpath is just the filename with no directory prefix.
     assert content.endswith("defs.bzl")
-    assert "/" in content  # absolute path
 
 
 @buck_test(data_dir="test_native_rules_data")

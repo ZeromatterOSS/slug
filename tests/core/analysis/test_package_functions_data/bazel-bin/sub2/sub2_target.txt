@@ -1,1 +1,0 @@
-../../buck-out/v2/gen/package_functions_test/1ef78538d8598cb2/sub2/__sub2_target__/sub2_target.txt

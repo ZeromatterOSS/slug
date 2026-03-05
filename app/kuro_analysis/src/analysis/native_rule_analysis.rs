@@ -150,7 +150,9 @@ fn analyze_genrule(
     };
     let cmd_raw = read_configured_string("cmd");
     let cmd_bash_raw = read_configured_string("cmd_bash");
-    let cmd = if !cmd_bash_raw.is_empty() && cfg!(unix) {
+    // Prefer cmd_bash when non-empty: kuro always executes via bash (even on Windows),
+    // so cmd_bash takes priority over cmd on all platforms.
+    let cmd = if !cmd_bash_raw.is_empty() {
         cmd_bash_raw
     } else {
         cmd_raw

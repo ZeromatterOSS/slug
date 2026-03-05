@@ -344,8 +344,36 @@ if NANO_PRELUDE_DIR.exists():
 # so test data BUILD files that invoke `fbpython` work on non-Meta systems.
 def _setup_fbpython_shim():
     import shutil
-    python3 = shutil.which("python3")
-    if python3 and not shutil.which("fbpython"):
+    if shutil.which("fbpython"):
+        return  # Already available natively
+
+    if sys.platform == "win32":
+        # On Windows, copy the running Python executable to fbpython.exe so that
+        # kuro's action executor (which uses CreateProcess) can spawn it directly.
+        # sys.executable gives the exact Python running pytest — most reliable.
+        import ctypes
+
+        python_exe = sys.executable
+        if not python_exe or not os.path.isfile(python_exe):
+            return
+
+        shim_dir = Path(tempfile.mkdtemp(prefix="kuro_shims_"))
+        # Resolve to long path to avoid 8.3 short-name issues (e.g., WALTER~1)
+        buf = ctypes.create_unicode_buffer(32768)
+        if ctypes.windll.kernel32.GetLongPathNameW(str(shim_dir), buf, 32768):
+            shim_dir = Path(buf.value)
+
+        shim_exe = shim_dir / "fbpython.exe"
+        shutil.copy2(python_exe, shim_exe)
+
+        current_path = os.environ.get("PATH", "")
+        # Windows PATH separator is ';'; prepend the shim dir
+        os.environ["PATH"] = f"{shim_dir};{current_path}"
+    else:
+        # Unix: create a #!/bin/sh wrapper script
+        python3 = shutil.which("python3")
+        if not python3:
+            return
         shim_dir = Path(tempfile.mkdtemp(prefix="kuro_shims_"))
         shim = shim_dir / "fbpython"
         shim.write_text(f"#!/bin/sh\nexec {python3} \"$@\"\n")

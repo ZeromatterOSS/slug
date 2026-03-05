@@ -1,0 +1,2 @@
+write_package_value("test.key", "root_value")
+write_package_value("test.dict", {"name": "root_dict", "value": 42})

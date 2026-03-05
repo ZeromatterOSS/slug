@@ -1,0 +1,3 @@
+write_package_value("test.key", "inner_value", overwrite = True)
+write_package_value("test.dict", {"name": "inner_dict", "value": 100}, overwrite = True)
+write_package_value("test.sub_dir", "value")
