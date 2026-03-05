@@ -159,6 +159,7 @@ def golden_replace_temp_path(*, output: str, rel_path: str, tmp_path: str) -> No
     )
 
 
+
 def sanitize_hashes(s: str) -> str:
     # Remote message hashes
     s = re.sub(r"\b[0-9]{16,}\b", "<STRING_HASH>", s)

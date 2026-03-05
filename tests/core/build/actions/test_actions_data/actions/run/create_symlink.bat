@@ -8,4 +8,4 @@
 
 @echo off
 
-mklink %1 %~f0
+mklink "%~1" "%~f0"

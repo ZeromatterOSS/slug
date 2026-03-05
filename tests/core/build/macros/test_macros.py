@@ -26,10 +26,10 @@ async def test_run_with_source_macros(buck: Buck) -> None:
     assert result.stdout.endswith(f"source{sep}bar\n")
 
     result = await buck.run("//source:cat_file")
-    assert result.stdout == "foo file\n"
+    assert result.stdout.replace("\r\n", "\n") == "foo file\n"
 
     result = await buck.run("//source:cat_dir")
-    assert result.stdout == "bar file\n"
+    assert result.stdout.replace("\r\n", "\n") == "bar file\n"
 
 
 @buck_test()

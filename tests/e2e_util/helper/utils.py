@@ -105,7 +105,9 @@ def replace_hash(s: str) -> str:
 
 
 def replace_digest(s: str) -> str:
-    return re.sub(r"\b[0-9a-f]{40}:[0-9]{1,3}\b", "<DIGEST>", s)
+    # Handle both SHA-1 (40 chars) and SHA-256 (64 chars) digests
+    s = re.sub(r"\b[0-9a-f]{40}:[0-9]{1,}\b", "<DIGEST>", s)
+    return re.sub(r"\b[0-9a-f]{64}:[0-9]{1,}\b", "<DIGEST>", s)
 
 
 def read_invocation_record(record: Path) -> typing.Dict[str, typing.Any]:

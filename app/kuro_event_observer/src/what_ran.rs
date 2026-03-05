@@ -404,13 +404,17 @@ pub fn worker_command_as_fallback_to_string(command: &kuro_data::WorkerCommand) 
 
 pub fn command_to_string<'a>(command: impl Into<Command<'a>>) -> String {
     // TODO: the `env` command and `shlex` quoting below is POSIX-specific. How can we best support windows?
+    // We normalize backslashes to forward slashes in env var values (file paths)
+    // so that golden files work cross-platform.
     let command = command.into();
     let mut cmd = "env --chdir=\"$(kuro root --kind project)\" --".to_owned();
 
     for entry in command.env.iter() {
         cmd.push(' ');
+        // Normalize Windows path separators in env var values for cross-platform display
+        let value = entry.value.replace('\\', "/");
         cmd.push_str(
-            shlex::try_quote(format!("{}={}", entry.key, entry.value).as_ref())
+            shlex::try_quote(format!("{}={}", entry.key, value).as_ref())
                 .expect("Null byte unexpected")
                 .as_ref(),
         );

@@ -355,13 +355,11 @@ async def test_invalid_command(buck: Buck) -> None:
         buck.build("//run_bad:run_invalid_command_local"),
         stderr_regex="non-zero exit code.*no exit code",
     )
-    if platform.system() == "Linux":
-        expected_error = "non-zero exit code"
-    else:
-        expected_error = "cannot find binary path"
+    # kuro runs commands locally even when local_only=False (no RE support)
+    # so the error message matches the local failure pattern on all platforms
     await expect_failure(
         buck.build("//run_bad:run_invalid_command_remote"),
-        stderr_regex=expected_error,
+        stderr_regex="non-zero exit code.*no exit code",
     )
 
 

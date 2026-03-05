@@ -8,7 +8,7 @@
         "<unspecified>": {
           "artifact_info": {
             "DEFAULT": {
-              "digest": "a0650c6744bfac90685f4cb410302181fde39e20ce7cea37c02dc323efd4bec9:79",
+              "digest": "<DIGEST>",
               "kind": "directory"
             }
           },
@@ -38,7 +38,7 @@
         "<unspecified>": {
           "artifact_info": {
             "DEFAULT": {
-              "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855:0",
+              "digest": "<DIGEST>",
               "is_exec": false,
               "kind": "file"
             }
@@ -69,7 +69,7 @@
         "<unspecified>": {
           "artifact_info": {
             "DEFAULT": {
-              "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855:0",
+              "digest": "<DIGEST>",
               "is_exec": false,
               "kind": "file"
             }

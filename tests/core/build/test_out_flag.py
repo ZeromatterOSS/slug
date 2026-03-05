@@ -94,8 +94,8 @@ async def test_out_stdout_multiple(buck: Buck) -> None:
     # The e2e test runner adds a `--build-report` flag in order to be able
     # to parse out failures. In normal usage of `--out -` there wouldn't be this
     # extra line of JSON on the stdout, we'd _just_ get the requested outputs.
-    a, b, build_report, trailing = result.stdout.split("\n")
-    assert (a, b) == ("a", "b") or (a, b) == ("b", "a")
+    a, b, build_report, trailing = result.stdout.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    assert (a.rstrip("\r"), b.rstrip("\r")) == ("a", "b") or (a.rstrip("\r"), b.rstrip("\r")) == ("b", "a")
     assert build_report.startswith("{")
     assert trailing == ""
 
