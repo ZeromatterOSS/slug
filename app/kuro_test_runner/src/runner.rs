@@ -22,6 +22,7 @@ use kuro_test_api::data::ConfiguredTargetHandle;
 use kuro_test_api::data::ExecuteResponse;
 use kuro_test_api::data::ExecutionResult2;
 use kuro_test_api::data::ExecutionStatus;
+use kuro_test_api::data::ExecutionStream;
 use kuro_test_api::data::ExternalRunnerSpec;
 use kuro_test_api::data::ExternalRunnerSpecValue;
 use kuro_test_api::data::RequiredLocalResources;
@@ -30,6 +31,7 @@ use kuro_test_api::data::TestStage;
 use kuro_test_api::data::TestStatus;
 use kuro_test_api::grpc::TestOrchestratorClient;
 use parking_lot::Mutex;
+use sorted_vector_map::SortedVectorMap;
 
 use crate::config::Config;
 use crate::config::EnvValue;
@@ -124,20 +126,21 @@ impl KuroTestRunner {
         &self,
         spec: ExternalRunnerSpec,
     ) -> kuro_error::Result<ExecuteResponse> {
-        let stage = TestStage::Testing {
-            suite: spec.target.target,
-            testcases: Vec::new(),
-            variant: None,
-        };
+        let suite = format!(
+            "{}//{}:{}",
+            spec.target.cell, spec.target.package, spec.target.target
+        );
+        let target_handle = spec.target.handle.clone();
+        let host_sharing_requirements = HostSharingRequirements::default();
 
-        let config_args = self.config.test_arg.iter().map(|arg| ArgValue {
+        let config_args: Vec<ArgValue> = self.config.test_arg.iter().map(|arg| ArgValue {
             content: ArgValueContent::ExternalRunnerSpecValue(ExternalRunnerSpecValue::Verbatim(
                 arg.to_owned(),
             )),
             format: None,
-        });
+        }).collect();
 
-        let command = spec
+        let base_command: Vec<ArgValue> = spec
             .command
             .into_iter()
             .map(|spec_value| ArgValue {
@@ -153,19 +156,7 @@ impl KuroTestRunner {
             .iter()
             .map(|s| s.parse())
             .collect::<kuro_error::Result<_>>()?;
-        let config_env = config_env.iter().map(|EnvValue { name, value }| {
-            (
-                name.to_owned(),
-                ArgValue {
-                    content: ArgValueContent::ExternalRunnerSpecValue(
-                        ExternalRunnerSpecValue::Verbatim(value.to_owned()),
-                    ),
-                    format: None,
-                },
-            )
-        });
-
-        let env = spec
+        let env: SortedVectorMap<String, ArgValue> = spec
             .env
             .into_iter()
             .map(|(key, value)| {
@@ -177,24 +168,102 @@ impl KuroTestRunner {
                     },
                 )
             })
-            .chain(config_env)
+            .chain(config_env.iter().map(|EnvValue { name, value }| {
+                (
+                    name.to_owned(),
+                    ArgValue {
+                        content: ArgValueContent::ExternalRunnerSpecValue(
+                            ExternalRunnerSpecValue::Verbatim(value.to_owned()),
+                        ),
+                        format: None,
+                    },
+                )
+            }))
             .collect();
 
-        let target_handle = spec.target.handle;
-        let host_sharing_requirements = HostSharingRequirements::default();
-        let pre_create_dirs = Vec::new();
-        let executor_override = None;
+        // Step 1: Listing stage — run the command with --list to discover test cases.
+        // This causes the orchestrator to emit a TestListing build signal for the
+        // critical path, and allows the test runner protocol to discover test case names.
+        let listing_command: Vec<ArgValue> = base_command
+            .iter()
+            .cloned()
+            .chain(std::iter::once(ArgValue {
+                content: ArgValueContent::ExternalRunnerSpecValue(
+                    ExternalRunnerSpecValue::Verbatim("--list".to_owned()),
+                ),
+                format: None,
+            }))
+            .collect();
+
+        let listing_stage = TestStage::Listing {
+            suite: suite.clone(),
+            cacheable: false,
+        };
+
+        let listing_response = self
+            .orchestrator_client
+            .execute2(
+                listing_stage,
+                target_handle.clone(),
+                listing_command,
+                env.clone(),
+                Duration::from_secs(self.config.timeout),
+                host_sharing_requirements.clone(),
+                Vec::new(),
+                None,
+                RequiredLocalResources { resources: vec![] },
+            )
+            .await?;
+
+        // Parse listing output to get test case names.
+        let testcases = match &listing_response {
+            ExecuteResponse::Result(result) => {
+                // Report listing result to the orchestrator.
+                let listing_status = match result.status {
+                    ExecutionStatus::Finished { exitcode: 0 } => TestStatus::LISTING_SUCCESS,
+                    _ => TestStatus::LISTING_FAILED,
+                };
+                let listing_result = TestResult {
+                    target: target_handle.clone(),
+                    name: format!("{suite} - listing"),
+                    status: listing_status,
+                    msg: None,
+                    duration: Some(result.execution_time),
+                    details: String::new(),
+                    max_memory_used_bytes: None,
+                };
+                self.report_test_result(listing_result)
+                    .await
+                    .buck_error_context("Listing result reporting failed")?;
+
+                // Extract test case names from listing stdout (one per line).
+                let ExecutionStream::Inline(stdout) = &result.stdout;
+                String::from_utf8_lossy(stdout)
+                    .lines()
+                    .map(|l| l.trim().to_owned())
+                    .filter(|l| !l.is_empty())
+                    .collect()
+            }
+            ExecuteResponse::Cancelled(_) => return Ok(listing_response),
+        };
+
+        // Step 2: Testing stage with discovered test cases.
+        let stage = TestStage::Testing {
+            suite,
+            testcases,
+            variant: None,
+        };
 
         self.orchestrator_client
             .execute2(
                 stage,
                 target_handle,
-                command,
+                base_command,
                 env,
                 Duration::from_secs(self.config.timeout),
                 host_sharing_requirements,
-                pre_create_dirs,
-                executor_override,
+                Vec::new(),
+                None,
                 RequiredLocalResources { resources: vec![] },
             )
             .await

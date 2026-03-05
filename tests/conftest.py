@@ -152,8 +152,6 @@ SKIP_TESTS = {
     "test_file_notify": "Requires RE: file notification during RE upload",
     "test_no_read_through_symlinks": "Requires --remote-only execution strategy",
     "test_no_read_through_source_symlinks_to_file": "Requires --remote-only execution strategy",
-    # Critical path metadata fields not populated in kuro
-    "test_critical_path_test_entries": "TestListing/TestExecution critical path entries not tracked",
     # Restart tests needing specific daemon behavior
     "test_restart_cas_missing": "Tests specific daemon error message not matching kuro",
     "test_restart_disabled": "Tests restart-disabled behavior not matching kuro",

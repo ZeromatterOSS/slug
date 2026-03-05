@@ -529,9 +529,11 @@ Current status: **853 pass, 155 skip** in `tests/core/` (updated 2026-03-04).
 
 These SKIP_TESTS entries could be fixed with code changes:
 
-1. **`test_what_materialized_*`** (3 tests in `test_log/`) - "Materializations not tracked for local execution". Would need to implement materialization event tracking for local builds (currently only tracked for RE).
+1. ~~**`test_what_materialized_*`** (3 tests in `test_log/`) - "Materializations not tracked for local execution". Would need to implement materialization event tracking for local builds (currently only tracked for RE).~~ **FIXED** (2026-03-05): Added `MaterializationStart`/`MaterializationEnd` span events in `local.rs` after `declare_existing`, using `calc_output_count_and_bytes()` for stats.
 
 2. ~~**`test_attr_default_coercion.py`** (in collect_ignore) - kuro doesn't validate label defaults at rule definition time. Could add validation in `AttrType::Label` coercion for default values.~~ **FIXED**: Added `strict_label_parsing` mode to `BuildAttrCoercionContext` - bare names without `:` or `//` now fail at bzl evaluation time. Moved from `collect_ignore` to active tests.
+
+3. ~~**`test_critical_path_test_entries`** in `test_critical_path.py` - "TestListing/TestExecution critical path entries not tracked". `KuroTestRunner::execute_test_from_spec` only performed `TestStage::Testing`, never `TestStage::Listing`.~~ **FIXED** (2026-03-05): Added listing stage in `kuro_test_runner/runner.rs` — runs command with `--list` first, parses test case names from stdout, reports LISTING_SUCCESS/LISTING_FAILED result, then runs testing stage with discovered test cases. Also fixed suite format to use full label (`{cell}//{package}:{target}`).
 
 ### Investigate Further
 

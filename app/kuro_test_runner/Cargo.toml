@@ -16,3 +16,4 @@ kuro_error = { workspace = true }
 kuro_grpc = { workspace = true }
 kuro_test_api = { workspace = true }
 host_sharing = { workspace = true }
+sorted_vector_map = { workspace = true }
