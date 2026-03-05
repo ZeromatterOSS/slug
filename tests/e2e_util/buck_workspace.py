@@ -545,7 +545,9 @@ def buck_test(
         if p not in SKIPPABLE_PLATFORMS:
             raise Exception(f"skip_for_os must specifiy one of {SKIPPABLE_PLATFORMS}")
     if platform.system().lower() in skip_for_os:
-        return lambda *args: None
+        # Return a proper skip marker so parametrized tests remain collectable
+        # (returning `lambda *args: None` makes the test None, causing PytestCollectionWarning)
+        return pytest.mark.skip(reason=f"Skipped on {platform.system()}")
 
     if data_dir is not None and inplace:
         raise Exception(
