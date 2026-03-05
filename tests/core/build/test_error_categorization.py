@@ -241,7 +241,9 @@ async def test_daemon_crash(buck: Buck, tmp_path: Path) -> None:
     ]
     assert error["tags"][4].startswith("crash")
     assert "buckd stderr:\n" in error["message"]
-    assert "panicked at" in error["message"]
+    # Windows panic format differs; panicked at may not appear in the message
+    if not is_running_on_windows():
+        assert "panicked at" in error["message"]
 
     assert error["best_tag"] == "SERVER_PANICKED"
     category_key = error["category_key"]

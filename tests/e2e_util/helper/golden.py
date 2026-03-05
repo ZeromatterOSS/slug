@@ -194,6 +194,15 @@ def sanitize_stderr(s: str) -> str:
     s = re.sub(r"Network: .+", "Network: <NETWORK_STATS>", s)
     # Remove thread ID & path from "panicked at" line
     s = re.sub(r"\([0-9]+\) panicked at .+", "(<THREAD_ID>) panicked at <PATH>", s)
+    # Strip Rust backtrace output (present when RUST_BACKTRACE=1 is set)
+    s = re.sub(r"^[Ss]tack backtrace:.*$", "", s, flags=re.MULTILINE)
+    s = re.sub(r"^\s{1,4}\d+: .+$", "", s, flags=re.MULTILINE)
+    s = re.sub(r"^\s{8,}at .+$", "", s, flags=re.MULTILINE)
+    s = re.sub(r"^note: run with `RUST_BACKTRACE=1` .+$", "", s, flags=re.MULTILINE)
+    # Collapse multiple consecutive blank lines to a single blank line
+    s = re.sub(r"\n{3,}", "\n\n", s)
+    # Collapse multiple trailing newlines to a single newline
+    s = re.sub(r"\n{2,}$", "\n", s)
     return sanitize_hashes(s)
 
 
