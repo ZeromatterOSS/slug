@@ -17,7 +17,7 @@ from buck2.tests.e2e_util.api.buck import Buck
 from buck2.tests.e2e_util.api.buck_result import ExitCodeV2
 from buck2.tests.e2e_util.asserts import expect_failure
 from buck2.tests.e2e_util.buck_workspace import buck_test, env
-from buck2.tests.e2e_util.helper.golden import golden
+from buck2.tests.e2e_util.helper.golden import golden, sanitize_json_strings
 from buck2.tests.e2e_util.helper.utils import read_invocation_record
 
 
@@ -31,7 +31,7 @@ def command_report_test(name: str, command: list[str]) -> None:
         del report["trace_id"]
 
         golden(
-            output=json.dumps(report, indent=2, sort_keys=True),
+            output=json.dumps(sanitize_json_strings(report), indent=2, sort_keys=True),
             rel_path="fixtures/" + name + ".golden.json",
         )
         pass

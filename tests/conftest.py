@@ -143,7 +143,6 @@ SKIP_TESTS = {
     "test_re_execute_failure": "Requires Remote Execution (RE) for re-execute failure testing",
     # command_report tests requiring Meta-internal env vars or features
     "test_command_report_watchman_error": "Requires Watchman integration",
-    "test_command_report_init_daemon_error": "Requires BUCK2_TEST_INIT_DAEMON_ERROR (Meta-internal)",
     "test_exit_result_connection_error": "Requires BUCK2_TEST_FAIL_BUCKD_AUTH (Meta-internal)",
     "test_command_report_post_build_client_error": "Requires BUCK2_TEST_BUILD_ERROR (Meta-internal)",
     "test_what_materialized_csv": "Materializations not tracked for local execution in kuro",

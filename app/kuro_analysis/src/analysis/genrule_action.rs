@@ -36,6 +36,7 @@ use kuro_execute::execute::request::CommandExecutionOutput;
 use kuro_execute::execute::request::CommandExecutionPaths;
 use kuro_execute::execute::request::CommandExecutionRequest;
 use kuro_execute::execute::request::ExecutorPreference;
+use kuro_error::BuckErrorContext;
 use sorted_vector_map::SortedVectorMap;
 
 /// A simple shell command action for native genrule targets.
@@ -75,6 +76,53 @@ impl GenruleAction {
     }
 }
 
+/// Shell-quote a path for bash compatibility.
+///
+/// On Windows, converts the path to MSYS2 POSIX format (`/c/path/to/file`) and
+/// backslash-escapes any spaces or shell-special characters. Double-quoting is
+/// intentionally avoided: when bash is spawned via CreateProcess (Rust `Command`
+/// or Python subprocess), MSYS2 path translation does not apply to double-quoted
+/// Windows paths containing spaces, causing "No such file or directory" even when
+/// the directory exists. The `/drive/path` format with backslash-escaped spaces
+/// works correctly in that context.
+///
+/// On Unix, backslash-escapes special characters.
+fn shell_quote_path(path: &str) -> String {
+    if path.is_empty() {
+        return path.to_owned();
+    }
+    // On Windows, convert C:\... to /c/... (MSYS2 POSIX drive format).
+    let normalized = if cfg!(windows) {
+        let bytes = path.as_bytes();
+        if bytes.len() >= 3 && bytes[1] == b':' && (bytes[2] == b'\\' || bytes[2] == b'/') {
+            let drive = (bytes[0] as char).to_ascii_lowercase();
+            let rest = path[3..].replace('\\', "/");
+            format!("/{}/{}", drive, rest)
+        } else {
+            path.replace('\\', "/")
+        }
+    } else {
+        path.to_owned()
+    };
+    // Backslash-escape shell-special characters (including spaces).
+    // Using backslash escapes rather than double-quoting sidesteps the MSYS2
+    // path-translation issue described in the doc comment above.
+    let needs_escape = normalized
+        .contains(|c: char| matches!(c, ' ' | '\'' | '"' | '(' | ')' | '&' | ';' | '|' | '<' | '>'));
+    if needs_escape {
+        let mut result = String::with_capacity(normalized.len() + 8);
+        for c in normalized.chars() {
+            if matches!(c, ' ' | '\'' | '"' | '(' | ')' | '&' | ';' | '|' | '<' | '>') {
+                result.push('\\');
+            }
+            result.push(c);
+        }
+        result
+    } else {
+        normalized
+    }
+}
+
 /// Expand genrule make variables using resolved absolute paths.
 ///
 /// Handles:
@@ -83,40 +131,47 @@ impl GenruleAction {
 /// - `$(locations label)` - space-separated output paths of label
 /// - `$(execpath label)` - alias for $(location label)
 /// - `$(execpaths label)` - alias for $(locations label)
+///
+/// Paths are shell-quoted to handle spaces and special characters (important on
+/// Windows where user home directories may contain spaces).
 fn expand_genrule_cmd(
     cmd: &str,
     srcs: &[String],
     outs: &[String],
     locations: &[(String, Vec<String>)],
 ) -> String {
-    let srcs_str = srcs.join(" ");
-    let outs_str = outs.join(" ");
-    let first_out = outs.first().map(|s| s.as_str()).unwrap_or("");
-    let first_src = srcs.first().map(|s| s.as_str()).unwrap_or("");
+    let srcs_str = srcs.iter().map(|s| shell_quote_path(s)).collect::<Vec<_>>().join(" ");
+    let outs_str = outs.iter().map(|s| shell_quote_path(s)).collect::<Vec<_>>().join(" ");
+    let first_out_raw = outs.first().map(|s| s.as_str()).unwrap_or("");
+    let first_src_raw = srcs.first().map(|s| s.as_str()).unwrap_or("");
+    let first_out = shell_quote_path(first_out_raw);
+    let first_src = shell_quote_path(first_src_raw);
 
-    // Compute output directory (dirname of first output)
-    let out_dir = std::path::Path::new(first_out)
+    // Compute output directory (dirname of first output) from the raw path,
+    // then apply shell quoting to the result.
+    let out_dir_raw = std::path::Path::new(first_out_raw)
         .parent()
         .and_then(|p| p.to_str())
         .unwrap_or("");
+    let out_dir = shell_quote_path(out_dir_raw);
 
     // Expand $(VARNAME) style make variables
     let mut cmd = cmd
         .replace("$(SRCS)", &srcs_str)
         .replace("$(OUTS)", &outs_str)
-        .replace("$(@D)", out_dir)
-        .replace("$(RULEDIR)", out_dir)
-        .replace("$(GENDIR)", out_dir)
-        .replace("$(BINDIR)", out_dir)
+        .replace("$(@D)", &out_dir)
+        .replace("$(RULEDIR)", &out_dir)
+        .replace("$(GENDIR)", &out_dir)
+        .replace("$(BINDIR)", &out_dir)
         .replace("$(TARGET)", ""); // Not easily available at exec time, skip
 
     // Expand single-char $ substitutions
     if outs.len() == 1 {
-        cmd = cmd.replace("$@", first_out);
+        cmd = cmd.replace("$@", &first_out);
     } else {
-        cmd = cmd.replace("$@", out_dir);
+        cmd = cmd.replace("$@", &out_dir);
     }
-    cmd = cmd.replace("$<", first_src);
+    cmd = cmd.replace("$<", &first_src);
     cmd = cmd.replace("$^", &srcs_str);
 
     // Expand $(location ...) and related patterns.
@@ -193,18 +248,18 @@ fn resolve_location(label: &str, multi: bool, locations: &[(String, Vec<String>)
         // Exact match
         if key == label {
             return if multi {
-                paths.join(" ")
+                paths.iter().map(|p| shell_quote_path(p)).collect::<Vec<_>>().join(" ")
             } else {
-                paths.first().cloned().unwrap_or_default()
+                paths.first().map(|p| shell_quote_path(p)).unwrap_or_default()
             };
         }
         // Name-only match (key name suffix == label name suffix)
         let key_name = key.rsplit(':').next().unwrap_or(key.as_str());
         if key_name == label_name {
             return if multi {
-                paths.join(" ")
+                paths.iter().map(|p| shell_quote_path(p)).collect::<Vec<_>>().join(" ")
             } else {
-                paths.first().cloned().unwrap_or_default()
+                paths.first().map(|p| shell_quote_path(p)).unwrap_or_default()
             };
         }
     }
@@ -258,7 +313,11 @@ impl Action for GenruleAction {
         ctx: &mut dyn ActionExecutionCtx,
         waiting_data: WaitingData,
     ) -> Result<(ActionOutputs, ActionExecutionMetadata), ExecuteError> {
-        // Resolve input artifact paths for make-variable expansion
+        // Resolve input artifact paths for make-variable expansion.
+        // We use project-relative paths (forward-slash, never containing spaces) so that
+        // the generated bash command works on Windows without MSYS2 path-translation issues.
+        // Bash runs with CWD = project root (via `env --chdir`), so relative paths resolve
+        // correctly to the same files.
         let mut srcs_abs_paths: Vec<String> = Vec::new();
         for ag in &self.inputs {
             let values = ctx.artifact_values(ag);
@@ -270,23 +329,31 @@ impl Action for GenruleAction {
                         None
                     };
                 let proj_rel = artifact.resolve_path(ctx.fs(), content_hash.as_ref())?;
-                let abs = ctx.fs().fs().resolve(&proj_rel);
-                srcs_abs_paths.push(abs.to_string());
+                srcs_abs_paths.push(proj_rel.to_string());
             }
         }
 
-        // Resolve output artifact paths for make-variable expansion
+        // Resolve output artifact paths for make-variable expansion and pre-create output dirs.
+        // Genrule commands (like `echo foo > $@`) require the parent directory to exist.
+        // Use project-relative paths for the bash command (no spaces, no Windows drive issues).
         let mut outs_abs_paths: Vec<String> = Vec::new();
         for ba in &self.outputs {
             let proj_rel = ctx.fs().resolve_build(
                 ba.get_path(),
                 Some(&ContentBasedPathHash::for_output_artifact()),
             )?;
-            let abs = ctx.fs().fs().resolve(&proj_rel);
-            outs_abs_paths.push(abs.to_string());
+            // Ensure the parent directory exists so the command can write to the output file.
+            // Genrule semantics (matching Bazel) require output dirs to be pre-created.
+            if let Some(parent) = proj_rel.parent() {
+                let abs_parent = ctx.fs().fs().resolve(parent);
+                std::fs::create_dir_all(abs_parent.as_path())
+                    .buck_error_context("Failed to create genrule output directory")?;
+            }
+            outs_abs_paths.push(proj_rel.to_string());
         }
 
-        // Resolve location mapping artifact paths for $(location ...) expansion
+        // Resolve location mapping artifact paths for $(location ...) expansion.
+        // Again use project-relative paths.
         let mut location_resolved: Vec<(String, Vec<String>)> =
             Vec::with_capacity(self.location_mappings.len());
         for (label_key, ags) in &self.location_mappings {
@@ -301,8 +368,7 @@ impl Action for GenruleAction {
                             None
                         };
                     let proj_rel = artifact.resolve_path(ctx.fs(), content_hash.as_ref())?;
-                    let abs = ctx.fs().fs().resolve(&proj_rel);
-                    paths.push(abs.to_string());
+                    paths.push(proj_rel.to_string());
                 }
             }
             location_resolved.push((label_key.clone(), paths));

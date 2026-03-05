@@ -269,6 +269,28 @@ def sanitize_python(s: str, project_dir: Path) -> str:
     return s
 
 
+def sanitize_json_strings(obj: typing.Any) -> typing.Any:
+    """Recursively sanitize all string values in a JSON-like object using sanitize_stderr.
+
+    This is useful for JSON reports where error message strings may contain
+    Rust backtrace output (when RUST_BACKTRACE=1 is set).
+    """
+    if isinstance(obj, str):
+        result = sanitize_stderr(obj)
+        # Preserve original trailing newline behavior: sanitize_stderr may add
+        # a trailing '\n' for backtrace cleanup, but JSON string values that
+        # didn't originally end with '\n' should not get one added.
+        if not obj.endswith("\n") and result.endswith("\n"):
+            result = result.rstrip("\n")
+        return result
+    elif isinstance(obj, dict):
+        return {k: sanitize_json_strings(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_json_strings(item) for item in obj]
+    else:
+        return obj
+
+
 def strip_waiting_on(s: str) -> str:
     # Strip "Waiting on" lines
     return "\n".join(filter(lambda x: "Waiting on" not in x, s.splitlines()))
