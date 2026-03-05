@@ -1,6 +1,6 @@
 [repositories]
     root = .
-    fake_prelude = cell1/kuro/fake_prelude
+    fake_prelude = cell1/buck2/fake_prelude
     cell1 = cell1
     cell2 = cell2
     cell3a = dir3/cell3a

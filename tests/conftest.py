@@ -89,6 +89,16 @@ collect_ignore = [
     "core/resource_control/test_memory_reporting.py",          # Requires cgroup memory reporting
 ]
 
+# Tests to skip specifically on Windows (platform limitation)
+_WINDOWS_SKIP_TESTS = {
+    # signal.SIGINT (value 2) is not supported for send_signal on Windows subprocesses;
+    # only CTRL_C_EVENT and CTRL_BREAK_EVENT are supported.
+    "test_cancellation": "Windows subprocess does not support signal.SIGINT",
+    "test_cancellation_bxl": "Windows subprocess does not support signal.SIGINT",
+    # Uses 'ln -s' to create symlinks, which is not available on Windows
+    "test_hash_all_commands_key_change_deps": "Uses 'ln -s' Unix symlink command (not available on Windows)",
+}
+
 # Individual test functions to skip (mapped to [test_file_path, test_function_name])
 SKIP_TESTS = {
     # Buck2-specific modifier tests within otherwise-working test files
@@ -144,6 +154,8 @@ SKIP_TESTS = {
     # command_report tests requiring Meta-internal env vars or features
     "test_command_report_watchman_error": "Requires Watchman integration",
     "test_exit_result_connection_error": "Requires BUCK2_TEST_FAIL_BUCKD_AUTH (Meta-internal)",
+    "test_kill_error": "Requires BUCK2_TEST_FAIL_BUCKD_AUTH (Meta-internal) and kuro clean doesn't bypass daemon auth",
+    "test_clean_error": "Requires BUCK2_TEST_FAIL_BUCKD_AUTH (Meta-internal) and kuro clean doesn't bypass daemon auth",
     "test_command_report_post_build_client_error": "Requires BUCK2_TEST_BUILD_ERROR (Meta-internal)",
     "test_what_materialized_csv": "Materializations not tracked for local execution in kuro",
     "test_what_materialized_sorted": "Materializations not tracked for local execution in kuro",
@@ -365,6 +377,9 @@ def _setup_fbpython_shim():
 
         shim_exe = shim_dir / "fbpython.exe"
         shutil.copy2(python_exe, shim_exe)
+        # Also create python3.exe shim: on Windows "python3" is a Store stub,
+        # but test data (defs.bzl) may invoke "python3 -c ...".
+        shutil.copy2(python_exe, shim_dir / "python3.exe")
 
         current_path = os.environ.get("PATH", "")
         # Windows PATH separator is ';'; prepend the shim dir
@@ -462,6 +477,13 @@ def pytest_collection_modifyitems(items):
             item.add_marker(
                 pytest.mark.skip(reason=SKIP_TESTS[skip_key])
             )
+        # Skip tests that use SIGINT on Windows (signal.SIGINT unsupported in subprocesses)
+        if sys.platform == "win32":
+            base_name = item.originalname if hasattr(item, "originalname") else item.name
+            if base_name in _WINDOWS_SKIP_TESTS:
+                item.add_marker(
+                    pytest.mark.skip(reason=_WINDOWS_SKIP_TESTS[base_name])
+                )
 
 
 def pytest_configure(config):
