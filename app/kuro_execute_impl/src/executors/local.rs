@@ -60,6 +60,7 @@ use kuro_execute::directory::extract_artifact_value;
 use kuro_execute::directory::insert_entry;
 use kuro_execute::entry::HashingInfo;
 use kuro_execute::entry::build_entry_from_disk;
+use kuro_execute::output_size::OutputSize;
 use kuro_execute::execute::action_digest::ActionDigest;
 use kuro_execute::execute::blocking::BlockingExecutor;
 use kuro_execute::execute::clean_output_paths::CleanOutputPaths;
@@ -1121,7 +1122,41 @@ impl LocalExecutor {
             .iter()
             .map(|(p, _)| p.clone())
             .collect();
+        // Collect stats before to_declare is consumed so we can emit materialization events.
+        let matl_stats: Vec<(ProjectRelativePathBuf, u64, u64)> = to_declare
+            .iter()
+            .map(|p| {
+                let counts = p.artifact.calc_output_count_and_bytes();
+                (p.path.clone(), counts.count, counts.bytes)
+            })
+            .collect();
         self.materializer.declare_existing(to_declare).await?;
+        // Emit MaterializationStart/End events for locally-produced artifacts so that
+        // `kuro log what-materialized` reports them.
+        if let Some(dispatcher) = get_dispatcher_opt() {
+            for (path, file_count, total_bytes) in matl_stats {
+                let path_str = path.as_str().to_owned();
+                dispatcher.span(
+                    kuro_data::MaterializationStart { action_digest: None },
+                    || {
+                        (
+                            (),
+                            kuro_data::MaterializationEnd {
+                                action_digest: None,
+                                file_count,
+                                total_bytes,
+                                path: path_str,
+                                success: true,
+                                error: None,
+                                method: Some(
+                                    kuro_data::MaterializationMethod::Write as i32,
+                                ),
+                            },
+                        )
+                    },
+                );
+            }
+        }
         kuro_util::future::try_join_all(output_path_to_content_based_path_copies.into_iter().map(
             |(path, value, copied_artifacts)| {
                 self.materializer

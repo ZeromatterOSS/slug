@@ -171,9 +171,6 @@ SKIP_TESTS = {
     "test_kill_error": "Requires BUCK2_TEST_FAIL_BUCKD_AUTH (Meta-internal) and kuro clean doesn't bypass daemon auth",
     "test_clean_error": "Requires BUCK2_TEST_FAIL_BUCKD_AUTH (Meta-internal) and kuro clean doesn't bypass daemon auth",
     "test_command_report_post_build_client_error": "Requires BUCK2_TEST_BUILD_ERROR (Meta-internal)",
-    "test_what_materialized_csv": "Materializations not tracked for local execution in kuro",
-    "test_what_materialized_sorted": "Materializations not tracked for local execution in kuro",
-    "test_what_materialized_aggregated": "Materializations not tracked for local execution in kuro",
     "test_what_uploaded_csv": "Requires Remote Execution (RE) uploads not available",
     "test_what_uploaded_aggregated": "Requires Remote Execution (RE) uploads not available",
     # build modifiers tests - Buck2-specific ?modifier syntax for build command
