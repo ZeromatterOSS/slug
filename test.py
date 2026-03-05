@@ -396,6 +396,33 @@ def test(package_args: list[str]) -> None:
     run(["cargo", "test", "--doc", *extra_args, *package_args], timeout=timeout_sec)
 
 
+def run_python_tests(kuro_binary: str) -> None:
+    """Run Python integration tests in tests/core/ using pytest."""
+    print_running("pytest tests/core/")
+    # On Windows, kuro binary may be named kuro.exe
+    binary_path = Path(kuro_binary)
+    if is_windows() and not binary_path.exists():
+        exe_path = binary_path.with_suffix(".exe")
+        if exe_path.exists():
+            kuro_binary = str(exe_path)
+    env = os.environ.copy()
+    env["TEST_EXECUTABLE"] = kuro_binary
+    # 30 minutes should be enough for all integration tests
+    timeout_sec = 30 * 60
+    run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/core/",
+            "-q",
+            "--tb=short",
+        ],
+        timeout=timeout_sec,
+        env=env,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -415,6 +442,12 @@ def main() -> None:
         action="store",
         default="buck2",
         help="Path to a buck2 binary",
+    )
+    parser.add_argument(
+        "--kuro",
+        action="store",
+        default=None,
+        help="Path to a kuro binary (alias for --buck2 in CI)",
     )
     parser.add_argument(
         "--lint-only",
@@ -465,6 +498,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    # --kuro is an alias for --buck2 (used in CI)
+    if args.kuro is not None:
+        args.buck2 = args.kuro
+
     # Change to buck2 directory
     buck2_dir = Path(__file__).parent.absolute()
     os.chdir(str(buck2_dir))
@@ -506,6 +543,17 @@ def main() -> None:
     ):
         with timing():
             test(package_args)
+
+    # Run Python integration tests when a kuro binary is provided (e.g., in CI)
+    if args.kuro is not None and not (
+        args.lint_only
+        or args.lint_rust_only
+        or args.lint_starlark_only
+        or args.rustfmt_only
+        or args.rustdoc_only
+    ):
+        with timing():
+            run_python_tests(args.buck2)
 
     # On CI, check to make sure our test doesn't overwrite existing files
     if args.ci:

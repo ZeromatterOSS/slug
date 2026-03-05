@@ -2,6 +2,9 @@ name: run_test_py
 runs:
   using: composite
   steps:
+  - name: Install Python test dependencies
+    run: pip3 install -r requirements-test.txt
+    shell: bash
   - name: Run test.py
     run: python3 test.py --ci --git --kuro=$RUNNER_TEMP/artifacts/kuro
     shell: bash
