@@ -396,9 +396,25 @@ def test(package_args: list[str]) -> None:
     run(["cargo", "test", "--doc", *extra_args, *package_args], timeout=timeout_sec)
 
 
+def _normalize_windows_path(path: str) -> str:
+    """
+    Convert Git Bash Unix-style Windows paths to native Windows paths.
+    e.g. /d/a/_temp -> D:/a/_temp
+    This is needed when test.py is invoked from bash on Windows CI (GitHub Actions).
+    """
+    import re
+    m = re.match(r"^/([a-zA-Z])/(.*)", path)
+    if m:
+        return f"{m.group(1).upper()}:/{m.group(2)}"
+    return path
+
+
 def run_python_tests(kuro_binary: str) -> None:
     """Run Python integration tests in tests/core/ using pytest."""
     print_running("pytest tests/core/")
+    # On Windows (via Git Bash CI), paths like /d/a/_temp need conversion
+    if is_windows():
+        kuro_binary = _normalize_windows_path(kuro_binary)
     # On Windows, kuro binary may be named kuro.exe
     binary_path = Path(kuro_binary)
     if is_windows() and not binary_path.exists():

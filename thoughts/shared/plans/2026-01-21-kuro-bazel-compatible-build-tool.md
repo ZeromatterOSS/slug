@@ -502,6 +502,20 @@ Example aliases created: `com_google_protobuf -> protobuf`, `com_google_absl -> 
 
 Current status: **853 pass, 155 skip** in `tests/core/` (updated 2026-03-04).
 
+### CI Infrastructure (2026-03-05)
+
+- **`test.py` accepts `--kuro` arg** (was failing with argparse error in CI)
+- **Python integration tests added to CI** via `run_python_tests()` in `test.py`
+- **`requirements-test.txt` created** (pytest>=9.0.0, pytest-asyncio>=1.0.0)
+- **`run_test_py/action.yml` updated** to install pytest deps before running
+- **Test collection fixed** (0 errors, 933 tests collected):
+  - `tests/e2e/` excluded from collection (requires Meta-internal workspace)
+  - Template files excluded (`test_bxl_template.py`, `test_bxl_check_dependencies_template.py`)
+  - `tests/manual_test/` excluded
+- **`Attr.md` golden file updated** to match current `attr.*` documentation
+- **121 tracked `.pyc` files removed** from git + `.gitignore` updated
+  (were causing `check_no_changes` CI failure after pytest runs)
+
 ### Fixed (2026-03-03)
 
 - **Source location tests + `test_local_incompatible`** (6 tests in `test_error_categorization.py`) - Fixed by:
