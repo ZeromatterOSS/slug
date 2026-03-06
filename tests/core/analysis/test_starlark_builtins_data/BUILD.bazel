@@ -1,0 +1,27 @@
+load(
+    ":defs.bzl",
+    "json_decode_rule",
+    "json_encode_rule",
+    "struct_fields_rule",
+    "struct_hasattr_rule",
+    "struct_nested_rule",
+    "type_and_dir_rule",
+)
+
+# === struct tests ===
+
+struct_fields_rule(name = "struct_fields")
+
+struct_hasattr_rule(name = "struct_hasattr")
+
+struct_nested_rule(name = "struct_nested")
+
+# === json tests ===
+
+json_encode_rule(name = "json_encode")
+
+json_decode_rule(name = "json_decode")
+
+# === type() and dir() tests ===
+
+type_and_dir_rule(name = "type_dir")
