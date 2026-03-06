@@ -47,3 +47,25 @@ select_value = rule(
         "value": attr.string(default = ""),
     },
 )
+
+
+def _bool_setting_impl(ctx):
+    """A boolean build setting (no output)."""
+    return []
+
+
+bool_flag = rule(
+    implementation = _bool_setting_impl,
+    build_setting = config.bool(flag = True),
+)
+
+
+def _string_setting_impl(ctx):
+    """A string build setting (no output)."""
+    return []
+
+
+string_flag = rule(
+    implementation = _string_setting_impl,
+    build_setting = config.string(flag = True),
+)

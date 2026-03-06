@@ -220,6 +220,26 @@ async def test_select_resolves_with_target_platforms(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_config_bool_build_setting(buck: Buck) -> None:
+    """config.bool() build settings work with flag_values in config_setting for select()."""
+    result = await buck.build("//:select_by_bool_flag")
+    output = result.get_build_report().output_for_target("//:select_by_bool_flag")
+    content = output.read_text().strip()
+    # Default is False, so flag_is_false config_setting should match
+    assert content == "flag_is_false", f"Expected 'flag_is_false', got: {content!r}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_config_string_build_setting(buck: Buck) -> None:
+    """config.string() build settings work with flag_values in config_setting for select()."""
+    result = await buck.build("//:select_by_string_flag")
+    output = result.get_build_report().output_for_target("//:select_by_string_flag")
+    content = output.read_text().strip()
+    # Default is "default_val", so string_flag_is_default should match
+    assert content == "default_selected", f"Expected 'default_selected', got: {content!r}"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_label_flag_with_flag_values(buck: Buck) -> None:
     """label_flag build settings work with flag_values in config_setting for select()."""
     result = await buck.build("//:select_by_label_flag")

@@ -1,4 +1,4 @@
-load(":defs.bzl", "collect_files", "select_value", "write_list")
+load(":defs.bzl", "bool_flag", "collect_files", "select_value", "string_flag", "write_list")
 
 # === filegroup tests ===
 
@@ -215,6 +215,52 @@ select_value(
         ":linux_os_config": "linux_selected",
         ":macos_os_config": "macos_selected",
         "//conditions:default": "no_platform_selected",
+    }),
+)
+
+# === config.bool() build settings with flag_values ===
+
+bool_flag(
+    name = "my_bool_flag",
+    build_setting_default = False,
+)
+
+config_setting(
+    name = "bool_flag_true",
+    flag_values = {"//:my_bool_flag": "True"},
+)
+
+config_setting(
+    name = "bool_flag_false",
+    flag_values = {"//:my_bool_flag": "False"},
+)
+
+select_value(
+    name = "select_by_bool_flag",
+    value = select({
+        ":bool_flag_true": "flag_is_true",
+        ":bool_flag_false": "flag_is_false",
+        "//conditions:default": "no_flag",
+    }),
+)
+
+# === config.string() build settings with flag_values ===
+
+string_flag(
+    name = "my_string_flag",
+    build_setting_default = "default_val",
+)
+
+config_setting(
+    name = "string_flag_is_default",
+    flag_values = {"//:my_string_flag": "default_val"},
+)
+
+select_value(
+    name = "select_by_string_flag",
+    value = select({
+        ":string_flag_is_default": "default_selected",
+        "//conditions:default": "fallback_selected",
     }),
 )
 
