@@ -61,7 +61,7 @@ async def test_resolve(buck: Buck) -> None:
     assert "a-string\n" == result.stdout
 
 
-@buck_test(skip_for_os=["windows"])
+@buck_test()
 async def test_bxl_declared_artifact_path(buck: Buck) -> None:
     result = await buck.bxl(
         "//actions_test/declared_artifact_path.bxl:declared_artifact_path_test",

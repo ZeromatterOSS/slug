@@ -40,10 +40,7 @@ async def test_soft_error_no_stack(buck: Buck) -> None:
     assert "Traceback" not in res.stderr
 
 
-@buck_test(
-    # windows errors are slightly different, just skip for now
-    skip_for_os=["windows"],
-)
+@buck_test()
 @env("BUCK2_HARD_ERROR", "false")
 async def test_package_listing_errors(buck: Buck) -> None:
     outs = []
@@ -73,10 +70,7 @@ async def test_package_listing_errors(buck: Buck) -> None:
     golden(output="\n\n\n".join(outs), rel_path="package_listing/expected.golden.out")
 
 
-@buck_test(
-    # windows errors are slightly different, just skip for now
-    skip_for_os=["windows"],
-)
+@buck_test()
 async def test_configured_graph_deps_collapsed_in_errors(buck: Buck) -> None:
     out = await expect_failure(
         buck.cquery(
@@ -91,10 +85,7 @@ async def test_configured_graph_deps_collapsed_in_errors(buck: Buck) -> None:
     golden(output=stderr, rel_path="deps_collapsed/expected.golden.out")
 
 
-@buck_test(
-    # windows errors are slightly different, just skip for now
-    skip_for_os=["windows"],
-)
+@buck_test()
 async def test_configured_graph_deps_collapsed_in_errors_2(buck: Buck) -> None:
     out = await expect_failure(
         buck.cquery(

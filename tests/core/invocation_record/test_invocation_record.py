@@ -101,7 +101,7 @@ async def test_has_no_command_result(buck: Buck, tmp_path: Path) -> None:
     )
 
 
-@buck_test(skip_for_os=["windows"])  # TODO(T154836632)
+@buck_test()
 async def test_metadata(buck: Buck, tmp_path: Path) -> None:
     record = tmp_path / "record.json"
 
@@ -113,7 +113,7 @@ async def test_metadata(buck: Buck, tmp_path: Path) -> None:
     assert "username" in record["metadata"]["strings"]
 
 
-@buck_test(skip_for_os=["windows"])  # TODO(T154836632)
+@buck_test()
 async def test_client_metadata(buck: Buck, tmp_path: Path) -> None:
     record = tmp_path / "record.json"
 
@@ -135,7 +135,7 @@ async def test_client_metadata(buck: Buck, tmp_path: Path) -> None:
     assert record["metadata"]["strings"]["client"] == "baz"
 
 
-@buck_test(skip_for_os=["windows"])  # TODO(T154836632)
+@buck_test()
 async def test_client_metadata_env(buck: Buck, tmp_path: Path) -> None:
     record = tmp_path / "record.json"
 
@@ -160,7 +160,7 @@ async def test_client_metadata_env(buck: Buck, tmp_path: Path) -> None:
     assert record["metadata"]["strings"]["client"] == "baz"
 
 
-@buck_test(skip_for_os=["windows"])  # TODO(T154836632)
+@buck_test()
 async def test_client_metadata_clean(buck: Buck, tmp_path: Path) -> None:
     record = tmp_path / "record.json"
 
@@ -182,7 +182,7 @@ async def test_client_metadata_clean(buck: Buck, tmp_path: Path) -> None:
     assert record["metadata"]["strings"]["client"] == "baz"
 
 
-@buck_test(skip_for_os=["windows"])
+@buck_test(skip_for_os=["windows"])  # allocator-stats not implemented for Cargo builds
 async def test_client_metadata_debug(buck: Buck, tmp_path: Path) -> None:
     record = tmp_path / "record.json"
     # buck.debug() doesn't start the daemon, so we need to start it with a build
@@ -238,7 +238,7 @@ async def test_non_action_error_message_in_record(buck: Buck, tmp_path: Path) ->
     )
 
 
-@buck_test(skip_for_os=["windows"])  # TODO(T154836632)
+@buck_test()
 async def test_rule_type_names_ci(buck: Buck, tmp_path: Path) -> None:
     record = tmp_path / "record.json"
 
@@ -262,7 +262,7 @@ async def test_rule_type_names_ci(buck: Buck, tmp_path: Path) -> None:
     ]
 
 
-@buck_test(skip_for_os=["windows"])  # TODO(T154836632)
+@buck_test()
 async def test_rule_type_names_sandcastle(buck: Buck, tmp_path: Path) -> None:
     record = tmp_path / "record.json"
 
@@ -286,7 +286,7 @@ async def test_rule_type_names_sandcastle(buck: Buck, tmp_path: Path) -> None:
     ]
 
 
-@buck_test(skip_for_os=["windows"])  # TODO(T154836632)
+@buck_test()
 async def test_rule_type_names_user(buck: Buck, tmp_path: Path) -> None:
     record = tmp_path / "record.json"
 
@@ -308,7 +308,7 @@ async def test_rule_type_names_user(buck: Buck, tmp_path: Path) -> None:
     ]
 
 
-@buck_test(skip_for_os=["windows"])  # TODO(T154836632)
+@buck_test()
 async def test_rule_type_names_on_failure(buck: Buck, tmp_path: Path) -> None:
     record = tmp_path / "record.json"
 

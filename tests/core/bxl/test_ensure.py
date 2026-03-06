@@ -83,7 +83,7 @@ async def test_bxl_ensure(buck: Buck) -> None:
     assert "tset3" in json_array[3]
 
 
-@buck_test(skip_for_os=["windows"])
+@buck_test()
 async def test_bxl_artifact_path(buck: Buck) -> None:
     result = await buck.bxl(
         "//artifacts.bxl:artifact_path_test",
@@ -125,7 +125,7 @@ async def test_bxl_artifact_path(buck: Buck) -> None:
     )
 
 
-@buck_test(skip_for_os=["windows"])
+@buck_test()
 async def test_bxl_artifact_path_cmd_args(buck: Buck) -> None:
     result = await buck.bxl(
         "//artifacts.bxl:cmd_args_artifact_path_test",
@@ -204,13 +204,18 @@ async def test_bxl_artifact_path_cmd_args(buck: Buck) -> None:
 def _test_bxl_artifact_path_cmd_args_helper(
     buck: Buck, part_to_validate: str, full_path: str, is_abs: bool
 ) -> None:
-    assert "buck-out/v2/gen/root" in full_path
-    assert part_to_validate in full_path
+    # Normalize to forward slashes for cross-platform path comparison
+    normalized = full_path.replace("\\", "/")
+    assert "buck-out/v2/gen/root" in normalized
+    assert part_to_validate in normalized
     if is_abs:
-        assert str((buck.cwd / Path("buck-out/v2/gen/root"))) in full_path
+        expected_prefix = str(buck.cwd / Path("buck-out/v2/gen/root")).replace(
+            "\\", "/"
+        )
+        assert expected_prefix in normalized
         assert os.path.exists(full_path) is False
     else:
-        assert str(buck.cwd) not in full_path
+        assert str(buck.cwd).replace("\\", "/") not in normalized
         assert os.path.exists((buck.cwd / Path(full_path))) is False
 
 

@@ -26,7 +26,7 @@ output_cleanup_targets = [
 ]
 
 
-@buck_test(skip_for_os=["windows"])
+@buck_test()
 @pytest.mark.parametrize(
     "first",
     output_cleanup_targets,
