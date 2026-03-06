@@ -177,3 +177,20 @@ genrule(
     tools = [":echo_tool"],
     cmd = "bash $(location :echo_tool) > $@",
 )
+
+# === toolchain_type and toolchain tests ===
+
+toolchain_type(
+    name = "my_toolchain_type",
+)
+
+sh_binary(
+    name = "my_toolchain_impl",
+    srcs = ["hello.sh"],
+)
+
+toolchain(
+    name = "my_toolchain",
+    toolchain_type = ":my_toolchain_type",
+    toolchain = ":my_toolchain_impl",
+)

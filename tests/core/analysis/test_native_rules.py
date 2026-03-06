@@ -168,3 +168,25 @@ async def test_genrule_select_cmd(buck: Buck) -> None:
     content = output.read_text().strip()
     # With //conditions:default, the default branch is always selected
     assert content == "selected_default"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_genrule_with_tool(buck: Buck) -> None:
+    """genrule tools= attribute makes executables available via $(location)."""
+    result = await buck.build("//:genrule_with_tool")
+    output = result.get_build_report().output_for_target("//:genrule_with_tool")
+    # The genrule runs the sh_binary tool via bash, which outputs "hello from shell script"
+    content = output.read_text().strip()
+    assert "hello" in content
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_toolchain_type_builds(buck: Buck) -> None:
+    """toolchain_type() rule can be defined and builds successfully."""
+    await buck.build("//:my_toolchain_type")
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_toolchain_builds(buck: Buck) -> None:
+    """toolchain() rule can be defined and builds successfully."""
+    await buck.build("//:my_toolchain")
