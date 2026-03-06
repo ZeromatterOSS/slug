@@ -500,7 +500,7 @@ Example aliases created: `com_google_protobuf -> protobuf`, `com_google_absl -> 
 
 ## Test Suite TODO (as of 2026-03-03)
 
-Current status: **853 pass, 155 skip** in `tests/core/` (updated 2026-03-04).
+Current status: **862 pass, 152 skip** in `tests/core/` (updated 2026-03-06).
 
 ### CI Infrastructure (2026-03-05)
 
@@ -547,3 +547,15 @@ These SKIP_TESTS entries could be fixed with code changes:
 - Eden/cgroup tests (~20): require EdenFS or Linux cgroups
 - Buck2 modifier syntax (~40): `?modifier` target syntax not part of Bazel
 - Meta-internal tests: manifold HTTP, BUCK2_TEST_* env vars, native.constraint rule
+
+### New Tests Added (2026-03-06)
+
+**Aspect tests** (`tests/core/analysis/test_aspects.py`, 5 tests):
+- `test_aspect_basic_propagation` - Aspect propagates through deps via shadow graph
+- `test_aspect_transitive_propagation` - Transitive propagation through 3-level dep chain
+- `test_aspect_provider_access` - Aspects can access providers from target
+- `test_aspect_required_providers_filter` - `required_providers` skips non-matching targets
+- `test_aspect_ctx_rule_kind` - `ctx.rule.kind` returns the rule type name
+
+**bzlmod test** (`tests/core/bzlmod/test_module_parsing.py`):
+- Converted `test_module_bazel_syntax_error` from @skip/pass to real test with test data in `test_module_parsing_invalid_data/`
