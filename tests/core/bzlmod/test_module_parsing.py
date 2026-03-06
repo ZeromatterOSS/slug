@@ -10,8 +10,8 @@
 
 """Tests for MODULE.bazel file parsing."""
 
-import pytest
 from buck2.tests.e2e_util.api.buck import Buck
+from buck2.tests.e2e_util.asserts import expect_failure
 from buck2.tests.e2e_util.buck_workspace import buck_test
 
 
@@ -22,11 +22,10 @@ async def test_module_bazel_recognized(buck: Buck) -> None:
     await buck.audit("cell")
 
 
-@pytest.mark.skip(
-    reason="Requires a separate data directory with invalid MODULE.bazel syntax. "
-    "Not yet set up for kuro test infrastructure."
-)
-@buck_test(data_dir="test_module_parsing_data")
+@buck_test(data_dir="test_module_parsing_invalid_data")
 async def test_module_bazel_syntax_error(buck: Buck) -> None:
-    """Verify that invalid MODULE.bazel syntax gives helpful error."""
-    pass
+    """Verify that invalid MODULE.bazel syntax gives a helpful error."""
+    await expect_failure(
+        buck.build("//:hello"),
+        stderr_regex="MODULE.bazel",
+    )

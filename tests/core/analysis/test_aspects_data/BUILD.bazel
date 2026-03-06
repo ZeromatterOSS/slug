@@ -1,0 +1,68 @@
+load(":defs.bzl", "collector", "counter", "kind_reporter", "my_lib", "plain_lib", "tagged_lib")
+
+# files_aspect tests
+my_lib(
+    name = "foo",
+    srcs = ["foo.txt"],
+)
+
+my_lib(
+    name = "bar",
+    srcs = ["bar.txt"],
+    deps = [":foo"],
+)
+
+collector(
+    name = "collect_bar",
+    deps = [":bar"],
+)
+
+my_lib(
+    name = "a",
+    srcs = ["a.txt"],
+)
+
+my_lib(
+    name = "b",
+    srcs = ["b.txt"],
+    deps = [":a"],
+)
+
+my_lib(
+    name = "c",
+    srcs = ["c.txt"],
+    deps = [":b"],
+)
+
+collector(
+    name = "collect_c",
+    deps = [":c"],
+)
+
+# required_providers filter tests
+tagged_lib(
+    name = "tagged",
+    srcs = ["foo.txt"],
+)
+
+plain_lib(
+    name = "plain",
+    srcs = ["bar.txt"],
+)
+
+counter(
+    name = "count_mixed",
+    deps = [
+        ":tagged",
+        ":plain",
+    ],
+)
+
+# ctx.rule.kind test
+kind_reporter(
+    name = "kinds_of_deps",
+    deps = [
+        ":foo",
+        ":tagged",
+    ],
+)

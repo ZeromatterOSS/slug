@@ -1,0 +1,4 @@
+module(
+    name = "test_invalid_syntax",
+    version = "1.0.0",
+# missing closing parenthesis — syntax error
