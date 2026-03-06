@@ -130,3 +130,12 @@ async def test_ctx_resolve_tools(buck: Buck) -> None:
     content = output.read_text().strip()
     tool_names = content.splitlines() if content else []
     assert "tool_artifact.txt" in tool_names
+
+
+@buck_test(data_dir="test_ctx_attributes_data")
+async def test_ctx_actions_template_dict(buck: Buck) -> None:
+    """ctx.actions.template_dict() creates computed substitutions for expand_template."""
+    result = await buck.build("//:computed_template")
+    output = result.get_build_report().output_for_target("//:computed_template")
+    content = output.read_text().strip()
+    assert content == "Hi items: a,b,c"

@@ -214,3 +214,34 @@ resolve_tools_rule = rule(
         "tools": attr.label_list(default = []),
     },
 )
+
+
+# ============================================================================
+# ctx.actions.template_dict (computed_substitutions for expand_template)
+# ============================================================================
+
+def _template_dict_rule_impl(ctx):
+    """Tests ctx.actions.template_dict() for computed substitutions."""
+    template = ctx.file.template
+
+    # Build a template_dict with computed substitutions
+    subs = ctx.actions.template_dict()
+    subs.add("{GREETING}", "Hi")
+    subs.add_joined("{ITEMS}", ["a", "b", "c"], join_with = ",")
+
+    out = ctx.actions.declare_file("computed_template.txt")
+    ctx.actions.expand_template(
+        template = template,
+        output = out,
+        substitutions = {},
+        computed_substitutions = subs,
+    )
+    return [DefaultInfo(default_output = out)]
+
+
+template_dict_rule = rule(
+    implementation = _template_dict_rule_impl,
+    attrs = {
+        "template": attr.label(allow_single_file = True),
+    },
+)

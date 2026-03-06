@@ -9,6 +9,7 @@ load(":defs.bzl",
      "label_rule",
      "resolve_tools_rule",
      "symlink_rule",
+     "template_dict_rule",
      "workspace_name_rule",
 )
 
@@ -70,4 +71,11 @@ genrule(
 resolve_tools_rule(
     name = "resolve_tools",
     tools = [":a_tool_output"],
+)
+
+# === ctx.actions.template_dict (computed_substitutions) ===
+
+template_dict_rule(
+    name = "computed_template",
+    template = "computed_template.txt",
 )
