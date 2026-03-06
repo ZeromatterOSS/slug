@@ -136,6 +136,25 @@ genrule(
     }),
 )
 
+genrule(
+    name = "genrule_execpath",
+    srcs = ["defs.bzl"],
+    outs = ["genrule_execpath.txt"],
+    cmd = "echo $(execpath :defs.bzl) > $@",
+)
+
+genrule(
+    name = "genrule_bindir",
+    outs = ["genrule_bindir.txt"],
+    cmd = "echo $(BINDIR) > $@",
+)
+
+genrule(
+    name = "genrule_ruledir",
+    outs = ["genrule_ruledir.txt"],
+    cmd = "echo $(@D) > $@",
+)
+
 # === sh_binary test ===
 
 sh_binary(

@@ -181,6 +181,33 @@ async def test_genrule_with_tool(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_genrule_execpath_expansion(buck: Buck) -> None:
+    """genrule $(execpath :label) expands to the execpath of a source file (alias for $(location))."""
+    result = await buck.build("//:genrule_execpath")
+    output = result.get_build_report().output_for_target("//:genrule_execpath")
+    content = output.read_text().strip()
+    assert content.endswith("defs.bzl"), f"Expected path ending with defs.bzl, got: {content!r}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_genrule_bindir_expansion(buck: Buck) -> None:
+    """genrule $(BINDIR) expands to the output directory root (buck-out/...)."""
+    result = await buck.build("//:genrule_bindir")
+    output = result.get_build_report().output_for_target("//:genrule_bindir")
+    content = output.read_text().strip()
+    assert "buck-out" in content, f"Expected buck-out in BINDIR expansion, got: {content!r}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_genrule_ruledir_expansion(buck: Buck) -> None:
+    """genrule $(@D) expands to the output directory for the rule."""
+    result = await buck.build("//:genrule_ruledir")
+    output = result.get_build_report().output_for_target("//:genrule_ruledir")
+    content = output.read_text().strip()
+    assert "buck-out" in content, f"Expected buck-out in $(@D) expansion, got: {content!r}"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_select_resolves_with_target_platforms(buck: Buck) -> None:
     """select() correctly resolves to platform-specific branch with --target-platforms."""
     result = await buck.build(
