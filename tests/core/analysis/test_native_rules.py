@@ -181,6 +181,18 @@ async def test_genrule_with_tool(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_select_resolves_with_target_platforms(buck: Buck) -> None:
+    """select() correctly resolves to platform-specific branch with --target-platforms."""
+    result = await buck.build(
+        "//:select_platform",
+        "--target-platforms=//:linux_platform",
+    )
+    output = result.get_build_report().output_for_target("//:select_platform")
+    content = output.read_text().strip()
+    assert content == "linux_selected", f"Expected 'linux_selected', got: {content!r}"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_toolchain_type_builds(buck: Buck) -> None:
     """toolchain_type() rule can be defined and builds successfully."""
     await buck.build("//:my_toolchain_type")

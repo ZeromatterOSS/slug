@@ -37,3 +37,9 @@ write_value(
     name = "package_relative_label_test",
     value = package_relative_label(":package_name_test"),
 )
+
+# === native.bazel_version test ===
+write_value(
+    name = "bazel_version_test",
+    value = native.bazel_version,
+)

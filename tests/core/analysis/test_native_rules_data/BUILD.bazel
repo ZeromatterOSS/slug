@@ -178,6 +178,27 @@ genrule(
     cmd = "bash $(location :echo_tool) > $@",
 )
 
+# === select() with platform resolution ===
+
+config_setting(
+    name = "linux_os_config",
+    constraint_values = [":linux"],
+)
+
+config_setting(
+    name = "macos_os_config",
+    constraint_values = [":macos"],
+)
+
+select_value(
+    name = "select_platform",
+    value = select({
+        ":linux_os_config": "linux_selected",
+        ":macos_os_config": "macos_selected",
+        "//conditions:default": "no_platform_selected",
+    }),
+)
+
 # === toolchain_type and toolchain tests ===
 
 toolchain_type(

@@ -70,3 +70,14 @@ async def test_package_relative_label(buck: Buck) -> None:
     content = output.read_text().strip()
     # ":package_name_test" relative to root package "//" -> "//:package_name_test"
     assert content == "//:package_name_test"
+
+
+@buck_test(data_dir="test_package_functions_data")
+async def test_native_bazel_version(buck: Buck) -> None:
+    """native.bazel_version returns a version >= 9.0.0 for Bazel compatibility."""
+    result = await buck.build("//:bazel_version_test")
+    output = result.get_build_report().output_for_target("//:bazel_version_test")
+    version = output.read_text().strip()
+    parts = version.split(".")
+    assert len(parts) >= 2, f"Expected semver, got: {version!r}"
+    assert int(parts[0]) >= 9, f"Expected major version >= 9, got: {version!r}"
