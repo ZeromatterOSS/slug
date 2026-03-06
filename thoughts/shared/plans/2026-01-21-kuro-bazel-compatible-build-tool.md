@@ -500,7 +500,7 @@ Example aliases created: `com_google_protobuf -> protobuf`, `com_google_absl -> 
 
 ## Test Suite TODO (as of 2026-03-03)
 
-Current status: **862 pass, 152 skip** in `tests/core/` (updated 2026-03-06).
+Current status: **861 pass, 152 skip, 1 xfail** in `tests/core/` (updated 2026-03-06).
 
 ### CI Infrastructure (2026-03-05)
 
