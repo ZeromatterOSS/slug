@@ -222,9 +222,7 @@ SKIP_TESTS = {
     "test_build_root_executable_remote": "Requires Remote Execution for remote build execution",
     # CAS artifact - requires Content Addressable Storage RE service
     "test_cas_artifact": "Requires CAS/RE service not available in local builds",
-    # Unbound artifact causes daemon hang/deadlock (10 min timeout)
-    "test_unbound_artifact": "Unbound artifact build hangs daemon - deadlock in kuro",
-    "test_unbound_artifact_inside_tset": "Unbound artifact inside tset hangs daemon - deadlock in kuro",
+    # (test_unbound_artifact and test_unbound_artifact_inside_tset now pass - deadlock fixed)
     # BXL tests with --materializations=none: kuro always materializes artifacts locally
     "test_bxl_ensure_no_materialization": "kuro doesn't support --materializations=none; artifacts are always materialized",
     "test_bxl_build_no_materialization": "kuro doesn't support --materializations=none; artifacts are always materialized",

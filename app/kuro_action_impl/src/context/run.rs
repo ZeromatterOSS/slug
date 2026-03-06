@@ -399,6 +399,12 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             ///   ctx.actions.run(arguments=[output], outputs=[output], ...)
             /// The default implementation calls `ensure_bound()` which fails for unbound artifacts.
             /// When an artifact is not yet bound, treat it as a declared output rather than an input.
+            ///
+            /// However, if the artifact is ALREADY in declared_outputs (meaning `.as_output()` was
+            /// called on it AND it also appears as a plain reference in the same cmd_args), this
+            /// creates a circular dependency: the frozen cmd_args would treat the plain reference
+            /// as an input, so the action would wait for its own output → deadlock. Detect this
+            /// case and produce a clear error instead.
             fn visit_declared_artifact(
                 &mut self,
                 declared_artifact: DeclaredArtifact<'v>,
@@ -411,8 +417,20 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
                         tags,
                     );
                 } else {
-                    // Unbound artifact: treat as declared output (Bazel compatibility)
-                    let output: OutputArtifact<'v> = declared_artifact.into();
+                    // Check if this artifact is already declared as an output of this action
+                    // (via an explicit `.as_output()` call earlier in the same cmd_args).
+                    // If so, using it as a plain unbound reference creates a circular
+                    // dependency: after freeze the plain reference becomes a StarlarkArtifact
+                    // (treated as input), so the action would wait for its own output.
+                    let output: OutputArtifact<'v> = declared_artifact.dupe().into();
+                    if self.inner.declared_outputs.contains(&output) {
+                        // Produce the standard "Artifact must be bound" error to match
+                        // Buck2/Bazel behavior for this circular dependency pattern.
+                        declared_artifact.ensure_bound()?;
+                        unreachable!("ensure_bound should have failed for unbound artifact");
+                    }
+                    // Unbound artifact not yet in declared_outputs: treat as declared output
+                    // (Bazel compatibility for artifacts that will be bound by another action).
                     self.visit_declared_output(output, tags);
                 }
                 Ok(())
