@@ -1,0 +1,29 @@
+load(":defs.bzl", "list_files")
+
+# === glob(["*.txt"]) - match all .txt in current dir ===
+
+list_files(
+    name = "glob_all_txt",
+    srcs = glob(["*.txt"]),
+)
+
+# === glob with exclude ===
+
+list_files(
+    name = "glob_exclude",
+    srcs = glob(["*.txt"], exclude = ["excluded.txt"]),
+)
+
+# === glob with recursive pattern ===
+
+list_files(
+    name = "glob_recursive",
+    srcs = glob(["**/*.txt"]),
+)
+
+# === glob with multiple patterns ===
+
+list_files(
+    name = "glob_multi_pattern",
+    srcs = glob(["*.txt", "*.bzl"]),
+)
