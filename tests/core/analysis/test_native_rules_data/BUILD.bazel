@@ -218,6 +218,31 @@ select_value(
     }),
 )
 
+# === label_flag with flag_values in config_setting ===
+
+label_flag(
+    name = "my_label_flag",
+    build_setting_default = "//:my_toolchain_type",
+)
+
+config_setting(
+    name = "using_default_label",
+    flag_values = {"//:my_label_flag": "//:my_toolchain_type"},
+)
+
+config_setting(
+    name = "using_other_label",
+    flag_values = {"//:my_label_flag": "//:nonexistent"},
+)
+
+select_value(
+    name = "select_by_label_flag",
+    value = select({
+        ":using_default_label": "default_flag_selected",
+        "//conditions:default": "fallback_selected",
+    }),
+)
+
 # === toolchain_type and toolchain tests ===
 
 toolchain_type(

@@ -220,6 +220,16 @@ async def test_select_resolves_with_target_platforms(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_label_flag_with_flag_values(buck: Buck) -> None:
+    """label_flag build settings work with flag_values in config_setting for select()."""
+    result = await buck.build("//:select_by_label_flag")
+    output = result.get_build_report().output_for_target("//:select_by_label_flag")
+    content = output.read_text().strip()
+    # config_setting with flag_values matching the label_flag's default should select
+    assert content == "default_flag_selected", f"Expected 'default_flag_selected', got: {content!r}"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_toolchain_type_builds(buck: Buck) -> None:
     """toolchain_type() rule can be defined and builds successfully."""
     await buck.build("//:my_toolchain_type")
