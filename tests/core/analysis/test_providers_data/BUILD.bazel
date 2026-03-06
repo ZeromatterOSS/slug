@@ -1,0 +1,43 @@
+load(":defs.bzl",
+     "MyInfo",
+     "TagInfo",
+     "check_provider_rule",
+     "executable_rule",
+     "flat_provider_rule",
+     "multi_output_group",
+     "my_rule",
+     "read_provider_rule",
+)
+
+# === User-defined provider ===
+
+my_rule(
+    name = "my_rule_target",
+    message = "hello provider",
+    count = 42,
+)
+
+read_provider_rule(
+    name = "read_provider",
+    dep = ":my_rule_target",
+)
+
+check_provider_rule(
+    name = "check_provider",
+    dep = ":my_rule_target",
+)
+
+# === OutputGroupInfo ===
+
+multi_output_group(name = "multi_groups")
+
+# === FlatInfo provider with list fields ===
+
+flat_provider_rule(
+    name = "flat_provider",
+    srcs = ["MODULE.bazel", "defs.bzl"],
+)
+
+# === DefaultInfo with executable ===
+
+executable_rule(name = "my_executable")
