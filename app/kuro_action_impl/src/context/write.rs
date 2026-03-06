@@ -633,7 +633,7 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
                     })
                     .unwrap_or_default();
                 // Try reading the file from various cell locations
-                let file_content = if cell_name.is_empty() || cell_name == "root" || cell_name == "manual_test" {
+                let file_content = if kuro_core::cells::is_root_cell_name(cell_name) {
                     let p = project_root.join(&full_path);
                     std::fs::read_to_string(&p)
                         .map_err(|e| {

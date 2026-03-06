@@ -932,8 +932,9 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<String> {
         use starlark::values::dict::DictRef;
+        let _ = (attribute_name, heap);
 
-        // Build substitution map from additional_substitutions
+        // Build substitution map from additional_substitutions (user-provided overrides)
         let mut substitutions: std::collections::HashMap<String, String> =
             std::collections::HashMap::new();
 
@@ -945,7 +946,25 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             }
         }
 
-        // Expand $(VAR) patterns using the substitutions + common defaults
+        // Add built-in Make variables (BINDIR, GENDIR, CC, etc.) as fallbacks.
+        // User-provided substitutions take priority.
+        let bin_dir = bin_dir_path_from_label(this.0.label);
+        let builtins: &[(&str, &str)] = &[
+            ("BINDIR", bin_dir.as_str()),
+            ("GENDIR", bin_dir.as_str()),
+            ("TARGET_CPU", "k8"),
+            ("COMPILATION_MODE", "fastbuild"),
+            ("CC", "/usr/bin/gcc"),
+            ("CC_FLAGS", ""),
+            ("JAVA", "/usr/bin/java"),
+            ("JAVA_RUNFILES", ""),
+            ("JAVABASE", ""),
+        ];
+        for (k, v) in builtins {
+            substitutions.entry(k.to_string()).or_insert_with(|| v.to_string());
+        }
+
+        // Expand $(VAR) patterns using the substitutions
         let mut result = String::with_capacity(command.len());
         let mut remaining = command;
         while let Some(start) = remaining.find("$(") {
@@ -953,10 +972,10 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             remaining = &remaining[start..];
 
             if let Some(end) = remaining.find(')') {
-                let inner = &remaining[2..end].trim();
+                let inner = remaining[2..end].trim();
                 let after = &remaining[end + 1..];
 
-                if let Some(val) = substitutions.get(*inner) {
+                if let Some(val) = substitutions.get(inner) {
                     result.push_str(val);
                 } else {
                     // Leave unresolved $(VAR) patterns as-is

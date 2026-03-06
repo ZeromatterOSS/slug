@@ -1,0 +1,73 @@
+load(":defs.bzl",
+     "bin_dir_rule",
+     "disabled_features_rule",
+     "do_nothing_rule",
+     "expand_make_vars_rule",
+     "expand_template_rule",
+     "features_rule",
+     "genfiles_dir_rule",
+     "label_rule",
+     "resolve_tools_rule",
+     "symlink_rule",
+     "workspace_name_rule",
+)
+
+# === ctx.bin_dir ===
+
+bin_dir_rule(name = "bin_dir")
+
+# === ctx.genfiles_dir ===
+
+genfiles_dir_rule(name = "genfiles_dir")
+
+# === ctx.features / ctx.disabled_features ===
+
+features_rule(
+    name = "features_enabled",
+    features = ["fast", "opt", "-debug"],
+)
+
+disabled_features_rule(
+    name = "features_disabled",
+    features = ["fast", "opt", "-debug", "-slow"],
+)
+
+# === ctx.workspace_name ===
+
+workspace_name_rule(name = "workspace_name")
+
+# === ctx.label ===
+
+label_rule(name = "label_info")
+
+# === ctx.expand_make_variables ===
+
+expand_make_vars_rule(name = "make_vars")
+
+# === ctx.actions.symlink ===
+
+symlink_rule(name = "file_symlink")
+
+# === ctx.actions.expand_template ===
+
+expand_template_rule(
+    name = "expand_template",
+    template = "template.txt",
+)
+
+# === ctx.actions.do_nothing ===
+
+do_nothing_rule(name = "do_nothing")
+
+# === ctx.resolve_tools ===
+
+genrule(
+    name = "a_tool_output",
+    outs = ["tool_artifact.txt"],
+    cmd = "echo 'tool_content' > $@",
+)
+
+resolve_tools_rule(
+    name = "resolve_tools",
+    tools = [":a_tool_output"],
+)
