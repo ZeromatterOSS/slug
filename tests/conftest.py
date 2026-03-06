@@ -153,14 +153,14 @@ SKIP_TESTS = {
     "test_no_read_through_symlinks": "Requires --remote-only execution strategy",
     "test_no_read_through_source_symlinks_to_file": "Requires --remote-only execution strategy",
     # Restart tests needing specific daemon behavior
-    "test_restart_cas_missing": "Tests specific daemon error message not matching kuro",
-    "test_restart_disabled": "Tests restart-disabled behavior not matching kuro",
+    "test_restart_cas_missing": "Requires Remote Execution (RE): BUCK2_TEST_TOMBSTONED_DIGESTS only affects RE downloads",
+    "test_restart_disabled": "Requires Remote Execution (RE): BUCK2_TEST_TOMBSTONED_DIGESTS only affects RE downloads",
     # Require Meta-internal tooling or unimplemented features
-    "test_client_metadata_debug": "kuro debug allocator-stats not implemented for Cargo builds",
+    # test_client_metadata_debug: skipped on Windows by skip_for_os=["windows"] decorator; no SKIP_TESTS entry needed
     # test_error_categorization.py tests that check Buck2-specific source locations or require RE
     "test_buck2_fail": "Requires --remote-only Remote Execution (RE)",
-    "test_targets_error_categorization": "Checks Buck2-specific source location in errors",
-    "test_daemon_abort": "Checks Buck2-specific crash signal output format",
+    # "test_targets_error_categorization": "Checks Buck2-specific source location in errors",
+    # "test_daemon_abort": "Checks Buck2-specific crash signal output format",
     "test_download_failure": "Requires --remote-only Remote Execution (RE) and BUCK2_TEST_FAIL_RE_DOWNLOADS",
     "test_re_execute_failure": "Requires Remote Execution (RE) for re-execute failure testing",
     # command_report tests requiring Meta-internal env vars or features

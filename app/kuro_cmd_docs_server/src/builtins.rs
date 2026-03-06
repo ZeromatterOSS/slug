@@ -84,11 +84,14 @@ pub(crate) async fn docs_starlark_builtins(
 ) -> kuro_error::Result<DocsResponse> {
     let starlark = Globals::extended_by(starlark_library_extensions_for_kuro()).documentation();
 
-    let build = GlobalsBuilder::new()
+    let mut build = GlobalsBuilder::new()
         .with(register_load_natives)
         .with(register_analysis_natives)
         .build()
         .documentation();
+    // Remove the Attr type from build docs: it has no methods and its name collides
+    // with the `attr` namespace on case-insensitive filesystems (Windows/macOS).
+    build.members.shift_remove("Attr");
 
     let mut bxl = GlobalsBuilder::new()
         .with(register_bxl_natives)

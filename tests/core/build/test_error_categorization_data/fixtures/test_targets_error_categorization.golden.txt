@@ -2,7 +2,7 @@
 
 [<TIMESTAMP>] Starting new kuro daemon...
 [<TIMESTAMP>] Connected to new kuro daemon.
-[<TIMESTAMP>] Buck UI: https://www.internalfb.com/kuro/<UUID>
+[<TIMESTAMP>] Build ID: <UUID>
 [<TIMESTAMP>] Error parsing root//starlark_fail
 [<TIMESTAMP>] Error evaluating build file: `root//starlark_fail:TARGETS.fixture`
 [<TIMESTAMP>]
