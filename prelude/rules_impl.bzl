@@ -19,6 +19,7 @@ load("@prelude//:genrule.bzl", "genrule_attributes", "genrule_impl")
 load("@prelude//:http_file.bzl", "http_file_impl")
 load("@prelude//:remote_file.bzl", "remote_file_impl")
 load("@prelude//:sh_binary.bzl", "sh_binary_impl")
+load("@prelude//:sh_library.bzl", "sh_library_impl")
 load("@prelude//:sh_test.bzl", "sh_test_impl")
 load("@prelude//:test_suite.bzl", "test_suite_impl")
 load("@prelude//configurations:rules.bzl", _config_extra_attributes = "extra_attributes", _config_implemented_rules = "implemented_rules")
@@ -59,6 +60,7 @@ _extra_impl_rules = _merge_dicts([
         "http_file": http_file_impl,
         "remote_file": remote_file_impl,
         "sh_binary": sh_binary_impl,
+        "sh_library": sh_library_impl,
         "sh_test": sh_test_impl,
         "test_suite": test_suite_impl,
         "toolchain_alias": alias_impl,

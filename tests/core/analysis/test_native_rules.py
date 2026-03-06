@@ -141,6 +141,12 @@ async def test_sh_binary_builds(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_sh_library_builds(buck: Buck) -> None:
+    """sh_library() rule can be defined and builds successfully."""
+    await buck.build("//:hello_sh_lib")
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_sh_test_runs(buck: Buck) -> None:
     """sh_test() runs successfully using bash as interpreter."""
     result = await buck.test("//:hello_sh_test")

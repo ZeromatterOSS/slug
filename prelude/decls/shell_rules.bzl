@@ -200,7 +200,49 @@ sh_test = prelude_rule(
     cfg = constraint_overrides.transition,
 )
 
+sh_library = prelude_rule(
+    name = "sh_library",
+    docs = """
+        An `sh_library()` is used to group shell scripts and their associated resources.
+        It is used as a dependency of `sh_binary()` and `sh_test()`.
+    """,
+    examples = """
+        ```
+        sh_library(
+            name = "my_lib",
+            srcs = ["lib.sh"],
+        )
+
+        sh_binary(
+            name = "my_script",
+            main = "main.sh",
+            deps = [":my_lib"],
+        )
+        ```
+    """,
+    further = None,
+    attrs = (
+        # @unsorted-dict-items
+        {
+            "srcs": attrs.list(attrs.source(), default = [], doc = """
+                The list of shell scripts that belong to this library.
+            """),
+            "deps": attrs.list(attrs.dep(), default = [], doc = """
+                A list of `sh_library()` targets that are required by this library.
+            """),
+            "data": attrs.list(attrs.source(allow_directory = True), default = [], doc = """
+                A list of files needed at runtime by this library.
+            """),
+            "default_host_platform": attrs.option(attrs.configuration_label(), default = None),
+        } |
+        buck.licenses_arg() |
+        buck.labels_arg() |
+        buck.contacts_arg()
+    ),
+)
+
 shell_rules = struct(
     sh_binary = sh_binary,
+    sh_library = sh_library,
     sh_test = sh_test,
 )

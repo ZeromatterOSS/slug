@@ -143,6 +143,13 @@ sh_binary(
     srcs = ["hello.sh"],
 )
 
+# === sh_library test ===
+
+sh_library(
+    name = "hello_sh_lib",
+    srcs = ["hello.sh"],
+)
+
 # === sh_test test ===
 
 sh_test(
