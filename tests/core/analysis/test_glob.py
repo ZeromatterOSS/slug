@@ -13,51 +13,64 @@ from buck2.tests.e2e_util.buck_workspace import buck_test
 
 
 @buck_test(data_dir="test_glob_data")
-async def test_glob_simple(buck: Buck) -> None:
-    """glob(['*.txt']) matches all .txt files in the current directory."""
-    result = await buck.build("//:glob_all_txt")
-    output = result.get_build_report().output_for_target("//:glob_all_txt")
-    names = set(output.read_text().strip().splitlines())
-    assert "a.txt" in names
-    assert "b.txt" in names
-    assert "excluded.txt" in names
-    # Should not include BUILD.bazel or defs.bzl
-    assert "BUILD.bazel" not in names
-    assert "defs.bzl" not in names
+async def test_glob_all_txt(buck: Buck) -> None:
+    """glob(["src/**/*.txt"]) finds all .txt files in src/."""
+    result = await buck.build("//:all_txt")
+    output = result.get_build_report().output_for_target("//:all_txt")
+    names = output.read_text().strip().splitlines()
+    assert "a.txt" in names, f"Expected a.txt in {names}"
+    assert "b.txt" in names, f"Expected b.txt in {names}"
+    assert "c.py" not in names, f"c.py should not match *.txt: {names}"
 
 
 @buck_test(data_dir="test_glob_data")
-async def test_glob_exclude(buck: Buck) -> None:
-    """glob(['*.txt'], exclude=['excluded.txt']) skips the excluded file."""
-    result = await buck.build("//:glob_exclude")
-    output = result.get_build_report().output_for_target("//:glob_exclude")
-    names = set(output.read_text().strip().splitlines())
-    assert "a.txt" in names
-    assert "b.txt" in names
-    assert "excluded.txt" not in names
+async def test_glob_py_extension(buck: Buck) -> None:
+    """glob(["src/**/*.py"]) finds only .py files."""
+    result = await buck.build("//:all_py")
+    output = result.get_build_report().output_for_target("//:all_py")
+    names = output.read_text().strip().splitlines()
+    assert "c.py" in names, f"Expected c.py in {names}"
+    assert "a.txt" not in names, f"a.txt should not match *.py: {names}"
+    assert "b.txt" not in names, f"b.txt should not match *.py: {names}"
 
 
 @buck_test(data_dir="test_glob_data")
-async def test_glob_recursive(buck: Buck) -> None:
-    """glob(['**/*.txt']) recursively matches .txt files in subdirectories."""
-    result = await buck.build("//:glob_recursive")
-    output = result.get_build_report().output_for_target("//:glob_recursive")
-    names = set(output.read_text().strip().splitlines())
-    # Should include root-level .txt files
-    assert "a.txt" in names
-    assert "b.txt" in names
-    # Should include nested files (basename is just the filename)
-    assert "nested.txt" in names
+async def test_glob_with_exclude(buck: Buck) -> None:
+    """glob with exclude= omits specified files."""
+    result = await buck.build("//:txt_no_b")
+    output = result.get_build_report().output_for_target("//:txt_no_b")
+    names = output.read_text().strip().splitlines()
+    assert "a.txt" in names, f"Expected a.txt in {names}"
+    assert "b.txt" not in names, f"b.txt should be excluded: {names}"
 
 
 @buck_test(data_dir="test_glob_data")
 async def test_glob_multiple_patterns(buck: Buck) -> None:
-    """glob() accepts multiple patterns and merges matches."""
-    result = await buck.build("//:glob_multi_pattern")
-    output = result.get_build_report().output_for_target("//:glob_multi_pattern")
-    names = set(output.read_text().strip().splitlines())
-    # .txt files should be included
-    assert "a.txt" in names
-    assert "b.txt" in names
-    # .bzl files should also be included
-    assert "defs.bzl" in names
+    """glob with multiple patterns combines results."""
+    result = await buck.build("//:multi_pattern")
+    output = result.get_build_report().output_for_target("//:multi_pattern")
+    names = output.read_text().strip().splitlines()
+    # Should include .txt files from src/ and .json files from data/
+    assert "a.txt" in names, f"Expected a.txt in {names}"
+    assert "b.txt" in names, f"Expected b.txt in {names}"
+    assert "x.json" in names, f"Expected x.json in {names}"
+    assert "y.json" in names, f"Expected y.json in {names}"
+
+
+@buck_test(data_dir="test_glob_data")
+async def test_glob_no_match_returns_empty(buck: Buck) -> None:
+    """glob() with no matching files returns empty list (rule still builds)."""
+    result = await buck.build("//:no_match")
+    output = result.get_build_report().output_for_target("//:no_match")
+    content = output.read_text().strip()
+    assert content == "", f"Expected empty output for no matches, got: {content!r}"
+
+
+@buck_test(data_dir="test_glob_data")
+async def test_glob_package_root(buck: Buck) -> None:
+    """glob(["data/*.json"]) finds files in a subdirectory."""
+    result = await buck.build("//:root_files")
+    output = result.get_build_report().output_for_target("//:root_files")
+    names = output.read_text().strip().splitlines()
+    assert "x.json" in names, f"Expected x.json in {names}"
+    assert "y.json" in names, f"Expected y.json in {names}"
