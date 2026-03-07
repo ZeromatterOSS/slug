@@ -66,7 +66,7 @@ mod target_modifiers;
 mod transition_dep;
 mod tuple;
 pub(crate) mod ty_maybe_select;
-mod visibility;
+pub mod visibility;
 mod within_view;
 
 pub trait AttrTypeExt {

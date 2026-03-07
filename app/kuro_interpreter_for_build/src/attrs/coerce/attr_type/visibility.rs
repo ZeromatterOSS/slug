@@ -60,6 +60,64 @@ impl AttrTypeCoerce for VisibilityAttrType {
 const BAZEL_VISIBILITY_PUBLIC: &str = "//visibility:public";
 const BAZEL_VISIBILITY_PRIVATE: &str = "//visibility:private";
 
+/// Parse visibility from a slice of strings (for native rules).
+///
+/// Equivalent to `parse_visibility_with_view` but accepts `&[String]` instead of `Value`,
+/// for use in contexts where we have string slices rather than Starlark values.
+pub(crate) fn parse_visibility_from_strs(
+    ctx: &dyn AttrCoercionContext,
+    visibility: &[String],
+) -> kuro_error::Result<VisibilityWithinViewBuilder> {
+    let mut builder = VisibilityWithinViewBuilder::with_capacity(visibility.len());
+    for item in visibility {
+        if item == VisibilityPattern::PUBLIC || item == BAZEL_VISIBILITY_PUBLIC {
+            builder.add_public();
+        } else if item == BAZEL_VISIBILITY_PRIVATE {
+            continue;
+        } else if item == ":__pkg__" || item == ":__subpackages__" {
+            let normalized_opt = ctx.coerce_providers_label(":__v__").ok().map(|dummy| {
+                let pkg = dummy.target().pkg();
+                let cell_path = pkg.as_cell_path();
+                let path_str = cell_path.path().as_str();
+                if item == ":__pkg__" {
+                    format!("//{}:", path_str)
+                } else if path_str.is_empty() {
+                    "//...".to_owned()
+                } else {
+                    format!("//{}/...", path_str)
+                }
+            });
+            match normalized_opt {
+                Some(normalized) => match ctx.coerce_target_pattern(&normalized) {
+                    Ok(pattern) => builder.add(VisibilityPattern(pattern)),
+                    Err(_) => builder.add_public(),
+                },
+                None => builder.add_public(),
+            }
+        } else {
+            let normalized_item = if item.ends_with(":__pkg__") {
+                item.trim_end_matches("__pkg__").to_owned()
+            } else if item.ends_with(":__subpackages__") {
+                let base = item.trim_end_matches(":__subpackages__");
+                format!("{}/...", base)
+            } else {
+                item.clone()
+            };
+            match ctx.coerce_target_pattern(&normalized_item) {
+                Ok(pattern) => {
+                    builder.add(VisibilityPattern(pattern));
+                }
+                Err(_) => {
+                    // Skip visibility entries that can't be resolved
+                    // (e.g., package_group references or unknown cell aliases)
+                    continue;
+                }
+            }
+        }
+    }
+    Ok(builder)
+}
+
 pub(crate) fn parse_visibility_with_view(
     ctx: &dyn AttrCoercionContext,
     attr: Value,

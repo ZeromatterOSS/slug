@@ -43,8 +43,8 @@ use kuro_node::rule::Rule;
 use kuro_node::rule::RuleIncomingTransition;
 use kuro_node::rule_type::NativeRuleKind;
 use kuro_node::rule_type::RuleType;
-use kuro_node::visibility::VisibilityPatternList;
 use kuro_node::visibility::VisibilitySpecification;
+use kuro_node::visibility::VisibilityWithinViewBuilder;
 use kuro_util::arc_str::ArcSlice;
 use kuro_util::arc_str::ArcStr;
 use once_cell::sync::Lazy;
@@ -57,6 +57,7 @@ use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneType;
 
 use crate::attrs::coerce::attr_type::AttrTypeExt;
+use crate::attrs::coerce::attr_type::visibility::parse_visibility_from_strs;
 use crate::interpreter::module_internals::ModuleInternals;
 
 /// Pre-built Rule definitions for native rules.
@@ -814,32 +815,6 @@ mod rule_defs {
     });
 }
 
-/// Bazel-style visibility constants
-const BAZEL_VISIBILITY_PUBLIC: &str = "//visibility:public";
-
-/// Parses a visibility list and returns a VisibilitySpecification.
-/// Supports both Kuro-style ("PUBLIC") and Bazel-style ("//visibility:public").
-/// Returns None if no visibility was explicitly specified (to use default).
-fn parse_explicit_visibility(visibility: &[String]) -> Option<VisibilitySpecification> {
-    if visibility.is_empty() {
-        return None; // No explicit visibility, use default
-    }
-    for item in visibility {
-        // Check for public visibility patterns
-        if item == "PUBLIC"
-            || item == BAZEL_VISIBILITY_PUBLIC
-            || item.contains("__subpackages__")
-            || item.contains("__pkg__")
-        {
-            // TODO(bazel-compat): Implement proper Bazel visibility patterns.
-            // For now, treat __subpackages__ and __pkg__ as public.
-            return Some(VisibilitySpecification(VisibilityPatternList::Public));
-        }
-    }
-    // Explicit visibility but not public - default to private
-    Some(VisibilitySpecification::DEFAULT)
-}
-
 /// Extract visibility strings from a Starlark value.
 /// Handles None (returns empty), list of strings, or tuple of strings.
 fn extract_visibility_strings(value: starlark::values::Value) -> Vec<String> {
@@ -868,6 +843,7 @@ fn create_native_target_node(
     target_name: &str,
     attrs: Vec<(String, CoercedAttr)>,
     visibility: &[String],
+    coercion_ctx: &dyn AttrCoercionContext,
     default_visibility: &VisibilitySpecification,
 ) -> kuro_error::Result<TargetNode> {
     let target_label = TargetLabel::new(
@@ -886,8 +862,13 @@ fn create_native_target_node(
 
     // Add visibility attribute (AttributeId(5))
     // Use explicit visibility if provided, otherwise fall back to package default
-    let visibility_spec =
-        parse_explicit_visibility(visibility).unwrap_or_else(|| default_visibility.dupe());
+    let visibility_spec = if visibility.is_empty() {
+        default_visibility.dupe()
+    } else {
+        parse_visibility_from_strs(coercion_ctx, visibility)
+            .unwrap_or_else(|_| VisibilityWithinViewBuilder::with_capacity(0))
+            .build_visibility()
+    };
     attr_values.push_sorted(
         VISIBILITY_ATTRIBUTE.id,
         CoercedAttr::Visibility(visibility_spec),
@@ -974,6 +955,7 @@ fn create_native_cc_target<'v>(
             ("includes".to_owned(), empty_string_list),
         ],
         &extract_visibility_strings(visibility),
+        internals.attr_coercion_context(),
         &internals.default_visibility(),
     )?;
 
@@ -1019,6 +1001,7 @@ fn create_sh_target<'v>(
             ),
         ],
         &extract_visibility_strings(visibility),
+        internals.attr_coercion_context(),
         &internals.default_visibility(),
     )?;
 
@@ -1071,6 +1054,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             name,
             vec![], // No attributes beyond name
             &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
 
@@ -1124,6 +1108,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             name,
             vec![("constraint_setting".to_owned(), coerced_constraint_setting)],
             &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
 
@@ -1176,6 +1161,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             name,
             vec![("actual".to_owned(), coerced_actual)],
             &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
 
@@ -1242,6 +1228,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
                 ("data".to_owned(), coerced_data),
             ],
             &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
 
@@ -1297,6 +1284,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             name,
             vec![("build_setting_default".to_owned(), coerced_default)],
             &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
 
@@ -1443,6 +1431,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
                 ("flag_values".to_owned(), coerced_flag_values),
             ],
             &vis_strings,
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
 
@@ -1481,6 +1470,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             name,
             vec![],
             &["//visibility:public".to_owned()], // package_group is always public
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
 
@@ -1523,6 +1513,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             name,
             vec![],
             &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
 
@@ -1664,6 +1655,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
                 ("tools".to_owned(), coerced_tools),
             ],
             &vis_strings,
+            coercion_ctx,
             &default_vis,
         )?;
 
@@ -1692,6 +1684,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
                 out_name,
                 vec![("srcs".to_owned(), srcs_attr.clone())],
                 &vis_strings,
+                coercion_ctx,
                 &default_vis,
             )?;
             internals.record(out_target)?;
@@ -1772,6 +1765,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
                 ("flags".to_owned(), flags_coerced),
             ],
             &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
 
@@ -1805,6 +1799,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             name,
             attrs,
             &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
         internals.record(target_node)?;
@@ -1835,6 +1830,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             name,
             vec![("platforms".to_owned(), coerced_platforms)],
             &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
         internals.record(target_node)?;
@@ -1969,6 +1965,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
                     ),
                 ],
                 &vis_strings,
+                coercion_ctx,
                 &default_vis,
             )?;
 
@@ -2048,6 +2045,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
                 ("toolchain".to_owned(), coerced_toolchain),
             ],
             &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
 
@@ -2156,6 +2154,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             name,
             vec![("tests".to_owned(), coerced_tests)],
             &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
 
@@ -2186,6 +2185,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             name,
             vec![],
             &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
 
@@ -2253,6 +2253,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
                 ("strict".to_owned(), coerced_strict),
             ],
             &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
 
@@ -2277,6 +2278,7 @@ pub fn init_analysis_test_register() {
             name,
             vec![],
             &[],
+            internals.attr_coercion_context(),
             &internals.default_visibility(),
         )?;
         internals.record(target_node)?;
