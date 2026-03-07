@@ -8,6 +8,8 @@
 
 # pyre-strict
 
+import json
+
 from buck2.tests.e2e_util.api.buck import Buck
 from buck2.tests.e2e_util.buck_workspace import buck_test
 
@@ -274,3 +276,39 @@ async def test_all_targets_pattern(buck: Buck) -> None:
     targets = set(result.stdout.strip().splitlines())
     expected = {_ROOT_LIB, _ROOT_APP, _LIB_CORE, _LIB_UTIL, _APP_MAIN, _APP_SECONDARY}
     assert expected.issubset(targets), f"Missing targets. Expected {expected}, got {targets}"
+
+
+# ============================================================================
+# Output formats
+# ============================================================================
+
+
+@buck_test(data_dir="test_bazel_compat_query_data")
+async def test_output_json_format(buck: Buck) -> None:
+    """--output=json returns a valid JSON array of target labels."""
+    result = await buck.uquery("root//lib/...", "--output=json")
+    data = json.loads(result.stdout)
+    assert isinstance(data, list), f"Expected JSON array, got: {type(data)}"
+    assert _LIB_CORE in data, f"Expected {_LIB_CORE} in JSON: {data}"
+    assert _LIB_UTIL in data, f"Expected {_LIB_UTIL} in JSON: {data}"
+
+
+@buck_test(data_dir="test_bazel_compat_query_data")
+async def test_output_build_format(buck: Buck) -> None:
+    """--output=build returns BUILD-syntax rule definitions."""
+    result = await buck.uquery("root//lib:core", "--output=build")
+    content = result.stdout
+    # Should contain the rule call with the target name
+    assert "lib_rule" in content, f"Expected rule name in build output: {content!r}"
+    assert '"core"' in content or "'core'" in content, \
+        f"Expected target name 'core' in build output: {content!r}"
+
+
+@buck_test(data_dir="test_bazel_compat_query_data")
+async def test_output_default_label_format(buck: Buck) -> None:
+    """Default output (--output=label) returns one label per line."""
+    result = await buck.uquery("root//lib/...")
+    lines = result.stdout.strip().splitlines()
+    assert len(lines) == 2, f"Expected 2 targets, got: {lines}"
+    assert _LIB_CORE in lines
+    assert _LIB_UTIL in lines
