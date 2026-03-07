@@ -241,12 +241,12 @@ pub struct Aspect {
 - [x] All crates build: `cargo build -p kuro_build_api -p kuro_interpreter_for_build`
 
 **Deferred to Phase 8c (Requires DICE Integration):**
-- [ ] Aspect implementation function can be called
-- [ ] `ctx.rule.kind` returns correct rule kind
-- [ ] `ctx.rule.attr` provides access to rule attributes
-- [ ] `ctx.label` returns target label
-- [ ] Aspect can return providers
-- [ ] Simple aspect with no propagation works
+- [x] Aspect implementation function can be called (verified 2026-03-06)
+- [x] `ctx.rule.kind` returns correct rule kind (test_aspect_ctx_rule_kind passes)
+- [x] `ctx.rule.attr` provides access to rule attributes (string/int/list attrs tested)
+- [x] `ctx.label` returns target label (test_aspect_ctx_label passes)
+- [x] Aspect can return providers (verified via FilesInfo, CountInfo, KindInfo)
+- [x] Simple aspect with no propagation works (kind_aspect tested)
 
 ---
 
@@ -318,9 +318,9 @@ impl Key for AspectKey {
 
 #### Success Criteria (Phase 8c)
 
-- [ ] Aspect propagates through `attr_aspects` attributes
-- [ ] `ctx.rule.attr.deps` contains aspect results (shadow graph)
-- [ ] `required_providers` filtering works
+- [x] Aspect propagates through `attr_aspects` attributes (test_aspect_basic_propagation passes)
+- [x] `ctx.rule.attr.deps` contains aspect results (shadow graph) (verified via FilesInfo collection)
+- [x] `required_providers` filtering works (test_aspect_required_providers_filter passes)
 - [ ] Aspect results are cached via DICE
 - [ ] Incremental recomputation works correctly
 - [ ] `graph_structure_aspect` from rules_cc executes successfully
