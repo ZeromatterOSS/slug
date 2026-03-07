@@ -1,0 +1,20 @@
+load("//:defs.bzl", "app_rule")
+
+# Main app depending on both lib targets
+app_rule(
+    name = "main",
+    deps = [
+        "//lib:core",
+        "//lib:util",
+    ],
+    app_name = "main_application",
+)
+
+# Secondary app depending only on util
+app_rule(
+    name = "secondary",
+    deps = [
+        "//lib:util",
+    ],
+    app_name = "secondary_application",
+)

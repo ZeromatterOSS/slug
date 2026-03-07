@@ -1,0 +1,16 @@
+load(":defs.bzl", "app_rule", "lib_rule")
+
+# Root-level library
+lib_rule(
+    name = "root_lib",
+)
+
+# Root-level app depending on root_lib and //lib:core
+app_rule(
+    name = "root_app",
+    deps = [
+        ":root_lib",
+        "//lib:core",
+    ],
+    app_name = "root_application",
+)

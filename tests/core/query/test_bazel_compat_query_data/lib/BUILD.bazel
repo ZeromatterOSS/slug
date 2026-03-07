@@ -1,0 +1,12 @@
+load("//:defs.bzl", "lib_rule")
+
+# Core library (no deps)
+lib_rule(
+    name = "core",
+)
+
+# Utility library depending on core
+lib_rule(
+    name = "util",
+    deps = [":core"],
+)
