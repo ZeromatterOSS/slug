@@ -305,3 +305,23 @@ toolchain(
     toolchain_type = ":my_toolchain_type",
     toolchain = ":my_toolchain_impl",
 )
+
+# === package_group tests ===
+
+package_group(
+    name = "all_packages",
+    packages = ["//..."],
+)
+
+package_group(
+    name = "root_only",
+    packages = ["//"],
+)
+
+# A target with package_group visibility
+genrule(
+    name = "pkg_group_target",
+    outs = ["pkg_group.txt"],
+    cmd = "echo package_group_ok > $@",
+    visibility = [":all_packages"],
+)

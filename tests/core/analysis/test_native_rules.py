@@ -259,3 +259,19 @@ async def test_toolchain_type_builds(buck: Buck) -> None:
 async def test_toolchain_builds(buck: Buck) -> None:
     """toolchain() rule can be defined and builds successfully."""
     await buck.build("//:my_toolchain")
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_package_group_builds(buck: Buck) -> None:
+    """package_group() rule builds successfully."""
+    await buck.build("//:all_packages")
+    await buck.build("//:root_only")
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_target_with_package_group_visibility(buck: Buck) -> None:
+    """genrule with package_group visibility builds successfully."""
+    result = await buck.build("//:pkg_group_target")
+    output = result.get_build_report().output_for_target("//:pkg_group_target")
+    content = output.read_text().strip()
+    assert "package_group_ok" in content
