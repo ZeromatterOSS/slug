@@ -1,0 +1,25 @@
+load(":defs.bzl", "copy_file_rule", "write_json_dict_rule", "write_json_list_rule", "write_json_struct_rule")
+
+# write_json tests
+write_json_dict_rule(
+    name = "write_json_dict",
+)
+
+write_json_struct_rule(
+    name = "write_json_struct",
+)
+
+write_json_list_rule(
+    name = "write_json_list",
+)
+
+# copy_file test - use filegroup to wrap the source file as a target
+filegroup(
+    name = "source_file",
+    srcs = ["source.txt"],
+)
+
+copy_file_rule(
+    name = "copy_source",
+    src = ":source_file",
+)
