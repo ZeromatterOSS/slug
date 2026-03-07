@@ -1,4 +1,4 @@
-load(":defs.bzl", "collector", "leaf")
+load(":defs.bzl", "collector", "leaf", "runfiles_files_attr_rule", "runfiles_merge_all_rule", "runfiles_merge_rule", "runfiles_transitive_rule")
 
 leaf(
     name = "dep",
@@ -21,4 +21,33 @@ collector(
     runtime_deps = [":runtime_dep"],
     data = [":data_dep"],
     files = ["own.txt"],
+)
+
+# === runfiles.merge() test ===
+
+runfiles_merge_rule(
+    name = "runfiles_merge",
+    srcs1 = ["dep.txt"],
+    srcs2 = ["data.txt"],
+)
+
+# === runfiles.merge_all() test ===
+
+runfiles_merge_all_rule(
+    name = "runfiles_merge_all",
+    srcs = ["dep.txt", "data.txt", "runtime.txt"],
+)
+
+# === ctx.runfiles(transitive_files=...) test ===
+
+runfiles_transitive_rule(
+    name = "runfiles_transitive",
+    srcs = ["dep.txt", "data.txt"],
+)
+
+# === runfiles.files attribute test ===
+
+runfiles_files_attr_rule(
+    name = "runfiles_files_attr",
+    srcs = ["dep.txt"],
 )
