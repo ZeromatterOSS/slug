@@ -1,0 +1,9 @@
+# Sub-package targets to test cross-package visibility
+
+# This target depends on the root package target that has //visibility:public visibility
+genrule(
+    name = "depends_on_public",
+    srcs = ["//:always_public"],
+    outs = ["depends.txt"],
+    cmd = "cp $(location //:always_public) $@",
+)

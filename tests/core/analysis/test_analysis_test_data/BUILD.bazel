@@ -1,0 +1,11 @@
+load("//:defs.bzl", "check_my_info_test", "my_rule")
+
+my_rule(
+    name = "my_target",
+    val = "hello",
+)
+
+check_my_info_test(
+    name = "check_my_info",
+    target_under_test = ":my_target",
+)

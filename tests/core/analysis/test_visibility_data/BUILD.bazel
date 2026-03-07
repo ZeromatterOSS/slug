@@ -1,0 +1,21 @@
+# Test package_group creation
+package_group(
+    name = "my_packages",
+    packages = ["//..."],
+)
+
+# Test that a target can use a package_group for visibility
+genrule(
+    name = "public_target",
+    outs = ["public.txt"],
+    cmd = "echo public > $@",
+    visibility = ["//:my_packages"],
+)
+
+# Test //visibility:public
+genrule(
+    name = "always_public",
+    outs = ["always.txt"],
+    cmd = "echo always > $@",
+    visibility = ["//visibility:public"],
+)
