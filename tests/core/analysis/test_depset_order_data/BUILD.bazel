@@ -2,6 +2,7 @@ load(
     ":defs.bzl",
     "depset_consumer",
     "depset_default_infer_rule",
+    "depset_keyword_rule",
     "depset_mismatch_rule",
     "depset_order_rule",
     "depset_producer",
@@ -45,4 +46,9 @@ depset_producer(
 depset_consumer(
     name = "depset_consumer",
     dep = ":depset_producer",
+)
+
+# Test depset() with keyword direct= and transitive= args
+depset_keyword_rule(
+    name = "depset_keyword",
 )

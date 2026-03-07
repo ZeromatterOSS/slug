@@ -83,3 +83,20 @@ depset_consumer = rule(
         "dep": attr.label(),
     },
 )
+
+
+# === depset(direct=...) keyword form ===
+
+def _depset_keyword_impl(ctx):
+    """Tests depset() with keyword 'direct=' and 'transitive=' arguments."""
+    a = depset(direct = ["x", "y"])
+    b = depset(direct = ["z"], transitive = [a])
+    out = ctx.actions.declare_file("keyword_depset.txt")
+    ctx.actions.write(out, "\n".join(b.to_list()))
+    return [DefaultInfo(default_output = out)]
+
+
+depset_keyword_rule = rule(
+    implementation = _depset_keyword_impl,
+    attrs = {},
+)

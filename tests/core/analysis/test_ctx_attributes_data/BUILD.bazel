@@ -1,5 +1,6 @@
 load(":defs.bzl",
      "bin_dir_rule",
+     "build_file_path_rule",
      "ctx_var_rule",
      "disabled_features_rule",
      "do_nothing_rule",
@@ -84,3 +85,7 @@ template_dict_rule(
 # === ctx.var ===
 
 ctx_var_rule(name = "ctx_var")
+
+# === ctx.build_file_path ===
+
+build_file_path_rule(name = "build_file_path")

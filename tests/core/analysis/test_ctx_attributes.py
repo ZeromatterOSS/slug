@@ -176,3 +176,14 @@ async def test_ctx_var_target_cpu(buck: Buck) -> None:
     )
     assert lines["target_cpu_set"] == "True", \
         f"TARGET_CPU should be non-empty, got: {lines.get('target_cpu_set')!r}"
+
+
+@buck_test(data_dir="test_ctx_attributes_data")
+async def test_ctx_build_file_path(buck: Buck) -> None:
+    """ctx.build_file_path returns the BUILD file path relative to the workspace."""
+    result = await buck.build("//:build_file_path")
+    output = result.get_build_report().output_for_target("//:build_file_path")
+    path = output.read_text().strip()
+    # For root package, should be "BUILD.bazel" or similar
+    assert "BUILD" in path, f"Expected BUILD file path, got: {path!r}"
+    assert not path.startswith("/"), f"Path should be relative, got: {path!r}"

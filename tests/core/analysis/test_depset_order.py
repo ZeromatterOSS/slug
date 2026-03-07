@@ -62,3 +62,12 @@ async def test_depset_cross_rule_traversal(buck: Buck) -> None:
     content = output.read_text().strip().splitlines()
     # All items from the transitive depset chain should be present
     assert set(content) == {"item_a1", "item_a2", "item_b1", "item_c1"}
+
+
+@buck_test(data_dir="test_depset_order_data")
+async def test_depset_keyword_direct_transitive(buck: Buck) -> None:
+    """depset(direct=[...], transitive=[...]) keyword form works correctly."""
+    result = await buck.build("//:depset_keyword")
+    output = result.get_build_report().output_for_target("//:depset_keyword")
+    content = set(output.read_text().strip().splitlines())
+    assert content == {"x", "y", "z"}, f"Expected {{x, y, z}}, got {content}"

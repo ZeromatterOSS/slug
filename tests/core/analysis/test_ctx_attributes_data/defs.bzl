@@ -273,3 +273,20 @@ ctx_var_rule = rule(
     implementation = _ctx_var_rule_impl,
     attrs = {},
 )
+
+
+# ============================================================================
+# ctx.build_file_path
+# ============================================================================
+
+def _build_file_path_rule_impl(ctx):
+    """Tests ctx.build_file_path returns the BUILD file path."""
+    out = ctx.actions.declare_file("build_file_path.txt")
+    ctx.actions.write(out, ctx.build_file_path)
+    return [DefaultInfo(default_output = out)]
+
+
+build_file_path_rule = rule(
+    implementation = _build_file_path_rule_impl,
+    attrs = {},
+)
