@@ -1,4 +1,4 @@
-load(":defs.bzl", "collector", "counter", "kind_reporter", "my_lib", "plain_lib", "tagged_lib")
+load(":defs.bzl", "attr_reporter", "collector", "configurable_lib", "counter", "kind_reporter", "label_reporter", "my_lib", "plain_lib", "tagged_lib")
 
 # files_aspect tests
 my_lib(
@@ -65,4 +65,28 @@ kind_reporter(
         ":foo",
         ":tagged",
     ],
+)
+
+# ctx.label in aspect test
+configurable_lib(
+    name = "config_alpha",
+    value = "alpha",
+    count = 10,
+)
+
+configurable_lib(
+    name = "config_beta",
+    value = "beta",
+    count = 20,
+    deps = [":config_alpha"],
+)
+
+label_reporter(
+    name = "label_report",
+    deps = [":config_beta"],
+)
+
+attr_reporter(
+    name = "attr_report",
+    deps = [":config_beta"],
 )

@@ -133,3 +133,83 @@ kind_reporter = rule(
         "deps": attr.label_list(aspects = [kind_aspect]),
     },
 )
+
+
+# ── ctx.label in aspect and ctx.rule.attr with string/int attrs ──────────────
+
+LabelInfo = provider(fields = ["label_str"])
+StringAttrInfo = provider(fields = ["value", "count"])
+
+
+def _label_aspect_impl(target, ctx):
+    """Record the canonical label of each visited target."""
+    return [LabelInfo(label_str = str(ctx.label))]
+
+
+label_aspect = aspect(
+    implementation = _label_aspect_impl,
+    attr_aspects = ["deps"],
+)
+
+
+def _attr_aspect_impl(target, ctx):
+    """Record string/int attrs from the visited rule."""
+    value = ctx.rule.attr.value if hasattr(ctx.rule.attr, "value") else "N/A"
+    count = ctx.rule.attr.count if hasattr(ctx.rule.attr, "count") else -1
+    return [StringAttrInfo(value = str(value), count = count)]
+
+
+attr_value_aspect = aspect(
+    implementation = _attr_aspect_impl,
+    attr_aspects = ["deps"],
+)
+
+
+def _configurable_lib_impl(ctx):
+    return [DefaultInfo()]
+
+
+configurable_lib = rule(
+    impl = _configurable_lib_impl,
+    attrs = {
+        "value": attr.string(default = "default_value"),
+        "count": attr.int(default = 42),
+        "deps": attr.label_list(aspects = [label_aspect, attr_value_aspect]),
+    },
+)
+
+
+def _label_reporter_impl(ctx):
+    """Report label strings collected by label_aspect."""
+    labels = []
+    for dep in ctx.attrs.deps:
+        if LabelInfo in dep:
+            labels.append(dep[LabelInfo].label_str)
+    out = ctx.actions.write("labels.txt", "\n".join(sorted(labels)))
+    return [DefaultInfo(default_outputs = [out])]
+
+
+label_reporter = rule(
+    impl = _label_reporter_impl,
+    attrs = {
+        "deps": attr.label_list(aspects = [label_aspect]),
+    },
+)
+
+
+def _attr_reporter_impl(ctx):
+    """Report string/int attr values collected by attr_value_aspect."""
+    lines = []
+    for dep in ctx.attrs.deps:
+        if StringAttrInfo in dep:
+            lines.append("{}:{}".format(dep[StringAttrInfo].value, dep[StringAttrInfo].count))
+    out = ctx.actions.write("attr_values.txt", "\n".join(sorted(lines)))
+    return [DefaultInfo(default_outputs = [out])]
+
+
+attr_reporter = rule(
+    impl = _attr_reporter_impl,
+    attrs = {
+        "deps": attr.label_list(aspects = [attr_value_aspect]),
+    },
+)

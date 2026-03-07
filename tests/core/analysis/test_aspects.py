@@ -67,3 +67,23 @@ async def test_aspect_ctx_rule_kind(buck: Buck) -> None:
     # :foo is a my_lib, :tagged is a tagged_lib
     assert "my_lib" in kinds, f"Expected 'my_lib' in {kinds}"
     assert "tagged_lib" in kinds, f"Expected 'tagged_lib' in {kinds}"
+
+
+@buck_test(data_dir="test_aspects_data")
+async def test_aspect_ctx_label(buck: Buck) -> None:
+    """ctx.label in an aspect returns a string containing the target's label."""
+    result = await buck.build("//:label_report")
+    output = result.get_build_report().output_for_target("//:label_report")
+    content = output.read_text().strip()
+    # The label of config_beta should appear (reporter's direct dep)
+    assert "config_beta" in content, f"Expected 'config_beta' in labels: {content!r}"
+
+
+@buck_test(data_dir="test_aspects_data")
+async def test_aspect_ctx_rule_attr_string_and_int(buck: Buck) -> None:
+    """ctx.rule.attr in an aspect accesses string and int attributes."""
+    result = await buck.build("//:attr_report")
+    output = result.get_build_report().output_for_target("//:attr_report")
+    lines = output.read_text().strip().splitlines()
+    # attr_reporter has dep config_beta (value="beta", count=20)
+    assert "beta:20" in lines, f"Expected 'beta:20' in {lines}"
