@@ -2211,14 +2211,47 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(kwargs)] extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _ = (expression, scope, opts, strict, extra_kwargs);
+        let _ = extra_kwargs;
         let internals = ModuleInternals::from_context(eval, "genquery")?;
+        let coercion_ctx = internals.attr_coercion_context();
+
+        // Coerce expression (required string)
+        let coerced_expression =
+            CoercedAttr::String(StringLiteral(ArcStr::from(expression)));
+
+        // Coerce scope (list of dep labels, optional - default to empty list)
+        let scope_attr_type = AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY));
+        let scope_value = if scope.is_none() {
+            eval.heap().alloc(Vec::<Value>::new())
+        } else {
+            scope
+        };
+        let coerced_scope =
+            scope_attr_type.coerce(AttrIsConfigurable::No, coercion_ctx, scope_value)?;
+
+        // Coerce opts (list of strings, optional - default to empty list)
+        let opts_attr_type = AttrType::list(AttrType::string());
+        let opts_value = if opts.is_none() {
+            eval.heap().alloc(Vec::<Value>::new())
+        } else {
+            opts
+        };
+        let coerced_opts =
+            opts_attr_type.coerce(AttrIsConfigurable::No, coercion_ctx, opts_value)?;
+
+        // Coerce strict (bool)
+        let coerced_strict = CoercedAttr::Bool(BoolLiteral(strict));
 
         let target_node = create_native_target_node(
             rule_defs::GENQUERY_RULE.clone(),
             internals.package(),
             name,
-            vec![],
+            vec![
+                ("expression".to_owned(), coerced_expression),
+                ("scope".to_owned(), coerced_scope),
+                ("opts".to_owned(), coerced_opts),
+                ("strict".to_owned(), coerced_strict),
+            ],
             &extract_visibility_strings(visibility),
             &internals.default_visibility(),
         )?;

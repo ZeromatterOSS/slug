@@ -1,0 +1,11 @@
+genrule(
+    name = "simple_gen",
+    outs = ["simple.txt"],
+    cmd = "echo hello > $@",
+)
+
+genquery(
+    name = "deps_query",
+    expression = "deps(//:simple_gen)",
+    scope = ["//:simple_gen"],
+)

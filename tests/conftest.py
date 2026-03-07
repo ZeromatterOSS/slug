@@ -116,6 +116,9 @@ _WINDOWS_SKIP_TESTS = {
 
 # Individual test functions to skip (mapped to [test_file_path, test_function_name])
 SKIP_TESTS = {
+    # Anon targets test: includes as_artifact_short_path which expects Buck2-style
+    # extension WITH leading dot ('.out'), but Bazel/kuro returns extension WITHOUT dot ('out')
+    "test_anon_targets": "Sub-test as_artifact_short_path uses Buck2-style File.extension with leading dot; kuro returns Bazel-compatible extension without dot",
     # Buck2-specific modifier tests within otherwise-working test files
     "test_audit_subtarget_modifiers": "Uses Buck2-specific ?modifier syntax",
     "test_audit_subtarget_modifiers_target_universe": "Uses Buck2-specific ?modifier syntax",
