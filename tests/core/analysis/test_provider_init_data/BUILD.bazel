@@ -1,0 +1,31 @@
+load(":defs.bzl",
+     "init_provider_rule",
+     "multi_init_rule",
+     "raw_constructor_rule",
+     "validated_provider_rule")
+
+# Test basic init function (uppercases string)
+init_provider_rule(
+    name = "init_basic",
+    input_value = "hello",
+)
+
+# Test raw constructor bypass (should NOT uppercase)
+raw_constructor_rule(
+    name = "raw_bypass",
+    input_value = "hello",
+)
+
+# Test init with multiple fields
+multi_init_rule(
+    name = "multi_init",
+    label_name = "  my_target  ",
+    count = 5,
+)
+
+# Test init with files
+validated_provider_rule(
+    name = "validated",
+    srcs = ["src.txt"],
+    hdrs = ["hdr.txt"],
+)

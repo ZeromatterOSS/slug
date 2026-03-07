@@ -1,5 +1,6 @@
 load(":defs.bzl",
      "bin_dir_rule",
+     "ctx_var_rule",
      "disabled_features_rule",
      "do_nothing_rule",
      "expand_make_vars_rule",
@@ -79,3 +80,7 @@ template_dict_rule(
     name = "computed_template",
     template = "computed_template.txt",
 )
+
+# === ctx.var ===
+
+ctx_var_rule(name = "ctx_var")

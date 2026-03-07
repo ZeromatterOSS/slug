@@ -139,3 +139,40 @@ async def test_ctx_actions_template_dict(buck: Buck) -> None:
     output = result.get_build_report().output_for_target("//:computed_template")
     content = output.read_text().strip()
     assert content == "Hi items: a,b,c"
+
+
+@buck_test(data_dir="test_ctx_attributes_data")
+async def test_ctx_var_bindir(buck: Buck) -> None:
+    """ctx.var['BINDIR'] returns a buck-out path."""
+    result = await buck.build("//:ctx_var")
+    output = result.get_build_report().output_for_target("//:ctx_var")
+    lines = dict(
+        line.split("=", 1) for line in output.read_text().strip().splitlines()
+    )
+    assert lines["bindir_starts_with_buck_out"] == "True", \
+        f"BINDIR should start with buck-out, got: {lines.get('bindir_starts_with_buck_out')!r}"
+
+
+@buck_test(data_dir="test_ctx_attributes_data")
+async def test_ctx_var_compilation_mode(buck: Buck) -> None:
+    """ctx.var['COMPILATION_MODE'] returns a valid compilation mode."""
+    result = await buck.build("//:ctx_var")
+    output = result.get_build_report().output_for_target("//:ctx_var")
+    lines = dict(
+        line.split("=", 1) for line in output.read_text().strip().splitlines()
+    )
+    valid_modes = {"fastbuild", "opt", "dbg"}
+    assert lines["compilation_mode"] in valid_modes, \
+        f"COMPILATION_MODE should be one of {valid_modes}, got: {lines.get('compilation_mode')!r}"
+
+
+@buck_test(data_dir="test_ctx_attributes_data")
+async def test_ctx_var_target_cpu(buck: Buck) -> None:
+    """ctx.var['TARGET_CPU'] is non-empty."""
+    result = await buck.build("//:ctx_var")
+    output = result.get_build_report().output_for_target("//:ctx_var")
+    lines = dict(
+        line.split("=", 1) for line in output.read_text().strip().splitlines()
+    )
+    assert lines["target_cpu_set"] == "True", \
+        f"TARGET_CPU should be non-empty, got: {lines.get('target_cpu_set')!r}"

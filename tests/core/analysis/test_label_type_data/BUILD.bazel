@@ -1,0 +1,25 @@
+load(":defs.bzl",
+     "label_attrs_rule",
+     "label_eq_rule",
+     "label_external_rule",
+     "label_relative_rule",
+     "label_root_rule",
+     "label_str_rule")
+
+# Test Label() with package path
+label_attrs_rule(name = "label_attrs")
+
+# Test Label() at root package
+label_root_rule(name = "label_root")
+
+# Test Label() with external repo
+label_external_rule(name = "label_external")
+
+# Test Label.relative()
+label_relative_rule(name = "label_relative")
+
+# Test Label equality
+label_eq_rule(name = "label_eq")
+
+# Test str(Label())
+label_str_rule(name = "label_str")

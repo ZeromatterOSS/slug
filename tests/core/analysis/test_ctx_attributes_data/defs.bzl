@@ -245,3 +245,31 @@ template_dict_rule = rule(
         "template": attr.label(allow_single_file = True),
     },
 )
+
+
+# ============================================================================
+# ctx.var - Make variables dictionary
+# ============================================================================
+
+def _ctx_var_rule_impl(ctx):
+    """Tests ctx.var provides access to Make variables."""
+    # BINDIR and COMPILATION_MODE are standard Make variables
+    bindir = ctx.var.get("BINDIR", "")
+    compilation_mode = ctx.var.get("COMPILATION_MODE", "")
+    target_cpu = ctx.var.get("TARGET_CPU", "")
+    out = ctx.actions.declare_file("ctx_var.txt")
+    ctx.actions.write(
+        out,
+        "bindir_starts_with_buck_out={}\ncompilation_mode={}\ntarget_cpu_set={}".format(
+            bindir.startswith("buck-out"),
+            compilation_mode,
+            len(target_cpu) > 0,
+        ),
+    )
+    return [DefaultInfo(default_output = out)]
+
+
+ctx_var_rule = rule(
+    implementation = _ctx_var_rule_impl,
+    attrs = {},
+)
