@@ -1,0 +1,95 @@
+load(
+    ":defs.bzl",
+    "bool_attr_rule",
+    "int_attr_rule",
+    "label_keyed_dict_rule",
+    "output_attr_rule",
+    "output_list_rule",
+    "string_dict_iter_rule",
+    "string_dict_rule",
+    "string_list_dict_rule",
+)
+
+# === attr.string_dict() ===
+
+string_dict_rule(
+    name = "string_dict_target",
+    data = {
+        "key_a": "val_a",
+        "key_b": "val_b",
+    },
+)
+
+string_dict_iter_rule(
+    name = "string_dict_iter",
+    data = {
+        "alpha": "1",
+        "beta": "2",
+        "gamma": "3",
+    },
+)
+
+# === attr.string_list_dict() ===
+
+string_list_dict_rule(
+    name = "string_list_dict_target",
+    data = {
+        "unix": ["-DUNIX", "-DPOSIX"],
+        "win": ["-DWIN32"],
+    },
+)
+
+# === attr.label_keyed_string_dict() ===
+
+genrule(
+    name = "dep_a",
+    outs = ["dep_a.txt"],
+    cmd = "echo dep_a > $@",
+)
+
+genrule(
+    name = "dep_b",
+    outs = ["dep_b.txt"],
+    cmd = "echo dep_b > $@",
+)
+
+label_keyed_dict_rule(
+    name = "label_keyed_dict_target",
+    deps = {
+        ":dep_a": "role_a",
+        ":dep_b": "role_b",
+    },
+)
+
+# === attr.output() ===
+
+output_attr_rule(
+    name = "output_attr_target",
+    out = "my_output.txt",
+)
+
+# === attr.output_list() ===
+
+output_list_rule(
+    name = "output_list_target",
+    outs = ["first.txt", "second.txt"],
+)
+
+# === attr.int() ===
+
+int_attr_rule(
+    name = "int_attr_target",
+    count = 42,
+)
+
+# === attr.bool() ===
+
+bool_attr_rule(
+    name = "bool_attr_true",
+    flag = True,
+)
+
+bool_attr_rule(
+    name = "bool_attr_false",
+    flag = False,
+)

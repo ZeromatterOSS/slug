@@ -297,6 +297,28 @@ fn dependency_methods(builder: &mut MethodsBuilder) {
             })?)
     }
 
+    /// Returns the default outputs of this dependency as a depset (Bazel-compatible).
+    ///
+    /// `Target.files` in Bazel returns a depset of the target's default outputs.
+    /// This is equivalent to `dep[DefaultInfo].files`.
+    #[starlark(attribute)]
+    fn files<'v>(this: &Dependency<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        // Search all providers for one with a "files" attribute (from DefaultInfo)
+        Ok(this
+            .provider_collection
+            .providers
+            .values()
+            .copied()
+            .find_map(|fv: FrozenValue| {
+                fv.to_value()
+                    .get_attr("files", heap)
+                    .ok()
+                    .flatten()
+                    .filter(|v| !v.is_none())
+            })
+            .internal_error("Target has no 'files' depset (DefaultInfo missing)")?)
+    }
+
     /// Returns a `FilesToRunProvider` for this dependency (Bazel-compatible).
     ///
     /// `dep.files_to_run` in Bazel returns a provider with `executable` (the target's

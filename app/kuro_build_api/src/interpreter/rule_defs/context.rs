@@ -1320,9 +1320,13 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
         if self.declared.borrow().contains_key(attribute) {
             return true;
         }
-        // Check if attrs has a string value for this attribute (i.e. it's an attr.output())
+        // Check if attrs has a string or list value for this attribute
+        // (i.e. it's an attr.output() or attr.output_list())
         if let Ok(Some(v)) = self.attrs.get_attr(attribute, heap) {
             if v.unpack_str().is_some() {
+                return true;
+            }
+            if starlark::values::list::ListRef::from_value(v).is_some() {
                 return true;
             }
         }
@@ -1340,16 +1344,62 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
             return Some(*v);
         }
 
+        use kuro_core::fs::buck_out_path::BuckOutPathKind;
+        use kuro_execute::execute::request::OutputType;
+        use crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
+        use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
+
+        let declare_file = |filename: &str| -> Option<Value<'v>> {
+            if filename.is_empty() {
+                return None;
+            }
+            let artifact = self
+                .actions
+                .state()
+                .ok()?
+                .declare_output(
+                    None,
+                    filename,
+                    OutputType::File,
+                    None,
+                    BuckOutPathKind::default(),
+                    heap,
+                )
+                .ok()?;
+            Some(heap.alloc(StarlarkDeclaredArtifact::new(
+                None,
+                artifact,
+                AssociatedArtifacts::new(),
+            )))
+        };
+
+        // Check if the attr is a list (attr.output_list()) - returns a list of declared artifacts
+        let raw_attr_val = self.attrs.get_attr(attribute, heap).ok().flatten();
+        if let Some(list_ref) = raw_attr_val
+            .as_ref()
+            .and_then(|v| starlark::values::list::ListRef::from_value(*v))
+        {
+            let filenames: Vec<String> = list_ref
+                .iter()
+                .filter_map(|elem| elem.unpack_str().map(|s| s.to_owned()))
+                .collect();
+            if !filenames.is_empty() || list_ref.is_empty() {
+                let artifacts: Vec<Value<'v>> = filenames
+                    .iter()
+                    .filter_map(|f| declare_file(f.as_str()))
+                    .collect();
+                let result = heap.alloc(artifacts);
+                self.declared.borrow_mut().insert(attribute.to_owned(), result);
+                return Some(result);
+            }
+        }
+
         // Determine the filename for this output attribute.
         // Case 1: attr.output() - the attribute value in attrs is the filename string
         // Case 2: rule(outputs={...}) pattern - expand using target name
         // Case 3: well-known fallback patterns
         let filename_owned: String;
-        let filename: &str = if let Some(v) = self
-            .attrs
-            .get_attr(attribute, heap)
-            .ok()
-            .flatten()
+        let filename: &str = if let Some(v) = raw_attr_val
             .and_then(|v| v.unpack_str().map(|s| s.to_owned()))
         {
             filename_owned = v;
@@ -1373,32 +1423,7 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
             return None;
         }
 
-        use kuro_core::fs::buck_out_path::BuckOutPathKind;
-        use kuro_execute::execute::request::OutputType;
-
-        // Declare the file via the analysis registry
-        let artifact = self
-            .actions
-            .state()
-            .ok()?
-            .declare_output(
-                None,
-                filename,
-                OutputType::File,
-                None,
-                BuckOutPathKind::default(),
-                heap,
-            )
-            .ok()?;
-
-        use crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
-        use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
-
-        let val = heap.alloc(StarlarkDeclaredArtifact::new(
-            None,
-            artifact,
-            AssociatedArtifacts::new(),
-        ));
+        let val = declare_file(filename)?;
         self.declared.borrow_mut().insert(attribute.to_owned(), val);
         Some(val)
     }
