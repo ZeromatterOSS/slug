@@ -87,7 +87,7 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
     }
 
     /// The file extension of this artifact. e.g. for an artifact at foo/bar.sh,
-    /// this is `.sh` (with the leading dot). If no extension is present, `""` is returned.
+    /// this is `sh` (without the leading dot). If no extension is present, `""` is returned.
     #[starlark(attribute)]
     fn extension<'v>(
         this: &'v dyn StarlarkArtifactLike<'v>,
@@ -95,7 +95,7 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<StringValue<'v>> {
         Ok(this.with_filename(&|filename| match filename.extension() {
             None => heap.alloc_str(""),
-            Some(x) => heap.alloc_str(&format!(".{}", x)),
+            Some(x) => heap.alloc_str(x),
         })?)
     }
 

@@ -1,0 +1,30 @@
+load(":defs.bzl", "dir_artifact_rule", "file_dirname_rule", "file_props_rule", "generated_file_props_rule")
+
+# === Source file properties ===
+
+file_props_rule(
+    name = "source_file_props",
+    src = "source.txt",
+)
+
+# === Generated file properties ===
+
+generated_file_props_rule(
+    name = "generated_file_props",
+)
+
+# === Dirname test with root-level files ===
+
+file_dirname_rule(
+    name = "file_dirnames",
+    srcs = [
+        "source.txt",
+        "MODULE.bazel",
+    ],
+)
+
+# === Directory artifact ===
+
+dir_artifact_rule(
+    name = "dir_artifact_props",
+)
