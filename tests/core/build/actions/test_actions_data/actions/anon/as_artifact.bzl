@@ -54,7 +54,7 @@ def _short_path_impl(ctx: AnalysisContext) -> list[Provider]:
     artifact_with_path = ctx.actions.assert_short_path(artifact, short_path = "dir/hello.out")
     _assert_eq(artifact_with_path.short_path, "dir/hello.out")
     _assert_eq(artifact_with_path.basename, "hello.out")
-    _assert_eq(artifact_with_path.extension, ".out")
+    _assert_eq(artifact_with_path.extension, "out")  # Bazel-compatible: no leading dot
     return [DefaultInfo()]
 
 _short_path = rule(impl = _short_path_impl, attrs = {})

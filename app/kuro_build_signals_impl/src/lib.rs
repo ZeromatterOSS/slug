@@ -814,19 +814,23 @@ impl DetailedCriticalPath {
         let mut current_kind = "buckd_command_init";
         let mut current_start = early_command_timing.command_start;
         for (span_start, kind) in &early_command_timing.early_spans {
+            // Clamp end to start to handle nanosecond-level timer imprecision where
+            // consecutive Instant::now() calls can return slightly out-of-order values.
+            let span_end = (*span_start).max(current_start);
             enhancer.add_simple_entry(
                 None,
                 generic_entry(current_kind),
-                TimeSpan::new(current_start, *span_start)?,
+                TimeSpan::new_unchecked(current_start, span_end),
                 true,
             )?;
             current_kind = kind;
             current_start = *span_start;
         }
+        let early_cmd_end = early_command_timing.early_command_end.max(current_start);
         enhancer.add_simple_entry(
             None,
             generic_entry(current_kind),
-            TimeSpan::new(current_start, early_command_timing.early_command_end)?,
+            TimeSpan::new_unchecked(current_start, early_cmd_end),
             true,
         )?;
         Ok(())
@@ -848,10 +852,11 @@ impl DetailedCriticalPath {
             enhancer.add_entry(entry)?;
         }
 
+        let compute_end = Instant::now().max(critical_path_compute_start);
         enhancer.add_simple_entry(
             Some("unknown_final_work"),
             kuro_data::critical_path_entry2::ComputeCriticalPath {}.into(),
-            TimeSpan::new(critical_path_compute_start, Instant::now())?,
+            TimeSpan::new_unchecked(critical_path_compute_start, compute_end),
             true,
         )?;
         Ok(enhancer.into_entries())
