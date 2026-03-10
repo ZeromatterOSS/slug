@@ -8,6 +8,10 @@
 
 # pyre-strict
 
+import sys
+
+import pytest
+
 from buck2.tests.e2e_util.api.buck import Buck
 from buck2.tests.e2e_util.buck_workspace import buck_test
 
@@ -205,6 +209,36 @@ async def test_genrule_ruledir_expansion(buck: Buck) -> None:
     output = result.get_build_report().output_for_target("//:genrule_ruledir")
     content = output.read_text().strip()
     assert "buck-out" in content, f"Expected buck-out in $(@D) expansion, got: {content!r}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+@pytest.mark.skipif(sys.platform != "win32", reason="cmd_ps is Windows-only")
+async def test_genrule_cmd_ps_on_windows(buck: Buck) -> None:
+    """On Windows, genrule uses cmd_ps (PowerShell) when cmd_ps is provided."""
+    result = await buck.build("//:genrule_cmd_ps")
+    output = result.get_build_report().output_for_target("//:genrule_cmd_ps")
+    content = output.read_text().strip()
+    assert content == "from_powershell", f"Expected 'from_powershell', got: {content!r}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+@pytest.mark.skipif(sys.platform != "win32", reason="cmd_bat is Windows-only")
+async def test_genrule_cmd_bat_on_windows(buck: Buck) -> None:
+    """On Windows, genrule uses cmd_bat (CMD.exe) when cmd_bat is provided but not cmd_ps."""
+    result = await buck.build("//:genrule_cmd_bat")
+    output = result.get_build_report().output_for_target("//:genrule_cmd_bat")
+    content = output.read_text().strip()
+    assert content == "from_cmd", f"Expected 'from_cmd', got: {content!r}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+@pytest.mark.skipif(sys.platform != "win32", reason="cmd_ps/cmd_bat priority is Windows-only")
+async def test_genrule_cmd_ps_priority_on_windows(buck: Buck) -> None:
+    """On Windows, cmd_ps takes priority over cmd_bat when both are provided."""
+    result = await buck.build("//:genrule_cmd_ps_priority")
+    output = result.get_build_report().output_for_target("//:genrule_cmd_ps_priority")
+    content = output.read_text().strip()
+    assert content == "from_ps_wins", f"Expected 'from_ps_wins', got: {content!r}"
 
 
 @buck_test(data_dir="test_native_rules_data")

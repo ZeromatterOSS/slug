@@ -362,7 +362,7 @@ mod rule_defs {
     });
 
     /// Creates the AttributeSpec for genrule.
-    /// genrule has cmd, cmd_bash, outs, srcs, tools attributes.
+    /// genrule has cmd, cmd_bash, cmd_bat, cmd_ps, outs, srcs, tools attributes.
     fn genrule_attributes() -> AttributeSpec {
         let cmd_attr = Attribute::new(
             Some(Arc::new(CoercedAttr::String(StringLiteral(ArcStr::from(
@@ -377,6 +377,22 @@ mod rule_defs {
                 "",
             ))))),
             "Bash-specific command (preferred over cmd on Unix)",
+            AttrType::string(),
+        );
+
+        let cmd_bat_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::String(StringLiteral(ArcStr::from(
+                "",
+            ))))),
+            "Windows CMD.exe command (takes priority over cmd on Windows when cmd_ps is absent)",
+            AttrType::string(),
+        );
+
+        let cmd_ps_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::String(StringLiteral(ArcStr::from(
+                "",
+            ))))),
+            "Windows PowerShell command (takes highest priority on Windows)",
             AttrType::string(),
         );
 
@@ -414,6 +430,8 @@ mod rule_defs {
             vec![
                 ("cmd".to_owned(), cmd_attr),
                 ("cmd_bash".to_owned(), cmd_bash_attr),
+                ("cmd_bat".to_owned(), cmd_bat_attr),
+                ("cmd_ps".to_owned(), cmd_ps_attr),
                 ("outs".to_owned(), outs_attr),
                 ("srcs".to_owned(), srcs_attr),
                 ("tools".to_owned(), tools_attr),
@@ -1573,8 +1591,6 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let _unused = (
-            cmd_bat,
-            cmd_ps,
             toolchains,
             executable,
             local,
@@ -1590,7 +1606,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let internals = ModuleInternals::from_context(eval, "genrule")?;
         let coercion_ctx = internals.attr_coercion_context();
 
-        // Coerce cmd and cmd_bash as configurable strings (both support select())
+        // Coerce cmd, cmd_bash, cmd_bat, cmd_ps as configurable strings (support select())
         let cmd_attr_type = AttrType::string();
         let cmd_value = if cmd.is_none() {
             eval.heap().alloc("")
@@ -1606,6 +1622,18 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         };
         let coerced_cmd_bash =
             cmd_attr_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, cmd_bash_value)?;
+
+        let coerced_cmd_bat = cmd_attr_type.coerce(
+            AttrIsConfigurable::Yes,
+            coercion_ctx,
+            eval.heap().alloc(cmd_bat),
+        )?;
+
+        let coerced_cmd_ps = cmd_attr_type.coerce(
+            AttrIsConfigurable::Yes,
+            coercion_ctx,
+            eval.heap().alloc(cmd_ps),
+        )?;
 
         // Coerce outs
         let coerced_outs = CoercedAttr::List(ListLiteral(ArcSlice::from_iter(
@@ -1650,6 +1678,8 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             vec![
                 ("cmd".to_owned(), coerced_cmd),
                 ("cmd_bash".to_owned(), coerced_cmd_bash),
+                ("cmd_bat".to_owned(), coerced_cmd_bat),
+                ("cmd_ps".to_owned(), coerced_cmd_ps),
                 ("outs".to_owned(), coerced_outs),
                 ("srcs".to_owned(), coerced_srcs),
                 ("tools".to_owned(), coerced_tools),

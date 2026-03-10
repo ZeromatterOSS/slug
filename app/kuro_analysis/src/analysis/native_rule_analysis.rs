@@ -78,6 +78,7 @@ use starlark::values::any_complex::StarlarkAnyComplex;
 use starlark_map::small_map::SmallMap;
 
 use crate::analysis::genrule_action::GenruleAction;
+use crate::analysis::genrule_action::GenruleShell;
 
 /// Analyze a native rule target and return the analysis result.
 pub fn analyze_native_rule(
@@ -150,12 +151,29 @@ fn analyze_genrule(
     };
     let cmd_raw = read_configured_string("cmd");
     let cmd_bash_raw = read_configured_string("cmd_bash");
-    // Prefer cmd_bash when non-empty: kuro always executes via bash (even on Windows),
-    // so cmd_bash takes priority over cmd on all platforms.
-    let cmd = if !cmd_bash_raw.is_empty() {
-        cmd_bash_raw
+
+    // Select command and shell interpreter based on platform and available attrs.
+    // On Windows, Bazel priority is: cmd_ps > cmd_bat > cmd_bash > cmd
+    // On Unix, priority is: cmd_bash > cmd
+    #[cfg(windows)]
+    let (cmd, shell) = {
+        let cmd_ps_raw = read_configured_string("cmd_ps");
+        let cmd_bat_raw = read_configured_string("cmd_bat");
+        if !cmd_ps_raw.is_empty() {
+            (cmd_ps_raw, GenruleShell::PowerShell)
+        } else if !cmd_bat_raw.is_empty() {
+            (cmd_bat_raw, GenruleShell::CmdExe)
+        } else if !cmd_bash_raw.is_empty() {
+            (cmd_bash_raw, GenruleShell::Bash)
+        } else {
+            (cmd_raw, GenruleShell::Bash)
+        }
+    };
+    #[cfg(not(windows))]
+    let (cmd, shell) = if !cmd_bash_raw.is_empty() {
+        (cmd_bash_raw, GenruleShell::Bash)
     } else {
-        cmd_raw
+        (cmd_raw, GenruleShell::Bash)
     };
 
     // Read outs attribute → list of output file name strings
@@ -255,7 +273,7 @@ fn analyze_genrule(
     }
 
     // Create the genrule action
-    let genrule_action = GenruleAction::new(cmd, inputs, output_artifacts, location_mappings);
+    let genrule_action = GenruleAction::new(cmd, inputs, output_artifacts, location_mappings, shell);
 
     // Register the action
     let registered_action = Arc::new(RegisteredAction::new(
@@ -1348,6 +1366,7 @@ fn analyze_genquery(target: &ConfiguredTargetLabel) -> kuro_error::Result<Analys
         vec![],
         vec![output_artifact],
         vec![],
+        GenruleShell::Bash,
     );
     let registered_action = Arc::new(RegisteredAction::new(
         action_key.dupe(),

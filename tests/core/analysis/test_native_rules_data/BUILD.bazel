@@ -155,6 +155,32 @@ genrule(
     cmd = "echo $(@D) > $@",
 )
 
+# Windows-specific shell selection: cmd_ps (PowerShell) and cmd_bat (CMD.exe)
+# On Windows: cmd_ps > cmd_bat > cmd_bash > cmd priority order.
+# On non-Windows: cmd_ps/cmd_bat are ignored; cmd_bash > cmd.
+
+genrule(
+    name = "genrule_cmd_ps",
+    outs = ["genrule_cmd_ps.txt"],
+    cmd = "echo generic > $@",
+    cmd_ps = "Set-Content -Path $(OUTS) -Value from_powershell",
+)
+
+genrule(
+    name = "genrule_cmd_bat",
+    outs = ["genrule_cmd_bat.txt"],
+    cmd = "echo generic > $@",
+    cmd_bat = "echo from_cmd> $(OUTS)",
+)
+
+genrule(
+    name = "genrule_cmd_ps_priority",
+    outs = ["genrule_cmd_ps_priority.txt"],
+    cmd = "echo generic > $@",
+    cmd_bat = "echo from_bat > $(OUTS)",
+    cmd_ps = "Set-Content -Path $(OUTS) -Value from_ps_wins",
+)
+
 # === sh_binary test ===
 
 sh_binary(

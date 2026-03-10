@@ -39,13 +39,27 @@ use kuro_execute::execute::request::ExecutorPreference;
 use kuro_error::BuckErrorContext;
 use sorted_vector_map::SortedVectorMap;
 
+/// Which shell interpreter to use for executing the genrule command.
+#[derive(Debug, Clone, Allocative)]
+pub enum GenruleShell {
+    /// Run via `bash -c "cmd"` (default, works everywhere)
+    Bash,
+    /// Run via `powershell.exe -Command "cmd"` (Windows only, selected by `cmd_ps` attr)
+    PowerShell,
+    /// Run via `cmd.exe /c "cmd"` (Windows only, selected by `cmd_bat` attr)
+    CmdExe,
+}
+
 /// A simple shell command action for native genrule targets.
 ///
-/// This action runs a bash command to produce genrule output files.
+/// This action runs a shell command to produce genrule output files.
 /// Make variables like `$(SRCS)`, `$(OUTS)`, `$@`, `$<`, `$^` are expanded
 /// at execution time using the actual artifact paths.
 /// `$(location label)`, `$(locations label)`, `$(execpath label)`, and
 /// `$(execpaths label)` are also expanded using dep artifact paths.
+///
+/// On Windows, `GenruleShell::PowerShell` or `GenruleShell::CmdExe` can be used
+/// when the genrule specifies `cmd_ps` or `cmd_bat` respectively.
 #[derive(Debug, Allocative)]
 pub struct GenruleAction {
     /// The shell command template with unexpanded make variables.
@@ -58,6 +72,8 @@ pub struct GenruleAction {
     /// The normalized_label is a string key used to match $(location <key>) patterns.
     /// Each entry stores the artifact groups for the matching dependency.
     location_mappings: Vec<(String, Vec<ArtifactGroup>)>,
+    /// The shell interpreter to use when executing the command.
+    shell: GenruleShell,
 }
 
 impl GenruleAction {
@@ -66,12 +82,14 @@ impl GenruleAction {
         inputs: Vec<ArtifactGroup>,
         outputs: Vec<BuildArtifact>,
         location_mappings: Vec<(String, Vec<ArtifactGroup>)>,
+        shell: GenruleShell,
     ) -> Self {
         Self {
             cmd,
             inputs,
             outputs,
             location_mappings,
+            shell,
         }
     }
 }
@@ -123,6 +141,21 @@ fn shell_quote_path(path: &str) -> String {
     }
 }
 
+/// Quote a path for PowerShell or CMD.exe (Windows native shells).
+///
+/// Unlike bash, PowerShell and CMD.exe can use forward-slash paths directly.
+/// We wrap in double quotes only when the path contains spaces.
+fn windows_quote_path(path: &str) -> String {
+    if path.is_empty() {
+        return path.to_owned();
+    }
+    if path.contains(' ') {
+        format!("\"{}\"", path)
+    } else {
+        path.to_owned()
+    }
+}
+
 /// Expand genrule make variables using resolved absolute paths.
 ///
 /// Handles:
@@ -139,13 +172,14 @@ fn expand_genrule_cmd(
     srcs: &[String],
     outs: &[String],
     locations: &[(String, Vec<String>)],
+    quote_fn: fn(&str) -> String,
 ) -> String {
-    let srcs_str = srcs.iter().map(|s| shell_quote_path(s)).collect::<Vec<_>>().join(" ");
-    let outs_str = outs.iter().map(|s| shell_quote_path(s)).collect::<Vec<_>>().join(" ");
+    let srcs_str = srcs.iter().map(|s| quote_fn(s)).collect::<Vec<_>>().join(" ");
+    let outs_str = outs.iter().map(|s| quote_fn(s)).collect::<Vec<_>>().join(" ");
     let first_out_raw = outs.first().map(|s| s.as_str()).unwrap_or("");
     let first_src_raw = srcs.first().map(|s| s.as_str()).unwrap_or("");
-    let first_out = shell_quote_path(first_out_raw);
-    let first_src = shell_quote_path(first_src_raw);
+    let first_out = quote_fn(first_out_raw);
+    let first_src = quote_fn(first_src_raw);
 
     // Compute output directory (dirname of first output) from the raw path,
     // then apply shell quoting to the result.
@@ -153,7 +187,7 @@ fn expand_genrule_cmd(
         .parent()
         .and_then(|p| p.to_str())
         .unwrap_or("");
-    let out_dir = shell_quote_path(out_dir_raw);
+    let out_dir = quote_fn(out_dir_raw);
 
     // Expand $(VARNAME) style make variables
     let mut cmd = cmd
@@ -176,7 +210,7 @@ fn expand_genrule_cmd(
 
     // Expand $(location ...) and related patterns.
     // We do a single-pass scan to handle all variants consistently.
-    cmd = expand_location_patterns(&cmd, locations);
+    cmd = expand_location_patterns(&cmd, locations, quote_fn);
 
     cmd
 }
@@ -186,7 +220,11 @@ fn expand_genrule_cmd(
 /// For each `$(location key)` pattern, looks up `key` in the `locations` mapping
 /// and replaces with the first resolved path.
 /// For `$(locations key)`, replaces with space-separated list of all paths.
-fn expand_location_patterns(cmd: &str, locations: &[(String, Vec<String>)]) -> String {
+fn expand_location_patterns(
+    cmd: &str,
+    locations: &[(String, Vec<String>)],
+    quote_fn: fn(&str) -> String,
+) -> String {
     if locations.is_empty() || !cmd.contains("$(location") && !cmd.contains("$(execpath") {
         return cmd.to_owned();
     }
@@ -219,7 +257,7 @@ fn expand_location_patterns(cmd: &str, locations: &[(String, Vec<String>)]) -> S
 
         if let Some(end) = label_rest.find(')') {
             let label = label_rest[..end].trim();
-            let expansion = resolve_location(label, multi, locations);
+            let expansion = resolve_location(label, multi, locations, quote_fn);
             result.push_str(&expansion);
             // Advance past "$(" + keyword + label + ")"
             remaining = &remaining[start + 2 + label_start + end + 1..];
@@ -239,7 +277,12 @@ fn expand_location_patterns(cmd: &str, locations: &[(String, Vec<String>)]) -> S
 /// Matches the label against each key in the mappings using:
 /// 1. Exact match
 /// 2. Target-name match (after the last ':')
-fn resolve_location(label: &str, multi: bool, locations: &[(String, Vec<String>)]) -> String {
+fn resolve_location(
+    label: &str,
+    multi: bool,
+    locations: &[(String, Vec<String>)],
+    quote_fn: fn(&str) -> String,
+) -> String {
     // Normalize: strip leading "@" repo prefix for simple matching,
     // or use suffix after ':'
     let label_name = label.rsplit(':').next().unwrap_or(label);
@@ -248,18 +291,18 @@ fn resolve_location(label: &str, multi: bool, locations: &[(String, Vec<String>)
         // Exact match
         if key == label {
             return if multi {
-                paths.iter().map(|p| shell_quote_path(p)).collect::<Vec<_>>().join(" ")
+                paths.iter().map(|p| quote_fn(p)).collect::<Vec<_>>().join(" ")
             } else {
-                paths.first().map(|p| shell_quote_path(p)).unwrap_or_default()
+                paths.first().map(|p| quote_fn(p)).unwrap_or_default()
             };
         }
         // Name-only match (key name suffix == label name suffix)
         let key_name = key.rsplit(':').next().unwrap_or(key.as_str());
         if key_name == label_name {
             return if multi {
-                paths.iter().map(|p| shell_quote_path(p)).collect::<Vec<_>>().join(" ")
+                paths.iter().map(|p| quote_fn(p)).collect::<Vec<_>>().join(" ")
             } else {
-                paths.first().map(|p| shell_quote_path(p)).unwrap_or_default()
+                paths.first().map(|p| quote_fn(p)).unwrap_or_default()
             };
         }
     }
@@ -374,12 +417,20 @@ impl Action for GenruleAction {
             location_resolved.push((label_key.clone(), paths));
         }
 
+        // Select path-quoting function based on shell type.
+        // Bash requires POSIX path conversion on Windows; PowerShell and CMD.exe use native paths.
+        let quote_fn: fn(&str) -> String = match &self.shell {
+            GenruleShell::Bash => shell_quote_path,
+            GenruleShell::PowerShell | GenruleShell::CmdExe => windows_quote_path,
+        };
+
         // Expand make variables in the command
         let expanded_cmd = expand_genrule_cmd(
             &self.cmd,
             &srcs_abs_paths,
             &outs_abs_paths,
             &location_resolved,
+            quote_fn,
         );
 
         // Build CommandExecutionPaths for the action executor
@@ -402,13 +453,27 @@ impl Action for GenruleAction {
         let paths =
             CommandExecutionPaths::new(ce_inputs, ce_outputs, ctx.fs(), ctx.digest_config(), None)?;
 
-        // Run bash -c "expanded_cmd"
-        let req = CommandExecutionRequest::new(
-            vec!["bash".to_owned()],
-            vec!["-c".to_owned(), expanded_cmd],
-            paths,
-            SortedVectorMap::default(),
-        );
+        // Build the execution request using the appropriate shell interpreter.
+        let req = match &self.shell {
+            GenruleShell::Bash => CommandExecutionRequest::new(
+                vec!["bash".to_owned()],
+                vec!["-c".to_owned(), expanded_cmd],
+                paths,
+                SortedVectorMap::default(),
+            ),
+            GenruleShell::PowerShell => CommandExecutionRequest::new(
+                vec!["powershell.exe".to_owned()],
+                vec!["-Command".to_owned(), expanded_cmd],
+                paths,
+                SortedVectorMap::default(),
+            ),
+            GenruleShell::CmdExe => CommandExecutionRequest::new(
+                vec!["cmd.exe".to_owned()],
+                vec!["/c".to_owned(), expanded_cmd],
+                paths,
+                SortedVectorMap::default(),
+            ),
+        };
 
         let prepared = ctx.prepare_action(&req, false)?;
         let manager = ctx.command_execution_manager(waiting_data);
