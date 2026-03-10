@@ -70,7 +70,9 @@ impl CriticalPathProtoEnhancer {
         // TODO(cjhopman): If data.duration.total.start() < waiting_for_deps_end, we have overlapping entries. That should be an error (as it indicates that we claim that
         // both A depends on B and that A started before B finished). For now, ignore the overlapping span.
         if waiting_for_deps_end > data.duration.total.start() {
-            data.duration.total = TimeSpan::new(waiting_for_deps_end, data.duration.total.end())?;
+            // Clamp end to start to handle nanosecond-level timer imprecision.
+            let end = data.duration.total.end().max(waiting_for_deps_end);
+            data.duration.total = TimeSpan::new_unchecked(waiting_for_deps_end, end);
         }
 
         let node_start = data.duration.total.start();
@@ -92,7 +94,8 @@ impl CriticalPathProtoEnhancer {
                                 category: Some(category.variant_name_lowercase().to_owned()),
                             },
                         ),
-                        TimeSpan::new(prev_start, *start)?,
+                        // Clamp end to start to handle nanosecond-level timer imprecision.
+                        TimeSpan::new_unchecked(prev_start, (*start).max(prev_start)),
                         false,
                     )?;
                 }
