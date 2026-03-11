@@ -3516,6 +3516,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 }
             }
 
+            // Add --linkopt flags from command line
+            for opt in crate::interpreter::rule_defs::build_config::get_linkopts() {
+                args.push(heap.alloc_str(&opt).to_value());
+            }
+
             return Ok(heap.alloc(args));
         }
 
@@ -3562,6 +3567,24 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 }
                 _ => {
                     // fastbuild: minimal flags for fast compilation
+                }
+            }
+        }
+
+        // Add --copt flags from command line (apply to all C/C++ compilations)
+        if is_compile {
+            for opt in crate::interpreter::rule_defs::build_config::get_copts() {
+                args.push(heap.alloc_str(&opt).to_value());
+            }
+            // Add language-specific flags: --cxxopt for C++, --conlyopt for C
+            // Determine language from action_name (c++-compile vs c-compile)
+            if action_name.contains("c++") {
+                for opt in crate::interpreter::rule_defs::build_config::get_cxxopts() {
+                    args.push(heap.alloc_str(&opt).to_value());
+                }
+            } else {
+                for opt in crate::interpreter::rule_defs::build_config::get_conlyopts() {
+                    args.push(heap.alloc_str(&opt).to_value());
                 }
             }
         }

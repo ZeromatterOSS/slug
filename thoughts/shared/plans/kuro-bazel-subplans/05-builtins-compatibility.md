@@ -99,7 +99,7 @@ These functions must be available in all .bzl files without any `load()` stateme
 |----------|-------------|-------------|----------|
 | `analysis_test_transition` | Config transition for analysis tests | Not implemented | TBD |
 | `aspect` | Defines aspect for dependency propagation | ✓ Implemented | `aspect.rs` (Phase 8) |
-| `configuration_field` | References late-bound defaults | Not implemented | TBD |
+| `configuration_field` | References late-bound defaults | ✓ Implemented (resolves known fragment+name pairs to labels) | `configuration_field.rs`, `attrs_global.rs` |
 | `depset` | Creates dependency set | ✓ Implemented | `transitive_set/globals.rs` |
 | `exec_group` | Establishes execution group | ✓ Stub | `rule.rs` |
 | `exec_transition` | Defines exec transition (internal) | Not implemented | Low priority |
@@ -216,7 +216,7 @@ These modules must be available as globals in .bzl files.
 | `config.int()` | Integer build setting | ✓ Implemented |
 | `config.string()` | String build setting | ✓ Implemented |
 | `config.string_list()` | String list setting | ✓ Implemented |
-| `config.string_set()` | String set setting | Not implemented (low priority) |
+| `config.string_set()` | String set setting | ✓ Implemented (2026-03-11) |
 | `config.exec()` | Execution transition | ✓ Implemented |
 | `config.target()` | No-op target transition | ✓ Implemented |
 | `config.none()` | Remove all configuration | ✓ Implemented |

@@ -190,6 +190,21 @@ fn config_module_methods(builder: &mut starlark::environment::MethodsBuilder) {
             allow_multiple: allow_multiple || repeatable,
         })
     }
+
+    /// Creates a string set build setting (like string_list but with deduplication).
+    fn string_set(
+        #[starlark(this)] _this: &ConfigModule,
+        #[starlark(require = named, default = false)] flag: bool,
+        #[starlark(require = named, default = false)] repeatable: bool,
+        #[starlark(require = named, default = false)] allow_multiple: bool,
+    ) -> starlark::Result<ConfigBuildSetting> {
+        let _ = repeatable;
+        Ok(ConfigBuildSetting {
+            setting_type: "string_set".to_owned(),
+            flag,
+            allow_multiple: allow_multiple || repeatable,
+        })
+    }
 }
 
 /// Register the config global.
