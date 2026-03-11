@@ -29,31 +29,48 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 
 | Rule | Description | Kuro Status | Location |
 |------|-------------|-------------|----------|
-| `alias` | Creates alternative name for target | ✓ Exists | `prelude/alias.bzl` |
-| `config_setting` | Matches configuration for `select()` | Needs verification | TBD |
-| `filegroup` | Groups files under single label | ✓ Exists | `prelude/filegroup.bzl` |
-| `genquery` | Runs query language, outputs results | Not implemented | TBD |
-| `genrule` | Generic build rule using shell | ✓ Exists | `prelude/genrule.bzl` |
-| `starlark_doc_extract` | Extracts docs from .bzl files | Not implemented | Low priority |
-| `test_suite` | Defines collections of tests | ✓ Exists | `prelude/test_suite.bzl` |
+| `alias` | Creates alternative name for target | ✓ Implemented | `native_rules.rs` |
+| `config_setting` | Matches configuration for `select()` | ✓ Implemented | `native_rules.rs` |
+| `filegroup` | Groups files under single label | ✓ Implemented | `native_rules.rs` |
+| `genquery` | Runs query language, outputs results | ✓ Implemented | `native_rules.rs` |
+| `genrule` | Generic build rule using shell | ✓ Implemented | `native_rules.rs` |
+| `starlark_doc_extract` | Extracts docs from .bzl files | ✓ Implemented | `native_rules.rs` |
+| `test_suite` | Defines collections of tests | ✓ Implemented | `native_rules.rs` |
+| `analysis_test` | Analysis-time test | ✓ Implemented | `native_rules.rs` |
+| `exports_files` | Marks files as exported | ✓ Implemented | `native_rules.rs` |
+| `package_group` | Defines package set for visibility | ✓ Implemented | `native_rules.rs` |
 
 #### Platform & Toolchain Rules
 
 | Rule | Description | Kuro Status | Location |
 |------|-------------|-------------|----------|
-| `constraint_setting` | Introduces new constraint type | Needs implementation | TBD |
-| `constraint_value` | Defines value for constraint type | Needs implementation | TBD |
-| `platform` | Defines platform with constraints | Needs implementation | TBD |
-| `toolchain` | Declares toolchain type/constraints | Needs implementation | TBD |
-| `toolchain_type` | Defines new toolchain type | Needs implementation | TBD |
+| `constraint_setting` | Introduces new constraint type | ✓ Implemented | `native_rules.rs` |
+| `constraint_value` | Defines value for constraint type | ✓ Implemented | `native_rules.rs` |
+| `platform` | Defines platform with constraints | ✓ Implemented | `native_rules.rs` |
+| `toolchain` | Declares toolchain type/constraints | ✓ Implemented | `native_rules.rs` |
+| `toolchain_type` | Defines new toolchain type | ✓ Implemented | `native_rules.rs` |
+| `execution_platform` | Defines execution platform | ✓ Implemented | `native_rules.rs` |
+| `execution_platforms` | Lists execution platforms | ✓ Implemented | `native_rules.rs` |
 
 #### Shell Rules
 
 | Rule | Description | Kuro Status | Location |
 |------|-------------|-------------|----------|
-| `sh_binary` | Executable shell script | ✓ Exists | `prelude/sh_binary.bzl` |
-| `sh_library` | Library of shell scripts | Needs verification | TBD |
-| `sh_test` | Test written as shell script | ✓ Exists | `prelude/sh_test.bzl` |
+| `sh_binary` | Executable shell script | ✓ Implemented | `native_rules.rs` |
+| `sh_library` | Library of shell scripts | ✓ Implemented | `native_rules.rs` |
+| `sh_test` | Test written as shell script | ✓ Implemented | `native_rules.rs` |
+
+#### C++ Rules (native in Bazel 9)
+
+| Rule | Description | Kuro Status | Location |
+|------|-------------|-------------|----------|
+| `cc_library` | C++ library | ✓ Implemented | `native_rules.rs` |
+| `cc_binary` | C++ binary | ✓ Implemented | `native_rules.rs` |
+| `cc_test` | C++ test | ✓ Implemented | `native_rules.rs` |
+| `cc_import` | Prebuilt C++ library | ✓ Implemented | `native_rules.rs` |
+| `cc_shared_library` | Shared library from deps | ✓ Implemented | `native_rules.rs` (2026-03-11) |
+| `cc_toolchain` | C++ toolchain definition | ✓ Implemented | `native_rules.rs` |
+| `cc_toolchain_suite` | C++ toolchain suite | ✓ Implemented | `native_rules.rs` |
 
 ### Implementation Strategy
 
@@ -254,9 +271,9 @@ These modules must be available as globals in .bzl files.
 
 | Function | Description | Kuro Status |
 |----------|-------------|-------------|
-| `proto.encode_text()` | Encode proto to text | Not implemented |
+| `proto.encode_text()` | Encode proto to text | ✓ Implemented |
 
-**Status**: Not implemented (low priority)
+**Status**: ✓ Implemented (proto_common.rs, 2026-03-11)
 
 ### Module: `java_common`
 
@@ -294,7 +311,7 @@ These modules must be available as globals in .bzl files.
 - [x] Implement `coverage_common` (2026-02: stub in coverage_common.rs)
 
 **Phase 7c.3: Lower Priority**
-- [ ] Implement `proto` module (proto_common exists; `proto.encode_text()` not yet)
+- [x] Implement `proto` module (proto_common exists; `proto.encode_text()` added 2026-03-11)
 - [x] Implement `java_common` module (2026-03-11: stubs in java_common.rs)
 
 ### Success Criteria (Phase 7c)
