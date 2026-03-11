@@ -380,3 +380,15 @@ async def test_cc_common_create_compilation_context(buck: Buck) -> None:
     assert lines["has_defines"] == "True"
     assert lines["has_system_includes"] == "True"
     assert lines["has_direct_headers"] == "True"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_cc_common_merge_cc_infos(buck: Buck) -> None:
+    """cc_common.merge_cc_infos() merges CcInfo providers with proper data."""
+    result = await buck.build("//:cc_merge_infos_test")
+    output = result.get_build_report().output_for_target("//:cc_merge_infos_test")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    assert lines["has_compilation_context"] == "True"
+    assert lines["has_linking_context"] == "True"
+    assert lines["comp_ctx_type"] == "CcCompilationContext"

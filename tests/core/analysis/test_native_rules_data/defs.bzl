@@ -172,6 +172,39 @@ cc_compilation_context_test = rule(
 )
 
 
+def _cc_merge_infos_test_impl(ctx):
+    """Tests that cc_common.merge_cc_infos() merges CcInfo providers."""
+    # Create two CcInfo instances with compilation contexts
+    comp_ctx1 = cc_common.create_compilation_context(
+        headers = depset([]),
+        defines = depset(["DEF1=1"]),
+    )
+    comp_ctx2 = cc_common.create_compilation_context(
+        headers = depset([]),
+        defines = depset(["DEF2=2"]),
+    )
+    info1 = CcInfo(compilation_context = comp_ctx1)
+    info2 = CcInfo(compilation_context = comp_ctx2)
+
+    merged = cc_common.merge_cc_infos(cc_infos = [info1, info2])
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    lines = [
+        "type=" + type(merged),
+        "has_compilation_context=" + str(hasattr(merged, "compilation_context")),
+        "has_linking_context=" + str(hasattr(merged, "linking_context")),
+        "comp_ctx_type=" + type(merged.compilation_context),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+cc_merge_infos_test = rule(
+    implementation = _cc_merge_infos_test_impl,
+    attrs = {},
+)
+
+
 def _bool_setting_impl(ctx):
     """A boolean build setting (no output)."""
     return []

@@ -3882,16 +3882,83 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 
     /// Merges multiple CcInfo providers into a single CcInfo.
     ///
-    /// Used to combine CcInfo from multiple dependencies.
+    /// Collects compilation contexts and linking contexts from all input
+    /// CcInfo providers and merges them into a single CcInfo.
     #[allow(unused_variables)]
     fn merge_cc_infos<'v>(
         #[starlark(this)] _this: &CcCommonModule,
         #[starlark(require = named, default = NoneType)] cc_infos: Value<'v>,
         #[starlark(require = named, default = NoneType)] direct_cc_infos: Value<'v>,
         heap: Heap<'v>,
-    ) -> starlark::Result<CcInfoInstanceStub> {
-        // Return a stub CcInfo - merging is a no-op for now
-        Ok(CcInfoInstanceStub)
+    ) -> starlark::Result<Value<'v>> {
+        // Collect compilation contexts and linking contexts from all inputs
+        let mut linking_contexts: Vec<Value<'v>> = Vec::new();
+        let mut last_compilation_context: Value<'v> = Value::new_none();
+
+        // Process cc_infos (transitive)
+        if !cc_infos.is_none() {
+            if let Ok(iter) = cc_infos.iterate(heap) {
+                for info in iter {
+                    if let Ok(Some(comp_ctx)) = info.get_attr("compilation_context", heap) {
+                        if !comp_ctx.is_none() {
+                            last_compilation_context = comp_ctx;
+                        }
+                    }
+                    if let Ok(Some(link_ctx)) = info.get_attr("linking_context", heap) {
+                        if !link_ctx.is_none() {
+                            linking_contexts.push(link_ctx);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Process direct_cc_infos
+        if !direct_cc_infos.is_none() {
+            if let Ok(iter) = direct_cc_infos.iterate(heap) {
+                for info in iter {
+                    if let Ok(Some(comp_ctx)) = info.get_attr("compilation_context", heap) {
+                        if !comp_ctx.is_none() {
+                            last_compilation_context = comp_ctx;
+                        }
+                    }
+                    if let Ok(Some(link_ctx)) = info.get_attr("linking_context", heap) {
+                        if !link_ctx.is_none() {
+                            linking_contexts.push(link_ctx);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Merge linking contexts into a single one
+        let merged_linking_context = if linking_contexts.is_empty() {
+            Value::new_none()
+        } else {
+            // Collect all linker_inputs depsets as transitive children
+            let mut transitive_depsets: Vec<Value<'v>> = Vec::new();
+            for ctx_val in &linking_contexts {
+                if let Ok(Some(linker_inputs)) = ctx_val.get_attr("linker_inputs", heap) {
+                    if !linker_inputs.is_none() {
+                        transitive_depsets.push(linker_inputs);
+                    }
+                }
+            }
+            let merged_linker_inputs = crate::interpreter::rule_defs::depset::make_depset_from_lists(
+                heap,
+                Vec::new(),
+                transitive_depsets,
+                "default",
+            )?;
+            heap.alloc(LinkingContextWithInputsGen {
+                linker_inputs: merged_linker_inputs,
+            })
+        };
+
+        Ok(heap.alloc(CcInfoInstanceGen {
+            compilation_context: last_compilation_context,
+            linking_context: merged_linking_context,
+        }))
     }
 
     /// Creates a debug context from compilation outputs.
@@ -4187,10 +4254,20 @@ impl<'v> StarlarkValue<'v> for CcInfoProvider {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         // CcInfo(compilation_context=..., linking_context=...)
-        // Return a stub CcInfo instance
-        let _kwargs = args.names_map()?;
+        let kwargs = args.names_map()?;
         let heap = eval.heap();
-        Ok(heap.alloc(CcInfoInstanceStub))
+        let compilation_context = kwargs
+            .get("compilation_context")
+            .copied()
+            .unwrap_or(Value::new_none());
+        let linking_context = kwargs
+            .get("linking_context")
+            .copied()
+            .unwrap_or(Value::new_none());
+        Ok(heap.alloc(CcInfoInstanceGen {
+            compilation_context,
+            linking_context,
+        }))
     }
 
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
@@ -4198,7 +4275,93 @@ impl<'v> StarlarkValue<'v> for CcInfoProvider {
     }
 }
 
-/// A stub CcInfo instance (returned when CcInfo(...) is called).
+/// A CcInfo instance with actual compilation and linking context data.
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
+#[repr(C)]
+pub struct CcInfoInstanceGen<V: ValueLifetimeless> {
+    compilation_context: V,
+    linking_context: V,
+}
+
+starlark_complex_value!(pub CcInfoInstance);
+
+impl<V: ValueLifetimeless> Display for CcInfoInstanceGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CcInfo(...)")
+    }
+}
+
+impl<'v, V: ValueLike<'v>> ProviderLike<'v> for CcInfoInstanceGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    fn id(&self) -> &Arc<ProviderId> {
+        CcInfoProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        vec![
+            ("compilation_context", self.compilation_context.to_value()),
+            ("linking_context", self.linking_context.to_value()),
+        ]
+    }
+}
+
+#[starlark::values::starlark_value(type = "CcInfoInstance")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for CcInfoInstanceGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(
+            attribute,
+            "compilation_context"
+                | "linking_context"
+                | "_legacy_transitive_native_libraries"
+                | "_debug_context"
+        )
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "compilation_context" => {
+                if self.compilation_context.to_value().is_none() {
+                    use crate::interpreter::rule_defs::context::CompilationContextStub;
+                    Some(heap.alloc(CompilationContextStub))
+                } else {
+                    Some(self.compilation_context.to_value())
+                }
+            }
+            "linking_context" => {
+                if self.linking_context.to_value().is_none() {
+                    use crate::interpreter::rule_defs::context::LinkingContextStub;
+                    Some(heap.alloc(LinkingContextStub))
+                } else {
+                    Some(self.linking_context.to_value())
+                }
+            }
+            "_legacy_transitive_native_libraries" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "_debug_context" => Some(heap.alloc(CcDebugContext)),
+            _ => None,
+        }
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
+    }
+}
+
+/// A stub CcInfo instance (returned when CcInfo(...) is called with no data).
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct CcInfoInstanceStub;
 
