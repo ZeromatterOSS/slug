@@ -332,9 +332,9 @@ Quick reference to all phases and their locations:
 
 | Phase | Title                   | Status          |
 | ----- | ----------------------- | --------------- |
-| 7a    | Bazel Native Rules      | [~] Partial (constraint_setting/value, config_setting, platform, toolchain_type, cc_libc_top_alias, genquery stub done; genrule cmd/cmd_bash accept select(); 2026-02-25; genrule cmd_ps/cmd_bat Windows shells implemented with correct priority; 2026-03-10) |
+| 7a    | Bazel Native Rules      | [~] Partial (constraint_setting/value, config_setting, platform, toolchain_type, cc_libc_top_alias, genquery stub done; genrule cmd/cmd_bash accept select(); 2026-02-25; genrule cmd_ps/cmd_bat Windows shells; config_setting values={} supports Bazel-style compilation_mode/cpu keys; 2026-03-11) |
 | 7b    | Bazel Global Functions  | [~] Partial (audit done, glob exclude_directories added, missing functions implemented; 2026-02-25) |
-| 7c    | Bazel Top-Level Modules | [~] Partial (config module done, platform_common done, testing.analysis_test() done, coverage_common done; 2026-02-25) |
+| 7c    | Bazel Top-Level Modules | [~] Partial (config module done, platform_common done, testing.analysis_test() done, coverage_common done; cc_common nearly complete with all critical functions; 2026-03-11) |
 | 7d    | Buck2-Specific Removal  | [~] Partial (read_config/read_root_config error with message; oncall/read_oncall/load_symbols removed; soft_error already errors; 2026-02-24; native.bzl 576→40 lines, rules.bzl APPLE_PLATFORMS_KEY removed, user/all.bzl Android/CXX/Xcode removed; 2026-02-25) |
 
 ### Aspects (Phases 8a-8d) - [Sub-plan](./kuro-bazel-subplans/06-aspects.md)
