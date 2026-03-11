@@ -316,8 +316,12 @@ async fn check_config_setting_flag_values(
     Ok(true) // All flag_values match their build_setting_defaults
 }
 
-/// Check whether all `values` entries in a `config_setting` target match the current buckconfig.
-/// The `values` dict uses `"section.property": "expected_value"` format (buckconfig key-value).
+/// Check whether all `values` entries in a `config_setting` target match the current config.
+///
+/// Supports two key formats:
+/// - Bazel-style simple keys: `"compilation_mode"`, `"cpu"`, `"define"`, etc.
+///   These map to Bazel command-line flags and are resolved against known defaults.
+/// - Buck2-style dotted keys: `"section.property"` format (buckconfig key-value).
 ///
 /// Returns `true` if all values match (or if `values` is empty), `false` otherwise.
 async fn check_config_setting_values(
@@ -354,27 +358,86 @@ async fn check_config_setting_values(
             _ => return Ok(false), // Unexpected value type
         };
 
-        // Parse "section.property" format
-        let dot_pos = match key_str.find('.') {
-            Some(pos) => pos,
-            None => return Ok(false), // Not a valid buckconfig key
-        };
-        let section = &key_str[..dot_pos];
-        let property = &key_str[dot_pos + 1..];
+        // Check if this is a Bazel-style simple key (no dot) or Buck2-style dotted key
+        if let Some(dot_pos) = key_str.find('.') {
+            // Buck2-style: "section.property" format
+            let section = &key_str[..dot_pos];
+            let property = &key_str[dot_pos + 1..];
 
-        let actual_value = ctx
-            .get_legacy_config_property(config_setting_cell, BuckconfigKeyRef { section, property })
-            .await?;
+            let actual_value = ctx
+                .get_legacy_config_property(
+                    config_setting_cell,
+                    BuckconfigKeyRef { section, property },
+                )
+                .await?;
 
-        match actual_value {
-            Some(v) if v.as_ref() == expected_str.as_str() => {
-                // This key matches
+            match actual_value {
+                Some(v) if v.as_ref() == expected_str.as_str() => {
+                    // This key matches
+                }
+                _ => return Ok(false), // Mismatch or not set
             }
-            _ => return Ok(false), // Mismatch or not set
+        } else {
+            // Bazel-style: resolve well-known keys against host defaults
+            let matches = resolve_bazel_config_value(&key_str, &expected_str);
+            if !matches {
+                return Ok(false);
+            }
         }
     }
 
     Ok(true) // All values match
+}
+
+/// Resolve a Bazel-style config_setting value key against known defaults.
+///
+/// In Bazel, `config_setting(values = {"compilation_mode": "opt"})` matches
+/// against command-line flags like `--compilation_mode=opt`. Since Kuro doesn't
+/// yet have full flag parsing, we match against sensible defaults.
+fn resolve_bazel_config_value(key: &str, expected: &str) -> bool {
+    match key {
+        "compilation_mode" => {
+            // Default compilation mode is "fastbuild"
+            // TODO(bazel): Read from --compilation_mode flag or .bazelrc
+            expected == "fastbuild"
+        }
+        "cpu" => {
+            // Match against host CPU
+            let host_cpu = if cfg!(target_arch = "x86_64") {
+                "k8"
+            } else if cfg!(target_arch = "aarch64") {
+                "aarch64"
+            } else {
+                "unknown"
+            };
+            expected == host_cpu
+        }
+        "host_cpu" => {
+            let host_cpu = if cfg!(target_arch = "x86_64") {
+                "k8"
+            } else if cfg!(target_arch = "aarch64") {
+                "aarch64"
+            } else {
+                "unknown"
+            };
+            expected == host_cpu
+        }
+        "define" => {
+            // No defines set by default
+            // TODO(bazel): Read from --define flags
+            false
+        }
+        "stamp" => {
+            // Default stamping is off
+            expected == "0"
+        }
+        "features" => {
+            // No features set by default
+            false
+        }
+        // For unknown keys, don't match
+        _ => false,
+    }
 }
 
 /// Compute aspect results for dependencies that have aspects attached via attributes.

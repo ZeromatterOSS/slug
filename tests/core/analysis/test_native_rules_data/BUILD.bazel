@@ -393,3 +393,24 @@ cc_compilation_context_test(
 cc_merge_infos_test(
     name = "cc_merge_infos_test",
 )
+
+# === config_setting with Bazel-style values (compilation_mode, cpu) ===
+
+config_setting(
+    name = "fastbuild_mode",
+    values = {"compilation_mode": "fastbuild"},
+)
+
+config_setting(
+    name = "opt_mode",
+    values = {"compilation_mode": "opt"},
+)
+
+select_value(
+    name = "select_by_compilation_mode",
+    value = select({
+        ":fastbuild_mode": "fastbuild_selected",
+        ":opt_mode": "opt_selected",
+        "//conditions:default": "fallback_selected",
+    }),
+)

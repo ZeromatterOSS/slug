@@ -434,3 +434,13 @@ async def test_cc_common_merge_cc_infos(buck: Buck) -> None:
     assert lines["defines"] == "DEF1=1,DEF2=2"
     assert lines["includes_count"] == "2"
     assert lines["includes"] == "inc1/,inc2/"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_config_setting_values_compilation_mode(buck: Buck) -> None:
+    """config_setting(values={"compilation_mode": "fastbuild"}) matches by default."""
+    result = await buck.build("//:select_by_compilation_mode")
+    output = result.get_build_report().output_for_target("//:select_by_compilation_mode")
+    content = output.read_text().strip()
+    # Default compilation mode is "fastbuild", so the fastbuild config_setting should match
+    assert content == "fastbuild_selected"
