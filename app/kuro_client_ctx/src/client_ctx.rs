@@ -246,6 +246,7 @@ impl<'a> ClientCommandContext<'a> {
                 .clone()
                 .unwrap_or_default(),
             define_values: config_opts.define.clone(),
+            action_env: config_opts.action_env.clone(),
             ..self.empty_client_context(cmd.logging_name())?
         })
     }
@@ -291,6 +292,7 @@ impl<'a> ClientCommandContext<'a> {
             profile_pattern_opts: None,
             compilation_mode: String::new(),
             define_values: Vec::new(),
+            action_env: Vec::new(),
         })
     }
 

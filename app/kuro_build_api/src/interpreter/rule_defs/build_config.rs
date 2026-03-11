@@ -23,6 +23,7 @@ use std::sync::RwLock;
 static BUILD_CONFIG: RwLock<BuildConfig> = RwLock::new(BuildConfig {
     compilation_mode: None,
     defines: None,
+    action_env: None,
 });
 
 struct BuildConfig {
@@ -30,6 +31,8 @@ struct BuildConfig {
     compilation_mode: Option<String>,
     /// --define KEY=VALUE pairs from the command line.
     defines: Option<HashMap<String, String>>,
+    /// --action_env NAME=VALUE pairs from the command line.
+    action_env: Option<HashMap<String, String>>,
 }
 
 /// Set the compilation mode for the current build.
@@ -81,5 +84,33 @@ pub fn get_all_defines() -> HashMap<String, String> {
         .read()
         .ok()
         .and_then(|c| c.defines.clone())
+        .unwrap_or_default()
+}
+
+/// Set --action_env values for the current build.
+/// Each entry should be "NAME=VALUE" or "NAME" (inherit from environment) format.
+pub fn set_action_env(env_values: &[String]) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        let mut map = HashMap::new();
+        for entry in env_values {
+            if let Some((key, value)) = entry.split_once('=') {
+                map.insert(key.to_owned(), value.to_owned());
+            } else {
+                // NAME without =VALUE means inherit from the process environment
+                if let Ok(value) = std::env::var(entry) {
+                    map.insert(entry.to_owned(), value);
+                }
+            }
+        }
+        config.action_env = if map.is_empty() { None } else { Some(map) };
+    }
+}
+
+/// Get all --action_env values as a map.
+pub fn get_action_env() -> HashMap<String, String> {
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| c.action_env.clone())
         .unwrap_or_default()
 }

@@ -1615,8 +1615,9 @@ impl<'v> StarlarkValue<'v> for ToolchainsStub {
             // Generic toolchain type - return a stub that won't crash on attribute access
             Ok(heap.alloc(GenericToolchainStub))
         } else {
-            // For completely unrecognized keys, return None
-            Ok(Value::new_none())
+            // For unrecognized toolchain keys, return a generic stub rather than None.
+            // This prevents AttributeError crashes when rules access toolchain attributes.
+            Ok(heap.alloc(GenericToolchainStub))
         }
     }
 }

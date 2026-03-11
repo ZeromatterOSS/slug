@@ -276,6 +276,19 @@ pub struct CommonBuildConfigurationOptions {
     #[clap(long = "define", hide = true, value_name = "KEY=VALUE", num_args = 1)]
     pub define: Vec<String>,
 
+    /// Pass environment variable to build actions (Bazel compatibility).
+    ///
+    /// Values are in NAME or NAME=VALUE format. NAME without =VALUE inherits
+    /// from the host environment.
+    #[clap(
+        long = "action-env",
+        alias = "action_env",
+        hide = true,
+        value_name = "NAME[=VALUE]",
+        num_args = 1
+    )]
+    pub action_env: Vec<String>,
+
     // ---- Bazel compatibility flags (accepted, some are no-ops) ----
     /// Enable ANSI color output (Bazel compatibility).
     ///
@@ -459,6 +472,7 @@ impl CommonBuildConfigurationOptions {
             exit_when: None,
             compilation_mode: None,
             define: vec![],
+            action_env: vec![],
             color: None,
             show_progress: false,
             strategy: vec![],
@@ -483,6 +497,7 @@ impl CommonBuildConfigurationOptions {
             exit_when: None,
             compilation_mode: None,
             define: vec![],
+            action_env: vec![],
             color: None,
             show_progress: false,
             strategy: vec![],

@@ -193,6 +193,10 @@ message ClientContext {
   /// Bazel-compatible --define KEY=VALUE pairs.
   /// Accessible via ctx.var and config_setting(define_values={}).
   repeated string define_values = 27;
+
+  /// Bazel-compatible --action_env NAME=VALUE or NAME pairs.
+  /// Injected into the environment of all build actions.
+  repeated string action_env = 28;
 }
 
 message TargetsRequest {

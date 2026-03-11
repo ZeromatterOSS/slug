@@ -318,6 +318,9 @@ impl<'a> ServerCommandContext<'a> {
         kuro_build_api::interpreter::rule_defs::build_config::set_defines(
             &client_context.define_values,
         );
+        kuro_build_api::interpreter::rule_defs::build_config::set_action_env(
+            &client_context.action_env,
+        );
 
         let oncall = if client_context.oncall.is_empty() {
             None
