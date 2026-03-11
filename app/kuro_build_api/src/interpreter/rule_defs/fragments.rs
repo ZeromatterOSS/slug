@@ -58,8 +58,9 @@ pub struct CppFragment {
 
 impl Default for CppFragment {
     fn default() -> Self {
+        let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
         Self {
-            compilation_mode: "fastbuild".to_owned(),
+            compilation_mode: mode,
             force_pic: false,
             use_llvm_coverage_map_format: false,
             apple_generate_dsym: false,
