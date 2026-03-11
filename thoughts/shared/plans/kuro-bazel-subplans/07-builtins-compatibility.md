@@ -78,30 +78,22 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 |------|-------------|-------------|----------|
 | `environment_group` | Defines environment groups | ✓ Implemented | `native_rules.rs` (2026-03-11) |
 
-#### Proto Rules
+#### Language-Specific Rules (NOT native in Bazel 9 — require load())
 
-| Rule | Description | Kuro Status | Location |
-|------|-------------|-------------|----------|
-| `proto_library` | Protocol buffer library | ✓ Stub | `native_rules.rs` (2026-03-11) |
-| `cc_proto_library` | C++ proto library | ✓ Stub | `native_rules.rs` (2026-03-11) |
-| `java_proto_library` | Java proto library | ✓ Stub | `native_rules.rs` (2026-03-11) |
+In Bazel 9, language-specific rules were moved to external Starlark repositories:
+- `proto_library`, `cc_proto_library`, `java_proto_library` → `@protobuf`
+- `java_library`, `java_binary`, `java_test`, `java_import` → `@rules_java`
+- `py_library`, `py_binary`, `py_test` → `@rules_python`
+- `objc_library`, `objc_import` → `@rules_apple`
+- `cc_library`, `cc_binary`, `cc_test`, etc. → `@rules_cc`
+- `sh_binary`, `sh_test`, `sh_library` → `@rules_shell`
 
-#### Java Rules
+These should NOT be implemented as native Rust rules. Instead, ensure the
+`cc_common`, `java_common`, `platform_common` modules are robust enough for
+external rulesets to define their rules in Starlark via `rule()`.
 
-| Rule | Description | Kuro Status | Location |
-|------|-------------|-------------|----------|
-| `java_library` | Java library | ✓ Stub | `native_rules.rs` (2026-03-11) |
-| `java_binary` | Java binary | ✓ Stub | `native_rules.rs` (2026-03-11) |
-| `java_test` | Java test | ✓ Stub | `native_rules.rs` (2026-03-11) |
-| `java_import` | Prebuilt Java library | ✓ Stub | `native_rules.rs` (2026-03-11) |
-
-#### Python Rules
-
-| Rule | Description | Kuro Status | Location |
-|------|-------------|-------------|----------|
-| `py_library` | Python library | ✓ Stub | `native_rules.rs` (2026-03-11) |
-| `py_binary` | Python binary | ✓ Stub | `native_rules.rs` (2026-03-11) |
-| `py_test` | Python test | ✓ Stub | `native_rules.rs` (2026-03-11) |
+**Note**: cc_*/sh_* remain as native rules in Kuro for now (Buck2 heritage),
+but the long-term goal is migrating them to Starlark via rules_cc/rules_shell.
 
 ### Implementation Strategy
 
