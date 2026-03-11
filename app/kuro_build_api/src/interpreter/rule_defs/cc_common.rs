@@ -4028,6 +4028,80 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         Ok(eval.heap().alloc(Vec::<String>::new()))
     }
 
+    /// Creates compile variables for use with get_memory_inefficient_command_line.
+    ///
+    /// Returns CcToolchainVariables with compilation-related settings.
+    #[allow(unused_variables)]
+    fn create_compile_variables<'v>(
+        #[starlark(this)] _this: &CcCommonModule,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        #[starlark(require = named)] cc_toolchain: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        source_file: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        output_file: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        user_compile_flags: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        include_directories: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        quote_include_directories: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        system_include_directories: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        framework_include_directories: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        preprocessor_defines: Value<'v>,
+        #[starlark(require = named, default = false)] use_pic: bool,
+        #[starlark(require = named, default = false)] add_legacy_cxx_options: bool,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        variables_extension: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
+        let mut map: SmallMap<Value<'v>, Value<'v>> = SmallMap::new();
+
+        if !source_file.is_none() {
+            map.insert_hashed(
+                heap.alloc_str("source_file").to_value().get_hashed().unwrap(),
+                source_file,
+            );
+        }
+        if !output_file.is_none() {
+            map.insert_hashed(
+                heap.alloc_str("output_file").to_value().get_hashed().unwrap(),
+                output_file,
+            );
+        }
+        if !user_compile_flags.is_none() {
+            map.insert_hashed(
+                heap.alloc_str("user_compile_flags").to_value().get_hashed().unwrap(),
+                user_compile_flags,
+            );
+        }
+        if !include_directories.is_none() {
+            map.insert_hashed(
+                heap.alloc_str("include_directories").to_value().get_hashed().unwrap(),
+                include_directories,
+            );
+        }
+        if !preprocessor_defines.is_none() {
+            map.insert_hashed(
+                heap.alloc_str("preprocessor_defines").to_value().get_hashed().unwrap(),
+                preprocessor_defines,
+            );
+        }
+        if use_pic {
+            map.insert_hashed(
+                heap.alloc_str("use_pic").to_value().get_hashed().unwrap(),
+                Value::new_bool(true),
+            );
+        }
+
+        let vars = heap.alloc(Dict::new(map));
+        Ok(heap.alloc(CcToolchainVariablesGen { vars }))
+    }
+
     /// Creates link variables for use with get_memory_inefficient_command_line.
     ///
     /// Used by rules_rust to get linker command line from cc toolchain.

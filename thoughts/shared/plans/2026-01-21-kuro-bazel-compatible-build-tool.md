@@ -373,7 +373,7 @@ Quick reference to all phases and their locations:
 | Phase | Title                              | Status          |
 | ----- | ---------------------------------- | --------------- |
 | 16    | Local Build Isolation (Sandboxing) | [x] Functional (Linux: user+mount namespaces, root read-only, output dirs writable, --nosandbox flag; 2026-02-20) |
-| 17    | Platform Support                   | [~] Partial (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; Make variables and tool paths use host_target_cpu()/host_cc_path()/host_tool_path(); MSVC auto-detection via vswhere.exe with full compile/link/archive support in cc_common.rs; examples/hello_world builds and runs on Windows; 2026-03-10) |
+| 17    | Platform Support                   | [~] Partial (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; Make variables and tool paths use host_target_cpu()/host_cc_path()/host_tool_path(); MSVC auto-detection via vswhere.exe with full compile/link/archive support in cc_common.rs; CcToolchainInfoStub returns correct compiler/cpu/system-name/libc per platform; get_environment_variables returns MSVC INCLUDE/LIB; host_path_separator correct on Windows; examples/hello_world builds and runs on Windows; 2026-03-11) |
 | 18    | Query Commands + Test Runner       | [x] Functional (deps, rdeps, allpaths, somepath, kind, attr, filter, buildfiles, tests; --output=label/json/build/graph; kuro test //... runs 4 tests) |
 
 ---

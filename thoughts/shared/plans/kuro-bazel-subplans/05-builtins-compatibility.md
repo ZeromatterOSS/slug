@@ -190,10 +190,10 @@ These modules must be available as globals in .bzl files.
 | `compile()` | C++ compilation | ✓ Implemented (creates real compile actions; 2026-03-10) |
 | `create_compilation_context()` | Create CompilationContext | ✓ Implemented (headers, includes, defines; 2026-03-11) |
 | `create_compilation_outputs()` | Create CcCompilationOutputs | Stub |
-| `create_compile_variables()` | Generate compilation vars | Stub |
+| `create_compile_variables()` | Generate compilation vars | ✓ Implemented (stores source/output/flags/includes/defines in dict; 2026-03-11) |
 | `create_linker_input()` | Create LinkerInput | ✓ Implemented (stores user_link_flags, additional_inputs; 2026-03-11) |
 | `create_linking_context()` | Create LinkingContext | Stub |
-| `create_link_variables()` | Generate linking vars | Stub |
+| `create_link_variables()` | Generate linking vars | ✓ Implemented (stores user_link_flags/search_dirs/dynamic flag in dict; 2026-03-11) |
 | `create_library_to_link()` | Create LibraryToLink | Stub |
 | `configure_features()` | Create FeatureConfiguration | ✓ Implemented (stores requested/unsupported features, 30+ default features; 2026-03-11) |
 | `link()` | C++ linking | ✓ Implemented (creates real link actions, supports executable/dynamic_library/static_library; 2026-03-11) |
@@ -206,7 +206,7 @@ These modules must be available as globals in .bzl files.
 | `get_execution_requirements()` | Get exec requirements | Stub |
 | `CcToolchainInfo` | Provider | ✓ Implemented |
 
-**Status**: Mostly implemented (compile/link/configure_features/is_enabled/create_compilation_context/merge_cc_infos/create_linker_input/create_linking_context/get_tool_for_action/get_memory_inefficient_command_line/get_environment_variables are real; create_compile_variables/create_link_variables are stubs)
+**Status**: Mostly implemented (compile/link/configure_features/is_enabled/create_compilation_context/merge_cc_infos/create_linker_input/create_linking_context/create_compile_variables/create_link_variables/get_tool_for_action/get_memory_inefficient_command_line/get_environment_variables are real; remaining are stubs: action_is_enabled, get_execution_requirements)
 
 ### Module: `config`
 
