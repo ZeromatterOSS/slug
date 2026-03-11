@@ -333,8 +333,8 @@ Quick reference to all phases and their locations:
 | Phase | Title                   | Status          |
 | ----- | ----------------------- | --------------- |
 | 7a    | Bazel Native Rules      | [~] Partial (constraint_setting/value, config_setting, platform, toolchain_type, cc_libc_top_alias, genquery stub done; genrule cmd/cmd_bash accept select(); 2026-02-25; genrule cmd_ps/cmd_bat Windows shells; config_setting values={} supports Bazel-style compilation_mode/cpu keys; config_setting define_values={} matching; 2026-03-11) |
-| 7b    | Bazel Global Functions  | [~] Partial (audit done, glob exclude_directories added, missing functions implemented; 2026-02-25) |
-| 7c    | Bazel Top-Level Modules | [~] Partial (config module done, platform_common done, testing.analysis_test() done, coverage_common done; cc_common nearly complete with all critical functions; 2026-03-11) |
+| 7b    | Bazel Global Functions  | [~] Partial (audit done, glob exclude_directories added, missing functions implemented; package_group visibility resolution working with cross-package deps; 2026-03-11) |
+| 7c    | Bazel Top-Level Modules | [~] Partial (config module done, platform_common done, testing.analysis_test() done, coverage_common done; cc_common compile passes flags, compilation context preserves all include types, linking_context extracts objects; 2026-03-11) |
 | 7d    | Buck2-Specific Removal  | [~] Partial (read_config/read_root_config error with message; oncall/read_oncall/load_symbols removed; soft_error already errors; 2026-02-24; native.bzl 576→40 lines, rules.bzl APPLE_PLATFORMS_KEY removed, user/all.bzl Android/CXX/Xcode removed; 2026-02-25) |
 
 ### Aspects (Phases 8a-8d) - [Sub-plan](./kuro-bazel-subplans/06-aspects.md)
@@ -373,7 +373,7 @@ Quick reference to all phases and their locations:
 | Phase | Title                              | Status          |
 | ----- | ---------------------------------- | --------------- |
 | 16    | Local Build Isolation (Sandboxing) | [x] Functional (Linux: user+mount namespaces, root read-only, output dirs writable, --nosandbox flag; 2026-02-20) |
-| 17    | Platform Support                   | [~] Partial (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; Make variables and tool paths use host_target_cpu()/host_cc_path()/host_tool_path(); MSVC auto-detection via vswhere.exe with full compile/link/archive support in cc_common.rs; CcToolchainInfoStub returns correct compiler/cpu/system-name/libc per platform; get_environment_variables returns MSVC INCLUDE/LIB; host_path_separator correct on Windows; examples/hello_world builds and runs on Windows; --copt/--cxxopt/--conlyopt/--linkopt/--strip/--features flags wired to ctx.fragments.cpp; execution_requirements parsed in ctx.actions.run(); PlatformFragment/JavaFragment/AppleFragment stubs; 2026-03-11) |
+| 17    | Platform Support                   | [x] Functional (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; MSVC auto-detection; CcToolchainInfoStub per-platform; --copt/--cxxopt/--linkopt/--strip/--features flags; execution_requirements; PlatformFragment/JavaFragment/AppleFragment stubs; 30+ common Bazel CLI flags accepted; package_group visibility resolution; 2026-03-11) |
 | 18    | Query Commands + Test Runner       | [x] Functional (deps, rdeps, allpaths, somepath, kind, attr, filter, buildfiles, tests; --output=label/json/build/graph; kuro test //... runs 4 tests) |
 
 ---
