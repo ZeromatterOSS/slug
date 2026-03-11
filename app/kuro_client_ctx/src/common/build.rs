@@ -214,26 +214,6 @@ pub struct CommonBuildOptions {
     #[clap(long = "verbose-failures", alias = "verbose_failures", hide = true)]
     pub verbose_failures: bool,
 
-    /// Set user-defined build variables (Bazel compatibility).
-    ///
-    /// Values are in KEY=VALUE format. Accepted for compatibility with Bazel's
-    /// --define flag. Can be used with config_setting(define_values = {...}).
-    /// Currently accepted but not yet wired to select() evaluation.
-    #[clap(long = "define", hide = true, value_name = "KEY=VALUE")]
-    pub define: Vec<String>,
-
-    /// Pass environment variable to build actions (Bazel compatibility).
-    ///
-    /// Values are in NAME or NAME=VALUE format. Accepted for compatibility with
-    /// Bazel's --action_env flag. Currently accepted but not propagated to actions.
-    #[clap(
-        long = "action-env",
-        alias = "action_env",
-        hide = true,
-        value_name = "NAME[=VALUE]"
-    )]
-    pub action_env: Vec<String>,
-
     /// Pass environment variable to host actions (Bazel compatibility).
     ///
     /// Accepted for compatibility with Bazel's --host_action_env flag.

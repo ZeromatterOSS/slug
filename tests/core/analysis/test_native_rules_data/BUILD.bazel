@@ -358,6 +358,14 @@ genrule(
     visibility = [":all_packages"],
 )
 
+# A library visible only to targets allowed by the all_packages group
+genrule(
+    name = "pkg_group_lib",
+    outs = ["pkg_group_lib.txt"],
+    cmd = "echo visible_via_group > $@",
+    visibility = [":all_packages"],
+)
+
 # === stamp file tests ===
 
 stamp_file_info(

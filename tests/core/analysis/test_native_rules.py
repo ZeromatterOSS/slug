@@ -312,6 +312,15 @@ async def test_target_with_package_group_visibility(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_package_group_cross_package_visibility(buck: Buck) -> None:
+    """Target in subpackage can depend on target visible via package_group."""
+    result = await buck.build("//subpkg:cross_pkg_consumer")
+    output = result.get_build_report().output_for_target("//subpkg:cross_pkg_consumer")
+    content = output.read_text().strip()
+    assert "visible_via_group" in content
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_declare_file_with_sibling(buck: Buck) -> None:
     """declare_file() with sibling places output in sibling's directory."""
     result = await buck.build("//:sibling_test")

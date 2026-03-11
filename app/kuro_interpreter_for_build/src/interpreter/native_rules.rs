@@ -1502,8 +1502,18 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         features: UnpackListOrTuple<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _unused = (packages, includes, tags, testonly, deprecation, features);
+        let _unused = (tags, testonly, deprecation, features);
         let internals = ModuleInternals::from_context(eval, "package_group")?;
+
+        // Register the package_group in the global registry for visibility resolution
+        let pkg_label = internals.package().buildfile_path.package();
+        let pkg_path = pkg_label.cell_relative_path().as_str();
+        let group_label = format!("//{}:{}", pkg_path, name);
+        kuro_node::visibility::register_package_group(
+            &group_label,
+            packages.items,
+            includes.items,
+        );
 
         let target_node = create_native_target_node(
             rule_defs::PACKAGE_GROUP_RULE.clone(),

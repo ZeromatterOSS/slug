@@ -1,0 +1,9 @@
+# Cross-package test: this target depends on //:pkg_group_lib which has
+# visibility restricted to the :all_packages package_group (which allows //...).
+genrule(
+    name = "cross_pkg_consumer",
+    outs = ["cross_pkg.txt"],
+    srcs = ["//:pkg_group_lib"],
+    cmd = "cat $(location //:pkg_group_lib) > $@",
+    visibility = ["//visibility:public"],
+)

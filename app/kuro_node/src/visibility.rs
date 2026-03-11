@@ -8,9 +8,11 @@
  * above-listed licenses.
  */
 
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Display;
 use std::fmt::Formatter;
+use std::sync::RwLock;
 
 use allocative::Allocative;
 use dupe::Dupe;
@@ -22,6 +24,130 @@ use kuro_util::arc_str::ThinArcSlice;
 use pagable::Pagable;
 
 use crate::attrs::attr_type::any_matches::AnyMatches;
+
+// ============================================================================
+// Package Group Registry
+// ============================================================================
+
+/// A package specification from a package_group's `packages` attribute.
+#[derive(Debug, Clone)]
+pub enum PackageSpec {
+    /// Match a single package exactly: `"//foo/bar"`
+    Exact(String),
+    /// Match a package and all subpackages: `"//foo/bar/..."`
+    Recursive(String),
+    /// Match all packages: `"//..."`
+    AllPackages,
+    /// Negate a spec: `"-//foo/bar"`
+    Negated(Box<PackageSpec>),
+    /// Public - visible to all
+    Public,
+    /// Private - visible to none
+    Private,
+}
+
+impl PackageSpec {
+    /// Parse a package specification string.
+    pub fn parse(spec: &str) -> PackageSpec {
+        if spec == "public" || spec == "//visibility:public" {
+            return PackageSpec::Public;
+        }
+        if spec == "private" || spec == "//visibility:private" {
+            return PackageSpec::Private;
+        }
+        if spec.starts_with('-') {
+            return PackageSpec::Negated(Box::new(PackageSpec::parse(&spec[1..])));
+        }
+        if spec == "//..." {
+            return PackageSpec::AllPackages;
+        }
+        if spec.ends_with("/...") {
+            // "//foo/bar/..." -> prefix is "foo/bar"
+            let prefix = spec.trim_start_matches("//").trim_end_matches("/...");
+            return PackageSpec::Recursive(prefix.to_owned());
+        }
+        // "//foo/bar" -> exact match on "foo/bar"
+        let pkg = spec.trim_start_matches("//");
+        PackageSpec::Exact(pkg.to_owned())
+    }
+
+    /// Check if a package path matches this spec.
+    fn matches_package_path(&self, pkg_path: &str) -> bool {
+        match self {
+            PackageSpec::Exact(p) => pkg_path == p,
+            PackageSpec::Recursive(prefix) => {
+                pkg_path == prefix.as_str()
+                    || pkg_path.starts_with(&format!("{}/", prefix))
+            }
+            PackageSpec::AllPackages => true,
+            PackageSpec::Public => true,
+            PackageSpec::Private => false,
+            PackageSpec::Negated(inner) => !inner.matches_package_path(pkg_path),
+        }
+    }
+}
+
+/// Registered package group data.
+#[derive(Debug, Clone)]
+pub struct PackageGroupData {
+    pub packages: Vec<PackageSpec>,
+    pub includes: Vec<String>,
+}
+
+static PACKAGE_GROUP_REGISTRY: RwLock<Option<HashMap<String, PackageGroupData>>> =
+    RwLock::new(None);
+
+/// Register a package_group with its packages and includes.
+pub fn register_package_group(label: &str, packages: Vec<String>, includes: Vec<String>) {
+    let specs: Vec<PackageSpec> = packages.iter().map(|s| PackageSpec::parse(s)).collect();
+    let data = PackageGroupData {
+        packages: specs,
+        includes,
+    };
+    let mut registry = PACKAGE_GROUP_REGISTRY.write().unwrap();
+    registry
+        .get_or_insert_with(HashMap::new)
+        .insert(label.to_owned(), data);
+}
+
+/// Check if a target's package matches a registered package_group.
+/// Returns None if the label is not a registered package_group.
+pub fn check_package_group(group_label: &str, target: &TargetLabel) -> Option<bool> {
+    let registry = PACKAGE_GROUP_REGISTRY.read().unwrap();
+    let registry = registry.as_ref()?;
+    let data = registry.get(group_label)?;
+
+    let pkg_path = target.pkg().cell_relative_path().as_str();
+
+    // Check direct package specs
+    let mut matched = false;
+    for spec in &data.packages {
+        match spec {
+            PackageSpec::Negated(_) => {
+                if !spec.matches_package_path(pkg_path) {
+                    return Some(false);
+                }
+            }
+            _ => {
+                if spec.matches_package_path(pkg_path) {
+                    matched = true;
+                }
+            }
+        }
+    }
+    if matched {
+        return Some(true);
+    }
+
+    // Check included package groups (transitively)
+    for include_label in &data.includes {
+        if let Some(true) = check_package_group(include_label, target) {
+            return Some(true);
+        }
+    }
+
+    Some(false)
+}
 
 #[derive(Debug, kuro_error::Error)]
 pub enum VisibilityError {
@@ -111,8 +237,30 @@ impl VisibilityPatternList {
             VisibilityPatternList::Public => true,
             VisibilityPatternList::List(patterns) => {
                 for pattern in patterns {
+                    // First try standard pattern matching (//pkg:__pkg__, //pkg/..., etc.)
                     if pattern.0.matches(target) {
                         return true;
+                    }
+                    // If the pattern is a Target (e.g. //some:package_group), check if
+                    // it's a registered package_group and resolve it
+                    if let ParsedPattern::Target(pkg, name, TargetPatternExtra) = &pattern.0 {
+                        let group_label = format!(
+                            "{}//{}:{}",
+                            pkg.cell_name(),
+                            pkg.cell_relative_path(),
+                            name
+                        );
+                        // Also try without cell name for root cell
+                        let group_label_short = format!(
+                            "//{}:{}",
+                            pkg.cell_relative_path(),
+                            name
+                        );
+                        if let Some(true) = check_package_group(&group_label, target)
+                            .or_else(|| check_package_group(&group_label_short, target))
+                        {
+                            return true;
+                        }
                     }
                 }
                 false
