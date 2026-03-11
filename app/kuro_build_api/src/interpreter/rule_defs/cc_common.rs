@@ -3623,9 +3623,33 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] variables: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // TODO(cc_common): Extract env vars from feature configuration
-        let map: SmallMap<Value<'v>, Value<'v>> = SmallMap::new();
-        Ok(eval.heap().alloc(Dict::new(map)))
+        let _ = (this, feature_configuration, action_name, variables);
+        let heap = eval.heap();
+        let mut map: SmallMap<Value<'v>, Value<'v>> = SmallMap::new();
+
+        // On Windows, provide MSVC environment variables for compilation/linking
+        #[cfg(target_os = "windows")]
+        if let Some(tools) = get_msvc_tool_paths() {
+            let include_val = format!(
+                "{};{};{};{}",
+                tools.msvc_include, tools.ucrt_include, tools.um_include, tools.shared_include
+            );
+            map.insert_hashed(
+                heap.alloc_str("INCLUDE").to_value().get_hashed().unwrap(),
+                heap.alloc_str(&include_val).to_value(),
+            );
+
+            let lib_val = format!(
+                "{};{};{}",
+                tools.msvc_lib, tools.ucrt_lib, tools.um_lib
+            );
+            map.insert_hashed(
+                heap.alloc_str("LIB").to_value().get_hashed().unwrap(),
+                heap.alloc_str(&lib_val).to_value(),
+            );
+        }
+
+        Ok(heap.alloc(Dict::new(map)))
     }
 
     /// Creates empty toolchain variables.

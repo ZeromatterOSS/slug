@@ -1832,21 +1832,45 @@ fn cc_toolchain_info_stub_methods(builder: &mut MethodsBuilder) {
     #[starlark(attribute)]
     fn compiler(this: &CcToolchainInfoStub) -> starlark::Result<&'static str> {
         let _ = this;
-        Ok("gcc")
+        if cfg!(windows) {
+            Ok("msvc")
+        } else if cfg!(target_os = "macos") {
+            Ok("clang")
+        } else {
+            Ok("gcc")
+        }
     }
 
     /// Target CPU architecture.
     #[starlark(attribute)]
     fn cpu(this: &CcToolchainInfoStub) -> starlark::Result<&'static str> {
         let _ = this;
-        Ok("k8")
+        Ok(host_target_cpu())
     }
 
     /// GNU system name for the target.
     #[starlark(attribute)]
     fn target_gnu_system_name(this: &CcToolchainInfoStub) -> starlark::Result<&'static str> {
         let _ = this;
-        Ok("x86_64-linux-gnu")
+        if cfg!(windows) {
+            if cfg!(target_arch = "aarch64") {
+                Ok("aarch64-w64-windows-msvc")
+            } else {
+                Ok("x86_64-w64-windows-msvc")
+            }
+        } else if cfg!(target_os = "macos") {
+            if cfg!(target_arch = "aarch64") {
+                Ok("aarch64-apple-darwin")
+            } else {
+                Ok("x86_64-apple-darwin")
+            }
+        } else {
+            if cfg!(target_arch = "aarch64") {
+                Ok("aarch64-linux-gnu")
+            } else {
+                Ok("x86_64-linux-gnu")
+            }
+        }
     }
 
     /// All input files for the toolchain.
@@ -1925,8 +1949,9 @@ fn cc_toolchain_info_stub_methods(builder: &mut MethodsBuilder) {
         this: &CcToolchainInfoStub,
         #[starlark(require = named)] feature_configuration: Value<'v>,
     ) -> starlark::Result<bool> {
-        // Return true - PIC is typically needed for dynamic libraries
-        Ok(true)
+        let _ = (this, feature_configuration);
+        // MSVC doesn't use PIC; Unix does
+        Ok(!cfg!(windows))
     }
 
     /// Returns whether PIC is used only for dynamic libraries.
