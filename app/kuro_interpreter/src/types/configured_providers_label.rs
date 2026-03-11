@@ -170,6 +170,23 @@ fn configured_label_methods(builder: &mut MethodsBuilder) {
         }
     }
 
+    /// Returns the canonical repo name (Bazel compatibility).
+    /// Modern replacement for `workspace_name`.
+    /// For the main repository, returns an empty string.
+    /// For external repositories, returns the repository name.
+    #[starlark(attribute)]
+    fn repo_name<'v>(
+        this: &'v StarlarkConfiguredProvidersLabel,
+        heap: Heap<'v>,
+    ) -> starlark::Result<StringValue<'v>> {
+        let cell = this.label.target().pkg().cell_name().as_str();
+        if kuro_core::cells::is_root_cell_name(cell) {
+            Ok(heap.alloc_str_intern(""))
+        } else {
+            Ok(heap.alloc_str_intern(cell))
+        }
+    }
+
     /// Returns the execution root-relative path for the workspace (Bazel compatibility).
     /// For the main repository, returns "" (empty string).
     /// For external repositories, returns "external/<repo_name>".
