@@ -78,6 +78,31 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 |------|-------------|-------------|----------|
 | `environment_group` | Defines environment groups | ✓ Implemented | `native_rules.rs` (2026-03-11) |
 
+#### Proto Rules
+
+| Rule | Description | Kuro Status | Location |
+|------|-------------|-------------|----------|
+| `proto_library` | Protocol buffer library | ✓ Stub | `native_rules.rs` (2026-03-11) |
+| `cc_proto_library` | C++ proto library | ✓ Stub | `native_rules.rs` (2026-03-11) |
+| `java_proto_library` | Java proto library | ✓ Stub | `native_rules.rs` (2026-03-11) |
+
+#### Java Rules
+
+| Rule | Description | Kuro Status | Location |
+|------|-------------|-------------|----------|
+| `java_library` | Java library | ✓ Stub | `native_rules.rs` (2026-03-11) |
+| `java_binary` | Java binary | ✓ Stub | `native_rules.rs` (2026-03-11) |
+| `java_test` | Java test | ✓ Stub | `native_rules.rs` (2026-03-11) |
+| `java_import` | Prebuilt Java library | ✓ Stub | `native_rules.rs` (2026-03-11) |
+
+#### Python Rules
+
+| Rule | Description | Kuro Status | Location |
+|------|-------------|-------------|----------|
+| `py_library` | Python library | ✓ Stub | `native_rules.rs` (2026-03-11) |
+| `py_binary` | Python binary | ✓ Stub | `native_rules.rs` (2026-03-11) |
+| `py_test` | Python test | ✓ Stub | `native_rules.rs` (2026-03-11) |
+
 ### Implementation Strategy
 
 **Phase 7a.1: Verify Existing Rules**
