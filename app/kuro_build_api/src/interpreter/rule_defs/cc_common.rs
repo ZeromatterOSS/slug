@@ -3157,24 +3157,55 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                     // Each linker input may have libraries
                                     if let Ok(Some(libraries)) = input.get_attr("libraries", heap) {
                                         if !libraries.is_none() {
-                                            if let Ok(lib_iter) = libraries.iterate(heap) {
-                                                for lib in lib_iter {
-                                                    // Library_to_link has static_library, dynamic_library, etc.
-                                                    if let Ok(Some(static_lib)) =
-                                                        lib.get_attr("static_library", heap)
-                                                    {
-                                                        if !static_lib.is_none() {
-                                                            args.push(static_lib);
-                                                        }
+                                            // Libraries can be a depset or list
+                                            let mut lib_elements = Vec::new();
+                                            crate::interpreter::rule_defs::depset::collect_depset_elements(
+                                                libraries,
+                                                &mut lib_elements,
+                                                heap,
+                                            );
+                                            for lib in lib_elements {
+                                                // Library_to_link has static_library, dynamic_library, objects, etc.
+                                                if let Ok(Some(static_lib)) =
+                                                    lib.get_attr("static_library", heap)
+                                                {
+                                                    if !static_lib.is_none() {
+                                                        args.push(static_lib);
                                                     }
-                                                    if let Ok(Some(dynamic_lib)) =
-                                                        lib.get_attr("dynamic_library", heap)
-                                                    {
-                                                        if !dynamic_lib.is_none() {
-                                                            args.push(dynamic_lib);
+                                                }
+                                                if let Ok(Some(dynamic_lib)) =
+                                                    lib.get_attr("dynamic_library", heap)
+                                                {
+                                                    if !dynamic_lib.is_none() {
+                                                        args.push(dynamic_lib);
+                                                    }
+                                                }
+                                                // Also include objects from library_to_link
+                                                if let Ok(Some(objects)) =
+                                                    lib.get_attr("objects", heap)
+                                                {
+                                                    if !objects.is_none() {
+                                                        if let Ok(obj_iter) = objects.iterate(heap) {
+                                                            for obj in obj_iter {
+                                                                args.push(obj);
+                                                            }
                                                         }
                                                     }
                                                 }
+                                            }
+                                        }
+                                    }
+                                    // Extract user_link_flags from linker inputs (e.g., -lpthread)
+                                    if let Ok(Some(dep_link_flags)) = input.get_attr("user_link_flags", heap) {
+                                        if !dep_link_flags.is_none() {
+                                            let mut flag_elements = Vec::new();
+                                            crate::interpreter::rule_defs::depset::collect_depset_elements(
+                                                dep_link_flags,
+                                                &mut flag_elements,
+                                                heap,
+                                            );
+                                            for flag in flag_elements {
+                                                args.push(flag);
                                             }
                                         }
                                     }
