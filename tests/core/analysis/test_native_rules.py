@@ -453,3 +453,31 @@ async def test_config_setting_values_compilation_mode(buck: Buck) -> None:
     content = output.read_text().strip()
     # Default compilation mode is "fastbuild", so the fastbuild config_setting should match
     assert content == "fastbuild_selected"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_existing_rules_returns_kind(buck: Buck) -> None:
+    """native.existing_rules() returns dicts with 'kind' key for each target."""
+    result = await buck.build("//:existing_rules_check")
+    output = result.get_build_report().output_for_target("//:existing_rules_check")
+    content = output.read_text().strip()
+    lines = content.splitlines()
+    # Should have entries like "source_files=filegroup", "original=write_list", etc.
+    entries = {}
+    repo_name = None
+    for line in lines:
+        if line.startswith("repo="):
+            repo_name = line.split("=", 1)[1]
+        elif "=" in line:
+            name, kind = line.split("=", 1)
+            entries[name] = kind
+    # Verify some known targets have correct kinds
+    assert entries.get("source_files") == "filegroup", f"Expected filegroup, got {entries.get('source_files')}"
+    assert entries.get("original") == "write_list", f"Expected write_list, got {entries.get('original')}"
+    assert entries.get("aliased") == "alias", f"Expected alias, got {entries.get('aliased')}"
+    assert entries.get("genrule_basic") == "genrule", f"Expected genrule, got {entries.get('genrule_basic')}"
+    # No target should have MISSING kind
+    for name, kind in entries.items():
+        assert kind != "MISSING", f"Target {name} has MISSING kind"
+    # repository_name() for root cell should be "@"
+    assert repo_name == "@", f"Expected '@' for root cell repository_name(), got '{repo_name}'"

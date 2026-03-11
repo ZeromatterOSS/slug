@@ -284,6 +284,35 @@ cc_merge_infos_test = rule(
 )
 
 
+def _existing_rules_test_impl(ctx):
+    """Writes existing_rules info captured at load time."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "\n".join(ctx.attr.items) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+existing_rules_test = rule(
+    implementation = _existing_rules_test_impl,
+    attrs = {
+        "items": attr.string_list(default = []),
+    },
+)
+
+
+def capture_existing_rules(name):
+    """Macro that captures native.existing_rules() and writes the info."""
+    rules = native.existing_rules()
+    items = []
+    for rule_name, rule_info in rules.items():
+        kind = rule_info.get("kind", "MISSING")
+        items.append("{}={}".format(rule_name, kind))
+    items.append("repo=" + native.repository_name())
+    existing_rules_test(
+        name = name,
+        items = items,
+    )
+
+
 def _bool_setting_impl(ctx):
     """A boolean build setting (no output)."""
     return []

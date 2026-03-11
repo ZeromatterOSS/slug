@@ -253,6 +253,32 @@ impl ModuleInternals {
             .collect()
     }
 
+    /// Returns (name, kind) pairs for all targets recorded so far.
+    /// Used by `native.existing_rules()` for Bazel compatibility.
+    pub(crate) fn get_targets_with_kind(&self) -> Vec<(String, String)> {
+        self.recording_targets()
+            .recorder
+            .targets
+            .iter()
+            .map(|(name, node)| {
+                (
+                    name.as_str().to_owned(),
+                    node.rule_type().name().to_owned(),
+                )
+            })
+            .collect()
+    }
+
+    /// Returns the rule kind for a target, or None if not found.
+    /// Used by `native.existing_rule()` for Bazel compatibility.
+    pub(crate) fn get_target_kind(&self, name: &str) -> Option<String> {
+        self.recording_targets()
+            .recorder
+            .targets
+            .get(TargetNameRef::unchecked_new(name))
+            .map(|node| node.rule_type().name().to_owned())
+    }
+
     pub fn buildfile_path(&self) -> &Arc<BuildFilePath> {
         &self.buildfile_path
     }

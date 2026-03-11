@@ -453,6 +453,39 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
             .to_string())
     }
 
+    /// Returns the name of the Bazel module associated with the repository where
+    /// the calling .bzl file lives. For the root module this returns the module name
+    /// from MODULE.bazel; for external modules it returns their declared name.
+    ///
+    /// If called outside a bzlmod context, returns an empty string.
+    ///
+    /// See: https://bazel.build/rules/lib/builtins/native#module_name
+    fn module_name(eval: &mut Evaluator) -> starlark::Result<NoneOr<String>> {
+        let cell_name = BuildContext::from_context(eval)?
+            .cell_info()
+            .name()
+            .to_string();
+        if kuro_core::cells::is_root_cell_name(&cell_name) {
+            // For root cell, return the cell name from MODULE.bazel
+            // (CellResolver sets it to the module(name=...) value or "_main")
+            Ok(NoneOr::Other(cell_name))
+        } else {
+            Ok(NoneOr::Other(cell_name))
+        }
+    }
+
+    /// Returns the version of the Bazel module associated with the repository where
+    /// the calling .bzl file lives.
+    ///
+    /// Currently returns None as Kuro doesn't track module versions yet.
+    ///
+    /// See: https://bazel.build/rules/lib/builtins/native#module_version
+    fn module_version(eval: &mut Evaluator) -> starlark::Result<NoneOr<String>> {
+        let _ = eval;
+        // TODO(bzlmod): Return actual module version from MODULE.bazel
+        Ok(NoneOr::None)
+    }
+
     /// Convert a depset to a transitive_set.
     ///
     /// This is a Kuro-specific bridge to preserve transitive_set performance internally
@@ -535,11 +568,17 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
     /// Bazel-compatible: can be called as `native.repository_name()` from .bzl files.
     ///
     /// The returned name starts with `@` for compatibility with Bazel.
+    /// For the main repository, returns `@` (empty after @), matching Bazel behavior.
     fn repository_name(eval: &mut Evaluator) -> starlark::Result<String> {
-        Ok(format!(
-            "@{}",
-            BuildContext::from_context(eval)?.cell_info().name()
-        ))
+        let cell_name = BuildContext::from_context(eval)?
+            .cell_info()
+            .name()
+            .to_string();
+        if kuro_core::cells::is_root_cell_name(&cell_name) {
+            Ok("@".to_owned())
+        } else {
+            Ok(format!("@{}", cell_name))
+        }
     }
 
     /// Returns a dict of all rules instantiated so far in the current BUILD file.
@@ -554,18 +593,20 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
         let Ok(internals) = ModuleInternals::from_context(eval, "native.existing_rules") else {
             return Ok(eval.heap().alloc(AllocDict(SmallMap::<&str, Value>::new())));
         };
-        let target_names = internals.get_target_names();
+        let targets = internals.get_targets_with_kind();
 
         let heap = eval.heap();
-        let result: SmallMap<&str, Value<'v>> = target_names
-            .iter()
-            .map(|name| {
-                // Return minimal dict with just the name for now
-                // Full attribute introspection would require significant additional work
-                let attrs_dict: SmallMap<&str, Value<'v>> =
-                    [("name", heap.alloc(name.as_str()))].into_iter().collect();
+        let result: SmallMap<String, Value<'v>> = targets
+            .into_iter()
+            .map(|(name, kind)| {
+                let attrs_dict: SmallMap<&str, Value<'v>> = [
+                    ("name", heap.alloc(name.as_str())),
+                    ("kind", heap.alloc(kind.as_str())),
+                ]
+                .into_iter()
+                .collect();
                 let attrs_val = heap.alloc(AllocDict(attrs_dict));
-                (name.as_str(), attrs_val)
+                (name, attrs_val)
             })
             .collect();
 
@@ -586,14 +627,18 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
             return Ok(NoneOr::None);
         };
 
-        if !internals.target_exists(name) {
-            return Ok(NoneOr::None);
-        }
+        let kind = match internals.get_target_kind(name) {
+            Some(k) => k,
+            None => return Ok(NoneOr::None),
+        };
 
         let heap = eval.heap();
-        // Return minimal dict with just the name for now
-        let attrs_dict: SmallMap<&str, Value<'v>> =
-            [("name", heap.alloc(name))].into_iter().collect();
+        let attrs_dict: SmallMap<&str, Value<'v>> = [
+            ("name", heap.alloc(name)),
+            ("kind", heap.alloc(kind.as_str())),
+        ]
+        .into_iter()
+        .collect();
         Ok(NoneOr::Other(heap.alloc(AllocDict(attrs_dict))))
     }
 

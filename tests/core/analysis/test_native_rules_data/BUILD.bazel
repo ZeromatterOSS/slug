@@ -1,4 +1,4 @@
-load(":defs.bzl", "bool_flag", "cc_compilation_context_test", "cc_configure_features_test", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "collect_files", "run_env_info", "select_value", "sibling_file", "stamp_file_info", "string_flag", "write_list")
+load(":defs.bzl", "bool_flag", "capture_existing_rules", "cc_compilation_context_test", "cc_configure_features_test", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "collect_files", "existing_rules_test", "run_env_info", "select_value", "sibling_file", "stamp_file_info", "string_flag", "write_list")
 
 # === filegroup tests ===
 
@@ -422,3 +422,7 @@ select_value(
         "//conditions:default": "fallback_selected",
     }),
 )
+
+# === existing_rules() / repository_name() test ===
+# capture_existing_rules must be called AFTER other rules so it can see them.
+capture_existing_rules(name = "existing_rules_check")
