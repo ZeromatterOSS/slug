@@ -2669,6 +2669,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             }
         }
 
+        // Add global --copt flags from command line
+        for opt in crate::interpreter::rule_defs::build_config::get_copts() {
+            extra_flags.push(opt);
+        }
+
         // Get the declare_file method from actions
         let declare_file_method = actions.get_attr("declare_file", heap).ok().flatten();
         let run_method = actions.get_attr("run", heap).ok().flatten();
@@ -2845,7 +2850,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                 args_vec.push(heap.alloc_str(flag).to_value());
                             }
 
-                            // Add C-only or C++-only flags
+                            // Add C-only or C++-only flags (from function params + CLI)
                             if is_cxx {
                                 if !cxx_flags.is_none() {
                                     if let Ok(iter) = cxx_flags.iterate(heap) {
@@ -2854,6 +2859,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                         }
                                     }
                                 }
+                                for opt in crate::interpreter::rule_defs::build_config::get_cxxopts() {
+                                    args_vec.push(heap.alloc_str(&opt).to_value());
+                                }
                             } else {
                                 if !conly_flags.is_none() {
                                     if let Ok(iter) = conly_flags.iterate(heap) {
@@ -2861,6 +2869,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                             args_vec.push(flag);
                                         }
                                     }
+                                }
+                                for opt in crate::interpreter::rule_defs::build_config::get_conlyopts() {
+                                    args_vec.push(heap.alloc_str(&opt).to_value());
                                 }
                             }
 
@@ -2901,6 +2912,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                         }
                                     }
                                 }
+                                for opt in crate::interpreter::rule_defs::build_config::get_cxxopts() {
+                                    pic_args_vec.push(heap.alloc_str(&opt).to_value());
+                                }
                             } else {
                                 if !conly_flags.is_none() {
                                     if let Ok(iter) = conly_flags.iterate(heap) {
@@ -2908,6 +2922,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                             pic_args_vec.push(flag);
                                         }
                                     }
+                                }
+                                for opt in crate::interpreter::rule_defs::build_config::get_conlyopts() {
+                                    pic_args_vec.push(heap.alloc_str(&opt).to_value());
                                 }
                             }
                             pic_args_vec.push(heap.alloc_str("-c").to_value());
@@ -3222,6 +3239,13 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     for flag in iter {
                         args.push(flag);
                     }
+                }
+            }
+
+            // Add global --linkopt flags from command line
+            if !is_static {
+                for opt in crate::interpreter::rule_defs::build_config::get_linkopts() {
+                    args.push(heap.alloc_str(&opt).to_value());
                 }
             }
 
