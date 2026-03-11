@@ -70,7 +70,7 @@ impl FrozenExecutionPlatformInfo {
         )],
         heap: &starlark::values::FrozenHeap,
     ) -> starlark::values::FrozenValue {
-        use std::sync::Arc;
+        
 
         use starlark::values::FrozenValueOfUnchecked;
 

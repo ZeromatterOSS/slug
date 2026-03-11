@@ -61,7 +61,6 @@ use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 
-use crate::interpreter::rule_defs::context::AnalysisActions;
 use crate::interpreter::rule_defs::fragments::ConfigurationFragments;
 use crate::interpreter::rule_defs::provider::ProviderLike;
 
@@ -254,10 +253,6 @@ fn resolve_windows_compiler(bare_path: &str) -> String {
 ///
 /// IMPORTANT: Uses non-empty path segment counting to correctly handle trailing slashes.
 /// e.g. `external/protobuf/src/` has depth=1 (one segment "src"), NOT depth=2.
-fn include_flag_for_dir(dir: &str) -> String {
-    include_flag_for_dir_impl(dir, is_windows_host())
-}
-
 fn include_flag_for_dir_impl(dir: &str, msvc: bool) -> String {
     // MSVC uses /I for all include types (no -isystem/-idirafter distinction)
     if msvc {
@@ -1056,7 +1051,7 @@ fn ctx_cheat_label_stub_methods(builder: &mut MethodsBuilder) {
     /// Returns a label with the same package but a different name.
     fn same_package_label<'v>(
         this: &CtxCheatLabelStub,
-        #[starlark(require = pos)] name: &str,
+        #[starlark(require = pos)] _name: &str,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
@@ -2288,7 +2283,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             Ok(artifact) => {
                 Ok(artifact)
             }
-            Err(e) => {
+            Err(_) => {
                 // Fallback to stub on error
                 Ok(heap.alloc(CtxCheatArtifactStub {
                     path: output_name.to_owned(),
@@ -5692,7 +5687,7 @@ impl<'v> Freeze for AnalysisTestCallable<'v> {
 
     fn freeze(self, freezer: &Freezer) -> FreezeResult<FrozenAnalysisTestCallable> {
         Ok(FrozenAnalysisTestCallable {
-            implementation: self.implementation.freeze(freezer)?,
+            _implementation: self.implementation.freeze(freezer)?,
         })
     }
 }
@@ -5713,7 +5708,7 @@ impl<'v> StarlarkValue<'v> for AnalysisTestCallable<'v> {
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct FrozenAnalysisTestCallable {
     /// The frozen Starlark implementation function.
-    implementation: FrozenValue,
+    _implementation: FrozenValue,
 }
 
 impl Display for FrozenAnalysisTestCallable {

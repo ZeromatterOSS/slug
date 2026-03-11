@@ -2792,7 +2792,6 @@ impl<'v> StarlarkValue<'v> for BuildConfigurationStub {
         match attribute {
             "coverage_enabled" => Some(Value::new_bool(false)),
             "stamp_binaries" => Some(Value::new_bool(false)),
-            "stamp_binaries" => Some(Value::new_bool(false)),
             "host_path_separator" => {
                 let sep = if cfg!(windows) { ";" } else { ":" };
                 Some(heap.alloc_str(sep).to_value())
@@ -3042,7 +3041,7 @@ fn feature_configuration_stub_methods(builder: &mut MethodsBuilder) {
     /// Check if a feature was requested by the user.
     fn is_requested<'v>(
         this: &FeatureConfigurationStub,
-        #[starlark(require = pos)] feature_name: &str,
+        #[starlark(require = pos)] _feature_name: &str,
     ) -> starlark::Result<bool> {
         let _ = this;
         // Return false - no features explicitly requested

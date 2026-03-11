@@ -515,7 +515,7 @@ pub fn create_frozen_sh_test_info(
     heap: &starlark::values::FrozenHeap,
     command_fv: starlark::values::FrozenValue,
 ) -> FrozenExternalRunnerTestInfo {
-    use starlark::values::AllocFrozenValue;
+    
     use starlark::values::FrozenValueOfUnchecked;
     let test_type = heap.alloc("sh_test");
     let none = starlark::values::FrozenValue::new_none();

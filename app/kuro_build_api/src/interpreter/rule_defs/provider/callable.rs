@@ -350,7 +350,7 @@ pub(crate) struct UserProviderCallableData {
     pub(crate) fields: IndexMap<String, UserProviderField, StarlarkHasherSmallPromoteBuilder>,
     /// If true, this provider accepts arbitrary fields (created without `fields=` param).
     /// Bazel-compatible: `provider("doc")` without fields creates a schemaless provider.
-    pub(crate) schemaless: bool,
+    pub(crate) _schemaless: bool,
 }
 
 /// Initialized after the name is assigned to the provider.
@@ -594,7 +594,7 @@ impl<'v> StarlarkValue<'v> for UserProviderCallable {
                     provider_id,
                     fields: self.fields.clone(),
                     ty_provider_type_instance_id,
-                    schemaless: self.schemaless,
+                    _schemaless: self.schemaless,
                 }),
                 ty_provider,
                 ty_callable,

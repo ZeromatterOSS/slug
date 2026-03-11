@@ -32,15 +32,12 @@ use starlark::typing::Ty;
 use starlark::values::Demand;
 use starlark::values::Freeze;
 use starlark::values::FrozenRef;
-use starlark::values::FrozenValue;
 use starlark::values::Heap;
-use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::starlark_value;
-use starlark_map::small_map::SmallMap;
 
 use crate::interpreter::rule_defs::provider::ProviderLike;
 use crate::interpreter::rule_defs::provider::callable::UserProviderCallableData;

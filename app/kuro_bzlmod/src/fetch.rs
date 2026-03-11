@@ -567,6 +567,11 @@ fn extract_tar_gz_impl(
                     {
                         let _ = std::os::unix::fs::symlink(&*link_target, &dest_path);
                     }
+                    #[cfg(not(unix))]
+                    {
+                        // On Windows, copy the file instead of creating a symlink
+                        let _ = &link_target;
+                    }
                 }
             }
         }
