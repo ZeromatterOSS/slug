@@ -89,6 +89,159 @@ pub fn get_external_include_dirs() -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Detect whether the compiler is MSVC (cl.exe) based on the compiler path.
+fn is_msvc_compiler(compiler_path: &str) -> bool {
+    let lower = compiler_path.to_lowercase();
+    lower == "cl.exe"
+        || lower == "cl"
+        || lower.ends_with("\\cl.exe")
+        || lower.ends_with("/cl.exe")
+}
+
+/// Returns true if the host OS is Windows.
+fn is_windows_host() -> bool {
+    std::env::consts::OS == "windows"
+}
+
+/// Cached MSVC tool paths detected via vswhere.
+/// Maps tool name ("cl.exe", "link.exe", "lib.exe") to full path.
+static MSVC_TOOL_CACHE: std::sync::OnceLock<Option<MsvcToolPaths>> = std::sync::OnceLock::new();
+
+struct MsvcToolPaths {
+    cl: String,
+    link: String,
+    lib: String,
+    /// MSVC standard library include dir (e.g., .../MSVC/14.41/include)
+    msvc_include: String,
+    /// Windows SDK ucrt include dir
+    ucrt_include: String,
+    /// Windows SDK um include dir
+    um_include: String,
+    /// Windows SDK shared include dir
+    shared_include: String,
+    /// Windows SDK ucrt lib dir
+    ucrt_lib: String,
+    /// Windows SDK um lib dir
+    um_lib: String,
+    /// MSVC lib dir
+    msvc_lib: String,
+}
+
+/// Detect and cache MSVC tool paths on Windows.
+fn get_msvc_tool_paths() -> &'static Option<MsvcToolPaths> {
+    MSVC_TOOL_CACHE.get_or_init(|| {
+        #[cfg(target_os = "windows")]
+        {
+            use std::path::PathBuf;
+            use std::process::Command;
+
+            let vswhere_paths = [
+                "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe",
+                "C:\\Program Files\\Microsoft Visual Studio\\Installer\\vswhere.exe",
+            ];
+
+            let mut vs_path_opt: Option<String> = None;
+            for vswhere in &vswhere_paths {
+                if let Ok(output) = Command::new(vswhere)
+                    .args([
+                        "-latest",
+                        "-products",
+                        "*",
+                        "-requires",
+                        "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                        "-property",
+                        "installationPath",
+                    ])
+                    .output()
+                {
+                    if output.status.success() {
+                        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                        if !path.is_empty() {
+                            vs_path_opt = Some(path);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            let vs_path = vs_path_opt?;
+            let vc_tools = PathBuf::from(&vs_path).join("VC").join("Tools").join("MSVC");
+
+            let mut versions: Vec<String> = std::fs::read_dir(&vc_tools)
+                .ok()?
+                .filter_map(|e| e.ok())
+                .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+                .map(|e| e.file_name().to_string_lossy().to_string())
+                .collect();
+            versions.sort();
+            let msvc_ver = versions.pop()?;
+
+            let msvc_base = vc_tools.join(&msvc_ver);
+            let bin_dir = msvc_base.join("bin").join("Hostx64").join("x64");
+            if !bin_dir.exists() {
+                return None;
+            }
+
+            let msvc_include = msvc_base.join("include");
+            let msvc_lib = msvc_base.join("lib").join("x64");
+
+            // Find Windows SDK
+            let sdk_root = PathBuf::from("C:\\Program Files (x86)\\Windows Kits\\10");
+            let sdk_include = sdk_root.join("Include");
+            let sdk_lib = sdk_root.join("Lib");
+
+            // Find latest SDK version
+            let sdk_ver = std::fs::read_dir(&sdk_include)
+                .ok()
+                .and_then(|entries| {
+                    let mut vers: Vec<String> = entries
+                        .filter_map(|e| e.ok())
+                        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+                        .map(|e| e.file_name().to_string_lossy().to_string())
+                        .filter(|n| n.starts_with("10."))
+                        .collect();
+                    vers.sort();
+                    vers.pop()
+                })
+                .unwrap_or_default();
+
+            let base = bin_dir.to_string_lossy().to_string();
+            let ucrt_inc = sdk_include.join(&sdk_ver).join("ucrt");
+            let um_inc = sdk_include.join(&sdk_ver).join("um");
+            let shared_inc = sdk_include.join(&sdk_ver).join("shared");
+            let ucrt_lib_dir = sdk_lib.join(&sdk_ver).join("ucrt").join("x64");
+            let um_lib_dir = sdk_lib.join(&sdk_ver).join("um").join("x64");
+
+            Some(MsvcToolPaths {
+                cl: format!("{}\\cl.exe", base),
+                link: format!("{}\\link.exe", base),
+                lib: format!("{}\\lib.exe", base),
+                msvc_include: msvc_include.to_string_lossy().to_string(),
+                ucrt_include: ucrt_inc.to_string_lossy().to_string(),
+                um_include: um_inc.to_string_lossy().to_string(),
+                shared_include: shared_inc.to_string_lossy().to_string(),
+                ucrt_lib: ucrt_lib_dir.to_string_lossy().to_string(),
+                um_lib: um_lib_dir.to_string_lossy().to_string(),
+                msvc_lib: msvc_lib.to_string_lossy().to_string(),
+            })
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            None
+        }
+    })
+}
+
+/// Resolve a Windows compiler path. If bare "cl.exe", try to find the full MSVC path.
+fn resolve_windows_compiler(bare_path: &str) -> String {
+    if bare_path == "cl.exe" || bare_path == "cl" {
+        if let Some(tools) = get_msvc_tool_paths() {
+            return tools.cl.clone();
+        }
+    }
+    bare_path.to_owned()
+}
+
 /// Choose the appropriate include flag for a directory path.
 ///
 /// - Repo roots (`external/repo`) use `-isystem` (searched before standard system dirs)
@@ -102,6 +255,14 @@ pub fn get_external_include_dirs() -> Vec<String> {
 /// IMPORTANT: Uses non-empty path segment counting to correctly handle trailing slashes.
 /// e.g. `external/protobuf/src/` has depth=1 (one segment "src"), NOT depth=2.
 fn include_flag_for_dir(dir: &str) -> String {
+    include_flag_for_dir_impl(dir, is_windows_host())
+}
+
+fn include_flag_for_dir_impl(dir: &str, msvc: bool) -> String {
+    // MSVC uses /I for all include types (no -isystem/-idirafter distinction)
+    if msvc {
+        return format!("/I{}", dir);
+    }
     if dir.starts_with("external/") || dir.starts_with("bazel-out/") {
         // Count non-empty path components after "external/<repo>/"
         if dir.starts_with("external/") {
@@ -1058,18 +1219,27 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
 
         // Get compiler path from toolchain if available, otherwise use platform default
         let default_compiler = match std::env::consts::OS {
-            "windows" => "cl.exe",
+            "windows" => {
+                // On Windows, resolve cl.exe to its full MSVC path
+                if let Some(tools) = get_msvc_tool_paths() {
+                    tools.cl.as_str()
+                } else {
+                    "cl.exe"
+                }
+            }
             "macos" => "/usr/bin/clang++",
             _ => if is_cpp { "/usr/bin/g++" } else { "/usr/bin/gcc" },
         };
         let compiler_path = if !cc_toolchain.is_none() {
             // Try to get compiler path from toolchain
-            cc_toolchain
+            let raw = cc_toolchain
                 .get_attr("compiler_executable", heap)
                 .ok()
                 .flatten()
                 .and_then(|v| v.unpack_str().map(|s| s.to_owned()))
-                .unwrap_or_else(|| default_compiler.to_owned())
+                .unwrap_or_else(|| default_compiler.to_owned());
+            // Resolve bare "cl.exe" to full path on Windows
+            if is_windows_host() { resolve_windows_compiler(&raw) } else { raw }
         } else {
             default_compiler.to_owned()
         };
@@ -1084,24 +1254,45 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         };
 
         // Build the command line arguments list
-        // Format: [compiler, -c, source, -o, output, flags...]
-        // Use output_artifact (after .as_output()) in the command line
+        let msvc = is_msvc_compiler(&compiler_path);
         let mut args_vec: Vec<Value<'v>> = Vec::new();
-        args_vec.push(heap.alloc_str(&compiler_path).to_value());
-        args_vec.push(heap.alloc_str("-c").to_value());
-        args_vec.push(source);
-        args_vec.push(heap.alloc_str("-o").to_value());
-        args_vec.push(output_artifact); // Use the output artifact, not original output_file
 
-        // Always add -fPIC for position-independent code.
-        // This is safe for both static and dynamic linking and matches modern build system defaults.
-        args_vec.push(heap.alloc_str("-fPIC").to_value());
+        // Get output path as string for MSVC /Fo flag
+        let output_path_str = output_file
+            .get_attr("path", heap)
+            .ok()
+            .flatten()
+            .and_then(|v| v.unpack_str().map(|s| s.to_owned()))
+            .unwrap_or_default();
+
+        if msvc {
+            // MSVC flags: cl.exe /nologo /EHsc /c source /Fo<output>
+            args_vec.push(heap.alloc_str(&compiler_path).to_value());
+            args_vec.push(heap.alloc_str("/nologo").to_value());
+            args_vec.push(heap.alloc_str("/EHsc").to_value());
+            args_vec.push(heap.alloc_str("/c").to_value());
+            args_vec.push(source);
+            args_vec.push(heap.alloc_str(&format!("/Fo{}", output_path_str)).to_value());
+
+            // Add MSVC system include paths (STL headers, Windows SDK)
+            if let Some(tools) = get_msvc_tool_paths() {
+                for inc in [&tools.msvc_include, &tools.ucrt_include, &tools.um_include, &tools.shared_include] {
+                    if !inc.is_empty() {
+                        args_vec.push(heap.alloc_str(&format!("/I{}", inc)).to_value());
+                    }
+                }
+            }
+        } else {
+            // GCC/Clang flags: -c source -o output -fPIC
+            args_vec.push(heap.alloc_str("-c").to_value());
+            args_vec.push(source);
+            args_vec.push(heap.alloc_str("-o").to_value());
+            args_vec.push(output_artifact);
+            // -fPIC for position-independent code (not applicable to MSVC)
+            args_vec.push(heap.alloc_str("-fPIC").to_value());
+        }
 
         // Add include directories from compilation context (deduplicated)
-        // Strategy for external include directories:
-        // - Repo roots (external/repo): use -isystem (searched before standard system dirs)
-        // - Deep subdirs (external/repo/a/b/c): use -idirafter (searched AFTER standard
-        //   system dirs) to prevent shadowing system headers like endian.h, limits.h, etc.
         let mut seen_include_dirs = std::collections::HashSet::new();
         if !cc_compilation_context.is_none() {
             for attr_name in &["includes", "system_includes", "quote_includes"] {
@@ -1121,7 +1312,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                             {
                                 continue;
                             }
-                            let flag = include_flag_for_dir(&dir);
+                            let flag = include_flag_for_dir_impl(&dir, msvc);
                             args_vec.push(heap.alloc_str(&flag).to_value());
                         }
                     }
@@ -1153,7 +1344,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             if let Some(ext_idx) = effective_src_path.find("/src/") {
                 let inc_dir = &effective_src_path[..ext_idx + 5];
                 if seen_include_dirs.insert(inc_dir.to_string()) {
-                    let flag = include_flag_for_dir(inc_dir);
+                    let flag = include_flag_for_dir_impl(inc_dir, msvc);
                     args_vec.push(heap.alloc_str(&flag).to_value());
                 }
                 register_external_include_dir(inc_dir);
@@ -1165,17 +1356,14 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                 if let Some(second_slash) = effective_src_path[9..].find('/') {
                     let repo_dir = &effective_src_path[..9 + second_slash];
                     if seen_include_dirs.insert(repo_dir.to_string()) {
-                        let flag = include_flag_for_dir(repo_dir);
+                        let flag = include_flag_for_dir_impl(repo_dir, msvc);
                         args_vec.push(heap.alloc_str(&flag).to_value());
                     }
                     register_external_include_dir(repo_dir);
                 }
-                // Add the parent "external/" directory so that includes with the
-                // repo name as a prefix (e.g., `#include "rules_cc/cc/runfiles/runfiles.h"`)
-                // resolve correctly. In Bazel's execroot, the external repo name maps to
-                // the repo root, and "external/" acts as the lookup parent.
                 if seen_include_dirs.insert("external/".to_owned()) {
-                    args_vec.push(heap.alloc_str("-isystemexternal/").to_value());
+                    let ext_flag = if msvc { "/Iexternal/" } else { "-isystemexternal/" };
+                    args_vec.push(heap.alloc_str(ext_flag).to_value());
                 }
                 register_external_include_dir("external/");
             }
@@ -1199,14 +1387,14 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         // Add include directories discovered during analysis
         for include_dir in get_external_include_dirs() {
             if seen_include_dirs.insert(include_dir.clone()) {
-                let flag = include_flag_for_dir(&include_dir);
+                let flag = include_flag_for_dir_impl(&include_dir, msvc);
                 args_vec.push(heap.alloc_str(&flag).to_value());
             }
         }
 
-        // Add preprocessor defines from cc_compilation_context: -D<define>
-        // In Bazel, `defines` are transitive (propagated to all dependents).
-        // `local_defines` are not propagated but still apply to this target.
+        // Add preprocessor defines from cc_compilation_context
+        // MSVC uses /D, GCC/Clang uses -D
+        let define_prefix = if msvc { "/D" } else { "-D" };
         if !cc_compilation_context.is_none() {
             for attr_name in &["defines", "local_defines"] {
                 if let Ok(Some(defines_val)) = cc_compilation_context.get_attr(attr_name, heap) {
@@ -1220,7 +1408,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                         for elem in &elements {
                             let def = elem.to_str();
                             if !def.is_empty() {
-                                args_vec.push(heap.alloc_str(&format!("-D{}", def)).to_value());
+                                args_vec.push(heap.alloc_str(&format!("{}{}", define_prefix, def)).to_value());
                             }
                         }
                     }
@@ -1230,12 +1418,31 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
 
         // Add dependency file generation flags if dotd_file is specified
         if !dotd_file.is_none() {
-            args_vec.push(heap.alloc_str("-MMD").to_value()); // Generate deps, excluding system headers
-            args_vec.push(heap.alloc_str("-MF").to_value()); // Output dependency file to specified path
-            // Get the path of the dotd_file artifact
-            if let Ok(Some(path_method)) = dotd_file.get_attr("as_output", heap) {
-                if let Ok(dotd_output) = eval.eval_function(path_method, &[], &[]) {
-                    args_vec.push(dotd_output);
+            if msvc {
+                // MSVC: /showIncludes outputs deps to stdout (no .d file created).
+                // Use actions.write() to create an empty .d file as a separate action,
+                // since rules_cc declared the artifact and it must be bound.
+                args_vec.push(heap.alloc_str("/showIncludes").to_value());
+                if let Ok(Some(write_method)) = actions_value.get_attr("write", heap) {
+                    let dotd_output = if let Ok(Some(m)) = dotd_file.get_attr("as_output", heap) {
+                        eval.eval_function(m, &[], &[]).ok()
+                    } else {
+                        None
+                    };
+                    if let Some(dotd_out) = dotd_output {
+                        // actions.write(output, content) - write empty string to .d file
+                        let content = heap.alloc_str("").to_value();
+                        let _ = eval.eval_function(write_method, &[dotd_out, content], &[]);
+                    }
+                }
+            } else {
+                // GCC/Clang: -MMD -MF <depfile>
+                args_vec.push(heap.alloc_str("-MMD").to_value());
+                args_vec.push(heap.alloc_str("-MF").to_value());
+                if let Ok(Some(path_method)) = dotd_file.get_attr("as_output", heap) {
+                    if let Ok(dotd_output) = eval.eval_function(path_method, &[], &[]) {
+                        args_vec.push(dotd_output);
+                    }
                 }
             }
         }
@@ -1259,7 +1466,10 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         }
 
         // Add auxiliary outputs if provided (dotd, diagnostics, gcno, dwo, lto)
-        add_output!(dotd_file);
+        // On MSVC, dotd_file is handled by a separate write action
+        if !msvc {
+            add_output!(dotd_file);
+        }
         add_output!(diagnostics_file);
         add_output!(gcno_file);
         add_output!(dwo_file);
@@ -1346,27 +1556,28 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         };
         // Category names come in both uppercase (from rules_cc artifact_category_names struct)
         // and lowercase (from direct string usage). Normalize to uppercase for matching.
-        // Extensions follow Unix/Linux conventions (not Windows .dll/.lib or macOS .dylib).
+        // Platform-specific extensions: Windows uses .obj/.lib/.dll/.exe, Unix uses .o/.a/.so
+        let windows = is_windows_host();
         let result = match category.to_uppercase().as_str() {
             // Object files
-            "OBJECT_FILE" => format!("{}.o", name),
-            "PIC_OBJECT_FILE" => format!("{}.pic.o", name),
-            "PIC_FILE" => format!("{}.pic", name),
+            "OBJECT_FILE" => if windows { format!("{}.obj", name) } else { format!("{}.o", name) },
+            "PIC_OBJECT_FILE" => if windows { format!("{}.obj", name) } else { format!("{}.pic.o", name) },
+            "PIC_FILE" => if windows { format!("{}.obj", name) } else { format!("{}.pic", name) },
 
             // Libraries
-            "STATIC_LIBRARY" => format!("lib{}.a", name),
-            "ALWAYSLINK_STATIC_LIBRARY" => format!("lib{}.lo", name), // GNU libtool convention
-            "DYNAMIC_LIBRARY" => format!("lib{}.so", name),
-            "INTERFACE_LIBRARY" => format!("lib{}.so", name), // Same as dynamic per Bazel
+            "STATIC_LIBRARY" => if windows { format!("{}.lib", name) } else { format!("lib{}.a", name) },
+            "ALWAYSLINK_STATIC_LIBRARY" => if windows { format!("{}.lo.lib", name) } else { format!("lib{}.lo", name) },
+            "DYNAMIC_LIBRARY" => if windows { format!("{}.dll", name) } else { format!("lib{}.so", name) },
+            "INTERFACE_LIBRARY" => if windows { format!("{}.if.lib", name) } else { format!("lib{}.so", name) },
 
             // Executables
-            "EXECUTABLE" => name.to_owned(),
+            "EXECUTABLE" => if windows { format!("{}.exe", name) } else { name.to_owned() },
 
             // Dependency tracking
             "INCLUDED_FILE_LIST" => format!("{}.d", name),
 
             // Diagnostics
-            "SERIALIZED_DIAGNOSTICS_FILE" => format!("{}.dia", name), // Clang diagnostics
+            "SERIALIZED_DIAGNOSTICS_FILE" => format!("{}.dia", name),
 
             // Headers
             "GENERATED_HEADER" => format!("{}.h", name),
@@ -1677,17 +1888,49 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         }
 
         // --- Output path ---
+        let msvc = is_windows_host();
         if let Some(output) = get_var("output_execpath") {
             if action_name_str.contains("static-library") {
-                args.push(heap.alloc_str("rcs").to_value());
+                if msvc {
+                    // MSVC lib.exe: /nologo /OUT:<path>
+                    args.push(heap.alloc_str("/nologo").to_value());
+                } else {
+                    args.push(heap.alloc_str("rcs").to_value());
+                }
             } else if action_name_str.contains("dynamic-library") {
-                args.push(heap.alloc_str("-shared").to_value());
-                args.push(heap.alloc_str("-o").to_value());
+                if msvc {
+                    args.push(heap.alloc_str("/nologo").to_value());
+                    args.push(heap.alloc_str("/DLL").to_value());
+                } else {
+                    args.push(heap.alloc_str("-shared").to_value());
+                    args.push(heap.alloc_str("-o").to_value());
+                }
             } else {
-                args.push(heap.alloc_str("-o").to_value());
+                if msvc {
+                    args.push(heap.alloc_str("/nologo").to_value());
+                } else {
+                    args.push(heap.alloc_str("-o").to_value());
+                }
             }
 
-            if output.unpack_str().is_some() {
+            // For MSVC, format output as /OUT:<path>
+            let output_path_str = if let Some(s) = output.unpack_str() {
+                Some(s.to_owned())
+            } else if let Ok(Some(path)) = output.get_attr("path", heap) {
+                path.unpack_str().map(|s| s.to_owned())
+            } else {
+                None
+            };
+
+            if msvc {
+                if let Some(ref path) = output_path_str {
+                    args.push(heap.alloc_str(&format!("/OUT:{}", path)).to_value());
+                }
+                // Also need to bind the artifact
+                if let Ok(Some(as_output_method)) = output.get_attr("as_output", heap) {
+                    let _ = eval.eval_function(as_output_method, &[], &[]);
+                }
+            } else if output.unpack_str().is_some() {
                 args.push(output);
             } else {
                 let path_result = output.get_attr("path", heap);
@@ -1733,29 +1976,43 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                 }
             };
 
-        // --- Library search directories (-L flags and -rpath) ---
-        // Must come before libraries_to_link so the linker can find -l libraries.
-        // Also add -rpath for the same directories so the runtime linker can find them.
+        // --- Library search directories ---
         let mut lib_search_dirs: Vec<String> = Vec::new();
         if let Some(dirs) = get_var("library_search_directories") {
             for dir in iterate_value(dirs, eval) {
                 if let Some(dir_str) = dir.unpack_str() {
                     if !dir_str.is_empty() {
-                        args.push(heap.alloc_str(&format!("-L{}", dir_str)).to_value());
+                        if msvc {
+                            args.push(heap.alloc_str(&format!("/LIBPATH:{}", dir_str)).to_value());
+                        } else {
+                            args.push(heap.alloc_str(&format!("-L{}", dir_str)).to_value());
+                        }
                         lib_search_dirs.push(dir_str.to_owned());
                     }
                 }
             }
         }
 
+        // Add MSVC system library paths
+        if msvc {
+            if let Some(tools) = get_msvc_tool_paths() {
+                if !tools.msvc_lib.is_empty() {
+                    args.push(heap.alloc_str(&format!("/LIBPATH:{}", tools.msvc_lib)).to_value());
+                }
+                if !tools.ucrt_lib.is_empty() {
+                    args.push(heap.alloc_str(&format!("/LIBPATH:{}", tools.ucrt_lib)).to_value());
+                }
+                if !tools.um_lib.is_empty() {
+                    args.push(heap.alloc_str(&format!("/LIBPATH:{}", tools.um_lib)).to_value());
+                }
+            }
+        }
+
         // --- Libraries to link ---
-        // Wrap in --start-group/--end-group to handle circular dependencies between
-        // static libraries (e.g., abseil-cpp where libbase.a and libsynchronization.a
-        // have mutual references). Without this, the GNU linker only scans each .a
-        // file once and misses symbols from earlier files needed by later ones.
-        // Only add --start-group for executable linking (not ar/static-library or dynamic)
+        // On Linux, wrap in --start-group/--end-group for circular dep resolution.
+        // MSVC doesn't need this (it always resolves circular deps).
         let is_executable_link = action_name_str.contains("executable");
-        if is_executable_link {
+        if is_executable_link && !msvc {
             args.push(heap.alloc_str("-Wl,--start-group").to_value());
         }
         // Process based on .type field from rules_cc provider instances
@@ -1882,7 +2139,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             }
         }
 
-        if is_executable_link {
+        if is_executable_link && !msvc {
             args.push(heap.alloc_str("-Wl,--end-group").to_value());
         }
 
@@ -2651,14 +2908,22 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // TODO(cc_common): Implement proper tool lookup from feature configuration
         // For now, return platform-appropriate tool names
         let tool = match std::env::consts::OS {
-            "windows" => match action_name {
-                "c-compile" | "c++-compile" => "cl.exe",
-                "c++-link-executable" | "c++-link-dynamic-library" => "link.exe",
-                "c++-link-static-library" => "lib.exe",
-                "strip" => "",
-                "objcopy" => "",
-                _ => "cl.exe",
-            },
+            "windows" => {
+                let msvc = get_msvc_tool_paths();
+                match action_name {
+                    "c-compile" | "c++-compile" => {
+                        msvc.as_ref().map(|t| t.cl.as_str()).unwrap_or("cl.exe")
+                    }
+                    "c++-link-executable" | "c++-link-dynamic-library" => {
+                        msvc.as_ref().map(|t| t.link.as_str()).unwrap_or("link.exe")
+                    }
+                    "c++-link-static-library" => {
+                        msvc.as_ref().map(|t| t.lib.as_str()).unwrap_or("lib.exe")
+                    }
+                    "strip" | "objcopy" => "",
+                    _ => msvc.as_ref().map(|t| t.cl.as_str()).unwrap_or("cl.exe"),
+                }
+            }
             "macos" => match action_name {
                 "c-compile" => "/usr/bin/clang",
                 "c++-compile" => "/usr/bin/clang++",
@@ -2752,6 +3017,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         let is_static_lib = action_name.contains("static-library");
         let is_dynamic_lib = action_name.contains("dynamic-library");
         let is_link = action_name.contains("link") && !action_name.contains("compile");
+        let msvc = is_windows_host();
 
         // Helper to get string from a value (string or File with .path)
         let get_str_val = |v: Value<'v>| -> Option<String> {
@@ -2768,27 +3034,50 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 
         // --- Link/Archive actions ---
         if is_link {
-            // Get the output path (used for -o or rcs)
             let output_path = get_var("output_execpath").and_then(|v| get_str_val(v));
 
             if is_static_lib {
-                // ar archiver: rcs <output> (object files added separately by Starlark code)
-                args.push(heap.alloc_str("rcs").to_value());
-                if let Some(ref path) = output_path {
-                    args.push(heap.alloc_str(path).to_value());
+                if msvc {
+                    // MSVC: lib.exe /nologo /OUT:<output>
+                    args.push(heap.alloc_str("/nologo").to_value());
+                    if let Some(ref path) = output_path {
+                        args.push(heap.alloc_str(&format!("/OUT:{}", path)).to_value());
+                    }
+                } else {
+                    // ar archiver: rcs <output>
+                    args.push(heap.alloc_str("rcs").to_value());
+                    if let Some(ref path) = output_path {
+                        args.push(heap.alloc_str(path).to_value());
+                    }
                 }
             } else if is_dynamic_lib {
-                args.push(heap.alloc_str("-shared").to_value());
-                args.push(heap.alloc_str("-fPIC").to_value());
-                if let Some(ref path) = output_path {
-                    args.push(heap.alloc_str("-o").to_value());
-                    args.push(heap.alloc_str(path).to_value());
+                if msvc {
+                    // MSVC: link.exe /nologo /DLL /OUT:<output>
+                    args.push(heap.alloc_str("/nologo").to_value());
+                    args.push(heap.alloc_str("/DLL").to_value());
+                    if let Some(ref path) = output_path {
+                        args.push(heap.alloc_str(&format!("/OUT:{}", path)).to_value());
+                    }
+                } else {
+                    args.push(heap.alloc_str("-shared").to_value());
+                    args.push(heap.alloc_str("-fPIC").to_value());
+                    if let Some(ref path) = output_path {
+                        args.push(heap.alloc_str("-o").to_value());
+                        args.push(heap.alloc_str(path).to_value());
+                    }
                 }
             } else {
                 // Executable link
-                if let Some(ref path) = output_path {
-                    args.push(heap.alloc_str("-o").to_value());
-                    args.push(heap.alloc_str(path).to_value());
+                if msvc {
+                    args.push(heap.alloc_str("/nologo").to_value());
+                    if let Some(ref path) = output_path {
+                        args.push(heap.alloc_str(&format!("/OUT:{}", path)).to_value());
+                    }
+                } else {
+                    if let Some(ref path) = output_path {
+                        args.push(heap.alloc_str("-o").to_value());
+                        args.push(heap.alloc_str(path).to_value());
+                    }
                 }
             }
 
@@ -2810,14 +3099,21 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 
         // --- Compile actions below ---
 
-        // -fPIC if pic variable is set
-        if get_var("pic").is_some() {
-            args.push(heap.alloc_str("-fPIC").to_value());
-        }
-
-        // -c flag for compile (not link) actions
-        if is_compile {
-            args.push(heap.alloc_str("-c").to_value());
+        if msvc {
+            // MSVC compile flags
+            args.push(heap.alloc_str("/nologo").to_value());
+            args.push(heap.alloc_str("/EHsc").to_value());
+            if is_compile {
+                args.push(heap.alloc_str("/c").to_value());
+            }
+        } else {
+            // GCC/Clang: -fPIC if pic variable is set
+            if get_var("pic").is_some() {
+                args.push(heap.alloc_str("-fPIC").to_value());
+            }
+            if is_compile {
+                args.push(heap.alloc_str("-c").to_value());
+            }
         }
 
         // Source file
@@ -2837,10 +3133,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             }
         }
 
-        // Output file: -o <output>
+        // Output file
         if let Some(output) = get_var("output_file") {
             if !output.is_none() {
-                args.push(heap.alloc_str("-o").to_value());
+                let out_flag = if msvc { "/Fo" } else { "-o" };
+                args.push(heap.alloc_str(out_flag).to_value());
                 if let Some(s) = output.unpack_str() {
                     args.push(heap.alloc_str(s).to_value());
                 } else if let Ok(Some(path_val)) = output.get_attr("path", heap) {
@@ -2868,65 +3165,79 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             }
         }
 
-        // Include paths: -I<path>
+        // Include paths
+        let inc_prefix = if msvc { "/I" } else { "-I" };
         if let Some(includes) = get_var("include_paths") {
             if !includes.is_none() {
                 for inc in iterate_value(includes, eval) {
                     if let Some(s) = inc.unpack_str() {
                         if !s.is_empty() {
-                            args.push(heap.alloc_str(&format!("-I{}", s)).to_value());
+                            args.push(heap.alloc_str(&format!("{}{}", inc_prefix, s)).to_value());
                         }
                     }
                 }
             }
         }
 
-        // Quote include paths: -iquote <path>
+        // Quote include paths
         if let Some(quote_includes) = get_var("quote_include_paths") {
             if !quote_includes.is_none() {
                 for inc in iterate_value(quote_includes, eval) {
                     if let Some(s) = inc.unpack_str() {
                         if !s.is_empty() {
-                            args.push(heap.alloc_str("-iquote").to_value());
-                            args.push(heap.alloc_str(s).to_value());
+                            if msvc {
+                                args.push(heap.alloc_str(&format!("/I{}", s)).to_value());
+                            } else {
+                                args.push(heap.alloc_str("-iquote").to_value());
+                                args.push(heap.alloc_str(s).to_value());
+                            }
                         }
                     }
                 }
             }
         }
 
-        // System include paths: -isystem<path>
+        // System include paths
         if let Some(system_includes) = get_var("system_include_paths") {
             if !system_includes.is_none() {
                 for inc in iterate_value(system_includes, eval) {
                     if let Some(s) = inc.unpack_str() {
                         if !s.is_empty() {
-                            args.push(heap.alloc_str(&format!("-isystem{}", s)).to_value());
+                            if msvc {
+                                args.push(heap.alloc_str(&format!("/I{}", s)).to_value());
+                            } else {
+                                args.push(heap.alloc_str(&format!("-isystem{}", s)).to_value());
+                            }
                         }
                     }
                 }
             }
         }
 
-        // External include paths (treated as system includes)
+        // External include paths
         if let Some(ext_includes) = get_var("external_include_paths") {
             if !ext_includes.is_none() {
                 for inc in iterate_value(ext_includes, eval) {
                     if let Some(s) = inc.unpack_str() {
                         if !s.is_empty() {
-                            args.push(heap.alloc_str(&format!("-isystem{}", s)).to_value());
+                            if msvc {
+                                args.push(heap.alloc_str(&format!("/I{}", s)).to_value());
+                            } else {
+                                args.push(heap.alloc_str(&format!("-isystem{}", s)).to_value());
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Preprocessor defines: -D<define>
+        // Preprocessor defines
+        let def_prefix = if msvc { "/D" } else { "-D" };
         if let Some(defines) = get_var("preprocessor_defines") {
             if !defines.is_none() {
                 for def in iterate_value(defines, eval) {
                     if let Some(s) = def.unpack_str() {
-                        args.push(heap.alloc_str(&format!("-D{}", s)).to_value());
+                        args.push(heap.alloc_str(&format!("{}{}", def_prefix, s)).to_value());
                     }
                 }
             }
@@ -3044,15 +3355,13 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<bool> {
         // TODO(cc_common): Check against actual feature configuration
-        // For now, return true for common features
-        let enabled = matches!(
-            feature_name,
-            "supports_dynamic_linker"
-                | "supports_interface_shared_libraries"
-                | "pic"
-                | "targets_windows"
-                | "static_link_cpp_runtimes"
-        );
+        let enabled = match feature_name {
+            "supports_dynamic_linker" | "supports_interface_shared_libraries" => true,
+            "pic" => !is_windows_host(), // MSVC doesn't need PIC
+            "targets_windows" => is_windows_host(),
+            "static_link_cpp_runtimes" => true,
+            _ => false,
+        };
         Ok(enabled)
     }
 

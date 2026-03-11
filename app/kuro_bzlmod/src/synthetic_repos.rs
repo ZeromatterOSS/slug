@@ -244,7 +244,87 @@ struct HostPlatformInfo {
     /// Compiler identifier (e.g., "gcc", "clang", "msvc")
     compiler: &'static str,
     /// Tool paths for cc_toolchain_config_info
-    tool_paths: Vec<(&'static str, &'static str)>,
+    tool_paths: Vec<(&'static str, String)>,
+}
+
+/// Detect MSVC installation on Windows using vswhere.exe.
+///
+/// Returns the path to the MSVC bin directory (e.g.,
+/// `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.41.34120\bin\Hostx64\x64`)
+/// or None if not found.
+#[cfg(target_os = "windows")]
+fn detect_msvc_bin_dir(host_arch: &str) -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+    use std::process::Command;
+
+    // Try vswhere.exe to find VS installation
+    let vswhere_paths = [
+        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe",
+        "C:\\Program Files\\Microsoft Visual Studio\\Installer\\vswhere.exe",
+    ];
+
+    let mut vs_install_path: Option<String> = None;
+    for vswhere in &vswhere_paths {
+        if let Ok(output) = Command::new(vswhere)
+            .args([
+                "-latest",
+                "-products",
+                "*",
+                "-requires",
+                "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+                "-property",
+                "installationPath",
+            ])
+            .output()
+        {
+            if output.status.success() {
+                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !path.is_empty() {
+                    vs_install_path = Some(path);
+                    break;
+                }
+            }
+        }
+    }
+
+    let vs_path = vs_install_path?;
+    let vc_tools = PathBuf::from(&vs_path).join("VC").join("Tools").join("MSVC");
+
+    // Find the latest MSVC version directory
+    let mut versions: Vec<_> = std::fs::read_dir(&vc_tools)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .map(|e| e.file_name().to_string_lossy().to_string())
+        .collect();
+    versions.sort();
+    let latest_version = versions.pop()?;
+
+    let host_dir = match host_arch {
+        "aarch64" => "Hostarm64",
+        _ => "Hostx64",
+    };
+    let target_dir = match host_arch {
+        "aarch64" => "arm64",
+        _ => "x64",
+    };
+
+    let bin_dir = vc_tools
+        .join(&latest_version)
+        .join("bin")
+        .join(host_dir)
+        .join(target_dir);
+
+    if bin_dir.exists() {
+        Some(bin_dir)
+    } else {
+        None
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn detect_msvc_bin_dir(_host_arch: &str) -> Option<std::path::PathBuf> {
+    None
 }
 
 fn detect_host_platform() -> HostPlatformInfo {
@@ -258,14 +338,14 @@ fn detect_host_platform() -> HostPlatformInfo {
             cpu_constraint: "@platforms//cpu:x86_64",
             compiler: "gcc",
             tool_paths: vec![
-                ("gcc", "/usr/bin/gcc"),
-                ("ld", "/usr/bin/ld"),
-                ("ar", "/usr/bin/ar"),
-                ("cpp", "/usr/bin/cpp"),
-                ("gcov", "/usr/bin/gcov"),
-                ("nm", "/usr/bin/nm"),
-                ("objdump", "/usr/bin/objdump"),
-                ("strip", "/usr/bin/strip"),
+                ("gcc", "/usr/bin/gcc".to_string()),
+                ("ld", "/usr/bin/ld".to_string()),
+                ("ar", "/usr/bin/ar".to_string()),
+                ("cpp", "/usr/bin/cpp".to_string()),
+                ("gcov", "/usr/bin/gcov".to_string()),
+                ("nm", "/usr/bin/nm".to_string()),
+                ("objdump", "/usr/bin/objdump".to_string()),
+                ("strip", "/usr/bin/strip".to_string()),
             ],
         },
         ("linux", "aarch64") => HostPlatformInfo {
@@ -274,14 +354,14 @@ fn detect_host_platform() -> HostPlatformInfo {
             cpu_constraint: "@platforms//cpu:aarch64",
             compiler: "gcc",
             tool_paths: vec![
-                ("gcc", "/usr/bin/gcc"),
-                ("ld", "/usr/bin/ld"),
-                ("ar", "/usr/bin/ar"),
-                ("cpp", "/usr/bin/cpp"),
-                ("gcov", "/usr/bin/gcov"),
-                ("nm", "/usr/bin/nm"),
-                ("objdump", "/usr/bin/objdump"),
-                ("strip", "/usr/bin/strip"),
+                ("gcc", "/usr/bin/gcc".to_string()),
+                ("ld", "/usr/bin/ld".to_string()),
+                ("ar", "/usr/bin/ar".to_string()),
+                ("cpp", "/usr/bin/cpp".to_string()),
+                ("gcov", "/usr/bin/gcov".to_string()),
+                ("nm", "/usr/bin/nm".to_string()),
+                ("objdump", "/usr/bin/objdump".to_string()),
+                ("strip", "/usr/bin/strip".to_string()),
             ],
         },
         ("macos", "x86_64") => HostPlatformInfo {
@@ -290,14 +370,14 @@ fn detect_host_platform() -> HostPlatformInfo {
             cpu_constraint: "@platforms//cpu:x86_64",
             compiler: "clang",
             tool_paths: vec![
-                ("gcc", "/usr/bin/clang"),
-                ("ld", "/usr/bin/ld"),
-                ("ar", "/usr/bin/ar"),
-                ("cpp", "/usr/bin/clang"),
-                ("gcov", "/usr/bin/gcov"),
-                ("nm", "/usr/bin/nm"),
-                ("objdump", "/usr/bin/objdump"),
-                ("strip", "/usr/bin/strip"),
+                ("gcc", "/usr/bin/clang".to_string()),
+                ("ld", "/usr/bin/ld".to_string()),
+                ("ar", "/usr/bin/ar".to_string()),
+                ("cpp", "/usr/bin/clang".to_string()),
+                ("gcov", "/usr/bin/gcov".to_string()),
+                ("nm", "/usr/bin/nm".to_string()),
+                ("objdump", "/usr/bin/objdump".to_string()),
+                ("strip", "/usr/bin/strip".to_string()),
             ],
         },
         ("macos", "aarch64") => HostPlatformInfo {
@@ -306,48 +386,62 @@ fn detect_host_platform() -> HostPlatformInfo {
             cpu_constraint: "@platforms//cpu:aarch64",
             compiler: "clang",
             tool_paths: vec![
-                ("gcc", "/usr/bin/clang"),
-                ("ld", "/usr/bin/ld"),
-                ("ar", "/usr/bin/ar"),
-                ("cpp", "/usr/bin/clang"),
-                ("gcov", "/usr/bin/gcov"),
-                ("nm", "/usr/bin/nm"),
-                ("objdump", "/usr/bin/objdump"),
-                ("strip", "/usr/bin/strip"),
+                ("gcc", "/usr/bin/clang".to_string()),
+                ("ld", "/usr/bin/ld".to_string()),
+                ("ar", "/usr/bin/ar".to_string()),
+                ("cpp", "/usr/bin/clang".to_string()),
+                ("gcov", "/usr/bin/gcov".to_string()),
+                ("nm", "/usr/bin/nm".to_string()),
+                ("objdump", "/usr/bin/objdump".to_string()),
+                ("strip", "/usr/bin/strip".to_string()),
             ],
         },
-        ("windows", "x86_64") => HostPlatformInfo {
-            cpu_name: "x64_windows",
-            os_constraint: "@platforms//os:windows",
-            cpu_constraint: "@platforms//cpu:x86_64",
-            compiler: "msvc-cl",
-            tool_paths: vec![
-                ("gcc", "cl.exe"),
-                ("ld", "link.exe"),
-                ("ar", "lib.exe"),
-                ("cpp", "cl.exe"),
-                ("gcov", ""),
-                ("nm", "dumpbin.exe"),
-                ("objdump", "dumpbin.exe"),
-                ("strip", ""),
-            ],
-        },
-        ("windows", "aarch64") => HostPlatformInfo {
-            cpu_name: "arm64_windows",
-            os_constraint: "@platforms//os:windows",
-            cpu_constraint: "@platforms//cpu:aarch64",
-            compiler: "msvc-cl",
-            tool_paths: vec![
-                ("gcc", "cl.exe"),
-                ("ld", "link.exe"),
-                ("ar", "lib.exe"),
-                ("cpp", "cl.exe"),
-                ("gcov", ""),
-                ("nm", "dumpbin.exe"),
-                ("objdump", "dumpbin.exe"),
-                ("strip", ""),
-            ],
-        },
+        ("windows", "x86_64") | ("windows", "aarch64") => {
+            let (cpu_name, cpu_constraint) = if arch == "aarch64" {
+                ("arm64_windows", "@platforms//cpu:aarch64")
+            } else {
+                ("x64_windows", "@platforms//cpu:x86_64")
+            };
+
+            // Auto-detect MSVC installation
+            let msvc_bin = detect_msvc_bin_dir(arch);
+            let (cl, link, lib, dumpbin) = if let Some(ref bin_dir) = msvc_bin {
+                let base = bin_dir.to_string_lossy().to_string();
+                (
+                    format!("{}\\cl.exe", base),
+                    format!("{}\\link.exe", base),
+                    format!("{}\\lib.exe", base),
+                    format!("{}\\dumpbin.exe", base),
+                )
+            } else {
+                // Fallback to bare names (requires VS Developer Command Prompt)
+                tracing::warn!("MSVC not detected via vswhere; using bare tool names. \
+                    Ensure Visual Studio Build Tools are installed and cl.exe is on PATH.");
+                (
+                    "cl.exe".to_string(),
+                    "link.exe".to_string(),
+                    "lib.exe".to_string(),
+                    "dumpbin.exe".to_string(),
+                )
+            };
+
+            HostPlatformInfo {
+                cpu_name,
+                os_constraint: "@platforms//os:windows",
+                cpu_constraint,
+                compiler: "msvc-cl",
+                tool_paths: vec![
+                    ("gcc", cl.clone()),
+                    ("ld", link),
+                    ("ar", lib),
+                    ("cpp", cl),
+                    ("gcov", String::new()),
+                    ("nm", dumpbin.clone()),
+                    ("objdump", dumpbin),
+                    ("strip", String::new()),
+                ],
+            }
+        }
         // Fallback to Linux x86_64
         _ => HostPlatformInfo {
             cpu_name: "k8",
@@ -355,14 +449,14 @@ fn detect_host_platform() -> HostPlatformInfo {
             cpu_constraint: "@platforms//cpu:x86_64",
             compiler: "gcc",
             tool_paths: vec![
-                ("gcc", "/usr/bin/gcc"),
-                ("ld", "/usr/bin/ld"),
-                ("ar", "/usr/bin/ar"),
-                ("cpp", "/usr/bin/cpp"),
-                ("gcov", "/usr/bin/gcov"),
-                ("nm", "/usr/bin/nm"),
-                ("objdump", "/usr/bin/objdump"),
-                ("strip", "/usr/bin/strip"),
+                ("gcc", "/usr/bin/gcc".to_string()),
+                ("ld", "/usr/bin/ld".to_string()),
+                ("ar", "/usr/bin/ar".to_string()),
+                ("cpp", "/usr/bin/cpp".to_string()),
+                ("gcov", "/usr/bin/gcov".to_string()),
+                ("nm", "/usr/bin/nm".to_string()),
+                ("objdump", "/usr/bin/objdump".to_string()),
+                ("strip", "/usr/bin/strip".to_string()),
             ],
         },
     }
@@ -444,11 +538,15 @@ local_config(
     files.insert("BUILD.bazel".to_string(), build_content);
 
     // Generate tool_paths entries for the .bzl file
+    // Use forward slashes in paths for Starlark compatibility
     let tool_paths_str: String = host
         .tool_paths
         .iter()
         .filter(|(_, path)| !path.is_empty())
-        .map(|(name, path)| format!("        tool_path(name = \"{name}\", path = \"{path}\"),"))
+        .map(|(name, path)| {
+            let normalized = path.replace('\\', "/");
+            format!("        tool_path(name = \"{name}\", path = \"{normalized}\"),")
+        })
         .collect::<Vec<_>>()
         .join("\n");
 
