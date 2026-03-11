@@ -122,6 +122,7 @@ pub fn analyze_native_rule(
         NativeRuleKind::CcToolchainSuite => create_minimal_analysis_result(target),
         NativeRuleKind::CcImport => create_cc_analysis_result(target),
         NativeRuleKind::CcSharedLibrary => create_cc_analysis_result(target),
+        NativeRuleKind::EnvironmentGroup => create_minimal_analysis_result(target),
     }
 }
 

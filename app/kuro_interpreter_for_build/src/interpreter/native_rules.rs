@@ -1102,6 +1102,44 @@ pub(crate) mod rule_defs {
             toolchain_types: vec![],
         })
     });
+
+    fn environment_group_attributes() -> AttributeSpec {
+        let environments_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
+            "The environments in this group",
+            AttrType::list(AttrType::string()),
+        );
+        let defaults_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
+            "The default environments from this group",
+            AttrType::list(AttrType::string()),
+        );
+        AttributeSpec::from(
+            vec![
+                ("environments".to_owned(), environments_attr),
+                ("defaults".to_owned(), defaults_attr),
+            ],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("environment_group attributes should be valid")
+    }
+
+    pub static ENVIRONMENT_GROUP_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: environment_group_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::EnvironmentGroup),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+            toolchain_types: vec![],
+        })
+    });
 }
 
 /// Extract visibility strings from a Starlark value.
@@ -2795,6 +2833,63 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
 
         let target_node = create_native_target_node(
             rule_defs::CC_SHARED_LIBRARY_RULE.clone(),
+            internals.package(),
+            name,
+            attrs,
+            &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
+            &internals.default_visibility(),
+        )?;
+
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+
+    /// Declares a group of target environments and their defaults.
+    ///
+    /// Used by Bazel's environment-based constraint system (predates platforms).
+    ///
+    /// Example:
+    /// ```python
+    /// environment_group(
+    ///     name = "jdk",
+    ///     environments = [":jdk8", ":jdk11", ":jdk17"],
+    ///     defaults = [":jdk17"],
+    /// )
+    /// ```
+    ///
+    /// See: https://bazel.build/reference/be/general#environment_group
+    fn environment_group<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        environments: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        defaults: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let internals = ModuleInternals::from_context(eval, "environment_group")?;
+        let coercion_ctx = internals.attr_coercion_context();
+
+        let mut attrs = Vec::new();
+
+        // Coerce environments
+        let list_type = AttrType::list(AttrType::string());
+        let envs_value = eval.heap().alloc(environments.items);
+        let coerced_envs = list_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, envs_value)?;
+        attrs.push(("environments".to_owned(), coerced_envs));
+
+        // Coerce defaults
+        let defaults_value = eval.heap().alloc(defaults.items);
+        let coerced_defaults =
+            list_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, defaults_value)?;
+        attrs.push(("defaults".to_owned(), coerced_defaults));
+
+        let target_node = create_native_target_node(
+            rule_defs::ENVIRONMENT_GROUP_RULE.clone(),
             internals.package(),
             name,
             attrs,

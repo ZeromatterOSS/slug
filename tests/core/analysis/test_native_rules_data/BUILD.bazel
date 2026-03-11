@@ -495,6 +495,14 @@ cc_shared_library(
     deps = [":shared_lib_dep"],
 )
 
+# === environment_group test ===
+
+environment_group(
+    name = "jdk_versions",
+    environments = [":jdk8", ":jdk11"],
+    defaults = [":jdk11"],
+)
+
 # === existing_rules() / repository_name() test ===
 # capture_existing_rules must be called AFTER other rules so it can see them.
 capture_existing_rules(name = "existing_rules_check")

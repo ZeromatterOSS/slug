@@ -215,11 +215,68 @@ pub(crate) fn json(globals: &mut GlobalsBuilder) {
             x.to_json()
         }
 
+        /// Encodes a value to a JSON string with indentation for readability.
+        ///
+        /// Bazel-compatible: https://bazel.build/rules/lib/toplevel/json#encode_indent
+        fn encode_indent<'v>(
+            #[starlark(require = pos)] x: Value<'v>,
+            #[starlark(require = named, default = "")] prefix: &str,
+            #[starlark(require = named, default = "\t")] indent: &str,
+        ) -> anyhow::Result<String> {
+            let compact = x.to_json()?;
+            let parsed: serde_json::Value = serde_json::from_str(&compact)?;
+            let pretty = serde_json::to_string_pretty(&parsed)?;
+            // serde_json uses 2-space indent by default; replace with requested indent
+            let mut result = String::new();
+            for line in pretty.lines() {
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+                let stripped = line.trim_start();
+                let leading_spaces = line.len() - stripped.len();
+                // serde_json uses 2-space indentation levels
+                let depth = leading_spaces / 2;
+                result.push_str(prefix);
+                for _ in 0..depth {
+                    result.push_str(indent);
+                }
+                result.push_str(stripped);
+            }
+            Ok(result)
+        }
+
         fn decode<'v>(
             #[starlark(require = pos)] x: &str,
             heap: Heap<'v>,
         ) -> anyhow::Result<Value<'v>> {
             Ok(heap.alloc(serde_json::from_str::<serde_json::Value>(x)?))
+        }
+
+        /// Pretty-prints an already-encoded JSON string with indentation.
+        ///
+        /// Bazel-compatible: https://bazel.build/rules/lib/toplevel/json#indent
+        fn indent(
+            #[starlark(require = pos)] s: &str,
+            #[starlark(require = named, default = "")] prefix: &str,
+            #[starlark(require = named, default = "\t")] indent_str: &str,
+        ) -> anyhow::Result<String> {
+            let parsed: serde_json::Value = serde_json::from_str(s)?;
+            let pretty = serde_json::to_string_pretty(&parsed)?;
+            let mut result = String::new();
+            for line in pretty.lines() {
+                if !result.is_empty() {
+                    result.push('\n');
+                }
+                let stripped = line.trim_start();
+                let leading_spaces = line.len() - stripped.len();
+                let depth = leading_spaces / 2;
+                result.push_str(prefix);
+                for _ in 0..depth {
+                    result.push_str(indent_str);
+                }
+                result.push_str(stripped);
+            }
+            Ok(result)
         }
     }
 
@@ -258,6 +315,27 @@ mod tests {
             "123456789123456789123456789",
             "json.decode('123456789123456789123456789')",
         );
+    }
+
+    #[test]
+    fn test_json_encode_indent() {
+        let a = Assert::new();
+        // Default indent (tab)
+        a.is_true("'\\t1,' in json.encode_indent([1, 2])");
+        a.is_true("json.encode_indent([1, 2]).startswith('[')");
+        // Custom indent
+        a.is_true("'    1,' in json.encode_indent([1, 2], indent = '    ')");
+        // With prefix
+        a.is_true("'--\\t1,' in json.encode_indent([1, 2], prefix = '--')");
+        // Scalar value
+        a.eq("'42'", "json.encode_indent(42)");
+    }
+
+    #[test]
+    fn test_json_indent() {
+        let a = Assert::new();
+        a.is_true("'\\t1,' in json.indent('[1,2]')");
+        a.is_true("'  1,' in json.indent('[1,2]', indent_str = '  ')");
     }
 
     #[test]

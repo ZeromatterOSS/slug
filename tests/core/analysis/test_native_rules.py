@@ -608,3 +608,9 @@ async def test_java_common_module_available(buck: Buck) -> None:
 async def test_cc_shared_library_builds(buck: Buck) -> None:
     """cc_shared_library native rule can be parsed and analyzed."""
     await buck.build("//:my_shared_lib")
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_environment_group_builds(buck: Buck) -> None:
+    """environment_group native rule can be parsed and analyzed."""
+    await buck.build("//:jdk_versions")
