@@ -188,7 +188,7 @@ These modules must be available as globals in .bzl files.
 | Function | Description | Kuro Status |
 |----------|-------------|-------------|
 | `compile()` | C++ compilation | ✓ Implemented (creates real compile actions; 2026-03-10) |
-| `create_compilation_context()` | Create CompilationContext | Stub |
+| `create_compilation_context()` | Create CompilationContext | ✓ Implemented (headers, includes, defines; 2026-03-11) |
 | `create_compilation_outputs()` | Create CcCompilationOutputs | Stub |
 | `create_compile_variables()` | Generate compilation vars | Stub |
 | `create_linker_input()` | Create LinkerInput | Stub |
@@ -197,7 +197,7 @@ These modules must be available as globals in .bzl files.
 | `create_library_to_link()` | Create LibraryToLink | Stub |
 | `configure_features()` | Create FeatureConfiguration | Stub |
 | `link()` | C++ linking | ✓ Implemented (creates real link actions, supports executable/dynamic_library/static_library; 2026-03-11) |
-| `merge_cc_infos()` | Merge CcInfo providers | Stub |
+| `merge_cc_infos()` | Merge CcInfo providers | ✓ Implemented (merges compilation/linking contexts via depsets; 2026-03-11) |
 | `is_enabled()` | Check feature enabled | Stub |
 | `action_is_enabled()` | Check action enabled | Stub |
 | `get_tool_for_action()` | Get tool path | ✓ Implemented (platform-aware MSVC/GCC/Clang) |
