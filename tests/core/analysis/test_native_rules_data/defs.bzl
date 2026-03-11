@@ -117,6 +117,75 @@ run_env_info = rule(
 )
 
 
+def _cc_configure_features_test_impl(ctx):
+    """Tests that cc_common.configure_features() respects requested/unsupported features."""
+    # Default configuration
+    default_fc = cc_common.configure_features(cc_toolchain = None, ctx = ctx)
+
+    # Configuration with requested features
+    with_features = cc_common.configure_features(
+        cc_toolchain = None,
+        ctx = ctx,
+        requested_features = ["my_custom_feature", "c++17"],
+    )
+
+    # Configuration with unsupported features (disable pic)
+    without_pic = cc_common.configure_features(
+        cc_toolchain = None,
+        ctx = ctx,
+        unsupported_features = ["pic", "supports_pic"],
+    )
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    lines = [
+        "default_type=" + type(default_fc),
+        # Check some default features
+        "default_supports_dynamic_linker=" + str(cc_common.is_enabled(feature_configuration = default_fc, feature_name = "supports_dynamic_linker")),
+        "default_compiler_param_file=" + str(cc_common.is_enabled(feature_configuration = default_fc, feature_name = "compiler_param_file")),
+        "default_my_custom=" + str(cc_common.is_enabled(feature_configuration = default_fc, feature_name = "my_custom_feature")),
+        # Check requested features are enabled
+        "with_custom=" + str(cc_common.is_enabled(feature_configuration = with_features, feature_name = "my_custom_feature")),
+        "with_c++17=" + str(cc_common.is_enabled(feature_configuration = with_features, feature_name = "c++17")),
+        # Check unsupported features are disabled
+        "without_pic=" + str(cc_common.is_enabled(feature_configuration = without_pic, feature_name = "pic")),
+        "without_supports_pic=" + str(cc_common.is_enabled(feature_configuration = without_pic, feature_name = "supports_pic")),
+        # Unsupported doesn't affect other features
+        "without_pic_dynamic_linker=" + str(cc_common.is_enabled(feature_configuration = without_pic, feature_name = "supports_dynamic_linker")),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+cc_configure_features_test = rule(
+    implementation = _cc_configure_features_test_impl,
+    attrs = {},
+)
+
+
+def _cc_linker_input_test_impl(ctx):
+    """Tests that cc_common.create_linker_input() preserves user_link_flags."""
+    linker_input = cc_common.create_linker_input(
+        owner = ctx.label,
+        user_link_flags = depset(["-lpthread", "-lm"]),
+    )
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    flags = linker_input.user_link_flags
+    lines = [
+        "type=" + type(linker_input),
+        "has_user_link_flags=" + str(hasattr(linker_input, "user_link_flags")),
+        "flags_type=" + type(flags),
+        "flags_list=" + str(sorted(flags.to_list())),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+cc_linker_input_test = rule(
+    implementation = _cc_linker_input_test_impl,
+    attrs = {},
+)
+
+
 def _cc_link_test_impl(ctx):
     """Tests that cc_common.link() is callable and returns CcLinkingOutputs."""
     feature_config = cc_common.configure_features(cc_toolchain = None, ctx = ctx)

@@ -356,6 +356,43 @@ async def test_run_environment_info_provider(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_cc_common_configure_features(buck: Buck) -> None:
+    """cc_common.configure_features() respects requested/unsupported features."""
+    result = await buck.build("//:cc_configure_features_test")
+    output = result.get_build_report().output_for_target("//:cc_configure_features_test")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    assert lines["default_type"] == "FeatureConfiguration"
+    # Default features should be enabled
+    assert lines["default_supports_dynamic_linker"] == "True"
+    assert lines["default_compiler_param_file"] == "True"
+    # Custom feature not in defaults should be disabled
+    assert lines["default_my_custom"] == "False"
+    # Requested features should be enabled
+    assert lines["with_custom"] == "True"
+    assert lines["with_c++17"] == "True"
+    # Unsupported features should be disabled
+    assert lines["without_pic"] == "False"
+    assert lines["without_supports_pic"] == "False"
+    # Other features should still be enabled
+    assert lines["without_pic_dynamic_linker"] == "True"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_cc_common_linker_input(buck: Buck) -> None:
+    """cc_common.create_linker_input() preserves user_link_flags."""
+    result = await buck.build("//:cc_linker_input_test")
+    output = result.get_build_report().output_for_target("//:cc_linker_input_test")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    assert lines["type"] == "LinkerInput"
+    assert lines["has_user_link_flags"] == "True"
+    # Flags should be preserved, not empty
+    assert "-lm" in lines["flags_list"]
+    assert "-lpthread" in lines["flags_list"]
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_cc_common_link(buck: Buck) -> None:
     """cc_common.link() is callable and returns CcLinkingOutputs with expected attributes."""
     result = await buck.build("//:cc_link_test")

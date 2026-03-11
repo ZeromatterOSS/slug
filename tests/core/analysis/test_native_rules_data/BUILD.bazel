@@ -1,4 +1,4 @@
-load(":defs.bzl", "bool_flag", "cc_compilation_context_test", "cc_link_test", "cc_merge_infos_test", "collect_files", "run_env_info", "select_value", "sibling_file", "stamp_file_info", "string_flag", "write_list")
+load(":defs.bzl", "bool_flag", "cc_compilation_context_test", "cc_configure_features_test", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "collect_files", "run_env_info", "select_value", "sibling_file", "stamp_file_info", "string_flag", "write_list")
 
 # === filegroup tests ===
 
@@ -366,6 +366,18 @@ stamp_file_info(
 
 run_env_info(
     name = "run_env_test",
+)
+
+# === cc_common.configure_features() test ===
+
+cc_configure_features_test(
+    name = "cc_configure_features_test",
+)
+
+# === cc_common.create_linker_input() test ===
+
+cc_linker_input_test(
+    name = "cc_linker_input_test",
 )
 
 # === cc_common.link() test ===

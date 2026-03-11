@@ -313,26 +313,113 @@ fn normalize_external_cells_path(path: &str) -> Option<String> {
 ///
 /// This is created by cc_common.configure_features() and used to control
 /// which compiler flags and behaviors are enabled.
+///
+/// In Bazel, feature configuration is computed from the toolchain's declared
+/// features combined with requested_features and unsupported_features.
+/// We approximate this by maintaining a set of enabled feature names.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Clone)]
 pub struct FeatureConfiguration {
-    /// Whether PIC is enabled
-    pub pic_enabled: bool,
-    /// Whether to use preprocessor defines
-    pub defines_enabled: bool,
+    /// Set of enabled feature names
+    enabled_features: Vec<String>,
+}
+
+/// Default features that are typically enabled by CC toolchains.
+/// These match common Bazel CC toolchain defaults.
+fn default_cc_features() -> Vec<&'static str> {
+    let mut features = vec![
+        // Core features always enabled
+        "supports_dynamic_linker",
+        "supports_interface_shared_libraries",
+        "supports_start_end_lib",
+        "static_link_cpp_runtimes",
+        "compiler_param_file",
+        "linker_param_file",
+        // Compilation modes
+        "fastbuild",
+        "dbg",
+        "opt",
+        // Standard features
+        "no_legacy_features",
+        "dependency_file",
+        "random_seed",
+        "per_object_debug_info",
+        "preprocessor_defines",
+        "includes",
+        "include_paths",
+        "user_compile_flags",
+        "sysroot",
+        // Link features
+        "shared_flag",
+        "linkstamps",
+        "output_execpath_flags",
+        "runtime_library_search_directories",
+        "library_search_directories",
+        "archiver_flags",
+        "libraries_to_link",
+        "force_pic_flags",
+        "user_link_flags",
+        "strip_debug_symbols",
+    ];
+    // Platform-specific defaults
+    if !is_windows_host() {
+        features.push("pic");
+        features.push("supports_pic");
+    } else {
+        features.push("targets_windows");
+        features.push("copy_dynamic_libraries_to_binary");
+        features.push("has_configured_linker_path");
+        features.push("no_stripping");
+    }
+    features
 }
 
 impl Default for FeatureConfiguration {
     fn default() -> Self {
         Self {
-            pic_enabled: true,
-            defines_enabled: true,
+            enabled_features: default_cc_features()
+                .into_iter()
+                .map(|s| s.to_owned())
+                .collect(),
         }
+    }
+}
+
+impl FeatureConfiguration {
+    /// Create a feature configuration from requested and unsupported features.
+    pub fn new(requested_features: Vec<String>, unsupported_features: Vec<String>) -> Self {
+        let mut enabled: Vec<String> = default_cc_features()
+            .into_iter()
+            .map(|s| s.to_owned())
+            .collect();
+
+        // Add requested features
+        for f in &requested_features {
+            if !enabled.iter().any(|e| e == f) {
+                enabled.push(f.clone());
+            }
+        }
+
+        // Remove unsupported features
+        enabled.retain(|f| !unsupported_features.contains(f));
+
+        Self {
+            enabled_features: enabled,
+        }
+    }
+
+    /// Check if a feature is enabled.
+    pub fn is_feature_enabled(&self, feature_name: &str) -> bool {
+        self.enabled_features.iter().any(|f| f == feature_name)
     }
 }
 
 impl Display for FeatureConfiguration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "FeatureConfiguration(pic={})", self.pic_enabled)
+        write!(
+            f,
+            "FeatureConfiguration(features=[{}])",
+            self.enabled_features.len()
+        )
     }
 }
 
@@ -2534,9 +2621,34 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] unsupported_features: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<FeatureConfiguration> {
-        // TODO(cc_common): Properly process features from toolchain and config
-        // For now, return a default feature configuration
-        Ok(FeatureConfiguration::default())
+        let _ = (this, ctx, cc_toolchain);
+        let heap = eval.heap();
+
+        // Collect requested features from the list
+        let mut req: Vec<String> = Vec::new();
+        if !requested_features.is_none() {
+            if let Ok(iter) = requested_features.iterate(heap) {
+                for item in iter {
+                    if let Some(s) = item.unpack_str() {
+                        req.push(s.to_owned());
+                    }
+                }
+            }
+        }
+
+        // Collect unsupported features from the list
+        let mut unsup: Vec<String> = Vec::new();
+        if !unsupported_features.is_none() {
+            if let Ok(iter) = unsupported_features.iterate(heap) {
+                for item in iter {
+                    if let Some(s) = item.unpack_str() {
+                        unsup.push(s.to_owned());
+                    }
+                }
+            }
+        }
+
+        Ok(FeatureConfiguration::new(req, unsup))
     }
 
     /// Compiles C/C++ source files.
@@ -3588,7 +3700,36 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] linkstamps: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        Ok(heap.alloc(LinkerInputStubGen { owner, libraries }))
+        let _ = (this, linkstamps);
+        // Store user_link_flags as-is (depset or list); wrap list in depset if needed
+        let user_flags = if user_link_flags.is_none() {
+            Value::new_none()
+        } else if user_link_flags.request_value::<crate::interpreter::rule_defs::depset::Depset>().is_some() {
+            // Already a depset
+            user_link_flags
+        } else {
+            // Wrap list/iterable in a depset
+            match user_link_flags.iterate(heap) {
+                Ok(iter) => {
+                    match crate::interpreter::rule_defs::depset::make_depset_from_lists(
+                        heap,
+                        iter.collect(),
+                        Vec::new(),
+                        "default",
+                    ) {
+                        Ok(ds) => ds,
+                        Err(_) => user_link_flags,
+                    }
+                }
+                Err(_) => user_link_flags,
+            }
+        };
+        Ok(heap.alloc(LinkerInputStubGen {
+            owner,
+            libraries,
+            user_link_flags: user_flags,
+            additional_inputs,
+        }))
     }
 
     /// Creates a linking context.
@@ -3610,10 +3751,15 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] feature_name: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<bool> {
-        // TODO(cc_common): Check against actual feature configuration
+        let _ = (this, eval);
+        // Try to downcast to our FeatureConfiguration type
+        if let Some(fc) = feature_configuration.downcast_ref::<FeatureConfiguration>() {
+            return Ok(fc.is_feature_enabled(feature_name));
+        }
+        // Fallback for non-FeatureConfiguration values (e.g., None passed from tests)
         let enabled = match feature_name {
             "supports_dynamic_linker" | "supports_interface_shared_libraries" => true,
-            "pic" => !is_windows_host(), // MSVC doesn't need PIC
+            "pic" | "supports_pic" => !is_windows_host(),
             "targets_windows" => is_windows_host(),
             "static_link_cpp_runtimes" => true,
             _ => false,
@@ -5211,6 +5357,8 @@ impl<'v> StarlarkValue<'v> for FrozenAnalysisTestCallable {
 pub struct LinkerInputStubGen<V: ValueLifetimeless> {
     owner: V,
     libraries: V,
+    user_link_flags: V,
+    additional_inputs: V,
 }
 
 starlark_complex_value!(pub LinkerInputStub);
@@ -5245,10 +5393,18 @@ where
                 }
             }
             "user_link_flags" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                if self.user_link_flags.to_value().is_none() {
+                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                } else {
+                    Some(self.user_link_flags.to_value())
+                }
             }
             "additional_inputs" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                if self.additional_inputs.to_value().is_none() {
+                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                } else {
+                    Some(self.additional_inputs.to_value())
+                }
             }
             _ => None,
         }
