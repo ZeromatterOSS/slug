@@ -35,7 +35,7 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 | `filegroup` | Groups files under single label | ✓ Exists (native + bazel_tools Starlark impl) | `native_rules.rs`, `bazel_tools/tools/build_rules/filegroup.bzl` |
 | `genquery` | Runs query language, outputs results | ✓ Stub (creates empty output via GenruleAction "touch $@"; 2026-02-25) | `native_rules.rs`, `native_rule_analysis.rs` |
 | `genrule` | Generic build rule using shell | ✓ Implemented (native, with GenruleAction; cmd_bash preferred on Unix; $(location :file) works for source files; 2026-02-25) | `native_rules.rs`, `native_rule_analysis.rs`, `genrule_action.rs` |
-| `starlark_doc_extract` | Extracts docs from .bzl files | Not implemented | Low priority |
+| `starlark_doc_extract` | Extracts docs from .bzl files | ✓ Stub (empty output; hasattr(native, "starlark_doc_extract") returns True for rules_python IS_BAZEL_7_OR_HIGHER; 2026-03-11) | `native_rules.rs`, `native_rule_analysis.rs` |
 | `test_suite` | Defines collections of tests | ✓ Implemented (native, TESTS_ATTRIBUTE, expansion works) | `native_rules.rs`, `native_rule_analysis.rs` |
 
 #### Platform & Toolchain Rules
@@ -75,7 +75,7 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 - [x] Implement `sh_library` rule (native rule returning srcs as DefaultInfo outputs)
 - [x] Implement `sh_binary` rule (native rule with DefaultInfo.executable set to first src)
 - [x] Implement `sh_test` rule (like sh_binary + ExternalRunnerTestInfo, `kuro test` works)
-- [ ] (Low priority) `starlark_doc_extract`
+- [x] `starlark_doc_extract` (2026-03-11: stub creates empty output; hasattr detection works)
 
 ### Success Criteria (Phase 7a)
 
