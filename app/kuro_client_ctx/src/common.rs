@@ -289,6 +289,40 @@ pub struct CommonBuildConfigurationOptions {
     )]
     pub action_env: Vec<String>,
 
+    /// C/C++ compilation flags (Bazel compatibility).
+    ///
+    /// Values are passed to ctx.fragments.cpp.copts and added to all C/C++ compile actions.
+    #[clap(long = "copt", hide = true, value_name = "FLAG", num_args = 1)]
+    pub copts: Vec<String>,
+
+    /// C++-specific compilation flags (Bazel compatibility).
+    ///
+    /// Values are passed to ctx.fragments.cpp.cxxopts and added to C++ compile actions.
+    #[clap(long = "cxxopt", hide = true, value_name = "FLAG", num_args = 1)]
+    pub cxxopts: Vec<String>,
+
+    /// C-specific compilation flags (Bazel compatibility).
+    ///
+    /// Values are passed to ctx.fragments.cpp.conlyopts and added to C compile actions.
+    #[clap(long = "conlyopt", hide = true, value_name = "FLAG", num_args = 1)]
+    pub conlyopts: Vec<String>,
+
+    /// Linker flags (Bazel compatibility).
+    ///
+    /// Values are passed to ctx.fragments.cpp.linkopts and added to all link actions.
+    #[clap(long = "linkopt", hide = true, value_name = "FLAG", num_args = 1)]
+    pub linkopts: Vec<String>,
+
+    /// Strip mode for binaries: "always", "sometimes", or "never" (Bazel compatibility).
+    #[clap(long = "strip", hide = true, value_name = "always|sometimes|never")]
+    pub strip_mode: Option<String>,
+
+    /// Enable or disable build features (Bazel compatibility).
+    ///
+    /// Use --features=FEATURE to enable, --features=-FEATURE to disable.
+    #[clap(long = "features", hide = true, value_name = "FEATURE", num_args = 1)]
+    pub global_features: Vec<String>,
+
     // ---- Bazel compatibility flags (accepted, some are no-ops) ----
     /// Enable ANSI color output (Bazel compatibility).
     ///
@@ -473,6 +507,12 @@ impl CommonBuildConfigurationOptions {
             compilation_mode: None,
             define: vec![],
             action_env: vec![],
+            copts: vec![],
+            cxxopts: vec![],
+            conlyopts: vec![],
+            linkopts: vec![],
+            strip_mode: None,
+            global_features: vec![],
             color: None,
             show_progress: false,
             strategy: vec![],
@@ -498,6 +538,12 @@ impl CommonBuildConfigurationOptions {
             compilation_mode: None,
             define: vec![],
             action_env: vec![],
+            copts: vec![],
+            cxxopts: vec![],
+            conlyopts: vec![],
+            linkopts: vec![],
+            strip_mode: None,
+            global_features: vec![],
             color: None,
             show_progress: false,
             strategy: vec![],

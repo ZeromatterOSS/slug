@@ -321,6 +321,24 @@ impl<'a> ServerCommandContext<'a> {
         kuro_build_api::interpreter::rule_defs::build_config::set_action_env(
             &client_context.action_env,
         );
+        kuro_build_api::interpreter::rule_defs::build_config::set_copts(
+            &client_context.copts,
+        );
+        kuro_build_api::interpreter::rule_defs::build_config::set_cxxopts(
+            &client_context.cxxopts,
+        );
+        kuro_build_api::interpreter::rule_defs::build_config::set_conlyopts(
+            &client_context.conlyopts,
+        );
+        kuro_build_api::interpreter::rule_defs::build_config::set_linkopts(
+            &client_context.linkopts,
+        );
+        kuro_build_api::interpreter::rule_defs::build_config::set_strip(
+            &client_context.strip_mode,
+        );
+        kuro_build_api::interpreter::rule_defs::build_config::set_features(
+            &client_context.global_features,
+        );
 
         let oncall = if client_context.oncall.is_empty() {
             None

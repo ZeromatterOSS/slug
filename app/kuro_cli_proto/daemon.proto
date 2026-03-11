@@ -197,6 +197,28 @@ message ClientContext {
   /// Bazel-compatible --action_env NAME=VALUE or NAME pairs.
   /// Injected into the environment of all build actions.
   repeated string action_env = 28;
+
+  /// Bazel-compatible --copt flags.
+  /// Passed through to ctx.fragments.cpp.copts.
+  repeated string copts = 29;
+
+  /// Bazel-compatible --cxxopt flags.
+  /// Passed through to ctx.fragments.cpp.cxxopts.
+  repeated string cxxopts = 30;
+
+  /// Bazel-compatible --conlyopt flags.
+  /// Passed through to ctx.fragments.cpp.conlyopts.
+  repeated string conlyopts = 31;
+
+  /// Bazel-compatible --linkopt flags.
+  /// Passed through to ctx.fragments.cpp.linkopts.
+  repeated string linkopts = 32;
+
+  /// Bazel-compatible --strip flag: "always", "sometimes", or "never".
+  string strip_mode = 33;
+
+  /// Bazel-compatible --features flags.
+  repeated string global_features = 34;
 }
 
 message TargetsRequest {

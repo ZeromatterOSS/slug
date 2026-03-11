@@ -120,10 +120,20 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Returns whether binaries should be stripped.
+    /// Controlled by --strip flag: "always" → true, "never" → false,
+    /// "sometimes" (default) → true only for opt compilation mode.
     fn should_strip_binaries(
         #[allow(unused_variables)] this: &CppFragment,
     ) -> starlark::Result<bool> {
-        Ok(false)
+        let strip = crate::interpreter::rule_defs::build_config::get_strip();
+        match strip.as_str() {
+            "always" => Ok(true),
+            "never" => Ok(false),
+            _ => {
+                // "sometimes": strip in opt mode only
+                Ok(this.compilation_mode == "opt")
+            }
+        }
     }
 
     /// Returns whether to use specific tool files (incompatible flag).
@@ -212,28 +222,28 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
         Ok(NoneType)
     }
 
-    /// Whether to generate position-independent code.
+    /// C/C++ compilation options from --copt flag.
     #[starlark(attribute)]
     fn copts(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<Vec<String>> {
-        Ok(Vec::new())
+        Ok(crate::interpreter::rule_defs::build_config::get_copts())
     }
 
-    /// C-specific compilation options.
+    /// C-specific compilation options from --conlyopt flag.
     #[starlark(attribute)]
     fn conlyopts(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<Vec<String>> {
-        Ok(Vec::new())
+        Ok(crate::interpreter::rule_defs::build_config::get_conlyopts())
     }
 
-    /// C++-specific compilation options.
+    /// C++-specific compilation options from --cxxopt flag.
     #[starlark(attribute)]
     fn cxxopts(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<Vec<String>> {
-        Ok(Vec::new())
+        Ok(crate::interpreter::rule_defs::build_config::get_cxxopts())
     }
 
-    /// Linker options.
+    /// Linker options from --linkopt flag.
     #[starlark(attribute)]
     fn linkopts(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<Vec<String>> {
-        Ok(Vec::new())
+        Ok(crate::interpreter::rule_defs::build_config::get_linkopts())
     }
 
     /// FDO prefetch hints label, or None.

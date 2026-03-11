@@ -24,6 +24,12 @@ static BUILD_CONFIG: RwLock<BuildConfig> = RwLock::new(BuildConfig {
     compilation_mode: None,
     defines: None,
     action_env: None,
+    copts: None,
+    cxxopts: None,
+    conlyopts: None,
+    linkopts: None,
+    strip: None,
+    features: None,
 });
 
 struct BuildConfig {
@@ -33,6 +39,18 @@ struct BuildConfig {
     defines: Option<HashMap<String, String>>,
     /// --action_env NAME=VALUE pairs from the command line.
     action_env: Option<HashMap<String, String>>,
+    /// --copt flags (C/C++ compilation flags).
+    copts: Option<Vec<String>>,
+    /// --cxxopt flags (C++-specific compilation flags).
+    cxxopts: Option<Vec<String>>,
+    /// --conlyopt flags (C-specific compilation flags).
+    conlyopts: Option<Vec<String>>,
+    /// --linkopt flags (linker flags).
+    linkopts: Option<Vec<String>>,
+    /// --strip flag: "always", "sometimes", or "never".
+    strip: Option<String>,
+    /// --features flags (enabled/disabled features like "static_link_cpp_runtimes").
+    features: Option<Vec<String>>,
 }
 
 /// Set the compilation mode for the current build.
@@ -113,4 +131,76 @@ pub fn get_action_env() -> HashMap<String, String> {
         .ok()
         .and_then(|c| c.action_env.clone())
         .unwrap_or_default()
+}
+
+/// Set --copt values for the current build.
+pub fn set_copts(values: &[String]) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        config.copts = if values.is_empty() { None } else { Some(values.to_vec()) };
+    }
+}
+
+/// Get --copt values.
+pub fn get_copts() -> Vec<String> {
+    BUILD_CONFIG.read().ok().and_then(|c| c.copts.clone()).unwrap_or_default()
+}
+
+/// Set --cxxopt values for the current build.
+pub fn set_cxxopts(values: &[String]) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        config.cxxopts = if values.is_empty() { None } else { Some(values.to_vec()) };
+    }
+}
+
+/// Get --cxxopt values.
+pub fn get_cxxopts() -> Vec<String> {
+    BUILD_CONFIG.read().ok().and_then(|c| c.cxxopts.clone()).unwrap_or_default()
+}
+
+/// Set --conlyopt values for the current build.
+pub fn set_conlyopts(values: &[String]) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        config.conlyopts = if values.is_empty() { None } else { Some(values.to_vec()) };
+    }
+}
+
+/// Get --conlyopt values.
+pub fn get_conlyopts() -> Vec<String> {
+    BUILD_CONFIG.read().ok().and_then(|c| c.conlyopts.clone()).unwrap_or_default()
+}
+
+/// Set --linkopt values for the current build.
+pub fn set_linkopts(values: &[String]) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        config.linkopts = if values.is_empty() { None } else { Some(values.to_vec()) };
+    }
+}
+
+/// Get --linkopt values.
+pub fn get_linkopts() -> Vec<String> {
+    BUILD_CONFIG.read().ok().and_then(|c| c.linkopts.clone()).unwrap_or_default()
+}
+
+/// Set --strip value for the current build.
+pub fn set_strip(value: &str) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        config.strip = if value.is_empty() { None } else { Some(value.to_owned()) };
+    }
+}
+
+/// Get --strip value. Returns "sometimes" if not set.
+pub fn get_strip() -> String {
+    BUILD_CONFIG.read().ok().and_then(|c| c.strip.clone()).unwrap_or_else(|| "sometimes".to_owned())
+}
+
+/// Set --features values for the current build.
+pub fn set_features(values: &[String]) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        config.features = if values.is_empty() { None } else { Some(values.to_vec()) };
+    }
+}
+
+/// Get --features values.
+pub fn get_features() -> Vec<String> {
+    BUILD_CONFIG.read().ok().and_then(|c| c.features.clone()).unwrap_or_default()
 }

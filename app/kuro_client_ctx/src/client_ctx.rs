@@ -247,6 +247,12 @@ impl<'a> ClientCommandContext<'a> {
                 .unwrap_or_default(),
             define_values: config_opts.define.clone(),
             action_env: config_opts.action_env.clone(),
+            copts: config_opts.copts.clone(),
+            cxxopts: config_opts.cxxopts.clone(),
+            conlyopts: config_opts.conlyopts.clone(),
+            linkopts: config_opts.linkopts.clone(),
+            strip_mode: config_opts.strip_mode.clone().unwrap_or_default(),
+            global_features: config_opts.global_features.clone(),
             ..self.empty_client_context(cmd.logging_name())?
         })
     }
@@ -293,6 +299,12 @@ impl<'a> ClientCommandContext<'a> {
             compilation_mode: String::new(),
             define_values: Vec::new(),
             action_env: Vec::new(),
+            copts: Vec::new(),
+            cxxopts: Vec::new(),
+            conlyopts: Vec::new(),
+            linkopts: Vec::new(),
+            strip_mode: String::new(),
+            global_features: Vec::new(),
         })
     }
 
