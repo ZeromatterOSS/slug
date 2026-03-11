@@ -396,6 +396,24 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         Ok(heap.alloc(ConfigurationFragments::new(cpp)))
     }
 
+    /// Host configuration fragments (Bazel-compatible).
+    ///
+    /// In Bazel, `ctx.host_fragments` provides access to the host platform's
+    /// configuration fragments. Since Kuro doesn't distinguish host from target
+    /// configurations yet, this returns the same fragments as `ctx.fragments`.
+    #[starlark(attribute)]
+    fn host_fragments<'v>(
+        this: RefAnalysisContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+        let cpp = crate::interpreter::rule_defs::fragments::CppFragment::new(
+            mode, false, false, false,
+        );
+        Ok(heap.alloc(ConfigurationFragments::new(cpp)))
+    }
+
     /// Resolved toolchains for this target (Bazel-compatible).
     ///
     /// In Bazel, rules can declare toolchain dependencies via the `toolchains` attribute

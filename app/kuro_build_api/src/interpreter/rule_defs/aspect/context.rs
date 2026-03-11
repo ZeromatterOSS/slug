@@ -229,6 +229,23 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
         Ok(heap.alloc(ConfigurationFragments::new(cpp)))
     }
 
+    /// Host configuration fragments (Bazel-compatible).
+    ///
+    /// Returns the same fragments as `ctx.fragments` since Kuro doesn't
+    /// distinguish host from target configurations yet.
+    #[starlark(attribute)]
+    fn host_fragments<'v>(
+        this: RefAspectContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+        let cpp = crate::interpreter::rule_defs::fragments::CppFragment::new(
+            mode, false, false, false,
+        );
+        Ok(heap.alloc(ConfigurationFragments::new(cpp)))
+    }
+
     /// Toolchain resolution stub.
     ///
     /// Provides access to `ctx.toolchains[toolchain_type]` for aspect implementations.
