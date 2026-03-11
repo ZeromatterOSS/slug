@@ -268,10 +268,56 @@ starlark_simple_value!(ProtoLangToolchainInfoProvider);
 impl<'v> StarlarkValue<'v> for ProtoLangToolchainInfoProvider {}
 
 // ============================================================================
+// ProtoModule - Bazel's proto module (proto.encode_text, etc.)
+// ============================================================================
+
+/// The proto module provides protocol buffer utilities.
+///
+/// In Bazel, `proto.encode_text(x)` converts a struct/dict to text proto format.
+///
+/// Reference: https://bazel.build/rules/lib/toplevel/proto
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct ProtoModule;
+
+impl Display for ProtoModule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "proto")
+    }
+}
+
+starlark_simple_value!(ProtoModule);
+
+#[starlark_value(type = "proto")]
+impl<'v> StarlarkValue<'v> for ProtoModule {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(proto_module_methods)
+    }
+}
+
+#[starlark_module]
+fn proto_module_methods(builder: &mut MethodsBuilder) {
+    /// Encodes a value to text proto format.
+    ///
+    /// Converts a Starlark struct or dict to a textproto string representation.
+    ///
+    /// Reference: https://bazel.build/rules/lib/toplevel/proto#encode_text
+    fn encode_text<'v>(
+        #[starlark(this)] _this: &ProtoModule,
+        #[starlark(require = pos)] x: Value<'v>,
+        #[allow(unused_variables)] eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<String> {
+        // Simple textproto encoding: just use display for now
+        // A full implementation would recursively format struct fields
+        Ok(format!("{}", x))
+    }
+}
+
+// ============================================================================
 // Registration
 // ============================================================================
 
-/// Register the proto globals (ProtoInfo, proto_common_do_not_use).
+/// Register the proto globals (ProtoInfo, proto_common_do_not_use, proto).
 ///
 /// Note on provider registrations:
 /// ProtoInfo is deprecated as a native global in Bazel 8+.
@@ -290,4 +336,7 @@ pub fn register_proto_common(globals: &mut GlobalsBuilder) {
 
     /// ProtoLangToolchainInfo provider for language-specific proto toolchains.
     const ProtoLangToolchainInfo: ProtoLangToolchainInfoProvider = ProtoLangToolchainInfoProvider;
+
+    /// The proto module for protocol buffer utilities.
+    const proto: ProtoModule = ProtoModule;
 }

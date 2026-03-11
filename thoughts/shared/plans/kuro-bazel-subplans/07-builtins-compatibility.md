@@ -183,26 +183,27 @@ These modules must be available as globals in .bzl files.
 
 | Function | Description | Kuro Status |
 |----------|-------------|-------------|
-| `compile()` | C++ compilation | Stub |
-| `create_compilation_context()` | Create CompilationContext | Stub |
-| `create_compilation_outputs()` | Create CcCompilationOutputs | Stub |
-| `create_compile_variables()` | Generate compilation vars | Stub |
-| `create_linker_input()` | Create LinkerInput | Stub |
-| `create_linking_context()` | Create LinkingContext | Stub |
-| `create_link_variables()` | Generate linking vars | Stub |
-| `create_library_to_link()` | Create LibraryToLink | Stub |
-| `configure_features()` | Create FeatureConfiguration | Stub |
-| `link()` | C++ linking | Stub |
-| `merge_cc_infos()` | Merge CcInfo providers | Stub |
-| `is_enabled()` | Check feature enabled | Stub |
-| `action_is_enabled()` | Check action enabled | Stub |
-| `get_tool_for_action()` | Get tool path | Stub |
-| `get_memory_inefficient_command_line()` | Get command line | Stub |
-| `get_environment_variables()` | Get env vars | Stub |
-| `get_execution_requirements()` | Get exec requirements | Stub |
+| `compile()` | C++ compilation | ✓ Functional (creates real actions) |
+| `create_compilation_context()` | Create CompilationContext | ✓ Implemented |
+| `create_compilation_outputs()` | Create CcCompilationOutputs | ✓ Implemented |
+| `create_compile_variables()` | Generate compilation vars | ✓ Implemented |
+| `create_linker_input()` | Create LinkerInput | ✓ Implemented |
+| `create_linking_context()` | Create LinkingContext | ✓ Implemented |
+| `create_link_variables()` | Generate linking vars | ✓ Implemented |
+| `create_library_to_link()` | Create LibraryToLink | ✓ Implemented |
+| `configure_features()` | Create FeatureConfiguration | ✓ Implemented (respects requested/unsupported) |
+| `link()` | C++ linking | ✓ Functional (creates real actions) |
+| `merge_cc_infos()` | Merge CcInfo providers | ✓ Implemented |
+| `is_enabled()` | Check feature enabled | ✓ Implemented |
+| `action_is_enabled()` | Check action enabled | ✓ Implemented |
+| `get_tool_for_action()` | Get tool path | ✓ Implemented (detects cc/clang/cl) |
+| `get_memory_inefficient_command_line()` | Get command line | ✓ Implemented |
+| `get_environment_variables()` | Get env vars | ✓ Implemented |
+| `get_execution_requirements()` | Get exec requirements | ✓ Implemented |
 | `CcToolchainInfo` | Provider | ✓ Implemented |
+| `CcInfo` | Provider | ✓ Implemented |
 
-**Status**: Partially implemented (stubs for rules_cc loading, full implementation needed for compilation)
+**Status**: ✓ Substantially complete (all methods implemented, tested with rules_cc)
 
 ### Module: `config`
 
