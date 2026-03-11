@@ -979,9 +979,16 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             ("JAVA", if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }),
             ("JAVA_RUNFILES", ""),
             ("JAVABASE", ""),
+            ("ABI_GLIBC_VERSION", "2.17"),
+            ("ABI", "local"),
         ];
         for (k, v) in builtins {
             substitutions.entry(k.to_string()).or_insert_with(|| v.to_string());
+        }
+
+        // Merge --define KEY=VALUE entries (lowest priority, after user subs and builtins)
+        for (k, v) in crate::interpreter::rule_defs::build_config::get_all_defines() {
+            substitutions.entry(k).or_insert(v);
         }
 
         // Expand $(VAR) patterns using the substitutions
