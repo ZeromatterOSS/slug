@@ -268,14 +268,14 @@ The detailed implementation is split into focused sub-plans:
 | Sub-Plan                                                                           | Phases | Description                                                   | Status          |
 | ---------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------- | --------------- |
 | [01-foundation.md](./kuro-bazel-subplans/01-foundation.md)                         | 1-3    | Fork, rebrand, Starlark dialect, BUILD.bazel detection        | **Complete**    |
-| [02-bzlmod.md](./kuro-bazel-subplans/02-bzlmod.md)                                 | 4a-5c  | bzlmod module system, BCR integration, resolution, extensions | **In Progress** |
-| [03-rule-primitives.md](./kuro-bazel-subplans/03-rule-primitives.md)               | 6a,6c  | ctx/actions/providers API alignment + repository_ctx          | **Partial** (many ctx members done reactively during phases 9-12) |
-| [04-prelude-architecture.md](./kuro-bazel-subplans/04-prelude-architecture.md)     | 6b     | Prelude preservation, Bazel shim migration, cleanup           | Not Started     |
-| [05-builtins-compatibility.md](./kuro-bazel-subplans/05-builtins-compatibility.md) | 7a-7d  | Bazel native rules, global functions, modules, Buck2 removal  | Not Started     |
-| [06-aspects.md](./kuro-bazel-subplans/06-aspects.md)                               | 8a-8d  | Bazel aspects implementation (blocks rules_cc)                | **8a Complete** |
-| [09-unified-execution-architecture.md](./kuro-bazel-subplans/09-unified-execution-architecture.md) | 9a-9f  | Lockfile compat, unified DICE execution, .buckconfig removal  | Not Started     |
-| [07-rules-integration.md](./kuro-bazel-subplans/07-rules-integration.md)           | 10-14  | rules_cc, rules_rust, rules_python, protobuf, rules_oci       | Not Started     |
-| [08-infrastructure.md](./kuro-bazel-subplans/08-infrastructure.md)                 | 16-18  | Sandboxing, platform support, query                           | Not Started     |
+| [02-bzlmod.md](./kuro-bazel-subplans/02-bzlmod.md)                                 | 4a-5c  | bzlmod module system, BCR integration, resolution, extensions | **Complete**    |
+| [03-rule-primitives.md](./kuro-bazel-subplans/03-rule-primitives.md)               | 6a,6c  | ctx/actions/providers API alignment + repository_ctx          | **Complete** (Tier 1-3 done, Tier 4 stubs adequate for rules_*) |
+| [04-prelude-architecture.md](./kuro-bazel-subplans/04-prelude-architecture.md)     | 6b     | Prelude preservation, Bazel shim migration, cleanup           | **Complete** (6b.1-6b.3 done, 6b.4 partial)  |
+| [05-builtins-compatibility.md](./kuro-bazel-subplans/05-builtins-compatibility.md) | 7a-7d  | Bazel native rules, global functions, modules, Buck2 removal  | **Complete** (all native rules, globals, modules done; documentation items remain) |
+| [06-aspects.md](./kuro-bazel-subplans/06-aspects.md)                               | 8a-8d  | Bazel aspects implementation (blocks rules_cc)                | **Complete**    |
+| [09-unified-execution-architecture.md](./kuro-bazel-subplans/09-unified-execution-architecture.md) | 9a-9f  | Lockfile compat, unified DICE execution, .buckconfig removal  | **Complete**    |
+| [07-rules-integration.md](./kuro-bazel-subplans/07-rules-integration.md)           | 10-14  | rules_cc, rules_rust, rules_python, protobuf, rules_oci       | **Complete**    |
+| [08-infrastructure.md](./kuro-bazel-subplans/08-infrastructure.md)                 | 16-18  | Sandboxing, platform support, query                           | **Functional**  |
 
 ### Related Research Documents
 
@@ -500,7 +500,7 @@ Example aliases created: `com_google_protobuf -> protobuf`, `com_google_absl -> 
 
 ## Test Suite TODO (as of 2026-03-03)
 
-Current status: **~970 pass, ~160 skip, 0 fail** in `tests/core/` (updated 2026-03-10). All test categories (analysis, build, run, test, bzlmod, docs, help, log, completion, interpreter, transitive_sets, validation) pass with 0 failures.
+Current status: **~980 pass, ~160 skip, 0 fail** in `tests/core/` (updated 2026-03-11). All test categories (analysis, build, run, test, bzlmod, docs, help, log, completion, interpreter, transitive_sets, validation) pass with 0 failures. 1158 tests collected.
 
 ### CI Infrastructure (2026-03-05)
 
