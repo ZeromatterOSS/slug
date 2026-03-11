@@ -306,6 +306,20 @@ def capture_existing_rules(name):
     for rule_name, rule_info in rules.items():
         kind = rule_info.get("kind", "MISSING")
         items.append("{}={}".format(rule_name, kind))
+
+    # Also verify that attributes are returned for a known target
+    original_rule = rules.get("original")
+    if original_rule:
+        items.append("original_has_items=" + str("items" in original_rule))
+        original_items = original_rule.get("items", [])
+        items.append("original_items=" + ",".join(original_items))
+
+    # Verify existing_rule() returns attributes too
+    single = native.existing_rule("source_files")
+    if single:
+        items.append("single_kind=" + single.get("kind", "MISSING"))
+        items.append("single_has_srcs=" + str("srcs" in single))
+
     items.append("repo=" + native.repository_name())
     existing_rules_test(
         name = name,

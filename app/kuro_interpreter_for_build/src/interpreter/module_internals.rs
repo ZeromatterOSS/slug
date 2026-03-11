@@ -269,6 +269,86 @@ impl ModuleInternals {
             .collect()
     }
 
+    /// Returns full attribute data for all targets recorded so far.
+    /// Used by `native.existing_rules()` for Bazel compatibility.
+    /// Returns Vec of (name, kind, attrs_json) where attrs_json is a map of attribute name → serde_json::Value.
+    pub(crate) fn get_targets_with_attrs(
+        &self,
+    ) -> Vec<(String, String, Vec<(String, serde_json::Value)>)> {
+        use kuro_node::attrs::fmt_context::AttrFmtContext;
+        use kuro_node::attrs::inspect_options::AttrInspectOptions;
+        use kuro_query::query::environment::AttrFmtOptions;
+
+        let recording = self.recording_targets();
+        let package_label = recording.package.buildfile_path.package();
+        let ctx = AttrFmtContext {
+            package: Some(package_label),
+            options: AttrFmtOptions::default(),
+        };
+
+        recording
+            .recorder
+            .targets
+            .iter()
+            .map(|(name, node)| {
+                let kind = node.rule_type().name().to_owned();
+                let attrs: Vec<(String, serde_json::Value)> = node
+                    .attrs(AttrInspectOptions::DefinedOnly)
+                    .filter_map(|a| {
+                        // Skip internal attrs that start with __
+                        if a.name.starts_with("__") {
+                            return None;
+                        }
+                        match a.value.to_json(&ctx) {
+                            Ok(v) => Some((a.name.to_owned(), v)),
+                            Err(_) => None,
+                        }
+                    })
+                    .collect();
+                (name.as_str().to_owned(), kind, attrs)
+            })
+            .collect()
+    }
+
+    /// Returns full attribute data for a single target, or None if not found.
+    /// Used by `native.existing_rule()` for Bazel compatibility.
+    pub(crate) fn get_target_with_attrs(
+        &self,
+        name: &str,
+    ) -> Option<(String, Vec<(String, serde_json::Value)>)> {
+        use kuro_node::attrs::fmt_context::AttrFmtContext;
+        use kuro_node::attrs::inspect_options::AttrInspectOptions;
+        use kuro_query::query::environment::AttrFmtOptions;
+
+        let recording = self.recording_targets();
+        let package_label = recording.package.buildfile_path.package();
+        let ctx = AttrFmtContext {
+            package: Some(package_label),
+            options: AttrFmtOptions::default(),
+        };
+
+        recording
+            .recorder
+            .targets
+            .get(TargetNameRef::unchecked_new(name))
+            .map(|node| {
+                let kind = node.rule_type().name().to_owned();
+                let attrs: Vec<(String, serde_json::Value)> = node
+                    .attrs(AttrInspectOptions::DefinedOnly)
+                    .filter_map(|a| {
+                        if a.name.starts_with("__") {
+                            return None;
+                        }
+                        match a.value.to_json(&ctx) {
+                            Ok(v) => Some((a.name.to_owned(), v)),
+                            Err(_) => None,
+                        }
+                    })
+                    .collect();
+                (kind, attrs)
+            })
+    }
+
     /// Returns the rule kind for a target, or None if not found.
     /// Used by `native.existing_rule()` for Bazel compatibility.
     pub(crate) fn get_target_kind(&self, name: &str) -> Option<String> {

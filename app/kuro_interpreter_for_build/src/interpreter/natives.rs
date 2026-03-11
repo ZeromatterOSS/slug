@@ -78,6 +78,53 @@ fn depset_to_transitive_set<'v>(
     Ok(root)
 }
 
+/// Convert a serde_json::Value to a Starlark Value on the given heap.
+/// Used by existing_rules()/existing_rule() to convert CoercedAttr JSON representations
+/// to Starlark values that can be returned to .bzl code.
+fn json_to_starlark_value<'v>(heap: starlark::values::Heap<'v>, json: &serde_json::Value) -> Value<'v> {
+    match json {
+        serde_json::Value::Null => Value::new_none(),
+        serde_json::Value::Bool(b) => Value::new_bool(*b),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                heap.alloc(i as i32)
+            } else if let Some(f) = n.as_f64() {
+                heap.alloc(f)
+            } else {
+                heap.alloc(0)
+            }
+        }
+        serde_json::Value::String(s) => heap.alloc_str(s).to_value(),
+        serde_json::Value::Array(arr) => {
+            let items: Vec<Value<'v>> = arr.iter().map(|v| json_to_starlark_value(heap, v)).collect();
+            heap.alloc(AllocList(items))
+        }
+        serde_json::Value::Object(map) => {
+            // Check for select() representation: {"__type": "selector", "entries": {...}}
+            if let Some(serde_json::Value::String(t)) = map.get("__type") {
+                if t == "selector" {
+                    // Return the entries as a dict for now (select() values show their resolved form)
+                    if let Some(entries) = map.get("entries") {
+                        return json_to_starlark_value(heap, entries);
+                    }
+                } else if t == "concat" {
+                    // Concatenated selects - return first item as representative
+                    if let Some(serde_json::Value::Array(items)) = map.get("items") {
+                        if let Some(first) = items.first() {
+                            return json_to_starlark_value(heap, first);
+                        }
+                    }
+                }
+            }
+            let dict_entries: SmallMap<String, Value<'v>> = map
+                .iter()
+                .map(|(k, v)| (k.clone(), json_to_starlark_value(heap, v)))
+                .collect();
+            heap.alloc(AllocDict(dict_entries))
+        }
+    }
+}
+
 /// Extract cell name and package path from a project-relative filename.
 ///
 /// During analysis, BuildContext is unavailable but we can determine the cell
@@ -584,27 +631,30 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
     /// Returns a dict of all rules instantiated so far in the current BUILD file.
     /// Bazel-compatible: can be called as `native.existing_rules()` from .bzl files.
     ///
-    /// The keys are rule names, and the values are dicts containing basic rule info.
-    /// Note: Currently returns minimal information (name and kind). Full attribute
-    /// introspection may be added in a future version.
+    /// The keys are rule names, and the values are dicts containing all rule attributes
+    /// plus synthetic "name" and "kind" fields.
     fn existing_rules<'v>(eval: &mut Evaluator<'v, '_, '_>) -> starlark::Result<Value<'v>> {
         // When called outside a BUILD file (e.g., from a module extension via maybe()),
         // return an empty dict so that maybe() always proceeds to create the repo.
         let Ok(internals) = ModuleInternals::from_context(eval, "native.existing_rules") else {
             return Ok(eval.heap().alloc(AllocDict(SmallMap::<&str, Value>::new())));
         };
-        let targets = internals.get_targets_with_kind();
+        let targets = internals.get_targets_with_attrs();
 
         let heap = eval.heap();
         let result: SmallMap<String, Value<'v>> = targets
             .into_iter()
-            .map(|(name, kind)| {
-                let attrs_dict: SmallMap<&str, Value<'v>> = [
-                    ("name", heap.alloc(name.as_str())),
-                    ("kind", heap.alloc(kind.as_str())),
-                ]
-                .into_iter()
-                .collect();
+            .map(|(name, kind, attrs)| {
+                let mut attrs_dict: SmallMap<String, Value<'v>> = SmallMap::new();
+                attrs_dict.insert("name".to_owned(), heap.alloc(name.as_str()));
+                attrs_dict.insert("kind".to_owned(), heap.alloc(kind.as_str()));
+                for (attr_name, json_val) in attrs {
+                    // Skip "name" since we already added it
+                    if attr_name == "name" {
+                        continue;
+                    }
+                    attrs_dict.insert(attr_name, json_to_starlark_value(heap, &json_val));
+                }
                 let attrs_val = heap.alloc(AllocDict(attrs_dict));
                 (name, attrs_val)
             })
@@ -616,8 +666,7 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
     /// Returns a dict of the attributes of the rule with the given name, or None if not found.
     /// Bazel-compatible: can be called as `native.existing_rule(name)` from .bzl files.
     ///
-    /// Note: Currently returns minimal information. Full attribute introspection
-    /// may be added in a future version.
+    /// Returns all explicitly-set attributes plus synthetic "name" and "kind" fields.
     fn existing_rule<'v>(
         name: &str,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -627,18 +676,21 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
             return Ok(NoneOr::None);
         };
 
-        let kind = match internals.get_target_kind(name) {
-            Some(k) => k,
+        let (kind, attrs) = match internals.get_target_with_attrs(name) {
+            Some(data) => data,
             None => return Ok(NoneOr::None),
         };
 
         let heap = eval.heap();
-        let attrs_dict: SmallMap<&str, Value<'v>> = [
-            ("name", heap.alloc(name)),
-            ("kind", heap.alloc(kind.as_str())),
-        ]
-        .into_iter()
-        .collect();
+        let mut attrs_dict: SmallMap<String, Value<'v>> = SmallMap::new();
+        attrs_dict.insert("name".to_owned(), heap.alloc(name));
+        attrs_dict.insert("kind".to_owned(), heap.alloc(kind.as_str()));
+        for (attr_name, json_val) in attrs {
+            if attr_name == "name" {
+                continue;
+            }
+            attrs_dict.insert(attr_name, json_to_starlark_value(heap, &json_val));
+        }
         Ok(NoneOr::Other(heap.alloc(AllocDict(attrs_dict))))
     }
 

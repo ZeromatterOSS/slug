@@ -499,3 +499,30 @@ async def test_existing_rules_returns_kind(buck: Buck) -> None:
         assert kind != "MISSING", f"Target {name} has MISSING kind"
     # repository_name() for root cell should be "@"
     assert repo_name == "@", f"Expected '@' for root cell repository_name(), got '{repo_name}'"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_existing_rules_returns_attributes(buck: Buck) -> None:
+    """native.existing_rules() returns all explicitly-set attributes for each target."""
+    result = await buck.build("//:existing_rules_check")
+    output = result.get_build_report().output_for_target("//:existing_rules_check")
+    content = output.read_text().strip()
+    lines = content.splitlines()
+    line_dict = {}
+    for line in lines:
+        if "=" in line:
+            key, val = line.split("=", 1)
+            line_dict[key] = val
+
+    # Verify that existing_rules() returns actual attributes
+    # The "original" target is write_list with items=["hello", "world"]
+    assert line_dict.get("original_has_items") == "True", \
+        f"Expected 'items' attribute in existing_rules(), got: {line_dict.get('original_has_items')}"
+    assert line_dict.get("original_items") == "hello,world", \
+        f"Expected items=['hello','world'], got: {line_dict.get('original_items')}"
+
+    # Verify existing_rule() returns attributes for a single target
+    assert line_dict.get("single_kind") == "filegroup", \
+        f"Expected filegroup for single rule, got: {line_dict.get('single_kind')}"
+    assert line_dict.get("single_has_srcs") == "True", \
+        f"Expected 'srcs' attribute in existing_rule(), got: {line_dict.get('single_has_srcs')}"
