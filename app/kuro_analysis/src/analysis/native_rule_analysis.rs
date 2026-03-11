@@ -123,6 +123,14 @@ pub fn analyze_native_rule(
         NativeRuleKind::CcImport => create_cc_analysis_result(target),
         NativeRuleKind::CcSharedLibrary => create_cc_analysis_result(target),
         NativeRuleKind::EnvironmentGroup => create_minimal_analysis_result(target),
+        NativeRuleKind::ProtoLibrary => create_minimal_analysis_result(target),
+        NativeRuleKind::JavaLibrary => create_minimal_analysis_result(target),
+        NativeRuleKind::JavaBinary => create_minimal_analysis_result(target),
+        NativeRuleKind::JavaTest => create_minimal_analysis_result(target),
+        NativeRuleKind::JavaImport => create_minimal_analysis_result(target),
+        NativeRuleKind::PyLibrary => create_minimal_analysis_result(target),
+        NativeRuleKind::PyBinary => create_minimal_analysis_result(target),
+        NativeRuleKind::PyTest => create_minimal_analysis_result(target),
     }
 }
 

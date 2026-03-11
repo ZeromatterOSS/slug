@@ -72,6 +72,12 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 | `cc_toolchain` | C++ toolchain definition | ✓ Implemented | `native_rules.rs` |
 | `cc_toolchain_suite` | C++ toolchain suite | ✓ Implemented | `native_rules.rs` |
 
+#### Environment Rules
+
+| Rule | Description | Kuro Status | Location |
+|------|-------------|-------------|----------|
+| `environment_group` | Defines environment groups | ✓ Implemented | `native_rules.rs` (2026-03-11) |
+
 ### Implementation Strategy
 
 **Phase 7a.1: Verify Existing Rules**

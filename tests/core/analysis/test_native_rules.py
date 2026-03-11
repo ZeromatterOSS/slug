@@ -614,3 +614,21 @@ async def test_cc_shared_library_builds(buck: Buck) -> None:
 async def test_environment_group_builds(buck: Buck) -> None:
     """environment_group native rule can be parsed and analyzed."""
     await buck.build("//:jdk_versions")
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_proto_library_builds(buck: Buck) -> None:
+    """proto_library native rule can be parsed and analyzed."""
+    await buck.build("//:my_proto")
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_java_library_builds(buck: Buck) -> None:
+    """java_library native rule can be parsed and analyzed."""
+    await buck.build("//:my_java_lib")
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_py_library_builds(buck: Buck) -> None:
+    """py_library native rule can be parsed and analyzed."""
+    await buck.build("//:my_py_lib")

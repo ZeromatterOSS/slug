@@ -503,6 +503,23 @@ environment_group(
     defaults = [":jdk11"],
 )
 
+# === Language-specific native rules ===
+
+proto_library(
+    name = "my_proto",
+    srcs = ["defs.bzl"],  # Stand-in for .proto files
+)
+
+java_library(
+    name = "my_java_lib",
+    srcs = [],
+)
+
+py_library(
+    name = "my_py_lib",
+    srcs = [],
+)
+
 # === existing_rules() / repository_name() test ===
 # capture_existing_rules must be called AFTER other rules so it can see them.
 capture_existing_rules(name = "existing_rules_check")

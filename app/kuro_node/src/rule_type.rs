@@ -108,6 +108,22 @@ pub enum NativeRuleKind {
     CcSharedLibrary,
     #[display("environment_group")]
     EnvironmentGroup,
+    #[display("proto_library")]
+    ProtoLibrary,
+    #[display("java_library")]
+    JavaLibrary,
+    #[display("java_binary")]
+    JavaBinary,
+    #[display("java_test")]
+    JavaTest,
+    #[display("java_import")]
+    JavaImport,
+    #[display("py_library")]
+    PyLibrary,
+    #[display("py_binary")]
+    PyBinary,
+    #[display("py_test")]
+    PyTest,
 }
 
 impl NativeRuleKind {
@@ -142,6 +158,14 @@ impl NativeRuleKind {
             NativeRuleKind::CcImport => "cc_import",
             NativeRuleKind::CcSharedLibrary => "cc_shared_library",
             NativeRuleKind::EnvironmentGroup => "environment_group",
+            NativeRuleKind::ProtoLibrary => "proto_library",
+            NativeRuleKind::JavaLibrary => "java_library",
+            NativeRuleKind::JavaBinary => "java_binary",
+            NativeRuleKind::JavaTest => "java_test",
+            NativeRuleKind::JavaImport => "java_import",
+            NativeRuleKind::PyLibrary => "py_library",
+            NativeRuleKind::PyBinary => "py_binary",
+            NativeRuleKind::PyTest => "py_test",
         }
     }
 }
