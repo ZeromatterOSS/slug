@@ -3393,45 +3393,56 @@ impl<'v> StarlarkValue<'v> for PyRuntimeInfoStub {
 // OCI toolchain stubs (crane, registry, jq)
 // ============================================================================
 
-/// Detect the crane binary path from common locations.
-fn detect_crane_path() -> String {
-    let candidates = [
-        "/home/wgray/go/bin/crane",
-        "/usr/local/bin/crane",
-        "/usr/bin/crane",
-        "crane",
-    ];
-    for path in &candidates {
+/// Detect a binary path using platform-appropriate lookup.
+fn detect_binary_path(name: &str, extra_candidates: &[&str]) -> String {
+    // Check extra candidates first
+    for path in extra_candidates {
         if std::path::Path::new(path).exists() {
             return path.to_string();
         }
     }
-    // Fall back to PATH lookup
-    if let Ok(output) = std::process::Command::new("which").arg("crane").output() {
+    // Use platform-appropriate PATH lookup
+    let finder = if cfg!(windows) { "where" } else { "which" };
+    if let Ok(output) = std::process::Command::new(finder).arg(name).output() {
         if output.status.success() {
             if let Ok(s) = std::str::from_utf8(&output.stdout) {
-                return s.trim().to_string();
+                let first_line = s.lines().next().unwrap_or("").trim();
+                if !first_line.is_empty() {
+                    return first_line.to_string();
+                }
             }
         }
     }
-    "crane".to_string()
+    name.to_string()
+}
+
+/// Detect the crane binary path from common locations.
+fn detect_crane_path() -> String {
+    let extra = if cfg!(windows) {
+        vec![]
+    } else {
+        vec!["/usr/local/bin/crane", "/usr/bin/crane"]
+    };
+    detect_binary_path("crane", &extra)
 }
 
 /// Detect the jq binary path.
 fn detect_jq_path() -> String {
-    let candidates = ["/usr/bin/jq", "/usr/local/bin/jq", "jq"];
-    for path in &candidates {
-        if std::path::Path::new(path).exists() {
-            return path.to_string();
-        }
-    }
-    "jq".to_string()
+    let extra = if cfg!(windows) {
+        vec![]
+    } else {
+        vec!["/usr/bin/jq", "/usr/local/bin/jq"]
+    };
+    detect_binary_path("jq", &extra)
 }
 
 /// Get or create the OCI registry launcher script.
 /// The launcher script implements start_registry/stop_registry using crane registry serve.
 fn get_or_create_oci_launcher() -> String {
-    let launcher_path = "/tmp/kuro_oci_registry_launcher.sh";
+    let launcher_path = &format!(
+        "{}/kuro_oci_registry_launcher.sh",
+        std::env::temp_dir().to_string_lossy()
+    );
     if !std::path::Path::new(launcher_path).exists() {
         let crane_path = detect_crane_path();
         let content = format!(

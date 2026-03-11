@@ -142,6 +142,9 @@ pub struct StarlarkRuleCallable<'v> {
     /// Maps output attribute name → file name pattern (e.g., "output" → "%{name}.binpb").
     /// `%{name}` in patterns is substituted with the target name at analysis time.
     rule_outputs: Vec<(String, String)>,
+    /// Toolchain type labels declared via `rule(toolchains=[...])`.
+    /// These are stored as Display strings from ToolchainTypeRequirement, Label, or plain strings.
+    toolchain_types: Vec<String>,
 }
 
 /// Mappings of promise artifact name to the starlark function that will produce it, for anon targets.
@@ -214,6 +217,7 @@ impl<'v> StarlarkRuleCallable<'v> {
         artifact_promise_mappings: Option<ArtifactPromiseMappings<'v>>,
         is_test: bool,
         rule_outputs: Vec<(String, String)>,
+        toolchain_types: Vec<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> kuro_error::Result<StarlarkRuleCallable<'v>> {
         let build_context = BuildContext::from_context(eval)?;
@@ -316,6 +320,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             is_test,
             output_attr_names,
             rule_outputs,
+            toolchain_types,
         })
     }
 
@@ -346,6 +351,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             }),
             false,      // anon rules are never test rules
             Vec::new(), // anon rules have no rule_outputs
+            Vec::new(), // anon rules have no toolchain_types
             eval,
         )
     }
@@ -516,6 +522,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
                 rule_kind: self.rule_kind,
                 uses_plugins: self.uses_plugins,
                 is_test: self.is_test,
+                toolchain_types: self.toolchain_types.clone(),
             }),
             rule_type,
             implementation: frozen_impl,
@@ -526,6 +533,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
             artifact_promise_mappings,
             output_attr_names: self.output_attr_names,
             rule_outputs: self.rule_outputs,
+            toolchain_types: self.toolchain_types,
         })
     }
 }
@@ -549,6 +557,8 @@ pub struct FrozenStarlarkRuleCallable {
     output_attr_names: Vec<String>,
     /// Rule-level output declarations from `rule(outputs={...})`.
     rule_outputs: Vec<(String, String)>,
+    /// Toolchain type labels declared via `rule(toolchains=[...])`.
+    toolchain_types: Vec<String>,
 }
 starlark_simple_value!(FrozenStarlarkRuleCallable);
 
@@ -598,6 +608,11 @@ impl FrozenStarlarkRuleCallable {
 
     pub fn rule_outputs(&self) -> &Vec<(String, String)> {
         &self.rule_outputs
+    }
+
+    /// Returns the toolchain type labels declared on this rule.
+    pub fn toolchain_types(&self) -> &[String] {
+        &self.toolchain_types
     }
 }
 
@@ -810,7 +825,6 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkRuleCallable<'v>> {
         // TODO(bazel): Use the provides parameter to validate rule outputs
-        // TODO(bazel): Use the toolchains parameter for toolchain resolution
         // TODO(bazel): Use the fragments parameter for configuration fragment access
         // TODO(bazel): Use the subrules parameter for subrule composition
         // TODO(bazel): Use the initializer parameter for pre-analysis attribute validation
@@ -818,7 +832,6 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         // TODO(bazel): Use the executable parameter
         let _unused = (
             provides,
-            toolchains,
             fragments,
             subrules,
             initializer,
@@ -826,6 +839,20 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             executable,
             extra_kwargs,
         );
+
+        // Extract toolchain type labels from the toolchains parameter.
+        // Each item is either a string label, a Label object, or a ToolchainTypeRequirement.
+        let toolchain_types: Vec<String> = toolchains
+            .items
+            .iter()
+            .map(|v| {
+                if let Some(s) = v.unpack_str() {
+                    s.to_owned()
+                } else {
+                    format!("{}", v)
+                }
+            })
+            .collect();
 
         // Extract rule(outputs={...}) patterns.
         // Each key→value pair maps an output name to a template like "%{name}.binpb".
@@ -973,6 +1000,7 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             None,
             test,
             rule_outputs,
+            toolchain_types,
             eval,
         )?)
     }

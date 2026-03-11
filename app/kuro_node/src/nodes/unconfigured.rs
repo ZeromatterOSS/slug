@@ -201,6 +201,11 @@ impl TargetNode {
         self.0.rule.is_test
     }
 
+    /// Toolchain type labels declared via `rule(toolchains=[...])`.
+    pub fn toolchain_types(&self) -> &[String] {
+        &self.0.rule.toolchain_types
+    }
+
     pub fn is_configuration_rule(&self) -> bool {
         self.0.rule.rule_kind == RuleKind::Configuration
     }
@@ -733,6 +738,7 @@ pub mod testing {
                     cfg: RuleIncomingTransition::None,
                     uses_plugins: Vec::new(),
                     is_test: false,
+                    toolchain_types: Vec::new(),
                 }),
                 Arc::new(Package {
                     buildfile_path,

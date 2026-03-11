@@ -474,17 +474,24 @@ fn bazel_py_fragment_methods(builder: &mut MethodsBuilder) {
         use std::sync::OnceLock;
         static CACHED_PYTHON_PATH: OnceLock<String> = OnceLock::new();
         let path = CACHED_PYTHON_PATH.get_or_init(|| {
+            let finder = if cfg!(windows) { "where" } else { "which" };
             for name in &["python3", "python"] {
-                if let Ok(output) = std::process::Command::new("which").arg(name).output() {
+                if let Ok(output) = std::process::Command::new(finder).arg(name).output() {
                     if output.status.success() {
-                        let p = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+                        // `where` on Windows may return multiple lines; take the first
+                        let stdout = String::from_utf8_lossy(&output.stdout);
+                        let p = stdout.lines().next().unwrap_or("").trim().to_owned();
                         if !p.is_empty() {
                             return p;
                         }
                     }
                 }
             }
-            "python3".to_owned()
+            if cfg!(windows) {
+                "python.exe".to_owned()
+            } else {
+                "python3".to_owned()
+            }
         });
         Ok(path.clone())
     }

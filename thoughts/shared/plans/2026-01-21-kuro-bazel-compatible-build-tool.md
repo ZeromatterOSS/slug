@@ -323,10 +323,10 @@ Quick reference to all phases and their locations:
 
 | Phase | Title                                            | Status          |
 | ----- | ------------------------------------------------ | --------------- | --- |
-| 6b.1  | Preserve Buck2 Prelude Loading Mechanism         | [ ] Not Started |
-| 6b.2  | Migrate Bazel Shims from Native Rust to Starlark | [ ] Not Started |
-| 6b.3  | Remove Unused Buck2 Prelude Code                 | [ ] Not Started | /   |
-| 6b.4  | Simplify Native Module Registration              | [ ] Not Started |
+| 6b.1  | Preserve Buck2 Prelude Loading Mechanism         | [x] Already working (prelude.bzl → native.bzl → __kuro_builtins__ flow preserved) |
+| 6b.2  | Migrate Bazel Shims from Native Rust to Starlark | [x] Revised: Must stay native for external cell access (2026-01-28 discovery) |
+| 6b.3  | Remove Unused Buck2 Prelude Code                 | [x] Done via Phase 7d (15+ language dirs removed, 732 files, ~124k lines; 2026-02-26) |
+| 6b.4  | Simplify Native Module Registration              | [~] Partial (native modules work but could be further reduced) |
 
 ### Builtins Compatibility (Phases 7a-7d) - [Sub-plan](./kuro-bazel-subplans/05-builtins-compatibility.md)
 
@@ -373,7 +373,7 @@ Quick reference to all phases and their locations:
 | Phase | Title                              | Status          |
 | ----- | ---------------------------------- | --------------- |
 | 16    | Local Build Isolation (Sandboxing) | [x] Functional (Linux: user+mount namespaces, root read-only, output dirs writable, --nosandbox flag; 2026-02-20) |
-| 17    | Platform Support                   | [~] Partial (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; Make variables and tool paths use host_target_cpu()/host_cc_path()/host_tool_path(); 2026-03-10) |
+| 17    | Platform Support                   | [~] Partial (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; Make variables and tool paths use host_target_cpu()/host_cc_path()/host_tool_path(); MSVC auto-detection via vswhere.exe with full compile/link/archive support in cc_common.rs; examples/hello_world builds and runs on Windows; 2026-03-10) |
 | 18    | Query Commands + Test Runner       | [x] Functional (deps, rdeps, allpaths, somepath, kind, attr, filter, buildfiles, tests; --output=label/json/build/graph; kuro test //... runs 4 tests) |
 
 ---

@@ -107,6 +107,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -119,6 +120,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -148,6 +150,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -196,6 +199,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -233,6 +237,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -293,6 +298,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -306,6 +312,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -345,6 +352,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -358,6 +366,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -451,6 +460,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -510,6 +520,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -531,6 +542,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -554,6 +566,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -633,6 +646,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -644,6 +658,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -655,6 +670,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: true,
+            toolchain_types: vec![],
         })
     });
 
@@ -675,6 +691,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -731,6 +748,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -742,6 +760,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: true,
+            toolchain_types: vec![],
         })
     });
 
@@ -753,6 +772,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -767,6 +787,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 
@@ -780,6 +801,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: true,
+            toolchain_types: vec![],
         })
     });
 
@@ -829,6 +851,7 @@ mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            toolchain_types: vec![],
         })
     });
 }

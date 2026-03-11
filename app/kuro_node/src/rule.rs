@@ -48,6 +48,9 @@ pub struct Rule {
     /// Test rules auto-generate `ExternalRunnerTestInfo` from `DefaultInfo.executable`
     /// during analysis if no explicit `ExternalRunnerTestInfo` is provided.
     pub is_test: bool,
+    /// Toolchain type labels declared via `rule(toolchains=[...])`.
+    /// Used during analysis to populate `ctx.toolchains`.
+    pub toolchain_types: Vec<String>,
 }
 
 interner!(INTERNER, BuckHasher, Rule);
