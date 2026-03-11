@@ -15,15 +15,30 @@ Bazel 9.0 completed the "Starlarkification" effort, moving most language-specifi
 3. **Implement all Bazel modules** - Top-level modules like `cc_common`, `config`, etc.
 4. **Remove Buck2-specific builtins** - Functions that conflict with Bazel semantics
 
+> **CRITICAL ARCHITECTURAL CONSTRAINT — Bazel 9 Starlarkification**
+>
+> In Bazel 9.0, **ALL language-specific rules are pure Starlark**. They live in
+> external repos (`rules_cc`, `rules_java`, `rules_python`, `rules_shell`,
+> `protobuf`, `rules_apple`, etc.) and require explicit `load()` statements.
+>
+> **DO NOT** implement language-specific rules as native Rust builtins.
+> Instead, ensure the native *modules* (`cc_common`, `java_common`,
+> `platform_common`, etc.) are robust enough for external Starlark rulesets
+> to define their own rules via `rule()`.
+>
+> See the parent plan's [Native → Starlark Migration Architecture](../2026-01-21-kuro-bazel-compatible-build-tool.md#native--starlark-migration-architecture) for details.
+
 ---
 
 ## Phase 7a: Bazel Native Rules
 
 ### Overview
 
-In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific rules (cc_*, java_*, py_*, proto_*) require `load()` from external repositories.
+In Bazel 9.0, only **language-agnostic** rules are built-in. The complete
+list of true Bazel 9 native rules is below. **Nothing else should be added
+as a native rule.**
 
-### Native Rules to Implement
+### True Bazel 9 Native Rules (complete, exhaustive list)
 
 #### General Rules
 
@@ -39,6 +54,7 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 | `analysis_test` | Analysis-time test | ✓ Implemented | `native_rules.rs` |
 | `exports_files` | Marks files as exported | ✓ Implemented | `native_rules.rs` |
 | `package_group` | Defines package set for visibility | ✓ Implemented | `native_rules.rs` |
+| `environment_group` | Defines environment groups | ✓ Implemented | `native_rules.rs` (2026-03-11) |
 
 #### Platform & Toolchain Rules
 
@@ -49,51 +65,38 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 | `platform` | Defines platform with constraints | ✓ Implemented | `native_rules.rs` |
 | `toolchain` | Declares toolchain type/constraints | ✓ Implemented | `native_rules.rs` |
 | `toolchain_type` | Defines new toolchain type | ✓ Implemented | `native_rules.rs` |
-| `execution_platform` | Defines execution platform | ✓ Implemented | `native_rules.rs` |
-| `execution_platforms` | Lists execution platforms | ✓ Implemented | `native_rules.rs` |
 
-#### Shell Rules
+### Rules that are NOT native in Bazel 9 (require load() from external repos)
 
-| Rule | Description | Kuro Status | Location |
-|------|-------------|-------------|----------|
-| `sh_binary` | Executable shell script | ✓ Implemented | `native_rules.rs` |
-| `sh_library` | Library of shell scripts | ✓ Implemented | `native_rules.rs` |
-| `sh_test` | Test written as shell script | ✓ Implemented | `native_rules.rs` |
+> **DO NOT add these as native Rust rules.** They are defined in Starlark by
+> their respective `rules_*` repositories. Kuro's job is to make the native
+> *modules* (`cc_common`, `java_common`, etc.) robust enough that these repos
+> can define their rules using `rule()`.
 
-#### C++ Rules (native in Bazel 9)
+| Rules | External Repo | Detection Mechanism |
+|-------|---------------|---------------------|
+| `cc_library`, `cc_binary`, `cc_test`, `cc_import`, `cc_shared_library`, `cc_toolchain`, `cc_toolchain_suite` | `@rules_cc` | Version string ≥ 9.0.0 |
+| `sh_binary`, `sh_test`, `sh_library` | `@rules_shell` | Version string |
+| `proto_library`, `cc_proto_library`, `java_proto_library` | `@protobuf` | Version-based |
+| `java_library`, `java_binary`, `java_test`, `java_import` | `@rules_java` | Version-based |
+| `py_library`, `py_binary`, `py_test` | `@rules_python` | Config flag + feature detection |
+| `objc_library`, `objc_import` | `@rules_apple` | Version-based |
 
-| Rule | Description | Kuro Status | Location |
-|------|-------------|-------------|----------|
-| `cc_library` | C++ library | ✓ Implemented | `native_rules.rs` |
-| `cc_binary` | C++ binary | ✓ Implemented | `native_rules.rs` |
-| `cc_test` | C++ test | ✓ Implemented | `native_rules.rs` |
-| `cc_import` | Prebuilt C++ library | ✓ Implemented | `native_rules.rs` |
-| `cc_shared_library` | Shared library from deps | ✓ Implemented | `native_rules.rs` (2026-03-11) |
-| `cc_toolchain` | C++ toolchain definition | ✓ Implemented | `native_rules.rs` |
-| `cc_toolchain_suite` | C++ toolchain suite | ✓ Implemented | `native_rules.rs` |
+#### Buck2-Heritage Native Rules (temporary, to be migrated)
 
-#### Environment Rules
+These rules exist as native Rust implementations in Kuro due to Buck2 heritage.
+They are **not** native in Bazel 9 but remain for now to avoid breaking existing
+functionality. The long-term goal is migrating them to Starlark:
 
-| Rule | Description | Kuro Status | Location |
-|------|-------------|-------------|----------|
-| `environment_group` | Defines environment groups | ✓ Implemented | `native_rules.rs` (2026-03-11) |
-
-#### Language-Specific Rules (NOT native in Bazel 9 — require load())
-
-In Bazel 9, language-specific rules were moved to external Starlark repositories:
-- `proto_library`, `cc_proto_library`, `java_proto_library` → `@protobuf`
-- `java_library`, `java_binary`, `java_test`, `java_import` → `@rules_java`
-- `py_library`, `py_binary`, `py_test` → `@rules_python`
-- `objc_library`, `objc_import` → `@rules_apple`
-- `cc_library`, `cc_binary`, `cc_test`, etc. → `@rules_cc`
-- `sh_binary`, `sh_test`, `sh_library` → `@rules_shell`
-
-These should NOT be implemented as native Rust rules. Instead, ensure the
-`cc_common`, `java_common`, `platform_common` modules are robust enough for
-external rulesets to define their rules in Starlark via `rule()`.
-
-**Note**: cc_*/sh_* remain as native rules in Kuro for now (Buck2 heritage),
-but the long-term goal is migrating them to Starlark via rules_cc/rules_shell.
+| Rule | Current Status | Migration Target |
+|------|----------------|-----------------|
+| `cc_library`, `cc_binary`, `cc_test` | Native (Buck2) | `@rules_cc` Starlark |
+| `cc_import`, `cc_shared_library` | Native (Buck2) | `@rules_cc` Starlark |
+| `cc_toolchain`, `cc_toolchain_suite` | Native (Buck2) | `@rules_cc` Starlark |
+| `sh_binary`, `sh_test`, `sh_library` | Native (Buck2) | `@rules_shell` Starlark |
+| `cc_libc_top_alias` | Native (Buck2) | Remove or migrate |
+| `execution_platform`, `execution_platforms` | Native (Buck2) | MODULE.bazel function |
+| `label_flag` | Native (Buck2) | Evaluate if needed |
 
 ### Implementation Strategy
 
@@ -114,12 +117,18 @@ but the long-term goal is migrating them to Starlark via rules_cc/rules_shell.
 - [x] Implement `sh_library` rule (2026-02: implemented as native rule)
 - [x] (Low priority) `starlark_doc_extract` (2026-02: implemented as native rule)
 
+**Phase 7a.4: Buck2-Heritage Rule Migration (future)**
+- [ ] Migrate cc_*/sh_* from native Rust to Starlark via rules_cc/rules_shell
+- [ ] Remove `execution_platform`/`execution_platforms` as BUILD rules (use MODULE.bazel `register_execution_platforms()`)
+- [ ] Remove `cc_libc_top_alias` (Buck2-specific)
+
 ### Success Criteria (Phase 7a)
 
-- [x] All native rules available in BUILD files without `load()`
+- [x] All true Bazel 9 native rules available in BUILD files without `load()`
 - [x] `select()` works with `config_setting`
 - [x] Platform/toolchain rules work for rules_cc toolchain resolution
 - [x] Bazel BUILD files using native rules parse correctly
+- [ ] Buck2-heritage rules migrated to Starlark (future)
 
 ---
 
@@ -197,7 +206,10 @@ These functions must be available in all .bzl files without any `load()` stateme
 
 ### Overview
 
-These modules must be available as globals in .bzl files.
+These modules must be available as globals in .bzl files. These are the **native
+infrastructure** that external Starlark rulesets depend on to define their rules.
+Making these robust is the correct way to support language rules — NOT by adding
+native rule implementations.
 
 ### Module: `attr`
 
@@ -220,6 +232,10 @@ These modules must be available as globals in .bzl files.
 **Status**: ✓ Complete
 
 ### Module: `cc_common`
+
+> This is the **most critical module** for Bazel compatibility. `rules_cc` defines
+> all cc_* rules in Starlark using `cc_common.compile()`, `cc_common.link()`, etc.
+> Making this module complete and correct is how Kuro supports C++ builds.
 
 | Function | Description | Kuro Status |
 |----------|-------------|-------------|
@@ -299,6 +315,10 @@ These modules must be available as globals in .bzl files.
 **Status**: ✓ Implemented (proto_common.rs, 2026-03-11)
 
 ### Module: `java_common`
+
+> This module is what `rules_java` uses to define java_library etc. in Starlark.
+> Improving these stubs is how Kuro will support Java builds — NOT by adding
+> native `java_library` rules.
 
 | Function | Description | Kuro Status |
 |----------|-------------|-------------|
@@ -455,8 +475,9 @@ Per 06-prelude-architecture.md, these language-specific directories should be re
 ## Success Criteria Summary
 
 ### Phase 7a (Native Rules)
-- [x] All Bazel native rules available without `load()`
+- [x] All true Bazel 9 native rules available without `load()`
 - [x] Platform/toolchain rules work
+- [ ] Buck2-heritage language rules migrated to Starlark (future)
 
 ### Phase 7b (Global Functions)
 - [x] All global functions match Bazel signatures
