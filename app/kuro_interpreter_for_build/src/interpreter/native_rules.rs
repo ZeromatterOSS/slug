@@ -277,11 +277,22 @@ mod rule_defs {
             AttrType::dict(AttrType::string(), AttrType::string(), false),
         );
 
+        // define_values: dict mapping --define key names to expected values.
+        // config_setting(define_values = {"FOO": "bar"}) matches when --define FOO=bar.
+        let define_values_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::Dict(
+                DictLiteral(ArcSlice::default()),
+            ))),
+            "A dictionary of --define flag keys to expected values",
+            AttrType::dict(AttrType::string(), AttrType::string(), false),
+        );
+
         AttributeSpec::from(
             vec![
                 ("constraint_values".to_owned(), constraint_values_attr),
                 ("values".to_owned(), values_attr),
                 ("flag_values".to_owned(), flag_values_attr),
+                ("define_values".to_owned(), define_values_attr),
             ],
             false,
             &RuleIncomingTransition::None,
@@ -1387,7 +1398,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         features: UnpackListOrTuple<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _unused = (define_values, tags, testonly, deprecation, features);
+        let _unused = (tags, testonly, deprecation, features);
         let internals = ModuleInternals::from_context(eval, "config_setting")?;
         let coercion_ctx = internals.attr_coercion_context();
 
@@ -1461,6 +1472,30 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             CoercedAttr::Dict(DictLiteral(ArcSlice::default()))
         };
 
+        // Coerce define_values dict the same way as values dict
+        let coerced_define_values = if let Some(dict_ref) = DictRef::from_value(define_values) {
+            CoercedAttr::Dict(DictLiteral(ArcSlice::from_iter(dict_ref.iter().map(
+                |(k, v)| {
+                    let k_str = if let Some(s) = k.unpack_str() {
+                        s.to_owned()
+                    } else {
+                        format!("{}", k)
+                    };
+                    let v_str = if let Some(s) = v.unpack_str() {
+                        s.to_owned()
+                    } else {
+                        format!("{}", v)
+                    };
+                    (
+                        CoercedAttr::String(StringLiteral(ArcStr::from(k_str.as_str()))),
+                        CoercedAttr::String(StringLiteral(ArcStr::from(v_str.as_str()))),
+                    )
+                },
+            ))))
+        } else {
+            CoercedAttr::Dict(DictLiteral(ArcSlice::default()))
+        };
+
         let vis_strings = extract_visibility_strings(visibility);
         let target_node = create_native_target_node(
             rule_defs::CONFIG_SETTING_RULE.clone(),
@@ -1470,6 +1505,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
                 ("constraint_values".to_owned(), coerced_list),
                 ("values".to_owned(), coerced_values),
                 ("flag_values".to_owned(), coerced_flag_values),
+                ("define_values".to_owned(), coerced_define_values),
             ],
             &vis_strings,
             internals.attr_coercion_context(),

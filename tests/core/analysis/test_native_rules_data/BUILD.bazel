@@ -423,6 +423,27 @@ select_value(
     }),
 )
 
+# === config_setting with define_values (--define) ===
+
+config_setting(
+    name = "define_foo_bar",
+    define_values = {"FOO": "bar"},
+)
+
+config_setting(
+    name = "define_foo_baz",
+    define_values = {"FOO": "baz"},
+)
+
+select_value(
+    name = "select_by_define",
+    value = select({
+        ":define_foo_bar": "foo_is_bar",
+        ":define_foo_baz": "foo_is_baz",
+        "//conditions:default": "no_define",
+    }),
+)
+
 # === existing_rules() / repository_name() test ===
 # capture_existing_rules must be called AFTER other rules so it can see them.
 capture_existing_rules(name = "existing_rules_check")

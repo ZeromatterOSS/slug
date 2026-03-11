@@ -456,6 +456,24 @@ async def test_config_setting_values_compilation_mode(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_config_setting_define_values_default(buck: Buck) -> None:
+    """config_setting(define_values={"FOO": "bar"}) does not match when no --define given."""
+    result = await buck.build("//:select_by_define")
+    output = result.get_build_report().output_for_target("//:select_by_define")
+    content = output.read_text().strip()
+    assert content == "no_define"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_config_setting_define_values_match(buck: Buck) -> None:
+    """config_setting(define_values={"FOO": "bar"}) matches when --define FOO=bar given."""
+    result = await buck.build("//:select_by_define", "--define", "FOO=bar")
+    output = result.get_build_report().output_for_target("//:select_by_define")
+    content = output.read_text().strip()
+    assert content == "foo_is_bar"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_existing_rules_returns_kind(buck: Buck) -> None:
     """native.existing_rules() returns dicts with 'kind' key for each target."""
     result = await buck.build("//:existing_rules_check")
