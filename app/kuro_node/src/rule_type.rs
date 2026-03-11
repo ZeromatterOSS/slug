@@ -124,6 +124,10 @@ pub enum NativeRuleKind {
     PyBinary,
     #[display("py_test")]
     PyTest,
+    #[display("cc_proto_library")]
+    CcProtoLibrary,
+    #[display("java_proto_library")]
+    JavaProtoLibrary,
 }
 
 impl NativeRuleKind {
@@ -166,6 +170,8 @@ impl NativeRuleKind {
             NativeRuleKind::PyLibrary => "py_library",
             NativeRuleKind::PyBinary => "py_binary",
             NativeRuleKind::PyTest => "py_test",
+            NativeRuleKind::CcProtoLibrary => "cc_proto_library",
+            NativeRuleKind::JavaProtoLibrary => "java_proto_library",
         }
     }
 }

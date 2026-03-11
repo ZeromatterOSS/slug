@@ -1210,6 +1210,10 @@ pub(crate) mod rule_defs {
         Lazy::new(|| make_language_rule(NativeRuleKind::PyBinary, false));
     pub static PY_TEST_RULE: Lazy<Arc<Rule>> =
         Lazy::new(|| make_language_rule(NativeRuleKind::PyTest, true));
+    pub static CC_PROTO_LIBRARY_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_language_rule(NativeRuleKind::CcProtoLibrary, false));
+    pub static JAVA_PROTO_LIBRARY_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_language_rule(NativeRuleKind::JavaProtoLibrary, false));
 }
 
 /// Extract visibility strings from a Starlark value.
@@ -3145,6 +3149,50 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             deps,
             visibility,
             rule_defs::PY_TEST_RULE.clone(),
+        )
+    }
+
+    /// C++ proto library rule (Bazel-compatible).
+    fn cc_proto_library<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        register_standard_language_rule(
+            eval,
+            "cc_proto_library",
+            name,
+            srcs,
+            deps,
+            visibility,
+            rule_defs::CC_PROTO_LIBRARY_RULE.clone(),
+        )
+    }
+
+    /// Java proto library rule (Bazel-compatible).
+    fn java_proto_library<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        register_standard_language_rule(
+            eval,
+            "java_proto_library",
+            name,
+            srcs,
+            deps,
+            visibility,
+            rule_defs::JAVA_PROTO_LIBRARY_RULE.clone(),
         )
     }
 }

@@ -131,6 +131,8 @@ pub fn analyze_native_rule(
         NativeRuleKind::PyLibrary => create_minimal_analysis_result(target),
         NativeRuleKind::PyBinary => create_minimal_analysis_result(target),
         NativeRuleKind::PyTest => create_minimal_analysis_result(target),
+        NativeRuleKind::CcProtoLibrary => create_cc_analysis_result(target),
+        NativeRuleKind::JavaProtoLibrary => create_minimal_analysis_result(target),
     }
 }
 
