@@ -446,10 +446,18 @@ impl<'v> StarlarkValue<'v> for FeatureConfiguration {}
 pub struct CcCompilationContextGen<V: ValueLifetimeless> {
     /// Headers depset
     headers: V,
-    /// Include directories
+    /// Include directories (generic -I)
     includes: V,
+    /// Quote include directories (-iquote)
+    quote_includes: V,
+    /// System include directories (-isystem)
+    system_includes: V,
+    /// Framework include directories (-F)
+    framework_includes: V,
     /// Defines
     defines: V,
+    /// Local defines (not propagated to dependents)
+    local_defines: V,
 }
 
 starlark_complex_value!(pub CcCompilationContext);
@@ -494,19 +502,46 @@ where
                     Some(self.headers.to_value())
                 }
             }
-            "includes" | "quote_includes" | "system_includes" | "framework_includes"
-            | "external_includes" => {
+            "includes" => {
                 if self.includes.to_value().is_none() {
                     Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
                 } else {
                     Some(self.includes.to_value())
                 }
             }
-            "defines" | "local_defines" => {
+            "quote_includes" => {
+                if self.quote_includes.to_value().is_none() {
+                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                } else {
+                    Some(self.quote_includes.to_value())
+                }
+            }
+            "system_includes" | "external_includes" => {
+                if self.system_includes.to_value().is_none() {
+                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                } else {
+                    Some(self.system_includes.to_value())
+                }
+            }
+            "framework_includes" => {
+                if self.framework_includes.to_value().is_none() {
+                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                } else {
+                    Some(self.framework_includes.to_value())
+                }
+            }
+            "defines" => {
                 if self.defines.to_value().is_none() {
                     Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
                 } else {
                     Some(self.defines.to_value())
+                }
+            }
+            "local_defines" => {
+                if self.local_defines.to_value().is_none() {
+                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                } else {
+                    Some(self.local_defines.to_value())
                 }
             }
             "direct_headers"
@@ -3020,7 +3055,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         let compilation_context = heap.alloc(CcCompilationContextGen {
             headers: none_val,
             includes: none_val,
+            quote_includes: none_val,
+            system_includes: none_val,
+            framework_includes: none_val,
             defines: none_val,
+            local_defines: none_val,
         });
 
         // Create compilation outputs
@@ -3861,20 +3900,14 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(kwargs)] kwargs: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // Merge all include types into a single includes value
-        // Use the most specific one provided, falling back to the generic 'includes'
-        let merged_includes = if !system_includes.is_none() {
-            system_includes
-        } else if !quote_includes.is_none() {
-            quote_includes
-        } else {
-            includes
-        };
-
         Ok(heap.alloc(CcCompilationContextGen {
             headers,
-            includes: merged_includes,
+            includes,
+            quote_includes,
+            system_includes,
+            framework_includes,
             defines,
+            local_defines,
         }))
     }
 
@@ -3966,18 +3999,28 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] main_output: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // Create library_to_link (can be None for empty compilation outputs)
+        // Create library_to_link from compilation outputs
         let library_to_link = if compilation_outputs.is_none() {
             Value::new_none()
         } else {
-            // Create a stub library_to_link
+            // Extract objects and pic_objects from compilation_outputs
+            let objects = compilation_outputs
+                .get_attr("objects", heap)
+                .ok()
+                .flatten()
+                .unwrap_or(Value::new_none());
+            let pic_objects = compilation_outputs
+                .get_attr("pic_objects", heap)
+                .ok()
+                .flatten()
+                .unwrap_or(Value::new_none());
             heap.alloc(LibraryToLinkGen {
                 static_library: Value::new_none(),
                 pic_static_library: Value::new_none(),
                 dynamic_library: Value::new_none(),
                 interface_library: Value::new_none(),
-                objects: Value::new_none(),
-                pic_objects: Value::new_none(),
+                objects,
+                pic_objects,
                 alwayslink,
             })
         };
@@ -4371,7 +4414,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             heap.alloc(CcCompilationContextGen {
                 headers: merged_headers,
                 includes: merged_includes,
+                quote_includes: Value::new_none(),
+                system_includes: Value::new_none(),
+                framework_includes: Value::new_none(),
                 defines: merged_defines,
+                local_defines: Value::new_none(),
             })
         };
 
