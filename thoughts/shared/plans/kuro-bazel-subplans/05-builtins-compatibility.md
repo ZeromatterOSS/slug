@@ -191,22 +191,22 @@ These modules must be available as globals in .bzl files.
 | `create_compilation_context()` | Create CompilationContext | ✓ Implemented (headers, includes, defines; 2026-03-11) |
 | `create_compilation_outputs()` | Create CcCompilationOutputs | Stub |
 | `create_compile_variables()` | Generate compilation vars | Stub |
-| `create_linker_input()` | Create LinkerInput | Stub |
+| `create_linker_input()` | Create LinkerInput | ✓ Implemented (stores user_link_flags, additional_inputs; 2026-03-11) |
 | `create_linking_context()` | Create LinkingContext | Stub |
 | `create_link_variables()` | Generate linking vars | Stub |
 | `create_library_to_link()` | Create LibraryToLink | Stub |
-| `configure_features()` | Create FeatureConfiguration | Stub |
+| `configure_features()` | Create FeatureConfiguration | ✓ Implemented (stores requested/unsupported features, 30+ default features; 2026-03-11) |
 | `link()` | C++ linking | ✓ Implemented (creates real link actions, supports executable/dynamic_library/static_library; 2026-03-11) |
 | `merge_cc_infos()` | Merge CcInfo providers | ✓ Implemented (merges compilation/linking contexts via depsets; 2026-03-11) |
-| `is_enabled()` | Check feature enabled | Stub |
+| `is_enabled()` | Check feature enabled | ✓ Implemented (consults FeatureConfiguration's enabled set; 2026-03-11) |
 | `action_is_enabled()` | Check action enabled | Stub |
 | `get_tool_for_action()` | Get tool path | ✓ Implemented (platform-aware MSVC/GCC/Clang) |
 | `get_memory_inefficient_command_line()` | Get command line | ✓ Implemented (generates real compiler/linker command lines) |
-| `get_environment_variables()` | Get env vars | Stub |
+| `get_environment_variables()` | Get env vars | ✓ Implemented (returns MSVC INCLUDE/LIB on Windows; 2026-03-11) |
 | `get_execution_requirements()` | Get exec requirements | Stub |
 | `CcToolchainInfo` | Provider | ✓ Implemented |
 
-**Status**: Partially implemented (compile/link/get_tool_for_action/get_memory_inefficient_command_line are real; remaining are stubs)
+**Status**: Mostly implemented (compile/link/configure_features/is_enabled/create_compilation_context/merge_cc_infos/create_linker_input/create_linking_context/get_tool_for_action/get_memory_inefficient_command_line/get_environment_variables are real; create_compile_variables/create_link_variables are stubs)
 
 ### Module: `config`
 
