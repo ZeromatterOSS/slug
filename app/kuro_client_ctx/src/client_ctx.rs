@@ -245,6 +245,7 @@ impl<'a> ClientCommandContext<'a> {
                 .compilation_mode
                 .clone()
                 .unwrap_or_default(),
+            define_values: config_opts.define.clone(),
             ..self.empty_client_context(cmd.logging_name())?
         })
     }
@@ -289,6 +290,7 @@ impl<'a> ClientCommandContext<'a> {
             exit_when: Default::default(),
             profile_pattern_opts: None,
             compilation_mode: String::new(),
+            define_values: Vec::new(),
         })
     }
 

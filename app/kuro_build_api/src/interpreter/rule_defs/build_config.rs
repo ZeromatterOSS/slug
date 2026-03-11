@@ -10,9 +10,10 @@
 
 //! Global build configuration state for Bazel compatibility.
 //!
-//! Stores build-wide settings like `--compilation_mode` that are propagated
-//! from the CLI through the daemon to the analysis phase.
+//! Stores build-wide settings like `--compilation_mode` and `--define` that are
+//! propagated from the CLI through the daemon to the analysis phase.
 
+use std::collections::HashMap;
 use std::sync::RwLock;
 
 /// Global build configuration that persists for the duration of a build command.
@@ -21,11 +22,14 @@ use std::sync::RwLock;
 /// by `ctx.var`, `ctx.fragments`, and `config_setting` evaluation.
 static BUILD_CONFIG: RwLock<BuildConfig> = RwLock::new(BuildConfig {
     compilation_mode: None,
+    defines: None,
 });
 
 struct BuildConfig {
     /// Compilation mode: "fastbuild" (default), "dbg", or "opt".
     compilation_mode: Option<String>,
+    /// --define KEY=VALUE pairs from the command line.
+    defines: Option<HashMap<String, String>>,
 }
 
 /// Set the compilation mode for the current build.
@@ -40,6 +44,20 @@ pub fn set_compilation_mode(mode: &str) {
     }
 }
 
+/// Set --define values for the current build.
+/// Each entry should be "KEY=VALUE" format.
+pub fn set_defines(define_values: &[String]) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        let mut map = HashMap::new();
+        for entry in define_values {
+            if let Some((key, value)) = entry.split_once('=') {
+                map.insert(key.to_owned(), value.to_owned());
+            }
+        }
+        config.defines = if map.is_empty() { None } else { Some(map) };
+    }
+}
+
 /// Get the current compilation mode. Returns "fastbuild" if not set.
 pub fn get_compilation_mode() -> String {
     BUILD_CONFIG
@@ -47,4 +65,21 @@ pub fn get_compilation_mode() -> String {
         .ok()
         .and_then(|c| c.compilation_mode.clone())
         .unwrap_or_else(|| "fastbuild".to_owned())
+}
+
+/// Get the value of a --define variable, or None if not set.
+pub fn get_define(key: &str) -> Option<String> {
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| c.defines.as_ref().and_then(|d| d.get(key).cloned()))
+}
+
+/// Get all --define values as a map.
+pub fn get_all_defines() -> HashMap<String, String> {
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| c.defines.clone())
+        .unwrap_or_default()
 }

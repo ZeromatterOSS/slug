@@ -311,9 +311,12 @@ impl<'a> ServerCommandContext<'a> {
             }
         }
 
-        // Propagate compilation_mode from client to the global build config
+        // Propagate compilation_mode and --define values from client to the global build config
         kuro_build_api::interpreter::rule_defs::build_config::set_compilation_mode(
             &client_context.compilation_mode,
+        );
+        kuro_build_api::interpreter::rule_defs::build_config::set_defines(
+            &client_context.define_values,
         );
 
         let oncall = if client_context.oncall.is_empty() {

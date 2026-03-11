@@ -189,6 +189,10 @@ message ClientContext {
   /// Bazel-compatible compilation mode: "fastbuild", "dbg", or "opt".
   /// Propagated from --compilation_mode flag or .bazelrc.
   string compilation_mode = 26;
+
+  /// Bazel-compatible --define KEY=VALUE pairs.
+  /// Accessible via ctx.var and config_setting(define_values={}).
+  repeated string define_values = 27;
 }
 
 message TargetsRequest {

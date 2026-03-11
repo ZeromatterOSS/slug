@@ -269,6 +269,13 @@ pub struct CommonBuildConfigurationOptions {
     )]
     pub compilation_mode: Option<String>,
 
+    /// Define a Bazel-compatible variable accessible via `ctx.var`.
+    ///
+    /// Format: --define KEY=VALUE (e.g., --define FOO=bar).
+    /// Multiple --define flags can be specified.
+    #[clap(long = "define", hide = true, value_name = "KEY=VALUE", num_args = 1)]
+    pub define: Vec<String>,
+
     // ---- Bazel compatibility flags (accepted, some are no-ops) ----
     /// Enable ANSI color output (Bazel compatibility).
     ///
@@ -451,6 +458,7 @@ impl CommonBuildConfigurationOptions {
             preemptible: Some(PreemptibleWhen::Never),
             exit_when: None,
             compilation_mode: None,
+            define: vec![],
             color: None,
             show_progress: false,
             strategy: vec![],
@@ -474,6 +482,7 @@ impl CommonBuildConfigurationOptions {
             preemptible: Some(PreemptibleWhen::OnDifferentState),
             exit_when: None,
             compilation_mode: None,
+            define: vec![],
             color: None,
             show_progress: false,
             strategy: vec![],

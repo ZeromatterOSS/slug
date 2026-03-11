@@ -742,6 +742,12 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             let val = heap.alloc_str(v).to_value();
             map.insert_hashed(key.get_hashed().unwrap(), val);
         }
+        // Merge --define KEY=VALUE entries into ctx.var
+        for (k, v) in crate::interpreter::rule_defs::build_config::get_all_defines() {
+            let key = heap.alloc_str(&k).to_value();
+            let val = heap.alloc_str(&v).to_value();
+            map.insert_hashed(key.get_hashed().unwrap(), val);
+        }
         Ok(heap.alloc(Dict::new(map)))
     }
 
@@ -2641,14 +2647,21 @@ impl<'v> StarlarkValue<'v> for CtxVarDict {
             "JAVABASE" => String::new(),
             "ABI_GLIBC_VERSION" => "2.17".to_owned(),
             "ABI" => "local".to_owned(),
-            _ => String::new(), // Unknown variables return empty string
+            _ => {
+                // Check --define values for unknown keys
+                crate::interpreter::rule_defs::build_config::get_define(key)
+                    .unwrap_or_default()
+            }
         };
         Ok(heap.alloc_str(&value).to_value())
     }
 
     fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
-        // Return true for known Make variables
+        // Return true for known Make variables or --define keys
         if let Some(key) = other.unpack_str() {
+            if crate::interpreter::rule_defs::build_config::get_define(key).is_some() {
+                return Ok(true);
+            }
             Ok(matches!(
                 key,
                 "BINDIR"
@@ -2694,7 +2707,7 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
             "JAVABASE" => Some(String::new()),
             "ABI_GLIBC_VERSION" => Some("2.17".to_owned()),
             "ABI" => Some("local".to_owned()),
-            _ => None,
+            _ => crate::interpreter::rule_defs::build_config::get_define(key),
         };
         match value {
             Some(v) => Ok(heap.alloc_str(&v).to_value()),

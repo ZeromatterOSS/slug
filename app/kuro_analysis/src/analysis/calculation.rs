@@ -389,6 +389,48 @@ async fn check_config_setting_values(
     Ok(true) // All values match
 }
 
+/// Check whether all `define_values` entries in a `config_setting` target match the current
+/// --define flags. In Bazel, `config_setting(define_values = {"FOO": "bar"})` matches when
+/// `--define FOO=bar` is passed on the command line.
+fn check_config_setting_define_values(
+    configured_node: ConfiguredTargetNodeRef<'_>,
+) -> kuro_error::Result<bool> {
+    let target_node = configured_node.to_owned();
+    let target_ref = target_node.target_node().as_ref();
+
+    let define_attr = match target_ref.attr_or_none("define_values", AttrInspectOptions::All) {
+        Some(attr) => attr,
+        None => return Ok(true), // No define_values attr → vacuously matches
+    };
+
+    let pairs = match &define_attr.value {
+        CoercedAttr::Dict(d) => d.0.clone(),
+        _ => return Ok(true), // Not a dict → vacuously matches
+    };
+
+    if pairs.is_empty() {
+        return Ok(true); // Empty define_values dict → vacuously matches
+    }
+
+    for (key, expected_value) in pairs.iter() {
+        let key_str = match key {
+            CoercedAttr::String(s) => s.0.as_str().to_owned(),
+            _ => return Ok(false),
+        };
+        let expected_str = match expected_value {
+            CoercedAttr::String(s) => s.0.as_str().to_owned(),
+            _ => return Ok(false),
+        };
+
+        match kuro_build_api::interpreter::rule_defs::build_config::get_define(&key_str) {
+            Some(actual) if actual == expected_str => {} // Matches
+            _ => return Ok(false),                       // No match
+        }
+    }
+
+    Ok(true)
+}
+
 /// Resolve a Bazel-style config_setting value key against known defaults.
 ///
 /// In Bazel, `config_setting(values = {"compilation_mode": "opt"})` matches
@@ -421,9 +463,14 @@ fn resolve_bazel_config_value(key: &str, expected: &str) -> bool {
             expected == host_cpu
         }
         "define" => {
-            // No defines set by default
-            // TODO(bazel): Read from --define flags
-            false
+            // Check if expected is "KEY=VALUE" format and match against --define flags
+            if let Some((def_key, def_val)) = expected.split_once('=') {
+                kuro_build_api::interpreter::rule_defs::build_config::get_define(def_key)
+                    .as_deref() == Some(def_val)
+            } else {
+                // Just check if the key exists
+                kuro_build_api::interpreter::rule_defs::build_config::get_define(expected).is_some()
+            }
         }
         "stamp" => {
             // Default stamping is off
@@ -679,14 +726,15 @@ async fn get_analysis_result_inner(
 
             // For config_setting, pre-compute whether flag_values and values match.
             // This must be done asynchronously (DICE lookup) before the sync analyze_native_rule call.
-            let (flag_values_match, values_match) = if matches!(kind, NativeRuleKind::ConfigSetting)
-            {
-                let fv = check_config_setting_flag_values(configured_node, ctx).await?;
-                let vm = check_config_setting_values(configured_node, ctx).await?;
-                (fv, vm)
-            } else {
-                (true, true) // irrelevant for non-config_setting rules
-            };
+            let (flag_values_match, values_match, define_values_match) =
+                if matches!(kind, NativeRuleKind::ConfigSetting) {
+                    let fv = check_config_setting_flag_values(configured_node, ctx).await?;
+                    let vm = check_config_setting_values(configured_node, ctx).await?;
+                    let dv = check_config_setting_define_values(configured_node)?;
+                    (fv, vm, dv)
+                } else {
+                    (true, true, true) // irrelevant for non-config_setting rules
+                };
 
             let now = TimeSpan::start_now();
             let (res, spans) = record_root_spans(|| {
@@ -695,7 +743,7 @@ async fn get_analysis_result_inner(
                     configured_node,
                     kind,
                     dep_analysis,
-                    flag_values_match,
+                    flag_values_match && define_values_match,
                     values_match,
                 )?;
                 Ok(MaybeCompatible::Compatible(result))
