@@ -341,3 +341,15 @@ async def test_stamp_files_are_file_objects(buck: Buck) -> None:
     # Basenames
     assert lines["info_basename"] == "stable-status.txt"
     assert lines["version_basename"] == "volatile-status.txt"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_run_environment_info_provider(buck: Buck) -> None:
+    """RunEnvironmentInfo returns a proper provider with environment and inherited_environment."""
+    result = await buck.build("//:run_env_test")
+    output = result.get_build_report().output_for_target("//:run_env_test")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    assert lines["type"] == "RunEnvironmentInfo"
+    assert lines["env_type"] == "dict"
+    assert lines["inherited_type"] == "list"

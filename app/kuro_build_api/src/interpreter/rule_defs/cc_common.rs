@@ -4195,19 +4195,14 @@ pub fn register_cc_common(globals: &mut GlobalsBuilder) {
     /// Used by cc_toolchain.bzl for visibility_public_presubmit attribute.
     const PackageSpecificationInfo: NoneType = NoneType;
 
-    /// RunEnvironmentInfo - Callable stub.
-    /// This is a Bazel built-in provider for specifying environment variables
+    /// RunEnvironmentInfo - Provider for specifying environment variables
     /// that should be set when running binaries or tests.
-    /// Returns None for now; proper implementation would return a provider instance.
-    /// TODO(bazel): Implement proper RunEnvironmentInfo provider.
-    #[starlark(speculative_exec_safe)]
-    fn RunEnvironmentInfo<'v>(
-        #[starlark(require = named)] environment: Option<Value<'v>>,
-        #[starlark(require = named)] inherited_environment: Option<Value<'v>>,
-    ) -> starlark::Result<NoneType> {
-        let _unused = (environment, inherited_environment);
-        Ok(NoneType)
-    }
+    ///
+    /// Usage in rules:
+    /// ```python
+    /// return [RunEnvironmentInfo(environment = {"FOO": "bar"}, inherited_environment = ["PATH"])]
+    /// ```
+    const RunEnvironmentInfo: RunEnvironmentInfoProvider = RunEnvironmentInfoProvider;
 
     /// testing module constant for Bazel-compatible testing utilities.
     /// Currently a stub that provides TestEnvironment.
@@ -4241,14 +4236,11 @@ impl<'v> StarlarkValue<'v> for TestingModule {
 #[starlark_module]
 fn testing_methods(builder: &mut MethodsBuilder) {
     /// TestEnvironment provider for specifying test environment variables.
-    /// Returns None for now - proper implementation would return a TestEnvironment provider.
-    fn TestEnvironment<'v>(
-        this: &TestingModule,
-        environment: Option<Value<'v>>,
-        #[starlark(require = named)] inherited_environment: Option<Value<'v>>,
-    ) -> starlark::Result<NoneType> {
-        let _unused = (this, environment, inherited_environment);
-        Ok(NoneType)
+    /// This is an alias for RunEnvironmentInfo (deprecated in Bazel).
+    #[starlark(attribute)]
+    fn TestEnvironment<'v>(this: &TestingModule) -> starlark::Result<RunEnvironmentInfoProvider> {
+        let _ = this;
+        Ok(RunEnvironmentInfoProvider)
     }
 
     /// ExecutionInfo provider for specifying execution requirements.
@@ -4430,6 +4422,150 @@ where
 
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(attribute, "requirements")
+    }
+}
+
+// ============================================================================
+// RunEnvironmentInfo - Provider for specifying run/test environment variables
+// ============================================================================
+
+/// RunEnvironmentInfo provider callable.
+///
+/// `RunEnvironmentInfo` is a provider for specifying environment variables
+/// to be set when running binaries (`kuro run`) or tests (`kuro test`).
+///
+/// Reference: https://bazel.build/rules/lib/providers/RunEnvironmentInfo
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct RunEnvironmentInfoProvider;
+
+impl RunEnvironmentInfoProvider {
+    /// Get the static provider ID for RunEnvironmentInfo.
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "RunEnvironmentInfo".to_owned(),
+            })
+        })
+    }
+}
+
+impl Display for RunEnvironmentInfoProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RunEnvironmentInfo")
+    }
+}
+
+starlark_simple_value!(RunEnvironmentInfoProvider);
+
+#[starlark_value(type = "RunEnvironmentInfo")]
+impl<'v> StarlarkValue<'v> for RunEnvironmentInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        use starlark::values::dict::AllocDict;
+        let kwargs = args.names_map()?;
+        let environment = kwargs
+            .iter()
+            .find_map(|(k, v)| if k.as_str() == "environment" { Some(*v) } else { None })
+            .unwrap_or_else(|| {
+                eval.heap()
+                    .alloc(AllocDict(std::iter::empty::<(&str, Value)>()))
+            });
+        let inherited_environment = kwargs
+            .iter()
+            .find_map(|(k, v)| {
+                if k.as_str() == "inherited_environment" {
+                    Some(*v)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| eval.heap().alloc(AllocList::EMPTY));
+        Ok(eval.heap().alloc(RunEnvironmentInfoInstance {
+            environment,
+            inherited_environment,
+        }))
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+impl ProviderCallableLike for RunEnvironmentInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(RunEnvironmentInfoProvider::provider_id())
+    }
+}
+
+/// An instance of RunEnvironmentInfo.
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    starlark::values::Trace,
+    starlark::coerce::Coerce,
+    starlark::values::Freeze
+)]
+#[repr(C)]
+pub struct RunEnvironmentInfoInstanceGen<V: ValueLifetimeless> {
+    /// Environment variable dict mapping string keys to string values.
+    environment: V,
+    /// List of environment variable names to inherit from the host.
+    inherited_environment: V,
+}
+
+starlark_complex_value!(pub RunEnvironmentInfoInstance);
+
+impl<V: ValueLifetimeless> Display for RunEnvironmentInfoInstanceGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RunEnvironmentInfo(...)")
+    }
+}
+
+impl<'v, V: ValueLike<'v>> ProviderLike<'v> for RunEnvironmentInfoInstanceGen<V>
+where
+    Self: fmt::Debug,
+{
+    fn id(&self) -> &Arc<ProviderId> {
+        RunEnvironmentInfoProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        vec![
+            ("environment", self.environment.to_value()),
+            ("inherited_environment", self.inherited_environment.to_value()),
+        ]
+    }
+}
+
+#[starlark_value(type = "RunEnvironmentInfo")]
+impl<'v, V: ValueLike<'v> + 'v> StarlarkValue<'v> for RunEnvironmentInfoInstanceGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    type Canonical = RunEnvironmentInfoInstance<'v>;
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
+    }
+
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "environment" => Some(self.environment.to_value()),
+            "inherited_environment" => Some(self.inherited_environment.to_value()),
+            _ => None,
+        }
+    }
+
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "environment" | "inherited_environment")
     }
 }
 

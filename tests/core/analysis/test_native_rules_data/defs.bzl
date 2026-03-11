@@ -95,6 +95,28 @@ stamp_file_info = rule(
 )
 
 
+def _run_env_info_impl(ctx):
+    """Tests that RunEnvironmentInfo returns a proper provider."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    env_info = RunEnvironmentInfo(
+        environment = {"MY_VAR": "hello", "OTHER_VAR": "world"},
+        inherited_environment = ["PATH", "HOME"],
+    )
+    lines = [
+        "type=" + type(env_info),
+        "env_type=" + type(env_info.environment),
+        "inherited_type=" + type(env_info.inherited_environment),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out), env_info]
+
+
+run_env_info = rule(
+    implementation = _run_env_info_impl,
+    attrs = {},
+)
+
+
 def _bool_setting_impl(ctx):
     """A boolean build setting (no output)."""
     return []

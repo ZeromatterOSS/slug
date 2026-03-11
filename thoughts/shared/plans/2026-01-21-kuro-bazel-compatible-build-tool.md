@@ -119,7 +119,7 @@ native.depset_from_transitive_set(t, order = "default")
 - [x] BCR modules are fetched and cached correctly
 - [x] Lockfile (MODULE.bazel.lock) is generated and respected
 - [x] Sandboxed builds catch undeclared dependencies (buck-out input isolation implemented; 2026-02-23)
-- [ ] Cross-platform builds work (Linux, Windows, macOS)
+- [x] Cross-platform builds work (Linux, Windows, macOS) — Windows verified with MSVC (2026-03-10)
 
 ## What We're NOT Doing
 
