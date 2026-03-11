@@ -1148,11 +1148,13 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
         let heap = eval.heap();
 
         // Build the exe and args command lines:
-        // - String command: exe = ["/bin/bash", "-c"], args = [cmd_str, ...extra_arguments]
+        // - String command: exe = [shell, "-c"], args = [cmd_str, ...extra_arguments]
         // - List command: exe = the list, args = extra_arguments
         let (starlark_exe, starlark_args) = if let Some(cmd_str) = command.unpack_str() {
+            // Use platform-appropriate shell
+            let shell = if cfg!(windows) { "bash.exe" } else { "/bin/bash" };
             let exe_list = heap.alloc(vec![
-                heap.alloc_str("/bin/bash").to_value(),
+                heap.alloc_str(shell).to_value(),
                 heap.alloc_str("-c").to_value(),
             ]);
             let starlark_exe = StarlarkCmdArgs::try_from_value(exe_list)
