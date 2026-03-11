@@ -69,6 +69,7 @@ use crate::actions::impls::run::StarlarkRunActionValues;
 use crate::actions::impls::run::UnregisteredRunAction;
 use crate::actions::impls::run::dep_files::RunActionDepFiles;
 use crate::actions::impls::run::new_executor_preference;
+use kuro_execute::execute::request::ExecutorPreference;
 
 #[derive(Debug, kuro_error::Error)]
 #[kuro(tag = Input)]
@@ -449,7 +450,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             }
         }
 
-        let executor_preference = new_executor_preference(local_only, prefer_local, prefer_remote)?;
+        let mut executor_preference = new_executor_preference(local_only, prefer_local, prefer_remote)?;
 
         let mut artifact_visitor = RunCommandArtifactVisitor::new(&dep_files);
 
@@ -925,12 +926,32 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             collected_bazel_inputs.extend(tool_items);
         }
 
+        // Parse execution_requirements dict for executor preference overrides.
+        // Bazel keys: "no-remote" → local only, "no-cache" → disable cache upload,
+        // "requires-network" → informational only (ignored).
+        let mut effective_allow_cache_upload = allow_cache_upload;
+        if let NoneOr::Other(exec_reqs) = execution_requirements {
+            if let Ok(iter) = exec_reqs.iterate(eval.heap()) {
+                for key in iter {
+                    if let Some(k) = key.unpack_str() {
+                        match k {
+                            "no-remote" => {
+                                executor_preference = ExecutorPreference::LocalRequired;
+                            }
+                            "no-cache" => {
+                                effective_allow_cache_upload = NoneOr::Other(false);
+                            }
+                            _ => {} // Ignore other keys like "requires-network"
+                        }
+                    }
+                }
+            }
+        }
+
         // Ignore other Bazel-specific parameters that are not yet implemented.
         let _ = (
             progress_message,
             resource_set,
-            use_default_shell_env,
-            execution_requirements,
             toolchain,
             exec_group,
             input_manifests,
@@ -1009,7 +1030,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             metadata_param,
             no_outputs_cleanup,
             incremental_remote_outputs,
-            allow_cache_upload: allow_cache_upload.into_option(),
+            allow_cache_upload: effective_allow_cache_upload.into_option(),
             allow_dep_file_cache_upload,
             allow_offline_output_cache,
             force_full_hybrid_if_capable,
@@ -1019,6 +1040,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             remote_execution_custom_image: re_custom_image,
             meta_internal_extra_params: extra_params,
             expected_eligible_for_dedupe: expect_eligible_for_dedupe.into_option(),
+            use_default_shell_env,
         };
 
         if expect_eligible_for_dedupe.into_option().unwrap_or(false) {
@@ -1098,10 +1120,25 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneOr::None)] toolchain: NoneOr<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
+        // Parse execution_requirements for executor preference
+        let mut local_only = false;
+        let mut no_cache = false;
+        if let NoneOr::Other(exec_reqs) = execution_requirements {
+            if let Ok(iter) = exec_reqs.iterate(eval.heap()) {
+                for key in iter {
+                    if let Some(k) = key.unpack_str() {
+                        match k {
+                            "no-remote" => local_only = true,
+                            "no-cache" => no_cache = true,
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+
         let _ = (
             progress_message,
-            use_default_shell_env,
-            execution_requirements,
             input_manifests,
             exec_group,
             shadowed_action,
@@ -1259,7 +1296,11 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
         });
 
         let action = UnregisteredRunAction {
-            executor_preference: new_executor_preference(false, false, false)?,
+            executor_preference: if local_only {
+                ExecutorPreference::LocalRequired
+            } else {
+                new_executor_preference(false, false, false)?
+            },
             always_print_stderr: false,
             weight: WeightClass::Permits(1),
             low_pass_filter: true,
@@ -1267,7 +1308,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             metadata_param: None,
             no_outputs_cleanup: false,
             incremental_remote_outputs: false,
-            allow_cache_upload: None,
+            allow_cache_upload: if no_cache { Some(false) } else { None },
             allow_dep_file_cache_upload: false,
             allow_offline_output_cache: false,
             force_full_hybrid_if_capable: false,
@@ -1277,6 +1318,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             remote_execution_custom_image: None,
             meta_internal_extra_params: MetaInternalExtraParams::default(),
             expected_eligible_for_dedupe: None,
+            use_default_shell_env,
         };
 
         this.state()?.register_action(

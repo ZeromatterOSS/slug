@@ -257,6 +257,9 @@ pub(crate) struct UnregisteredRunAction {
     pub(crate) remote_execution_custom_image: Option<Box<RemoteExecutorCustomImage>>,
     pub(crate) meta_internal_extra_params: MetaInternalExtraParams,
     pub(crate) expected_eligible_for_dedupe: Option<bool>,
+    /// Bazel compatibility: when true, the action inherits the host environment.
+    /// When false (default), only explicitly set env vars are available (hermetic).
+    pub(crate) use_default_shell_env: bool,
 }
 
 impl UnregisteredAction for UnregisteredRunAction {

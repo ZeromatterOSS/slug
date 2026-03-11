@@ -535,6 +535,123 @@ impl<'v> StarlarkValue<'v> for ProtoFragment {
 }
 
 // ============================================================================
+// PlatformFragment - Platform configuration fragment
+// ============================================================================
+
+/// Platform configuration fragment.
+///
+/// Accessed via `ctx.fragments.platform`. Contains platform-related settings.
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct PlatformFragment;
+
+impl Display for PlatformFragment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<platform fragment>")
+    }
+}
+
+starlark_simple_value!(PlatformFragment);
+
+#[starlark_value(type = "platform_fragment")]
+impl<'v> StarlarkValue<'v> for PlatformFragment {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(platform_fragment_methods)
+    }
+}
+
+#[starlark_module]
+fn platform_fragment_methods(builder: &mut MethodsBuilder) {
+    /// Returns the host platform label.
+    #[starlark(attribute)]
+    fn host_platform(#[allow(unused_variables)] this: &PlatformFragment) -> starlark::Result<String> {
+        Ok("@local_config_platform//:host".to_owned())
+    }
+}
+
+// ============================================================================
+// JavaFragment - Java configuration fragment
+// ============================================================================
+
+/// Java configuration fragment stub.
+///
+/// Accessed via `ctx.fragments.java`. Returns safe defaults for any accessed attribute.
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct JavaFragment;
+
+impl Display for JavaFragment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<java fragment>")
+    }
+}
+
+starlark_simple_value!(JavaFragment);
+
+#[starlark_value(type = "java_fragment")]
+impl<'v> StarlarkValue<'v> for JavaFragment {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(
+            attribute,
+            "default_javac_flags" | "default_jvm_opts" | "source_version" | "target_version"
+        )
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "default_javac_flags" | "default_jvm_opts" => Some(heap.alloc(AllocList::EMPTY)),
+            "source_version" | "target_version" => Some(heap.alloc("11")),
+            _ => None,
+        }
+    }
+}
+
+// ============================================================================
+// AppleFragment - Apple configuration fragment
+// ============================================================================
+
+/// Apple configuration fragment stub.
+///
+/// Accessed via `ctx.fragments.apple`. Returns safe defaults for Apple platform settings.
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct AppleFragment;
+
+impl Display for AppleFragment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<apple fragment>")
+    }
+}
+
+starlark_simple_value!(AppleFragment);
+
+#[starlark_value(type = "apple_fragment")]
+impl<'v> StarlarkValue<'v> for AppleFragment {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(
+            attribute,
+            "single_arch_platform"
+                | "single_arch_cpu"
+                | "bitcode_mode"
+                | "mandatory_minimum_version"
+        )
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "single_arch_platform" | "bitcode_mode" => Some(heap.alloc(NoneType)),
+            "single_arch_cpu" => {
+                if cfg!(target_arch = "aarch64") {
+                    Some(heap.alloc("arm64"))
+                } else {
+                    Some(heap.alloc("x86_64"))
+                }
+            }
+            "mandatory_minimum_version" => Some(heap.alloc(false)),
+            _ => None,
+        }
+    }
+}
+
+// ============================================================================
 // ConfigurationFragments - Container for all fragments
 // ============================================================================
 
@@ -583,8 +700,9 @@ impl<'v> StarlarkValue<'v> for ConfigurationFragments {
             "py" => Some(heap.alloc(PyFragment)),
             "bazel_py" => Some(heap.alloc(BazelPyFragment)),
             "proto" => Some(heap.alloc(ProtoFragment)),
-            // TODO(fragments): Implement other fragments as needed
-            "java" | "apple" | "platform" => Some(heap.alloc(NoneType)),
+            "java" => Some(heap.alloc(JavaFragment)),
+            "apple" => Some(heap.alloc(AppleFragment)),
+            "platform" => Some(heap.alloc(PlatformFragment)),
             _ => None,
         }
     }
