@@ -101,7 +101,7 @@ impl<'v> StarlarkValue<'v> for BazelLabel {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
-            "name" | "package" | "workspace_name" | "workspace_root"
+            "name" | "package" | "workspace_name" | "workspace_root" | "repo_name"
         )
     }
 
@@ -110,7 +110,19 @@ impl<'v> StarlarkValue<'v> for BazelLabel {
             "name" => Some(heap.alloc(self.name.as_str())),
             "package" => Some(heap.alloc(self.package.as_str())),
             "workspace_name" => Some(heap.alloc(self.workspace_name.as_str())),
-            "workspace_root" => Some(heap.alloc("")),
+            "workspace_root" => {
+                // In Bazel, workspace_root is "" for the main repo and
+                // "external/<repo_name>" for external repos.
+                if self.workspace_name.is_empty()
+                    || kuro_core::cells::is_root_cell_name(&self.workspace_name)
+                {
+                    Some(heap.alloc(""))
+                } else {
+                    Some(heap.alloc(format!("external/{}", self.workspace_name)))
+                }
+            }
+            // repo_name is the modern Bazel equivalent of workspace_name
+            "repo_name" => Some(heap.alloc(self.workspace_name.as_str())),
             _ => None,
         }
     }
