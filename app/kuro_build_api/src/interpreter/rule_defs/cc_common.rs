@@ -3781,16 +3781,37 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Merges multiple linking contexts into one.
+    ///
+    /// Collects linker_inputs from all provided linking contexts into a
+    /// single merged linking context with transitive depset.
     #[allow(unused_variables)]
     fn merge_linking_contexts<'v>(
         #[starlark(this)] this: &CcCommonModule,
         #[starlark(require = named, default = NoneType)] linking_contexts: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // For now, return an empty linking context
-        // TODO(cc_common): Properly merge linker inputs from all contexts
-        // This requires handling depset merging which needs FrozenValue support
-        let linker_inputs = heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty());
+        // Collect all linker_inputs depsets as transitive children
+        let mut transitive_depsets: Vec<Value<'v>> = Vec::new();
+
+        if !linking_contexts.is_none() {
+            if let Ok(iter) = linking_contexts.iterate(heap) {
+                for ctx_val in iter {
+                    if let Ok(Some(linker_inputs)) = ctx_val.get_attr("linker_inputs", heap) {
+                        if !linker_inputs.is_none() {
+                            transitive_depsets.push(linker_inputs);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Create merged depset with all inputs as transitive children
+        let linker_inputs = crate::interpreter::rule_defs::depset::make_depset_from_lists(
+            heap,
+            Vec::new(), // no direct elements
+            transitive_depsets,
+            "default",
+        )?;
 
         Ok(heap.alloc(LinkingContextWithInputsGen { linker_inputs }))
     }
