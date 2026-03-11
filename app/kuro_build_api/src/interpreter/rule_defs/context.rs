@@ -2876,16 +2876,18 @@ starlark::starlark_simple_value!(ExecGroupToolchains);
 
 #[starlark::values::starlark_value(type = "exec_group_toolchains")]
 impl<'v> StarlarkValue<'v> for ExecGroupToolchains {
-    /// Returns None for any toolchain type lookup.
-    fn at(&self, _index: Value<'v>, _heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        // Return None - toolchain not resolved
-        // This causes rules to take their fallback/legacy code paths
-        Ok(Value::new_none())
+    /// Returns toolchain stub for known types, None for unknown.
+    /// Uses the same logic as ToolchainsStub to resolve known toolchain types.
+    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        // Delegate to ToolchainsStub's resolution logic
+        let stub = ToolchainsStub;
+        stub.at(index, heap)
     }
 
-    /// Returns False for any key - no toolchains resolved.
+    /// Returns True for known toolchain types, False for unknown.
     fn is_in(&self, _other: Value<'v>) -> starlark::Result<bool> {
-        Ok(false)
+        // Return true so rules can access toolchains via exec groups
+        Ok(true)
     }
 }
 
