@@ -327,6 +327,13 @@ def capture_existing_rules(name):
     )
 
 
+# Verify that hasattr(native, "starlark_doc_extract") returns True
+# This is critical for rules_python IS_BAZEL_7_OR_HIGHER detection.
+HAS_STARLARK_DOC_EXTRACT = hasattr(native, "starlark_doc_extract")
+if not HAS_STARLARK_DOC_EXTRACT:
+    fail("hasattr(native, 'starlark_doc_extract') must be True for Bazel 7+ compat")
+
+
 def _bool_setting_impl(ctx):
     """A boolean build setting (no output)."""
     return []

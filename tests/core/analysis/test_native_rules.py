@@ -526,3 +526,22 @@ async def test_existing_rules_returns_attributes(buck: Buck) -> None:
         f"Expected filegroup for single rule, got: {line_dict.get('single_kind')}"
     assert line_dict.get("single_has_srcs") == "True", \
         f"Expected 'srcs' attribute in existing_rule(), got: {line_dict.get('single_has_srcs')}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_starlark_doc_extract_builds(buck: Buck) -> None:
+    """starlark_doc_extract rule exists (Bazel 7+ feature detection for rules_python)."""
+    result = await buck.build("//:doc_extract_test")
+    output = result.get_build_report().output_for_target("//:doc_extract_test")
+    # Stub creates an empty output file, similar to genquery
+    assert output.exists()
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_hasattr_native_starlark_doc_extract(buck: Buck) -> None:
+    """hasattr(native, 'starlark_doc_extract') returns True (rules_python IS_BAZEL_7_OR_HIGHER)."""
+    # defs.bzl contains: if not hasattr(native, "starlark_doc_extract"): fail(...)
+    # If any target from this file builds, the check passed.
+    result = await buck.build("//:doc_extract_test")
+    output = result.get_build_report().output_for_target("//:doc_extract_test")
+    assert output.exists()

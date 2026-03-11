@@ -865,6 +865,43 @@ mod rule_defs {
             toolchain_types: vec![],
         })
     });
+
+    /// Attributes for starlark_doc_extract rule.
+    fn starlark_doc_extract_attributes() -> AttributeSpec {
+        let src_attr = Attribute::new(
+            None,
+            "src",
+            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+        );
+        let symbol_names_attr = Attribute::new(
+            None,
+            "The symbol names to extract documentation for",
+            AttrType::list(AttrType::string()),
+        );
+
+        AttributeSpec::from(
+            vec![
+                ("src".to_owned(), src_attr),
+                ("symbol_names".to_owned(), symbol_names_attr),
+            ],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("starlark_doc_extract attributes should be valid")
+    }
+
+    /// The Rule definition for starlark_doc_extract.
+    pub static STARLARK_DOC_EXTRACT_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: starlark_doc_extract_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::StarlarkDocExtract),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+            toolchain_types: vec![],
+        })
+    });
 }
 
 /// Extract visibility strings from a Starlark value.
@@ -2350,6 +2387,60 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
                 ("scope".to_owned(), coerced_scope),
                 ("opts".to_owned(), coerced_opts),
                 ("strict".to_owned(), coerced_strict),
+            ],
+            &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
+            &internals.default_visibility(),
+        )?;
+
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+
+    /// Bazel's starlark_doc_extract rule: extracts documentation from .bzl files.
+    ///
+    /// This is a stub implementation that creates an empty output file.
+    /// Its primary purpose is to make `hasattr(native, "starlark_doc_extract")` return
+    /// True, which rules_python uses as a Bazel 7+ feature detection signal.
+    ///
+    /// See: https://bazel.build/reference/be/general#starlark_doc_extract
+    fn starlark_doc_extract<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named)] src: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        symbol_names: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] extra_kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let _ = extra_kwargs;
+        let internals = ModuleInternals::from_context(eval, "starlark_doc_extract")?;
+        let coercion_ctx = internals.attr_coercion_context();
+
+        // Coerce src (required dep label)
+        let src_attr_type =
+            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY);
+        let coerced_src = src_attr_type.coerce(AttrIsConfigurable::No, coercion_ctx, src)?;
+
+        // Coerce symbol_names (list of strings, optional)
+        let names_attr_type = AttrType::list(AttrType::string());
+        let names_value = if symbol_names.is_none() {
+            eval.heap().alloc(Vec::<Value>::new())
+        } else {
+            symbol_names
+        };
+        let coerced_names =
+            names_attr_type.coerce(AttrIsConfigurable::No, coercion_ctx, names_value)?;
+
+        let target_node = create_native_target_node(
+            rule_defs::STARLARK_DOC_EXTRACT_RULE.clone(),
+            internals.package(),
+            name,
+            vec![
+                ("src".to_owned(), coerced_src),
+                ("symbol_names".to_owned(), coerced_names),
             ],
             &extract_visibility_strings(visibility),
             internals.attr_coercion_context(),

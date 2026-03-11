@@ -117,6 +117,7 @@ pub fn analyze_native_rule(
         NativeRuleKind::Genquery => analyze_genquery(target),
         NativeRuleKind::ExecutionPlatform => analyze_execution_platform(target, dep_analysis),
         NativeRuleKind::ExecutionPlatforms => analyze_execution_platforms(target, dep_analysis),
+        NativeRuleKind::StarlarkDocExtract => analyze_genquery(target), // stub: empty output file
     }
 }
 

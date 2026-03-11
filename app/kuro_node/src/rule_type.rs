@@ -96,6 +96,8 @@ pub enum NativeRuleKind {
     ExecutionPlatform,
     #[display("execution_platforms")]
     ExecutionPlatforms,
+    #[display("starlark_doc_extract")]
+    StarlarkDocExtract,
 }
 
 impl NativeRuleKind {
@@ -124,6 +126,7 @@ impl NativeRuleKind {
             NativeRuleKind::Genquery => "genquery",
             NativeRuleKind::ExecutionPlatform => "execution_platform",
             NativeRuleKind::ExecutionPlatforms => "execution_platforms",
+            NativeRuleKind::StarlarkDocExtract => "starlark_doc_extract",
         }
     }
 }

@@ -444,6 +444,13 @@ select_value(
     }),
 )
 
+# === starlark_doc_extract test ===
+
+starlark_doc_extract(
+    name = "doc_extract_test",
+    src = ":source_files",
+)
+
 # === existing_rules() / repository_name() test ===
 # capture_existing_rules must be called AFTER other rules so it can see them.
 capture_existing_rules(name = "existing_rules_check")
