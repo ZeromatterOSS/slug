@@ -2713,7 +2713,10 @@ impl<'v> StarlarkValue<'v> for BuildConfigurationStub {
         match attribute {
             "coverage_enabled" => Some(Value::new_bool(false)),
             "stamp_binaries" => Some(Value::new_bool(false)),
-            "host_path_separator" => Some(heap.alloc_str(":").to_value()),
+            "host_path_separator" => {
+                let sep = if cfg!(windows) { ";" } else { ":" };
+                Some(heap.alloc_str(sep).to_value())
+            }
             "default_shell_env" => {
                 // Return empty dict - Bazel populates with env vars from --action_env
                 Some(heap.alloc(starlark::values::dict::Dict::default()))
