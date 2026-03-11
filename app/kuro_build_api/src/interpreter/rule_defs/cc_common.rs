@@ -3494,6 +3494,28 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 }
             }
 
+            // Compilation-mode-based linker flags
+            if !is_static_lib {
+                let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                match mode.as_str() {
+                    "opt" => {
+                        if !msvc {
+                            // Strip debug info in opt mode
+                            let strip = crate::interpreter::rule_defs::build_config::get_strip();
+                            if strip == "always" || (strip == "sometimes") {
+                                args.push(heap.alloc_str("-Wl,-S").to_value());
+                            }
+                        }
+                    }
+                    "dbg" => {
+                        if msvc {
+                            args.push(heap.alloc_str("/DEBUG").to_value());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
             return Ok(heap.alloc(args));
         }
 
@@ -3513,6 +3535,34 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             }
             if is_compile {
                 args.push(heap.alloc_str("-c").to_value());
+            }
+        }
+
+        // Compilation-mode-based flags (Bazel adds these via feature configuration)
+        if is_compile {
+            let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+            match mode.as_str() {
+                "opt" => {
+                    if msvc {
+                        args.push(heap.alloc_str("/O2").to_value());
+                        args.push(heap.alloc_str("/DNDEBUG").to_value());
+                    } else {
+                        args.push(heap.alloc_str("-O2").to_value());
+                        args.push(heap.alloc_str("-DNDEBUG").to_value());
+                    }
+                }
+                "dbg" => {
+                    if msvc {
+                        args.push(heap.alloc_str("/Od").to_value());
+                        args.push(heap.alloc_str("/Zi").to_value());
+                    } else {
+                        args.push(heap.alloc_str("-g").to_value());
+                        args.push(heap.alloc_str("-O0").to_value());
+                    }
+                }
+                _ => {
+                    // fastbuild: minimal flags for fast compilation
+                }
             }
         }
 

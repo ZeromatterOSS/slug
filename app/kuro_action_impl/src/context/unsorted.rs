@@ -194,6 +194,38 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
         ))
     }
 
+    /// Bazel-compatible: declares a symlink artifact.
+    ///
+    /// In Bazel, this is only available with `--experimental_allow_unresolved_symlinks`.
+    /// The returned artifact represents a symlink that will be created by
+    /// `ctx.actions.symlink()`. We implement this as a regular file artifact
+    /// since Buck2/Kuro handles symlinks transparently during execution.
+    fn declare_symlink<'v>(
+        this: &AnalysisActions<'v>,
+        #[starlark(require = pos)] filename: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        sibling: starlark::values::Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<StarlarkDeclaredArtifact<'v>> {
+        // Symlink artifacts are treated as regular file artifacts in Kuro.
+        // The actual symlink creation happens via ctx.actions.symlink().
+        let prefix = sibling_to_prefix(sibling)?;
+        let artifact = this.state()?.declare_output(
+            prefix.as_deref(),
+            filename,
+            OutputType::FileOrDirectory,
+            eval.call_stack_top_location(),
+            BuckOutPathKind::Configuration,
+            eval.heap(),
+        )?;
+
+        Ok(StarlarkDeclaredArtifact::new(
+            eval.call_stack_top_location(),
+            artifact,
+            AssociatedArtifacts::new(),
+        ))
+    }
+
     /// Bazel-compatible: declare a shareable artifact.
     /// In Bazel, this creates an artifact that can be shared across targets.
     /// We implement it as a simple declare_output alias.
