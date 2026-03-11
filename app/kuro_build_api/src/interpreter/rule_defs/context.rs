@@ -1588,8 +1588,23 @@ impl<'v> StarlarkValue<'v> for ToolchainsStub {
             // jq toolchain
             let jq_path = detect_jq_path();
             Ok(heap.alloc(JqToolchainStub { jq_path }))
+        } else if target_name == "test_runner_toolchain_type"
+            || (target_name == "toolchain_type" && pkg_segment == "test_runner")
+        {
+            // Test runner toolchain - return a generic toolchain with test runner info
+            Ok(heap.alloc(GenericToolchainStub))
+        } else if key_str.contains("exec_tools") {
+            // exec_tools toolchains (e.g., rules_python exec_tools, rules_rust exec_tools)
+            // These provide tools for execution, return a generic toolchain
+            Ok(heap.alloc(GenericToolchainStub))
+        } else if target_name == "toolchain_type"
+            || target_name.ends_with("_toolchain_type")
+            || target_name.ends_with("_toolchain")
+        {
+            // Generic toolchain type - return a stub that won't crash on attribute access
+            Ok(heap.alloc(GenericToolchainStub))
         } else {
-            // Return None for unknown toolchain types (exec_tools, launcher, etc.)
+            // For completely unrecognized keys, return None
             Ok(Value::new_none())
         }
     }
@@ -3871,6 +3886,35 @@ impl<'v> StarlarkValue<'v> for JqToolchainStub {
             })),
             _ => None,
         }
+    }
+}
+
+/// A generic toolchain stub for unrecognized toolchain types.
+///
+/// Instead of returning None (which crashes on attribute access), this returns
+/// a stub that accepts any attribute access and returns None. This allows rules
+/// to check for toolchain presence without crashing.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct GenericToolchainStub;
+
+impl std::fmt::Display for GenericToolchainStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<GenericToolchain>")
+    }
+}
+
+starlark::starlark_simple_value!(GenericToolchainStub);
+
+#[starlark::values::starlark_value(type = "GenericToolchain")]
+impl<'v> StarlarkValue<'v> for GenericToolchainStub {
+    fn has_attr(&self, _attribute: &str, _heap: Heap<'v>) -> bool {
+        // Accept any attribute to avoid crashes
+        true
+    }
+
+    fn get_attr(&self, _attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        // Return None for any attribute - callers should check for None
+        Some(Value::new_none())
     }
 }
 
