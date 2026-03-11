@@ -444,6 +444,62 @@ pub struct CommonBuildConfigurationOptions {
     /// Tool tag for build metrics (Bazel compatibility, accepted but ignored).
     #[clap(long = "tool-tag", alias = "tool_tag", hide = true, value_name = "TAG")]
     pub tool_tag: Option<String>,
+
+    /// Host C compiler flags (Bazel compatibility, accepted but ignored).
+    #[clap(long = "host-copt", alias = "host_copt", hide = true, value_name = "FLAG", num_args = 1)]
+    pub host_copt: Vec<String>,
+
+    /// Host C++ compiler flags (Bazel compatibility, accepted but ignored).
+    #[clap(long = "host-cxxopt", alias = "host_cxxopt", hide = true, value_name = "FLAG", num_args = 1)]
+    pub host_cxxopt: Vec<String>,
+
+    /// Host linker flags (Bazel compatibility, accepted but ignored).
+    #[clap(long = "host-linkopt", alias = "host_linkopt", hide = true, value_name = "FLAG", num_args = 1)]
+    pub host_linkopt: Vec<String>,
+
+    /// Force position-independent code (Bazel compatibility, accepted but ignored).
+    #[clap(long = "force-pic", alias = "force_pic", hide = true)]
+    pub force_pic: bool,
+
+    /// Per-file compiler options (Bazel compatibility, accepted but ignored).
+    #[clap(long = "per-file-copt", alias = "per_file_copt", hide = true, value_name = "REGEX=OPTS", num_args = 1)]
+    pub per_file_copt: Vec<String>,
+
+    /// Local CPU resources (Bazel compatibility, accepted but ignored).
+    #[clap(long = "local-cpu-resources", alias = "local_cpu_resources", hide = true, value_name = "N")]
+    pub local_cpu_resources: Option<String>,
+
+    /// Local RAM resources in MB (Bazel compatibility, accepted but ignored).
+    #[clap(long = "local-ram-resources", alias = "local_ram_resources", hide = true, value_name = "MB")]
+    pub local_ram_resources: Option<String>,
+
+    /// Show subcommands (Bazel compatibility, accepted but ignored).
+    #[clap(long = "subcommands", hide = true)]
+    pub subcommands: bool,
+
+    /// Sandbox debug mode (Bazel compatibility, accepted but ignored).
+    #[clap(long = "sandbox-debug", alias = "sandbox_debug", hide = true)]
+    pub sandbox_debug: bool,
+
+    /// Host platform (Bazel compatibility, accepted but ignored).
+    #[clap(long = "host-platform", alias = "host_platform", hide = true, value_name = "LABEL")]
+    pub host_platform: Option<String>,
+
+    /// Host compilation mode (Bazel compatibility, accepted but ignored).
+    #[clap(long = "host-compilation-mode", alias = "host_compilation_mode", hide = true, value_name = "MODE")]
+    pub host_compilation_mode: Option<String>,
+
+    /// Build tag filter (Bazel compatibility, accepted but ignored).
+    #[clap(long = "build-tag-filter", alias = "build_tag_filter", hide = true, value_name = "TAGS")]
+    pub build_tag_filter: Option<String>,
+
+    /// Test tag filter (Bazel compatibility, accepted but ignored).
+    #[clap(long = "test-tag-filter", alias = "test_tag_filter", hide = true, value_name = "TAGS")]
+    pub test_tag_filter: Option<String>,
+
+    /// Run under (Bazel compatibility, accepted but ignored).
+    #[clap(long = "run-under", alias = "run_under", hide = true, value_name = "COMMAND")]
+    pub run_under: Option<String>,
 }
 
 impl CommonBuildConfigurationOptions {
@@ -596,6 +652,20 @@ impl CommonBuildConfigurationOptions {
             remote_accept_cached: false,
             announce_rc: false,
             tool_tag: None,
+            host_copt: vec![],
+            host_cxxopt: vec![],
+            host_linkopt: vec![],
+            force_pic: false,
+            per_file_copt: vec![],
+            local_cpu_resources: None,
+            local_ram_resources: None,
+            subcommands: false,
+            sandbox_debug: false,
+            host_platform: None,
+            host_compilation_mode: None,
+            build_tag_filter: None,
+            test_tag_filter: None,
+            run_under: None,
         };
         &DEFAULT
     }
@@ -642,6 +712,20 @@ impl CommonBuildConfigurationOptions {
             remote_accept_cached: false,
             announce_rc: false,
             tool_tag: None,
+            host_copt: vec![],
+            host_cxxopt: vec![],
+            host_linkopt: vec![],
+            force_pic: false,
+            per_file_copt: vec![],
+            local_cpu_resources: None,
+            local_ram_resources: None,
+            subcommands: false,
+            sandbox_debug: false,
+            host_platform: None,
+            host_compilation_mode: None,
+            build_tag_filter: None,
+            test_tag_filter: None,
+            run_under: None,
         };
         &OPTS
     }
