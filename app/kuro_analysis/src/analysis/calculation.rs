@@ -480,6 +480,24 @@ fn resolve_bazel_config_value(key: &str, expected: &str) -> bool {
             // No features set by default
             false
         }
+        "crosstool_top" => {
+            // Default crosstool_top matches a typical auto-detected toolchain
+            expected.contains("local_config_cc") || expected.contains("cc_toolchain_suite")
+        }
+        "compiler" => {
+            // Match against host compiler type
+            if cfg!(windows) {
+                // MSVC is default on Windows
+                expected == "msvc-cl" || expected == "cl" || expected == "msvc"
+            } else if cfg!(target_os = "macos") {
+                expected == "clang" || expected == "compiler"
+            } else {
+                expected == "gcc" || expected == "compiler"
+            }
+        }
+        "host_crosstool_top" => {
+            expected.contains("local_config_cc") || expected.contains("cc_toolchain_suite")
+        }
         // For unknown keys, don't match
         _ => false,
     }
