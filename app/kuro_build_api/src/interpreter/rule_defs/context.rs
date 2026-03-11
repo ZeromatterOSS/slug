@@ -388,9 +388,12 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     #[starlark(attribute)]
     fn fragments<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
-        // Return default configuration fragments for now
-        // TODO(fragments): Pull actual configuration from target configuration
-        Ok(heap.alloc(ConfigurationFragments::default()))
+        // Build configuration fragments using the global compilation mode
+        let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+        let cpp = crate::interpreter::rule_defs::fragments::CppFragment::new(
+            mode, false, false, false,
+        );
+        Ok(heap.alloc(ConfigurationFragments::new(cpp)))
     }
 
     /// Resolved toolchains for this target (Bazel-compatible).
@@ -718,12 +721,13 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         // Return an actual Dict so that dict(ctx.var) and iteration work correctly.
         // BINDIR and GENDIR are derived from the actual target's cell/configuration.
         let bin_dir = bin_dir_path_from_label(this.0.label);
+        let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
         use starlark::values::dict::Dict;
         let entries: &[(&str, &str)] = &[
             ("BINDIR", bin_dir.as_str()),
             ("GENDIR", bin_dir.as_str()),
             ("TARGET_CPU", host_target_cpu()),
-            ("COMPILATION_MODE", "fastbuild"),
+            ("COMPILATION_MODE", comp_mode.as_str()),
             ("CC", host_cc_path()),
             ("CC_FLAGS", ""),
             ("JAVA", if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }),
@@ -958,11 +962,12 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         // Add built-in Make variables (BINDIR, GENDIR, CC, etc.) as fallbacks.
         // User-provided substitutions take priority.
         let bin_dir = bin_dir_path_from_label(this.0.label);
+        let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
         let builtins: &[(&str, &str)] = &[
             ("BINDIR", bin_dir.as_str()),
             ("GENDIR", bin_dir.as_str()),
             ("TARGET_CPU", host_target_cpu()),
-            ("COMPILATION_MODE", "fastbuild"),
+            ("COMPILATION_MODE", comp_mode.as_str()),
             ("CC", host_cc_path()),
             ("CC_FLAGS", ""),
             ("JAVA", if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }),
@@ -2622,12 +2627,13 @@ impl<'v> StarlarkValue<'v> for CtxVarDict {
         let key = index.unpack_str().unwrap_or("");
         let cpu = host_target_cpu();
         let cc = host_cc_path();
+        let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
         // Return common Make variables
         let value: String = match key {
-            "BINDIR" => format!("bazel-out/{cpu}-fastbuild/bin"),
-            "GENDIR" => format!("bazel-out/{cpu}-fastbuild/genfiles"),
+            "BINDIR" => format!("bazel-out/{cpu}-{comp_mode}/bin"),
+            "GENDIR" => format!("bazel-out/{cpu}-{comp_mode}/genfiles"),
             "TARGET_CPU" => cpu.to_owned(),
-            "COMPILATION_MODE" => "fastbuild".to_owned(),
+            "COMPILATION_MODE" => comp_mode,
             "CC" => cc.to_owned(),
             "CC_FLAGS" => String::new(),
             "JAVA" => if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }.to_owned(),
@@ -2675,11 +2681,12 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
         let _ = this;
         let cpu = host_target_cpu();
         let cc = host_cc_path();
+        let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
         let value: Option<String> = match key {
-            "BINDIR" => Some(format!("bazel-out/{cpu}-fastbuild/bin")),
-            "GENDIR" => Some(format!("bazel-out/{cpu}-fastbuild/genfiles")),
+            "BINDIR" => Some(format!("bazel-out/{cpu}-{comp_mode}/bin")),
+            "GENDIR" => Some(format!("bazel-out/{cpu}-{comp_mode}/genfiles")),
             "TARGET_CPU" => Some(cpu.to_owned()),
-            "COMPILATION_MODE" => Some("fastbuild".to_owned()),
+            "COMPILATION_MODE" => Some(comp_mode),
             "CC" => Some(cc.to_owned()),
             "CC_FLAGS" => Some(String::new()),
             "JAVA" => Some(if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }.to_owned()),

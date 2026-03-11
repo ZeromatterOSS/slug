@@ -222,9 +222,11 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
     #[starlark(attribute)]
     fn fragments<'v>(this: RefAspectContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
-        // Return default configuration fragments for now
-        // TODO(fragments): Pull actual configuration from target configuration
-        Ok(heap.alloc(ConfigurationFragments::default()))
+        let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+        let cpp = crate::interpreter::rule_defs::fragments::CppFragment::new(
+            mode, false, false, false,
+        );
+        Ok(heap.alloc(ConfigurationFragments::new(cpp)))
     }
 
     /// Toolchain resolution stub.

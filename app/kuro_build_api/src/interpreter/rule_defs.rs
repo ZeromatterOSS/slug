@@ -14,6 +14,7 @@ use crate::interpreter::rule_defs::provider::registration::register_builtin_prov
 
 pub mod apple_common;
 pub mod artifact;
+pub mod build_config;
 pub mod artifact_tagging;
 pub mod aspect;
 pub mod bazel_label;

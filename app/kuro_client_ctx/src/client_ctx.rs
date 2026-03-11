@@ -241,6 +241,10 @@ impl<'a> ClientCommandContext<'a> {
             }
             .into(),
             profile_pattern_opts: starlark_opts.profile_pattern_opts(&self.working_dir),
+            compilation_mode: config_opts
+                .compilation_mode
+                .clone()
+                .unwrap_or_default(),
             ..self.empty_client_context(cmd.logging_name())?
         })
     }
@@ -284,6 +288,7 @@ impl<'a> ClientCommandContext<'a> {
             representative_config_flags: Vec::new(),
             exit_when: Default::default(),
             profile_pattern_opts: None,
+            compilation_mode: String::new(),
         })
     }
 

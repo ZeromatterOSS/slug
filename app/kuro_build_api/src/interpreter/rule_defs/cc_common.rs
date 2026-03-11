@@ -624,15 +624,27 @@ impl<'v> StarlarkValue<'v> for CtxCheatStub {
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "label" => Some(heap.alloc(CtxCheatLabelStub)),
-            "bin_dir" => Some(heap.alloc(CtxCheatDirStub {
-                path: format!("bazel-out/{}-fastbuild/bin", crate::interpreter::rule_defs::context::host_target_cpu()),
-            })),
-            "genfiles_dir" => Some(heap.alloc(CtxCheatDirStub {
-                path: format!("bazel-out/{}-fastbuild/genfiles", crate::interpreter::rule_defs::context::host_target_cpu()),
-            })),
+            "bin_dir" => {
+                let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                Some(heap.alloc(CtxCheatDirStub {
+                    path: format!("bazel-out/{}-{}/bin", crate::interpreter::rule_defs::context::host_target_cpu(), m),
+                }))
+            },
+            "genfiles_dir" => {
+                let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                Some(heap.alloc(CtxCheatDirStub {
+                    path: format!("bazel-out/{}-{}/genfiles", crate::interpreter::rule_defs::context::host_target_cpu(), m),
+                }))
+            },
             "configuration" => Some(heap.alloc(CtxCheatConfigStub)),
             "actions" => Some(heap.alloc(CtxCheatActionsStub)),
-            "fragments" => Some(heap.alloc(ConfigurationFragments::default())),
+            "fragments" => {
+                let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                let cpp = crate::interpreter::rule_defs::fragments::CppFragment::new(
+                    mode, false, false, false,
+                );
+                Some(heap.alloc(ConfigurationFragments::new(cpp)))
+            },
             "workspace_name" => Some(heap.alloc_str("").to_value()),
             "exec_groups" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::context::ExecGroupsDict))
@@ -694,16 +706,28 @@ impl<'v> StarlarkValue<'v> for CtxCheatWithActions<'v> {
                 package: self.pkg_path.clone(),
                 workspace_name: self.cell_name.clone(),
             })),
-            "bin_dir" => Some(heap.alloc(CtxCheatDirStub {
-                path: format!("bazel-out/{}-fastbuild/bin", crate::interpreter::rule_defs::context::host_target_cpu()),
-            })),
-            "genfiles_dir" => Some(heap.alloc(CtxCheatDirStub {
-                path: format!("bazel-out/{}-fastbuild/genfiles", crate::interpreter::rule_defs::context::host_target_cpu()),
-            })),
+            "bin_dir" => {
+                let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                Some(heap.alloc(CtxCheatDirStub {
+                    path: format!("bazel-out/{}-{}/bin", crate::interpreter::rule_defs::context::host_target_cpu(), m),
+                }))
+            },
+            "genfiles_dir" => {
+                let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                Some(heap.alloc(CtxCheatDirStub {
+                    path: format!("bazel-out/{}-{}/genfiles", crate::interpreter::rule_defs::context::host_target_cpu(), m),
+                }))
+            },
             "configuration" => Some(heap.alloc(CtxCheatConfigStub)),
             // Return the REAL actions object here
             "actions" => Some(self.actions),
-            "fragments" => Some(heap.alloc(ConfigurationFragments::default())),
+            "fragments" => {
+                let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                let cpp = crate::interpreter::rule_defs::fragments::CppFragment::new(
+                    mode, false, false, false,
+                );
+                Some(heap.alloc(ConfigurationFragments::new(cpp)))
+            },
             "workspace_name" => Some(heap.alloc_str("").to_value()),
             "exec_groups" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::context::ExecGroupsDict))
@@ -868,9 +892,12 @@ impl<'v> StarlarkValue<'v> for CtxCheatArtifactStub {
             }
             "is_source" => Some(Value::new_bool(false)),
             "is_directory" => Some(Value::new_bool(false)),
-            "root" => Some(heap.alloc(CtxCheatArtifactRootStub {
-                path: format!("bazel-out/{}-fastbuild/bin", crate::interpreter::rule_defs::context::host_target_cpu()),
-            })),
+            "root" => {
+                let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                Some(heap.alloc(CtxCheatArtifactRootStub {
+                    path: format!("bazel-out/{}-{}/bin", crate::interpreter::rule_defs::context::host_target_cpu(), m),
+                }))
+            },
             _ => None,
         }
     }

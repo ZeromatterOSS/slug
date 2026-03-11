@@ -185,6 +185,10 @@ message ClientContext {
   /// Options for starlark profiling via --profile-patterns and related
   /// arguments.
   optional ProfilePatternOptions profile_pattern_opts = 25;
+
+  /// Bazel-compatible compilation mode: "fastbuild", "dbg", or "opt".
+  /// Propagated from --compilation_mode flag or .bazelrc.
+  string compilation_mode = 26;
 }
 
 message TargetsRequest {

@@ -392,14 +392,12 @@ async fn check_config_setting_values(
 /// Resolve a Bazel-style config_setting value key against known defaults.
 ///
 /// In Bazel, `config_setting(values = {"compilation_mode": "opt"})` matches
-/// against command-line flags like `--compilation_mode=opt`. Since Kuro doesn't
-/// yet have full flag parsing, we match against sensible defaults.
+/// against command-line flags like `--compilation_mode=opt`.
 fn resolve_bazel_config_value(key: &str, expected: &str) -> bool {
     match key {
         "compilation_mode" => {
-            // Default compilation mode is "fastbuild"
-            // TODO(bazel): Read from --compilation_mode flag or .bazelrc
-            expected == "fastbuild"
+            let mode = kuro_build_api::interpreter::rule_defs::build_config::get_compilation_mode();
+            expected == mode
         }
         "cpu" => {
             // Match against host CPU
