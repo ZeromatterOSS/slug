@@ -363,7 +363,10 @@ impl BazelModule {
 #[starlark_value(type = "bazel_module")]
 impl<'v> StarlarkValue<'v> for BazelModule {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "name" | "version" | "is_root" | "tags")
+        matches!(
+            attribute,
+            "name" | "version" | "is_root" | "tags" | "repo_name" | "bazel_module_repo_name"
+        )
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
@@ -372,6 +375,11 @@ impl<'v> StarlarkValue<'v> for BazelModule {
             "version" => Some(heap.alloc(&self.version as &str)),
             "is_root" => Some(Value::new_bool(self.is_root)),
             "tags" => Some(heap.alloc(BazelModuleTags::with_tags(self.tags_by_class.clone()))),
+            // The canonical repo name used for the module's repository.
+            // For root module this is usually "" or the module name.
+            "repo_name" | "bazel_module_repo_name" => {
+                Some(heap.alloc(&self.name as &str))
+            }
             _ => None,
         }
     }
@@ -382,6 +390,8 @@ impl<'v> StarlarkValue<'v> for BazelModule {
             "version".to_owned(),
             "is_root".to_owned(),
             "tags".to_owned(),
+            "repo_name".to_owned(),
+            "bazel_module_repo_name".to_owned(),
         ]
     }
 
