@@ -161,12 +161,29 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] allow_empty: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<ValueOfUnchecked<'v, UnpackList<String>>> {
-        let _ = (include, exclude, allow_empty);
+        let _ = allow_empty;
         let extra = ModuleInternals::from_context(eval, "subpackages")?;
         // Return direct subpackage paths relative to this package.
         // In Bazel, subpackages() returns strings like "bar", "baz" (just the last path component
         // or the package-relative path to the subpackage).
-        let res = extra.sub_packages().map(|p| p.as_str());
+        let all_packages: Vec<String> = extra.sub_packages().map(|p| p.as_str().to_owned()).collect();
+
+        // Apply include/exclude glob filtering if patterns are provided
+        let include_patterns = &include.items;
+        let exclude_patterns = &exclude.items;
+
+        let filtered: Vec<String> = if include_patterns.is_empty() {
+            // No include patterns = return all (Bazel behavior)
+            all_packages
+        } else {
+            let spec = GlobSpec::new(include_patterns, exclude_patterns)?;
+            all_packages
+                .into_iter()
+                .filter(|pkg| spec.matches(pkg))
+                .collect()
+        };
+
+        let res = filtered.iter().map(|s| s.as_str());
         Ok(eval.heap().alloc_typed_unchecked(AllocList(res)).cast())
     }
 

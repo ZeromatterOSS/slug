@@ -298,8 +298,8 @@ These modules must be available as globals in .bzl files.
 - [x] Implement `coverage_common` (already fully implemented: CoverageCommonModule, instrumented_files_info(), InstrumentedFilesInfo provider registered in more.rs)
 
 **Phase 7c.3: Lower Priority**
-- [ ] Implement `proto` module
-- [ ] Implement `java_common` module
+- [x] Implement `proto` module (2026-03-11: proto.encode_text() in proto_common.rs)
+- [x] Implement `java_common` module (2026-03-11: java_common.compile/merge/boot_class_path stubs, JavaInfo/JavaPluginInfo providers in java_common.rs)
 
 ### Success Criteria (Phase 7c)
 
