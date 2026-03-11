@@ -187,7 +187,7 @@ These modules must be available as globals in .bzl files.
 
 | Function | Description | Kuro Status |
 |----------|-------------|-------------|
-| `compile()` | C++ compilation | Stub |
+| `compile()` | C++ compilation | ✓ Implemented (creates real compile actions; 2026-03-10) |
 | `create_compilation_context()` | Create CompilationContext | Stub |
 | `create_compilation_outputs()` | Create CcCompilationOutputs | Stub |
 | `create_compile_variables()` | Generate compilation vars | Stub |
@@ -196,17 +196,17 @@ These modules must be available as globals in .bzl files.
 | `create_link_variables()` | Generate linking vars | Stub |
 | `create_library_to_link()` | Create LibraryToLink | Stub |
 | `configure_features()` | Create FeatureConfiguration | Stub |
-| `link()` | C++ linking | Stub |
+| `link()` | C++ linking | ✓ Implemented (creates real link actions, supports executable/dynamic_library/static_library; 2026-03-11) |
 | `merge_cc_infos()` | Merge CcInfo providers | Stub |
 | `is_enabled()` | Check feature enabled | Stub |
 | `action_is_enabled()` | Check action enabled | Stub |
-| `get_tool_for_action()` | Get tool path | Stub |
-| `get_memory_inefficient_command_line()` | Get command line | Stub |
+| `get_tool_for_action()` | Get tool path | ✓ Implemented (platform-aware MSVC/GCC/Clang) |
+| `get_memory_inefficient_command_line()` | Get command line | ✓ Implemented (generates real compiler/linker command lines) |
 | `get_environment_variables()` | Get env vars | Stub |
 | `get_execution_requirements()` | Get exec requirements | Stub |
 | `CcToolchainInfo` | Provider | ✓ Implemented |
 
-**Status**: Partially implemented (stubs for rules_cc loading, full implementation needed for compilation)
+**Status**: Partially implemented (compile/link/get_tool_for_action/get_memory_inefficient_command_line are real; remaining are stubs)
 
 ### Module: `config`
 

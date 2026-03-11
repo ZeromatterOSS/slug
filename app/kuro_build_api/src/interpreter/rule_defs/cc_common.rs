@@ -2897,6 +2897,262 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         Ok(heap.alloc((compilation_context, compilation_outputs)))
     }
 
+    /// Links C++ code into a binary or shared library.
+    ///
+    /// This is the core linking function that rules_cc calls to create
+    /// executables and shared libraries from compilation outputs.
+    #[allow(unused_variables)]
+    fn link<'v>(
+        #[starlark(this)] this: &CcCommonModule,
+        #[starlark(require = named)] actions: Value<'v>,
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        #[starlark(require = named)] cc_toolchain: Value<'v>,
+        #[starlark(require = named, default = "c++")] language: &str,
+        #[starlark(require = named, default = "executable")] output_type: &str,
+        #[starlark(require = named, default = true)] link_deps_statically: bool,
+        #[starlark(require = named, default = NoneType)] compilation_outputs: Value<'v>,
+        #[starlark(require = named, default = NoneType)] linking_contexts: Value<'v>,
+        #[starlark(require = named, default = NoneType)] user_link_flags: Value<'v>,
+        #[starlark(require = named, default = 0)] stamp: i32,
+        #[starlark(require = named, default = NoneType)] additional_inputs: Value<'v>,
+        #[starlark(require = named, default = NoneType)] additional_outputs: Value<'v>,
+        #[starlark(require = named, default = NoneType)] variables_extension: Value<'v>,
+        #[starlark(require = named, default = NoneType)] grep_includes: Value<'v>,
+        #[starlark(require = named, default = NoneType)] main_output: Value<'v>,
+        #[starlark(require = named, default = NoneType)] use_test_only_flags: Value<'v>,
+        #[starlark(require = named, default = NoneType)] pdb_file: Value<'v>,
+        #[starlark(require = named, default = NoneType)] win_def_file: Value<'v>,
+        #[starlark(kwargs)] kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
+
+        // Get the declare_file and run methods from actions
+        let declare_file_method = actions.get_attr("declare_file", heap).ok().flatten();
+        let run_method = actions.get_attr("run", heap).ok().flatten();
+
+        // Determine action name based on output type
+        let action_name = match output_type {
+            "dynamic_library" => "c++-link-dynamic-library",
+            "static_library" => "c++-link-static-library",
+            _ => "c++-link-executable",
+        };
+
+        // Determine output extension based on output type and platform
+        let is_dynamic = output_type == "dynamic_library";
+        let is_static = output_type == "static_library";
+        let output_ext = if is_static {
+            if is_windows_host() { ".lib" } else { ".a" }
+        } else if is_dynamic {
+            if is_windows_host() { ".dll" } else if std::env::consts::OS == "macos" { ".dylib" } else { ".so" }
+        } else {
+            if is_windows_host() { ".exe" } else { "" }
+        };
+
+        let output_name = format!("{}{}", name, output_ext);
+
+        // Declare output file
+        let output_file = if let Some(declare_file) = declare_file_method {
+            eval.eval_function(
+                declare_file,
+                &[heap.alloc_str(&output_name).to_value()],
+                &[],
+            )
+            .ok()
+        } else {
+            None
+        };
+
+        if let (Some(run), Some(out)) = (run_method, output_file) {
+            let output_artifact = out
+                .get_attr("as_output", heap)
+                .ok()
+                .flatten()
+                .and_then(|method| eval.eval_function(method, &[], &[]).ok())
+                .unwrap_or(out);
+
+            // Get linker tool path
+            let linker_tool = match std::env::consts::OS {
+                "windows" => {
+                    let msvc = get_msvc_tool_paths();
+                    if is_static {
+                        msvc.as_ref().map(|t| t.lib.clone()).unwrap_or_else(|| "lib.exe".to_owned())
+                    } else {
+                        msvc.as_ref().map(|t| t.link.clone()).unwrap_or_else(|| "link.exe".to_owned())
+                    }
+                }
+                "macos" => {
+                    if is_static { "/usr/bin/ar".to_owned() } else { "/usr/bin/clang++".to_owned() }
+                }
+                _ => {
+                    if is_static { "/usr/bin/ar".to_owned() } else { "/usr/bin/g++".to_owned() }
+                }
+            };
+
+            // Build link command arguments
+            let mut args: Vec<Value<'v>> = Vec::new();
+            args.push(heap.alloc_str(&linker_tool).to_value());
+
+            if is_static {
+                // Static library: ar rcs output.a obj1.o obj2.o ...
+                if !is_windows_host() {
+                    args.push(heap.alloc_str("rcs").to_value());
+                }
+                args.push(output_artifact);
+                if is_windows_host() {
+                    // MSVC lib.exe: /OUT:output.lib obj1.obj obj2.obj
+                    // Replace the last push with /OUT: flag
+                    args.pop();
+                    let out_flag = format!("/OUT:{}", output_artifact);
+                    args.push(heap.alloc_str(&out_flag).to_value());
+                }
+            } else {
+                // Executable or shared library
+                if is_windows_host() {
+                    args.push(heap.alloc_str(&format!("/OUT:{}", output_artifact)).to_value());
+                    if is_dynamic {
+                        args.push(heap.alloc_str("/DLL").to_value());
+                    }
+                } else {
+                    args.push(heap.alloc_str("-o").to_value());
+                    args.push(output_artifact);
+                    if is_dynamic {
+                        args.push(heap.alloc_str("-shared").to_value());
+                    }
+                }
+            }
+
+            // Collect object files from compilation_outputs
+            if !compilation_outputs.is_none() {
+                // Try objects attribute first (regular objects)
+                if let Ok(Some(objects)) = compilation_outputs.get_attr("objects", heap) {
+                    if !objects.is_none() {
+                        if let Ok(iter) = objects.iterate(heap) {
+                            for obj in iter {
+                                args.push(obj);
+                            }
+                        }
+                    }
+                }
+                // Also try pic_objects if no regular objects
+                if let Ok(Some(pic_objects)) = compilation_outputs.get_attr("pic_objects", heap) {
+                    if !pic_objects.is_none() {
+                        if let Ok(iter) = pic_objects.iterate(heap) {
+                            for obj in iter {
+                                args.push(obj);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Collect linker inputs from linking_contexts
+            if !linking_contexts.is_none() {
+                if let Ok(iter) = linking_contexts.iterate(heap) {
+                    for ctx_val in iter {
+                        // Each linking_context has linker_inputs (a depset)
+                        if let Ok(Some(linker_inputs)) = ctx_val.get_attr("linker_inputs", heap) {
+                            if !linker_inputs.is_none() {
+                                // Try to iterate through linker inputs (depset)
+                                let mut elements = Vec::new();
+                                crate::interpreter::rule_defs::depset::collect_depset_elements(
+                                    linker_inputs,
+                                    &mut elements,
+                                    heap,
+                                );
+                                for input in elements {
+                                    // Each linker input may have libraries
+                                    if let Ok(Some(libraries)) = input.get_attr("libraries", heap) {
+                                        if !libraries.is_none() {
+                                            if let Ok(lib_iter) = libraries.iterate(heap) {
+                                                for lib in lib_iter {
+                                                    // Library_to_link has static_library, dynamic_library, etc.
+                                                    if let Ok(Some(static_lib)) =
+                                                        lib.get_attr("static_library", heap)
+                                                    {
+                                                        if !static_lib.is_none() {
+                                                            args.push(static_lib);
+                                                        }
+                                                    }
+                                                    if let Ok(Some(dynamic_lib)) =
+                                                        lib.get_attr("dynamic_library", heap)
+                                                    {
+                                                        if !dynamic_lib.is_none() {
+                                                            args.push(dynamic_lib);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Add user link flags
+            if !user_link_flags.is_none() {
+                if let Ok(iter) = user_link_flags.iterate(heap) {
+                    for flag in iter {
+                        args.push(flag);
+                    }
+                }
+            }
+
+            let args_val = heap.alloc(args);
+            let outputs_list = heap.alloc(vec![output_artifact]);
+            let progress = heap
+                .alloc_str(&format!("Linking {}", output_name))
+                .to_value();
+            let category = if is_static {
+                "cpp_link_static_library"
+            } else if is_dynamic {
+                "cpp_link_dynamic_library"
+            } else {
+                "cpp_link_executable"
+            };
+
+            let _ = eval.eval_function(
+                run,
+                &[args_val],
+                &[
+                    ("outputs", outputs_list),
+                    ("category", heap.alloc_str(category).to_value()),
+                    ("identifier", heap.alloc_str(&output_name).to_value()),
+                    ("progress_message", progress),
+                ],
+            );
+
+            // Create library_to_link if output is a library
+            let library_to_link = if is_static || is_dynamic {
+                heap.alloc(LibraryToLinkGen {
+                    static_library: if is_static { out } else { Value::new_none() },
+                    pic_static_library: Value::new_none(),
+                    dynamic_library: if is_dynamic { out } else { Value::new_none() },
+                    interface_library: Value::new_none(),
+                    alwayslink: false,
+                })
+            } else {
+                Value::new_none()
+            };
+
+            // Return CcLinkingOutputs
+            let executable = if !is_static && !is_dynamic { out } else { Value::new_none() };
+            let linking_outputs = heap.alloc(CcLinkingOutputsGen { library_to_link, executable });
+
+            Ok(linking_outputs)
+        } else {
+            // Fallback: return empty linking outputs
+            Ok(heap.alloc(CcLinkingOutputsGen {
+                library_to_link: Value::new_none(),
+                executable: Value::new_none(),
+            }))
+        }
+    }
+
     /// Gets the tool path for a given action.
     #[allow(unused_variables)]
     fn get_tool_for_action<'v>(
@@ -3438,7 +3694,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         };
 
         // Create linking outputs
-        let linking_outputs = heap.alloc(CcLinkingOutputsGen { library_to_link });
+        let linking_outputs = heap.alloc(CcLinkingOutputsGen {
+            library_to_link,
+            executable: Value::new_none(),
+        });
 
         // Create linker_inputs depset
         // TODO(cc_common): Properly create depset with linker inputs from library_to_link
@@ -3713,6 +3972,7 @@ where
 #[repr(C)]
 pub struct CcLinkingOutputsGen<V: ValueLifetimeless> {
     library_to_link: V,
+    executable: V,
 }
 
 starlark_complex_value!(pub CcLinkingOutputs);
@@ -3729,12 +3989,13 @@ where
     Self: ProvidesStaticType<'v>,
 {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "library_to_link")
+        matches!(attribute, "library_to_link" | "executable")
     }
 
     fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "library_to_link" => Some(self.library_to_link.to_value()),
+            "executable" => Some(self.executable.to_value()),
             _ => None,
         }
     }

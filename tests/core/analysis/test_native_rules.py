@@ -353,3 +353,15 @@ async def test_run_environment_info_provider(buck: Buck) -> None:
     assert lines["type"] == "RunEnvironmentInfo"
     assert lines["env_type"] == "dict"
     assert lines["inherited_type"] == "list"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_cc_common_link(buck: Buck) -> None:
+    """cc_common.link() is callable and returns CcLinkingOutputs with expected attributes."""
+    result = await buck.build("//:cc_link_test")
+    output = result.get_build_report().output_for_target("//:cc_link_test")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    assert lines["type"] == "CcLinkingOutputs"
+    assert lines["has_library_to_link"] == "True"
+    assert lines["has_executable"] == "True"

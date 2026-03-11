@@ -117,6 +117,32 @@ run_env_info = rule(
 )
 
 
+def _cc_link_test_impl(ctx):
+    """Tests that cc_common.link() is callable and returns CcLinkingOutputs."""
+    feature_config = cc_common.configure_features(cc_toolchain = None, ctx = ctx)
+    result = cc_common.link(
+        actions = ctx.actions,
+        name = ctx.label.name,
+        feature_configuration = feature_config,
+        cc_toolchain = None,
+        output_type = "executable",
+    )
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    lines = [
+        "type=" + type(result),
+        "has_library_to_link=" + str(hasattr(result, "library_to_link")),
+        "has_executable=" + str(hasattr(result, "executable")),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+cc_link_test = rule(
+    implementation = _cc_link_test_impl,
+    attrs = {},
+)
+
+
 def _bool_setting_impl(ctx):
     """A boolean build setting (no output)."""
     return []
