@@ -542,6 +542,43 @@ impl RepositoryContext {
 // Helper functions for I/O operations
 // ============================================================================
 
+/// Resolve a Bazel label string to a file system path.
+///
+/// Given a label like "@repo//pkg:file" or "//pkg:file", returns
+/// a path relative to the workspace root.
+fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> String {
+    let stripped = label_str.strip_prefix('@').unwrap_or(label_str);
+    let (repo, rest) = if let Some(idx) = stripped.find("//") {
+        (&stripped[..idx], &stripped[idx + 2..])
+    } else {
+        ("", stripped)
+    };
+
+    let (pkg, target) = if let Some(colon_idx) = rest.find(':') {
+        (&rest[..colon_idx], &rest[colon_idx + 1..])
+    } else {
+        (rest, rest.rsplit('/').next().unwrap_or(rest))
+    };
+
+    let is_root = repo.is_empty() || kuro_core::cells::is_root_cell_name(repo);
+    if is_root {
+        if pkg.is_empty() {
+            target.to_owned()
+        } else {
+            format!("{}/{}", pkg, target)
+        }
+    } else {
+        // External repo: look under workspace_root/external/<repo>
+        let external_dir = workspace_root.join("external").join(repo);
+        if external_dir.exists() {
+            format!("external/{}/{}/{}", repo, pkg, target)
+        } else {
+            // Fall back to just the label path
+            format!("{}/{}", pkg, target)
+        }
+    }
+}
+
 /// Download a file from a URL synchronously.
 /// Uses blocking HTTP client since Starlark interpreter is synchronous.
 fn download_url(url: &str) -> Result<Vec<u8>, String> {
@@ -785,6 +822,9 @@ fn get_urls_from_value<'v>(url_value: Value<'v>) -> Vec<String> {
 #[starlark_module]
 fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     /// Create a path object for a path within the repository.
+    ///
+    /// Accepts a string, a RepositoryPath, or a Label object.
+    /// When given a Label, resolves it to a file system path under the workspace.
     fn path<'v>(
         this: &RepositoryContext,
         path_arg: Value<'v>,
@@ -794,6 +834,11 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             s.to_owned()
         } else if let Some(repo_path) = path_arg.downcast_ref::<RepositoryPath>() {
             repo_path.path_str().to_owned()
+        } else if path_arg.get_type() == "Label" {
+            // Handle Label objects: resolve to workspace-relative path.
+            // Label("@repo//pkg:file") → "external/repo/pkg/file" or "pkg/file" for root
+            let label_str = format!("{}", path_arg);
+            resolve_label_to_path(&label_str, &this.working_dir)
         } else {
             path_arg.to_repr()
         };
@@ -1439,25 +1484,46 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         // Search PATH for the program
         if let Ok(path_var) = std::env::var("PATH") {
-            for dir in path_var.split(':') {
-                let full_path = Path::new(dir).join(program);
-                if full_path.is_file() {
-                    // Check if executable
-                    #[cfg(unix)]
-                    {
-                        use std::os::unix::fs::PermissionsExt;
-                        if let Ok(meta) = std::fs::metadata(&full_path) {
-                            if meta.permissions().mode() & 0o111 != 0 {
-                                return Ok(heap.alloc(RepositoryPath::new(
-                                    full_path.to_string_lossy().to_string(),
-                                )));
+            let separator = if cfg!(windows) { ';' } else { ':' };
+            for dir in path_var.split(separator) {
+                // On Windows, also try common executable extensions
+                let candidates: Vec<std::path::PathBuf> = if cfg!(windows) {
+                    let base = Path::new(dir).join(program);
+                    if base.extension().is_some() {
+                        // Already has extension
+                        vec![base]
+                    } else {
+                        vec![
+                            base.with_extension("exe"),
+                            base.with_extension("cmd"),
+                            base.with_extension("bat"),
+                            base.with_extension("com"),
+                            base.clone(),
+                        ]
+                    }
+                } else {
+                    vec![Path::new(dir).join(program)]
+                };
+
+                for full_path in candidates {
+                    if full_path.is_file() {
+                        #[cfg(unix)]
+                        {
+                            use std::os::unix::fs::PermissionsExt;
+                            if let Ok(meta) = std::fs::metadata(&full_path) {
+                                if meta.permissions().mode() & 0o111 != 0 {
+                                    return Ok(heap.alloc(RepositoryPath::new(
+                                        full_path.to_string_lossy().to_string(),
+                                    )));
+                                }
                             }
                         }
-                    }
-                    #[cfg(not(unix))]
-                    {
-                        return Ok(heap
-                            .alloc(RepositoryPath::new(full_path.to_string_lossy().to_string())));
+                        #[cfg(not(unix))]
+                        {
+                            return Ok(heap.alloc(RepositoryPath::new(
+                                full_path.to_string_lossy().to_string(),
+                            )));
+                        }
                     }
                 }
             }
