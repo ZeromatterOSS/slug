@@ -4253,22 +4253,44 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         // Collect compilation contexts and linking contexts from all inputs
         let mut linking_contexts: Vec<Value<'v>> = Vec::new();
-        let mut last_compilation_context: Value<'v> = Value::new_none();
+        let mut headers_depsets: Vec<Value<'v>> = Vec::new();
+        let mut includes_depsets: Vec<Value<'v>> = Vec::new();
+        let mut defines_depsets: Vec<Value<'v>> = Vec::new();
+
+        // Helper closure to extract contexts from a CcInfo
+        let mut process_info = |info: Value<'v>| {
+            if let Ok(Some(comp_ctx)) = info.get_attr("compilation_context", heap) {
+                if !comp_ctx.is_none() {
+                    // Extract headers, includes, defines depsets from compilation context
+                    if let Ok(Some(h)) = comp_ctx.get_attr("headers", heap) {
+                        if !h.is_none() {
+                            headers_depsets.push(h);
+                        }
+                    }
+                    if let Ok(Some(i)) = comp_ctx.get_attr("includes", heap) {
+                        if !i.is_none() {
+                            includes_depsets.push(i);
+                        }
+                    }
+                    if let Ok(Some(d)) = comp_ctx.get_attr("defines", heap) {
+                        if !d.is_none() {
+                            defines_depsets.push(d);
+                        }
+                    }
+                }
+            }
+            if let Ok(Some(link_ctx)) = info.get_attr("linking_context", heap) {
+                if !link_ctx.is_none() {
+                    linking_contexts.push(link_ctx);
+                }
+            }
+        };
 
         // Process cc_infos (transitive)
         if !cc_infos.is_none() {
             if let Ok(iter) = cc_infos.iterate(heap) {
                 for info in iter {
-                    if let Ok(Some(comp_ctx)) = info.get_attr("compilation_context", heap) {
-                        if !comp_ctx.is_none() {
-                            last_compilation_context = comp_ctx;
-                        }
-                    }
-                    if let Ok(Some(link_ctx)) = info.get_attr("linking_context", heap) {
-                        if !link_ctx.is_none() {
-                            linking_contexts.push(link_ctx);
-                        }
-                    }
+                    process_info(info);
                 }
             }
         }
@@ -4277,19 +4299,54 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         if !direct_cc_infos.is_none() {
             if let Ok(iter) = direct_cc_infos.iterate(heap) {
                 for info in iter {
-                    if let Ok(Some(comp_ctx)) = info.get_attr("compilation_context", heap) {
-                        if !comp_ctx.is_none() {
-                            last_compilation_context = comp_ctx;
-                        }
-                    }
-                    if let Ok(Some(link_ctx)) = info.get_attr("linking_context", heap) {
-                        if !link_ctx.is_none() {
-                            linking_contexts.push(link_ctx);
-                        }
-                    }
+                    process_info(info);
                 }
             }
         }
+
+        // Merge compilation contexts by combining headers/includes/defines depsets
+        let merged_compilation_context = if headers_depsets.is_empty()
+            && includes_depsets.is_empty()
+            && defines_depsets.is_empty()
+        {
+            Value::new_none()
+        } else {
+            let merged_headers = if headers_depsets.is_empty() {
+                Value::new_none()
+            } else {
+                crate::interpreter::rule_defs::depset::make_depset_from_lists(
+                    heap,
+                    Vec::new(),
+                    headers_depsets,
+                    "default",
+                )?
+            };
+            let merged_includes = if includes_depsets.is_empty() {
+                Value::new_none()
+            } else {
+                crate::interpreter::rule_defs::depset::make_depset_from_lists(
+                    heap,
+                    Vec::new(),
+                    includes_depsets,
+                    "default",
+                )?
+            };
+            let merged_defines = if defines_depsets.is_empty() {
+                Value::new_none()
+            } else {
+                crate::interpreter::rule_defs::depset::make_depset_from_lists(
+                    heap,
+                    Vec::new(),
+                    defines_depsets,
+                    "default",
+                )?
+            };
+            heap.alloc(CcCompilationContextGen {
+                headers: merged_headers,
+                includes: merged_includes,
+                defines: merged_defines,
+            })
+        };
 
         // Merge linking contexts into a single one
         let merged_linking_context = if linking_contexts.is_empty() {
@@ -4316,7 +4373,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         };
 
         Ok(heap.alloc(CcInfoInstanceGen {
-            compilation_context: last_compilation_context,
+            compilation_context: merged_compilation_context,
             linking_context: merged_linking_context,
         }))
     }

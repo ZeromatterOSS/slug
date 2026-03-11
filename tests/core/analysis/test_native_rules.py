@@ -429,3 +429,8 @@ async def test_cc_common_merge_cc_infos(buck: Buck) -> None:
     assert lines["has_compilation_context"] == "True"
     assert lines["has_linking_context"] == "True"
     assert lines["comp_ctx_type"] == "CcCompilationContext"
+    # Verify both CcInfos' defines/includes were merged (not just the last one)
+    assert lines["defines_count"] == "2"
+    assert lines["defines"] == "DEF1=1,DEF2=2"
+    assert lines["includes_count"] == "2"
+    assert lines["includes"] == "inc1/,inc2/"

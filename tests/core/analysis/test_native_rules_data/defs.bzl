@@ -247,15 +247,21 @@ def _cc_merge_infos_test_impl(ctx):
     comp_ctx1 = cc_common.create_compilation_context(
         headers = depset([]),
         defines = depset(["DEF1=1"]),
+        includes = depset(["inc1/"]),
     )
     comp_ctx2 = cc_common.create_compilation_context(
         headers = depset([]),
         defines = depset(["DEF2=2"]),
+        includes = depset(["inc2/"]),
     )
     info1 = CcInfo(compilation_context = comp_ctx1)
     info2 = CcInfo(compilation_context = comp_ctx2)
 
     merged = cc_common.merge_cc_infos(cc_infos = [info1, info2])
+
+    # Verify merged compilation context has defines from BOTH inputs
+    merged_defines = merged.compilation_context.defines.to_list()
+    merged_includes = merged.compilation_context.includes.to_list()
 
     out = ctx.actions.declare_file(ctx.label.name + ".txt")
     lines = [
@@ -263,6 +269,10 @@ def _cc_merge_infos_test_impl(ctx):
         "has_compilation_context=" + str(hasattr(merged, "compilation_context")),
         "has_linking_context=" + str(hasattr(merged, "linking_context")),
         "comp_ctx_type=" + type(merged.compilation_context),
+        "defines_count=" + str(len(merged_defines)),
+        "defines=" + ",".join(sorted(merged_defines)),
+        "includes_count=" + str(len(merged_includes)),
+        "includes=" + ",".join(sorted(merged_includes)),
     ]
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
