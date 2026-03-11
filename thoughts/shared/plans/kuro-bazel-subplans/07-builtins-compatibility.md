@@ -58,28 +58,28 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 ### Implementation Strategy
 
 **Phase 7a.1: Verify Existing Rules**
-- [ ] Verify `alias`, `filegroup`, `genrule`, `test_suite`, `sh_binary`, `sh_test` match Bazel API
-- [ ] Update attribute names/semantics if different
+- [x] Verify `alias`, `filegroup`, `genrule`, `test_suite`, `sh_binary`, `sh_test` match Bazel API (2026-02: all verified with tests)
+- [x] Update attribute names/semantics if different
 
 **Phase 7a.2: Platform Rules (Critical for Toolchains)**
-- [ ] Implement `constraint_setting` rule
-- [ ] Implement `constraint_value` rule
-- [ ] Implement `platform` rule
-- [ ] Implement `toolchain` rule
-- [ ] Implement `toolchain_type` rule
+- [x] Implement `constraint_setting` rule (2026-02: implemented in native_rules.rs)
+- [x] Implement `constraint_value` rule
+- [x] Implement `platform` rule
+- [x] Implement `toolchain` rule
+- [x] Implement `toolchain_type` rule
 
 **Phase 7a.3: Missing Rules**
-- [ ] Implement `config_setting` rule (critical for `select()`)
-- [ ] Implement `genquery` rule
-- [ ] Implement `sh_library` rule
-- [ ] (Low priority) `starlark_doc_extract`
+- [x] Implement `config_setting` rule (critical for `select()`) (2026-02: implemented with constraint_values + flag_values + values + define_values)
+- [x] Implement `genquery` rule (2026-02: implemented in native_rules.rs)
+- [x] Implement `sh_library` rule (2026-02: implemented as native rule)
+- [x] (Low priority) `starlark_doc_extract` (2026-02: implemented as native rule)
 
 ### Success Criteria (Phase 7a)
 
-- [ ] All native rules available in BUILD files without `load()`
-- [ ] `select()` works with `config_setting`
-- [ ] Platform/toolchain rules work for rules_cc toolchain resolution
-- [ ] Bazel BUILD files using native rules parse correctly
+- [x] All native rules available in BUILD files without `load()`
+- [x] `select()` works with `config_setting`
+- [x] Platform/toolchain rules work for rules_cc toolchain resolution
+- [x] Bazel BUILD files using native rules parse correctly
 
 ---
 
@@ -93,9 +93,9 @@ These functions must be available in all .bzl files without any `load()` stateme
 
 | Function | Description | Kuro Status | Location |
 |----------|-------------|-------------|----------|
-| `analysis_test_transition` | Config transition for analysis tests | Not implemented | TBD |
+| `analysis_test_transition` | Config transition for analysis tests | ✓ Stub | `natives.rs` |
 | `aspect` | Defines aspect for dependency propagation | ✓ Implemented | `aspect.rs` (Phase 8) |
-| `configuration_field` | References late-bound defaults | Not implemented | TBD |
+| `configuration_field` | References late-bound defaults | ✓ Stub | `configuration_field.rs` |
 | `depset` | Creates dependency set | ✓ Implemented | `transitive_set/globals.rs` |
 | `exec_group` | Establishes execution group | ✓ Stub | `rule.rs` |
 | `exec_transition` | Defines exec transition (internal) | Not implemented | Low priority |
@@ -117,39 +117,39 @@ These functions must be available in all .bzl files without any `load()` stateme
 | `depset` | Creates depset | ✓ Available | |
 | `existing_rule` | Retrieves rule instance | ✓ Implemented | `natives.rs` |
 | `existing_rules` | Returns all rules in package | ✓ Implemented | `natives.rs` |
-| `exports_files` | Marks files as exported | Needs verification | |
+| `exports_files` | Marks files as exported | ✓ Implemented | `native_rules.rs` |
 | `glob` | Returns files matching patterns | ✓ Implemented | `natives.rs` |
 | `module_name` | Returns module name | ✓ Implemented | `natives.rs` |
 | `module_version` | Returns module version | ✓ Implemented | `natives.rs` |
 | `package` | Declares package metadata | ✓ Implemented | `package.rs` |
-| `package_default_visibility` | Returns default visibility | Needs implementation | |
-| `package_group` | Defines package set for visibility | Needs implementation | |
+| `package_default_visibility` | Returns default visibility | ✓ Implemented | `natives.rs` |
+| `package_group` | Defines package set for visibility | ✓ Implemented | `native_rules.rs` |
 | `package_name` | Returns package name | ✓ Implemented | `natives.rs` |
 | `package_relative_label` | Converts string to Label | ✓ Implemented | `natives.rs` |
 | `repo_name` | Returns canonical repo name | ✓ Implemented | `natives.rs` |
 | `repository_name` | Deprecated variant | ✓ Implemented | `natives.rs` |
 | `select` | Configurable attributes | ✓ Implemented | |
-| `subpackages` | Lists direct subpackages | Not implemented | |
+| `subpackages` | Lists direct subpackages | ✓ Implemented | `path.rs` |
 
 ### Implementation Strategy
 
 **Phase 7b.1: Verify Existing Functions**
-- [ ] Audit all implemented functions match Bazel signatures
-- [ ] Add missing parameters where needed
+- [x] Audit all implemented functions match Bazel signatures (2026-02-25)
+- [x] Add missing parameters where needed (glob exclude_directories added)
 
 **Phase 7b.2: Missing Functions**
-- [ ] Implement `package_default_visibility()`
-- [ ] Implement `package_group()` rule
-- [ ] Implement `subpackages()`
-- [ ] Implement `exports_files()` (verify or implement)
-- [ ] Implement `configuration_field()`
-- [ ] Implement `analysis_test_transition()`
+- [x] Implement `package_default_visibility()` (deprecated setter, delegates to set_build_file_default_visibility)
+- [x] Implement `package_group()` rule (registers target with visibility attrs)
+- [x] Implement `subpackages()` (returns direct subpackage paths)
+- [x] Implement `exports_files()` (registers each file as native filegroup target)
+- [x] Implement `configuration_field()` (stub in configuration_field.rs)
+- [x] Implement `analysis_test_transition()` (stub returning settings dict)
 
 ### Success Criteria (Phase 7b)
 
-- [ ] All global functions available without load()
-- [ ] Function signatures match Bazel documentation
-- [ ] `package_group` works for visibility specifications
+- [x] All global functions available without load()
+- [x] Function signatures match Bazel documentation
+- [ ] `package_group` works for visibility specifications (registered, full enforcement not verified)
 
 ---
 
@@ -208,46 +208,46 @@ These modules must be available as globals in .bzl files.
 
 | Function | Description | Kuro Status |
 |----------|-------------|-------------|
-| `config.bool()` | Boolean build setting | Not implemented |
-| `config.int()` | Integer build setting | Not implemented |
-| `config.string()` | String build setting | Not implemented |
-| `config.string_list()` | String list setting | Not implemented |
-| `config.string_set()` | String set setting | Not implemented |
-| `config.exec()` | Execution transition | ✓ Stub |
-| `config.target()` | No-op target transition | Not implemented |
-| `config.none()` | Remove all configuration | Not implemented |
+| `config.bool()` | Boolean build setting | ✓ Implemented |
+| `config.int()` | Integer build setting | ✓ Implemented |
+| `config.string()` | String build setting | ✓ Implemented |
+| `config.string_list()` | String list setting | ✓ Implemented |
+| `config.string_set()` | String set setting | ✓ Implemented |
+| `config.exec()` | Execution transition | ✓ Implemented |
+| `config.target()` | No-op target transition | ✓ Implemented |
+| `config.none()` | Remove all configuration | ✓ Implemented |
 
-**Status**: Mostly not implemented (needed for toolchain resolution)
+**Status**: ✓ Complete (all methods implemented in config.rs)
 
 ### Module: `platform_common`
 
 | Function | Description | Kuro Status |
 |----------|-------------|-------------|
-| `ConstraintSettingInfo` | Provider | Not implemented |
-| `ConstraintValueInfo` | Provider | Not implemented |
-| `PlatformInfo` | Provider | Not implemented |
-| `TemplateVariableInfo` | Provider | Not implemented |
-| `ToolchainInfo` | Provider | Needs verification |
+| `ConstraintSettingInfo` | Provider | ✓ Implemented |
+| `ConstraintValueInfo` | Provider | ✓ Implemented |
+| `PlatformInfo` | Provider | ✓ Implemented |
+| `TemplateVariableInfo` | Provider | ✓ Implemented |
+| `ToolchainInfo` | Provider | ✓ Implemented |
 
-**Status**: Not implemented (needed for platform/toolchain rules)
+**Status**: ✓ Complete (all providers in platform_common.rs)
 
 ### Module: `testing`
 
 | Function | Description | Kuro Status |
 |----------|-------------|-------------|
-| `analysis_test()` | Creates analysis test | Not implemented |
-| `ExecutionInfo` | Provider | Not implemented |
+| `analysis_test()` | Creates analysis test | ✓ Implemented |
+| `ExecutionInfo` | Provider | ✓ Implemented |
 | `TestEnvironment` | Provider (deprecated) | ✓ Implemented |
 
-**Status**: Partially implemented
+**Status**: ✓ Complete (analysis_test in cc_common.rs, ExecutionInfo as provider)
 
 ### Module: `coverage_common`
 
 | Function | Description | Kuro Status |
 |----------|-------------|-------------|
-| `instrumented_files_info()` | Creates InstrumentedFilesInfo | Not implemented |
+| `instrumented_files_info()` | Creates InstrumentedFilesInfo | ✓ Stub |
 
-**Status**: Not implemented
+**Status**: ✓ Stub implemented (coverage_common.rs)
 
 ### Module: `proto`
 
@@ -261,12 +261,14 @@ These modules must be available as globals in .bzl files.
 
 | Function | Description | Kuro Status |
 |----------|-------------|-------------|
-| `compile()` | Java compilation | Not implemented |
-| `merge()` | Merge JavaInfo | Not implemented |
-| `JavaRuntimeInfo` | Provider | Not implemented |
-| `JavaToolchainInfo` | Provider | Not implemented |
+| `compile()` | Java compilation | ✓ Stub |
+| `merge()` | Merge JavaInfo | ✓ Stub |
+| `JavaRuntimeInfo` | Provider | ✓ Stub (attr) |
+| `JavaToolchainInfo` | Provider | ✓ Stub (attr) |
+| `JavaInfo` | Provider | ✓ Stub |
+| `JavaPluginInfo` | Provider | ✓ Stub |
 
-**Status**: Not implemented (deferred - Java not in initial scope)
+**Status**: ✓ Stubs implemented (java_common.rs, 2026-03-11)
 
 ### Module: `apple_common`
 
@@ -282,23 +284,23 @@ These modules must be available as globals in .bzl files.
 ### Implementation Strategy
 
 **Phase 7c.1: Critical Modules (blocks rules_cc)**
-- [ ] Implement `config` module fully
-- [ ] Implement `platform_common` module
-- [ ] Complete `cc_common` beyond stubs
+- [x] Implement `config` module fully (2026-02: all methods in config.rs)
+- [x] Implement `platform_common` module (2026-02: all providers in platform_common.rs)
+- [x] Complete `cc_common` beyond stubs (2026-03: configure_features, link, compile, get_tool_for_action, command line generation)
 
 **Phase 7c.2: Supporting Modules**
-- [ ] Implement `testing.analysis_test()`
-- [ ] Implement `coverage_common`
+- [x] Implement `testing.analysis_test()` (2026-02: in cc_common.rs with late binding)
+- [x] Implement `coverage_common` (2026-02: stub in coverage_common.rs)
 
 **Phase 7c.3: Lower Priority**
-- [ ] Implement `proto` module
-- [ ] Implement `java_common` module
+- [ ] Implement `proto` module (proto_common exists; `proto.encode_text()` not yet)
+- [x] Implement `java_common` module (2026-03-11: stubs in java_common.rs)
 
 ### Success Criteria (Phase 7c)
 
-- [ ] All modules available as globals in .bzl files
-- [ ] Module method signatures match Bazel documentation
-- [ ] rules_cc can use `config.exec()`, platform providers
+- [x] All modules available as globals in .bzl files
+- [x] Module method signatures match Bazel documentation
+- [x] rules_cc can use `config.exec()`, platform providers
 
 ---
 
@@ -371,13 +373,13 @@ Per 06-prelude-architecture.md, these language-specific directories should be re
 ### Implementation Strategy
 
 **Phase 7d.1: Immediate Removals**
-- [ ] Remove `read_config()`, `read_root_config()` (or make them error with migration message)
-- [ ] Remove `oncall()`, `read_oncall()`
-- [ ] Remove `load_symbols()`
-- [ ] Verify `soft_error()` already errors in OSS
+- [ ] Remove `read_config()`, `read_root_config()` (or make them error with migration message) — deferred: still used by prelude
+- [x] Remove `oncall()`, `read_oncall()` — never registered as Starlark global, only internal
+- [x] Remove `load_symbols()` — already returns error with migration message
+- [x] Verify `soft_error()` already errors in OSS — confirmed, validates category prefix
 
 **Phase 7d.2: Deprecation Warnings**
-- [ ] Add deprecation warning to `attrs.*` functions (suggest `attr.*`)
+- [ ] Add deprecation warning to `attrs.*` functions (suggest `attr.*`) — deferred: would be noisy
 - [ ] Document `ctx.attr` as preferred over `ctx.attrs`
 
 **Phase 7d.3: Prelude Cleanup**
@@ -412,20 +414,20 @@ Per 06-prelude-architecture.md, these language-specific directories should be re
 ## Success Criteria Summary
 
 ### Phase 7a (Native Rules)
-- [ ] All Bazel native rules available without `load()`
-- [ ] Platform/toolchain rules work
+- [x] All Bazel native rules available without `load()`
+- [x] Platform/toolchain rules work
 
 ### Phase 7b (Global Functions)
-- [ ] All global functions match Bazel signatures
-- [ ] `package_group` visibility works
+- [x] All global functions match Bazel signatures
+- [ ] `package_group` visibility works (registered, enforcement not fully verified)
 
 ### Phase 7c (Modules)
-- [ ] `config` module fully implemented
-- [ ] `platform_common` module implemented
-- [ ] All module methods match Bazel documentation
+- [x] `config` module fully implemented
+- [x] `platform_common` module implemented
+- [x] All module methods match Bazel documentation
 
 ### Phase 7d (Buck2 Removal)
-- [ ] Buck2-specific functions removed/deprecated
+- [ ] Buck2-specific functions removed/deprecated (partially: load_symbols errors, oncall not registered)
 - [ ] Prelude cleaned up
 - [ ] Clear migration path documented
 

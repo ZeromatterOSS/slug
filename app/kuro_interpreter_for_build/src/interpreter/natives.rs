@@ -294,11 +294,25 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
         Ok(eval.heap().alloc(AllocDict(entries)))
     }
 
-    /// Bazel's `AnalysisFailureInfo` provider stub.
+    /// Bazel's `AnalysisFailureInfo` provider for analysis failure detection.
     ///
     /// Used by bazel_skylib's unittest framework to detect analysis failures.
-    fn AnalysisFailureInfo<'v>(eval: &mut Evaluator<'v, '_, '_>) -> starlark::Result<Value<'v>> {
-        Ok(eval.heap().alloc("AnalysisFailureInfo_stub"))
+    /// In Bazel, this is a callable provider: AnalysisFailureInfo(causes=depset(...))
+    fn AnalysisFailureInfo<'v>(
+        #[starlark(require = named, default = NoneOr::None)] causes: NoneOr<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let entries = vec![
+            ("_type", eval.heap().alloc("AnalysisFailureInfo")),
+            (
+                "causes",
+                match causes {
+                    NoneOr::Other(v) => v,
+                    NoneOr::None => Value::new_none(),
+                },
+            ),
+        ];
+        Ok(eval.heap().alloc(AllocDict(entries)))
     }
 }
 
