@@ -3245,6 +3245,8 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     pic_static_library: Value::new_none(),
                     dynamic_library: if is_dynamic { out } else { Value::new_none() },
                     interface_library: Value::new_none(),
+                    objects: Value::new_none(),
+                    pic_objects: Value::new_none(),
                     alwayslink: false,
                 })
             } else {
@@ -3328,15 +3330,34 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Checks if an action is enabled in the feature configuration.
-    #[allow(unused_variables)]
+    ///
+    /// In Bazel, action enablement is controlled by features that gate specific
+    /// compiler/linker actions. We check if the action_name corresponds to a
+    /// known feature and consult the FeatureConfiguration if so.
     fn action_is_enabled<'v>(
-        #[starlark(this)] this: &CcCommonModule,
+        #[starlark(this)] _this: &CcCommonModule,
         #[starlark(require = named)] feature_configuration: Value<'v>,
         #[starlark(require = named)] action_name: &str,
-        eval: &mut Evaluator<'v, '_, '_>,
+        #[allow(unused_variables)] eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<bool> {
-        // TODO(cc_common): Check against feature configuration
-        // For now, all actions are considered enabled
+        // Try to consult the FeatureConfiguration for action-specific features.
+        // In Bazel, actions like "c++-compile", "c++-link-executable" etc. are
+        // enabled based on the feature configuration. We map action names to
+        // features where there's a direct correspondence.
+        if let Some(fc) = feature_configuration.downcast_ref::<FeatureConfiguration>() {
+            // Some actions correspond directly to features
+            let feature_name = match action_name {
+                "c++-compile" | "c-compile" | "cc-flags-make-variable" => None, // Always enabled
+                "c++-link-executable" | "c++-link-dynamic-library"
+                | "c++-link-nodeps-dynamic-library" | "c++-link-static-library" => None, // Always enabled
+                // For other action names, check if there's a matching feature
+                other => Some(other),
+            };
+            if let Some(feature) = feature_name {
+                return Ok(fc.is_feature_enabled(feature));
+            }
+        }
+        // Default: actions are enabled
         Ok(true)
     }
 
@@ -3928,6 +3949,8 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 pic_static_library: Value::new_none(),
                 dynamic_library: Value::new_none(),
                 interface_library: Value::new_none(),
+                objects: Value::new_none(),
+                pic_objects: Value::new_none(),
                 alwayslink,
             })
         };
@@ -3938,10 +3961,72 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             executable: Value::new_none(),
         });
 
-        // Create linker_inputs depset
-        // TODO(cc_common): Properly create depset with linker inputs from library_to_link
-        // For now, use empty depset - proper depset creation requires FrozenValue
-        let linker_inputs = heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty());
+        // Create a LinkerInput wrapping the library_to_link
+        let libraries_depset = if library_to_link.is_none() {
+            heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())
+        } else {
+            crate::interpreter::rule_defs::depset::make_depset_from_lists(
+                heap,
+                vec![library_to_link],
+                Vec::new(),
+                "default",
+            )?
+        };
+
+        // Wrap user_link_flags in a depset if provided as a list
+        let user_link_flags_depset = if user_link_flags.is_none() {
+            heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())
+        } else {
+            match user_link_flags.iterate(heap) {
+                Ok(iter) => {
+                    match crate::interpreter::rule_defs::depset::make_depset_from_lists(
+                        heap,
+                        iter.collect(),
+                        Vec::new(),
+                        "default",
+                    ) {
+                        Ok(ds) => ds,
+                        Err(_) => user_link_flags,
+                    }
+                }
+                Err(_) => user_link_flags,
+            }
+        };
+
+        let additional_inputs_depset = if additional_inputs.is_none() {
+            heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())
+        } else {
+            additional_inputs
+        };
+
+        let linker_input = heap.alloc(LinkerInputStubGen {
+            owner: Value::new_none(), // No owner label available in this context
+            libraries: libraries_depset,
+            user_link_flags: user_link_flags_depset,
+            additional_inputs: additional_inputs_depset,
+        });
+
+        // Create linker_inputs depset containing this LinkerInput
+        // Also include transitive linker_inputs from provided linking_contexts
+        let mut transitive_depsets: Vec<Value<'v>> = Vec::new();
+        if !linking_contexts.is_none() {
+            if let Ok(iter) = linking_contexts.iterate(heap) {
+                for ctx_val in iter {
+                    if let Ok(Some(li)) = ctx_val.get_attr("linker_inputs", heap) {
+                        if !li.is_none() {
+                            transitive_depsets.push(li);
+                        }
+                    }
+                }
+            }
+        }
+
+        let linker_inputs = crate::interpreter::rule_defs::depset::make_depset_from_lists(
+            heap,
+            vec![linker_input],
+            transitive_depsets,
+            "default",
+        )?;
 
         // Create linking context
         let linking_context = heap.alloc(LinkingContextWithInputsGen { linker_inputs });
@@ -4009,6 +4094,8 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             pic_static_library,
             dynamic_library,
             interface_library,
+            objects,
+            pic_objects,
             alwayslink,
         }))
     }
@@ -4346,6 +4433,8 @@ pub struct LibraryToLinkGen<V: ValueLifetimeless> {
     pic_static_library: V,
     dynamic_library: V,
     interface_library: V,
+    objects: V,
+    pic_objects: V,
     alwayslink: bool,
 }
 
@@ -4369,16 +4458,32 @@ where
                 | "pic_static_library"
                 | "dynamic_library"
                 | "interface_library"
+                | "objects"
+                | "pic_objects"
                 | "alwayslink"
         )
     }
 
-    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "static_library" => Some(self.static_library.to_value()),
             "pic_static_library" => Some(self.pic_static_library.to_value()),
             "dynamic_library" => Some(self.dynamic_library.to_value()),
             "interface_library" => Some(self.interface_library.to_value()),
+            "objects" => {
+                if self.objects.to_value().is_none() {
+                    Some(heap.alloc(starlark::values::list::AllocList::EMPTY))
+                } else {
+                    Some(self.objects.to_value())
+                }
+            }
+            "pic_objects" => {
+                if self.pic_objects.to_value().is_none() {
+                    Some(heap.alloc(starlark::values::list::AllocList::EMPTY))
+                } else {
+                    Some(self.pic_objects.to_value())
+                }
+            }
             "alwayslink" => Some(Value::new_bool(self.alwayslink)),
             _ => None,
         }
