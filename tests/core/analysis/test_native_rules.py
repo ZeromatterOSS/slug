@@ -566,3 +566,23 @@ async def test_cc_import_registers_target(buck: Buck) -> None:
     """cc_import() registers a resolvable target for prebuilt libraries."""
     result = await buck.targets("//:test_cc_import")
     assert "//:test_cc_import" in result.stdout.replace("root//:", "//:")
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_cc_command_line_generation(buck: Buck) -> None:
+    """cc_common.get_tool_for_action() and get_memory_inefficient_command_line() work."""
+    result = await buck.build("//:cc_command_line_test")
+    output = result.get_build_report().output_for_target("//:cc_command_line_test")
+    content = output.read_text().replace("\r\n", "\n")
+    lines = dict(line.split("=", 1) for line in content.strip().split("\n") if "=" in line)
+
+    # Compiler tool should exist (e.g. gcc, clang, cl.exe)
+    assert lines.get("compiler_path", "") != "", f"compiler_path should be non-empty, got: {lines}"
+    # Compile command line should contain the source and output file
+    assert lines.get("has_source_in_compile") == "True", f"compile cmdline should contain test.cc: {lines}"
+    assert lines.get("has_output_in_compile") == "True", f"compile cmdline should contain test.o: {lines}"
+    # Linker tool should exist
+    assert lines.get("linker_path", "") != "", f"linker_path should be non-empty, got: {lines}"
+    # Both should have non-zero length command lines
+    assert int(lines.get("compile_cmdline_len", "0")) > 0, f"compile cmdline should be non-empty: {lines}"
+    assert int(lines.get("link_cmdline_len", "0")) > 0, f"link cmdline should be non-empty: {lines}"

@@ -354,3 +354,60 @@ string_flag = rule(
     implementation = _string_setting_impl,
     build_setting = config.string(flag = True),
 )
+
+
+def _cc_command_line_test_impl(ctx):
+    """Tests cc_common.get_tool_for_action() and get_memory_inefficient_command_line()."""
+    fc = cc_common.configure_features(cc_toolchain = None, ctx = ctx)
+
+    # Get the compiler tool
+    compiler_path = cc_common.get_tool_for_action(
+        feature_configuration = fc,
+        action_name = "c++-compile",
+    )
+
+    # Get command line for a compile action
+    compile_cmdline = cc_common.get_memory_inefficient_command_line(
+        feature_configuration = fc,
+        action_name = "c++-compile",
+        variables = cc_common.create_compile_variables(
+            cc_toolchain = None,
+            feature_configuration = fc,
+            source_file = "test.cc",
+            output_file = "test.o",
+        ),
+    )
+
+    # Get the linker tool
+    linker_path = cc_common.get_tool_for_action(
+        feature_configuration = fc,
+        action_name = "c++-link-executable",
+    )
+
+    # Get command line for a link action
+    link_cmdline = cc_common.get_memory_inefficient_command_line(
+        feature_configuration = fc,
+        action_name = "c++-link-executable",
+        variables = cc_common.create_link_variables(
+            cc_toolchain = None,
+            feature_configuration = fc,
+        ),
+    )
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    lines = [
+        "compiler_path=" + compiler_path,
+        "compile_cmdline_len=" + str(len(compile_cmdline)),
+        "has_source_in_compile=" + str(any(["test.cc" in str(a) for a in compile_cmdline])),
+        "has_output_in_compile=" + str(any(["test.o" in str(a) for a in compile_cmdline])),
+        "linker_path=" + linker_path,
+        "link_cmdline_len=" + str(len(link_cmdline)),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+cc_command_line_test = rule(
+    implementation = _cc_command_line_test_impl,
+    attrs = {},
+)
