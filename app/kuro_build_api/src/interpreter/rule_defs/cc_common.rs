@@ -2542,6 +2542,13 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             }
         }
 
+        // Also include global --features from command line
+        for feat in crate::interpreter::rule_defs::build_config::get_features() {
+            if !req.contains(&feat) {
+                req.push(feat);
+            }
+        }
+
         // Collect unsupported features from the list
         let mut unsup: Vec<String> = Vec::new();
         if !unsupported_features.is_none() {
