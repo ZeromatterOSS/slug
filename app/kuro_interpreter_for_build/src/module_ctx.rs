@@ -541,7 +541,12 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
-            "modules" | "os" | "root_module_has_non_dev_dependency"
+            "modules"
+                | "os"
+                | "root_module_has_non_dev_dependency"
+                | "is_isolated"
+                | "root_module_direct_deps"
+                | "root_module_direct_dev_deps"
         )
     }
 
@@ -566,6 +571,12 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
             "root_module_has_non_dev_dependency" => {
                 Some(Value::new_bool(self.root_module_has_non_dev_dependency))
             }
+            // Whether this extension is isolated (Bazel 7.1+)
+            "is_isolated" => Some(Value::new_bool(false)),
+            // Root module's direct (non-dev) bazel_dep labels
+            "root_module_direct_deps" => Some(Value::new_none()),
+            // Root module's direct dev bazel_dep labels
+            "root_module_direct_dev_deps" => Some(Value::new_none()),
             _ => None,
         }
     }
@@ -575,6 +586,9 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
             "modules".to_owned(),
             "os".to_owned(),
             "root_module_has_non_dev_dependency".to_owned(),
+            "is_isolated".to_owned(),
+            "root_module_direct_deps".to_owned(),
+            "root_module_direct_dev_deps".to_owned(),
         ]
     }
 
@@ -593,6 +607,21 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
 /// Full implementation requires integration with the bzlmod extension execution engine.
 #[starlark_module]
 fn module_ctx_methods(builder: &mut MethodsBuilder) {
+    /// Returns whether the given module uses this extension as a dev dependency.
+    ///
+    /// In Bazel, module extensions can check if a particular bazel_module has
+    /// declared the extension as a dev dependency. Dev dependencies are only
+    /// visible in the root module.
+    fn is_dev_dependency<'v>(
+        this: &ModuleContext,
+        #[starlark(require = pos)] _module: Value<'v>,
+    ) -> starlark::Result<bool> {
+        // For now, return false (not a dev dependency).
+        // A full implementation would check the module's use_extension() declaration.
+        let _ = this;
+        Ok(false)
+    }
+
     /// Read a file and return its contents as a string.
     /// STUB: Returns empty string.
     fn read(
