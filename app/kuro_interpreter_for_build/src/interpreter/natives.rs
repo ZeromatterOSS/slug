@@ -349,15 +349,25 @@ pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
     /// This is a Bazel built-in native rule that was used before toolchain resolution.
     /// In modern Bazel (and rules_cc 0.2.16+), this is deprecated in favor of toolchain()
     /// rules, but native cc_toolchain_suite must still exist for backwards compatibility.
-    ///
-    /// Currently a no-op stub that allows parsing.
     fn cc_toolchain_suite<'v>(
         #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
         #[starlark(kwargs)] _kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        // TODO(toolchains): Implement cc_toolchain_suite target registration.
-        // Currently a no-op stub for parsing compatibility.
-        let _unused = name;
+        let internals = ModuleInternals::from_context(eval, "cc_toolchain_suite")?;
+        let target_node = crate::interpreter::native_rules::create_native_target_node(
+            crate::interpreter::native_rules::rule_defs::CC_TOOLCHAIN_SUITE_RULE.clone(),
+            internals.package(),
+            name,
+            vec![],
+            &crate::interpreter::native_rules::extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
+            &internals.default_visibility(),
+        )?;
+        internals.record(target_node)?;
         Ok(NoneType)
     }
 
@@ -366,15 +376,25 @@ pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
     /// This is a Bazel built-in native rule for C++ toolchain definition.
     /// In modern Bazel with rules_cc 0.2.16+, the pure Starlark cc_toolchain rule
     /// is preferred, but native cc_toolchain must exist for backwards compatibility.
-    ///
-    /// Currently a no-op stub that allows parsing.
     fn cc_toolchain<'v>(
         #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
         #[starlark(kwargs)] _kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        // TODO(toolchains): Implement cc_toolchain target registration.
-        // Currently a no-op stub for parsing compatibility.
-        let _unused = name;
+        let internals = ModuleInternals::from_context(eval, "cc_toolchain")?;
+        let target_node = crate::interpreter::native_rules::create_native_target_node(
+            crate::interpreter::native_rules::rule_defs::CC_TOOLCHAIN_RULE.clone(),
+            internals.package(),
+            name,
+            vec![],
+            &crate::interpreter::native_rules::extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
+            &internals.default_visibility(),
+        )?;
+        internals.record(target_node)?;
         Ok(NoneType)
     }
 
@@ -425,20 +445,25 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
     /// In modern Bazel (and rules_cc 0.2.16+), this is deprecated in favor of toolchain()
     /// rules, but the native.cc_toolchain_suite function must still exist for backwards
     /// compatibility with the wrapper in rules_cc.
-    ///
-    /// Currently a no-op stub that allows parsing.
     fn cc_toolchain_suite<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = NoneOr::None)] _toolchains: NoneOr<Value<'v>>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        _visibility: UnpackListOrTuple<String>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        _tags: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
         #[starlark(kwargs)] _kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        // TODO(toolchains): Implement cc_toolchain_suite target registration.
-        // Currently a no-op stub for parsing compatibility.
-        let _unused = name;
+        let internals = ModuleInternals::from_context(eval, "cc_toolchain_suite")?;
+        let target_node = crate::interpreter::native_rules::create_native_target_node(
+            crate::interpreter::native_rules::rule_defs::CC_TOOLCHAIN_SUITE_RULE.clone(),
+            internals.package(),
+            name,
+            vec![],
+            &crate::interpreter::native_rules::extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
+            &internals.default_visibility(),
+        )?;
+        internals.record(target_node)?;
         Ok(NoneType)
     }
 
@@ -447,22 +472,25 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
     /// This is a Bazel built-in native rule for C++ toolchain definition.
     /// In modern Bazel with rules_cc 0.2.16+, the pure Starlark cc_toolchain rule
     /// is preferred, but native.cc_toolchain must exist for backwards compatibility.
-    ///
-    /// Currently a no-op stub that allows parsing.
     fn cc_toolchain<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = NoneOr::None)] _all_files: NoneOr<Value<'v>>,
-        #[starlark(require = named, default = NoneOr::None)] _toolchain_config: NoneOr<Value<'v>>,
-        #[starlark(require = named, default = NoneOr::None)] _toolchain_identifier: NoneOr<&str>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        _visibility: UnpackListOrTuple<String>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        _tags: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
         #[starlark(kwargs)] _kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        // TODO(toolchains): Implement cc_toolchain target registration.
-        // Currently a no-op stub for parsing compatibility.
-        let _unused = name;
+        let internals = ModuleInternals::from_context(eval, "cc_toolchain")?;
+        let target_node = crate::interpreter::native_rules::create_native_target_node(
+            crate::interpreter::native_rules::rule_defs::CC_TOOLCHAIN_RULE.clone(),
+            internals.package(),
+            name,
+            vec![],
+            &crate::interpreter::native_rules::extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
+            &internals.default_visibility(),
+        )?;
+        internals.record(target_node)?;
         Ok(NoneType)
     }
     /// The `glob()` function specifies a set of files using patterns.

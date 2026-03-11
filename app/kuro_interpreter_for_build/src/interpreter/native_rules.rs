@@ -62,7 +62,7 @@ use crate::interpreter::module_internals::ModuleInternals;
 
 /// Pre-built Rule definitions for native rules.
 /// These are created once and reused across all invocations.
-mod rule_defs {
+pub(crate) mod rule_defs {
     use super::*;
 
     /// Creates the AttributeSpec for constraint_setting.
@@ -902,11 +902,86 @@ mod rule_defs {
             toolchain_types: vec![],
         })
     });
+
+    /// Attributes for cc_toolchain rule.
+    /// Accepts all_files (label dep), toolchain_config (label dep), toolchain_identifier (string),
+    /// and common attributes. Extra kwargs are silently accepted for forward compat.
+    fn cc_toolchain_attributes() -> AttributeSpec {
+        let all_files_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::None)),
+            "all_files",
+            AttrType::option(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
+        );
+        let toolchain_config_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::None)),
+            "toolchain_config",
+            AttrType::option(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
+        );
+        let toolchain_identifier_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::String(StringLiteral::default()))),
+            "toolchain_identifier",
+            AttrType::string(),
+        );
+
+        AttributeSpec::from(
+            vec![
+                ("all_files".to_owned(), all_files_attr),
+                ("toolchain_config".to_owned(), toolchain_config_attr),
+                ("toolchain_identifier".to_owned(), toolchain_identifier_attr),
+            ],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("cc_toolchain attributes should be valid")
+    }
+
+    /// The Rule definition for cc_toolchain.
+    pub static CC_TOOLCHAIN_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: cc_toolchain_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::CcToolchain),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+            toolchain_types: vec![],
+        })
+    });
+
+    /// Attributes for cc_toolchain_suite rule.
+    /// Accepts toolchains (dict of string to label).
+    fn cc_toolchain_suite_attributes() -> AttributeSpec {
+        let toolchains_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::None)),
+            "toolchains",
+            AttrType::option(AttrType::dict(AttrType::string(), AttrType::string(), false)),
+        );
+
+        AttributeSpec::from(
+            vec![("toolchains".to_owned(), toolchains_attr)],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("cc_toolchain_suite attributes should be valid")
+    }
+
+    /// The Rule definition for cc_toolchain_suite.
+    pub static CC_TOOLCHAIN_SUITE_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: cc_toolchain_suite_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::CcToolchainSuite),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+            toolchain_types: vec![],
+        })
+    });
 }
 
 /// Extract visibility strings from a Starlark value.
 /// Handles None (returns empty), list of strings, or tuple of strings.
-fn extract_visibility_strings(value: starlark::values::Value) -> Vec<String> {
+pub(crate) fn extract_visibility_strings(value: starlark::values::Value) -> Vec<String> {
     if value.is_none() {
         return Vec::new();
     }
@@ -926,7 +1001,7 @@ fn extract_visibility_strings(value: starlark::values::Value) -> Vec<String> {
 }
 
 /// Creates a TargetNode for a native rule.
-fn create_native_target_node(
+pub(crate) fn create_native_target_node(
     rule: Arc<Rule>,
     package: Arc<Package>,
     target_name: &str,

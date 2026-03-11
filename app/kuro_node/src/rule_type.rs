@@ -98,6 +98,10 @@ pub enum NativeRuleKind {
     ExecutionPlatforms,
     #[display("starlark_doc_extract")]
     StarlarkDocExtract,
+    #[display("cc_toolchain")]
+    CcToolchain,
+    #[display("cc_toolchain_suite")]
+    CcToolchainSuite,
 }
 
 impl NativeRuleKind {
@@ -127,6 +131,8 @@ impl NativeRuleKind {
             NativeRuleKind::ExecutionPlatform => "execution_platform",
             NativeRuleKind::ExecutionPlatforms => "execution_platforms",
             NativeRuleKind::StarlarkDocExtract => "starlark_doc_extract",
+            NativeRuleKind::CcToolchain => "cc_toolchain",
+            NativeRuleKind::CcToolchainSuite => "cc_toolchain_suite",
         }
     }
 }

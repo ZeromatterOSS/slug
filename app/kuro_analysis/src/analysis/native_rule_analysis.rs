@@ -118,6 +118,8 @@ pub fn analyze_native_rule(
         NativeRuleKind::ExecutionPlatform => analyze_execution_platform(target, dep_analysis),
         NativeRuleKind::ExecutionPlatforms => analyze_execution_platforms(target, dep_analysis),
         NativeRuleKind::StarlarkDocExtract => analyze_genquery(target), // stub: empty output file
+        NativeRuleKind::CcToolchain => create_minimal_analysis_result(target),
+        NativeRuleKind::CcToolchainSuite => create_minimal_analysis_result(target),
     }
 }
 

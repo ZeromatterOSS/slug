@@ -545,3 +545,17 @@ async def test_hasattr_native_starlark_doc_extract(buck: Buck) -> None:
     result = await buck.build("//:doc_extract_test")
     output = result.get_build_report().output_for_target("//:doc_extract_test")
     assert output.exists()
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_cc_toolchain_registers_target(buck: Buck) -> None:
+    """cc_toolchain() registers a resolvable target (not a no-op)."""
+    result = await buck.targets("//:test_cc_toolchain")
+    assert "//:test_cc_toolchain" in result.stdout.replace("root//:", "//:")
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_cc_toolchain_suite_registers_target(buck: Buck) -> None:
+    """cc_toolchain_suite() registers a resolvable target (not a no-op)."""
+    result = await buck.targets("//:test_cc_toolchain_suite")
+    assert "//:test_cc_toolchain_suite" in result.stdout.replace("root//:", "//:")

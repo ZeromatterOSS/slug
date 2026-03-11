@@ -451,6 +451,18 @@ starlark_doc_extract(
     src = ":source_files",
 )
 
+# === cc_toolchain and cc_toolchain_suite tests ===
+
+cc_toolchain(
+    name = "test_cc_toolchain",
+    toolchain_identifier = "test-toolchain",
+)
+
+cc_toolchain_suite(
+    name = "test_cc_toolchain_suite",
+    toolchains = {"k8": "test_cc_toolchain"},
+)
+
 # === existing_rules() / repository_name() test ===
 # capture_existing_rules must be called AFTER other rules so it can see them.
 capture_existing_rules(name = "existing_rules_check")
