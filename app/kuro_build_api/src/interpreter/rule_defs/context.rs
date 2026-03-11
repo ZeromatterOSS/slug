@@ -1697,12 +1697,24 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
         match attribute {
             "cc_provider_in_toolchain" => Some(Value::new_bool(false)),
             "toolchain_id" => Some(heap.alloc_str("local_cc_toolchain").to_value()),
-            "compiler" => Some(heap.alloc_str("gcc").to_value()),
-            "cpu" => Some(heap.alloc_str("k8").to_value()),
-            "target_gnu_system_name" => Some(heap.alloc_str("x86_64-linux-gnu").to_value()),
+            "compiler" => {
+                let compiler = if cfg!(windows) { "msvc" } else if cfg!(target_os = "macos") { "clang" } else { "gcc" };
+                Some(heap.alloc_str(compiler).to_value())
+            }
+            "cpu" => Some(heap.alloc_str(host_target_cpu()).to_value()),
+            "target_gnu_system_name" => {
+                let name = if cfg!(windows) {
+                    if cfg!(target_arch = "aarch64") { "aarch64-w64-windows-msvc" } else { "x86_64-w64-windows-msvc" }
+                } else if cfg!(target_os = "macos") {
+                    if cfg!(target_arch = "aarch64") { "aarch64-apple-darwin" } else { "x86_64-apple-darwin" }
+                } else {
+                    if cfg!(target_arch = "aarch64") { "aarch64-linux-gnu" } else { "x86_64-linux-gnu" }
+                };
+                Some(heap.alloc_str(name).to_value())
+            }
             "sysroot" => Some(Value::new_none()),
             "_supports_header_parsing" => Some(Value::new_bool(true)),
-            "_needs_pic_for_dynamic_libraries" => Some(Value::new_bool(true)),
+            "_needs_pic_for_dynamic_libraries" => Some(Value::new_bool(!cfg!(windows))),
             "_use_pic_for_dynamic_libraries_not_for_binaries" => Some(Value::new_bool(false)),
             "_supports_start_end_lib" => Some(Value::new_bool(false)),
             "_cc_info" => Some(heap.alloc(CcInfoStub)),
@@ -1710,7 +1722,10 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
             "_toolchain_features" => Some(heap.alloc(ToolchainFeaturesStub)),
             "_is_tool_configuration" => Some(Value::new_bool(false)),
             "_fdo_context" => Some(Value::new_none()),
-            "libc" => Some(heap.alloc_str("glibc").to_value()),
+            "libc" => {
+                let libc = if cfg!(windows) { "msvcrt" } else if cfg!(target_os = "macos") { "macosx" } else { "glibc" };
+                Some(heap.alloc_str(libc).to_value())
+            }
             "_abi_glibc_version" => Some(heap.alloc_str("2.17").to_value()),
             "_abi" => Some(heap.alloc_str("local").to_value()),
             "_crosstool_top_path" => Some(heap.alloc_str("external/local_config_cc").to_value()),
@@ -1726,7 +1741,10 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
             }
             "_cpp_configuration" => Some(heap.alloc(CppFragment::default())),
             "_if_so_builder" => Some(Value::new_none()),
-            "_solib_dir" => Some(heap.alloc_str("_solib_k8").to_value()),
+            "_solib_dir" => {
+                let solib = if cfg!(target_arch = "aarch64") { "_solib_aarch64" } else { "_solib_k8" };
+                Some(heap.alloc_str(solib).to_value())
+            }
             "_build_variables_dict" => {
                 let map: SmallMap<Value, Value> = SmallMap::new();
                 Some(heap.alloc(Dict::new(map)))
