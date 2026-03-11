@@ -383,6 +383,67 @@ pub struct CommonBuildConfigurationOptions {
         value_name = "N"
     )]
     pub remote_retries: Option<u32>,
+
+    /// Spawn strategy (Bazel compatibility, accepted but ignored).
+    #[clap(long = "spawn-strategy", alias = "spawn_strategy", hide = true, value_name = "STRATEGY")]
+    pub spawn_strategy: Option<String>,
+
+    /// Dynamic local strategy (Bazel compatibility, accepted but ignored).
+    #[clap(long = "dynamic-local-strategy", alias = "dynamic_local_strategy", hide = true, value_name = "MNEMONIC=STRATEGY", num_args = 1)]
+    pub dynamic_local_strategy: Vec<String>,
+
+    /// Dynamic remote strategy (Bazel compatibility, accepted but ignored).
+    #[clap(long = "dynamic-remote-strategy", alias = "dynamic_remote_strategy", hide = true, value_name = "MNEMONIC=STRATEGY", num_args = 1)]
+    pub dynamic_remote_strategy: Vec<String>,
+
+    /// Disk cache directory (Bazel compatibility, accepted but ignored).
+    #[clap(long = "disk-cache", alias = "disk_cache", hide = true, value_name = "PATH")]
+    pub disk_cache: Option<String>,
+
+    /// Repository cache directory (Bazel compatibility, accepted but ignored).
+    #[clap(long = "repository-cache", alias = "repository_cache", hide = true, value_name = "PATH")]
+    pub repository_cache: Option<String>,
+
+    /// Symlink prefix for output directories (Bazel compatibility, accepted but ignored).
+    #[clap(long = "symlink-prefix", alias = "symlink_prefix", hide = true, value_name = "PREFIX")]
+    pub symlink_prefix: Option<String>,
+
+    /// Remote timeout (Bazel compatibility, accepted but ignored).
+    #[clap(long = "remote-timeout", alias = "remote_timeout", hide = true, value_name = "SECONDS")]
+    pub remote_timeout: Option<String>,
+
+    /// Loading phase threads (Bazel compatibility, accepted but ignored).
+    #[clap(long = "loading-phase-threads", alias = "loading_phase_threads", hide = true, value_name = "N")]
+    pub loading_phase_threads: Option<String>,
+
+    /// Build event text file (Bazel compatibility, accepted but ignored).
+    #[clap(long = "build-event-text-file", alias = "build_event_text_file", hide = true, value_name = "PATH")]
+    pub build_event_text_file: Option<String>,
+
+    /// Build event binary file (Bazel compatibility, accepted but ignored).
+    #[clap(long = "build-event-binary-file", alias = "build_event_binary_file", hide = true, value_name = "PATH")]
+    pub build_event_binary_file: Option<String>,
+
+    /// --repo_env NAME=VALUE pairs (Bazel compatibility).
+    /// Sets environment variables for repository rules.
+    #[clap(long = "repo-env", alias = "repo_env", hide = true, value_name = "NAME=VALUE", num_args = 1)]
+    pub repo_env: Vec<String>,
+
+    /// Remote upload local results (Bazel compatibility, accepted but ignored).
+    #[clap(long = "remote-upload-local-results", alias = "remote_upload_local_results", hide = true)]
+    pub remote_upload_local_results: bool,
+
+    /// Remote accept cached results (Bazel compatibility, accepted but ignored).
+    #[clap(long = "remote-accept-cached", alias = "remote_accept_cached", hide = true)]
+    pub remote_accept_cached: bool,
+
+    /// Announce RC (Bazel compatibility, accepted but ignored).
+    #[clap(long = "announce-rc", alias = "announce_rc", hide = true)]
+    pub announce_rc: bool,
+
+    /// Tool tag for build metrics (Bazel compatibility, accepted but ignored).
+    #[clap(long = "tool-tag", alias = "tool_tag", hide = true, value_name = "TAG")]
+    pub tool_tag: Option<String>,
 }
 
 impl CommonBuildConfigurationOptions {
@@ -520,6 +581,21 @@ impl CommonBuildConfigurationOptions {
             remote_executor: None,
             remote_cache: None,
             remote_retries: None,
+            spawn_strategy: None,
+            dynamic_local_strategy: vec![],
+            dynamic_remote_strategy: vec![],
+            disk_cache: None,
+            repository_cache: None,
+            symlink_prefix: None,
+            remote_timeout: None,
+            loading_phase_threads: None,
+            build_event_text_file: None,
+            build_event_binary_file: None,
+            repo_env: vec![],
+            remote_upload_local_results: false,
+            remote_accept_cached: false,
+            announce_rc: false,
+            tool_tag: None,
         };
         &DEFAULT
     }
@@ -551,6 +627,21 @@ impl CommonBuildConfigurationOptions {
             remote_executor: None,
             remote_cache: None,
             remote_retries: None,
+            spawn_strategy: None,
+            dynamic_local_strategy: vec![],
+            dynamic_remote_strategy: vec![],
+            disk_cache: None,
+            repository_cache: None,
+            symlink_prefix: None,
+            remote_timeout: None,
+            loading_phase_threads: None,
+            build_event_text_file: None,
+            build_event_binary_file: None,
+            repo_env: vec![],
+            remote_upload_local_results: false,
+            remote_accept_cached: false,
+            announce_rc: false,
+            tool_tag: None,
         };
         &OPTS
     }
