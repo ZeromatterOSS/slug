@@ -3,7 +3,7 @@
 {
   "error_category": "USER",
   "failures": {
-    "root//fail_action:fail_one": "Action failed: root//fail_action:fail_one (root//config:dog_platform#<HASH>) (failname name)\nLocal command returned non-zero exit code 1\nLocal command: env --chdir=\"$(kuro root --kind project)\" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/failname/name' false\nStdout: <empty>\nStderr: <empty>\n"
+    "root//fail_action:fail_one": "Action failed: root//fail_action:fail_one (root//config:dog_platform#<HASH>) (failname)\nLocal command returned non-zero exit code 1\nLocal command: env --chdir=\"$(kuro root --kind project)\" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/failname' false\nStdout: <empty>\nStderr: <empty>\n"
   },
   "results": {
     "root//fail_action:fail_one": {
@@ -21,7 +21,7 @@
                 },
                 "name": {
                   "category": "failname",
-                  "identifier": "name"
+                  "identifier": ""
                 },
                 "stderr_content": "<STRING_HASH>",
                 "stdout_content": "<STRING_HASH>"
@@ -48,7 +48,7 @@
   },
   "strings": {
     "<STRING_HASH>": "",
-    "<STRING_HASH>": "Action failed: root//fail_action:fail_one (root//config:dog_platform#<HASH>) (failname name)\nLocal command returned non-zero exit code 1\nLocal command: env --chdir=\"$(kuro root --kind project)\" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/failname/name' false\nStdout: <empty>\nStderr: <empty>\n",
+    "<STRING_HASH>": "Action failed: root//fail_action:fail_one (root//config:dog_platform#<HASH>) (failname)\nLocal command returned non-zero exit code 1\nLocal command: env --chdir=\"$(kuro root --kind project)\" -- 'BUCK_SCRATCH_PATH=buck-out/v2/tmp/root/<HASH>/failname' false\nStdout: <empty>\nStderr: <empty>\n",
     "<STRING_HASH>": "Local command returned non-zero exit code 1"
   },
   "success": false,
