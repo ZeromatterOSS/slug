@@ -471,55 +471,10 @@ impl RunAction {
         }
         // Bazel compatibility: visit extra input artifacts from the `inputs` parameter.
         // These artifacts are tracked as dependencies but don't appear on the command line.
-        use std::io::Write;
-        if !self.starlark_values.bazel_inputs.is_empty() {
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("/tmp/cc_common_compile.log")
-            {
-                let _ = writeln!(
-                    f,
-                    "[visit_artifacts] category={}, bazel_inputs count: {}",
-                    self.starlark_values.category.as_str(),
-                    self.starlark_values.bazel_inputs.len()
-                );
-            }
-        }
         for bazel_input in &self.starlark_values.bazel_inputs {
             let val = bazel_input.to_value();
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("/tmp/cc_common_compile.log")
-            {
-                let _ = writeln!(
-                    f,
-                    "  [visit_artifacts] bazel_input type={}, value={}",
-                    val.get_type(),
-                    val
-                );
-            }
             if let Some(cmd_arg) = ValueAsCommandLineLike::unpack_value_opt(val) {
-                if let Ok(mut f) = std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("/tmp/cc_common_compile.log")
-                {
-                    let _ = writeln!(
-                        f,
-                        "    -> unpacked as CommandLineArgLike, visiting artifacts"
-                    );
-                }
                 cmd_arg.0.visit_artifacts(artifact_visitor)?;
-            } else {
-                if let Ok(mut f) = std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("/tmp/cc_common_compile.log")
-                {
-                    let _ = writeln!(f, "    -> could NOT unpack as CommandLineArgLike!");
-                }
             }
         }
         Ok(())

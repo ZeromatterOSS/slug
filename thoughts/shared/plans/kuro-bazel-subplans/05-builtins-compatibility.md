@@ -156,7 +156,7 @@ These functions must be available in all .bzl files without any `load()` stateme
 
 - [x] All global functions available without load() (2026-02-25: audited and verified)
 - [x] Function signatures match Bazel signatures (2026-02-25: glob exclude_directories added, all others verified)
-- [ ] `package_group` works for visibility specifications (registered but full visibility checking not yet verified)
+- [x] `package_group` works for visibility specifications (PackageGroupRegistry in visibility.rs; cross-package test in test_native_rules_data/subpkg/; 2026-03-11)
 
 ---
 
@@ -434,7 +434,7 @@ Per 04-prelude-architecture.md, these language-specific directories should be re
 ### Phase 7b (Global Functions)
 - [x] All global functions match Bazel signatures (2026-02-25: audited against Bazel docs)
 - [x] repo_name(), existing_rule(), existing_rules(), package_relative_label() available as direct BUILD globals (2026-02-25)
-- [ ] `package_group` visibility works (registered but full visibility enforcement not yet verified)
+- [x] `package_group` visibility works (PackageGroupRegistry, cross-package deps verified; 2026-03-11)
 
 ### Phase 7c (Modules)
 - [x] `config` module fully implemented (config.rs)

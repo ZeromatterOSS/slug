@@ -272,6 +272,30 @@ fn duplicate_category_singleton_actions() {
 }
 
 #[test]
+fn mixed_identified_unidentified_actions_in_same_category() {
+    // One action with identifier + one without in the same category
+    let result = category_identifier_test(&[("foo", Some("x")), ("foo", None)]).unwrap_err();
+
+    assert!(
+        result
+            .category_key()
+            .ends_with("ActionErrors::ActionCategoryDuplicateSingleton")
+    );
+}
+
+#[test]
+fn mixed_unidentified_then_identified_actions_in_same_category() {
+    // Reverse order: unidentified first, then identified
+    let result = category_identifier_test(&[("foo", None), ("foo", Some("x"))]).unwrap_err();
+
+    assert!(
+        result
+            .category_key()
+            .ends_with("ActionErrors::ActionCategoryDuplicateSingleton")
+    );
+}
+
+#[test]
 fn duplicate_category_identifier() {
     let result = category_identifier_test(&[
         ("cxx_compile", Some("foo.cpp")),

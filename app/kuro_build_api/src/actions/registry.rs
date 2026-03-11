@@ -268,6 +268,14 @@ impl<'v> ActionsRegistry<'v> {
                         let existing_identifiers = observed_names
                             .entry(category.to_owned())
                             .or_insert_with(HashSet::<String>::new);
+                        // If the category already has an unidentified action (empty string sentinel),
+                        // mixing identified and unidentified actions is not allowed.
+                        if existing_identifiers.contains("") {
+                            return Err(ActionErrors::ActionCategoryDuplicateSingleton(
+                                category.to_owned(),
+                            )
+                            .into());
+                        }
                         // false -> identifier was already present in the set
                         if !existing_identifiers.insert(identifier.to_owned()) {
                             return Err(ActionErrors::ActionCategoryIdentifierNotUnique(
@@ -278,12 +286,21 @@ impl<'v> ActionsRegistry<'v> {
                         }
                     }
                     (category, None) => {
-                        // Bazel compat: Bazel doesn't require unique action (mnemonic, identifier)
-                        // pairs - output path uniqueness is the real invariant (already enforced by
-                        // claimed_output_paths). Don't error on duplicate no-identifier categories.
-                        observed_names
+                        let existing_identifiers = observed_names
                             .entry(category.to_owned())
-                            .or_insert_with(HashSet::new);
+                            .or_insert_with(HashSet::<String>::new);
+                        // If the category already has any actions (identified or unidentified),
+                        // having an unidentified action is ambiguous.
+                        if !existing_identifiers.is_empty()
+                            || existing_identifiers.contains("")
+                        {
+                            return Err(ActionErrors::ActionCategoryDuplicateSingleton(
+                                category.to_owned(),
+                            )
+                            .into());
+                        }
+                        // Use empty string as sentinel for "no identifier"
+                        existing_identifiers.insert(String::new());
                     }
                 }
 
