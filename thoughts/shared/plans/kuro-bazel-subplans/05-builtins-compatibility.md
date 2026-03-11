@@ -189,24 +189,24 @@ These modules must be available as globals in .bzl files.
 |----------|-------------|-------------|
 | `compile()` | C++ compilation | ✓ Implemented (creates real compile actions; 2026-03-10) |
 | `create_compilation_context()` | Create CompilationContext | ✓ Implemented (headers, includes, defines; 2026-03-11) |
-| `create_compilation_outputs()` | Create CcCompilationOutputs | Stub |
+| `create_compilation_outputs()` | Create CcCompilationOutputs | ✓ Implemented (stores objects/pic_objects; 2026-03-11) |
 | `create_compile_variables()` | Generate compilation vars | ✓ Implemented (stores source/output/flags/includes/defines in dict; 2026-03-11) |
 | `create_linker_input()` | Create LinkerInput | ✓ Implemented (stores user_link_flags, additional_inputs; 2026-03-11) |
-| `create_linking_context()` | Create LinkingContext | Stub |
+| `create_linking_context()` | Create LinkingContext | ✓ Implemented (wraps linker_inputs depset; 2026-03-11) |
 | `create_link_variables()` | Generate linking vars | ✓ Implemented (stores user_link_flags/search_dirs/dynamic flag in dict; 2026-03-11) |
-| `create_library_to_link()` | Create LibraryToLink | Stub |
+| `create_library_to_link()` | Create LibraryToLink | ✓ Implemented (stores static/pic/dynamic libraries + objects/pic_objects + alwayslink; 2026-03-11) |
 | `configure_features()` | Create FeatureConfiguration | ✓ Implemented (stores requested/unsupported features, 30+ default features; 2026-03-11) |
 | `link()` | C++ linking | ✓ Implemented (creates real link actions, supports executable/dynamic_library/static_library; 2026-03-11) |
-| `merge_cc_infos()` | Merge CcInfo providers | ✓ Implemented (merges compilation/linking contexts via depsets; 2026-03-11) |
+| `merge_cc_infos()` | Merge CcInfo providers | ✓ Implemented (properly merges headers/includes/defines depsets from all CcInfos; 2026-03-11) |
 | `is_enabled()` | Check feature enabled | ✓ Implemented (consults FeatureConfiguration's enabled set; 2026-03-11) |
-| `action_is_enabled()` | Check action enabled | Stub |
+| `action_is_enabled()` | Check action enabled | ✓ Implemented (consults FeatureConfiguration for action-specific features; 2026-03-11) |
 | `get_tool_for_action()` | Get tool path | ✓ Implemented (platform-aware MSVC/GCC/Clang) |
 | `get_memory_inefficient_command_line()` | Get command line | ✓ Implemented (generates real compiler/linker command lines) |
 | `get_environment_variables()` | Get env vars | ✓ Implemented (returns MSVC INCLUDE/LIB on Windows; 2026-03-11) |
 | `get_execution_requirements()` | Get exec requirements | Stub |
 | `CcToolchainInfo` | Provider | ✓ Implemented |
 
-**Status**: Mostly implemented (compile/link/configure_features/is_enabled/create_compilation_context/merge_cc_infos/create_linker_input/create_linking_context/create_compile_variables/create_link_variables/get_tool_for_action/get_memory_inefficient_command_line/get_environment_variables are real; remaining are stubs: action_is_enabled, get_execution_requirements)
+**Status**: Nearly complete — all critical functions implemented. Only `get_execution_requirements` returns empty dict (acceptable default). `create_linking_context_from_compilation_outputs` now properly populates linker_inputs depset. (2026-03-11)
 
 ### Module: `config`
 
