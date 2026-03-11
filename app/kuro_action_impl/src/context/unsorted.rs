@@ -9,6 +9,7 @@
  */
 
 use kuro_build_api::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
+use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkArtifactLike;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use kuro_build_api::interpreter::rule_defs::artifact_tagging::ArtifactTag;
 use kuro_build_api::interpreter::rule_defs::cmd_args::StarlarkCmdArgs;
@@ -25,7 +26,49 @@ use starlark::values::FrozenValueTyped;
 use starlark::values::Value;
 use starlark::values::ValueOfUnchecked;
 use starlark::values::ValueTyped;
+use starlark::values::UnpackValue;
 use starlark::values::typing::StarlarkIter;
+
+/// Extract the parent directory from a sibling artifact to use as prefix.
+///
+/// In Bazel, `declare_file("foo.o", sibling=some_artifact)` places the new file
+/// in the same output directory as `some_artifact`. We implement this by extracting
+/// the parent directory from the sibling's short path and using it as the prefix
+/// for `declare_output`.
+fn sibling_to_prefix<'v>(sibling: Value<'v>) -> starlark::Result<Option<String>> {
+    if sibling.is_none() {
+        return Ok(None);
+    }
+
+    if let Some(artifact_like) = <&dyn StarlarkArtifactLike<'v>>::unpack_value(sibling)? {
+        // Use Cell to extract the parent dir from within the with_short_path closure
+        let parent_dir = std::cell::Cell::new(None);
+        artifact_like.with_short_path(&|path| {
+            if let Some(parent) = path.parent() {
+                let s = parent.as_str();
+                if !s.is_empty() {
+                    parent_dir.set(Some(s.to_owned()));
+                }
+            }
+            // The return value is required by the trait but we don't use it.
+            starlark::values::StringValue::default()
+        }).map_err(starlark::Error::from)?;
+        Ok(parent_dir.into_inner())
+    } else if let Some(s) = sibling.unpack_str() {
+        if let Some(idx) = s.rfind('/') {
+            let parent = &s[..idx];
+            if parent.is_empty() { Ok(None) } else { Ok(Some(parent.to_owned())) }
+        } else {
+            Ok(None)
+        }
+    } else {
+        Err(kuro_error::kuro_error!(
+            kuro_error::ErrorTag::Input,
+            "Expected File or declared artifact for `sibling`, got `{}`",
+            sibling.get_type()
+        ).into())
+    }
+}
 
 #[starlark_module]
 pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
@@ -94,6 +137,10 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
 
     /// Bazel-compatible alias for `declare_output`.
     /// Declares an output file that will be created by an action.
+    ///
+    /// When `sibling` is provided, the new file is placed in the same directory
+    /// as the sibling artifact. This is useful for rules that need to create
+    /// output files alongside other outputs (e.g., .o files next to .cc files).
     fn declare_file<'v>(
         this: &AnalysisActions<'v>,
         #[starlark(require = pos)] filename: &str,
@@ -101,10 +148,9 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
         sibling: starlark::values::Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkDeclaredArtifact<'v>> {
-        // Ignore sibling for now - Bazel uses it to declare files relative to another file
-        let _ = sibling;
+        let prefix = sibling_to_prefix(sibling)?;
         let artifact = this.state()?.declare_output(
-            None,
+            prefix.as_deref(),
             filename,
             OutputType::FileOrDirectory,
             eval.call_stack_top_location(),
@@ -122,8 +168,8 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
     /// Bazel-compatible alias for declaring directory outputs.
     /// Declares an output directory that will be created by an action.
     ///
-    /// In Bazel, `ctx.actions.declare_directory()` is used to declare
-    /// outputs that are directories rather than single files.
+    /// When `sibling` is provided, the new directory is placed in the same
+    /// directory as the sibling artifact.
     fn declare_directory<'v>(
         this: &AnalysisActions<'v>,
         #[starlark(require = pos)] filename: &str,
@@ -131,10 +177,9 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
         sibling: starlark::values::Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkDeclaredArtifact<'v>> {
-        // Ignore sibling for now - Bazel uses it to declare files relative to another file
-        let _ = sibling;
+        let prefix = sibling_to_prefix(sibling)?;
         let artifact = this.state()?.declare_output(
-            None,
+            prefix.as_deref(),
             filename,
             OutputType::Directory,
             eval.call_stack_top_location(),
@@ -159,9 +204,9 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
         sibling: starlark::values::Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkDeclaredArtifact<'v>> {
-        let _ = sibling;
+        let prefix = sibling_to_prefix(sibling)?;
         let artifact = this.state()?.declare_output(
-            None,
+            prefix.as_deref(),
             filename,
             OutputType::FileOrDirectory,
             eval.call_stack_top_location(),

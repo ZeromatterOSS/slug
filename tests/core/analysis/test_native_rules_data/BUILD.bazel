@@ -1,4 +1,4 @@
-load(":defs.bzl", "bool_flag", "collect_files", "select_value", "string_flag", "write_list")
+load(":defs.bzl", "bool_flag", "collect_files", "select_value", "sibling_file", "string_flag", "write_list")
 
 # === filegroup tests ===
 
@@ -342,6 +342,12 @@ package_group(
 package_group(
     name = "root_only",
     packages = ["//"],
+)
+
+# === declare_file with sibling parameter ===
+
+sibling_file(
+    name = "sibling_test",
 )
 
 # A target with package_group visibility

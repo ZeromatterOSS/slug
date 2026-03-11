@@ -49,6 +49,26 @@ select_value = rule(
 )
 
 
+def _sibling_file_impl(ctx):
+    """Declares a file relative to a sibling artifact's directory."""
+    # First declare a file in a subdirectory
+    original = ctx.actions.declare_file("subdir/" + ctx.label.name + "_original.txt")
+    ctx.actions.write(original, "original\n")
+    # Now declare a sibling file in the same directory
+    sibling_out = ctx.actions.declare_file(ctx.label.name + "_sibling.txt", sibling = original)
+    ctx.actions.write(sibling_out, "sibling\n")
+    return [DefaultInfo(
+        default_output = sibling_out,
+        files = depset([original, sibling_out]),
+    )]
+
+
+sibling_file = rule(
+    implementation = _sibling_file_impl,
+    attrs = {},
+)
+
+
 def _bool_setting_impl(ctx):
     """A boolean build setting (no output)."""
     return []

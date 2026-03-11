@@ -309,3 +309,14 @@ async def test_target_with_package_group_visibility(buck: Buck) -> None:
     output = result.get_build_report().output_for_target("//:pkg_group_target")
     content = output.read_text().strip()
     assert "package_group_ok" in content
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_declare_file_with_sibling(buck: Buck) -> None:
+    """declare_file() with sibling places output in sibling's directory."""
+    result = await buck.build("//:sibling_test")
+    output = result.get_build_report().output_for_target("//:sibling_test")
+    content = output.read_text().strip()
+    assert content == "sibling", f"Expected 'sibling', got: {content!r}"
+    # The sibling file should be in the same subdirectory as the original
+    assert "subdir" in str(output), f"Expected 'subdir' in output path: {output}"
