@@ -104,6 +104,8 @@ pub enum NativeRuleKind {
     CcToolchainSuite,
     #[display("cc_import")]
     CcImport,
+    #[display("cc_shared_library")]
+    CcSharedLibrary,
 }
 
 impl NativeRuleKind {
@@ -136,6 +138,7 @@ impl NativeRuleKind {
             NativeRuleKind::CcToolchain => "cc_toolchain",
             NativeRuleKind::CcToolchainSuite => "cc_toolchain_suite",
             NativeRuleKind::CcImport => "cc_import",
+            NativeRuleKind::CcSharedLibrary => "cc_shared_library",
         }
     }
 }

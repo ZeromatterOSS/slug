@@ -483,6 +483,18 @@ java_common_test(
     name = "java_common_test",
 )
 
+# === cc_shared_library native rule test ===
+
+cc_library(
+    name = "shared_lib_dep",
+    srcs = [],
+)
+
+cc_shared_library(
+    name = "my_shared_lib",
+    deps = [":shared_lib_dep"],
+)
+
 # === existing_rules() / repository_name() test ===
 # capture_existing_rules must be called AFTER other rules so it can see them.
 capture_existing_rules(name = "existing_rules_check")

@@ -54,6 +54,7 @@ use starlark::starlark_module;
 use starlark::values::Value;
 use starlark::values::dict::UnpackDictEntries;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
+use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
 
 use crate::attrs::coerce::attr_type::AttrTypeExt;
@@ -1032,6 +1033,68 @@ pub(crate) mod rule_defs {
         Arc::new(Rule {
             attributes: cc_import_attributes(),
             rule_type: RuleType::Native(NativeRuleKind::CcImport),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+            toolchain_types: vec![],
+        })
+    });
+
+    /// Attributes for cc_shared_library rule.
+    /// cc_shared_library produces a shared library from cc_library dependencies.
+    fn cc_shared_library_attributes() -> AttributeSpec {
+        let deps_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(ListLiteral(ArcSlice::default())))),
+            "Direct dependencies to include in the shared library",
+            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
+        );
+        let exports_filter_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(ListLiteral(ArcSlice::default())))),
+            "Labels of targets whose symbols should be exported",
+            AttrType::list(AttrType::string()),
+        );
+        let dynamic_deps_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(ListLiteral(ArcSlice::default())))),
+            "Other cc_shared_library dependencies",
+            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
+        );
+        let roots_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(ListLiteral(ArcSlice::default())))),
+            "Root targets from which to start dependency collection",
+            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
+        );
+        let shared_lib_name_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::None)),
+            "Override output shared library name",
+            AttrType::option(AttrType::string()),
+        );
+        let user_link_flags_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(ListLiteral(ArcSlice::default())))),
+            "Additional linker flags",
+            AttrType::list(AttrType::string()),
+        );
+
+        AttributeSpec::from(
+            vec![
+                ("deps".to_owned(), deps_attr),
+                ("exports_filter".to_owned(), exports_filter_attr),
+                ("dynamic_deps".to_owned(), dynamic_deps_attr),
+                ("roots".to_owned(), roots_attr),
+                ("shared_lib_name".to_owned(), shared_lib_name_attr),
+                ("user_link_flags".to_owned(), user_link_flags_attr),
+            ],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("cc_shared_library attributes should be valid")
+    }
+
+    /// The Rule definition for cc_shared_library.
+    pub static CC_SHARED_LIBRARY_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: cc_shared_library_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::CcSharedLibrary),
             rule_kind: RuleKind::Normal,
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
@@ -2649,6 +2712,89 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
 
         let target_node = create_native_target_node(
             rule_defs::CC_IMPORT_RULE.clone(),
+            internals.package(),
+            name,
+            attrs,
+            &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
+            &internals.default_visibility(),
+        )?;
+
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+
+    /// Creates a shared library from cc_library dependencies.
+    ///
+    /// `cc_shared_library` produces a shared library (.so, .dylib, .dll) that includes
+    /// all of its `deps` and their transitive dependencies, minus any dependencies
+    /// already provided by `dynamic_deps`.
+    ///
+    /// Example:
+    /// ```python
+    /// cc_shared_library(
+    ///     name = "my_shared_lib",
+    ///     deps = [":my_lib"],
+    ///     exports_filter = ["//my_package:__subpackages__"],
+    /// )
+    /// ```
+    ///
+    /// See: https://bazel.build/reference/be/c-cpp#cc_shared_library
+    fn cc_shared_library<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        exports_filter: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        dynamic_deps: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] roots: Value<'v>,
+        #[starlark(require = named, default = NoneOr::None)] shared_lib_name: NoneOr<&str>,
+        #[starlark(require = named, default = UnpackListOrTuple::default())]
+        user_link_flags: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let _ = (exports_filter, shared_lib_name, user_link_flags);
+        let internals = ModuleInternals::from_context(eval, "cc_shared_library")?;
+        let coercion_ctx = internals.attr_coercion_context();
+
+        let mut attrs = Vec::new();
+
+        // Coerce deps
+        let deps_type = AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY));
+        let deps_value = if deps.is_none() {
+            eval.heap().alloc(Vec::<Value>::new())
+        } else {
+            deps
+        };
+        let coerced_deps = deps_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, deps_value)?;
+        attrs.push(("deps".to_owned(), coerced_deps));
+
+        // Coerce dynamic_deps
+        let dynamic_deps_value = if dynamic_deps.is_none() {
+            eval.heap().alloc(Vec::<Value>::new())
+        } else {
+            dynamic_deps
+        };
+        let coerced_dynamic_deps =
+            deps_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, dynamic_deps_value)?;
+        attrs.push(("dynamic_deps".to_owned(), coerced_dynamic_deps));
+
+        // Coerce roots
+        let roots_value = if roots.is_none() {
+            eval.heap().alloc(Vec::<Value>::new())
+        } else {
+            roots
+        };
+        let coerced_roots =
+            deps_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, roots_value)?;
+        attrs.push(("roots".to_owned(), coerced_roots));
+
+        let target_node = create_native_target_node(
+            rule_defs::CC_SHARED_LIBRARY_RULE.clone(),
             internals.package(),
             name,
             attrs,

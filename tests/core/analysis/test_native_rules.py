@@ -602,3 +602,9 @@ async def test_java_common_module_available(buck: Buck) -> None:
     assert lines.get("has_boot_class_path") == "True", f"java_common should have boot_class_path: {lines}"
     assert lines.get("java_info_type") == "JavaInfo", f"JavaInfo should be available: {lines}"
     assert lines.get("java_plugin_info_type") == "JavaPluginInfo", f"JavaPluginInfo should be available: {lines}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_cc_shared_library_builds(buck: Buck) -> None:
+    """cc_shared_library native rule can be parsed and analyzed."""
+    await buck.build("//:my_shared_lib")
