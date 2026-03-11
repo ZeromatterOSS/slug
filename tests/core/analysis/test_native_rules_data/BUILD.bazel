@@ -1,4 +1,4 @@
-load(":defs.bzl", "bool_flag", "capture_existing_rules", "cc_command_line_test", "cc_compilation_context_test", "cc_configure_features_test", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "collect_files", "existing_rules_test", "run_env_info", "select_value", "sibling_file", "stamp_file_info", "string_flag", "write_list")
+load(":defs.bzl", "bool_flag", "capture_existing_rules", "cc_command_line_test", "cc_compilation_context_test", "cc_configure_features_test", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "collect_files", "existing_rules_test", "java_common_test", "run_env_info", "select_value", "sibling_file", "stamp_file_info", "string_flag", "write_list")
 
 # === filegroup tests ===
 
@@ -475,6 +475,12 @@ cc_import(
     name = "test_cc_import",
     hdrs = ["defs.bzl"],  # Using defs.bzl as a stand-in for a header file
     alwayslink = True,
+)
+
+# === java_common module test ===
+
+java_common_test(
+    name = "java_common_test",
 )
 
 # === existing_rules() / repository_name() test ===

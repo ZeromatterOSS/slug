@@ -586,3 +586,19 @@ async def test_cc_command_line_generation(buck: Buck) -> None:
     # Both should have non-zero length command lines
     assert int(lines.get("compile_cmdline_len", "0")) > 0, f"compile cmdline should be non-empty: {lines}"
     assert int(lines.get("link_cmdline_len", "0")) > 0, f"link cmdline should be non-empty: {lines}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_java_common_module_available(buck: Buck) -> None:
+    """java_common module is available as a global with expected methods."""
+    result = await buck.build("//:java_common_test")
+    output = result.get_build_report().output_for_target("//:java_common_test")
+    content = output.read_text().replace("\r\n", "\n")
+    lines = dict(line.split("=", 1) for line in content.strip().split("\n") if "=" in line)
+
+    assert lines.get("type") == "java_common", f"Expected java_common type, got: {lines}"
+    assert lines.get("has_compile") == "True", f"java_common should have compile method: {lines}"
+    assert lines.get("has_merge") == "True", f"java_common should have merge method: {lines}"
+    assert lines.get("has_boot_class_path") == "True", f"java_common should have boot_class_path: {lines}"
+    assert lines.get("java_info_type") == "JavaInfo", f"JavaInfo should be available: {lines}"
+    assert lines.get("java_plugin_info_type") == "JavaPluginInfo", f"JavaPluginInfo should be available: {lines}"

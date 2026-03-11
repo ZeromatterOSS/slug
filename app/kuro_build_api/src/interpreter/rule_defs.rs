@@ -27,6 +27,7 @@ pub mod configuration_field;
 pub mod context;
 pub mod coverage_common;
 pub mod depset;
+pub mod java_common;
 pub mod digest_config;
 pub mod fragments;
 pub mod label_relative_path;

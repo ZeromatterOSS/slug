@@ -53,6 +53,7 @@ use crate::interpreter::rule_defs::config_common::register_config_common;
 use crate::interpreter::rule_defs::configuration_field::register_configuration_field;
 use crate::interpreter::rule_defs::context::register_analysis_context;
 use crate::interpreter::rule_defs::coverage_common::register_coverage_common;
+use crate::interpreter::rule_defs::java_common::register_java_common;
 use crate::interpreter::rule_defs::depset::register_depset;
 use crate::interpreter::rule_defs::digest_config::register_digest_config_type;
 use crate::interpreter::rule_defs::platform_common::register_platform_common;
@@ -75,6 +76,7 @@ fn register_build_api_globals(globals: &mut GlobalsBuilder) {
     register_cc_common(globals);
     register_config_common(globals);
     register_coverage_common(globals);
+    register_java_common(globals);
     register_platform_common(globals);
     register_proto_common(globals);
     register_py_common(globals);

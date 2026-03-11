@@ -411,3 +411,24 @@ cc_command_line_test = rule(
     implementation = _cc_command_line_test_impl,
     attrs = {},
 )
+
+
+def _java_common_test_impl(ctx):
+    """Tests that java_common module is available and has expected attributes."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    lines = [
+        "type=" + type(java_common),
+        "has_compile=" + str(hasattr(java_common, "compile")),
+        "has_merge=" + str(hasattr(java_common, "merge")),
+        "has_boot_class_path=" + str(hasattr(java_common, "boot_class_path")),
+        "java_info_type=" + type(JavaInfo),
+        "java_plugin_info_type=" + type(JavaPluginInfo),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+java_common_test = rule(
+    implementation = _java_common_test_impl,
+    attrs = {},
+)

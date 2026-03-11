@@ -81,7 +81,7 @@ fn depset_to_transitive_set<'v>(
 /// Convert a serde_json::Value to a Starlark Value on the given heap.
 /// Used by existing_rules()/existing_rule() to convert CoercedAttr JSON representations
 /// to Starlark values that can be returned to .bzl code.
-fn json_to_starlark_value<'v>(heap: starlark::values::Heap<'v>, json: &serde_json::Value) -> Value<'v> {
+pub(crate) fn json_to_starlark_value<'v>(heap: starlark::values::Heap<'v>, json: &serde_json::Value) -> Value<'v> {
     match json {
         serde_json::Value::Null => Value::new_none(),
         serde_json::Value::Bool(b) => Value::new_bool(*b),
@@ -270,9 +270,13 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(require = named)] settings: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = settings;
-        // Return a simple struct as a placeholder transition object
-        Ok(eval.heap().alloc("analysis_test_transition_stub"))
+        // Return a struct with settings stored, mimicking Bazel's transition object.
+        // In Bazel, the returned object is passed to rule(cfg = ...) for analysis tests.
+        let entries = vec![
+            ("_type", eval.heap().alloc("analysis_test_transition")),
+            ("settings", settings),
+        ];
+        Ok(eval.heap().alloc(AllocDict(entries)))
     }
 
     /// Bazel's `AnalysisTestResultInfo` provider for analysis test results.

@@ -12,7 +12,6 @@ use starlark::collections::SmallMap;
 use starlark::environment::GlobalsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
-use starlark::values::AllocValue;
 use starlark::values::StringValue;
 use starlark::values::Value;
 use starlark::values::ValueOfUnchecked;
@@ -185,16 +184,26 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
         let Ok(internals) = ModuleInternals::from_context(eval, "existing_rules") else {
             return Ok(eval.heap().alloc(AllocDict(SmallMap::<&str, Value>::new())));
         };
-        let target_names = internals.get_target_names();
+        let targets = internals.get_targets_with_attrs();
 
         let heap = eval.heap();
-        let result: SmallMap<&str, Value<'v>> = target_names
-            .iter()
-            .map(|name| {
-                let attrs_dict: SmallMap<&str, Value<'v>> =
-                    [("name", heap.alloc(name.as_str()))].into_iter().collect();
+        let result: SmallMap<String, Value<'v>> = targets
+            .into_iter()
+            .map(|(name, kind, attrs)| {
+                let mut attrs_dict: SmallMap<String, Value<'v>> = SmallMap::new();
+                attrs_dict.insert("name".to_owned(), heap.alloc(name.as_str()));
+                attrs_dict.insert("kind".to_owned(), heap.alloc(kind.as_str()));
+                for (attr_name, json_val) in attrs {
+                    if attr_name == "name" {
+                        continue;
+                    }
+                    attrs_dict.insert(
+                        attr_name,
+                        crate::interpreter::natives::json_to_starlark_value(heap, &json_val),
+                    );
+                }
                 let attrs_val = heap.alloc(AllocDict(attrs_dict));
-                (name.as_str(), attrs_val)
+                (name, attrs_val)
             })
             .collect();
 
@@ -215,13 +224,24 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
             return Ok(NoneOr::None);
         };
 
-        if !internals.target_exists(name) {
-            return Ok(NoneOr::None);
-        }
+        let (kind, attrs) = match internals.get_target_with_attrs(name) {
+            Some(data) => data,
+            None => return Ok(NoneOr::None),
+        };
 
         let heap = eval.heap();
-        let attrs_dict: SmallMap<&str, Value<'v>> =
-            [("name", heap.alloc(name))].into_iter().collect();
+        let mut attrs_dict: SmallMap<String, Value<'v>> = SmallMap::new();
+        attrs_dict.insert("name".to_owned(), heap.alloc(name));
+        attrs_dict.insert("kind".to_owned(), heap.alloc(kind.as_str()));
+        for (attr_name, json_val) in attrs {
+            if attr_name == "name" {
+                continue;
+            }
+            attrs_dict.insert(
+                attr_name,
+                crate::interpreter::natives::json_to_starlark_value(heap, &json_val),
+            );
+        }
         Ok(NoneOr::Other(heap.alloc(AllocDict(attrs_dict))))
     }
 
