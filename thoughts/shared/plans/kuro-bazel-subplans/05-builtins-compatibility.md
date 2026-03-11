@@ -206,7 +206,7 @@ These modules must be available as globals in .bzl files.
 | `get_execution_requirements()` | Get exec requirements | Stub |
 | `CcToolchainInfo` | Provider | ✓ Implemented |
 
-**Status**: Nearly complete — all critical functions implemented. Only `get_execution_requirements` returns empty dict (acceptable default). `create_linking_context_from_compilation_outputs` now properly populates linker_inputs depset. (2026-03-11)
+**Status**: Nearly complete — all critical functions implemented. Only `get_execution_requirements` returns empty dict (acceptable default). `create_linking_context_from_compilation_outputs` now properly populates linker_inputs depset. `get_memory_inefficient_command_line` now emits compilation-mode-based flags: `-O2 -DNDEBUG` for opt, `-g -O0` for dbg, plus MSVC equivalents and linker strip flags. (2026-03-11)
 
 ### Module: `config`
 

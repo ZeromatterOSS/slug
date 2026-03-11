@@ -92,7 +92,7 @@ Status key: **Done** = fully working, **Stub** = exists but returns hardcoded/in
 | 1 | `ctx.actions.args()` | **Done** | Returns `StarlarkCmdArgs` (unsorted.rs:311) |
 | 2 | `ctx.actions.declare_directory(filename, sibling?)` | **Done** | unsorted.rs:128. `sibling` extracts parent dir from artifact to use as prefix. |
 | 3 | `ctx.actions.declare_file(filename, sibling?)` | **Done** | unsorted.rs:98. `sibling` extracts parent dir from artifact to use as prefix. |
-| 4 | `ctx.actions.declare_symlink(filename, sibling?)` | **Missing** | Requires `--experimental_allow_unresolved_symlinks`. Low priority. |
+| 4 | `ctx.actions.declare_symlink(filename, sibling?)` | **Done** | Delegates to declare_output. Symlink creation via ctx.actions.symlink(). |
 | 5 | `ctx.actions.do_nothing(mnemonic, inputs=[])` | **Done** | Stub implementation in unsorted.rs. |
 | 6 | `ctx.actions.expand_template(template, output, substitutions, is_executable?, computed_substitutions?)` | **Done** | write.rs:404. Reads template at analysis time. `computed_substitutions` now applied via `StarlarkTemplateDict`. |
 | 7 | `ctx.actions.run(outputs, executable, inputs, arguments, ...)` | **Done** | run.rs:243. Supports both Buck2 (`exe=`) and Bazel (`executable=`) styles. |
@@ -145,7 +145,7 @@ The `Args` object is returned by `ctx.actions.args()`. In Kuro this is `Starlark
 | `ctx.resolve_tools(tools)` | Collect tool files + runfiles | Small |
 | `ctx.expand_make_variables(...)` | Deprecated but some rules use it | Small |
 | `ctx.actions.do_nothing(mnemonic, inputs)` | No-op action | Trivial |
-| `ctx.actions.declare_symlink(filename)` | Unresolved symlink support | Small |
+| `ctx.actions.declare_symlink(filename)` | **DONE** — Delegates to declare_output (2026-03-11) | Small |
 | `ctx.actions.template_dict()` | Lazy computed substitutions | Medium |
 
 **Tier 4 — Low priority / experimental:**
