@@ -37,6 +37,9 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 | `genrule` | Generic build rule using shell | ✓ Implemented (native, with GenruleAction; cmd_bash preferred on Unix; $(location :file) works for source files; 2026-02-25) | `native_rules.rs`, `native_rule_analysis.rs`, `genrule_action.rs` |
 | `starlark_doc_extract` | Extracts docs from .bzl files | ✓ Stub (empty output; hasattr(native, "starlark_doc_extract") returns True for rules_python IS_BAZEL_7_OR_HIGHER; 2026-03-11) | `native_rules.rs`, `native_rule_analysis.rs` |
 | `test_suite` | Defines collections of tests | ✓ Implemented (native, TESTS_ATTRIBUTE, expansion works) | `native_rules.rs`, `native_rule_analysis.rs` |
+| `cc_import` | Imports prebuilt C/C++ libraries | ✓ Implemented (native, static_library/shared_library/hdrs/alwayslink; 2026-03-11) | `native_rules.rs`, `native_rule_analysis.rs` |
+| `cc_toolchain` | Legacy C++ toolchain definition | ✓ Implemented (native, registers target; 2026-03-11) | `natives.rs`, `native_rules.rs` |
+| `cc_toolchain_suite` | Legacy C++ toolchain suite | ✓ Implemented (native, registers target; 2026-03-11) | `natives.rs`, `native_rules.rs` |
 
 #### Platform & Toolchain Rules
 
