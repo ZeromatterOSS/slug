@@ -133,6 +133,8 @@ pub fn analyze_native_rule(
         NativeRuleKind::PyTest => create_minimal_analysis_result(target),
         NativeRuleKind::CcProtoLibrary => create_cc_analysis_result(target),
         NativeRuleKind::JavaProtoLibrary => create_minimal_analysis_result(target),
+        NativeRuleKind::ObjcLibrary => create_minimal_analysis_result(target),
+        NativeRuleKind::ObjcImport => create_minimal_analysis_result(target),
     }
 }
 

@@ -1214,6 +1214,10 @@ pub(crate) mod rule_defs {
         Lazy::new(|| make_language_rule(NativeRuleKind::CcProtoLibrary, false));
     pub static JAVA_PROTO_LIBRARY_RULE: Lazy<Arc<Rule>> =
         Lazy::new(|| make_language_rule(NativeRuleKind::JavaProtoLibrary, false));
+    pub static OBJC_LIBRARY_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_language_rule(NativeRuleKind::ObjcLibrary, false));
+    pub static OBJC_IMPORT_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_language_rule(NativeRuleKind::ObjcImport, false));
 }
 
 /// Extract visibility strings from a Starlark value.
@@ -3193,6 +3197,50 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             deps,
             visibility,
             rule_defs::JAVA_PROTO_LIBRARY_RULE.clone(),
+        )
+    }
+
+    /// Objective-C library rule (Bazel-compatible).
+    fn objc_library<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        register_standard_language_rule(
+            eval,
+            "objc_library",
+            name,
+            srcs,
+            deps,
+            visibility,
+            rule_defs::OBJC_LIBRARY_RULE.clone(),
+        )
+    }
+
+    /// Objective-C import rule (Bazel-compatible).
+    fn objc_import<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        register_standard_language_rule(
+            eval,
+            "objc_import",
+            name,
+            srcs,
+            deps,
+            visibility,
+            rule_defs::OBJC_IMPORT_RULE.clone(),
         )
     }
 }

@@ -128,6 +128,10 @@ pub enum NativeRuleKind {
     CcProtoLibrary,
     #[display("java_proto_library")]
     JavaProtoLibrary,
+    #[display("objc_library")]
+    ObjcLibrary,
+    #[display("objc_import")]
+    ObjcImport,
 }
 
 impl NativeRuleKind {
@@ -172,6 +176,8 @@ impl NativeRuleKind {
             NativeRuleKind::PyTest => "py_test",
             NativeRuleKind::CcProtoLibrary => "cc_proto_library",
             NativeRuleKind::JavaProtoLibrary => "java_proto_library",
+            NativeRuleKind::ObjcLibrary => "objc_library",
+            NativeRuleKind::ObjcImport => "objc_import",
         }
     }
 }
