@@ -1,4 +1,4 @@
-load(":defs.bzl", "bool_flag", "cc_link_test", "collect_files", "run_env_info", "select_value", "sibling_file", "stamp_file_info", "string_flag", "write_list")
+load(":defs.bzl", "bool_flag", "cc_compilation_context_test", "cc_link_test", "collect_files", "run_env_info", "select_value", "sibling_file", "stamp_file_info", "string_flag", "write_list")
 
 # === filegroup tests ===
 
@@ -372,4 +372,8 @@ run_env_info(
 
 cc_link_test(
     name = "cc_link_test",
+)
+
+cc_compilation_context_test(
+    name = "cc_compilation_context_test",
 )

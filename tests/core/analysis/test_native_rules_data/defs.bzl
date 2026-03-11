@@ -143,6 +143,35 @@ cc_link_test = rule(
 )
 
 
+def _cc_compilation_context_test_impl(ctx):
+    """Tests that cc_common.create_compilation_context() creates proper contexts."""
+    headers_depset = depset([])
+    includes_depset = depset(["include/"])
+    defines_depset = depset(["FOO=1"])
+    comp_ctx = cc_common.create_compilation_context(
+        headers = headers_depset,
+        includes = includes_depset,
+        defines = defines_depset,
+    )
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    lines = [
+        "type=" + type(comp_ctx),
+        "has_headers=" + str(hasattr(comp_ctx, "headers")),
+        "has_includes=" + str(hasattr(comp_ctx, "includes")),
+        "has_defines=" + str(hasattr(comp_ctx, "defines")),
+        "has_system_includes=" + str(hasattr(comp_ctx, "system_includes")),
+        "has_direct_headers=" + str(hasattr(comp_ctx, "direct_headers")),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+cc_compilation_context_test = rule(
+    implementation = _cc_compilation_context_test_impl,
+    attrs = {},
+)
+
+
 def _bool_setting_impl(ctx):
     """A boolean build setting (no output)."""
     return []

@@ -365,3 +365,18 @@ async def test_cc_common_link(buck: Buck) -> None:
     assert lines["type"] == "CcLinkingOutputs"
     assert lines["has_library_to_link"] == "True"
     assert lines["has_executable"] == "True"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_cc_common_create_compilation_context(buck: Buck) -> None:
+    """cc_common.create_compilation_context() creates CcCompilationContext with proper attributes."""
+    result = await buck.build("//:cc_compilation_context_test")
+    output = result.get_build_report().output_for_target("//:cc_compilation_context_test")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    assert lines["type"] == "CcCompilationContext"
+    assert lines["has_headers"] == "True"
+    assert lines["has_includes"] == "True"
+    assert lines["has_defines"] == "True"
+    assert lines["has_system_includes"] == "True"
+    assert lines["has_direct_headers"] == "True"

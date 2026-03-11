@@ -3621,6 +3621,45 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         Ok(enabled)
     }
 
+    /// Creates a compilation context from headers, includes, and defines.
+    ///
+    /// This is used by rules_cc to construct the compilation context that
+    /// gets propagated to dependents via CcInfo.
+    #[allow(unused_variables)]
+    fn create_compilation_context<'v>(
+        #[starlark(this)] this: &CcCommonModule,
+        #[starlark(require = named, default = NoneType)] headers: Value<'v>,
+        #[starlark(require = named, default = NoneType)] includes: Value<'v>,
+        #[starlark(require = named, default = NoneType)] quote_includes: Value<'v>,
+        #[starlark(require = named, default = NoneType)] system_includes: Value<'v>,
+        #[starlark(require = named, default = NoneType)] framework_includes: Value<'v>,
+        #[starlark(require = named, default = NoneType)] defines: Value<'v>,
+        #[starlark(require = named, default = NoneType)] local_defines: Value<'v>,
+        #[starlark(require = named, default = NoneType)] direct_headers: Value<'v>,
+        #[starlark(require = named, default = NoneType)] direct_public_headers: Value<'v>,
+        #[starlark(require = named, default = NoneType)] direct_private_headers: Value<'v>,
+        #[starlark(require = named, default = NoneType)] direct_textual_headers: Value<'v>,
+        #[starlark(require = named, default = NoneType)] purpose: Value<'v>,
+        #[starlark(kwargs)] kwargs: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        // Merge all include types into a single includes value
+        // Use the most specific one provided, falling back to the generic 'includes'
+        let merged_includes = if !system_includes.is_none() {
+            system_includes
+        } else if !quote_includes.is_none() {
+            quote_includes
+        } else {
+            includes
+        };
+
+        Ok(heap.alloc(CcCompilationContextGen {
+            headers,
+            includes: merged_includes,
+            defines,
+        }))
+    }
+
     /// Creates compilation outputs.
     #[allow(unused_variables)]
     fn create_compilation_outputs<'v>(
@@ -3636,19 +3675,49 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         }))
     }
 
-    /// Merges compilation outputs.
+    /// Merges multiple compilation outputs into one.
     #[allow(unused_variables)]
     fn merge_compilation_outputs<'v>(
         #[starlark(this)] this: &CcCommonModule,
         #[starlark(require = named, default = NoneType)] compilation_outputs: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // For now, just return a new empty compilation outputs
-        // TODO(cc_common): Actually merge the compilation outputs
-        let none_val = Value::new_none();
+        // Collect all objects and pic_objects from the list of compilation outputs
+        let mut all_objects: Vec<Value<'v>> = Vec::new();
+        let mut all_pic_objects: Vec<Value<'v>> = Vec::new();
+
+        if !compilation_outputs.is_none() {
+            if let Ok(iter) = compilation_outputs.iterate(heap) {
+                for co in iter {
+                    if let Ok(Some(objects)) = co.get_attr("objects", heap) {
+                        if !objects.is_none() {
+                            if let Ok(obj_iter) = objects.iterate(heap) {
+                                all_objects.extend(obj_iter);
+                            }
+                        }
+                    }
+                    if let Ok(Some(pic_objects)) = co.get_attr("pic_objects", heap) {
+                        if !pic_objects.is_none() {
+                            if let Ok(pic_iter) = pic_objects.iterate(heap) {
+                                all_pic_objects.extend(pic_iter);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(heap.alloc(CompilationOutputsGen {
-            objects: none_val,
-            pic_objects: none_val,
+            objects: if all_objects.is_empty() {
+                Value::new_none()
+            } else {
+                heap.alloc(all_objects)
+            },
+            pic_objects: if all_pic_objects.is_empty() {
+                Value::new_none()
+            } else {
+                heap.alloc(all_pic_objects)
+            },
         }))
     }
 
