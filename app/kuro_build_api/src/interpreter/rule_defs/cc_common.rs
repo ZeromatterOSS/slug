@@ -4043,11 +4043,40 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         user_link_flags: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // Return a CcToolchainVariables stub - the actual link flags are
-        // computed by get_memory_inefficient_command_line
-        Ok(eval.heap().alloc(CcToolchainVariablesGen {
-            vars: Value::new_none(),
-        }))
+        let _ = (feature_configuration, cc_toolchain);
+        let heap = eval.heap();
+        // Build a dict with the link variables for get_memory_inefficient_command_line
+        let mut map: SmallMap<Value<'v>, Value<'v>> = SmallMap::new();
+
+        if !user_link_flags.is_none() {
+            map.insert_hashed(
+                heap.alloc_str("user_link_flags").to_value().get_hashed().unwrap(),
+                user_link_flags,
+            );
+        }
+
+        if !runtime_library_search_directories.is_none() {
+            map.insert_hashed(
+                heap.alloc_str("runtime_library_search_directories")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
+                runtime_library_search_directories,
+            );
+        }
+
+        if is_linking_dynamic_library {
+            map.insert_hashed(
+                heap.alloc_str("is_linking_dynamic_library")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
+                Value::new_bool(true),
+            );
+        }
+
+        let vars = heap.alloc(Dict::new(map));
+        Ok(heap.alloc(CcToolchainVariablesGen { vars }))
     }
 
     /// Merges multiple CcInfo providers into a single CcInfo.
