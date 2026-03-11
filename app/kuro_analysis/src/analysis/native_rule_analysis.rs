@@ -120,6 +120,7 @@ pub fn analyze_native_rule(
         NativeRuleKind::StarlarkDocExtract => analyze_genquery(target), // stub: empty output file
         NativeRuleKind::CcToolchain => create_minimal_analysis_result(target),
         NativeRuleKind::CcToolchainSuite => create_minimal_analysis_result(target),
+        NativeRuleKind::CcImport => create_cc_analysis_result(target),
     }
 }
 

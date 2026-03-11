@@ -977,6 +977,68 @@ pub(crate) mod rule_defs {
             toolchain_types: vec![],
         })
     });
+
+    /// Attributes for cc_import rule.
+    /// cc_import provides a way to import prebuilt C/C++ libraries.
+    fn cc_import_attributes() -> AttributeSpec {
+        let static_library_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::None)),
+            "A prebuilt static library (.a or .lib)",
+            AttrType::option(AttrType::source(false)),
+        );
+        let shared_library_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::None)),
+            "A prebuilt shared library (.so, .dylib, or .dll)",
+            AttrType::option(AttrType::source(false)),
+        );
+        let interface_library_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::None)),
+            "An interface library for linking (.ifso or import .lib)",
+            AttrType::option(AttrType::source(false)),
+        );
+        let hdrs_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::List(ListLiteral(ArcSlice::default())))),
+            "Header files for this library",
+            AttrType::list(AttrType::source(false)),
+        );
+        let system_provided_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::Bool(BoolLiteral(false)))),
+            "If true, the shared library is provided by the system",
+            AttrType::bool(),
+        );
+        let alwayslink_attr = Attribute::new(
+            Some(Arc::new(CoercedAttr::Bool(BoolLiteral(false)))),
+            "If true, always link the static library",
+            AttrType::bool(),
+        );
+
+        AttributeSpec::from(
+            vec![
+                ("static_library".to_owned(), static_library_attr),
+                ("shared_library".to_owned(), shared_library_attr),
+                ("interface_library".to_owned(), interface_library_attr),
+                ("hdrs".to_owned(), hdrs_attr),
+                ("system_provided".to_owned(), system_provided_attr),
+                ("alwayslink".to_owned(), alwayslink_attr),
+            ],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("cc_import attributes should be valid")
+    }
+
+    /// The Rule definition for cc_import.
+    pub static CC_IMPORT_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: cc_import_attributes(),
+            rule_type: RuleType::Native(NativeRuleKind::CcImport),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+            toolchain_types: vec![],
+        })
+    });
 }
 
 /// Extract visibility strings from a Starlark value.
@@ -2517,6 +2579,79 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
                 ("src".to_owned(), coerced_src),
                 ("symbol_names".to_owned(), coerced_names),
             ],
+            &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
+            &internals.default_visibility(),
+        )?;
+
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+
+    /// Bazel's cc_import rule: imports a prebuilt C/C++ library.
+    ///
+    /// Creates a target that provides CcInfo from a prebuilt static or shared library.
+    /// Used for integrating pre-compiled libraries into the build graph.
+    ///
+    /// See: https://bazel.build/reference/be/c-cpp#cc_import
+    fn cc_import<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        static_library: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        shared_library: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        interface_library: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        hdrs: Value<'v>,
+        #[starlark(require = named, default = false)] system_provided: bool,
+        #[starlark(require = named, default = false)] alwayslink: bool,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let internals = ModuleInternals::from_context(eval, "cc_import")?;
+        let coercion_ctx = internals.attr_coercion_context();
+
+        let mut attrs = Vec::new();
+
+        // Coerce optional source attributes
+        let opt_source_type = AttrType::option(AttrType::source(false));
+
+        if !static_library.is_none() {
+            let coerced = opt_source_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, static_library)?;
+            attrs.push(("static_library".to_owned(), coerced));
+        }
+        if !shared_library.is_none() {
+            let coerced = opt_source_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, shared_library)?;
+            attrs.push(("shared_library".to_owned(), coerced));
+        }
+        if !interface_library.is_none() {
+            let coerced = opt_source_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, interface_library)?;
+            attrs.push(("interface_library".to_owned(), coerced));
+        }
+
+        // Coerce hdrs (list of sources)
+        let hdrs_type = AttrType::list(AttrType::source(false));
+        let hdrs_value = if hdrs.is_none() {
+            eval.heap().alloc(Vec::<Value>::new())
+        } else {
+            hdrs
+        };
+        let coerced_hdrs = hdrs_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, hdrs_value)?;
+        attrs.push(("hdrs".to_owned(), coerced_hdrs));
+
+        // Bool attributes
+        attrs.push(("system_provided".to_owned(), CoercedAttr::Bool(BoolLiteral(system_provided))));
+        attrs.push(("alwayslink".to_owned(), CoercedAttr::Bool(BoolLiteral(alwayslink))));
+
+        let target_node = create_native_target_node(
+            rule_defs::CC_IMPORT_RULE.clone(),
+            internals.package(),
+            name,
+            attrs,
             &extract_visibility_strings(visibility),
             internals.attr_coercion_context(),
             &internals.default_visibility(),

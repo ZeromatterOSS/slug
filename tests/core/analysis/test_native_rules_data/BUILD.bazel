@@ -463,6 +463,14 @@ cc_toolchain_suite(
     toolchains = {"k8": "test_cc_toolchain"},
 )
 
+# === cc_import test ===
+
+cc_import(
+    name = "test_cc_import",
+    hdrs = ["defs.bzl"],  # Using defs.bzl as a stand-in for a header file
+    alwayslink = True,
+)
+
 # === existing_rules() / repository_name() test ===
 # capture_existing_rules must be called AFTER other rules so it can see them.
 capture_existing_rules(name = "existing_rules_check")

@@ -559,3 +559,10 @@ async def test_cc_toolchain_suite_registers_target(buck: Buck) -> None:
     """cc_toolchain_suite() registers a resolvable target (not a no-op)."""
     result = await buck.targets("//:test_cc_toolchain_suite")
     assert "//:test_cc_toolchain_suite" in result.stdout.replace("root//:", "//:")
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_cc_import_registers_target(buck: Buck) -> None:
+    """cc_import() registers a resolvable target for prebuilt libraries."""
+    result = await buck.targets("//:test_cc_import")
+    assert "//:test_cc_import" in result.stdout.replace("root//:", "//:")

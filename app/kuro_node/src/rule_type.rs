@@ -102,6 +102,8 @@ pub enum NativeRuleKind {
     CcToolchain,
     #[display("cc_toolchain_suite")]
     CcToolchainSuite,
+    #[display("cc_import")]
+    CcImport,
 }
 
 impl NativeRuleKind {
@@ -133,6 +135,7 @@ impl NativeRuleKind {
             NativeRuleKind::StarlarkDocExtract => "starlark_doc_extract",
             NativeRuleKind::CcToolchain => "cc_toolchain",
             NativeRuleKind::CcToolchainSuite => "cc_toolchain_suite",
+            NativeRuleKind::CcImport => "cc_import",
         }
     }
 }
