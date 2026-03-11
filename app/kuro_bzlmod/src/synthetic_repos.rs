@@ -233,21 +233,159 @@ filegroup(
     }
 }
 
+/// Host platform information for toolchain configuration.
+struct HostPlatformInfo {
+    /// Bazel CPU identifier (e.g., "k8", "darwin_arm64", "x64_windows")
+    cpu_name: &'static str,
+    /// @platforms//os constraint value
+    os_constraint: &'static str,
+    /// @platforms//cpu constraint value
+    cpu_constraint: &'static str,
+    /// Compiler identifier (e.g., "gcc", "clang", "msvc")
+    compiler: &'static str,
+    /// Tool paths for cc_toolchain_config_info
+    tool_paths: Vec<(&'static str, &'static str)>,
+}
+
+fn detect_host_platform() -> HostPlatformInfo {
+    let os = std::env::consts::OS;
+    let arch = std::env::consts::ARCH;
+
+    match (os, arch) {
+        ("linux", "x86_64") => HostPlatformInfo {
+            cpu_name: "k8",
+            os_constraint: "@platforms//os:linux",
+            cpu_constraint: "@platforms//cpu:x86_64",
+            compiler: "gcc",
+            tool_paths: vec![
+                ("gcc", "/usr/bin/gcc"),
+                ("ld", "/usr/bin/ld"),
+                ("ar", "/usr/bin/ar"),
+                ("cpp", "/usr/bin/cpp"),
+                ("gcov", "/usr/bin/gcov"),
+                ("nm", "/usr/bin/nm"),
+                ("objdump", "/usr/bin/objdump"),
+                ("strip", "/usr/bin/strip"),
+            ],
+        },
+        ("linux", "aarch64") => HostPlatformInfo {
+            cpu_name: "aarch64",
+            os_constraint: "@platforms//os:linux",
+            cpu_constraint: "@platforms//cpu:aarch64",
+            compiler: "gcc",
+            tool_paths: vec![
+                ("gcc", "/usr/bin/gcc"),
+                ("ld", "/usr/bin/ld"),
+                ("ar", "/usr/bin/ar"),
+                ("cpp", "/usr/bin/cpp"),
+                ("gcov", "/usr/bin/gcov"),
+                ("nm", "/usr/bin/nm"),
+                ("objdump", "/usr/bin/objdump"),
+                ("strip", "/usr/bin/strip"),
+            ],
+        },
+        ("macos", "x86_64") => HostPlatformInfo {
+            cpu_name: "darwin_x86_64",
+            os_constraint: "@platforms//os:osx",
+            cpu_constraint: "@platforms//cpu:x86_64",
+            compiler: "clang",
+            tool_paths: vec![
+                ("gcc", "/usr/bin/clang"),
+                ("ld", "/usr/bin/ld"),
+                ("ar", "/usr/bin/ar"),
+                ("cpp", "/usr/bin/clang"),
+                ("gcov", "/usr/bin/gcov"),
+                ("nm", "/usr/bin/nm"),
+                ("objdump", "/usr/bin/objdump"),
+                ("strip", "/usr/bin/strip"),
+            ],
+        },
+        ("macos", "aarch64") => HostPlatformInfo {
+            cpu_name: "darwin_arm64",
+            os_constraint: "@platforms//os:osx",
+            cpu_constraint: "@platforms//cpu:aarch64",
+            compiler: "clang",
+            tool_paths: vec![
+                ("gcc", "/usr/bin/clang"),
+                ("ld", "/usr/bin/ld"),
+                ("ar", "/usr/bin/ar"),
+                ("cpp", "/usr/bin/clang"),
+                ("gcov", "/usr/bin/gcov"),
+                ("nm", "/usr/bin/nm"),
+                ("objdump", "/usr/bin/objdump"),
+                ("strip", "/usr/bin/strip"),
+            ],
+        },
+        ("windows", "x86_64") => HostPlatformInfo {
+            cpu_name: "x64_windows",
+            os_constraint: "@platforms//os:windows",
+            cpu_constraint: "@platforms//cpu:x86_64",
+            compiler: "msvc-cl",
+            tool_paths: vec![
+                ("gcc", "cl.exe"),
+                ("ld", "link.exe"),
+                ("ar", "lib.exe"),
+                ("cpp", "cl.exe"),
+                ("gcov", ""),
+                ("nm", "dumpbin.exe"),
+                ("objdump", "dumpbin.exe"),
+                ("strip", ""),
+            ],
+        },
+        ("windows", "aarch64") => HostPlatformInfo {
+            cpu_name: "arm64_windows",
+            os_constraint: "@platforms//os:windows",
+            cpu_constraint: "@platforms//cpu:aarch64",
+            compiler: "msvc-cl",
+            tool_paths: vec![
+                ("gcc", "cl.exe"),
+                ("ld", "link.exe"),
+                ("ar", "lib.exe"),
+                ("cpp", "cl.exe"),
+                ("gcov", ""),
+                ("nm", "dumpbin.exe"),
+                ("objdump", "dumpbin.exe"),
+                ("strip", ""),
+            ],
+        },
+        // Fallback to Linux x86_64
+        _ => HostPlatformInfo {
+            cpu_name: "k8",
+            os_constraint: "@platforms//os:linux",
+            cpu_constraint: "@platforms//cpu:x86_64",
+            compiler: "gcc",
+            tool_paths: vec![
+                ("gcc", "/usr/bin/gcc"),
+                ("ld", "/usr/bin/ld"),
+                ("ar", "/usr/bin/ar"),
+                ("cpp", "/usr/bin/cpp"),
+                ("gcov", "/usr/bin/gcov"),
+                ("nm", "/usr/bin/nm"),
+                ("objdump", "/usr/bin/objdump"),
+                ("strip", "/usr/bin/strip"),
+            ],
+        },
+    }
+}
+
 /// Generate the @local_config_cc and @local_config_cc_toolchains repos.
 ///
 /// These are created by rules_cc's cc_configure_extension.
 fn generate_rules_cc_repos() -> Vec<SyntheticRepo> {
+    let host = detect_host_platform();
     vec![
-        generate_local_config_cc_repo(),
-        generate_local_config_cc_toolchains_repo(),
+        generate_local_config_cc_repo(&host),
+        generate_local_config_cc_toolchains_repo(&host),
     ]
 }
 
 /// Generate the @local_config_cc repository.
 ///
 /// This contains the detected C++ toolchain configuration.
-fn generate_local_config_cc_repo() -> SyntheticRepo {
+fn generate_local_config_cc_repo(host: &HostPlatformInfo) -> SyntheticRepo {
     let mut files = HashMap::new();
+
+    let cpu = host.cpu_name;
 
     // BUILD.bazel with basic toolchain detection
     // This is a simplified version - full implementation would detect system compiler
@@ -255,7 +393,8 @@ fn generate_local_config_cc_repo() -> SyntheticRepo {
     // and doesn't work in Kuro's Buck2-based model. Instead, we set visibility explicitly.
     // Also, we use native cc_toolchain_suite and cc_toolchain instead of loading from
     // rules_cc, because the rules_cc versions have additional required implicit attributes.
-    let build_content = r#"# Auto-generated by kuro_bzlmod::synthetic_repos
+    let build_content = format!(
+        r#"# Auto-generated by kuro_bzlmod::synthetic_repos
 # This is a simplified toolchain configuration
 
 load(":local_config.bzl", "local_config")
@@ -263,11 +402,10 @@ load(":local_config.bzl", "local_config")
 # Placeholder toolchain - actual detection happens at build time
 cc_toolchain_suite(
     name = "toolchain",
-    toolchains = {
-        "k8": ":cc-compiler-k8",
-        "k8|gcc": ":cc-compiler-k8",
-        "k8|clang": ":cc-compiler-k8",
-    },
+    toolchains = {{
+        "{cpu}": ":cc-compiler-{cpu}",
+        "{cpu}|{compiler}": ":cc-compiler-{cpu}",
+    }},
     visibility = ["//visibility:public"],
 )
 
@@ -278,7 +416,7 @@ filegroup(
 )
 
 cc_toolchain(
-    name = "cc-compiler-k8",
+    name = "cc-compiler-{cpu}",
     all_files = ":empty",
     ar_files = ":empty",
     as_files = ":empty",
@@ -298,12 +436,25 @@ local_config(
     name = "local_toolchain_config",
     visibility = ["//visibility:public"],
 )
-"#;
+"#,
+        cpu = cpu,
+        compiler = host.compiler,
+    );
 
-    files.insert("BUILD.bazel".to_string(), build_content.to_string());
+    files.insert("BUILD.bazel".to_string(), build_content);
+
+    // Generate tool_paths entries for the .bzl file
+    let tool_paths_str: String = host
+        .tool_paths
+        .iter()
+        .filter(|(_, path)| !path.is_empty())
+        .map(|(name, path)| format!("        tool_path(name = \"{name}\", path = \"{path}\"),"))
+        .collect::<Vec<_>>()
+        .join("\n");
 
     // local_config.bzl - the rule definition must be in a .bzl file
-    let bzl_content = r#"# Auto-generated by kuro_bzlmod::synthetic_repos
+    let bzl_content = format!(
+        r#"# Auto-generated by kuro_bzlmod::synthetic_repos
 # Minimal toolchain configuration rule
 
 load("@rules_cc//cc:cc_toolchain_config_lib.bzl", "tool_path")
@@ -314,29 +465,26 @@ def _impl(ctx):
         toolchain_identifier = "local",
         host_system_name = "local",
         target_system_name = "local",
-        target_cpu = "k8",
+        target_cpu = "{cpu}",
         target_libc = "local",
-        compiler = "gcc",
+        compiler = "{compiler}",
         abi_version = "local",
         abi_libc_version = "local",
         tool_paths = [
-            tool_path(name = "gcc", path = "/usr/bin/gcc"),
-            tool_path(name = "ld", path = "/usr/bin/ld"),
-            tool_path(name = "ar", path = "/usr/bin/ar"),
-            tool_path(name = "cpp", path = "/usr/bin/cpp"),
-            tool_path(name = "gcov", path = "/usr/bin/gcov"),
-            tool_path(name = "nm", path = "/usr/bin/nm"),
-            tool_path(name = "objdump", path = "/usr/bin/objdump"),
-            tool_path(name = "strip", path = "/usr/bin/strip"),
+{tool_paths}
         ],
     )
 
 local_config = rule(
     implementation = _impl,
-    attrs = {},
+    attrs = {{}},
     provides = [CcToolchainConfigInfo],
 )
-"#;
+"#,
+        cpu = cpu,
+        compiler = host.compiler,
+        tool_paths = tool_paths_str,
+    );
 
     files.insert("local_config.bzl".to_string(), bzl_content.to_string());
 
@@ -347,25 +495,30 @@ local_config = rule(
 }
 
 /// Generate the @local_config_cc_toolchains repository.
-fn generate_local_config_cc_toolchains_repo() -> SyntheticRepo {
+fn generate_local_config_cc_toolchains_repo(host: &HostPlatformInfo) -> SyntheticRepo {
     let mut files = HashMap::new();
+
+    let cpu = host.cpu_name;
+    let os_constraint = host.os_constraint;
+    let cpu_constraint = host.cpu_constraint;
 
     // BUILD.bazel with toolchain registrations
     // Note: We don't use package(default_visibility=...) because that's Bazel-specific
     // and doesn't work in Kuro's Buck2-based model. Instead, we set visibility explicitly.
-    let build_content = r#"# Auto-generated by kuro_bzlmod::synthetic_repos
+    let build_content = format!(
+        r#"# Auto-generated by kuro_bzlmod::synthetic_repos
 
 toolchain(
-    name = "cc-toolchain-k8",
+    name = "cc-toolchain-{cpu}",
     exec_compatible_with = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:linux",
+        "{cpu_constraint}",
+        "{os_constraint}",
     ],
     target_compatible_with = [
-        "@platforms//cpu:x86_64",
-        "@platforms//os:linux",
+        "{cpu_constraint}",
+        "{os_constraint}",
     ],
-    toolchain = "@local_config_cc//:cc-compiler-k8",
+    toolchain = "@local_config_cc//:cc-compiler-{cpu}",
     toolchain_type = "@rules_cc//cc:toolchain_type",
     visibility = ["//visibility:public"],
 )
@@ -373,12 +526,16 @@ toolchain(
 # Alias for :all pattern
 alias(
     name = "all",
-    actual = ":cc-toolchain-k8",
+    actual = ":cc-toolchain-{cpu}",
     visibility = ["//visibility:public"],
 )
-"#;
+"#,
+        cpu = cpu,
+        os_constraint = os_constraint,
+        cpu_constraint = cpu_constraint,
+    );
 
-    files.insert("BUILD.bazel".to_string(), build_content.to_string());
+    files.insert("BUILD.bazel".to_string(), build_content);
 
     SyntheticRepo {
         name: "local_config_cc_toolchains".to_string(),

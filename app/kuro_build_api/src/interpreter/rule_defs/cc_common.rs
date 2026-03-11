@@ -377,10 +377,10 @@ impl<'v> StarlarkValue<'v> for CtxCheatStub {
         match attribute {
             "label" => Some(heap.alloc(CtxCheatLabelStub)),
             "bin_dir" => Some(heap.alloc(CtxCheatDirStub {
-                path: "bazel-out/k8-fastbuild/bin".to_owned(),
+                path: format!("bazel-out/{}-fastbuild/bin", crate::interpreter::rule_defs::context::host_target_cpu()),
             })),
             "genfiles_dir" => Some(heap.alloc(CtxCheatDirStub {
-                path: "bazel-out/k8-fastbuild/genfiles".to_owned(),
+                path: format!("bazel-out/{}-fastbuild/genfiles", crate::interpreter::rule_defs::context::host_target_cpu()),
             })),
             "configuration" => Some(heap.alloc(CtxCheatConfigStub)),
             "actions" => Some(heap.alloc(CtxCheatActionsStub)),
@@ -447,10 +447,10 @@ impl<'v> StarlarkValue<'v> for CtxCheatWithActions<'v> {
                 workspace_name: self.cell_name.clone(),
             })),
             "bin_dir" => Some(heap.alloc(CtxCheatDirStub {
-                path: "bazel-out/k8-fastbuild/bin".to_owned(),
+                path: format!("bazel-out/{}-fastbuild/bin", crate::interpreter::rule_defs::context::host_target_cpu()),
             })),
             "genfiles_dir" => Some(heap.alloc(CtxCheatDirStub {
-                path: "bazel-out/k8-fastbuild/genfiles".to_owned(),
+                path: format!("bazel-out/{}-fastbuild/genfiles", crate::interpreter::rule_defs::context::host_target_cpu()),
             })),
             "configuration" => Some(heap.alloc(CtxCheatConfigStub)),
             // Return the REAL actions object here
@@ -621,7 +621,7 @@ impl<'v> StarlarkValue<'v> for CtxCheatArtifactStub {
             "is_source" => Some(Value::new_bool(false)),
             "is_directory" => Some(Value::new_bool(false)),
             "root" => Some(heap.alloc(CtxCheatArtifactRootStub {
-                path: "bazel-out/k8-fastbuild/bin".to_owned(),
+                path: format!("bazel-out/{}-fastbuild/bin", crate::interpreter::rule_defs::context::host_target_cpu()),
             })),
             _ => None,
         }
@@ -1056,12 +1056,11 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         // Determine if this is a C++ compile action (vs plain C)
         let is_cpp = action_name_raw.contains("c++") || action_name_raw.contains("cpp");
 
-        // Get compiler path from toolchain if available, otherwise use default
-        // Use g++ for C++ files, gcc for C files
-        let default_compiler = if is_cpp {
-            "/usr/bin/g++"
-        } else {
-            "/usr/bin/gcc"
+        // Get compiler path from toolchain if available, otherwise use platform default
+        let default_compiler = match std::env::consts::OS {
+            "windows" => "cl.exe",
+            "macos" => "/usr/bin/clang++",
+            _ => if is_cpp { "/usr/bin/g++" } else { "/usr/bin/gcc" },
         };
         let compiler_path = if !cc_toolchain.is_none() {
             // Try to get compiler path from toolchain
@@ -2539,9 +2538,14 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                 .and_then(|method| eval.eval_function(method, &[], &[]).ok())
                                 .unwrap_or(pic_out);
 
-                            // Build compile command: gcc -c src -o output
+                            // Build compile command: <compiler> -c src -o output
+                            let host_compiler = match std::env::consts::OS {
+                                "windows" => "cl.exe",
+                                "macos" => "/usr/bin/clang",
+                                _ => "/usr/bin/gcc",
+                            };
                             let args = heap.alloc(vec![
-                                heap.alloc_str("/usr/bin/gcc").to_value(),
+                                heap.alloc_str(host_compiler).to_value(),
                                 heap.alloc_str("-c").to_value(),
                                 src,
                                 heap.alloc_str("-o").to_value(),
@@ -2582,7 +2586,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 
                             // Register PIC compile action with unique identifier
                             let pic_args = heap.alloc(vec![
-                                heap.alloc_str("/usr/bin/gcc").to_value(),
+                                heap.alloc_str(host_compiler).to_value(),
                                 heap.alloc_str("-c").to_value(),
                                 heap.alloc_str("-fPIC").to_value(),
                                 src,
@@ -2645,15 +2649,34 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<String> {
         // TODO(cc_common): Implement proper tool lookup from feature configuration
-        // For now, return placeholder tool names
-        let tool = match action_name {
-            "c-compile" => "/usr/bin/gcc",
-            "c++-compile" => "/usr/bin/g++",
-            "c++-link-executable" | "c++-link-dynamic-library" => "/usr/bin/g++",
-            "c++-link-static-library" => "/usr/bin/ar",
-            "strip" => "/usr/bin/strip",
-            "objcopy" => "/usr/bin/objcopy",
-            _ => "/usr/bin/gcc",
+        // For now, return platform-appropriate tool names
+        let tool = match std::env::consts::OS {
+            "windows" => match action_name {
+                "c-compile" | "c++-compile" => "cl.exe",
+                "c++-link-executable" | "c++-link-dynamic-library" => "link.exe",
+                "c++-link-static-library" => "lib.exe",
+                "strip" => "",
+                "objcopy" => "",
+                _ => "cl.exe",
+            },
+            "macos" => match action_name {
+                "c-compile" => "/usr/bin/clang",
+                "c++-compile" => "/usr/bin/clang++",
+                "c++-link-executable" | "c++-link-dynamic-library" => "/usr/bin/clang++",
+                "c++-link-static-library" => "/usr/bin/ar",
+                "strip" => "/usr/bin/strip",
+                "objcopy" => "/usr/bin/objcopy",
+                _ => "/usr/bin/clang",
+            },
+            _ => match action_name {
+                "c-compile" => "/usr/bin/gcc",
+                "c++-compile" => "/usr/bin/g++",
+                "c++-link-executable" | "c++-link-dynamic-library" => "/usr/bin/g++",
+                "c++-link-static-library" => "/usr/bin/ar",
+                "strip" => "/usr/bin/strip",
+                "objcopy" => "/usr/bin/objcopy",
+                _ => "/usr/bin/gcc",
+            },
         };
         Ok(tool.to_owned())
     }

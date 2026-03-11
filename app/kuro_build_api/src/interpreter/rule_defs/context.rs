@@ -713,11 +713,11 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         let entries: &[(&str, &str)] = &[
             ("BINDIR", bin_dir.as_str()),
             ("GENDIR", bin_dir.as_str()),
-            ("TARGET_CPU", "k8"),
+            ("TARGET_CPU", host_target_cpu()),
             ("COMPILATION_MODE", "fastbuild"),
-            ("CC", "/usr/bin/gcc"),
+            ("CC", host_cc_path()),
             ("CC_FLAGS", ""),
-            ("JAVA", "/usr/bin/java"),
+            ("JAVA", if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }),
             ("JAVA_RUNFILES", ""),
             ("JAVABASE", ""),
             ("ABI_GLIBC_VERSION", "2.17"),
@@ -952,11 +952,11 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         let builtins: &[(&str, &str)] = &[
             ("BINDIR", bin_dir.as_str()),
             ("GENDIR", bin_dir.as_str()),
-            ("TARGET_CPU", "k8"),
+            ("TARGET_CPU", host_target_cpu()),
             ("COMPILATION_MODE", "fastbuild"),
-            ("CC", "/usr/bin/gcc"),
+            ("CC", host_cc_path()),
             ("CC_FLAGS", ""),
-            ("JAVA", "/usr/bin/java"),
+            ("JAVA", if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }),
             ("JAVA_RUNFILES", ""),
             ("JAVABASE", ""),
         ];
@@ -1223,6 +1223,69 @@ pub fn bin_dir_path_from_label(
         format!("buck-out/v2/gen/{}/{}", cell_name, cfg_hash)
     } else {
         "buck-out/v2/gen".to_owned()
+    }
+}
+
+/// Returns the Bazel CPU identifier for the host platform.
+/// See https://bazel.build/concepts/platforms#cpu
+pub fn host_target_cpu() -> &'static str {
+    match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("linux", "x86_64") => "k8",
+        ("linux", "aarch64") => "aarch64",
+        ("macos", "x86_64") => "darwin_x86_64",
+        ("macos", "aarch64") => "darwin_arm64",
+        ("windows", "x86_64") => "x64_windows",
+        ("windows", "aarch64") => "arm64_windows",
+        _ => "k8",
+    }
+}
+
+/// Returns the default C compiler path for the host platform.
+pub fn host_cc_path() -> &'static str {
+    match std::env::consts::OS {
+        "windows" => "cl.exe",
+        "macos" => "/usr/bin/clang",
+        _ => "/usr/bin/gcc",
+    }
+}
+
+/// Returns the tool path for a given tool name, appropriate for the host platform.
+pub fn host_tool_path(tool_name: &str) -> &'static str {
+    match std::env::consts::OS {
+        "windows" => match tool_name {
+            "gcc" | "g++" | "cpp" => "cl.exe",
+            "ar" => "lib.exe",
+            "ld" => "link.exe",
+            "nm" | "objdump" => "dumpbin.exe",
+            "objcopy" | "strip" | "gcov" | "dwp" | "llvm-profdata" => "",
+            _ => "",
+        },
+        "macos" => match tool_name {
+            "gcc" | "g++" | "cpp" => "/usr/bin/clang",
+            "ar" => "/usr/bin/ar",
+            "ld" => "/usr/bin/ld",
+            "nm" => "/usr/bin/nm",
+            "objcopy" => "/usr/bin/objcopy",
+            "objdump" => "/usr/bin/objdump",
+            "strip" => "/usr/bin/strip",
+            "gcov" => "/usr/bin/gcov",
+            "dwp" => "/usr/bin/dwp",
+            "llvm-profdata" => "/usr/bin/llvm-profdata",
+            _ => "",
+        },
+        _ => match tool_name {
+            "gcc" | "g++" | "cpp" => "/usr/bin/gcc",
+            "ar" => "/usr/bin/ar",
+            "ld" => "/usr/bin/ld",
+            "nm" => "/usr/bin/nm",
+            "objcopy" => "/usr/bin/objcopy",
+            "objdump" => "/usr/bin/objdump",
+            "strip" => "/usr/bin/strip",
+            "gcov" => "/usr/bin/gcov",
+            "dwp" => "/usr/bin/dwp",
+            "llvm-profdata" => "/usr/bin/llvm-profdata",
+            _ => "",
+        },
     }
 }
 
@@ -2490,22 +2553,24 @@ impl<'v> StarlarkValue<'v> for CtxVarDict {
 
     fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let key = index.unpack_str().unwrap_or("");
+        let cpu = host_target_cpu();
+        let cc = host_cc_path();
         // Return common Make variables
-        let value = match key {
-            "BINDIR" => "bazel-out/k8-fastbuild/bin",
-            "GENDIR" => "bazel-out/k8-fastbuild/genfiles",
-            "TARGET_CPU" => "k8",
-            "COMPILATION_MODE" => "fastbuild",
-            "CC" => "/usr/bin/gcc",
-            "CC_FLAGS" => "",
-            "JAVA" => "/usr/bin/java",
-            "JAVA_RUNFILES" => "",
-            "JAVABASE" => "",
-            "ABI_GLIBC_VERSION" => "2.17",
-            "ABI" => "local",
-            _ => "", // Unknown variables return empty string
+        let value: String = match key {
+            "BINDIR" => format!("bazel-out/{cpu}-fastbuild/bin"),
+            "GENDIR" => format!("bazel-out/{cpu}-fastbuild/genfiles"),
+            "TARGET_CPU" => cpu.to_owned(),
+            "COMPILATION_MODE" => "fastbuild".to_owned(),
+            "CC" => cc.to_owned(),
+            "CC_FLAGS" => String::new(),
+            "JAVA" => if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }.to_owned(),
+            "JAVA_RUNFILES" => String::new(),
+            "JAVABASE" => String::new(),
+            "ABI_GLIBC_VERSION" => "2.17".to_owned(),
+            "ABI" => "local".to_owned(),
+            _ => String::new(), // Unknown variables return empty string
         };
-        Ok(heap.alloc_str(value).to_value())
+        Ok(heap.alloc_str(&value).to_value())
     }
 
     fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
@@ -2541,22 +2606,24 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
-        let value = match key {
-            "BINDIR" => Some("bazel-out/k8-fastbuild/bin"),
-            "GENDIR" => Some("bazel-out/k8-fastbuild/genfiles"),
-            "TARGET_CPU" => Some("k8"),
-            "COMPILATION_MODE" => Some("fastbuild"),
-            "CC" => Some("/usr/bin/gcc"),
-            "CC_FLAGS" => Some(""),
-            "JAVA" => Some("/usr/bin/java"),
-            "JAVA_RUNFILES" => Some(""),
-            "JAVABASE" => Some(""),
-            "ABI_GLIBC_VERSION" => Some("2.17"),
-            "ABI" => Some("local"),
+        let cpu = host_target_cpu();
+        let cc = host_cc_path();
+        let value: Option<String> = match key {
+            "BINDIR" => Some(format!("bazel-out/{cpu}-fastbuild/bin")),
+            "GENDIR" => Some(format!("bazel-out/{cpu}-fastbuild/genfiles")),
+            "TARGET_CPU" => Some(cpu.to_owned()),
+            "COMPILATION_MODE" => Some("fastbuild".to_owned()),
+            "CC" => Some(cc.to_owned()),
+            "CC_FLAGS" => Some(String::new()),
+            "JAVA" => Some(if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }.to_owned()),
+            "JAVA_RUNFILES" => Some(String::new()),
+            "JAVABASE" => Some(String::new()),
+            "ABI_GLIBC_VERSION" => Some("2.17".to_owned()),
+            "ABI" => Some("local".to_owned()),
             _ => None,
         };
         match value {
-            Some(v) => Ok(heap.alloc_str(v).to_value()),
+            Some(v) => Ok(heap.alloc_str(&v).to_value()),
             None => Ok(default),
         }
     }
@@ -2885,19 +2952,7 @@ impl<'v> StarlarkValue<'v> for ToolPathsStub {
 
     fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let key = index.unpack_str().unwrap_or("unknown");
-        let path = match key {
-            "gcc" | "g++" | "cpp" => "/usr/bin/gcc",
-            "ar" => "/usr/bin/ar",
-            "ld" => "/usr/bin/ld",
-            "nm" => "/usr/bin/nm",
-            "objcopy" => "/usr/bin/objcopy",
-            "objdump" => "/usr/bin/objdump",
-            "strip" => "/usr/bin/strip",
-            "gcov" => "/usr/bin/gcov",
-            "dwp" => "/usr/bin/dwp",
-            "llvm-profdata" => "/usr/bin/llvm-profdata",
-            _ => "",
-        };
+        let path = host_tool_path(key);
         Ok(heap.alloc_str(path).to_value())
     }
 
@@ -2935,19 +2990,10 @@ fn tool_paths_stub_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
-        let path = match key {
-            "gcc" | "g++" | "cpp" => "/usr/bin/gcc",
-            "ar" => "/usr/bin/ar",
-            "ld" => "/usr/bin/ld",
-            "nm" => "/usr/bin/nm",
-            "objcopy" => "/usr/bin/objcopy",
-            "objdump" => "/usr/bin/objdump",
-            "strip" => "/usr/bin/strip",
-            "gcov" => "/usr/bin/gcov",
-            "dwp" => "/usr/bin/dwp",
-            "llvm-profdata" => "/usr/bin/llvm-profdata",
-            _ => return Ok(default),
-        };
+        let path = host_tool_path(key);
+        if path.is_empty() {
+            return Ok(default);
+        }
         Ok(heap.alloc_str(path).to_value())
     }
 }

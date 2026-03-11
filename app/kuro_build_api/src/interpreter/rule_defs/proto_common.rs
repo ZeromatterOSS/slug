@@ -228,7 +228,8 @@ fn proto_common_module_methods(builder: &mut MethodsBuilder) {
         #[allow(unused_variables)] eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<String> {
         // TODO(proto_common): Extract from toolchain
-        Ok("/usr/bin/protoc".to_owned())
+        let path = if cfg!(windows) { "protoc.exe" } else { "/usr/bin/protoc" };
+        Ok(path.to_owned())
     }
 
     /// Checks if a proto toolchain has a plugin.

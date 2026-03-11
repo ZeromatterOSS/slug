@@ -373,7 +373,7 @@ Quick reference to all phases and their locations:
 | Phase | Title                              | Status          |
 | ----- | ---------------------------------- | --------------- |
 | 16    | Local Build Isolation (Sandboxing) | [x] Functional (Linux: user+mount namespaces, root read-only, output dirs writable, --nosandbox flag; 2026-02-20) |
-| 17    | Platform Support                   | [~] Partial (Linux: @local_config_platform//:host auto-generated with host OS/CPU; @platforms//os:linux config_settings match; 2026-02-25) |
+| 17    | Platform Support                   | [~] Partial (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; Make variables and tool paths use host_target_cpu()/host_cc_path()/host_tool_path(); 2026-03-10) |
 | 18    | Query Commands + Test Runner       | [x] Functional (deps, rdeps, allpaths, somepath, kind, attr, filter, buildfiles, tests; --output=label/json/build/graph; kuro test //... runs 4 tests) |
 
 ---
