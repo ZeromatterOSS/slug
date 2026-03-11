@@ -320,3 +320,24 @@ async def test_declare_file_with_sibling(buck: Buck) -> None:
     assert content == "sibling", f"Expected 'sibling', got: {content!r}"
     # The sibling file should be in the same subdirectory as the original
     assert "subdir" in str(output), f"Expected 'subdir' in output path: {output}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_stamp_files_are_file_objects(buck: Buck) -> None:
+    """ctx.info_file and ctx.version_file return File-like objects."""
+    result = await buck.build("//:stamp_info")
+    output = result.get_build_report().output_for_target("//:stamp_info")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    # Both should be File type
+    assert lines["info_type"] == "File", f"Expected File type, got: {lines['info_type']}"
+    assert lines["version_type"] == "File", f"Expected File type, got: {lines['version_type']}"
+    # Paths should be correct
+    assert "stable-status.txt" in lines["info_path"]
+    assert "volatile-status.txt" in lines["version_path"]
+    # Short paths
+    assert lines["info_short_path"] == "stable-status.txt"
+    assert lines["version_short_path"] == "volatile-status.txt"
+    # Basenames
+    assert lines["info_basename"] == "stable-status.txt"
+    assert lines["version_basename"] == "volatile-status.txt"

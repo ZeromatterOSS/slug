@@ -58,6 +58,7 @@ use starlark::values::type_repr::StarlarkTypeRepr;
 use crate::analysis::anon_promises_dyn::RunAnonPromisesAccessor;
 use crate::analysis::registry::AnalysisRegistry;
 use crate::deferred::calculation::GET_PROMISED_ARTIFACT;
+use crate::interpreter::rule_defs::artifact::methods::ArtifactRootStub;
 use crate::interpreter::rule_defs::bazel_label::BazelLabel;
 use crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider;
 use crate::interpreter::rule_defs::fragments::ConfigurationFragments;
@@ -650,24 +651,32 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// Volatile build status file (Bazel-compatible).
     ///
     /// In Bazel, `ctx.version_file` provides access to the volatile-status.txt file
-    /// which contains stamping info like BUILD_TIMESTAMP. Returns a path string stub.
+    /// which contains stamping info like BUILD_TIMESTAMP.
+    /// Returns a File object with the standard path attributes.
     #[starlark(attribute)]
     fn version_file<'v>(
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
-        Ok(heap.alloc_str("bazel-out/volatile-status.txt").to_value())
+        Ok(heap.alloc(StampFile {
+            full_path: "bazel-out/volatile-status.txt".to_owned(),
+            short_path: "volatile-status.txt".to_owned(),
+        }))
     }
 
     /// Stable build status file (Bazel-compatible).
     ///
     /// In Bazel, `ctx.info_file` provides access to the stable-status.txt file
-    /// which contains stamping info like BUILD_EMBED_LABEL. Returns a path string stub.
+    /// which contains stamping info like BUILD_EMBED_LABEL.
+    /// Returns a File object with the standard path attributes.
     #[starlark(attribute)]
     fn info_file<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
-        Ok(heap.alloc_str("bazel-out/stable-status.txt").to_value())
+        Ok(heap.alloc(StampFile {
+            full_path: "bazel-out/stable-status.txt".to_owned(),
+            short_path: "stable-status.txt".to_owned(),
+        }))
     }
 
     /// Execution groups for this rule (Bazel-compatible).
@@ -3501,6 +3510,86 @@ function stop_registry() {{
         }
     }
     launcher_path.to_string()
+}
+
+/// A Bazel-compatible stamp file (stable-status.txt or volatile-status.txt).
+///
+/// In Bazel, `ctx.info_file` and `ctx.version_file` return File objects
+/// representing build stamping status files. Rules add these as inputs
+/// to actions when stamping is enabled (ctx.attr.stamp != 0).
+///
+/// This provides a File-like object with the correct type and attributes.
+/// TODO(stamping): Generate real stamp file content during execution.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct StampFile {
+    /// Full path (e.g. "bazel-out/stable-status.txt")
+    full_path: String,
+    /// Short path / filename (e.g. "stable-status.txt")
+    short_path: String,
+}
+
+impl std::fmt::Display for StampFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<stamp file {}>", self.short_path)
+    }
+}
+
+starlark::starlark_simple_value!(StampFile);
+
+// Use "File" type for Bazel compatibility
+#[starlark::values::starlark_value(type = "File")]
+impl<'v> StarlarkValue<'v> for StampFile {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(
+            attribute,
+            "path"
+                | "short_path"
+                | "basename"
+                | "dirname"
+                | "extension"
+                | "is_source"
+                | "is_directory"
+                | "owner"
+                | "root"
+        )
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "path" => Some(heap.alloc_str(&self.full_path).to_value()),
+            "short_path" => Some(heap.alloc_str(&self.short_path).to_value()),
+            "basename" => {
+                let basename = std::path::Path::new(&self.short_path)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(&self.short_path);
+                Some(heap.alloc_str(basename).to_value())
+            }
+            "dirname" => {
+                let path_str = &self.full_path;
+                match path_str.rfind('/') {
+                    Some(pos) => Some(heap.alloc_str(&path_str[..pos]).to_value()),
+                    None => Some(heap.alloc_str("").to_value()),
+                }
+            }
+            "extension" => Some(heap.alloc_str("txt").to_value()),
+            "is_source" => Some(Value::new_bool(false)),
+            "is_directory" => Some(Value::new_bool(false)),
+            "owner" => Some(Value::new_none()),
+            "root" => {
+                // Root is the prefix before the short_path
+                let root_path = if let Some(prefix) =
+                    self.full_path.strip_suffix(&self.short_path)
+                {
+                    prefix.trim_end_matches('/').to_owned()
+                } else {
+                    "bazel-out".to_owned()
+                };
+                Some(heap.alloc(ArtifactRootStub { path: root_path }))
+            }
+            _ => None,
+        }
+    }
 }
 
 /// A stub that wraps a string path and provides a `.path` attribute.

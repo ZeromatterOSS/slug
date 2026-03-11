@@ -57,12 +57,12 @@ Status key: **Done** = fully working, **Stub** = exists but returns hardcoded/in
 | 12 | `ctx.files` | `struct` | **Done** | `CtxFiles` (context.rs:523) |
 | 13 | `ctx.fragments` | `fragments` | **Stub** | Returns `ConfigurationFragments::default()` (context.rs:368). Has `ctx.fragments.cpp` sub-stub. |
 | 14 | `ctx.genfiles_dir` | `root` | **Done** | Same as bin_dir (no separate genfiles dir in Kuro, context.rs:641). |
-| 15 | `ctx.info_file` | `File` | **Stub** | Returns string `"bazel-out/stable-status.txt"` (context.rs:658). Should return a real `File` object. |
+| 15 | `ctx.info_file` | `File` | **Done** | Returns `StampFile` object with type "File", path/short_path/basename/extension/root attributes (context.rs). |
 | 16 | `ctx.label` | `Label` | **Done** | `StarlarkConfiguredProvidersLabel` (context.rs:331) |
 | 17 | `ctx.outputs` | `structure` | **Stub** | Hardcodes 3 artifacts: stripped_binary, executable, dwp_file (context.rs:403). Doesn't read from rule `outputs={}`. Deprecated in Bazel. |
 | 18 | `ctx.toolchains` | `ToolchainContext` | **Stub** | Returns `ToolchainsStub` with hardcoded cc/rust/python detection (context.rs:387) |
 | 19 | `ctx.var` | `dict[str,str]` | **Stub** | `CtxVarDict` stub (context.rs:698) |
-| 20 | `ctx.version_file` | `File` | **Stub** | Returns string `"bazel-out/volatile-status.txt"` (context.rs:646). Should return a real `File` object. |
+| 20 | `ctx.version_file` | `File` | **Done** | Returns `StampFile` object with type "File", path/short_path/basename/extension/root attributes (context.rs). |
 | 21 | `ctx.workspace_name` | `string` | **Done** | Returns `"_main"` for root cell, cell name for external cells (context.rs:602). Runfiles also create `_main` symlink (run.rs). |
 | — | `ctx.aspect_ids` | `list[str]` | **Done** | Aspect-only. Returns `[]` stub in AspectContext (aspect/context.rs). |
 | — | `ctx.rule` | `rule_attributes` | **Done** | Aspect-only. `AspectRuleInfo` with `kind`, `attr`, `files`, `file`, `executable` (aspect/rule_info.rs). |
@@ -132,7 +132,7 @@ The `Args` object is returned by `ctx.actions.args()`. In Kuro this is `Starlark
 
 | Item | Blocking | Effort |
 |---|---|---|
-| `ctx.info_file` / `ctx.version_file` — return real `File` objects | Build stamping (rules_rust, rules_go) | Small — declare artifacts instead of returning strings |
+| ~~`ctx.info_file` / `ctx.version_file`~~ | ~~Build stamping (rules_rust, rules_go)~~ | **DONE** — Returns `StampFile` objects with type "File" and all standard File attributes |
 | `ctx.bin_dir` / `ctx.genfiles_dir` — derive from real config | Correct output paths | Small — read from configured target label |
 | `ctx.features` / `ctx.disabled_features` — read from rule attrs | rules_cc feature configuration | Small — extract from `features` attribute |
 | ~~`args.use_param_file()` / `args.set_param_file_format()`~~ | ~~Long command lines (protobuf compilations)~~ | **DONE** — Real param file writing during execution with format support |

@@ -69,6 +69,32 @@ sibling_file = rule(
 )
 
 
+def _stamp_file_info_impl(ctx):
+    """Tests that ctx.info_file and ctx.version_file return File-like objects."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    info = ctx.info_file
+    version = ctx.version_file
+    lines = [
+        "info_type=" + type(info),
+        "info_path=" + info.path,
+        "info_short_path=" + info.short_path,
+        "info_basename=" + info.basename,
+        "info_extension=" + info.extension,
+        "version_type=" + type(version),
+        "version_path=" + version.path,
+        "version_short_path=" + version.short_path,
+        "version_basename=" + version.basename,
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+stamp_file_info = rule(
+    implementation = _stamp_file_info_impl,
+    attrs = {},
+)
+
+
 def _bool_setting_impl(ctx):
     """A boolean build setting (no output)."""
     return []

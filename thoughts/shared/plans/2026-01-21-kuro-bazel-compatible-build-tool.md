@@ -316,7 +316,7 @@ Quick reference to all phases and their locations:
 
 | Phase | Title                                      | Status          |
 | ----- | ------------------------------------------ | --------------- |
-| 6a    | `ctx` and `ctx.actions` Completeness       | [~] Partial — Tier 1 items complete (run_shell, expand_location, add_joined all done); Tier 2-4 items remain |
+| 6a    | `ctx` and `ctx.actions` Completeness       | [~] Partial — Tier 1 complete; Tier 2: all Done (param files, sibling, info_file/version_file); Tier 3-4 remain |
 | 6c    | `repository_ctx` Implementation            | [x] Done — full implementation in `repository_ctx.rs`; all 5 attrs + 18 methods; Starlark repo rule execution via late binding in `starlark_repo_rule_executor.rs` |
 
 ### Prelude Architecture (Phase 6b) - [Sub-plan](./kuro-bazel-subplans/04-prelude-architecture.md)
@@ -500,7 +500,7 @@ Example aliases created: `com_google_protobuf -> protobuf`, `com_google_absl -> 
 
 ## Test Suite TODO (as of 2026-03-03)
 
-Current status: **863 pass, 150 skip, 1 xfail** in `tests/core/` (updated 2026-03-06).
+Current status: **~970 pass, ~160 skip, 0 fail** in `tests/core/` (updated 2026-03-10). All test categories (analysis, build, run, test, bzlmod, docs, help, log, completion, interpreter, transitive_sets, validation) pass with 0 failures.
 
 ### CI Infrastructure (2026-03-05)
 

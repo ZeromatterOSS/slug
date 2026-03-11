@@ -43,7 +43,7 @@ use crate::interpreter::rule_defs::artifact::starlark_promise_artifact::Starlark
 /// Provides `path` attribute for output root path.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct ArtifactRootStub {
-    path: String,
+    pub path: String,
 }
 
 impl std::fmt::Display for ArtifactRootStub {

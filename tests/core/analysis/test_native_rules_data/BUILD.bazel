@@ -1,4 +1,4 @@
-load(":defs.bzl", "bool_flag", "collect_files", "select_value", "sibling_file", "string_flag", "write_list")
+load(":defs.bzl", "bool_flag", "collect_files", "select_value", "sibling_file", "stamp_file_info", "string_flag", "write_list")
 
 # === filegroup tests ===
 
@@ -356,4 +356,10 @@ genrule(
     outs = ["pkg_group.txt"],
     cmd = "echo package_group_ok > $@",
     visibility = [":all_packages"],
+)
+
+# === stamp file tests ===
+
+stamp_file_info(
+    name = "stamp_info",
 )
