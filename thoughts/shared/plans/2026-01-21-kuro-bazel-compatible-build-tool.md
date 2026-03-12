@@ -316,7 +316,7 @@ Quick reference to all phases and their locations:
 
 | Phase | Title                                      | Status          |
 | ----- | ------------------------------------------ | --------------- |
-| 6a    | `ctx` and `ctx.actions` Completeness       | [~] Partial — Tier 1 complete; Tier 2: all Done (param files, sibling, info_file/version_file); Tier 3-4 remain |
+| 6a    | `ctx` and `ctx.actions` Completeness       | [~] Partial — Tier 1-2 complete; ctx.configuration real data (default_shell_env, short_id, test_env); ctx.var with keys/values/items; Tier 3-4 remain |
 | 6c    | `repository_ctx` Implementation            | [x] Done — full implementation in `repository_ctx.rs`; all 5 attrs + 18 methods; Starlark repo rule execution via late binding in `starlark_repo_rule_executor.rs` |
 
 ### Prelude Architecture (Phase 6b) - [Sub-plan](./kuro-bazel-subplans/04-prelude-architecture.md)
@@ -334,7 +334,7 @@ Quick reference to all phases and their locations:
 | ----- | ----------------------- | --------------- |
 | 7a    | Bazel Native Rules      | [~] Partial (constraint_setting/value, config_setting, platform, toolchain_type, cc_libc_top_alias, genquery stub done; genrule cmd/cmd_bash accept select(); 2026-02-25; genrule cmd_ps/cmd_bat Windows shells; config_setting values={} supports compilation_mode/cpu/crosstool_top/compiler keys; config_setting define_values={} properly stored and matched; 2026-03-11) |
 | 7b    | Bazel Global Functions  | [~] Partial (audit done, glob exclude_directories added, missing functions implemented; package_group visibility resolution working with cross-package deps; existing_rules()/existing_rule() return "kind" field; repository_name() returns "@" for root cell; module_name()/module_version() added; 2026-03-11) |
-| 7c    | Bazel Top-Level Modules | [~] Partial (config module done, platform_common done, testing.analysis_test() done, coverage_common done; cc_common compile passes flags, compilation context preserves all include types, linking_context extracts objects; Label.workspace_root returns "external/<repo>" for external repos, Label.repo_name added; 2026-03-11) |
+| 7c    | Bazel Top-Level Modules | [~] Partial (config module done, platform_common done, testing.analysis_test() done, coverage_common done; cc_common compile passes flags, compilation context preserves all include types, linking_context extracts objects; Label.workspace_root returns "external/<repo>" for external repos, Label.repo_name added; cc_common.is_cc_toolchain_resolution_enabled_do_not_use() added; ctx.configuration has real default_shell_env/short_id/test_env; ctx.var.values()/items() added; 2026-03-12) |
 | 7d    | Buck2-Specific Removal  | [~] Partial (read_config/read_root_config error with message; oncall/read_oncall/load_symbols removed; soft_error already errors; 2026-02-24; native.bzl 576→40 lines, rules.bzl APPLE_PLATFORMS_KEY removed, user/all.bzl Android/CXX/Xcode removed; 2026-02-25) |
 
 ### Aspects (Phases 8a-8d) - [Sub-plan](./kuro-bazel-subplans/06-aspects.md)
