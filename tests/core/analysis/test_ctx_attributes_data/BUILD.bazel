@@ -11,6 +11,7 @@ load(":defs.bzl",
      "label_rule",
      "resolve_tools_rule",
      "symlink_rule",
+     "symlink_target_path_rule",
      "template_dict_rule",
      "workspace_name_rule",
 )
@@ -50,6 +51,8 @@ expand_make_vars_rule(name = "make_vars")
 # === ctx.actions.symlink ===
 
 symlink_rule(name = "file_symlink")
+
+symlink_target_path_rule(name = "target_path_symlink")
 
 # === ctx.actions.expand_template ===
 

@@ -150,6 +150,24 @@ symlink_rule = rule(
 )
 
 
+def _symlink_target_path_rule_impl(ctx):
+    """Tests ctx.actions.symlink with target_path (string path symlink)."""
+    # Create the actual content file
+    content_file = ctx.actions.declare_file("real_content.txt")
+    ctx.actions.write(content_file, "target_path_content")
+
+    # Create a symlink to the content file using target_path (relative path)
+    link = ctx.actions.declare_symlink("path_link.txt")
+    ctx.actions.symlink(output = link, target_path = "real_content.txt")
+    return [DefaultInfo(default_output = link, files = depset([content_file, link]))]
+
+
+symlink_target_path_rule = rule(
+    implementation = _symlink_target_path_rule_impl,
+    attrs = {},
+)
+
+
 # ============================================================================
 # ctx.actions.expand_template
 # ============================================================================

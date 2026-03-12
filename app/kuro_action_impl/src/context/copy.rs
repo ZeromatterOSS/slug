@@ -19,12 +19,14 @@ use kuro_execute::execute::request::OutputType;
 use starlark::environment::MethodsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
+use starlark::values::Value;
 use starlark::values::ValueTyped;
 use starlark::values::dict::UnpackDictEntries;
 use starlark::values::none::NoneOr;
 
 use crate::actions::impls::copy::CopyMode;
 use crate::actions::impls::copy::UnregisteredCopyAction;
+use crate::actions::impls::copy::UnregisteredSymlinkPathAction;
 use crate::actions::impls::symlinked_dir::UnregisteredSymlinkedDirAction;
 
 fn create_dir_tree<'v>(
@@ -146,29 +148,61 @@ pub(crate) fn analysis_actions_methods_copy(methods: &mut MethodsBuilder) {
 
     /// Creates a symlink action (Bazel-compatible).
     ///
-    /// This is the Bazel equivalent of Buck2's `symlink_file`. Creates a symlink
-    /// from `output` to `target_file`.
+    /// Accepts either `target_file` (an artifact) or `target_path` (a string).
+    /// Exactly one must be provided.
+    ///
+    /// When `target_file` is used, creates a symlink tracked by the artifact's content.
+    /// When `target_path` is used, creates an unresolved symlink pointing to the given path
+    /// (the output should be declared via `ctx.actions.declare_symlink()`).
     ///
     /// See: https://bazel.build/rules/lib/actions#symlink
     fn symlink<'v>(
         this: &AnalysisActions<'v>,
         #[starlark(require = named)] output: OutputArtifactArg<'v>,
-        #[starlark(require = named)] target_file: ValueAsInputArtifactLike<'v>,
+        #[starlark(require = named, default = NoneOr::None)] target_file: NoneOr<
+            ValueAsInputArtifactLike<'v>,
+        >,
+        #[starlark(require = named, default = NoneOr::None)] target_path: NoneOr<&str>,
+        #[starlark(require = named, default = NoneOr::None)] target_type: NoneOr<&str>,
         #[starlark(require = named, default = false)] is_executable: bool,
         #[starlark(require = named, default = NoneOr::None)] progress_message: NoneOr<&str>,
         #[starlark(require = named, default = false)] use_exec_root_for_source: bool,
         eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<ValueTyped<'v, StarlarkDeclaredArtifact<'v>>> {
-        let _ = (is_executable, progress_message, use_exec_root_for_source);
-        Ok(copy_file_impl(
-            eval,
-            this,
-            output,
-            target_file,
-            CopyMode::Symlink,
-            OutputType::FileOrDirectory,
-            None,
-        )?)
+    ) -> starlark::Result<Value<'v>> {
+        let _ = (is_executable, progress_message, use_exec_root_for_source, target_type);
+
+        match (target_file.into_option(), target_path.into_option()) {
+            (Some(target_file), None) => {
+                // Artifact-backed symlink (content-tracked)
+                let result = copy_file_impl(
+                    eval,
+                    this,
+                    output,
+                    target_file,
+                    CopyMode::Symlink,
+                    OutputType::FileOrDirectory,
+                    None,
+                )?;
+                Ok(result.to_value())
+            }
+            (None, Some(path)) => {
+                // String path symlink (unresolved, for declare_symlink outputs)
+                let action = UnregisteredSymlinkPathAction::new(path.to_owned());
+                let mut this = this.state()?;
+                let (declaration, output_artifact) =
+                    this.get_or_declare_output(eval, output, OutputType::FileOrDirectory, None)?;
+                this.register_action(indexset![output_artifact], action, None, None)?;
+                Ok(declaration
+                    .into_declared_artifact(AssociatedArtifacts::new())
+                    .to_value())
+            }
+            (Some(_), Some(_)) => Err(starlark::Error::new_other(anyhow::anyhow!(
+                "ctx.actions.symlink(): exactly one of target_file or target_path must be specified, got both"
+            ))),
+            (None, None) => Err(starlark::Error::new_other(anyhow::anyhow!(
+                "ctx.actions.symlink(): exactly one of target_file or target_path must be specified, got neither"
+            ))),
+        }
     }
 
     /// Make a copy of a directory.

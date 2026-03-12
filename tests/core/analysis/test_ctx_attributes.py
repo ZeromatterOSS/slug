@@ -105,6 +105,13 @@ async def test_ctx_actions_symlink(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_ctx_attributes_data")
+async def test_ctx_actions_symlink_target_path(buck: Buck) -> None:
+    """ctx.actions.symlink with target_path creates an unresolved symlink to a string path."""
+    # Build succeeds (no exception = success). The symlink action with target_path is registered.
+    await buck.build("//:target_path_symlink")
+
+
+@buck_test(data_dir="test_ctx_attributes_data")
 async def test_ctx_actions_expand_template(buck: Buck) -> None:
     """ctx.actions.expand_template substitutes placeholders in a template file."""
     result = await buck.build("//:expand_template")
