@@ -105,6 +105,42 @@ async def test_select_constraint_values_custom_platform(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_select_by_compilation_mode_default(buck: Buck) -> None:
+    """select() with config_setting(values={"compilation_mode":"fastbuild"}) matches default mode."""
+    result = await buck.build("//:select_by_compilation_mode")
+    output = result.get_build_report().output_for_target("//:select_by_compilation_mode")
+    content = output.read_text().strip()
+    assert content == "fastbuild_selected"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_select_by_compilation_mode_opt(buck: Buck) -> None:
+    """select() matches config_setting(values={"compilation_mode":"opt"}) with --compilation_mode=opt."""
+    result = await buck.build("//:select_by_compilation_mode", "--compilation_mode=opt")
+    output = result.get_build_report().output_for_target("//:select_by_compilation_mode")
+    content = output.read_text().strip()
+    assert content == "opt_selected"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_select_by_define_default(buck: Buck) -> None:
+    """select() with config_setting(define_values={}) uses default when --define not set."""
+    result = await buck.build("//:select_by_define")
+    output = result.get_build_report().output_for_target("//:select_by_define")
+    content = output.read_text().strip()
+    assert content == "no_define"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_select_by_define_match(buck: Buck) -> None:
+    """select() matches config_setting(define_values={"FOO":"bar"}) with --define=FOO=bar."""
+    result = await buck.build("//:select_by_define", "--define=FOO=bar")
+    output = result.get_build_report().output_for_target("//:select_by_define")
+    content = output.read_text().strip()
+    assert content == "foo_is_bar"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_constraint_setting_and_value_build(buck: Buck) -> None:
     """constraint_setting and constraint_value rules can be defined and build."""
     # These build successfully as analysis-only rules (no outputs)
