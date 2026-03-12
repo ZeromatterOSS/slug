@@ -622,23 +622,18 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // Try to get the actual BUILD file path from the label
         if let Some(label) = this.0.label {
-            let label_str = format!("{}", label);
-            // Extract package path from label like "//foo/bar:target"
-            if let Some(pkg) = label_str.strip_prefix("//") {
-                if let Some(colon_pos) = pkg.find(':') {
-                    let pkg_path = &pkg[..colon_pos];
-                    if pkg_path.is_empty() {
-                        return Ok(heap.alloc_str("BUILD.bazel").to_value());
-                    }
-                    let build_path = format!("{}/BUILD.bazel", pkg_path);
-                    return Ok(heap.alloc_str(&build_path).to_value());
-                }
-            }
+            let pkg = label.label().target().pkg();
+            let pkg_path = pkg.cell_relative_path().as_str();
+            let path = if pkg_path.is_empty() {
+                "BUILD.bazel".to_owned()
+            } else {
+                format!("{}/BUILD.bazel", pkg_path)
+            };
+            Ok(heap.alloc_str(&path).to_value())
+        } else {
+            Ok(heap.alloc_str("BUILD.bazel").to_value())
         }
-        // Fallback
-        Ok(heap.alloc_str("BUILD.bazel").to_value())
     }
 
     /// Workspace name (Bazel-compatible).
