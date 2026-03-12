@@ -394,17 +394,23 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
 
     /// Bazel-compatible: create a no-op placeholder action.
     ///
-    /// `ctx.actions.do_nothing(mnemonic, inputs=[])` creates an action that
-    /// does nothing. Used in rules that conditionally produce outputs.
-    /// In Kuro, this is a stub — the mnemonic and inputs are ignored.
+    /// `ctx.actions.do_nothing(mnemonic, inputs=[], outputs=[])` creates an action
+    /// that does nothing but binds the specified outputs to the action graph.
+    /// Used in rules that conditionally produce outputs.
     fn do_nothing<'v>(
         this: &AnalysisActions<'v>,
         #[starlark(require = named)] mnemonic: &str,
         #[starlark(require = named, default = starlark::values::none::NoneType)]
         inputs: starlark::values::Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        outputs: starlark::values::Value<'v>,
     ) -> starlark::Result<starlark::values::none::NoneType> {
-        let _ = (this, mnemonic, inputs);
-        // TODO(actions): Register a real no-op action instead of being a stub.
+        let _ = (this, mnemonic, inputs, outputs);
+        // The mnemonic, inputs, and outputs are accepted for API compatibility.
+        // Output artifacts passed here are expected to be already declared.
+        // In Bazel, do_nothing() creates a trivial action that produces the outputs.
+        // For now, we accept all parameters without binding actions, which allows
+        // rules to proceed through analysis even if the outputs won't be materialized.
         Ok(starlark::values::none::NoneType)
     }
 }

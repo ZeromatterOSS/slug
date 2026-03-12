@@ -80,6 +80,8 @@ pub fn provider_id_for_idx(idx: u32) -> &'static Arc<ProviderId> {
         1 => PyRuntimeInfoProvider::provider_id(),
         2 => crate::interpreter::rule_defs::java_common::JavaInfoProvider::provider_id(),
         3 => crate::interpreter::rule_defs::java_common::JavaPluginInfoProvider::provider_id(),
+        4 => crate::interpreter::rule_defs::java_common::JavaRuntimeInfoProvider::provider_id(),
+        5 => crate::interpreter::rule_defs::java_common::JavaToolchainInfoProvider::provider_id(),
         _ => panic!("Invalid provider index: {}", idx),
     }
 }
@@ -90,6 +92,8 @@ pub fn provider_name_for_idx(idx: u32) -> &'static str {
         1 => "PyRuntimeInfo",
         2 => "JavaInfo",
         3 => "JavaPluginInfo",
+        4 => "JavaRuntimeInfo",
+        5 => "JavaToolchainInfo",
         _ => "Unknown",
     }
 }

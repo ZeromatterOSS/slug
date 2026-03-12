@@ -55,6 +55,10 @@ use crate::interpreter::rule_defs::py_common::create_native_provider_instance;
 pub const JAVA_INFO_IDX: u32 = 2;
 /// Provider index for JavaPluginInfo in the NativeProviderInstance dispatch table.
 pub const JAVA_PLUGIN_INFO_IDX: u32 = 3;
+/// Provider index for JavaRuntimeInfo in the NativeProviderInstance dispatch table.
+pub const JAVA_RUNTIME_INFO_IDX: u32 = 4;
+/// Provider index for JavaToolchainInfo in the NativeProviderInstance dispatch table.
+pub const JAVA_TOOLCHAIN_INFO_IDX: u32 = 5;
 
 // ============================================================================
 // JavaCommonModule - The main java_common namespace
@@ -362,8 +366,21 @@ impl<'v> StarlarkValue<'v> for JavaPluginInfoProvider {
 /// JavaRuntimeInfo provider callable (accessed via java_common.JavaRuntimeInfo).
 ///
 /// Provides information about the Java runtime used during execution.
+/// Called as `JavaRuntimeInfo(java_home=..., ...)` to create instances.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct JavaRuntimeInfoProvider;
+
+impl JavaRuntimeInfoProvider {
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "JavaRuntimeInfo".to_owned(),
+            })
+        })
+    }
+}
 
 impl Display for JavaRuntimeInfoProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -373,8 +390,27 @@ impl Display for JavaRuntimeInfoProvider {
 
 starlark_simple_value!(JavaRuntimeInfoProvider);
 
+impl ProviderCallableLike for JavaRuntimeInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
 #[starlark_value(type = "JavaRuntimeInfo")]
-impl<'v> StarlarkValue<'v> for JavaRuntimeInfoProvider {}
+impl<'v> StarlarkValue<'v> for JavaRuntimeInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        create_native_provider_instance(JAVA_RUNTIME_INFO_IDX, args, eval)
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
 
 // ============================================================================
 // JavaToolchainInfoProvider - Provider for Java toolchain information
@@ -383,8 +419,21 @@ impl<'v> StarlarkValue<'v> for JavaRuntimeInfoProvider {}
 /// JavaToolchainInfo provider callable (accessed via java_common.JavaToolchainInfo).
 ///
 /// Provides information about the Java toolchain (javac, bootclasspath, etc.).
+/// Called as `JavaToolchainInfo(javac=..., ...)` to create instances.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct JavaToolchainInfoProvider;
+
+impl JavaToolchainInfoProvider {
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "JavaToolchainInfo".to_owned(),
+            })
+        })
+    }
+}
 
 impl Display for JavaToolchainInfoProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -394,8 +443,27 @@ impl Display for JavaToolchainInfoProvider {
 
 starlark_simple_value!(JavaToolchainInfoProvider);
 
+impl ProviderCallableLike for JavaToolchainInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
 #[starlark_value(type = "JavaToolchainInfo")]
-impl<'v> StarlarkValue<'v> for JavaToolchainInfoProvider {}
+impl<'v> StarlarkValue<'v> for JavaToolchainInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        create_native_provider_instance(JAVA_TOOLCHAIN_INFO_IDX, args, eval)
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
 
 // ============================================================================
 // Registration
