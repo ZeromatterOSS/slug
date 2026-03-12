@@ -373,8 +373,8 @@ Quick reference to all phases and their locations:
 | Phase | Title                              | Status          |
 | ----- | ---------------------------------- | --------------- |
 | 16    | Local Build Isolation (Sandboxing) | [x] Functional (Linux: user+mount namespaces, root read-only, output dirs writable, --nosandbox flag; 2026-02-20) |
-| 17    | Platform Support                   | [x] Functional (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; MSVC auto-detection; CcToolchainInfoStub per-platform; --copt/--cxxopt/--linkopt/--strip/--features flags; execution_requirements; PlatformFragment/JavaFragment/AppleFragment stubs; 30+ common Bazel CLI flags accepted; package_group visibility resolution; 2026-03-11) |
-| 18    | Query Commands + Test Runner       | [x] Functional (deps, rdeps, allpaths, somepath, kind, attr, filter, buildfiles, tests; --output=label/json/build/graph; kuro test //... runs 4 tests) |
+| 17    | Platform Support                   | [x] Functional (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; MSVC auto-detection; CcToolchainInfoStub per-platform; --copt/--cxxopt/--linkopt/--strip/--features flags; execution_requirements; PlatformFragment/JavaFragment/AppleFragment/CoverageFragment; 60+ common Bazel CLI flags accepted; package_group visibility resolution; 2026-03-12) |
+| 18    | Query Commands + Test Runner       | [x] Functional (deps, rdeps, allpaths, somepath, kind, attr, filter, buildfiles, tests; --output=label/json/build/graph; kuro test //... runs 4 tests; kuro version/shutdown/fetch Bazel-compat commands; ctx.workspace_name/build_file_path attrs; 2026-03-12) |
 
 ---
 
@@ -509,6 +509,11 @@ Current status: **~980 pass, ~160 skip, 0 fail** in `tests/core/` (updated 2026-
 - **`kuro info` improvements**: Single-key queries output value only (Bazel compat); added output_path, bazel-genfiles, server_pid, server_log, build-language keys
 - **Cleaner test output**: Test runner uses proper string conversion (not Debug format), only includes non-empty stdout/stderr sections
 - **Stability fixes**: Replaced panic!() with proper error handling in DefaultInfo provider (for_each_in_list, files attribute) and configuror implicit import lookup
+- **New Bazel-compatible commands**: `kuro version` (multi-line build label format), `kuro shutdown` (alias for kill), `kuro fetch` (no-op, deps resolved lazily)
+- **Improved fragments**: Java fragment expanded with use_ijars(), strict_java_deps(), disallow_java_import_exports(), etc.; Coverage fragment added
+- **30+ new Bazel CLI flags accepted**: --host_features, --extra_toolchains, --extra_execution_platforms, --stamp/--nostamp, --enable_bzlmod, --allow_yanked_versions, --output_groups, --java_runtime_version, --java_language_version, --tool_java_*_version, --register_toolchains, --check_direct_dependencies, etc.
+- **New ctx attributes**: ctx.workspace_name (returns cell name), ctx.build_file_path (returns relative BUILD path)
+- **Init test fixed**: Aligned test expectation with Bazel-style genrule syntax (outs/$ instead of out/$OUT)
 
 ### CI Infrastructure (2026-03-05)
 
