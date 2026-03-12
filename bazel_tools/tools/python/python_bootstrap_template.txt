@@ -176,8 +176,8 @@ def FindModuleSpace(main_rel_path):
 def _CreateRunfilesOnDemand(main_rel_path):
   """Creates a minimal runfiles tree for Kuro-built py_binary targets.
 
-  In Kuro, external modules are stored under bazel-external/{module_name}/{version}/.
-  This function creates {binary}.runfiles/{workspace_name}/ -> that versioned directory.
+  In Kuro, external modules are stored under bazel-external/{module_name}+{version}/.
+  This function creates {binary}.runfiles/{workspace_name}/ -> that directory.
   """
   stub_filename = sys.argv[0]
   if not os.path.isabs(stub_filename):
@@ -190,18 +190,20 @@ def _CreateRunfilesOnDemand(main_rel_path):
     # Find the project root
     project_root = _FindProjectRoot(stub_filename)
     if project_root:
-      # Look for bazel-external/{workspace_name}/ with versioned subdirectories.
-      # Kuro stores BCR modules as bazel-external/{name}/{version}/ symlinks.
-      module_dir = os.path.join(project_root, 'bazel-external', workspace_name)
-      if os.path.isdir(module_dir):
-        # Find the latest version directory (last when sorted)
-        versions = sorted([
-            d for d in os.listdir(module_dir)
-            if os.path.isdir(os.path.join(module_dir, d)) or
-               os.path.islink(os.path.join(module_dir, d))
+      # Look for bazel-external/{workspace_name}+{version}/ directories.
+      # Kuro stores BCR modules as bazel-external/{name}+{version}/ symlinks.
+      external_dir = os.path.join(project_root, 'bazel-external')
+      if os.path.isdir(external_dir):
+        prefix = workspace_name + '+'
+        candidates = sorted([
+            d for d in os.listdir(external_dir)
+            if d.startswith(prefix) and (
+                os.path.isdir(os.path.join(external_dir, d)) or
+                os.path.islink(os.path.join(external_dir, d))
+            )
         ])
-        if versions:
-          versioned_src = os.path.realpath(os.path.join(module_dir, versions[-1]))
+        if candidates:
+          versioned_src = os.path.realpath(os.path.join(external_dir, candidates[-1]))
           try:
             os.symlink(versioned_src, ws_dir)
           except OSError:

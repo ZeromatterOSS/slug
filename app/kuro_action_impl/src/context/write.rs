@@ -649,21 +649,16 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
                     ));
                     std::fs::read_to_string(&bundled_path)
                         .or_else(|_| {
-                            // Try bazel-external direct path (no version) for bzlmod cells
-                            let external_path = project_root
-                                .join(format!("bazel-external/{}/{}", cell_name, full_path));
-                            std::fs::read_to_string(&external_path)
-                        })
-                        .or_else(|_| {
-                            // Try bazel-external versioned path: bazel-external/{cell}/{version}/{path}
-                            let cell_dir =
-                                project_root.join(format!("bazel-external/{}", cell_name));
-                            if let Ok(entries) = std::fs::read_dir(&cell_dir) {
+                            // Try bazel-external/{cell}+{version}/{path} format
+                            // Scan bazel-external/ for dirs matching {cell_name}+*
+                            let external_dir = project_root.join("bazel-external");
+                            if let Ok(entries) = std::fs::read_dir(&external_dir) {
+                                let prefix = format!("{}+", cell_name);
                                 for entry in entries.flatten() {
-                                    if entry
-                                        .file_type()
-                                        .map(|t| t.is_dir() || t.is_symlink())
-                                        .unwrap_or(false)
+                                    let name = entry.file_name();
+                                    let name_str = name.to_string_lossy();
+                                    if name_str.starts_with(&prefix)
+                                        || name_str == cell_name
                                     {
                                         let versioned_path = entry.path().join(&full_path);
                                         if let Ok(content) =
@@ -674,17 +669,16 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
                                     }
                                 }
                             }
-                            // Also try buck-out/v2/external_cells/bzlmod/{cell}/{version}/{path}
-                            let bzlmod_dir = project_root.join(format!(
-                                "buck-out/v2/external_cells/bzlmod/{}",
-                                cell_name
-                            ));
+                            // Also try buck-out/v2/external_cells/bzlmod/{cell}+{version}/{path}
+                            let bzlmod_dir =
+                                project_root.join("buck-out/v2/external_cells/bzlmod");
                             if let Ok(entries) = std::fs::read_dir(&bzlmod_dir) {
+                                let prefix = format!("{}+", cell_name);
                                 for entry in entries.flatten() {
-                                    if entry
-                                        .file_type()
-                                        .map(|t| t.is_dir() || t.is_symlink())
-                                        .unwrap_or(false)
+                                    let name = entry.file_name();
+                                    let name_str = name.to_string_lossy();
+                                    if name_str.starts_with(&prefix)
+                                        || name_str == cell_name
                                     {
                                         let versioned_path = entry.path().join(&full_path);
                                         if let Ok(content) =

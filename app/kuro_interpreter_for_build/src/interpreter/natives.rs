@@ -129,22 +129,25 @@ pub(crate) fn json_to_starlark_value<'v>(heap: starlark::values::Heap<'v>, json:
 ///
 /// During analysis, BuildContext is unavailable but we can determine the cell
 /// from the call stack filename. The filename is a project-relative path:
-/// - `bazel-external/{cell_name}/{version}/...` for external bzlmod modules
+/// - `bazel-external/{cell_name}+{version}/...` for external bzlmod modules
+/// - `bazel-external/{canonical_name}/...` for extension/repository rule repos
 /// - `bazel_tools/...` for bazel_tools cell
 /// - Other paths for root cell
 fn extract_cell_and_package_from_filename(filename: &str) -> (String, String) {
     if let Some(rest) = filename.strip_prefix("bazel-external/") {
-        // bazel-external/{cell_name}/{version}/{cell_relative_path}
-        if let Some(cell_end) = rest.find('/') {
-            let cell_name = rest[..cell_end].to_owned();
-            let after_cell = &rest[cell_end + 1..];
-            // Skip the version component
-            if let Some(version_end) = after_cell.find('/') {
-                let cell_relative = &after_cell[version_end + 1..];
-                if let Some(last_slash) = cell_relative.rfind('/') {
-                    return (cell_name, cell_relative[..last_slash].to_owned());
-                }
-                return (cell_name, String::new());
+        // bazel-external/{cell_name}+{version}/{cell_relative_path}
+        // or bazel-external/{canonical_name}/{cell_relative_path}
+        if let Some(dir_end) = rest.find('/') {
+            let dir_name = &rest[..dir_end];
+            // Extract cell name: strip "+version" suffix if present
+            let cell_name = if let Some(plus_idx) = dir_name.find('+') {
+                dir_name[..plus_idx].to_owned()
+            } else {
+                dir_name.to_owned()
+            };
+            let cell_relative = &rest[dir_end + 1..];
+            if let Some(last_slash) = cell_relative.rfind('/') {
+                return (cell_name, cell_relative[..last_slash].to_owned());
             }
             return (cell_name, String::new());
         }

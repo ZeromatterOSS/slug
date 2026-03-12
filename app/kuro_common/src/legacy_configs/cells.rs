@@ -704,9 +704,10 @@ impl BuckConfigBasedCells {
 
                                     // Only create symlinks for modules with cached source paths
                                     if let Some(source_path) = &module_info.source_path {
-                                        let link_path = external_base_dir
-                                            .join(module_name)
-                                            .join(&module_info.version);
+                                        let link_path = external_base_dir.join(format!(
+                                            "{}+{}",
+                                            module_name, module_info.version
+                                        ));
 
                                         match ensure_symlink(&link_path, source_path) {
                                             Ok(()) => {
@@ -729,9 +730,11 @@ impl BuckConfigBasedCells {
                                         // Also create buck-out/v2/external_cells/bzlmod/ symlink
                                         // so that build action command lines can reference source
                                         // files at their resolved paths (re-created after clean)
-                                        let buck_out_link = buck_out_external_cells_dir
-                                            .join(module_name)
-                                            .join(&module_info.version);
+                                        let buck_out_link =
+                                            buck_out_external_cells_dir.join(format!(
+                                                "{}+{}",
+                                                module_name, module_info.version
+                                            ));
                                         if let Err(e) = ensure_symlink(&buck_out_link, source_path)
                                         {
                                             tracing::warn!(
@@ -767,7 +770,7 @@ impl BuckConfigBasedCells {
 
                                             // Create a project-relative path for this external module
                                             let external_path = format!(
-                                                "bazel-external/{}/{}",
+                                                "bazel-external/{}+{}",
                                                 module_name, module_info.version
                                             );
                                             let cell_path = CellRootPathBuf::new(
@@ -817,7 +820,7 @@ impl BuckConfigBasedCells {
                                                 .unwrap_or_default();
 
                                             let external_path = format!(
-                                                "bazel-external/{}/{}",
+                                                "bazel-external/{}+{}",
                                                 module_name, module_info.version
                                             );
                                             let cell_path = CellRootPathBuf::new(
@@ -857,7 +860,7 @@ impl BuckConfigBasedCells {
                                                 .unwrap_or_default();
 
                                             let external_path = format!(
-                                                "bazel-external/{}/{}",
+                                                "bazel-external/{}+{}",
                                                 module_name, module_info.version
                                             );
                                             let cell_path = CellRootPathBuf::new(
