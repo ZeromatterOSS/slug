@@ -581,7 +581,7 @@ fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> String {
 
 /// Download a file from a URL synchronously.
 /// Uses blocking HTTP client since Starlark interpreter is synchronous.
-fn download_url(url: &str) -> Result<Vec<u8>, String> {
+pub(crate) fn download_url(url: &str) -> Result<Vec<u8>, String> {
     // Use a simple blocking HTTP GET
     // Since we're in sync context, we use std::process to call curl/wget
     // or implement a minimal HTTP client
@@ -628,7 +628,7 @@ fn download_url(url: &str) -> Result<Vec<u8>, String> {
 }
 
 /// Verify SHA256 hash of data.
-fn verify_sha256(data: &[u8], expected: &str) -> Result<(), String> {
+pub(crate) fn verify_sha256(data: &[u8], expected: &str) -> Result<(), String> {
     let hash = Sha256::digest(data);
     let computed = hex::encode(&hash);
 
@@ -643,7 +643,7 @@ fn verify_sha256(data: &[u8], expected: &str) -> Result<(), String> {
 }
 
 /// Verify SRI integrity hash of data.
-fn verify_integrity(data: &[u8], expected: &str) -> Result<(), String> {
+pub(crate) fn verify_integrity(data: &[u8], expected: &str) -> Result<(), String> {
     // Parse SRI format: "sha256-base64hash"
     let (algo, hash) = expected
         .split_once('-')
@@ -791,7 +791,7 @@ fn extract_zip(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> Resu
 }
 
 /// Extract an archive, detecting format automatically.
-fn extract_archive(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> Result<(), String> {
+pub(crate) fn extract_archive(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> Result<(), String> {
     // Try tar.gz first
     if extract_tar_gz(data, dest_dir, strip_prefix).is_ok() {
         return Ok(());
@@ -806,7 +806,7 @@ fn extract_archive(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> 
 }
 
 /// Get URLs from a Starlark value (string or list of strings).
-fn get_urls_from_value<'v>(url_value: Value<'v>) -> Vec<String> {
+pub(crate) fn get_urls_from_value<'v>(url_value: Value<'v>) -> Vec<String> {
     if let Some(s) = url_value.unpack_str() {
         vec![s.to_owned()]
     } else if let Some(list) = starlark::values::list::ListRef::from_value(url_value) {
