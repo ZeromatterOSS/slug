@@ -951,3 +951,16 @@ async def test_java_toolchain_stubs(buck: Buck) -> None:
     assert lines["has_java_exe"] == "True"
     assert lines["version"] == "11"
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_constraint_providers_callable(buck: Buck) -> None:
+    """ConstraintSettingInfo and ConstraintValueInfo are callable providers."""
+    result = await buck.build("//:constraint_provider_test")
+    output = result.get_build_report().output_for_target("//:constraint_provider_test")
+    content = output.read_text().replace("\r\n", "\n")
+    lines = dict(line.split("=", 1) for line in content.strip().split("\n") if "=" in line)
+
+    assert lines["cs_callable"] == "True"
+    assert lines["cs_has_label"] == "True"
+    assert lines["cv_callable"] == "True"
+

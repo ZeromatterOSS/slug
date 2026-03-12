@@ -867,3 +867,31 @@ java_toolchain_test = rule(
     implementation = _java_toolchain_test_impl,
     attrs = {},
 )
+
+
+def _constraint_provider_test_impl(ctx):
+    """Tests that ConstraintSettingInfo and ConstraintValueInfo are callable."""
+    results = []
+
+    # Test ConstraintSettingInfo is callable
+    cs_info = platform_common.ConstraintSettingInfo(label = "//test:setting")
+    results.append("cs_callable=True")
+    results.append("cs_has_label=" + str(hasattr(cs_info, "label")))
+    results.append("cs_label=" + str(cs_info.label))
+
+    # Test ConstraintValueInfo is callable
+    cv_info = platform_common.ConstraintValueInfo(
+        label = "//test:value",
+        constraint_setting = "//test:setting",
+    )
+    results.append("cv_callable=True")
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "\n".join(results) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+constraint_provider_test = rule(
+    implementation = _constraint_provider_test_impl,
+    attrs = {},
+)

@@ -158,6 +158,30 @@ impl<'v> StarlarkValue<'v> for ConstraintValueInfoProvider {
         RES.methods(constraint_value_info_provider_methods)
     }
 
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &starlark::eval::Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
+        args.no_positional_args(heap)?;
+        let kwargs = args.names_map()?;
+        let mut label = String::new();
+        let mut constraint_setting_label = String::new();
+        for (k, v) in kwargs.iter() {
+            match k.as_str() {
+                "label" => label = v.to_str(),
+                "constraint" | "constraint_setting" => constraint_setting_label = v.to_str(),
+                _ => {}
+            }
+        }
+        Ok(heap.alloc(ConstraintValueInfoInstance {
+            constraint_setting_label,
+            label,
+        }))
+    }
+
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
         demand.provide_value::<&dyn ProviderCallableLike>(self);
     }
@@ -258,8 +282,85 @@ impl ProviderCallableLike for ConstraintSettingInfoProvider {
 
 #[starlark_value(type = "ConstraintSettingInfo")]
 impl<'v> StarlarkValue<'v> for ConstraintSettingInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &starlark::eval::Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let kwargs = args.names_map()?;
+        let fields = eval
+            .heap()
+            .alloc(AllocDict(kwargs.into_iter().map(|(k, v)| (k.as_str(), v))));
+        Ok(eval.heap().alloc(ConstraintSettingInfoInstanceGen { fields }))
+    }
+
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
         demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+/// An instance of ConstraintSettingInfo created by calling the provider.
+///
+/// Created by `platform_common.ConstraintSettingInfo(label=...)`.
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    starlark::values::Trace,
+    starlark::coerce::Coerce,
+    starlark::values::Freeze
+)]
+#[repr(C)]
+pub struct ConstraintSettingInfoInstanceGen<V: ValueLifetimeless> {
+    fields: V,
+}
+
+starlark_complex_value!(pub ConstraintSettingInfoInstance);
+
+impl<V: ValueLifetimeless> Display for ConstraintSettingInfoInstanceGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ConstraintSettingInfo(...)")
+    }
+}
+
+impl<'v, V: ValueLike<'v>> ProviderLike<'v> for ConstraintSettingInfoInstanceGen<V>
+where
+    Self: Debug,
+{
+    fn id(&self) -> &Arc<ProviderId> {
+        ConstraintSettingInfoProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        vec![]
+    }
+}
+
+#[starlark::values::starlark_value(type = "ConstraintSettingInfo")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for ConstraintSettingInfoInstanceGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
+        if let Ok(iter) = self.fields.to_value().iterate(heap) {
+            for key in iter {
+                if key.unpack_str() == Some(attribute) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        let key = heap.alloc_str(attribute);
+        self.fields.to_value().at(key.to_value(), heap).ok()
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
     }
 }
 
