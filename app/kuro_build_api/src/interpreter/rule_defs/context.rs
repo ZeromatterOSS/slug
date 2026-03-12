@@ -1203,29 +1203,44 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             None
         };
 
-        // Expand $(location label) and $(locations label) patterns
+        // Expand $(location label), $(locations label), $(execpath label), $(execpaths label),
+        // $(rootpath label), $(rootpaths label), $(rlocationpath label), $(rlocationpaths label).
+        // In Kuro, all variants resolve to the same artifact path.
         let mut result = String::with_capacity(input.len());
         let mut remaining = input;
         while let Some(start) = remaining.find("$(") {
             result.push_str(&remaining[..start]);
             remaining = &remaining[start..];
 
-            // Check for $(location ...) or $(locations ...)
-            let is_locations = remaining.starts_with("$(locations ");
-            let is_location = !is_locations && remaining.starts_with("$(location ");
-
-            if is_location || is_locations {
-                let prefix_len = if is_locations {
-                    "$(locations ".len()
+            // Try each keyword variant: (prefix, is_multi)
+            let pattern: Option<(usize, bool)> =
+                if remaining.starts_with("$(locations ") {
+                    Some(("$(locations ".len(), true))
+                } else if remaining.starts_with("$(location ") {
+                    Some(("$(location ".len(), false))
+                } else if remaining.starts_with("$(execpaths ") {
+                    Some(("$(execpaths ".len(), true))
+                } else if remaining.starts_with("$(execpath ") {
+                    Some(("$(execpath ".len(), false))
+                } else if remaining.starts_with("$(rootpaths ") {
+                    Some(("$(rootpaths ".len(), true))
+                } else if remaining.starts_with("$(rootpath ") {
+                    Some(("$(rootpath ".len(), false))
+                } else if remaining.starts_with("$(rlocationpaths ") {
+                    Some(("$(rlocationpaths ".len(), true))
+                } else if remaining.starts_with("$(rlocationpath ") {
+                    Some(("$(rlocationpath ".len(), false))
                 } else {
-                    "$(location ".len()
+                    None
                 };
+
+            if let Some((prefix_len, is_multi)) = pattern {
                 if let Some(end) = remaining.find(')') {
                     let label = remaining[prefix_len..end].trim();
                     let after = &remaining[end + 1..];
 
                     if let Some(paths) = find_paths(label) {
-                        if is_locations {
+                        if is_multi {
                             result.push_str(&paths.join(" "));
                         } else {
                             result.push_str(paths.first().map(|s| s.as_str()).unwrap_or(""));

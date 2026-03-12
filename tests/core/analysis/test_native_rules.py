@@ -204,6 +204,42 @@ async def test_genrule_execpath_expansion(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_genrule_rootpath_expansion(buck: Buck) -> None:
+    """genrule $(rootpath :label) expands to the runfiles-relative path of a source file."""
+    result = await buck.build("//:genrule_rootpath")
+    output = result.get_build_report().output_for_target("//:genrule_rootpath")
+    content = output.read_text().strip()
+    assert content.endswith("defs.bzl"), f"Expected path ending with defs.bzl, got: {content!r}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_genrule_rootpaths_expansion(buck: Buck) -> None:
+    """genrule $(rootpaths :label) expands to space-separated runfiles-relative paths."""
+    result = await buck.build("//:genrule_rootpaths")
+    output = result.get_build_report().output_for_target("//:genrule_rootpaths")
+    content = output.read_text().strip()
+    assert content.endswith("defs.bzl"), f"Expected path ending with defs.bzl, got: {content!r}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_genrule_rlocationpath_expansion(buck: Buck) -> None:
+    """genrule $(rlocationpath :label) expands to the rlocation path of a source file."""
+    result = await buck.build("//:genrule_rlocationpath")
+    output = result.get_build_report().output_for_target("//:genrule_rlocationpath")
+    content = output.read_text().strip()
+    assert content.endswith("defs.bzl"), f"Expected path ending with defs.bzl, got: {content!r}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_genrule_rlocationpaths_expansion(buck: Buck) -> None:
+    """genrule $(rlocationpaths :label) expands to space-separated rlocation paths."""
+    result = await buck.build("//:genrule_rlocationpaths")
+    output = result.get_build_report().output_for_target("//:genrule_rlocationpaths")
+    content = output.read_text().strip()
+    assert content.endswith("defs.bzl"), f"Expected path ending with defs.bzl, got: {content!r}"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_genrule_bindir_expansion(buck: Buck) -> None:
     """genrule $(BINDIR) expands to the output directory root (buck-out/...)."""
     result = await buck.build("//:genrule_bindir")

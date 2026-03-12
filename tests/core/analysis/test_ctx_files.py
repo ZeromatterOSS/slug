@@ -72,3 +72,23 @@ async def test_ctx_expand_location(buck: Buck) -> None:
     # The expanded path should point to the output of :single_dep (single.txt)
     assert content.endswith("single.txt")
     assert "buck-out" in content
+
+
+@buck_test(data_dir="test_ctx_files_data")
+async def test_ctx_expand_rootpath(buck: Buck) -> None:
+    """ctx.expand_location resolves $(rootpath :target) to the output file path."""
+    result = await buck.build("//:expand_rootpath")
+    output = result.get_build_report().output_for_target("//:expand_rootpath")
+
+    content = output.read_text().strip()
+    assert content.endswith("single.txt"), f"Expected path ending with single.txt, got: {content!r}"
+
+
+@buck_test(data_dir="test_ctx_files_data")
+async def test_ctx_expand_rlocationpath(buck: Buck) -> None:
+    """ctx.expand_location resolves $(rlocationpath :target) to the output file path."""
+    result = await buck.build("//:expand_rlocationpath")
+    output = result.get_build_report().output_for_target("//:expand_rlocationpath")
+
+    content = output.read_text().strip()
+    assert content.endswith("single.txt"), f"Expected path ending with single.txt, got: {content!r}"

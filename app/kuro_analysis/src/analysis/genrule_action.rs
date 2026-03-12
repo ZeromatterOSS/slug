@@ -215,17 +215,27 @@ fn expand_genrule_cmd(
     cmd
 }
 
-/// Expand $(location label), $(locations label), $(execpath label), $(execpaths label).
+/// Expand $(location label), $(locations label), $(execpath label), $(execpaths label),
+/// $(rootpath label), $(rootpaths label), $(rlocationpath label), $(rlocationpaths label).
 ///
 /// For each `$(location key)` pattern, looks up `key` in the `locations` mapping
 /// and replaces with the first resolved path.
 /// For `$(locations key)`, replaces with space-separated list of all paths.
+///
+/// In Bazel, `execpath` returns exec-root-relative paths, `rootpath` returns
+/// runfiles-tree-relative paths, and `rlocationpath` returns rlocation paths.
+/// In Kuro, all three resolve to the same artifact path.
 fn expand_location_patterns(
     cmd: &str,
     locations: &[(String, Vec<String>)],
     quote_fn: fn(&str) -> String,
 ) -> String {
-    if locations.is_empty() || !cmd.contains("$(location") && !cmd.contains("$(execpath") {
+    if locations.is_empty()
+        || !cmd.contains("$(location")
+            && !cmd.contains("$(execpath")
+            && !cmd.contains("$(rootpath")
+            && !cmd.contains("$(rlocationpath")
+    {
         return cmd.to_owned();
     }
 
@@ -245,6 +255,14 @@ fn expand_location_patterns(
             ("execpaths ", true)
         } else if after_paren.starts_with("execpath ") {
             ("execpath ", false)
+        } else if after_paren.starts_with("rootpaths ") {
+            ("rootpaths ", true)
+        } else if after_paren.starts_with("rootpath ") {
+            ("rootpath ", false)
+        } else if after_paren.starts_with("rlocationpaths ") {
+            ("rlocationpaths ", true)
+        } else if after_paren.starts_with("rlocationpath ") {
+            ("rlocationpath ", false)
         } else {
             // Not a location pattern - keep the "$(" and continue
             result.push_str("$(");

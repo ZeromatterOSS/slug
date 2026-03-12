@@ -331,21 +331,31 @@ fn analyze_genrule(
 }
 
 /// Extract all unique labels from $(location label), $(locations label),
-/// $(execpath label), and $(execpaths label) patterns in a genrule cmd.
+/// $(execpath label), $(execpaths label), $(rootpath label), $(rootpaths label),
+/// $(rlocationpath label), and $(rlocationpaths label) patterns in a genrule cmd.
 fn extract_location_labels(cmd: &str) -> Vec<String> {
     let mut labels: Vec<String> = Vec::new();
     let mut remaining = cmd;
     while let Some(start) = remaining.find("$(") {
         let after_paren = &remaining[start + 2..];
-        let keyword_len =
-            if after_paren.starts_with("locations ") || after_paren.starts_with("execpaths ") {
-                10usize
-            } else if after_paren.starts_with("location ") || after_paren.starts_with("execpath ") {
-                9usize
-            } else {
-                remaining = &remaining[start + 2..];
-                continue;
-            };
+        let keyword_len = if after_paren.starts_with("locations ")
+            || after_paren.starts_with("execpaths ")
+            || after_paren.starts_with("rootpaths ")
+        {
+            10usize
+        } else if after_paren.starts_with("location ")
+            || after_paren.starts_with("execpath ")
+            || after_paren.starts_with("rootpath ")
+        {
+            9usize
+        } else if after_paren.starts_with("rlocationpaths ") {
+            15usize
+        } else if after_paren.starts_with("rlocationpath ") {
+            14usize
+        } else {
+            remaining = &remaining[start + 2..];
+            continue;
+        };
         let label_rest = &after_paren[keyword_len..];
         if let Some(end) = label_rest.find(')') {
             let label = label_rest[..end].trim().to_owned();

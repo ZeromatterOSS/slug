@@ -78,3 +78,37 @@ expand_location_rule = rule(
         "dep": attr.label(allow_single_file = True),
     },
 )
+
+
+def _expand_rootpath_rule_impl(ctx):
+    """Tests ctx.expand_location() for $(rootpath :target) expansion."""
+    out = ctx.actions.declare_file("rootpath_expanded.txt")
+    template = "$(rootpath :single_dep)"
+    expanded = ctx.expand_location(template, targets = [ctx.attr.dep])
+    ctx.actions.write(out, expanded)
+    return [DefaultInfo(default_output = out)]
+
+
+expand_rootpath_rule = rule(
+    implementation = _expand_rootpath_rule_impl,
+    attrs = {
+        "dep": attr.label(allow_single_file = True),
+    },
+)
+
+
+def _expand_rlocationpath_rule_impl(ctx):
+    """Tests ctx.expand_location() for $(rlocationpath :target) expansion."""
+    out = ctx.actions.declare_file("rlocationpath_expanded.txt")
+    template = "$(rlocationpath :single_dep)"
+    expanded = ctx.expand_location(template, targets = [ctx.attr.dep])
+    ctx.actions.write(out, expanded)
+    return [DefaultInfo(default_output = out)]
+
+
+expand_rlocationpath_rule = rule(
+    implementation = _expand_rlocationpath_rule_impl,
+    attrs = {
+        "dep": attr.label(allow_single_file = True),
+    },
+)

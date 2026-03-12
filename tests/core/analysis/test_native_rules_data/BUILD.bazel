@@ -155,6 +155,34 @@ genrule(
 )
 
 genrule(
+    name = "genrule_rootpath",
+    srcs = ["defs.bzl"],
+    outs = ["genrule_rootpath.txt"],
+    cmd = "echo $(rootpath :defs.bzl) > $@",
+)
+
+genrule(
+    name = "genrule_rootpaths",
+    srcs = ["defs.bzl"],
+    outs = ["genrule_rootpaths.txt"],
+    cmd = "echo $(rootpaths :defs.bzl) > $@",
+)
+
+genrule(
+    name = "genrule_rlocationpath",
+    srcs = ["defs.bzl"],
+    outs = ["genrule_rlocationpath.txt"],
+    cmd = "echo $(rlocationpath :defs.bzl) > $@",
+)
+
+genrule(
+    name = "genrule_rlocationpaths",
+    srcs = ["defs.bzl"],
+    outs = ["genrule_rlocationpaths.txt"],
+    cmd = "echo $(rlocationpaths :defs.bzl) > $@",
+)
+
+genrule(
     name = "genrule_bindir",
     outs = ["genrule_bindir.txt"],
     cmd = "echo $(BINDIR) > $@",

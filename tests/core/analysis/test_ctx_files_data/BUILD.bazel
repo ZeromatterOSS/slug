@@ -2,6 +2,8 @@ load(
     ":defs.bzl",
     "collect_from_deps",
     "expand_location_rule",
+    "expand_rlocationpath_rule",
+    "expand_rootpath_rule",
     "single_file_from_dep",
     "single_file_rule",
     "source_lib",
@@ -46,5 +48,19 @@ single_file_from_dep(
 
 expand_location_rule(
     name = "expand_location",
+    dep = ":single_dep",
+)
+
+# === ctx.expand_location expands $(rootpath :target) ===
+
+expand_rootpath_rule(
+    name = "expand_rootpath",
+    dep = ":single_dep",
+)
+
+# === ctx.expand_location expands $(rlocationpath :target) ===
+
+expand_rlocationpath_rule(
+    name = "expand_rlocationpath",
     dep = ":single_dep",
 )
