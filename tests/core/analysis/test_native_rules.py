@@ -898,3 +898,17 @@ async def test_is_tool_configuration(buck: Buck) -> None:
     assert lines["is_tool"] == "False"
     assert lines["type"] == "bool"
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_split_attr(buck: Buck) -> None:
+    """ctx.split_attr wraps attribute values in single-entry config dicts."""
+    result = await buck.build("//:split_attr_test")
+    output = result.get_build_report().output_for_target("//:split_attr_test")
+    content = output.read_text().replace("\r\n", "\n")
+    lines = dict(line.split("=", 1) for line in content.strip().split("\n") if "=" in line)
+
+    assert lines["has_split_attr"] == "True"
+    assert lines["is_dict"] == "True"
+    assert lines["has_default_key"] == "True"
+    assert lines["value"] == "hello_split"
+

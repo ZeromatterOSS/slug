@@ -390,6 +390,23 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             .buck_error_context("`attr` is not available for `dynamic_output` or BXL")?)
     }
 
+    /// Split configuration attributes.
+    ///
+    /// In Bazel, `ctx.split_attr.<name>` returns a dict mapping configuration keys
+    /// to attribute values when the attribute uses a split transition (cfg parameter).
+    /// Since Kuro does not implement split transitions, each attribute value is
+    /// wrapped in a single-entry dict with key `"//conditions:default"`.
+    #[starlark(attribute)]
+    fn split_attr<'v>(
+        this: RefAnalysisContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        match this.0.attrs {
+            Some(attrs) => Ok(heap.alloc(CtxSplitAttr::new(attrs))),
+            None => Ok(heap.alloc(CtxSplitAttrStub)),
+        }
+    }
+
     /// Configuration fragments for this target.
     ///
     /// Provides access to language-specific configuration like `ctx.fragments.cpp`,
@@ -1895,6 +1912,9 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
             "_compiler_files" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
             }
+            "gcov_files" | "_gcov_files" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             _ => None,
         }
     }
@@ -2582,6 +2602,86 @@ impl<'v> StarlarkValue<'v> for CtxFilesStub {
     fn get_attr(&self, _attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         use starlark::values::list::AllocList;
         Some(heap.alloc(AllocList::EMPTY))
+    }
+}
+
+// ============================================================================
+// CtxSplitAttr - Wraps attribute values in single-entry config dicts
+// ============================================================================
+
+/// Provides access to split-configuration attributes as `ctx.split_attr.<name>`.
+///
+/// In Bazel, when an attribute uses `cfg = some_transition`, `ctx.split_attr.<name>`
+/// returns a dict mapping configuration keys to the attribute values in those configs.
+/// Since Kuro doesn't implement split transitions, each value is wrapped in
+/// `{"//conditions:default": <original_value>}`.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
+pub struct CtxSplitAttr<'v> {
+    attrs: Value<'v>,
+}
+
+impl<'v> CtxSplitAttr<'v> {
+    pub fn new(attrs: ValueOfUnchecked<'v, StructRef<'static>>) -> Self {
+        Self {
+            attrs: attrs.get().to_value(),
+        }
+    }
+}
+
+impl<'v> std::fmt::Display for CtxSplitAttr<'v> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<ctx.split_attr>")
+    }
+}
+
+impl<'v> AllocValue<'v> for CtxSplitAttr<'v> {
+    fn alloc_value(self, heap: Heap<'v>) -> Value<'v> {
+        heap.alloc_complex_no_freeze(self)
+    }
+}
+
+#[starlark::values::starlark_value(type = "ctx_split_attr")]
+impl<'v> StarlarkValue<'v> for CtxSplitAttr<'v> {
+    fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
+        self.attrs.has_attr(attribute, heap)
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        use starlark::values::dict::AllocDict;
+
+        let attr_value = self.attrs.get_attr(attribute, heap).ok().flatten()?;
+        // Wrap in {"//conditions:default": value}
+        let key = heap.alloc_str("//conditions:default").to_value();
+        Some(heap.alloc(AllocDict(vec![(key, attr_value)])))
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        self.attrs.dir_attr()
+    }
+}
+
+/// A stub for ctx.split_attr when attrs are not available.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct CtxSplitAttrStub;
+
+impl std::fmt::Display for CtxSplitAttrStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<ctx.split_attr>")
+    }
+}
+
+starlark::starlark_simple_value!(CtxSplitAttrStub);
+
+#[starlark::values::starlark_value(type = "ctx_split_attr_stub")]
+impl<'v> StarlarkValue<'v> for CtxSplitAttrStub {
+    fn has_attr(&self, _attribute: &str, _heap: Heap<'v>) -> bool {
+        true
+    }
+
+    fn get_attr(&self, _attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        use starlark::values::dict::AllocDict;
+        let key = heap.alloc_str("//conditions:default").to_value();
+        Some(heap.alloc(AllocDict(vec![(key, Value::new_none())])))
     }
 }
 

@@ -748,3 +748,41 @@ is_tool_configuration_test = rule(
     implementation = _is_tool_configuration_test_impl,
     attrs = {},
 )
+
+
+# === ctx.split_attr test ===
+
+def _split_attr_test_impl(ctx):
+    """Tests ctx.split_attr wraps attribute values in config dicts."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+
+    # Access split_attr - should be available
+    has_split_attr = hasattr(ctx, "split_attr")
+
+    # Access a specific attribute through split_attr
+    split_message = ctx.split_attr.message
+    is_dict = type(split_message) == "dict"
+
+    # The dict should have "//conditions:default" as key
+    keys = list(split_message.keys())
+    has_default_key = "//conditions:default" in keys
+
+    # The value should be the original attribute value
+    value = split_message.get("//conditions:default", None)
+
+    lines = [
+        "has_split_attr=" + str(has_split_attr),
+        "is_dict=" + str(is_dict),
+        "has_default_key=" + str(has_default_key),
+        "value=" + str(value),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+split_attr_test = rule(
+    implementation = _split_attr_test_impl,
+    attrs = {
+        "message": attr.string(default = "hello_split"),
+    },
+)
