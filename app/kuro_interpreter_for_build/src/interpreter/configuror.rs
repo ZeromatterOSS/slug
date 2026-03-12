@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use kuro_error::BuckErrorContext;
 use kuro_common::package_listing::listing::PackageListing;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::cells::cell_path_with_allowed_relative_dir::CellPathWithAllowedRelativeDir;
@@ -116,22 +117,23 @@ impl BuildInterpreterConfiguror {
     ) -> kuro_error::Result<ModuleInternals> {
         let record_target_call_stack = self.record_target_call_stack;
         let skip_targets_with_duplicate_names = self.skip_targets_with_duplicate_names;
-        let package_implicits = implicit_import.map(|spec| {
-            PackageImplicits::new(
-                spec.dupe(),
-                loaded_modules
+        let package_implicits = match implicit_import {
+            Some(spec) => {
+                let env = loaded_modules
                     .map
                     .get(&StarlarkModulePath::LoadFile(spec.import()))
-                    .unwrap_or_else(|| {
-                        panic!(
+                    .with_internal_error(|| {
+                        format!(
                             "Should've had an env for the package implicit import (`{}`).",
                             spec.import(),
                         )
-                    })
+                    })?
                     .env()
-                    .dupe(),
-            )
-        });
+                    .dupe();
+                Some(PackageImplicits::new(spec.dupe(), env))
+            }
+            None => None,
+        };
         let attr_coercer = BuildAttrCoercionContext::new_with_package(
             cell_info.cell_resolver().dupe(),
             cell_info.cell_alias_resolver().dupe(),
