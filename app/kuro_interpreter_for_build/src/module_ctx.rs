@@ -1269,15 +1269,75 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
         Ok(Value::new_none())
     }
 
-    /// Apply a template file.
-    /// STUB: Returns None.
+    /// Create a file from a template with substitutions.
     fn template<'v>(
         this: &ModuleContext,
-        #[starlark(require = pos)] _path: Value<'v>,
-        #[starlark(require = pos)] _template: Value<'v>,
-        #[starlark(require = named)] _substitutions: Option<Value<'v>>,
-        #[starlark(require = named, default = false)] _executable: bool,
+        #[starlark(require = pos)] path: Value<'v>,
+        #[starlark(require = pos)] template: Value<'v>,
+        #[starlark(require = named)] substitutions: Option<Value<'v>>,
+        #[starlark(require = named, default = false)] executable: bool,
     ) -> starlark::Result<Value<'v>> {
+        let path_str = path.unpack_str().unwrap_or("");
+        let template_str = template.unpack_str().unwrap_or("");
+
+        // Read the template file
+        let template_path = if Path::new(template_str).is_absolute() {
+            PathBuf::from(template_str)
+        } else if let Some(ref wd) = this.working_dir {
+            wd.join(template_str)
+        } else {
+            PathBuf::from(template_str)
+        };
+
+        let mut content = std::fs::read_to_string(&template_path).map_err(|e| {
+            starlark::Error::new_other(anyhow!(
+                "Failed to read template {}: {}",
+                template_path.display(),
+                e
+            ))
+        })?;
+
+        // Apply substitutions
+        if let Some(subs) = substitutions {
+            if let Some(dict) = starlark::values::dict::DictRef::from_value(subs) {
+                for (k, v) in dict.iter() {
+                    if let (Some(key), Some(val)) = (k.unpack_str(), v.unpack_str()) {
+                        content = content.replace(key, val);
+                    }
+                }
+            }
+        }
+
+        // Write the output file
+        let output_path = if Path::new(path_str).is_absolute() {
+            PathBuf::from(path_str)
+        } else if let Some(ref wd) = this.working_dir {
+            wd.join(path_str)
+        } else {
+            PathBuf::from(path_str)
+        };
+
+        if let Some(parent) = output_path.parent() {
+            std::fs::create_dir_all(parent).ok();
+        }
+
+        std::fs::write(&output_path, &content).map_err(|e| {
+            starlark::Error::new_other(anyhow!(
+                "Failed to write template output {}: {}",
+                output_path.display(),
+                e
+            ))
+        })?;
+
+        #[cfg(unix)]
+        if executable {
+            use std::os::unix::fs::PermissionsExt;
+            let perms = std::fs::Permissions::from_mode(0o755);
+            std::fs::set_permissions(&output_path, perms).ok();
+        }
+        #[cfg(not(unix))]
+        let _ = executable;
+
         Ok(Value::new_none())
     }
 

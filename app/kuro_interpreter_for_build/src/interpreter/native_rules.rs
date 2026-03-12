@@ -1650,7 +1650,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         constraint_values: UnpackListOrTuple<String>,
         // Bazel: dict of configuration values (e.g., {"compilation_mode": "opt"})
-        // TODO(bazel): Implement values-based config_setting matching
+        // Matching implemented in calculation.rs resolve_bazel_config_value().
         // Accept Value<'v> to handle both string and Label() keys.
         #[starlark(require = named, default = starlark::values::none::NoneType)] values: Value<'v>,
         // Bazel: dict for --define flag values
