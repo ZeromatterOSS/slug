@@ -940,3 +940,34 @@ provider_callable_test = rule(
     implementation = _provider_callable_test_impl,
     attrs = {},
 )
+
+
+def _write_file_test_impl(ctx):
+    """Tests ctx.actions.write_file() Bazel-compatible alias."""
+    out = ctx.actions.write_file(
+        ctx.actions.declare_file(ctx.label.name + ".txt"),
+        "hello from write_file\n",
+    )
+    return [DefaultInfo(default_output = out)]
+
+
+write_file_test = rule(
+    implementation = _write_file_test_impl,
+    attrs = {},
+)
+
+
+def _write_file_executable_test_impl(ctx):
+    """Tests ctx.actions.write_file() with is_executable=True."""
+    out = ctx.actions.write_file(
+        ctx.actions.declare_file(ctx.label.name + ".sh"),
+        "#!/bin/bash\necho write_file_exec\n",
+        True,
+    )
+    return [DefaultInfo(default_output = out)]
+
+
+write_file_executable_test = rule(
+    implementation = _write_file_executable_test_impl,
+    attrs = {},
+)

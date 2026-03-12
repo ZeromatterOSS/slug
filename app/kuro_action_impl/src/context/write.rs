@@ -575,6 +575,79 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
         }
     }
 
+    /// Bazel-compatible alias for `write`.
+    ///
+    /// `ctx.actions.write_file(output, content, is_executable)` is the Bazel name
+    /// for what Buck2 calls `ctx.actions.write(output, content, is_executable)`.
+    fn write_file<'v>(
+        this: &AnalysisActions<'v>,
+        output: OutputArtifactArg<'v>,
+        content: WriteContentArg<'v>,
+        #[starlark(default = false)] is_executable: bool,
+        #[starlark(require = named, default = false)] allow_args: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<
+        Either<
+            ValueTyped<'v, StarlarkDeclaredArtifact<'v>>,
+            (
+                ValueTyped<'v, StarlarkDeclaredArtifact<'v>>,
+                Vec<StarlarkDeclaredArtifact<'v>>,
+            ),
+        >,
+    > {
+        let mut state = this.state()?;
+        let (declaration, output_artifact) = state.get_or_declare_output(
+            eval,
+            output,
+            OutputType::File,
+            None,
+        )?;
+
+        let (content_cli, mut associated_artifacts) = match content {
+            WriteContentArg::CommandLineArg(content) => {
+                let content_arg = content.as_command_line_arg();
+                if !allow_args && content_arg.contains_arg_attr() {
+                    let e: kuro_error::Error = WriteActionError::ArgAttrsDetectedButNotAllowed.into();
+                    return Err(e.into());
+                }
+                let mut visitor = CommandLineInputVisitor::new(false);
+                content_arg.visit_artifacts(&mut visitor)?;
+                (content, visitor.associated_artifacts)
+            }
+            WriteContentArg::StarlarkCommandLineValueUnpack(content) => {
+                let cli = StarlarkCmdArgs::try_from_value_typed(content)?;
+                if !allow_args && cli.contains_arg_attr() {
+                    let e: kuro_error::Error = WriteActionError::ArgAttrsDetectedButNotAllowed.into();
+                    return Err(e.into());
+                }
+                let mut visitor = CommandLineInputVisitor::new(false);
+                cli.visit_artifacts(&mut visitor)?;
+                let associated = visitor.associated_artifacts;
+                (
+                    CommandLineArg::from_cmd_args(eval.heap().alloc_typed(cli)),
+                    associated,
+                )
+            }
+        };
+
+        let action = UnregisteredWriteAction {
+            is_executable,
+            macro_files: None,
+            absolute: false,
+            use_dep_files_placeholder_for_content_based_paths: false,
+        };
+        state.register_action(
+            indexset![output_artifact],
+            action,
+            Some(content_cli.to_value()),
+            None,
+        )?;
+
+        let value =
+            declaration.into_declared_artifact(AssociatedArtifacts::from(associated_artifacts));
+        Ok(Either::Left(value))
+    }
+
     /// Expands a template file with substitutions (Bazel-compatible).
     ///
     /// Creates a new file by reading a template and replacing substitution patterns.

@@ -983,6 +983,24 @@ async def test_provider_callable(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_write_file(buck: Buck) -> None:
+    """ctx.actions.write_file() is a Bazel-compatible alias for ctx.actions.write()."""
+    result = await buck.build("//:write_file_test")
+    output = result.get_build_report().output_for_target("//:write_file_test")
+    content = output.read_text().replace("\r\n", "\n").strip()
+    assert content == "hello from write_file"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_write_file_executable(buck: Buck) -> None:
+    """ctx.actions.write_file() supports is_executable positional arg."""
+    result = await buck.build("//:write_file_executable_test")
+    output = result.get_build_report().output_for_target("//:write_file_executable_test")
+    content = output.read_text().replace("\r\n", "\n").strip()
+    assert "echo write_file_exec" in content
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_actions_fail(buck: Buck) -> None:
     """ctx.actions.fail() raises an error during analysis."""
     with pytest.raises(Exception) as exc_info:
