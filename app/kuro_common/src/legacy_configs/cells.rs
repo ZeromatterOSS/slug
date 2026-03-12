@@ -76,12 +76,26 @@ use crate::legacy_configs::path::ProjectConfigSource;
 /// - If symlink points elsewhere: replace it
 /// - If non-symlink exists: return error
 fn ensure_symlink(link: &Path, target: &Path) -> std::io::Result<()> {
-    // Check if symlink already correct
+    // Check if symlink already exists and points to the correct target
     if let Ok(existing) = std::fs::read_link(link) {
         if existing == target {
             return Ok(());
         }
-        std::fs::remove_file(link)?;
+        // Stale symlink pointing to wrong target - remove it
+        if cfg!(windows) {
+            // On Windows, symlinks to directories need remove_dir
+            let _ = std::fs::remove_dir(link);
+            let _ = std::fs::remove_file(link);
+        } else {
+            std::fs::remove_file(link)?;
+        }
+    } else if link.exists() {
+        // Path exists but is not a symlink (real directory) - don't touch it
+        tracing::warn!(
+            "bazel-external/{} is a real directory, not a symlink - skipping",
+            link.file_name().unwrap_or_default().to_string_lossy()
+        );
+        return Ok(());
     }
 
     // Create parent directories
@@ -94,7 +108,88 @@ fn ensure_symlink(link: &Path, target: &Path) -> std::io::Result<()> {
     return std::os::unix::fs::symlink(target, link);
 
     #[cfg(windows)]
-    return std::os::windows::fs::symlink_dir(target, link);
+    {
+        // Try symlink first (requires Developer Mode or admin privileges)
+        match std::os::windows::fs::symlink_dir(target, link) {
+            Ok(()) => return Ok(()),
+            Err(symlink_err) => {
+                // Fall back to junction point (no special privileges needed)
+                let output = std::process::Command::new("cmd")
+                    .args(["/c", "mklink", "/j"])
+                    .arg(link)
+                    .arg(target)
+                    .output();
+                match output {
+                    Ok(o) if o.status.success() => return Ok(()),
+                    _ => return Err(symlink_err),
+                }
+            }
+        }
+    }
+}
+
+/// Remove stale symlinks from bazel-external/ that don't correspond to any resolved module.
+/// This handles the case where a module is removed from MODULE.bazel or its version changes.
+fn cleanup_stale_symlinks(
+    external_base_dir: &Path,
+    valid_entries: &std::collections::HashSet<String>,
+) {
+    if !external_base_dir.exists() {
+        return;
+    }
+
+    let entries = match std::fs::read_dir(external_base_dir) {
+        Ok(entries) => entries,
+        Err(e) => {
+            tracing::debug!(
+                "Could not read bazel-external/ for cleanup: {}",
+                e
+            );
+            return;
+        }
+    };
+
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !valid_entries.contains(&name) {
+            let path = entry.path();
+            // Only remove symlinks/junctions, not real directories
+            if path.is_symlink() || (cfg!(windows) && is_junction(&path)) {
+                if let Err(e) = if cfg!(windows) {
+                    std::fs::remove_dir(&path).or_else(|_| std::fs::remove_file(&path))
+                } else {
+                    std::fs::remove_file(&path)
+                } {
+                    tracing::debug!(
+                        "Could not remove stale symlink bazel-external/{}: {}",
+                        name,
+                        e
+                    );
+                } else {
+                    tracing::info!(
+                        "Removed stale symlink: bazel-external/{}",
+                        name
+                    );
+                }
+            }
+        }
+    }
+}
+
+/// Check if a path is a Windows junction point.
+#[cfg(windows)]
+fn is_junction(path: &Path) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+    match std::fs::symlink_metadata(path) {
+        Ok(meta) => meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0,
+        Err(_) => false,
+    }
+}
+
+#[cfg(not(windows))]
+fn is_junction(_path: &Path) -> bool {
+    false
 }
 
 /// Buckconfigs can partially be loaded from within dice. However, some parts of what makes up the
@@ -694,6 +789,9 @@ impl BuckConfigBasedCells {
                                     .root()
                                     .as_path()
                                     .join("buck-out/v2/external_cells/bzlmod");
+                                // Track valid symlink names for stale cleanup
+                                let mut valid_symlink_names =
+                                    std::collections::HashSet::new();
                                 for (module_name, module_info) in &resolved_graph.modules {
                                     // Skip root module and local overrides
                                     if module_name == &parsed.module.name
@@ -704,10 +802,14 @@ impl BuckConfigBasedCells {
 
                                     // Only create symlinks for modules with cached source paths
                                     if let Some(source_path) = &module_info.source_path {
-                                        let link_path = external_base_dir.join(format!(
+                                        let entry_name = format!(
                                             "{}+{}",
                                             module_name, module_info.version
-                                        ));
+                                        );
+                                        valid_symlink_names
+                                            .insert(entry_name.clone());
+                                        let link_path =
+                                            external_base_dir.join(&entry_name);
 
                                         match ensure_symlink(&link_path, source_path) {
                                             Ok(()) => {
@@ -731,10 +833,7 @@ impl BuckConfigBasedCells {
                                         // so that build action command lines can reference source
                                         // files at their resolved paths (re-created after clean)
                                         let buck_out_link =
-                                            buck_out_external_cells_dir.join(format!(
-                                                "{}+{}",
-                                                module_name, module_info.version
-                                            ));
+                                            buck_out_external_cells_dir.join(&entry_name);
                                         if let Err(e) = ensure_symlink(&buck_out_link, source_path)
                                         {
                                             tracing::warn!(
@@ -747,6 +846,17 @@ impl BuckConfigBasedCells {
                                         }
                                     }
                                 }
+
+                                // Remove stale symlinks from previous resolutions
+                                // (e.g., modules removed from MODULE.bazel or version changes)
+                                cleanup_stale_symlinks(
+                                    &external_base_dir,
+                                    &valid_symlink_names,
+                                );
+                                cleanup_stale_symlinks(
+                                    &buck_out_external_cells_dir,
+                                    &valid_symlink_names,
+                                );
 
                                 // Register ALL resolved modules as cells
                                 for (module_name, module_info) in &resolved_graph.modules {

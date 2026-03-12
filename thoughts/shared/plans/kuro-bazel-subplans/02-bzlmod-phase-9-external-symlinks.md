@@ -203,9 +203,9 @@ if args.external {
 
 #### Success Criteria (Phase 9c)
 
-- [ ] Stale symlinks are detected and removed
-- [ ] Version updates create new symlinks correctly
-- [ ] Real directories in `bazel-external/` are not deleted
+- [x] Stale symlinks are detected and removed (2026-03-12)
+- [x] Version updates create new symlinks correctly (2026-03-12, ensure_symlink detects wrong target)
+- [x] Real directories in `bazel-external/` are not deleted (2026-03-12, ensure_symlink skips non-symlinks)
 - [ ] `kuro clean --external` removes `bazel-external/` (optional flag)
 
 ---
@@ -241,10 +241,10 @@ fn create_external_link(source: &Path, target: &Path) -> std::io::Result<()> {
 
 #### Success Criteria (Phase 9d)
 
-- [ ] Symlinks work on Unix (Linux, macOS)
-- [ ] Junction points work on Windows without admin
+- [x] Symlinks work on Unix (Linux, macOS) (2026-03-12, #[cfg(unix)] std::os::unix::fs::symlink)
+- [x] Junction points work on Windows without admin (2026-03-12, fallback to mklink /j)
 - [ ] Fallback to directory copy if junctions fail
-- [ ] Path handling is consistent across platforms
+- [x] Path handling is consistent across platforms (2026-03-12, tested on Windows)
 
 ---
 
