@@ -67,6 +67,20 @@ pub struct Rule {
     /// In Bazel, this declares which configuration fragments a rule requires.
     /// Currently stored as metadata; fragment access is handled via `ctx.fragments`.
     pub fragments: Vec<String>,
+    /// Build setting type from `rule(build_setting=config.bool(flag=True))`.
+    /// When set, this rule defines a user-configurable build flag.
+    /// The string is the setting type: "bool", "string", "int", "string_list", "string_set".
+    /// None means this is a regular rule, not a build setting.
+    pub build_setting_type: Option<String>,
+    /// Whether this build setting is a command-line flag (settable via --//pkg:target=value).
+    pub build_setting_is_flag: bool,
+}
+
+impl Rule {
+    /// Returns true if this rule is a build setting (user-configurable build flag).
+    pub fn is_build_setting(&self) -> bool {
+        self.build_setting_type.is_some()
+    }
 }
 
 interner!(INTERNER, BuckHasher, Rule);

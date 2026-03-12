@@ -157,6 +157,10 @@ pub struct StarlarkRuleCallable<'v> {
     /// Optional initializer function from `rule(initializer=...)`.
     /// Called at load time before target creation to transform attribute values.
     initializer: Option<Value<'v>>,
+    /// Build setting type (e.g., "bool", "string", "int") if this rule is a build setting.
+    build_setting_type: Option<String>,
+    /// Whether this build setting is a command-line flag.
+    build_setting_is_flag: bool,
 }
 
 /// Mappings of promise artifact name to the starlark function that will produce it, for anon targets.
@@ -235,6 +239,8 @@ impl<'v> StarlarkRuleCallable<'v> {
         exec_group_names: Vec<String>,
         fragments: Vec<String>,
         initializer: Option<Value<'v>>,
+        build_setting_type: Option<String>,
+        build_setting_is_flag: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> kuro_error::Result<StarlarkRuleCallable<'v>> {
         let build_context = BuildContext::from_context(eval)?;
@@ -343,6 +349,8 @@ impl<'v> StarlarkRuleCallable<'v> {
             exec_group_names,
             fragments,
             initializer,
+            build_setting_type,
+            build_setting_is_flag,
         })
     }
 
@@ -379,6 +387,8 @@ impl<'v> StarlarkRuleCallable<'v> {
             Vec::new(), // anon rules have no exec_groups
             Vec::new(), // anon rules have no fragments
             None,       // anon rules have no initializer
+            None,       // anon rules are not build settings
+            false,      // anon rules are not flags
             eval,
         )
     }
@@ -554,6 +564,8 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
                 toolchain_types: self.toolchain_types.clone(),
                 exec_group_names: self.exec_group_names.clone(),
                 fragments: self.fragments.clone(),
+                build_setting_type: self.build_setting_type.clone(),
+                build_setting_is_flag: self.build_setting_is_flag,
             }),
             rule_type,
             implementation: frozen_impl,
@@ -1014,6 +1026,13 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             .and_then(|v| v.get_attr("allow_multiple", eval.heap()).ok().flatten())
             .and_then(|v| v.unpack_bool())
             .unwrap_or(false);
+        let build_setting_type: Option<String> = build_setting
+            .and_then(|v| v.get_attr("setting_type", eval.heap()).ok().flatten())
+            .and_then(|v| v.unpack_str().map(|s| s.to_owned()));
+        let build_setting_is_flag: bool = build_setting
+            .and_then(|v| v.get_attr("flag", eval.heap()).ok().flatten())
+            .and_then(|v| v.unpack_bool())
+            .unwrap_or(false);
         let mut attrs = attrs;
         if build_setting.is_some() {
             // Add build_setting_default as an any-typed, non-mandatory attribute
@@ -1141,6 +1160,8 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             exec_group_names,
             fragment_names,
             initializer,
+            build_setting_type,
+            build_setting_is_flag,
             eval,
         )?)
     }

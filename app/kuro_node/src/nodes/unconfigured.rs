@@ -764,6 +764,8 @@ pub mod testing {
                     toolchain_types: Vec::new(),
                     exec_group_names: Vec::new(),
                     fragments: Vec::new(),
+                    build_setting_type: None,
+                    build_setting_is_flag: false,
                 }),
                 Arc::new(Package {
                     buildfile_path,
