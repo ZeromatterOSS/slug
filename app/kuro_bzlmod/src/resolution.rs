@@ -215,9 +215,34 @@ pub enum ModuleSource {
     /// Module from a local path override.
     LocalPath { path: String },
     /// Module from a git override.
-    Git { remote: String, commit: String },
+    Git {
+        remote: String,
+        commit: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        shallow_since: Option<String>,
+        #[serde(default)]
+        patches: Vec<String>,
+        #[serde(default)]
+        patch_strip: u32,
+        /// Path where the git repo was cloned during resolution.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        fetched_path: Option<PathBuf>,
+    },
     /// Module from an archive override.
-    Archive { urls: Vec<String> },
+    Archive {
+        urls: Vec<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        integrity: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        strip_prefix: Option<String>,
+        #[serde(default)]
+        patches: Vec<String>,
+        #[serde(default)]
+        patch_strip: u32,
+        /// Path where the archive was extracted during resolution.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        fetched_path: Option<PathBuf>,
+    },
 }
 
 /// Result of MVS resolution - the final resolved dependency graph.
@@ -501,36 +526,123 @@ impl MvsResolver {
                     .insert(lp.module_name.clone(), discovered);
             }
             Override::Git(g) => {
-                // For git overrides, we need to fetch and parse
-                // For now, create a placeholder - full implementation would clone the repo
-                tracing::warn!(
-                    "Git override for {} not fully implemented yet",
-                    g.module_name
-                );
+                // Fetch the git repo to a cache directory and parse its MODULE.bazel
+                let cache_key = format!("git-{}", g.commit);
+                let dest_dir = self.cache.base_dir().join("overrides").join(&g.module_name).join(&cache_key);
+                let complete_marker = dest_dir.join(".complete");
+
+                if !complete_marker.exists() {
+                    tracing::info!("Fetching git override for {} from {} at {}", g.module_name, g.remote, g.commit);
+                    if dest_dir.exists() {
+                        let _ = std::fs::remove_dir_all(&dest_dir);
+                    }
+                    std::fs::create_dir_all(&dest_dir).buck_error_context("Failed to create git override dir")?;
+
+                    let source_info = crate::registry::SourceInfo {
+                        source_type: Some("git_repository".to_string()),
+                        url: None,
+                        urls: None,
+                        integrity: None,
+                        strip_prefix: None,
+                        patches: std::collections::HashMap::new(),
+                        patch_strip: g.patch_strip,
+                        remote: Some(g.remote.clone()),
+                        commit: Some(g.commit.clone()),
+                        shallow_since: g.shallow_since.clone(),
+                    };
+
+                    self.source_fetcher.fetch_git_direct(&source_info, &dest_dir).await?;
+                    std::fs::write(&complete_marker, "").buck_error_context("Failed to write git override marker")?;
+                } else {
+                    tracing::debug!("Using cached git override for {}", g.module_name);
+                }
+
+                // Parse MODULE.bazel from the fetched source
+                let module_bazel_path = dest_dir.join("MODULE.bazel");
+                let parsed_module = if module_bazel_path.exists() {
+                    let parsed = parse_module_bazel(&module_bazel_path).with_buck_error_context(|| {
+                        format!("Failed to parse MODULE.bazel for git override '{}'", g.module_name)
+                    })?;
+                    parsed.module
+                } else {
+                    let mut module = Module::empty();
+                    module.name = g.module_name.clone();
+                    module
+                };
+
+                let version = parsed_module.version.clone();
                 let discovered = DiscoveredModule {
-                    key: ModuleKey::new(&g.module_name, ""),
-                    compatibility_level: 0,
-                    module: Module::empty(),
+                    key: ModuleKey::new(&g.module_name, version.as_str()),
+                    compatibility_level: parsed_module.compatibility_level,
+                    module: parsed_module,
                     source: ModuleSource::Git {
                         remote: g.remote.clone(),
                         commit: g.commit.clone(),
+                        shallow_since: g.shallow_since.clone(),
+                        patches: g.patches.clone(),
+                        patch_strip: g.patch_strip,
+                        fetched_path: Some(dest_dir),
                     },
                 };
                 self.overridden_modules
                     .insert(g.module_name.clone(), discovered);
             }
             Override::Archive(a) => {
-                // For archive overrides, we need to fetch and parse
-                tracing::warn!(
-                    "Archive override for {} not fully implemented yet",
-                    a.module_name
-                );
+                // Fetch the archive to a cache directory and parse its MODULE.bazel
+                let cache_key = format!("archive-{:x}", {
+                    use std::collections::hash_map::DefaultHasher;
+                    use std::hash::{Hash, Hasher};
+                    let mut h = DefaultHasher::new();
+                    a.urls.hash(&mut h);
+                    a.integrity.hash(&mut h);
+                    h.finish()
+                });
+                let dest_dir = self.cache.base_dir().join("overrides").join(&a.module_name).join(&cache_key);
+                let complete_marker = dest_dir.join(".complete");
+
+                if !complete_marker.exists() {
+                    tracing::info!("Fetching archive override for {} from {:?}", a.module_name, a.urls);
+                    if dest_dir.exists() {
+                        let _ = std::fs::remove_dir_all(&dest_dir);
+                    }
+                    std::fs::create_dir_all(&dest_dir).buck_error_context("Failed to create archive override dir")?;
+
+                    self.source_fetcher.fetch_archive_direct(
+                        &a.urls,
+                        a.integrity.as_deref(),
+                        a.strip_prefix.as_deref(),
+                        &dest_dir,
+                    ).await?;
+                    std::fs::write(&complete_marker, "").buck_error_context("Failed to write archive override marker")?;
+                } else {
+                    tracing::debug!("Using cached archive override for {}", a.module_name);
+                }
+
+                // Parse MODULE.bazel from the fetched source
+                let module_bazel_path = dest_dir.join("MODULE.bazel");
+                let parsed_module = if module_bazel_path.exists() {
+                    let parsed = parse_module_bazel(&module_bazel_path).with_buck_error_context(|| {
+                        format!("Failed to parse MODULE.bazel for archive override '{}'", a.module_name)
+                    })?;
+                    parsed.module
+                } else {
+                    let mut module = Module::empty();
+                    module.name = a.module_name.clone();
+                    module
+                };
+
+                let version = parsed_module.version.clone();
                 let discovered = DiscoveredModule {
-                    key: ModuleKey::new(&a.module_name, ""),
-                    compatibility_level: 0,
-                    module: Module::empty(),
+                    key: ModuleKey::new(&a.module_name, version.as_str()),
+                    compatibility_level: parsed_module.compatibility_level,
+                    module: parsed_module,
                     source: ModuleSource::Archive {
                         urls: a.urls.clone(),
+                        integrity: a.integrity.clone(),
+                        strip_prefix: a.strip_prefix.clone(),
+                        patches: a.patches.clone(),
+                        patch_strip: a.patch_strip,
+                        fetched_path: Some(dest_dir),
                     },
                 };
                 self.overridden_modules
@@ -850,12 +962,25 @@ impl MvsResolver {
                     // Local path is already available
                     info.source_path = Some(PathBuf::from(path));
                 }
-                ModuleSource::Git { .. } | ModuleSource::Archive { .. } => {
-                    // TODO: Implement git/archive fetching in fetch_sources
-                    tracing::warn!(
-                        "Git/Archive source fetching not yet implemented for {}",
-                        name
-                    );
+                ModuleSource::Git { fetched_path, .. } => {
+                    if let Some(path) = fetched_path {
+                        info.source_path = Some(path.clone());
+                    } else {
+                        tracing::warn!(
+                            "Git override for {} has no fetched path (should have been fetched during resolution)",
+                            name
+                        );
+                    }
+                }
+                ModuleSource::Archive { fetched_path, .. } => {
+                    if let Some(path) = fetched_path {
+                        info.source_path = Some(path.clone());
+                    } else {
+                        tracing::warn!(
+                            "Archive override for {} has no fetched path (should have been fetched during resolution)",
+                            name
+                        );
+                    }
                 }
             }
         }
@@ -1653,6 +1778,10 @@ module(name = "local_lib", version = "2.0.0")
         let git_source = ModuleSource::Git {
             remote: "https://github.com/example/repo.git".to_string(),
             commit: "abc123".to_string(),
+            shallow_since: None,
+            patches: Vec::new(),
+            patch_strip: 0,
+            fetched_path: None,
         };
         let json = serde_json::to_string(&git_source).unwrap();
         assert!(json.contains("Git"));
@@ -1661,6 +1790,11 @@ module(name = "local_lib", version = "2.0.0")
         // Test Archive source
         let archive_source = ModuleSource::Archive {
             urls: vec!["https://example.com/archive.tar.gz".to_string()],
+            integrity: None,
+            strip_prefix: None,
+            patches: Vec::new(),
+            patch_strip: 0,
+            fetched_path: None,
         };
         let json = serde_json::to_string(&archive_source).unwrap();
         assert!(json.contains("Archive"));

@@ -89,6 +89,56 @@ impl SourceFetcher {
         }
     }
 
+    /// Fetch a git repository directly to a destination directory.
+    /// Used for git_override during module resolution.
+    pub async fn fetch_git_direct(
+        &self,
+        source_info: &SourceInfo,
+        dest_dir: &Path,
+    ) -> kuro_error::Result<()> {
+        self.fetch_git(source_info, dest_dir).await
+    }
+
+    /// Fetch and extract an archive directly to a destination directory.
+    /// Used for archive_override during module resolution.
+    pub async fn fetch_archive_direct(
+        &self,
+        urls: &[String],
+        integrity: Option<&str>,
+        strip_prefix: Option<&str>,
+        dest_dir: &Path,
+    ) -> kuro_error::Result<()> {
+        if urls.is_empty() {
+            return Err(FetchError::NoSourceSpecified.into());
+        }
+
+        // Try each URL until one succeeds
+        let mut last_error = None;
+        for url in urls {
+            match self.download_archive(url).await {
+                Ok(data) => {
+                    // Verify integrity if specified
+                    if let Some(integrity) = integrity {
+                        verify_integrity(&data, integrity)?;
+                    }
+                    return self.extract_archive(&data, dest_dir, strip_prefix);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to download from {}: {}", url, e);
+                    last_error = Some(e);
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| {
+            FetchError::AllUrlsFailed {
+                name: "archive_override".to_string(),
+                version: "unknown".to_string(),
+            }
+            .into()
+        }))
+    }
+
     /// Fetch and extract source for a module.
     ///
     /// Returns the path to the extracted source directory.

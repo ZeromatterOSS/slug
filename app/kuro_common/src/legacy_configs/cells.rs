@@ -922,7 +922,7 @@ impl BuckConfigBasedCells {
                                                 path
                                             );
                                         }
-                                        ModuleSource::Git { remote, commit } => {
+                                        ModuleSource::Git { remote, commit, .. } => {
                                             let source_path_str = module_info
                                                 .source_path
                                                 .as_ref()
@@ -962,7 +962,7 @@ impl BuckConfigBasedCells {
                                                 commit
                                             );
                                         }
-                                        ModuleSource::Archive { urls } => {
+                                        ModuleSource::Archive { urls, .. } => {
                                             let source_path_str = module_info
                                                 .source_path
                                                 .as_ref()
