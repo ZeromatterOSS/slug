@@ -331,9 +331,9 @@ cc_test(
 
 #### Test Migration (Phase 9):
 
-- [ ] ADD `tests/core/cc_common/test_compile.py` for cc_common.compile()
-- [ ] ADD `tests/core/cc_common/test_link.py` for cc_common.link()
-- [ ] ADD `tests/core/cc_common/test_create_compilation_context.py`
+- [x] ADD `tests/core/cc_common/test_compile.py` for cc_common.compile() (6 tests)
+- [x] ADD `tests/core/cc_common/test_link.py` for cc_common.link() (6 tests)
+- [x] ADD `tests/core/cc_common/test_create_compilation_context.py` (5 tests)
 - [ ] ADD `tests/core/rules_cc/test_cc_library.py` for @rules_cc cc_library
 - [ ] ADD `tests/core/rules_cc/test_cc_binary.py` for linking
 

@@ -1,0 +1,27 @@
+load(":defs.bzl",
+    "basic_context_test",
+    "empty_context_test",
+    "merge_contexts_test",
+    "compilation_outputs_test",
+    "ccinfo_provider_test",
+)
+
+basic_context_test(
+    name = "basic_context",
+)
+
+empty_context_test(
+    name = "empty_context",
+)
+
+merge_contexts_test(
+    name = "merge_contexts",
+)
+
+compilation_outputs_test(
+    name = "compilation_outputs",
+)
+
+ccinfo_provider_test(
+    name = "ccinfo_provider",
+)

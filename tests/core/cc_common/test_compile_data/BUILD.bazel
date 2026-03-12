@@ -1,0 +1,40 @@
+load(":defs.bzl",
+    "compile_basic_test",
+    "compile_with_defines_test",
+    "compile_with_includes_test",
+    "compile_with_flags_test",
+    "compile_multiple_srcs_test",
+    "compile_dep_contexts_test",
+)
+
+compile_basic_test(
+    name = "compile_basic",
+    srcs = ["hello.c"],
+    hdrs = ["hello.h"],
+)
+
+compile_with_defines_test(
+    name = "compile_with_defines",
+    srcs = ["hello.c"],
+)
+
+compile_with_includes_test(
+    name = "compile_with_includes",
+    srcs = ["hello.c"],
+)
+
+compile_with_flags_test(
+    name = "compile_with_flags",
+    srcs = ["hello.c"],
+)
+
+compile_multiple_srcs_test(
+    name = "compile_multiple_srcs",
+    srcs = ["hello.c", "world.cc"],
+    hdrs = ["hello.h"],
+)
+
+compile_dep_contexts_test(
+    name = "compile_dep_contexts",
+    srcs = ["hello.c"],
+)
