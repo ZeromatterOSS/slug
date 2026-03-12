@@ -1183,10 +1183,74 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         use starlark::values::list::AllocList;
-        let _ = this;
-        // Return (inputs=[], command=[command], input_manifests=[])
-        let inputs = heap.alloc(AllocList::EMPTY);
-        let cmd_list = heap.alloc(AllocList(vec![heap.alloc_str(command).to_value()]));
+        use crate::interpreter::rule_defs::provider::dependency::Dependency;
+        use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
+
+        let _ = (attribute, make_variables, execution_requirements);
+
+        // Collect tool files as inputs
+        let mut tool_files: Vec<Value<'v>> = Vec::new();
+        let collect_files = |pc: starlark::values::FrozenValueTyped<
+            '_,
+            crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection,
+        >,
+                            files: &mut Vec<Value<'v>>| {
+            if let Ok(di) = pc.as_ref().default_info() {
+                for art in di.default_outputs() {
+                    files.push(heap.alloc(art));
+                }
+            }
+        };
+
+        // Collect files from tools parameter
+        if !tools.is_none() {
+            if let Ok(iter) = tools.iterate(heap) {
+                for tool_val in iter {
+                    if let Some(dep) = tool_val.downcast_ref::<Dependency>() {
+                        collect_files(dep.provider_collection(), &mut tool_files);
+                    } else if let Some(dep) = tool_val.downcast_ref::<FrozenDependency>() {
+                        collect_files(dep.provider_collection(), &mut tool_files);
+                    }
+                }
+            }
+        }
+
+        // Collect files from label_dict parameter
+        if !label_dict.is_none() {
+            if let Ok(iter) = label_dict.iterate(heap) {
+                for dep_val in iter {
+                    if let Some(dep) = dep_val.downcast_ref::<Dependency>() {
+                        collect_files(dep.provider_collection(), &mut tool_files);
+                    } else if let Some(dep) = dep_val.downcast_ref::<FrozenDependency>() {
+                        collect_files(dep.provider_collection(), &mut tool_files);
+                    }
+                }
+            }
+        }
+
+        // Expand $(location ...) in command string if requested
+        let resolved_command = if expand_locations && !command.is_empty() {
+            // Build combined targets list from tools + label_dict for location expansion
+            let mut all_targets: Vec<Value<'v>> = Vec::new();
+            if !tools.is_none() {
+                if let Ok(iter) = tools.iterate(heap) {
+                    all_targets.extend(iter);
+                }
+            }
+            if !label_dict.is_none() {
+                if let Ok(iter) = label_dict.iterate(heap) {
+                    all_targets.extend(iter);
+                }
+            }
+            let targets_list = heap.alloc(all_targets);
+            // Use the existing expand_location logic
+            expand_location_in_string(command, targets_list, heap)?
+        } else {
+            command.to_owned()
+        };
+
+        let inputs = heap.alloc(AllocList(tool_files));
+        let cmd_list = heap.alloc(AllocList(vec![heap.alloc_str(&resolved_command).to_value()]));
         let manifests = heap.alloc(AllocList::EMPTY);
         Ok(heap.alloc((inputs, cmd_list, manifests)))
     }
@@ -1383,6 +1447,122 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
 
         Ok(result)
     }
+}
+
+/// Standalone helper that expands `$(location ...)` patterns in a command string.
+///
+/// Used by both `ctx.expand_location()` and `ctx.resolve_command()`.
+fn expand_location_in_string<'v>(
+    input: &str,
+    targets: Value<'v>,
+    heap: Heap<'v>,
+) -> starlark::Result<String> {
+    use crate::interpreter::rule_defs::provider::dependency::Dependency;
+    use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
+
+    let mut label_to_paths: Vec<(String, Vec<String>)> = vec![];
+
+    let collect_output_paths = |pc: starlark::values::FrozenValueTyped<
+        '_,
+        crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection,
+    >|
+     -> Vec<String> {
+        if let Ok(di) = pc.as_ref().default_info() {
+            di.default_outputs()
+                .into_iter()
+                .map(|art| {
+                    art.artifact()
+                        .get_path()
+                        .with_full_path(|p| p.as_str().to_owned())
+                })
+                .collect()
+        } else {
+            vec![]
+        }
+    };
+
+    if let Ok(iter) = targets.iterate(heap) {
+        for dep_val in iter {
+            let (dep_label, paths) = if let Some(dep) = dep_val.downcast_ref::<Dependency>() {
+                let label_str = dep.label().label().unconfigured().to_string();
+                let paths = collect_output_paths(dep.provider_collection());
+                (label_str, paths)
+            } else if let Some(dep) = dep_val.downcast_ref::<FrozenDependency>() {
+                let label_str = dep.label().label().unconfigured().to_string();
+                let paths = collect_output_paths(dep.provider_collection());
+                (label_str, paths)
+            } else {
+                continue;
+            };
+            label_to_paths.push((dep_label, paths));
+        }
+    }
+
+    let find_paths = |label: &str| -> Option<Vec<String>> {
+        for (dep_label, paths) in &label_to_paths {
+            if dep_label == label {
+                return Some(paths.clone());
+            }
+            let dep_name = dep_label.rsplit(':').next().unwrap_or(dep_label.as_str());
+            let query_name = label.trim_start_matches(':');
+            if dep_name == query_name {
+                return Some(paths.clone());
+            }
+        }
+        None
+    };
+
+    let mut result = String::with_capacity(input.len());
+    let mut remaining = input;
+    while let Some(start) = remaining.find("$(") {
+        result.push_str(&remaining[..start]);
+        remaining = &remaining[start..];
+
+        let pattern: Option<(usize, bool)> = if remaining.starts_with("$(locations ") {
+            Some(("$(locations ".len(), true))
+        } else if remaining.starts_with("$(location ") {
+            Some(("$(location ".len(), false))
+        } else if remaining.starts_with("$(execpaths ") {
+            Some(("$(execpaths ".len(), true))
+        } else if remaining.starts_with("$(execpath ") {
+            Some(("$(execpath ".len(), false))
+        } else if remaining.starts_with("$(rootpaths ") {
+            Some(("$(rootpaths ".len(), true))
+        } else if remaining.starts_with("$(rootpath ") {
+            Some(("$(rootpath ".len(), false))
+        } else if remaining.starts_with("$(rlocationpaths ") {
+            Some(("$(rlocationpaths ".len(), true))
+        } else if remaining.starts_with("$(rlocationpath ") {
+            Some(("$(rlocationpath ".len(), false))
+        } else {
+            None
+        };
+
+        if let Some((prefix_len, is_multi)) = pattern {
+            if let Some(end) = remaining.find(')') {
+                let label = remaining[prefix_len..end].trim();
+                let after = &remaining[end + 1..];
+
+                if let Some(paths) = find_paths(label) {
+                    if is_multi {
+                        result.push_str(&paths.join(" "));
+                    } else {
+                        result.push_str(paths.first().map(|s| s.as_str()).unwrap_or(""));
+                    }
+                } else {
+                    result.push_str(&remaining[..end + 1]);
+                }
+                remaining = after;
+                continue;
+            }
+        }
+
+        result.push_str("$(");
+        remaining = &remaining[2..];
+    }
+    result.push_str(remaining);
+
+    Ok(result)
 }
 
 /// Derives the output directory path from a configured target label.

@@ -1237,3 +1237,50 @@ merge_cc_infos_full_test = rule(
     implementation = _merge_cc_infos_full_test_impl,
     attrs = {},
 )
+
+
+def _resolve_command_tools_test_impl(ctx):
+    """Test ctx.resolve_command() with tools param collects tool files as inputs."""
+    # Basic resolve_command without expansion
+    inputs, command, manifests = ctx.resolve_command(command = "echo hello")
+    if len(command) != 1:
+        fail("resolve_command should return command list of length 1, got %d" % len(command))
+    if command[0] != "echo hello":
+        fail("resolve_command returned wrong command: %s" % command[0])
+
+    # Test with tool dependencies - inputs should contain tool files
+    inputs2, command2, manifests2 = ctx.resolve_command(
+        command = "run tool",
+        tools = ctx.attr.deps,
+    )
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "resolve_command_tools: ok\n")
+    return [DefaultInfo(default_output = out)]
+
+
+resolve_command_tools_test = rule(
+    implementation = _resolve_command_tools_test_impl,
+    attrs = {
+        "deps": attr.label_list(),
+    },
+)
+
+
+def _write_mnemonic_test_impl(ctx):
+    """Test actions.write() accepts mnemonic and execution_requirements params (Bazel 9)."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    # These params should be accepted without error
+    ctx.actions.write(
+        out,
+        "write_mnemonic: ok\n",
+        mnemonic = "WriteTest",
+        execution_requirements = {"no-remote": "1"},
+    )
+    return [DefaultInfo(default_output = out)]
+
+
+write_mnemonic_test = rule(
+    implementation = _write_mnemonic_test_impl,
+    attrs = {},
+)

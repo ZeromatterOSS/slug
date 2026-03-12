@@ -397,6 +397,11 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneOr::None)] has_content_based_path: NoneOr<bool>,
         #[starlark(require = named, default = false)]
         use_dep_files_placeholder_for_content_based_paths: bool,
+        // Bazel 9 compatibility: accepted but ignored
+        #[starlark(require = named, default = NoneOr::None)] mnemonic: NoneOr<&str>,
+        #[starlark(require = named, default = NoneOr::None)] execution_requirements: NoneOr<
+            Value<'v>,
+        >,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<
         Either<
@@ -407,6 +412,9 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
             ),
         >,
     > {
+        // Bazel 9 params accepted for compatibility
+        let _ = (mnemonic, execution_requirements);
+
         fn count_write_to_file_macros(
             args_allowed: bool,
             cli: &dyn CommandLineArgLike,

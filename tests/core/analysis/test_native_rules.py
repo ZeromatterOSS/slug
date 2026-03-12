@@ -1074,3 +1074,21 @@ async def test_merge_cc_infos_full(buck: Buck) -> None:
     content = output.read_text().strip()
     assert "merge_cc_infos_full: ok" in content
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_resolve_command_tools(buck: Buck) -> None:
+    """ctx.resolve_command() returns proper tuple with tool inputs."""
+    result = await buck.build("//:resolve_command_tools_test")
+    output = result.get_build_report().output_for_target("//:resolve_command_tools_test")
+    content = output.read_text().strip()
+    assert "resolve_command_tools: ok" in content
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_write_mnemonic(buck: Buck) -> None:
+    """actions.write() accepts mnemonic and execution_requirements params (Bazel 9)."""
+    result = await buck.build("//:write_mnemonic_test")
+    output = result.get_build_report().output_for_target("//:write_mnemonic_test")
+    content = output.read_text().strip()
+    assert "write_mnemonic: ok" in content
+
