@@ -1,0 +1,5 @@
+# This glob pattern matches nothing and allow_empty=False, so it should error
+filegroup(
+    name = "should_fail",
+    srcs = glob(["**/*.nonexistent_extension"], allow_empty = False),
+)

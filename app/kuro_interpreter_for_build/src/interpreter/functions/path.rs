@@ -53,8 +53,7 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
     /// and _not_ appear in the glob result of `foo/BUCK`, even if you write `glob(["bar/file.txt"])`.
     /// As a consequence of this rule, `glob(["../foo.txt"])` will always return an empty list of files.
     ///
-    /// Currently `glob` is evaluated case-insensitively on all file systems, but we expect
-    /// that to change to case sensitive in the near future.
+    /// `glob` is evaluated case-sensitively, matching Bazel behavior.
     fn glob<'v>(
         include: UnpackListOrTuple<String>,
         #[starlark(require = named, default=UnpackListOrTuple::default())]
@@ -64,11 +63,22 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
         #[starlark(require = named, default = 1)] exclude_directories: i32,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<ValueOfUnchecked<'v, UnpackList<String>>> {
-        let _ = (allow_empty, exclude_directories);
+        let _ = exclude_directories;
         let extra = ModuleInternals::from_context(eval, "glob")?;
         let spec = GlobSpec::new(&include.items, &exclude.items)?;
-        let res = extra.resolve_glob(&spec).map(|path| path.as_str());
-        Ok(eval.heap().alloc_typed_unchecked(AllocList(res)).cast())
+        if !allow_empty {
+            // Collect results to check emptiness
+            let results: Vec<_> = extra.resolve_glob(&spec).map(|path| path.as_str().to_owned()).collect();
+            if results.is_empty() {
+                return Err(starlark::Error::new_other(
+                    anyhow::anyhow!("glob pattern '{}' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with package(default_glob_allow_empty = ...))", include.items.join(", "))
+                ));
+            }
+            Ok(eval.heap().alloc_typed_unchecked(AllocList(results.iter().map(|s| s.as_str()))).cast())
+        } else {
+            let res = extra.resolve_glob(&spec).map(|path| path.as_str());
+            Ok(eval.heap().alloc_typed_unchecked(AllocList(res)).cast())
+        }
     }
 
     /// `package_name()` can only be called in buildfiles (e.g. BUCK files) or PACKAGE files, and returns the name of the package.

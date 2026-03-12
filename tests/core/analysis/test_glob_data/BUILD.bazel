@@ -35,3 +35,21 @@ files_list(
     name = "root_files",
     srcs = glob(["data/*.json"]),
 )
+
+# Test glob case sensitivity: "SRC/**/*.txt" should NOT match files in "src/"
+files_list(
+    name = "case_sensitive",
+    srcs = glob(["SRC/**/*.txt"]),
+)
+
+# Test glob allow_empty=True with no matches (default, should succeed)
+files_list(
+    name = "allow_empty_true",
+    srcs = glob(["src/**/*.nonexistent"], allow_empty = True),
+)
+
+# Test glob exclude_directories parameter (accepted, default=1)
+files_list(
+    name = "exclude_dirs",
+    srcs = glob(["src/**/*.txt"], exclude_directories = 1),
+)

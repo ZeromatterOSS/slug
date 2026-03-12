@@ -158,8 +158,8 @@ impl GlobSpec {
         let options = glob::MatchOptions {
             require_literal_separator: true,
             require_literal_leading_dot: true,
-            // FIXME: We should have case sensitive globs
-            case_sensitive: false,
+            // Bazel globs are case-sensitive
+            case_sensitive: true,
         };
         let include_matches = self.exact_matches.contains(path)
             || self
@@ -226,14 +226,17 @@ mod tests {
     }
 
     #[test]
-    fn test_glob_match_case_insensitive() -> kuro_error::Result<()> {
-        // NOTE: We probably should change this. But for now, let's codify the current behavior
-        // since that's probably something that should require a migration.
-
+    fn test_glob_match_case_sensitive() -> kuro_error::Result<()> {
+        // Bazel globs are case-sensitive (matching filesystem behavior on Linux/macOS)
         let spec = GlobSpec::new(&["src/**/*"], &["src/excluded/**/*"])?;
         assert!(spec.matches("src/foo"));
-        assert!(spec.matches("SRC/foo"));
-        assert!(!spec.matches("src/EXCLUDED/bar"));
+        // Case mismatch on directory name - no match
+        assert!(!spec.matches("SRC/foo"));
+        // "EXCLUDED" != "excluded" so exclude pattern doesn't match,
+        // but "src/EXCLUDED/bar" still matches "src/**/*" include
+        assert!(spec.matches("src/EXCLUDED/bar"));
+        // Exact case matches exclude pattern
+        assert!(!spec.matches("src/excluded/bar"));
 
         Ok(())
     }

@@ -527,11 +527,21 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = 1)] exclude_directories: i32,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<ValueOfUnchecked<'v, UnpackList<String>>> {
-        let _unused = (allow_empty, exclude_directories);
+        let _ = exclude_directories;
         let extra = ModuleInternals::from_context(eval, "native.glob")?;
         let spec = GlobSpec::new(&include.items, &exclude.items)?;
-        let res = extra.resolve_glob(&spec).map(|path| path.as_str());
-        Ok(eval.heap().alloc_typed_unchecked(AllocList(res)).cast())
+        if !allow_empty {
+            let results: Vec<_> = extra.resolve_glob(&spec).map(|path| path.as_str().to_owned()).collect();
+            if results.is_empty() {
+                return Err(starlark::Error::new_other(
+                    anyhow::anyhow!("glob pattern '{}' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with package(default_glob_allow_empty = ...))", include.items.join(", "))
+                ));
+            }
+            Ok(eval.heap().alloc_typed_unchecked(AllocList(results.iter().map(|s| s.as_str()))).cast())
+        } else {
+            let res = extra.resolve_glob(&spec).map(|path| path.as_str());
+            Ok(eval.heap().alloc_typed_unchecked(AllocList(res)).cast())
+        }
     }
 
     /// Returns the name of the package being evaluated.
