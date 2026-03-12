@@ -63,6 +63,10 @@ pub struct Rule {
     /// Each entry is a group name (e.g., "compile", "link").
     /// Used to validate `ctx.exec_groups` key lookups at analysis time.
     pub exec_group_names: Vec<String>,
+    /// Configuration fragment names declared via `rule(fragments=["cpp", "java", ...])`.
+    /// In Bazel, this declares which configuration fragments a rule requires.
+    /// Currently stored as metadata; fragment access is handled via `ctx.fragments`.
+    pub fragments: Vec<String>,
 }
 
 interner!(INTERNER, BuckHasher, Rule);

@@ -151,6 +151,8 @@ pub struct StarlarkRuleCallable<'v> {
     toolchain_types: Vec<String>,
     /// Execution group names declared via `rule(exec_groups={...})`.
     exec_group_names: Vec<String>,
+    /// Configuration fragment names declared via `rule(fragments=["cpp", "java", ...])`.
+    fragments: Vec<String>,
 }
 
 /// Mappings of promise artifact name to the starlark function that will produce it, for anon targets.
@@ -227,6 +229,7 @@ impl<'v> StarlarkRuleCallable<'v> {
         rule_outputs: Vec<(String, String)>,
         toolchain_types: Vec<String>,
         exec_group_names: Vec<String>,
+        fragments: Vec<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> kuro_error::Result<StarlarkRuleCallable<'v>> {
         let build_context = BuildContext::from_context(eval)?;
@@ -333,6 +336,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             rule_outputs,
             toolchain_types,
             exec_group_names,
+            fragments,
         })
     }
 
@@ -367,6 +371,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             Vec::new(), // anon rules have no rule_outputs
             Vec::new(), // anon rules have no toolchain_types
             Vec::new(), // anon rules have no exec_groups
+            Vec::new(), // anon rules have no fragments
             eval,
         )
     }
@@ -541,6 +546,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
                 provides: self.provides.clone(),
                 toolchain_types: self.toolchain_types.clone(),
                 exec_group_names: self.exec_group_names.clone(),
+                fragments: self.fragments.clone(),
             }),
             rule_type,
             implementation: frozen_impl,
@@ -553,6 +559,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
             rule_outputs: self.rule_outputs,
             toolchain_types: self.toolchain_types,
             exec_group_names: self.exec_group_names,
+            fragments: self.fragments,
         })
     }
 }
@@ -580,6 +587,8 @@ pub struct FrozenStarlarkRuleCallable {
     toolchain_types: Vec<String>,
     /// Execution group names declared via `rule(exec_groups={...})`.
     exec_group_names: Vec<String>,
+    /// Configuration fragment names declared via `rule(fragments=["cpp", "java", ...])`.
+    fragments: Vec<String>,
 }
 starlark_simple_value!(FrozenStarlarkRuleCallable);
 
@@ -845,15 +854,21 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         #[starlark(kwargs)] extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkRuleCallable<'v>> {
-        // TODO(bazel): Use the fragments parameter for configuration fragment access
         // TODO(bazel): Use the subrules parameter for subrule composition
         // TODO(bazel): Use the initializer parameter for pre-analysis attribute validation
         let _unused = (
-            fragments,
             subrules,
             initializer,
             extra_kwargs,
         );
+
+        // Extract configuration fragment names from the fragments parameter.
+        // In Bazel, fragments=["cpp", "java"] declares which config fragments a rule needs.
+        let fragment_names: Vec<String> = fragments
+            .items
+            .into_iter()
+            .map(|s| s.to_owned())
+            .collect();
 
         // Extract execution group names from the exec_groups parameter.
         // In Bazel, exec_groups is a dict mapping group name → exec_group() value.
@@ -1052,6 +1067,7 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             rule_outputs,
             toolchain_types,
             exec_group_names,
+            fragment_names,
             eval,
         )?)
     }

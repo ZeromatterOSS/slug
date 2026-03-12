@@ -222,6 +222,11 @@ impl TargetNode {
         &self.0.rule.exec_group_names
     }
 
+    /// Configuration fragment names declared via `rule(fragments=["cpp", ...])`.
+    pub fn fragments(&self) -> &[String] {
+        &self.0.rule.fragments
+    }
+
     pub fn is_configuration_rule(&self) -> bool {
         self.0.rule.rule_kind == RuleKind::Configuration
     }
@@ -758,6 +763,7 @@ pub mod testing {
                     provides: Vec::new(),
                     toolchain_types: Vec::new(),
                     exec_group_names: Vec::new(),
+                    fragments: Vec::new(),
                 }),
                 Arc::new(Package {
                     buildfile_path,

@@ -839,6 +839,13 @@ impl<'a> ConfiguredTargetNodeRef<'a> {
         }
     }
 
+    pub fn fragments(self) -> &'a [String] {
+        match &self.0.get().target_node {
+            TargetNodeOrForward::TargetNode(target_node) => target_node.fragments(),
+            TargetNodeOrForward::Forward(_, _) => &[],
+        }
+    }
+
     pub fn execution_platform_resolution(self) -> &'a ExecutionPlatformResolution {
         &self.0.get().execution_platform_resolution
     }

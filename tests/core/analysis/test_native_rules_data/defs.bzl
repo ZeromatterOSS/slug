@@ -543,6 +543,27 @@ exec_groups_test = rule(
 )
 
 
+def _fragments_test_impl(ctx):
+    """Tests that rule(fragments=[...]) is accepted and ctx.fragments works."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    frags = ctx.fragments
+    has_cpp = hasattr(frags, "cpp")
+    cpp_mode = frags.cpp.compilation_mode() if has_cpp else "none"
+    lines = [
+        "has_cpp=" + str(has_cpp),
+        "compilation_mode=" + cpp_mode,
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+fragments_test = rule(
+    implementation = _fragments_test_impl,
+    fragments = ["cpp"],
+    attrs = {},
+)
+
+
 def _nonempty_deps_test_impl(ctx):
     """Tests that allow_empty=False on label_list is enforced."""
     out = ctx.actions.declare_file(ctx.label.name + ".txt")

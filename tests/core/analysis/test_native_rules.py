@@ -412,6 +412,17 @@ async def test_rule_exec_groups(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_rule_fragments(buck: Buck) -> None:
+    """rule(fragments=["cpp"]) is accepted and ctx.fragments.cpp works."""
+    result = await buck.build("//:fragments_test")
+    output = result.get_build_report().output_for_target("//:fragments_test")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    assert lines["has_cpp"] == "True"
+    assert lines["compilation_mode"] in ("fastbuild", "opt", "dbg")
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_run_environment_info_provider(buck: Buck) -> None:
     """RunEnvironmentInfo returns a proper provider with environment and inherited_environment."""
     result = await buck.build("//:run_env_test")
