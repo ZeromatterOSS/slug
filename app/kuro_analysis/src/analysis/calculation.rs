@@ -292,7 +292,19 @@ async fn check_config_setting_flag_values(
             Err(_) => return Ok(false), // Target not found → conservative: no match
         };
 
-        let default_val =
+        // Check for CLI override via --//pkg:target=value first
+        let flag_pkg = flag_target_label.pkg().cell_relative_path().as_str();
+        let flag_name = flag_target_label.name().as_str();
+        let flag_label_str = if flag_pkg.is_empty() {
+            format!("//:{}", flag_name)
+        } else {
+            format!("//{}:{}", flag_pkg, flag_name)
+        };
+
+        let actual_val = if let Some(cli_val) = kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(&flag_label_str) {
+            cli_val
+        } else {
+            // Fall back to build_setting_default
             match flag_node.attr_or_none("build_setting_default", AttrInspectOptions::All) {
                 Some(attr) => match &attr.value {
                     CoercedAttr::String(s) => s.0.as_str().to_owned(),
@@ -303,13 +315,14 @@ async fn check_config_setting_flag_values(
                             "False".to_owned()
                         }
                     }
-                    _ => return Ok(false), // Can't read default → conservative: no match
+                    _ => return Ok(false),
                 },
-                None => return Ok(false), // No build_setting_default → conservative: no match
-            };
+                None => return Ok(false),
+            }
+        };
 
-        if default_val != expected_str {
-            return Ok(false); // Mismatch → config_setting doesn't match in default config
+        if actual_val != expected_str {
+            return Ok(false); // Mismatch
         }
     }
 

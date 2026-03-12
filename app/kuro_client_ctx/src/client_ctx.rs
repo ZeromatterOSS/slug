@@ -257,6 +257,7 @@ impl<'a> ClientCommandContext<'a> {
             stamp: false, // Will be set from CommonBuildOptions.stamp on server side
             collect_code_coverage: config_opts.collect_code_coverage && !config_opts.nocollect_code_coverage,
             force_pic: config_opts.force_pic,
+            starlark_flags: crate::bazelrc::get_starlark_flags_from_args().to_vec(),
             ..self.empty_client_context(cmd.logging_name())?
         })
     }
@@ -313,6 +314,7 @@ impl<'a> ClientCommandContext<'a> {
             stamp: false,
             collect_code_coverage: false,
             force_pic: false,
+            starlark_flags: Vec::new(),
         })
     }
 

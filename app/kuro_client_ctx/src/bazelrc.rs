@@ -35,6 +35,7 @@
 
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 
 /// Known kuro subcommands (used to find injection point in argv).
 static KNOWN_COMMANDS: &[&str] = &[
@@ -328,8 +329,19 @@ fn normalize_flag(arg: &str) -> String {
 ///
 /// NOTE: normalization stops after `--`. Everything after `--` is passed to a
 /// subcommand (e.g., BXL script args) and must be preserved verbatim.
+/// Process-level storage for Starlark build flags extracted from the command line.
+/// Flags like `--//pkg:target=value` are extracted before clap parsing since
+/// clap can't handle the `--//` prefix.
+static STARLARK_FLAGS: OnceLock<Vec<String>> = OnceLock::new();
+
+/// Get the Starlark build flags that were extracted from the command line.
+pub fn get_starlark_flags_from_args() -> &'static [String] {
+    STARLARK_FLAGS.get().map(|v| v.as_slice()).unwrap_or(&[])
+}
+
 pub fn normalize_args(args: Vec<String>) -> Vec<String> {
     let mut result = Vec::with_capacity(args.len());
+    let mut starlark_flags = Vec::new();
     let mut past_separator = false;
     for arg in args {
         if past_separator {
@@ -337,10 +349,15 @@ pub fn normalize_args(args: Vec<String>) -> Vec<String> {
         } else if arg == "--" {
             past_separator = true;
             result.push(arg);
+        } else if arg.starts_with("--//") || arg.starts_with("--@") {
+            // Starlark build flag: --//pkg:target=value or --@repo//pkg:target=value
+            // Extract and store, don't pass to clap
+            starlark_flags.push(arg[2..].to_owned()); // strip leading --
         } else if !is_bazel_transitional_flag(&arg) {
             result.push(normalize_flag(&arg));
         }
     }
+    let _ = STARLARK_FLAGS.set(starlark_flags);
     result
 }
 

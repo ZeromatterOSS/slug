@@ -843,40 +843,70 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// Returns the value of a build setting rule (Bazel-compatible).
     ///
     /// For rules declared with `build_setting = config.string()` or similar,
-    /// this returns the current value of the build setting. Since Kuro doesn't
-    /// yet support build setting transitions, this returns the default value
-    /// from the `build_setting_default` attribute.
+    /// this returns the current value of the build setting. If the flag was
+    /// overridden on the command line via `--//pkg:target=value`, the CLI value
+    /// takes precedence over `build_setting_default`.
     #[starlark(attribute)]
     fn build_setting_value<'v>(
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // Try to get build_setting_default from attrs
-        if let Some(attrs) = this.0.attrs {
-            // Check if this build setting allows multiple values
-            let allows_multiple = attrs
-                .get()
-                .get_attr("_build_setting_allows_multiple", heap)
-                .ok()
-                .flatten()
-                .and_then(|v| v.unpack_bool())
-                .unwrap_or(false);
+        // Check if this build setting allows multiple values
+        let allows_multiple = this.0.attrs
+            .and_then(|attrs| {
+                attrs.get()
+                    .get_attr("_build_setting_allows_multiple", heap)
+                    .ok()
+                    .flatten()
+                    .and_then(|v| v.unpack_bool())
+            })
+            .unwrap_or(false);
 
+        // Check for command-line override via --//pkg:target=value
+        if let Some(label) = this.0.label {
+            let target = label.label().target();
+            // Build the label string in //pkg:target format
+            let pkg_path = target.pkg().cell_relative_path().as_str();
+            let target_name = target.name().as_str();
+            let label_str = if pkg_path.is_empty() {
+                format!("//:{}", target_name)
+            } else {
+                format!("//{}:{}", pkg_path, target_name)
+            };
+
+            if let Some(cli_value) = crate::interpreter::rule_defs::build_config::get_starlark_flag(&label_str) {
+                // Parse the CLI string value into the appropriate type
+                // For bool settings, convert "True"/"False"/"true"/"false" to bool
+                // For int settings, parse as int
+                // For string/string_list, return as-is
+                let value = match cli_value.as_str() {
+                    "True" | "true" | "1" => heap.alloc(true).to_value(),
+                    "False" | "false" | "0" => heap.alloc(false).to_value(),
+                    s => heap.alloc_str(s).to_value(),
+                };
+                if allows_multiple {
+                    use starlark::values::list::AllocList;
+                    return Ok(heap.alloc(AllocList([value])));
+                }
+                return Ok(value);
+            }
+        }
+
+        // Fall back to build_setting_default attribute
+        if let Some(attrs) = this.0.attrs {
             if let Some(val) = attrs.get().get_attr("build_setting_default", heap)? {
                 if allows_multiple {
-                    // For allow_multiple=True build settings, always return a list
                     use starlark::values::list::ListRef;
                     if ListRef::from_value(val).is_some() {
-                        return Ok(val); // Already a list
+                        return Ok(val);
                     }
-                    // Wrap single value in a list
                     use starlark::values::list::AllocList;
                     return Ok(heap.alloc(AllocList([val])));
                 }
                 return Ok(val);
             }
         }
-        // Default: return empty list for list settings (most common build settings)
+        // Default: return empty list for list settings
         use starlark::values::list::AllocList;
         Ok(heap.alloc(AllocList::EMPTY))
     }

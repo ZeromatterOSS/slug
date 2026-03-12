@@ -34,6 +34,7 @@ static BUILD_CONFIG: RwLock<BuildConfig> = RwLock::new(BuildConfig {
     stamp: false,
     collect_code_coverage: false,
     force_pic: false,
+    starlark_flags: None,
 });
 
 struct BuildConfig {
@@ -63,6 +64,10 @@ struct BuildConfig {
     collect_code_coverage: bool,
     /// --force_pic flag.
     force_pic: bool,
+    /// Starlark build flags from --//pkg:target=value on the command line.
+    /// Keys are fully-qualified target labels (e.g., "//pkg:my_bool_flag"),
+    /// values are the string representation of the flag value.
+    starlark_flags: Option<HashMap<String, String>>,
 }
 
 /// Set the compilation mode for the current build.
@@ -279,4 +284,44 @@ pub fn set_force_pic(enabled: bool) {
 /// Get --force_pic flag. Returns false if not set.
 pub fn get_force_pic() -> bool {
     BUILD_CONFIG.read().ok().map(|c| c.force_pic).unwrap_or(false)
+}
+
+/// Set Starlark build flags from --//pkg:target=value on the command line.
+/// Each entry should be in "//pkg:target=value" format (with or without leading --).
+pub fn set_starlark_flags(flags: &[String]) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        let mut map = HashMap::new();
+        for entry in flags {
+            // Strip leading -- if present
+            let entry = entry.strip_prefix("--").unwrap_or(entry);
+            if let Some((label, value)) = entry.split_once('=') {
+                // Normalize: ensure label starts with //
+                let label = if label.starts_with("//") || label.starts_with("@") {
+                    label.to_owned()
+                } else {
+                    format!("//{}", label)
+                };
+                map.insert(label, value.to_owned());
+            }
+        }
+        config.starlark_flags = if map.is_empty() { None } else { Some(map) };
+    }
+}
+
+/// Get the value of a Starlark build flag, or None if not set.
+/// The label should be in "//pkg:target" format.
+pub fn get_starlark_flag(label: &str) -> Option<String> {
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| c.starlark_flags.as_ref().and_then(|f| f.get(label).cloned()))
+}
+
+/// Get all Starlark build flags as a map.
+pub fn get_all_starlark_flags() -> HashMap<String, String> {
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| c.starlark_flags.clone())
+        .unwrap_or_default()
 }

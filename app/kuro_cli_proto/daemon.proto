@@ -233,6 +233,10 @@ message ClientContext {
 
   /// Bazel-compatible --force_pic flag.
   bool force_pic = 38;
+
+  /// Starlark build flags from --//pkg:target=value on the command line.
+  /// Each entry is "//pkg:target=value" format.
+  repeated string starlark_flags = 39;
 }
 
 message TargetsRequest {
