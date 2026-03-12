@@ -526,13 +526,6 @@ pub struct CommonBuildConfigurationOptions {
     #[clap(long = "host-features", alias = "host_features", hide = true, value_name = "FEATURE", num_args = 1)]
     pub host_features: Vec<String>,
 
-    /// Extra toolchains to consider (Bazel compatibility, accepted but ignored).
-    #[clap(long = "extra-toolchains", alias = "extra_toolchains", hide = true, value_name = "LABEL", num_args = 1)]
-    pub extra_toolchains: Vec<String>,
-
-    /// Extra execution platforms (Bazel compatibility, accepted but ignored).
-    #[clap(long = "extra-execution-platforms", alias = "extra_execution_platforms", hide = true, value_name = "LABEL", num_args = 1)]
-    pub extra_execution_platforms: Vec<String>,
 
     /// Register toolchains for toolchain resolution (Bazel compatibility, accepted but ignored).
     #[clap(long = "register-toolchains", alias = "register_toolchains", hide = true)]
@@ -550,13 +543,6 @@ pub struct CommonBuildConfigurationOptions {
     #[clap(long = "output-filter", alias = "output_filter", hide = true, value_name = "REGEX")]
     pub output_filter: Option<String>,
 
-    /// Stamp binaries with version info (Bazel compatibility, accepted but ignored).
-    #[clap(long = "stamp", hide = true)]
-    pub stamp: bool,
-
-    /// Don't stamp binaries (Bazel compatibility, accepted but ignored).
-    #[clap(long = "nostamp", hide = true)]
-    pub nostamp: bool,
 
     /// Build runfiles (Bazel compatibility, accepted but ignored).
     #[clap(long = "build-runfile-links", alias = "build_runfile_links", hide = true)]
@@ -763,15 +749,11 @@ impl CommonBuildConfigurationOptions {
             test_tag_filter: None,
             run_under: None,
             host_features: vec![],
-            extra_toolchains: vec![],
-            extra_execution_platforms: vec![],
             register_toolchains: false,
             check_direct_dependencies: None,
             modify_execution_info: None,
             output_filter: None,
 
-            stamp: false,
-            nostamp: false,
             build_runfile_links: false,
             nobuild_runfile_links: false,
             enable_bzlmod: false,
@@ -845,15 +827,11 @@ impl CommonBuildConfigurationOptions {
             test_tag_filter: None,
             run_under: None,
             host_features: vec![],
-            extra_toolchains: vec![],
-            extra_execution_platforms: vec![],
             register_toolchains: false,
             check_direct_dependencies: None,
             modify_execution_info: None,
             output_filter: None,
 
-            stamp: false,
-            nostamp: false,
             build_runfile_links: false,
             nobuild_runfile_links: false,
             enable_bzlmod: false,
