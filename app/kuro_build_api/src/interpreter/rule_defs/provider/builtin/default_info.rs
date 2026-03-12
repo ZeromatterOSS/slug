@@ -529,7 +529,7 @@ impl FrozenDefaultInfo {
         mut processor: impl FnMut(Value) -> kuro_error::Result<()>,
     ) -> kuro_error::Result<()> {
         let outputs_list = ListRef::from_frozen_value(value)
-            .unwrap_or_else(|| panic!("expected list, got `{value:?}` from info `{self:?}`"));
+            .with_internal_error(|| format!("expected list, got `{value:?}` from info `{self:?}`"))?;
 
         for value in outputs_list.iter() {
             processor(value)?;
@@ -590,10 +590,10 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
     fn files<'v>(this: &DefaultInfo<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         // Get the default_outputs as a list
         let outputs_value = this.default_outputs.get().to_value();
-        let outputs_list = ListRef::from_value(outputs_value).unwrap_or_else(|| {
-            // Should not happen since default_outputs is typed as a list
-            panic!("default_outputs should be a list, got: {:?}", outputs_value)
-        });
+        let outputs_list = match ListRef::from_value(outputs_value) {
+            Some(list) => list,
+            None => return Ok(heap.alloc(Depset::from_frozen_values(vec![], "default".to_owned()))),
+        };
 
         // Collect all elements as frozen values
         let frozen_elements: Vec<FrozenValue> = outputs_list
