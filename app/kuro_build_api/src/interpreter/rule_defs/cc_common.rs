@@ -5196,9 +5196,20 @@ where
     }
 
     fn items(&self) -> Vec<(&str, Value<'v>)> {
-        // OutputGroupInfo doesn't have fixed fields - it has dynamic output groups
-        // Return empty for now since the groups are stored in a dict
-        vec![]
+        use starlark::values::dict::DictRef;
+        if let Some(dict) = DictRef::from_value(self.groups.to_value()) {
+            dict.iter()
+                .filter_map(|(k, v)| {
+                    let s: &'v str = k.unpack_str()?;
+                    // SAFETY: 'v outlives &self since self contains V: ValueLike<'v>,
+                    // so the string data is valid for the duration of the &self borrow.
+                    let s: &str = unsafe { &*(s as *const str) };
+                    Some((s, v))
+                })
+                .collect()
+        } else {
+            vec![]
+        }
     }
 }
 
@@ -5208,21 +5219,40 @@ where
     Self: ProvidesStaticType<'v>,
 {
     fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
-        // Check if attribute exists in groups dict by trying to iterate
-        if let Ok(iter) = self.groups.to_value().iterate(heap) {
+        use starlark::values::dict::DictRef;
+        if let Some(dict) = DictRef::from_value(self.groups.to_value()) {
+            dict.get_str(attribute).is_some()
+        } else if let Ok(iter) = self.groups.to_value().iterate(heap) {
             for key in iter {
                 if key.unpack_str() == Some(attribute) {
                     return true;
                 }
             }
+            false
+        } else {
+            false
         }
-        false
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        // Get attribute from groups dict using at2
-        let key = heap.alloc_str(attribute);
-        self.groups.to_value().at(key.to_value(), heap).ok()
+        use starlark::values::dict::DictRef;
+        if let Some(dict) = DictRef::from_value(self.groups.to_value()) {
+            dict.get_str(attribute).map(|v| v)
+        } else {
+            let key = heap.alloc_str(attribute);
+            self.groups.to_value().at(key.to_value(), heap).ok()
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        use starlark::values::dict::DictRef;
+        if let Some(dict) = DictRef::from_value(self.groups.to_value()) {
+            dict.iter()
+                .filter_map(|(k, _)| k.unpack_str().map(|s| s.to_owned()))
+                .collect()
+        } else {
+            Vec::new()
+        }
     }
 
     // Support 'in' operator: `"key" in output_group_info`

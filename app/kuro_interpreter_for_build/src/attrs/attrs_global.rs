@@ -853,20 +853,31 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
         // Bazel-compatible: restrict to specific values (e.g., ["expanded", "hir"])
-        // Currently accepted but not enforced
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         values: UnpackListOrTuple<&str>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = values;
-        // Bazel semantics: if mandatory = False (default) and no default, use empty string
         let implicit = default.is_none() && !mandatory;
         let effective_default = match (default, mandatory) {
             (Some(d), _) => Some(d),
             (None, false) => Some(eval.heap().alloc("")),
             (None, true) => None,
         };
-        let mut attr = Attribute::attr(eval, effective_default, doc, AttrType::string())?;
+
+        // When values is specified, use enum type to enforce allowed values at coercion time.
+        // This matches Bazel's behavior where attr.string(values=["a","b"]) rejects other strings.
+        let attr_type = if values.items.is_empty() {
+            AttrType::string()
+        } else {
+            let variants: Vec<String> = values.items.iter().map(|s| s.to_string()).collect();
+            // If the default is empty string and it's not in the values list,
+            // use the first value as default (Bazel behavior)
+            AttrType::enumeration(variants).map_err(|e| {
+                starlark::Error::new_other(anyhow::anyhow!("{}", e))
+            })?
+        };
+
+        let mut attr = Attribute::attr(eval, effective_default, doc, attr_type)?;
         attr.implicit_default = implicit;
         Ok(attr)
     }

@@ -105,7 +105,20 @@ where
     }
 
     fn items(&self) -> Vec<(&str, Value<'v>)> {
-        Vec::new()
+        use starlark::values::dict::DictRef;
+        if let Some(dict) = DictRef::from_value(self.values.to_value()) {
+            dict.iter()
+                .filter_map(|(k, v)| {
+                    let s: &'v str = k.unpack_str()?;
+                    // SAFETY: 'v outlives &self since self contains V: ValueLike<'v>,
+                    // so the string data is valid for the duration of the &self borrow.
+                    let s: &str = unsafe { &*(s as *const str) };
+                    Some((s, v))
+                })
+                .collect()
+        } else {
+            Vec::new()
+        }
     }
 }
 
@@ -115,25 +128,40 @@ where
     Self: ProvidesStaticType<'v>,
 {
     fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
-        // Check if attribute exists in values dict
-        if let Ok(iter) = self.values.to_value().iterate(heap) {
+        use starlark::values::dict::DictRef;
+        if let Some(dict) = DictRef::from_value(self.values.to_value()) {
+            dict.get_str(attribute).is_some()
+        } else if let Ok(iter) = self.values.to_value().iterate(heap) {
             for key in iter {
                 if key.unpack_str() == Some(attribute) {
                     return true;
                 }
             }
+            false
+        } else {
+            false
         }
-        false
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        let key = heap.alloc_str(attribute);
-        self.values.to_value().at(key.to_value(), heap).ok()
+        use starlark::values::dict::DictRef;
+        if let Some(dict) = DictRef::from_value(self.values.to_value()) {
+            dict.get_str(attribute).map(|v| v)
+        } else {
+            let key = heap.alloc_str(attribute);
+            self.values.to_value().at(key.to_value(), heap).ok()
+        }
     }
 
     fn dir_attr(&self) -> Vec<String> {
-        // Can't iterate without heap, return empty
-        Vec::new()
+        use starlark::values::dict::DictRef;
+        if let Some(dict) = DictRef::from_value(self.values.to_value()) {
+            dict.iter()
+                .filter_map(|(k, _)| k.unpack_str().map(|s| s.to_owned()))
+                .collect()
+        } else {
+            Vec::new()
+        }
     }
 
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
