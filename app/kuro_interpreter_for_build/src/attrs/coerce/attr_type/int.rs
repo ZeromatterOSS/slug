@@ -26,7 +26,20 @@ impl AttrTypeCoerce for IntAttrType {
         _ctx: &dyn AttrCoercionContext,
         value: Value,
     ) -> kuro_error::Result<CoercedAttr> {
-        Ok(CoercedAttr::Int(i64::unpack_value_err(value)?))
+        let v = i64::unpack_value_err(value)?;
+        // Validate against allowed values if specified (Bazel attr.int(values=[...]))
+        if let Some(allowed) = &self.allowed_values {
+            if !allowed.contains(&v) {
+                let allowed_str: Vec<String> = allowed.iter().map(|i| i.to_string()).collect();
+                return Err(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Integer value {} is not allowed. Must be one of: [{}]",
+                    v,
+                    allowed_str.join(", ")
+                ));
+            }
+        }
+        Ok(CoercedAttr::Int(v))
     }
 
     fn starlark_type(&self) -> TyMaybeSelect {

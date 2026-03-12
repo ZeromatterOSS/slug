@@ -1,0 +1,6 @@
+load(":defs.bzl", "int_values_test")
+
+int_values_test(
+    name = "int_values_invalid",
+    stamp = 42,
+)

@@ -885,19 +885,16 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
     /// Takes an int from the user, supplies an int to the rule.
     /// Bazel-compatible alias for attrs.int().
     ///
-    /// `values` restricts the allowed values to a specific set (not yet enforced).
+    /// `values` restricts the allowed values to a specific set.
     fn int<'v>(
         #[starlark(require = named)] default: Option<Value<'v>>,
         #[starlark(require = named, default = "")] doc: &str,
         #[starlark(require = named, default = false)] mandatory: bool,
         // Bazel-compatible: restrict to specific values (e.g., [0, 1, -1] for stamp attribute)
-        // Currently accepted but not enforced
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         values: UnpackListOrTuple<i32>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        // TODO(bazel): Enforce values constraint during coercion
-        let _unused = values;
         // Bazel semantics: if mandatory = False (default) and no default, use 0
         let implicit = default.is_none() && !mandatory;
         let effective_default = match (default, mandatory) {
@@ -905,7 +902,12 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
             (None, false) => Some(eval.heap().alloc(0)),
             (None, true) => None,
         };
-        let mut attr = Attribute::attr(eval, effective_default, doc, AttrType::int())?;
+        let attr_type = if values.items.is_empty() {
+            AttrType::int()
+        } else {
+            AttrType::int_with_values(values.items.iter().map(|v| *v as i64).collect())
+        };
+        let mut attr = Attribute::attr(eval, effective_default, doc, attr_type)?;
         attr.implicit_default = implicit;
         Ok(attr)
     }

@@ -662,3 +662,29 @@ async def test_environment_group_builds(buck: Buck) -> None:
     await buck.build("//:jdk_versions")
 
 
+@buck_test(data_dir="test_native_rules_data")
+async def test_attr_int_values_valid(buck: Buck) -> None:
+    """attr.int(values=[...]) accepts valid integer values."""
+    result = await buck.build("//:int_values_valid")
+    output = result.get_build_report().output_for_target("//:int_values_valid")
+    content = output.read_text().strip()
+    assert "stamp=1" in content
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_attr_int_values_default(buck: Buck) -> None:
+    """attr.int(values=[...]) accepts the default value."""
+    result = await buck.build("//:int_values_default")
+    output = result.get_build_report().output_for_target("//:int_values_default")
+    content = output.read_text().strip()
+    assert "stamp=0" in content
+
+
+@buck_test(data_dir="test_attr_int_values_data")
+async def test_attr_int_values_invalid(buck: Buck) -> None:
+    """attr.int(values=[...]) rejects invalid integer values."""
+    from buck2.tests.e2e_util.api.buck_result import BuckException
+
+    with pytest.raises(BuckException):
+        await buck.build("//:int_values_invalid")
+

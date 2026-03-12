@@ -208,7 +208,14 @@ impl AttrType {
 
     pub fn int() -> Self {
         Self(Arc::new(AttrTypeInner2 {
-            inner: AttrTypeInner::Int(IntAttrType),
+            inner: AttrTypeInner::Int(IntAttrType::new()),
+            may_have_queries: false,
+        }))
+    }
+
+    pub fn int_with_values(values: Vec<i64>) -> Self {
+        Self(Arc::new(AttrTypeInner2 {
+            inner: AttrTypeInner::Int(IntAttrType::with_values(values)),
             may_have_queries: false,
         }))
     }

@@ -129,7 +129,7 @@ impl<'a, 't> CoercedAttrWithType<'a, 't> {
             (a, AttrTypeInner::Any(_)) => Self::pack_any(a),
 
             (CoercedAttr::Bool(b), AttrTypeInner::Bool(t)) => Ok(CoercedAttrWithType::Bool(*b, *t)),
-            (CoercedAttr::Int(i), AttrTypeInner::Int(t)) => Ok(CoercedAttrWithType::Int(*i, *t)),
+            (CoercedAttr::Int(i), AttrTypeInner::Int(t)) => Ok(CoercedAttrWithType::Int(*i, t.clone())),
             (CoercedAttr::String(s), AttrTypeInner::String(t)) => {
                 Ok(CoercedAttrWithType::String(s, *t))
             }
@@ -225,7 +225,7 @@ impl<'a, 't> CoercedAttrWithType<'a, 't> {
                 Err(CoercedAttrWithTypeError::Select.into())
             }
             CoercedAttr::Bool(b) => Ok(CoercedAttrWithType::Bool(*b, BoolAttrType)),
-            CoercedAttr::Int(i) => Ok(CoercedAttrWithType::Int(*i, IntAttrType)),
+            CoercedAttr::Int(i) => Ok(CoercedAttrWithType::Int(*i, IntAttrType::new())),
             CoercedAttr::String(s) => Ok(CoercedAttrWithType::String(s, StringAttrType)),
             CoercedAttr::List(l) => Ok(CoercedAttrWithType::AnyList(l)),
             CoercedAttr::Tuple(t) => Ok(CoercedAttrWithType::AnyTuple(t)),

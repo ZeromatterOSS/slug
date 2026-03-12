@@ -1,4 +1,4 @@
-load(":defs.bzl", "bool_flag", "capture_existing_rules", "cc_command_line_test", "cc_compilation_context_test", "cc_configure_features_test", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "collect_files", "existing_rules_test", "java_common_test", "run_env_info", "select_value", "sibling_file", "stamp_file_info", "string_flag", "write_list")
+load(":defs.bzl", "bool_flag", "capture_existing_rules", "cc_command_line_test", "cc_compilation_context_test", "cc_configure_features_test", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "collect_files", "existing_rules_test", "int_values_test", "java_common_test", "run_env_info", "select_value", "sibling_file", "stamp_file_info", "string_flag", "write_list")
 
 # === filegroup tests ===
 
@@ -540,6 +540,17 @@ environment_group(
     name = "jdk_versions",
     environments = [":jdk8", ":jdk11"],
     defaults = [":jdk11"],
+)
+
+# === attr.int(values=[...]) tests ===
+
+int_values_test(
+    name = "int_values_valid",
+    stamp = 1,
+)
+
+int_values_test(
+    name = "int_values_default",
 )
 
 # === existing_rules() / repository_name() test ===

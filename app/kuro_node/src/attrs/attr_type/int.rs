@@ -9,8 +9,31 @@
  */
 
 use allocative::Allocative;
-use dupe::Dupe;
 use pagable::Pagable;
 
-#[derive(Debug, Eq, PartialEq, Hash, Pagable, Allocative, Clone, Copy, Dupe)]
-pub struct IntAttrType;
+#[derive(Debug, Eq, PartialEq, Hash, Pagable, Allocative, Clone)]
+pub struct IntAttrType {
+    /// If set, restricts the attribute to only accept these specific integer values.
+    /// Used by Bazel's `attr.int(values=[...])` parameter.
+    pub allowed_values: Option<Vec<i64>>,
+}
+
+impl IntAttrType {
+    pub fn new() -> Self {
+        Self {
+            allowed_values: None,
+        }
+    }
+
+    pub fn with_values(values: Vec<i64>) -> Self {
+        if values.is_empty() {
+            Self {
+                allowed_values: None,
+            }
+        } else {
+            Self {
+                allowed_values: Some(values),
+            }
+        }
+    }
+}
