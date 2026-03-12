@@ -1295,6 +1295,10 @@ pub fn host_cc_path() -> &'static str {
 }
 
 /// Returns the tool path for a given tool name, appropriate for the host platform.
+///
+/// On Windows with MSVC, tools like strip/objcopy/gcov don't have MSVC equivalents,
+/// so we fall back to the bare tool name (works if LLVM tools are on PATH).
+/// On Unix, paths default to /usr/bin/<tool>.
 pub fn host_tool_path(tool_name: &str) -> &'static str {
     match std::env::consts::OS {
         "windows" => match tool_name {
@@ -1302,8 +1306,15 @@ pub fn host_tool_path(tool_name: &str) -> &'static str {
             "ar" => "lib.exe",
             "ld" => "link.exe",
             "nm" | "objdump" => "dumpbin.exe",
-            "objcopy" | "strip" | "gcov" | "dwp" | "llvm-profdata" => "",
-            _ => "",
+            // These tools don't have MSVC equivalents. Return the bare name
+            // so they can be found on PATH (e.g., if LLVM tools are installed).
+            "objcopy" => "llvm-objcopy",
+            "strip" => "strip",
+            "gcov" => "gcov",
+            "dwp" => "dwp",
+            "llvm-profdata" => "llvm-profdata",
+            "llvm-cov" => "llvm-cov",
+            _ => "", // Unknown tools
         },
         "macos" => match tool_name {
             "gcc" | "g++" | "cpp" => "/usr/bin/clang",
@@ -1316,7 +1327,8 @@ pub fn host_tool_path(tool_name: &str) -> &'static str {
             "gcov" => "/usr/bin/gcov",
             "dwp" => "/usr/bin/dwp",
             "llvm-profdata" => "/usr/bin/llvm-profdata",
-            _ => "",
+            "llvm-cov" => "/usr/bin/llvm-cov",
+            _ => "", // Unknown tools
         },
         _ => match tool_name {
             "gcc" | "g++" | "cpp" => "/usr/bin/gcc",
@@ -1329,7 +1341,8 @@ pub fn host_tool_path(tool_name: &str) -> &'static str {
             "gcov" => "/usr/bin/gcov",
             "dwp" => "/usr/bin/dwp",
             "llvm-profdata" => "/usr/bin/llvm-profdata",
-            _ => "",
+            "llvm-cov" => "/usr/bin/llvm-cov",
+            _ => "", // Unknown tools
         },
     }
 }
