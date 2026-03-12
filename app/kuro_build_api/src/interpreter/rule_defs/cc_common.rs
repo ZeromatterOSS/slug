@@ -2526,6 +2526,19 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         Ok(true)
     }
 
+    /// Returns an empty CC variables object.
+    ///
+    /// Used as a default argument for cc_common.get_memory_inefficient_command_line()
+    /// and other functions that accept a Variables parameter.
+    #[allow(unused_variables)]
+    fn empty_variables<'v>(
+        #[starlark(this)] this: &CcCommonModule,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        // Return an empty dict as the variables object
+        Ok(heap.alloc(starlark::values::dict::Dict::default()))
+    }
+
     /// Configures C++ features based on toolchain and requested features.
     ///
     /// Returns a FeatureConfiguration that controls which compiler flags are enabled.

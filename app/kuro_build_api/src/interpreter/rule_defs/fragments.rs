@@ -573,6 +573,12 @@ impl<'v> StarlarkValue<'v> for PlatformFragment {
 
 #[starlark_module]
 fn platform_fragment_methods(builder: &mut MethodsBuilder) {
+    /// Returns the target platform label.
+    #[starlark(attribute)]
+    fn platform(#[allow(unused_variables)] this: &PlatformFragment) -> starlark::Result<String> {
+        Ok("@local_config_platform//:host".to_owned())
+    }
+
     /// Returns the host platform label.
     #[starlark(attribute)]
     fn host_platform(#[allow(unused_variables)] this: &PlatformFragment) -> starlark::Result<String> {
