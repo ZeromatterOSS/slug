@@ -570,13 +570,16 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
     /// Returns the version of the Bazel module associated with the repository where
     /// the calling .bzl file lives.
     ///
-    /// Currently returns None as Kuro doesn't track module versions yet.
-    ///
     /// See: https://bazel.build/rules/lib/builtins/native#module_version
     fn module_version(eval: &mut Evaluator) -> starlark::Result<NoneOr<String>> {
-        let _ = eval;
-        // TODO(bzlmod): Return actual module version from MODULE.bazel
-        Ok(NoneOr::None)
+        let cell_name = BuildContext::from_context(eval)?
+            .cell_info()
+            .name()
+            .to_string();
+        match kuro_bzlmod::get_module_version(&cell_name) {
+            Some(version) => Ok(NoneOr::Other(version)),
+            None => Ok(NoneOr::None),
+        }
     }
 
     /// Convert a depset to a transitive_set.

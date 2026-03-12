@@ -912,6 +912,23 @@ impl BuckConfigBasedCells {
                                     }
                                 }
 
+                                // Populate the global module version registry
+                                // so module_version() builtin returns the correct version
+                                {
+                                    let mut version_map = std::collections::HashMap::new();
+                                    // Add root module
+                                    version_map.insert(
+                                        parsed.module.name.clone(),
+                                        parsed.module.version.to_string(),
+                                    );
+                                    // Add all resolved external modules
+                                    for (name, info) in &resolved_graph.modules {
+                                        version_map
+                                            .insert(name.clone(), info.version.clone());
+                                    }
+                                    kuro_bzlmod::set_module_versions(version_map);
+                                }
+
                                 // Handle repo_name aliases from transitive deps
                                 // Parse each resolved module's MODULE.bazel to extract repo_name aliases
                                 Self::collect_transitive_repo_aliases(

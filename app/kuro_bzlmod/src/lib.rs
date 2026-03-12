@@ -117,3 +117,35 @@ pub use types::BazelDep;
 pub use types::Module;
 pub use types::UseRepo;
 pub use version::Version;
+
+// ============================================================================
+// Module version registry
+// ============================================================================
+
+use std::collections::HashMap;
+use std::sync::RwLock;
+
+/// Global registry mapping cell/module names to their resolved versions.
+/// Populated during bzlmod resolution, read by module_version() builtin.
+static MODULE_VERSIONS: RwLock<Option<HashMap<String, String>>> = RwLock::new(None);
+
+/// Set the module version map (module_name -> version string).
+/// Called after bzlmod resolution completes.
+pub fn set_module_versions(versions: HashMap<String, String>) {
+    if let Ok(mut map) = MODULE_VERSIONS.write() {
+        *map = if versions.is_empty() {
+            None
+        } else {
+            Some(versions)
+        };
+    }
+}
+
+/// Get the version of a module by its cell/module name.
+/// Returns None if no version is known for this cell.
+pub fn get_module_version(cell_name: &str) -> Option<String> {
+    MODULE_VERSIONS
+        .read()
+        .ok()
+        .and_then(|map| map.as_ref().and_then(|m| m.get(cell_name).cloned()))
+}
