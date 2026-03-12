@@ -22,6 +22,7 @@ use kuro_client::commands::clean::CleanCommand;
 use kuro_client::commands::ctargets::ConfiguredTargetsCommand;
 use kuro_client::commands::expand_external_cell::ExpandExternalCellsCommand;
 use kuro_client::commands::explain::ExplainCommand;
+use kuro_client::commands::fetch::FetchCommand;
 use kuro_client::commands::help_env::HelpEnvCommand;
 use kuro_client::commands::info::InfoCommand;
 use kuro_client::commands::init::InitCommand;
@@ -40,6 +41,7 @@ use kuro_client::commands::status::StatusCommand;
 use kuro_client::commands::subscribe::SubscribeCommand;
 use kuro_client::commands::targets::TargetsCommand;
 use kuro_client::commands::test::TestCommand;
+use kuro_client::commands::version::VersionCommand;
 use kuro_client_ctx::argfiles::expand_argv;
 use kuro_client_ctx::bazelrc::inject_bazelrc_args;
 use kuro_client_ctx::bazelrc::normalize_args;
@@ -405,6 +407,12 @@ pub(crate) enum CommandKind {
     Log(LogCommand),
     Lsp(LspCommand),
     Subscribe(SubscribeCommand),
+    /// Print version information (Bazel `bazel version` compatibility)
+    Version(VersionCommand),
+    /// Alias for `kill` (Bazel `bazel shutdown` compatibility).
+    Shutdown(KillCommand),
+    /// Fetch external repositories (Bazel `bazel fetch` compatibility).
+    Fetch(FetchCommand),
 }
 
 impl CommandKind {
@@ -571,6 +579,9 @@ impl CommandKind {
             CommandKind::Lsp(cmd) => command_ctx.exec(cmd, matches, events_ctx),
             CommandKind::Subscribe(cmd) => command_ctx.exec(cmd, matches, events_ctx),
             CommandKind::ExpandExternalCell(cmd) => command_ctx.exec(cmd, matches, events_ctx),
+            CommandKind::Version(cmd) => cmd.exec().into(),
+            CommandKind::Shutdown(cmd) => command_ctx.exec(cmd, matches, events_ctx),
+            CommandKind::Fetch(cmd) => cmd.exec(matches, command_ctx).into(),
         }
     }
 
@@ -616,6 +627,9 @@ impl CommandKind {
             CommandKind::Lsp(cmd) => cmd.logging_name(),
             CommandKind::Subscribe(cmd) => cmd.logging_name(),
             CommandKind::ExpandExternalCell(cmd) => cmd.logging_name(),
+            CommandKind::Version(_) => "version",
+            CommandKind::Shutdown(cmd) => cmd.logging_name(),
+            CommandKind::Fetch(_) => "fetch",
         }
     }
 }
