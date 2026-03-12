@@ -294,10 +294,35 @@ fn get_test_result(
         status,
         msg: None,
         duration: Some(execution_result.execution_time),
-        details: format!(
-            "---- STDOUT ----\n{:?}\n---- STDERR ----\n{:?}\n",
-            execution_result.stdout, execution_result.stderr
-        ),
+        details: {
+            let stdout = match &execution_result.stdout {
+                kuro_test_api::data::ExecutionStream::Inline(d) => {
+                    String::from_utf8_lossy(d).into_owned()
+                }
+            };
+            let stderr = match &execution_result.stderr {
+                kuro_test_api::data::ExecutionStream::Inline(d) => {
+                    String::from_utf8_lossy(d).into_owned()
+                }
+            };
+            // Only include non-empty streams to reduce noise
+            let mut details = String::new();
+            if !stdout.trim().is_empty() {
+                details.push_str("---- STDOUT ----\n");
+                details.push_str(&stdout);
+                if !stdout.ends_with('\n') {
+                    details.push('\n');
+                }
+            }
+            if !stderr.trim().is_empty() {
+                details.push_str("---- STDERR ----\n");
+                details.push_str(&stderr);
+                if !stderr.ends_with('\n') {
+                    details.push('\n');
+                }
+            }
+            details
+        },
         max_memory_used_bytes: execution_result.max_memory_used_bytes,
     }
 }

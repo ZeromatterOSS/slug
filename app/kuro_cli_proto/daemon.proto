@@ -613,6 +613,10 @@ message TestRequest {
   // Whether `RunInfo` providers for targets matching `target_patterns`
   // should be built instead of only `ExternalTestInfo` providers.
   bool build_run_info = 16;
+
+  // Controls test output verbosity (Bazel --test_output compatibility).
+  // Values: "summary" (default), "errors", "all", "short", "streamed"
+  string test_output_mode = 17;
 }
 
 message BxlRequest {

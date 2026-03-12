@@ -307,11 +307,9 @@ Example: --test_tag_filters=small,-slow (include 'small', exclude 'slow')"
     /// - `short`: Show first few lines for failed tests
     /// - `streamed`: Stream all output in real-time
     ///
-    /// Accepted for compatibility. Kuro passes output via the test executor args.
     #[clap(
         long = "test-output",
         alias = "test_output",
-        hide = true,
         value_name = "MODE"
     )]
     test_output: Option<String>,
@@ -416,6 +414,7 @@ impl StreamingCommand for TestCommand {
                     ignore_tests_attribute: self.ignore_tests_attribute,
                     build_default_info: self.build_default_info,
                     build_run_info: self.build_run_info,
+                    test_output_mode: self.test_output.clone().unwrap_or_default(),
                 },
                 events_ctx,
                 ctx.console_interaction_stream(&self.common_opts.console_opts),

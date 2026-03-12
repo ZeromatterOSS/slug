@@ -423,7 +423,7 @@ impl<'a> BuckTestOrchestrator<'a> {
         } = test_executable_expanded;
 
         // Inject Bazel-compatible test environment variables
-        inject_bazel_test_env(&mut expanded_env, &test_target, timeout);
+        inject_bazel_test_env(&mut expanded_env, &test_target, timeout, &fs, &expanded_cmd);
 
         let input_deps_action_keys: Vec<_> = ensured_inputs
             .iter()
@@ -875,7 +875,7 @@ impl TestOrchestrator for BuckTestOrchestrator<'_> {
         } = test_executable_expanded;
 
         // Inject Bazel-compatible test environment variables
-        inject_bazel_test_env(&mut expanded_env, &test_target, Duration::default());
+        inject_bazel_test_env(&mut expanded_env, &test_target, Duration::default(), &fs, &expanded_cmd);
 
         let execution_request = Self::create_command_execution_request(
             self.dice.dupe().deref_mut(),
@@ -2192,6 +2192,8 @@ fn inject_bazel_test_env(
     env: &mut SortedVectorMap<String, String>,
     test_target: &ConfiguredProvidersLabel,
     timeout: Duration,
+    fs: &ArtifactFs,
+    expanded_cmd: &[String],
 ) {
     // TEST_TARGET: Full label of the test target (e.g. "//pkg:target")
     let label = test_target.target();
@@ -2207,6 +2209,73 @@ fn inject_bazel_test_env(
     let timeout_secs = timeout.as_secs();
     if timeout_secs > 0 {
         env.insert("TEST_TIMEOUT".to_owned(), timeout_secs.to_string());
+    }
+
+    // TEST_TMPDIR: A private writable directory for the test to use.
+    // Many test frameworks (gtest, pytest) rely on this for temp files.
+    // We use the system temp dir with a unique subdirectory per test invocation.
+    let tmpdir = std::env::temp_dir().join(format!(
+        "kuro_test_{}_{}",
+        label.pkg().to_string().replace('/', "_"),
+        label.name()
+    ));
+    // Create the directory eagerly so tests can use it immediately
+    let _ = std::fs::create_dir_all(&tmpdir);
+    env.insert(
+        "TEST_TMPDIR".to_owned(),
+        tmpdir.to_string_lossy().into_owned(),
+    );
+
+    // TEST_SIZE: The test size attribute. Defaults to "medium" per Bazel convention.
+    env.insert("TEST_SIZE".to_owned(), "medium".to_owned());
+
+    // TEST_SHARD_INDEX / TEST_TOTAL_SHARDS: Sharding info (no sharding = 0/0)
+    env.insert("TEST_SHARD_INDEX".to_owned(), "0".to_owned());
+    env.insert("TEST_TOTAL_SHARDS".to_owned(), "0".to_owned());
+
+    // RUNFILES_DIR: Path to the runfiles directory for the test executable.
+    // Bazel sets this to <exe>.runfiles/ so test frameworks can locate data files.
+    if let Some(exe_path) = expanded_cmd.first() {
+        let exe = std::path::Path::new(exe_path);
+        let runfiles_dir = if exe.extension().is_some() {
+            // Strip extension then add .runfiles (e.g. foo.exe -> foo.runfiles)
+            exe.with_extension("").with_extension("runfiles")
+        } else {
+            // Just append .runfiles (e.g. foo -> foo.runfiles)
+            std::path::PathBuf::from(format!("{}.runfiles", exe_path))
+        };
+        let runfiles_dir_str = runfiles_dir.to_string_lossy().into_owned();
+        env.insert("RUNFILES_DIR".to_owned(), runfiles_dir_str.clone());
+        // TEST_SRCDIR: Root of the runfiles tree (same as RUNFILES_DIR for Bazel 9+)
+        env.insert("TEST_SRCDIR".to_owned(), runfiles_dir_str);
+    }
+
+    // XML_OUTPUT_FILE: Where test frameworks should write JUnit XML results.
+    // Many frameworks (gtest, pytest --junitxml, cargo test) honor this.
+    // We put it in the test tmpdir so it's easy to find.
+    let xml_output_file = tmpdir.join("test.xml");
+    env.insert(
+        "XML_OUTPUT_FILE".to_owned(),
+        xml_output_file.to_string_lossy().into_owned(),
+    );
+
+    // TESTBRIDGE_TEST_ONLY: Already injected via --test_filter on the client side.
+    // TEST_BINARY: The relative path of the test binary (same as first cmd element).
+    if let Some(exe_path) = expanded_cmd.first() {
+        env.insert("TEST_BINARY".to_owned(), exe_path.clone());
+    }
+
+    // Resolve absolute path for runfiles if possible (helps test frameworks)
+    if let Some(exe_path) = expanded_cmd.first() {
+        let abs_runfiles = fs.fs().resolve(
+            &kuro_core::fs::project_rel_path::ProjectRelativePath::unchecked_new(
+                &format!("{}.runfiles", exe_path),
+            ),
+        );
+        env.insert(
+            "RUNFILES_MANIFEST_FILE".to_owned(),
+            format!("{}/MANIFEST", abs_runfiles),
+        );
     }
 }
 
