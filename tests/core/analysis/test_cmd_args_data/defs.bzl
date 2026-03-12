@@ -140,6 +140,58 @@ args_output_artifact = rule(
 )
 
 
+def _args_add_two_arg_impl(ctx):
+    """Tests args.add() with 2-arg form: add("--flag", value)."""
+    out = ctx.actions.declare_file("args_add_two_arg.txt")
+
+    args = ctx.actions.args()
+    args.add("--output", "foo.o")
+    args.add("--verbose")
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_add_two_arg = rule(
+    implementation = _args_add_two_arg_impl,
+    attrs = {},
+)
+
+
+def _args_add_all_two_arg_impl(ctx):
+    """Tests args.add_all() with 2-arg form: add_all("--flag", values)."""
+    out = ctx.actions.declare_file("args_add_all_two_arg.txt")
+
+    args = ctx.actions.args()
+    args.add_all("--src", ["a.c", "b.c", "c.c"])
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_add_all_two_arg = rule(
+    implementation = _args_add_all_two_arg_impl,
+    attrs = {},
+)
+
+
+def _args_add_joined_two_arg_impl(ctx):
+    """Tests args.add_joined() with 2-arg form: add_joined("--flag", values, join_with=...)."""
+    out = ctx.actions.declare_file("args_add_joined_two_arg.txt")
+
+    args = ctx.actions.args()
+    args.add_joined("--srcs", ["a.c", "b.c", "c.c"], join_with = ",")
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_add_joined_two_arg = rule(
+    implementation = _args_add_joined_two_arg_impl,
+    attrs = {},
+)
+
+
 def _output_artifact_in_relative_to_impl(ctx):
     source = ctx.file.source
     out = ctx.actions.declare_file("relative_to_test.txt")

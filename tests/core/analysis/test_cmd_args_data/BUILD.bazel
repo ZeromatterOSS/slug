@@ -1,5 +1,8 @@
 load(
     ":defs.bzl",
+    "args_add_all_two_arg",
+    "args_add_joined_two_arg",
+    "args_add_two_arg",
     "args_before_each",
     "args_builder",
     "args_format_each",
@@ -42,6 +45,18 @@ args_omit_if_empty(
 args_output_artifact(
     name = "args_output_artifact",
     src = "defs.bzl",
+)
+
+args_add_two_arg(
+    name = "args_add_two_arg",
+)
+
+args_add_all_two_arg(
+    name = "args_add_all_two_arg",
+)
+
+args_add_joined_two_arg(
+    name = "args_add_joined_two_arg",
 )
 
 output_artifact_in_relative_to(

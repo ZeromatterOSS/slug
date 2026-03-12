@@ -82,6 +82,36 @@ async def test_args_add_all_omit_if_empty(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_cmd_args_data")
+async def test_args_add_two_arg_form(buck: Buck) -> None:
+    """args.add("--flag", value) adds two separate arguments."""
+    result = await buck.build("//:args_add_two_arg")
+    output = result.get_build_report().output_for_target("//:args_add_two_arg")
+
+    content = output.read_text().strip().splitlines()
+    assert content == ["--output", "foo.o", "--verbose"]
+
+
+@buck_test(data_dir="test_cmd_args_data")
+async def test_args_add_all_two_arg_form(buck: Buck) -> None:
+    """args.add_all("--flag", values) adds flag once then all values."""
+    result = await buck.build("//:args_add_all_two_arg")
+    output = result.get_build_report().output_for_target("//:args_add_all_two_arg")
+
+    content = output.read_text().strip().splitlines()
+    assert content == ["--src", "a.c", "b.c", "c.c"]
+
+
+@buck_test(data_dir="test_cmd_args_data")
+async def test_args_add_joined_two_arg_form(buck: Buck) -> None:
+    """args.add_joined("--flag", values, join_with=...) adds flag then joined values as separate args."""
+    result = await buck.build("//:args_add_joined_two_arg")
+    output = result.get_build_report().output_for_target("//:args_add_joined_two_arg")
+
+    content = output.read_text().strip().splitlines()
+    assert content == ["--srcs", "a.c,b.c,c.c"]
+
+
+@buck_test(data_dir="test_cmd_args_data")
 async def test_args_add_format_with_artifact(buck: Buck) -> None:
     """args.add with format= applies a format string to an artifact path."""
     result = await buck.build("//:args_output_artifact")

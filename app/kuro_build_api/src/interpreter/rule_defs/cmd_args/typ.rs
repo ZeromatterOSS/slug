@@ -932,11 +932,17 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
 
     /// Bazel-compatible: add all values from a list or depset.
     ///
+    /// Supports both 1-arg form: `add_all(values, ...)` and
+    /// 2-arg form: `add_all("--flag", values, ...)` where the flag is added once before all values.
+    ///
     /// Supports `before_each` to add a string before each element,
     /// `format_each` to format each element, and `map_each` to transform elements.
     fn add_all<'v>(
         mut this: StarlarkCommandLineMut<'v>,
-        #[starlark(require = pos, default = starlark::values::none::NoneType)] values: Value<'v>,
+        #[starlark(require = pos, default = starlark::values::none::NoneType)]
+        arg_name_or_values: Value<'v>,
+        #[starlark(require = pos, default = starlark::values::none::NoneType)]
+        maybe_values: Value<'v>,
         #[starlark(require = named, default = "")] before_each: &str,
         #[starlark(require = named, default = "")] format_each: &str,
         #[starlark(require = named, default = starlark::values::none::NoneType)] map_each: Value<
@@ -951,6 +957,17 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<StarlarkCommandLineMut<'v>> {
         let _ = (expand_directories, allow_closure);
         let heap = eval.heap();
+
+        // Determine if 2-arg form (arg_name, values) or 1-arg form (values)
+        let (arg_name, values) = if !maybe_values.is_none() {
+            // 2-arg form: add_all("--flag", values, ...)
+            let name = arg_name_or_values.unpack_str().unwrap_or("");
+            (Some(name.to_owned()), maybe_values)
+        } else {
+            // 1-arg form: add_all(values, ...)
+            (None, arg_name_or_values)
+        };
+
         // If values is None, nothing to add
         if values.is_none() {
             return Ok(this);
@@ -1010,6 +1027,14 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
 
         if omit_if_empty && !items_were_added {
             return Ok(this);
+        }
+
+        // In 2-arg form, add the arg_name once before all values
+        if let Some(ref name) = arg_name {
+            if !name.is_empty() {
+                let s = heap.alloc_str(name).to_value();
+                this.borrow.add_value(s)?;
+            }
         }
 
         for item in final_items {
@@ -1144,15 +1169,15 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
             joined
         };
 
-        // If arg_name is provided, prepend it
+        // If arg_name is provided, add it as a separate argument (Bazel behavior)
         if let Some(name) = arg_name {
-            let combined = format!("{}={}", name, result);
-            let s = heap.alloc_str(&combined).to_value();
-            this.borrow.add_value(s)?;
-        } else {
-            let s = heap.alloc_str(&result).to_value();
-            this.borrow.add_value(s)?;
+            if !name.is_empty() {
+                let s = heap.alloc_str(&name).to_value();
+                this.borrow.add_value(s)?;
+            }
         }
+        let s = heap.alloc_str(&result).to_value();
+        this.borrow.add_value(s)?;
         Ok(this)
     }
 
