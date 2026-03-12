@@ -627,6 +627,7 @@ impl LocalExecutor {
         let mut env = vec![];
 
         let scratch_path_abs;
+        let test_tmpdir_fallback;
 
         if let Some(scratch_path) = &scratch_path.0 {
             // For the $TMPDIR - important it is absolute
@@ -649,6 +650,15 @@ impl LocalExecutor {
             } else {
                 env.push(("TMPDIR", StrOrOsStr::OsStr(scratch_path_abs.as_os_str())));
             }
+
+            // Bazel-compatible: TEST_TMPDIR is set for all test actions
+            if request.is_test() {
+                env.push(("TEST_TMPDIR", StrOrOsStr::OsStr(scratch_path_abs.as_os_str())));
+            }
+        } else if request.is_test() {
+            // For test commands without a scratch path, use system temp dir for TEST_TMPDIR
+            test_tmpdir_fallback = std::env::temp_dir();
+            env.push(("TEST_TMPDIR", StrOrOsStr::OsStr(test_tmpdir_fallback.as_os_str())));
         }
         env.extend(
             request
@@ -668,6 +678,12 @@ impl LocalExecutor {
         let daemon_id = self.daemon_id.to_string();
         env.push(("BUCK2_DAEMON_UUID", StrOrOsStr::from(&*daemon_id)));
         env.push(("BUCK_BUILD_ID", StrOrOsStr::from(build_id)));
+
+        // Bazel-compatible test environment variables
+        if request.is_test() {
+            env.push(("BAZEL_TEST", StrOrOsStr::from("1")));
+            env.push(("TZ", StrOrOsStr::from("UTC")));
+        }
 
         let liveliness_observer = manager.inner.liveliness_observer.dupe().and(cancellation);
 

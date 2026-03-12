@@ -415,12 +415,15 @@ impl<'a> BuckTestOrchestrator<'a> {
         let ExpandedTestExecutable {
             cwd,
             cmd: expanded_cmd,
-            env: expanded_env,
+            env: mut expanded_env,
             ensured_inputs,
             supports_re,
             declared_outputs,
             worker,
         } = test_executable_expanded;
+
+        // Inject Bazel-compatible test environment variables
+        inject_bazel_test_env(&mut expanded_env, &test_target, timeout);
 
         let input_deps_action_keys: Vec<_> = ensured_inputs
             .iter()
@@ -864,12 +867,15 @@ impl TestOrchestrator for BuckTestOrchestrator<'_> {
         let ExpandedTestExecutable {
             cwd,
             cmd: expanded_cmd,
-            env: expanded_env,
+            env: mut expanded_env,
             ensured_inputs,
             supports_re: _,
             declared_outputs,
             worker,
         } = test_executable_expanded;
+
+        // Inject Bazel-compatible test environment variables
+        inject_bazel_test_env(&mut expanded_env, &test_target, Duration::default());
 
         let execution_request = Self::create_command_execution_request(
             self.dice.dupe().deref_mut(),
@@ -2176,6 +2182,31 @@ impl CommandExecutionTarget for TestTarget<'_> {
             category: "test".to_owned(),
             identifier: "".to_owned(),
         }
+    }
+}
+
+/// Inject Bazel-compatible test environment variables into the expanded env.
+/// These match the variables documented in Bazel's Test Encyclopedia:
+/// https://bazel.build/reference/test-encyclopedia
+fn inject_bazel_test_env(
+    env: &mut SortedVectorMap<String, String>,
+    test_target: &ConfiguredProvidersLabel,
+    timeout: Duration,
+) {
+    // TEST_TARGET: Full label of the test target (e.g. "//pkg:target")
+    let label = test_target.target();
+    let test_target_str = format!("//{}:{}", label.pkg(), label.name());
+    env.insert("TEST_TARGET".to_owned(), test_target_str);
+
+    // TEST_WORKSPACE: The workspace/module name. For the root module this is "_main".
+    // For external repos it would be the canonical repo name, but tests are typically
+    // in the root module.
+    env.insert("TEST_WORKSPACE".to_owned(), "_main".to_owned());
+
+    // TEST_TIMEOUT: Timeout in seconds as a string
+    let timeout_secs = timeout.as_secs();
+    if timeout_secs > 0 {
+        env.insert("TEST_TIMEOUT".to_owned(), timeout_secs.to_string());
     }
 }
 

@@ -53,3 +53,13 @@ async def test_internal_test_executor_timeout(buck: Buck) -> None:
         ),
         stderr_regex="Timeout: ",
     )
+
+
+@buck_test()
+@env("BUCK2_ALLOW_INTERNAL_TEST_RUNNER_DO_NOT_USE", "1")
+async def test_bazel_test_env_vars(buck: Buck) -> None:
+    """Verify that Bazel-standard test environment variables are set."""
+    await buck.test(
+        ":check_bazel_env",
+        test_executor=INTERNAL_TEST_EXECUTOR,
+    )

@@ -14,3 +14,17 @@ python_test(
     name = "timeout",
     script = "import time; time.sleep(60)",
 )
+
+python_test(
+    name = "check_bazel_env",
+    script = "\n".join([
+        "import os, sys",
+        "errors = []",
+        "if os.environ.get('BAZEL_TEST') != '1': errors.append('BAZEL_TEST not set to 1')",
+        "if os.environ.get('TZ') != 'UTC': errors.append('TZ not set to UTC')",
+        "if not os.environ.get('TEST_TMPDIR'): errors.append('TEST_TMPDIR not set')",
+        "if not os.environ.get('TEST_TARGET'): errors.append('TEST_TARGET not set')",
+        "if not os.environ.get('TEST_WORKSPACE'): errors.append('TEST_WORKSPACE not set')",
+        "if errors: print('\\n'.join(errors), file=sys.stderr); sys.exit(1)",
+    ]),
+)
