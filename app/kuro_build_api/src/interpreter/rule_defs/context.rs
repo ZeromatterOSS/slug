@@ -2744,7 +2744,7 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
     /// Get all keys in the Make variables dict.
     fn keys<'v>(this: &CtxVarDict, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
-        let keys = vec![
+        let mut keys: Vec<String> = vec![
             "BINDIR",
             "GENDIR",
             "TARGET_CPU",
@@ -2756,13 +2756,86 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
             "JAVABASE",
             "ABI_GLIBC_VERSION",
             "ABI",
-        ];
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        // Include --define keys
+        for key in crate::interpreter::rule_defs::build_config::get_all_defines().keys() {
+            if !keys.contains(key) {
+                keys.push(key.clone());
+            }
+        }
         let values: Vec<Value> = keys.iter().map(|k| heap.alloc_str(k).to_value()).collect();
         Ok(heap.alloc(values))
     }
+
+    /// Get all values in the Make variables dict.
+    fn values<'v>(this: &CtxVarDict, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        let cpu = host_target_cpu();
+        let cc = host_cc_path();
+        let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+        let mut result: Vec<Value> = vec![
+            heap.alloc_str(&format!("bazel-out/{cpu}-{comp_mode}/bin")).to_value(),
+            heap.alloc_str(&format!("bazel-out/{cpu}-{comp_mode}/genfiles")).to_value(),
+            heap.alloc_str(cpu).to_value(),
+            heap.alloc_str(&comp_mode).to_value(),
+            heap.alloc_str(cc).to_value(),
+            heap.alloc_str("").to_value(), // CC_FLAGS
+            heap.alloc_str(if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }).to_value(),
+            heap.alloc_str("").to_value(), // JAVA_RUNFILES
+            heap.alloc_str("").to_value(), // JAVABASE
+            heap.alloc_str("2.17").to_value(), // ABI_GLIBC_VERSION
+            heap.alloc_str("local").to_value(), // ABI
+        ];
+        for (_, v) in crate::interpreter::rule_defs::build_config::get_all_defines() {
+            result.push(heap.alloc_str(&v).to_value());
+        }
+        Ok(heap.alloc(result))
+    }
+
+    /// Get all key-value pairs as a list of tuples.
+    fn items<'v>(this: &CtxVarDict, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        let cpu = host_target_cpu();
+        let cc = host_cc_path();
+        let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+        let mut result: Vec<Value> = Vec::new();
+        let entries: Vec<(&str, String)> = vec![
+            ("BINDIR", format!("bazel-out/{cpu}-{comp_mode}/bin")),
+            ("GENDIR", format!("bazel-out/{cpu}-{comp_mode}/genfiles")),
+            ("TARGET_CPU", cpu.to_owned()),
+            ("COMPILATION_MODE", comp_mode),
+            ("CC", cc.to_owned()),
+            ("CC_FLAGS", String::new()),
+            ("JAVA", if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }.to_owned()),
+            ("JAVA_RUNFILES", String::new()),
+            ("JAVABASE", String::new()),
+            ("ABI_GLIBC_VERSION", "2.17".to_owned()),
+            ("ABI", "local".to_owned()),
+        ];
+        for (k, v) in &entries {
+            let tuple = heap.alloc((heap.alloc_str(k).to_value(), heap.alloc_str(v).to_value()));
+            result.push(tuple);
+        }
+        for (k, v) in crate::interpreter::rule_defs::build_config::get_all_defines() {
+            let tuple = heap.alloc((heap.alloc_str(&k).to_value(), heap.alloc_str(&v).to_value()));
+            result.push(tuple);
+        }
+        Ok(heap.alloc(result))
+    }
 }
 
-/// A stub for ctx.configuration.
+/// Bazel-compatible ctx.configuration object.
+///
+/// Provides build configuration attributes:
+/// - `coverage_enabled`: Whether --collect_code_coverage is active
+/// - `host_path_separator`: ":" on Unix, ";" on Windows
+/// - `default_shell_env`: Dict from --action_env flags
+/// - `stamp_binaries`: Whether build stamping is enabled
+/// - `short_id`: Opaque configuration fingerprint
+/// - `test_env`: Dict from --test_env flags
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct BuildConfigurationStub;
 
@@ -2784,7 +2857,12 @@ impl<'v> StarlarkValue<'v> for BuildConfigurationStub {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
-            "coverage_enabled" | "host_path_separator" | "default_shell_env" | "stamp_binaries"
+            "coverage_enabled"
+                | "host_path_separator"
+                | "default_shell_env"
+                | "stamp_binaries"
+                | "short_id"
+                | "test_env"
         )
     }
 
@@ -2797,7 +2875,31 @@ impl<'v> StarlarkValue<'v> for BuildConfigurationStub {
                 Some(heap.alloc_str(sep).to_value())
             }
             "default_shell_env" => {
-                // Return empty dict - Bazel populates with env vars from --action_env
+                // Return --action_env values from build config
+                let env_map =
+                    crate::interpreter::rule_defs::build_config::get_action_env();
+                let dict = starlark::values::dict::Dict::new(
+                    env_map
+                        .into_iter()
+                        .map(|(k, v)| {
+                            (
+                                heap.alloc_str(&k).to_value().get_hashed().unwrap(),
+                                heap.alloc_str(&v).to_value(),
+                            )
+                        })
+                        .collect(),
+                );
+                Some(heap.alloc(dict))
+            }
+            "short_id" => {
+                // Opaque configuration fingerprint based on compilation mode + CPU
+                let comp_mode =
+                    crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                let cpu = host_target_cpu();
+                Some(heap.alloc_str(&format!("{cpu}-{comp_mode}")).to_value())
+            }
+            "test_env" => {
+                // --test_env variables (currently empty, could be wired up)
                 Some(heap.alloc(starlark::values::dict::Dict::default()))
             }
             _ => None,
