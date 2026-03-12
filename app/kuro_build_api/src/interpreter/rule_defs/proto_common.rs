@@ -33,22 +33,29 @@
 //!
 //! The protobuf rules (specifically `protobuf//bazel/private/native.bzl`) expect
 //! these to be available as global symbols:
-//! - `ProtoInfo` - Provider for proto compilation information (None placeholder)
+//! - `ProtoInfo` - Callable provider for proto compilation information
 //! - `proto_common_do_not_use` - Internal proto compilation utilities
+//! - `ProtoLangToolchainInfo` - Callable provider for language-specific proto toolchains
 //!
 //! Reference: https://bazel.build/rules/lib/ProtoInfo
 
 use std::fmt;
 use std::fmt::Display;
+use std::sync::Arc;
+use std::sync::OnceLock;
 
 use allocative::Allocative;
+use kuro_core::provider::id::ProviderId;
+use kuro_interpreter::types::provider::callable::ProviderCallableLike;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
+use starlark::eval::Arguments;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
+use starlark::values::Demand;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
@@ -58,22 +65,38 @@ use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 
+use crate::interpreter::rule_defs::py_common::create_native_provider_instance;
+
+/// Provider index for ProtoInfo in the NativeProviderInstance dispatch table.
+pub const PROTO_INFO_IDX: u32 = 6;
+/// Provider index for ProtoLangToolchainInfo in the NativeProviderInstance dispatch table.
+pub const PROTO_LANG_TOOLCHAIN_INFO_IDX: u32 = 7;
+
 // ============================================================================
 // ProtoInfo Provider - Encapsulates information provided by proto_library
 // ============================================================================
 
-/// ProtoInfo provider for protocol buffer compilation information.
+/// ProtoInfo provider callable.
 ///
 /// This provider encapsulates information about .proto files and their compilation,
 /// including source files, descriptor sets, and source roots.
-///
-/// Note: This is a stub implementation that allows protobuf rules to load.
-/// The actual ProtoInfo provider is defined in Starlark by the protobuf rules
-/// once they can load (using the `provider()` function).
+/// Called as `ProtoInfo(direct_sources=..., transitive_sources=..., ...)`.
 ///
 /// Reference: https://bazel.build/rules/lib/ProtoInfo
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Clone)]
 pub struct ProtoInfoProvider;
+
+impl ProtoInfoProvider {
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "ProtoInfo".to_owned(),
+            })
+        })
+    }
+}
 
 impl Display for ProtoInfoProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -83,8 +106,27 @@ impl Display for ProtoInfoProvider {
 
 starlark_simple_value!(ProtoInfoProvider);
 
+impl ProviderCallableLike for ProtoInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
 #[starlark_value(type = "ProtoInfo")]
-impl<'v> StarlarkValue<'v> for ProtoInfoProvider {}
+impl<'v> StarlarkValue<'v> for ProtoInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        create_native_provider_instance(PROTO_INFO_IDX, args, eval)
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
 
 // ============================================================================
 // proto_common_do_not_use - Internal proto compilation utilities
@@ -125,12 +167,13 @@ impl<'v> StarlarkValue<'v> for ProtoCommonModule {
         )
     }
 
-    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             // This flag controls whether proto toolchain resolution is enabled.
             // Set to false because Kuro doesn't implement Bazel-style toolchain resolution.
             // This causes protobuf rules to use the legacy codepath with _proto_compiler attr.
             "INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION" => Some(Value::new_bool(false)),
+            "ProtoInfo" => Some(heap.alloc(ProtoInfoProvider)),
             _ => None,
         }
     }
@@ -249,12 +292,25 @@ fn proto_common_module_methods(builder: &mut MethodsBuilder) {
 // ProtoLangToolchainInfo - Provider for language-specific proto toolchains
 // ============================================================================
 
-/// ProtoLangToolchainInfo provider for language-specific proto compilation.
+/// ProtoLangToolchainInfo provider callable.
 ///
 /// This provider carries configuration for compiling protos to a specific
 /// language (e.g., Java, Python, C++).
+/// Called as `ProtoLangToolchainInfo(proto_compiler=..., ...)` to create instances.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct ProtoLangToolchainInfoProvider;
+
+impl ProtoLangToolchainInfoProvider {
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "ProtoLangToolchainInfo".to_owned(),
+            })
+        })
+    }
+}
 
 impl Display for ProtoLangToolchainInfoProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -264,8 +320,27 @@ impl Display for ProtoLangToolchainInfoProvider {
 
 starlark_simple_value!(ProtoLangToolchainInfoProvider);
 
+impl ProviderCallableLike for ProtoLangToolchainInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
 #[starlark_value(type = "ProtoLangToolchainInfo")]
-impl<'v> StarlarkValue<'v> for ProtoLangToolchainInfoProvider {}
+impl<'v> StarlarkValue<'v> for ProtoLangToolchainInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        create_native_provider_instance(PROTO_LANG_TOOLCHAIN_INFO_IDX, args, eval)
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
 
 // ============================================================================
 // ProtoModule - Bazel's proto module (proto.encode_text, etc.)
@@ -318,17 +393,11 @@ fn proto_module_methods(builder: &mut MethodsBuilder) {
 // ============================================================================
 
 /// Register the proto globals (ProtoInfo, proto_common_do_not_use, proto).
-///
-/// Note on provider registrations:
-/// ProtoInfo is deprecated as a native global in Bazel 8+.
-/// The actual provider is defined in Starlark by the protobuf rules.
-///
-/// Reference: thoughts/shared/plans/kuro-bazel-subplans/02-bzlmod.md lines 86-128
 #[starlark_module]
 pub fn register_proto_common(globals: &mut GlobalsBuilder) {
-    /// ProtoInfo - None placeholder. Deprecated in Bazel 8+.
-    /// Actual provider defined in protobuf rules Starlark.
-    const ProtoInfo: NoneType = NoneType;
+    /// ProtoInfo provider for proto compilation information.
+    /// Callable as `ProtoInfo(direct_sources=..., ...)`.
+    const ProtoInfo: ProtoInfoProvider = ProtoInfoProvider;
 
     /// Internal proto compilation utilities (proto_common).
     /// This is exposed as proto_common_do_not_use for backward compatibility.

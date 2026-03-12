@@ -82,6 +82,8 @@ pub fn provider_id_for_idx(idx: u32) -> &'static Arc<ProviderId> {
         3 => crate::interpreter::rule_defs::java_common::JavaPluginInfoProvider::provider_id(),
         4 => crate::interpreter::rule_defs::java_common::JavaRuntimeInfoProvider::provider_id(),
         5 => crate::interpreter::rule_defs::java_common::JavaToolchainInfoProvider::provider_id(),
+        6 => crate::interpreter::rule_defs::proto_common::ProtoInfoProvider::provider_id(),
+        7 => crate::interpreter::rule_defs::proto_common::ProtoLangToolchainInfoProvider::provider_id(),
         _ => panic!("Invalid provider index: {}", idx),
     }
 }
@@ -94,6 +96,8 @@ pub fn provider_name_for_idx(idx: u32) -> &'static str {
         3 => "JavaPluginInfo",
         4 => "JavaRuntimeInfo",
         5 => "JavaToolchainInfo",
+        6 => "ProtoInfo",
+        7 => "ProtoLangToolchainInfo",
         _ => "Unknown",
     }
 }
