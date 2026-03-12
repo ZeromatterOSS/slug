@@ -895,3 +895,16 @@ constraint_provider_test = rule(
     implementation = _constraint_provider_test_impl,
     attrs = {},
 )
+
+
+def _actions_fail_test_impl(ctx):
+    """Tests ctx.actions.fail() raises an error at analysis time."""
+    ctx.actions.fail("unsupported platform")
+    # Should not reach here
+    return [DefaultInfo()]
+
+
+actions_fail_test = rule(
+    implementation = _actions_fail_test_impl,
+    attrs = {},
+)

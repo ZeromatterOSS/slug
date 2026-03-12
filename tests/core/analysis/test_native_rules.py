@@ -964,3 +964,11 @@ async def test_constraint_providers_callable(buck: Buck) -> None:
     assert lines["cs_has_label"] == "True"
     assert lines["cv_callable"] == "True"
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_actions_fail(buck: Buck) -> None:
+    """ctx.actions.fail() raises an error during analysis."""
+    with pytest.raises(Exception) as exc_info:
+        await buck.build("//:actions_fail_test")
+    assert "unsupported platform" in str(exc_info.value)
+

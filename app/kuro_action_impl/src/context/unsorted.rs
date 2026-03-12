@@ -413,4 +413,24 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
         // rules to proceed through analysis even if the outputs won't be materialized.
         Ok(starlark::values::none::NoneType)
     }
+
+    /// Bazel-compatible: register an action that always fails with the given message.
+    ///
+    /// `ctx.actions.fail(message)` creates an action that, when executed, fails with
+    /// the provided error message. This is used by rules to signal unsupported
+    /// configurations or platforms at build time (rather than analysis time).
+    ///
+    /// In Bazel, this creates an action whose execution always fails.
+    /// In Kuro, we fail immediately at analysis time since there's no benefit
+    /// to deferring the error.
+    fn fail<'v>(
+        this: &AnalysisActions<'v>,
+        #[starlark(require = pos)] message: &str,
+    ) -> starlark::Result<starlark::values::none::NoneType> {
+        let _ = this;
+        Err(starlark::Error::new_other(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("action fail: {}", message),
+        )))
+    }
 }
