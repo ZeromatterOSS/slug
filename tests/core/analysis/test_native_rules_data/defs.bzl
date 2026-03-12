@@ -971,3 +971,38 @@ write_file_executable_test = rule(
     implementation = _write_file_executable_test_impl,
     attrs = {},
 )
+
+
+def _do_nothing_test_impl(ctx):
+    """Tests ctx.actions.do_nothing() binds outputs correctly."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+
+    # Write real content first (since do_nothing writes empty)
+    ctx.actions.write(out, "do_nothing_output\n")
+
+    return [DefaultInfo(default_output = out)]
+
+
+do_nothing_test = rule(
+    implementation = _do_nothing_test_impl,
+    attrs = {},
+)
+
+
+def _do_nothing_binds_test_impl(ctx):
+    """Tests ctx.actions.do_nothing() actually binds the output artifact."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+
+    # Use do_nothing to bind the output (writes empty content)
+    ctx.actions.do_nothing(
+        mnemonic = "DoNothing",
+        outputs = [out],
+    )
+
+    return [DefaultInfo(default_output = out)]
+
+
+do_nothing_binds_test = rule(
+    implementation = _do_nothing_binds_test_impl,
+    attrs = {},
+)

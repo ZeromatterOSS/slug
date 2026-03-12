@@ -1001,6 +1001,15 @@ async def test_write_file_executable(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_do_nothing_binds_outputs(buck: Buck) -> None:
+    """ctx.actions.do_nothing() binds output artifacts so they can be built."""
+    result = await buck.build("//:do_nothing_binds_test")
+    output = result.get_build_report().output_for_target("//:do_nothing_binds_test")
+    # do_nothing writes empty content; just verify the build succeeded
+    assert output.exists()
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_actions_fail(buck: Buck) -> None:
     """ctx.actions.fail() raises an error during analysis."""
     with pytest.raises(Exception) as exc_info:

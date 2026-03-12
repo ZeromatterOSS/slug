@@ -8,22 +8,28 @@
  * above-listed licenses.
  */
 
+use indexmap::indexset;
 use kuro_build_api::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkArtifactLike;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
+use kuro_build_api::interpreter::rule_defs::artifact::starlark_output_artifact::StarlarkOutputArtifact;
 use kuro_build_api::interpreter::rule_defs::artifact_tagging::ArtifactTag;
 use kuro_build_api::interpreter::rule_defs::cmd_args::StarlarkCmdArgs;
+use kuro_build_api::interpreter::rule_defs::cmd_args::value::CommandLineArg;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
 use kuro_build_api::interpreter::rule_defs::digest_config::StarlarkDigestConfig;
 use kuro_build_api::interpreter::rule_defs::transitive_set::FrozenTransitiveSetDefinition;
 use kuro_build_api::interpreter::rule_defs::transitive_set::TransitiveSet;
 use kuro_core::fs::buck_out_path::BuckOutPathKind;
 use kuro_execute::execute::request::OutputType;
+
+use crate::actions::impls::write::UnregisteredWriteAction;
 use starlark::environment::MethodsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::values::FrozenValueTyped;
 use starlark::values::Value;
+use starlark::values::ValueLike;
 use starlark::values::ValueOfUnchecked;
 use starlark::values::ValueTyped;
 use starlark::values::UnpackValue;
@@ -404,13 +410,44 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
         inputs: starlark::values::Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)]
         outputs: starlark::values::Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<starlark::values::none::NoneType> {
-        let _ = (this, mnemonic, inputs, outputs);
-        // The mnemonic, inputs, and outputs are accepted for API compatibility.
-        // Output artifacts passed here are expected to be already declared.
-        // In Bazel, do_nothing() creates a trivial action that produces the outputs.
-        // For now, we accept all parameters without binding actions, which allows
-        // rules to proceed through analysis even if the outputs won't be materialized.
+        let _ = (mnemonic, inputs);
+
+        // Bind each output by registering a write action with empty content.
+        // This ensures outputs aren't left unbound, which would cause analysis errors.
+        if !outputs.is_none() {
+            if let Ok(iter) = outputs.iterate(eval.heap()) {
+                let mut state = this.state()?;
+                for output_val in iter {
+                    let output_artifact = if let Some(declared) = output_val.downcast_ref::<StarlarkDeclaredArtifact>() {
+                        declared.output_artifact()
+                    } else if let Some(output) = output_val.downcast_ref::<StarlarkOutputArtifact>() {
+                        output.artifact()
+                    } else {
+                        continue;
+                    };
+                    {
+                        let action = UnregisteredWriteAction {
+                            is_executable: false,
+                            macro_files: None,
+                            absolute: false,
+                            use_dep_files_placeholder_for_content_based_paths: false,
+                        };
+                        // Write empty content to bind the output
+                        let empty_args = StarlarkCmdArgs::default();
+                        let cli = eval.heap().alloc_typed(empty_args);
+                        let content = CommandLineArg::from_cmd_args(cli);
+                        state.register_action(
+                            indexset![output_artifact],
+                            action,
+                            Some(content.to_value()),
+                            None,
+                        )?;
+                    }
+                }
+            }
+        }
         Ok(starlark::values::none::NoneType)
     }
 
