@@ -2464,6 +2464,7 @@ impl<'v> StarlarkValue<'v> for CcCommonModule {
         matches!(
             attribute,
             "internal_DO_NOT_USE"
+                | "create_cc_toolchain_config_info"
                 | "get_tool_for_action"
                 | "get_execution_requirements"
                 | "action_is_enabled"
@@ -2487,6 +2488,7 @@ impl<'v> StarlarkValue<'v> for CcCommonModule {
     fn dir_attr(&self) -> Vec<String> {
         vec![
             "internal_DO_NOT_USE".to_owned(),
+            "create_cc_toolchain_config_info".to_owned(),
             "get_tool_for_action".to_owned(),
             "get_execution_requirements".to_owned(),
             "action_is_enabled".to_owned(),
@@ -4638,6 +4640,54 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         Ok(heap.alloc(CcDebugContext))
     }
+
+    /// Creates a CcToolchainConfigInfo provider instance.
+    ///
+    /// This is the main entry point for defining C++ toolchain configurations
+    /// in Starlark. Called from cc_toolchain_config rule implementations.
+    #[allow(unused_variables)]
+    fn create_cc_toolchain_config_info<'v>(
+        #[starlark(this)] _this: &CcCommonModule,
+        #[starlark(require = named)] ctx: Value<'v>,
+        #[starlark(require = named, default = "")] toolchain_identifier: &str,
+        #[starlark(require = named, default = "")] host_system_name: &str,
+        #[starlark(require = named, default = "")] target_system_name: &str,
+        #[starlark(require = named, default = "")] target_cpu: &str,
+        #[starlark(require = named, default = "")] target_libc: &str,
+        #[starlark(require = named, default = "")] compiler: &str,
+        #[starlark(require = named, default = "")] abi_version: &str,
+        #[starlark(require = named, default = "")] abi_libc_version: &str,
+        #[starlark(require = named, default = NoneType)] tool_paths: Value<'v>,
+        #[starlark(require = named, default = NoneType)] make_variables: Value<'v>,
+        #[starlark(require = named, default = "")] builtin_sysroot: &str,
+        #[starlark(require = named, default = "")] cc_target_os: &str,
+        #[starlark(require = named, default = NoneType)] features: Value<'v>,
+        #[starlark(require = named, default = NoneType)] action_configs: Value<'v>,
+        #[starlark(require = named, default = NoneType)] artifact_name_patterns: Value<'v>,
+        #[starlark(require = named, default = NoneType)] cxx_builtin_include_directories: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        // Store all fields in a dict for the CcToolchainConfigInfo instance
+        let fields = heap.alloc(starlark::values::dict::AllocDict([
+            ("toolchain_identifier", heap.alloc(toolchain_identifier)),
+            ("host_system_name", heap.alloc(host_system_name)),
+            ("target_system_name", heap.alloc(target_system_name)),
+            ("target_cpu", heap.alloc(target_cpu)),
+            ("target_libc", heap.alloc(target_libc)),
+            ("compiler", heap.alloc(compiler)),
+            ("abi_version", heap.alloc(abi_version)),
+            ("abi_libc_version", heap.alloc(abi_libc_version)),
+            ("tool_paths", if tool_paths.is_none() { heap.alloc(Vec::<Value>::new()) } else { tool_paths }),
+            ("make_variables", if make_variables.is_none() { heap.alloc(Vec::<Value>::new()) } else { make_variables }),
+            ("builtin_sysroot", heap.alloc(builtin_sysroot)),
+            ("cc_target_os", heap.alloc(cc_target_os)),
+            ("features", if features.is_none() { heap.alloc(Vec::<Value>::new()) } else { features }),
+            ("action_configs", if action_configs.is_none() { heap.alloc(Vec::<Value>::new()) } else { action_configs }),
+            ("artifact_name_patterns", if artifact_name_patterns.is_none() { heap.alloc(Vec::<Value>::new()) } else { artifact_name_patterns }),
+            ("cxx_builtin_include_directories", if cxx_builtin_include_directories.is_none() { heap.alloc(Vec::<Value>::new()) } else { cxx_builtin_include_directories }),
+        ]));
+        Ok(heap.alloc(CcToolchainConfigInfoInstanceGen { fields }))
+    }
 }
 
 // ============================================================================
@@ -5562,6 +5612,19 @@ where
     }
 }
 
+impl CcToolchainConfigInfoProvider {
+    /// Get the static provider ID for CcToolchainConfigInfo.
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "CcToolchainConfigInfo".to_owned(),
+            })
+        })
+    }
+}
+
 impl Display for CcToolchainConfigInfoProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<provider CcToolchainConfigInfo>")
@@ -5570,8 +5633,123 @@ impl Display for CcToolchainConfigInfoProvider {
 
 starlark_simple_value!(CcToolchainConfigInfoProvider);
 
+impl ProviderCallableLike for CcToolchainConfigInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
 #[starlark_value(type = "CcToolchainConfigInfo")]
-impl<'v> StarlarkValue<'v> for CcToolchainConfigInfoProvider {}
+impl<'v> StarlarkValue<'v> for CcToolchainConfigInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &starlark::eval::Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
+        let kwargs = args.names_map()?;
+        let fields = heap.alloc(starlark::values::dict::AllocDict(
+            kwargs.into_iter().map(|(k, v)| (k.as_str(), v)),
+        ));
+        Ok(heap.alloc(CcToolchainConfigInfoInstanceGen { fields }))
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+/// An instance of CcToolchainConfigInfo containing toolchain configuration.
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
+#[repr(C)]
+pub struct CcToolchainConfigInfoInstanceGen<V: ValueLifetimeless> {
+    /// The fields as a dict value
+    fields: V,
+}
+
+starlark_complex_value!(pub CcToolchainConfigInfoInstance);
+
+impl<V: ValueLifetimeless> Display for CcToolchainConfigInfoInstanceGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CcToolchainConfigInfo(...)")
+    }
+}
+
+impl<'v, V: ValueLike<'v>> ProviderLike<'v> for CcToolchainConfigInfoInstanceGen<V>
+where
+    Self: fmt::Debug,
+{
+    fn id(&self) -> &Arc<ProviderId> {
+        CcToolchainConfigInfoProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        use starlark::values::dict::DictRef;
+        if let Some(dict) = DictRef::from_value(self.fields.to_value()) {
+            dict.iter()
+                .filter_map(|(k, v)| {
+                    let s: &'v str = k.unpack_str()?;
+                    let s: &str = unsafe { &*(s as *const str) };
+                    Some((s, v))
+                })
+                .collect()
+        } else {
+            vec![]
+        }
+    }
+}
+
+#[starlark::values::starlark_value(type = "CcToolchainConfigInfo")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for CcToolchainConfigInfoInstanceGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
+        use starlark::values::dict::DictRef;
+        if let Some(dict) = DictRef::from_value(self.fields.to_value()) {
+            dict.get_str(attribute).is_some()
+        } else if let Ok(iter) = self.fields.to_value().iterate(heap) {
+            for key in iter {
+                if key.unpack_str() == Some(attribute) {
+                    return true;
+                }
+            }
+            false
+        } else {
+            false
+        }
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        use starlark::values::dict::DictRef;
+        if let Some(dict) = DictRef::from_value(self.fields.to_value()) {
+            dict.get_str(attribute)
+        } else {
+            let key = heap.alloc_str(attribute);
+            self.fields.to_value().at(key.to_value(), heap).ok()
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        use starlark::values::dict::DictRef;
+        DictRef::from_value(self.fields.to_value())
+            .map(|dict| dict.iter().filter_map(|(k, _)| k.unpack_str().map(|s| s.to_owned())).collect())
+            .unwrap_or_default()
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
+    }
+}
 
 // ============================================================================
 // Registration

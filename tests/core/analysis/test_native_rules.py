@@ -1010,6 +1010,15 @@ async def test_do_nothing_binds_outputs(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_cc_toolchain_config_info(buck: Buck) -> None:
+    """cc_common.create_cc_toolchain_config_info() creates a provider with accessible attributes."""
+    result = await buck.build("//:cc_toolchain_config_info_test")
+    output = result.get_build_report().output_for_target("//:cc_toolchain_config_info_test")
+    content = output.read_text().strip()
+    assert "cc_toolchain_config_info: ok" in content
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_actions_fail(buck: Buck) -> None:
     """ctx.actions.fail() raises an error during analysis."""
     with pytest.raises(Exception) as exc_info:

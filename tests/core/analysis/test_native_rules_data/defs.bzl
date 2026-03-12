@@ -1006,3 +1006,42 @@ do_nothing_binds_test = rule(
     implementation = _do_nothing_binds_test_impl,
     attrs = {},
 )
+
+
+def _cc_toolchain_config_info_test_impl(ctx):
+    """Tests cc_common.create_cc_toolchain_config_info() creates a provider."""
+    config = cc_common.create_cc_toolchain_config_info(
+        ctx = ctx,
+        toolchain_identifier = "test_toolchain",
+        host_system_name = "local",
+        target_system_name = "local",
+        target_cpu = "x86_64",
+        target_libc = "local",
+        compiler = "gcc",
+        abi_version = "local",
+        abi_libc_version = "local",
+        tool_paths = [],
+    )
+
+    # Verify we got a CcToolchainConfigInfo instance
+    if type(config) != "CcToolchainConfigInfo":
+        fail("Expected CcToolchainConfigInfo, got %s" % type(config))
+
+    # Verify attributes are accessible
+    if config.toolchain_identifier != "test_toolchain":
+        fail("Expected toolchain_identifier='test_toolchain', got '%s'" % config.toolchain_identifier)
+    if config.target_cpu != "x86_64":
+        fail("Expected target_cpu='x86_64', got '%s'" % config.target_cpu)
+    if config.compiler != "gcc":
+        fail("Expected compiler='gcc', got '%s'" % config.compiler)
+
+    # Write a success marker
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "cc_toolchain_config_info: ok\n")
+    return [DefaultInfo(default_output = out)]
+
+
+cc_toolchain_config_info_test = rule(
+    implementation = _cc_toolchain_config_info_test_impl,
+    attrs = {},
+)
