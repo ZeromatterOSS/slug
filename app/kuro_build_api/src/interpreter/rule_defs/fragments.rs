@@ -590,9 +590,12 @@ fn platform_fragment_methods(builder: &mut MethodsBuilder) {
 // JavaFragment - Java configuration fragment
 // ============================================================================
 
-/// Java configuration fragment stub.
+/// Java configuration fragment.
 ///
-/// Accessed via `ctx.fragments.java`. Returns safe defaults for any accessed attribute.
+/// Accessed via `ctx.fragments.java`. Contains Java build settings used by
+/// rules_java's Starlark implementations.
+///
+/// Reference: https://bazel.build/rules/lib/fragments/java
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct JavaFragment;
 
@@ -606,19 +609,77 @@ starlark_simple_value!(JavaFragment);
 
 #[starlark_value(type = "java_fragment")]
 impl<'v> StarlarkValue<'v> for JavaFragment {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(java_fragment_methods)
+    }
+
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
-            "default_javac_flags" | "default_jvm_opts" | "source_version" | "target_version"
+            "default_javac_flags"
+                | "default_javac_flags_depset"
+                | "default_jvm_opts"
+                | "source_version"
+                | "target_version"
+                | "plugins"
+                | "one_version_enforcement_level"
+                | "multi_release_deploy_jars"
+                | "bytecode_optimization_pass_actions"
+                | "bytecode_optimizer_mnemonic"
+                | "split_bytecode_optimization_pass"
+                | "run_android_lint"
         )
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "default_javac_flags" | "default_jvm_opts" => Some(heap.alloc(AllocList::EMPTY)),
+            "default_javac_flags" | "default_jvm_opts" | "plugins"
+            | "default_javac_flags_depset" => Some(heap.alloc(AllocList::EMPTY)),
             "source_version" | "target_version" => Some(heap.alloc("11")),
+            "one_version_enforcement_level" => Some(heap.alloc("OFF")),
+            "bytecode_optimizer_mnemonic" => Some(heap.alloc("Optimizer")),
+            "bytecode_optimization_pass_actions" => Some(heap.alloc(0)),
+            "multi_release_deploy_jars" | "split_bytecode_optimization_pass"
+            | "run_android_lint" => Some(Value::new_bool(false)),
             _ => None,
         }
+    }
+}
+
+#[starlark_module]
+fn java_fragment_methods(builder: &mut MethodsBuilder) {
+    /// Whether to use interface JARs for faster rebuilds.
+    fn use_ijars(#[allow(unused_variables)] this: &JavaFragment) -> starlark::Result<bool> {
+        Ok(true)
+    }
+
+    /// Whether to use header compilation for direct deps.
+    fn use_header_compilation_direct_deps(
+        #[allow(unused_variables)] this: &JavaFragment,
+    ) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Strict Java deps enforcement level: "OFF", "WARN", "ERROR", "DEFAULT".
+    fn strict_java_deps(
+        #[allow(unused_variables)] this: &JavaFragment,
+    ) -> starlark::Result<String> {
+        Ok("DEFAULT".to_owned())
+    }
+
+    /// Whether java_import exports are restricted.
+    fn disallow_java_import_exports(
+        #[allow(unused_variables)] this: &JavaFragment,
+    ) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Whether explicit Java test dependencies should be enforced.
+    fn enforce_explicit_java_test_deps(
+        #[allow(unused_variables)] this: &JavaFragment,
+    ) -> starlark::Result<bool> {
+        Ok(false)
     }
 }
 
@@ -669,6 +730,43 @@ impl<'v> StarlarkValue<'v> for AppleFragment {
 }
 
 // ============================================================================
+// CoverageFragment - Coverage configuration fragment
+// ============================================================================
+
+/// Coverage configuration fragment.
+///
+/// Accessed via `ctx.fragments.coverage`. Contains coverage-related build settings.
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct CoverageFragment;
+
+impl Display for CoverageFragment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<coverage fragment>")
+    }
+}
+
+starlark_simple_value!(CoverageFragment);
+
+#[starlark_value(type = "coverage_fragment")]
+impl<'v> StarlarkValue<'v> for CoverageFragment {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(coverage_fragment_methods)
+    }
+}
+
+#[starlark_module]
+fn coverage_fragment_methods(builder: &mut MethodsBuilder) {
+    /// The list of file extensions for which coverage output is generated.
+    #[starlark(attribute)]
+    fn output_generator(
+        #[allow(unused_variables)] this: &CoverageFragment,
+    ) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+}
+
+// ============================================================================
 // ConfigurationFragments - Container for all fragments
 // ============================================================================
 
@@ -707,7 +805,7 @@ impl<'v> StarlarkValue<'v> for ConfigurationFragments {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
-            "cpp" | "py" | "bazel_py" | "java" | "apple" | "platform" | "proto"
+            "cpp" | "py" | "bazel_py" | "java" | "apple" | "platform" | "proto" | "coverage"
         )
     }
 
@@ -720,6 +818,7 @@ impl<'v> StarlarkValue<'v> for ConfigurationFragments {
             "java" => Some(heap.alloc(JavaFragment)),
             "apple" => Some(heap.alloc(AppleFragment)),
             "platform" => Some(heap.alloc(PlatformFragment)),
+            "coverage" => Some(heap.alloc(CoverageFragment)),
             _ => None,
         }
     }
@@ -733,6 +832,7 @@ impl<'v> StarlarkValue<'v> for ConfigurationFragments {
             "apple".to_owned(),
             "platform".to_owned(),
             "proto".to_owned(),
+            "coverage".to_owned(),
         ]
     }
 }

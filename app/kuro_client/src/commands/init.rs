@@ -359,8 +359,8 @@ mod tests {
 
 genrule(
     name = \"hello_world\",
-    out = \"out.txt\",
-    cmd = \"echo BUILT BY KURO> $OUT\",
+    outs = [\"out.txt\"],
+    cmd = \"echo BUILT BY KURO> $@\",
 )
 ";
         assert_eq!(actual_build, expected_build);
