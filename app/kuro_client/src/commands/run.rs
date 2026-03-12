@@ -287,11 +287,34 @@ impl StreamingCommand for RunCommand {
             }
         }
 
+        // Set environment variables for the executed binary
+        let mut env_vars = vec![("BUCK_RUN_BUILD_ID".to_owned(), ctx.trace_id.to_string())];
+
+        // Set RUNFILES_DIR if the runfiles tree was created
+        if let Some(exe_path) = run_args.first() {
+            let runfiles_dir = format!("{}.runfiles", exe_path);
+            if std::path::Path::new(&runfiles_dir).exists() {
+                // Convert to absolute path
+                let abs_runfiles = ctx.working_dir.resolve(std::path::Path::new(&runfiles_dir));
+                env_vars.push((
+                    "RUNFILES_DIR".to_owned(),
+                    abs_runfiles.to_string_lossy().into_owned(),
+                ));
+                env_vars.push((
+                    "RUNFILES_MANIFEST_FILE".to_owned(),
+                    format!(
+                        "{}/MANIFEST",
+                        abs_runfiles.to_string_lossy()
+                    ),
+                ));
+            }
+        }
+
         ExitResult::exec(
             run_args[0].clone().into(),
             run_args.into_iter().map(|arg| arg.into()).collect(),
             chdir,
-            vec![("BUCK_RUN_BUILD_ID".to_owned(), ctx.trace_id.to_string())],
+            env_vars,
         )
     }
 
