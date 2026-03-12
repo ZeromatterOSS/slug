@@ -10,6 +10,9 @@
 ## ConfiguredProvidersLabel.path
 ## ConfiguredProvidersLabel.project\_root
 ## ConfiguredProvidersLabel.raw\_target
+## ConfiguredProvidersLabel.relative
+## ConfiguredProvidersLabel.repo\_name
+## ConfiguredProvidersLabel.same\_package\_label
 ## ConfiguredProvidersLabel.sub\_target
 ## ConfiguredProvidersLabel.workspace\_name
 ## ConfiguredProvidersLabel.workspace\_root

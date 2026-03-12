@@ -12,5 +12,6 @@
 ## DefaultInfo.default\_runfiles
 ## DefaultInfo.executable
 ## DefaultInfo.files
+## DefaultInfo.files\_to\_run
 ## DefaultInfo.other\_outputs
 ## DefaultInfo.sub\_targets

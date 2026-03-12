@@ -4,8 +4,10 @@
 ## alias
 ## bazel\_version
 ## cc\_binary
+## cc\_import
 ## cc\_libc\_top\_alias
 ## cc\_library
+## cc\_shared\_library
 ## cc\_test
 ## cc\_toolchain
 ## cc\_toolchain\_suite
@@ -13,6 +15,7 @@
 ## constraint\_setting
 ## constraint\_value
 ## depset\_from\_transitive\_set
+## environment\_group
 ## execution\_platform
 ## execution\_platforms
 ## existing\_rule
@@ -23,6 +26,8 @@
 ## genrule
 ## glob
 ## label\_flag
+## module\_name
+## module\_version
 ## package\_group
 ## package\_name
 ## package\_relative\_label
@@ -31,6 +36,7 @@
 ## sh\_binary
 ## sh\_library
 ## sh\_test
+## starlark\_doc\_extract
 ## test\_suite
 ## toolchain
 ## toolchain\_type

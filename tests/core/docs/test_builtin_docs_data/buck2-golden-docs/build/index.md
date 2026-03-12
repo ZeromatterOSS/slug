@@ -12,6 +12,8 @@
 ## ExecutionPlatformRegistrationInfo
 ## InstallInfo
 ## InstrumentedFilesInfo
+## JavaInfo
+## JavaPluginInfo
 ## Label
 ## OutputGroupInfo
 ## PackageSpecificationInfo
@@ -28,8 +30,10 @@
 ## aspect
 ## cc\_binary
 ## cc\_common
+## cc\_import
 ## cc\_libc\_top\_alias
 ## cc\_library
+## cc\_shared\_library
 ## cc\_test
 ## cc\_toolchain
 ## cc\_toolchain\_suite
@@ -43,6 +47,7 @@
 ## dedupe
 ## depset
 ## dynamic\_actions
+## environment\_group
 ## exec\_group
 ## execution\_platform
 ## execution\_platforms
@@ -58,6 +63,7 @@
 ## glob
 ## host\_info
 ## implicit\_package\_symbol
+## java\_common
 ## label\_flag
 ## licenses
 ## load\_symbols
@@ -70,6 +76,7 @@
 ## package\_relative\_label
 ## platform
 ## platform\_common
+## proto
 ## proto\_common\_do\_not\_use
 ## provider
 ## provider\_field
@@ -95,6 +102,7 @@
 ## sha1
 ## sha256
 ## soft\_error
+## starlark\_doc\_extract
 ## subpackages
 # In //foo/BUILD.bazel, with subpackages foo/bar and foo/baz:
 ## subrule

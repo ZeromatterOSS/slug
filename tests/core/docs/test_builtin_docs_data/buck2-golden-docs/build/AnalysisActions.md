@@ -15,6 +15,7 @@
 ## AnalysisActions.declare\_file
 ## AnalysisActions.declare\_output
 ## AnalysisActions.declare\_shareable\_artifact
+## AnalysisActions.declare\_symlink
 ## AnalysisActions.digest\_config
 ## AnalysisActions.do\_nothing
 ## AnalysisActions.download\_file
@@ -26,6 +27,7 @@
 # Step 2: Create a factory
 # Step 3 & 4: Use it in a rule or bxl script
 ## AnalysisActions.expand\_template
+## AnalysisActions.fail
 ## AnalysisActions.run
 ## AnalysisActions.run\_shell
 ## AnalysisActions.symlink
@@ -34,4 +36,5 @@
 ## AnalysisActions.template\_dict
 ## AnalysisActions.tset
 ## AnalysisActions.write
+## AnalysisActions.write\_file
 ## AnalysisActions.write\_json
