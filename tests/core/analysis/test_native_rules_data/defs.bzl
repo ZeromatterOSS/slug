@@ -418,6 +418,29 @@ cc_command_line_test = rule(
 def _java_common_test_impl(ctx):
     """Tests that java_common module is available and has expected attributes."""
     out = ctx.actions.declare_file(ctx.label.name + ".txt")
+
+    # Test JavaInfo is callable
+    java_info = JavaInfo(compile_jar = None, output_jar = None)
+    has_compile_jar = hasattr(java_info, "compile_jar")
+    has_output_jar = hasattr(java_info, "output_jar")
+
+    # Test java_common.compile() returns a JavaInfo instance
+    compile_result = java_common.compile(ctx = ctx)
+    compile_has_compile_jar = hasattr(compile_result, "compile_jar")
+    compile_has_transitive = hasattr(compile_result, "transitive_compile_time_jars")
+
+    # Test java_common.merge() returns a JavaInfo instance
+    merge_result = java_common.merge([])
+    merge_has_compile_jar = hasattr(merge_result, "compile_jar")
+
+    # Test JavaPluginInfo is callable
+    plugin_info = JavaPluginInfo(runtime_deps = [], processor_class = "com.example.Proc")
+    has_processor_class = hasattr(plugin_info, "processor_class")
+
+    # Test java_common.JavaRuntimeInfo and JavaToolchainInfo attributes
+    has_runtime_info = hasattr(java_common, "JavaRuntimeInfo")
+    has_toolchain_info = hasattr(java_common, "JavaToolchainInfo")
+
     lines = [
         "type=" + type(java_common),
         "has_compile=" + str(hasattr(java_common, "compile")),
@@ -425,6 +448,12 @@ def _java_common_test_impl(ctx):
         "has_boot_class_path=" + str(hasattr(java_common, "boot_class_path")),
         "java_info_type=" + type(JavaInfo),
         "java_plugin_info_type=" + type(JavaPluginInfo),
+        "java_info_callable=" + str(has_compile_jar and has_output_jar),
+        "compile_returns_java_info=" + str(compile_has_compile_jar and compile_has_transitive),
+        "merge_returns_java_info=" + str(merge_has_compile_jar),
+        "plugin_info_callable=" + str(has_processor_class),
+        "has_runtime_info=" + str(has_runtime_info),
+        "has_toolchain_info=" + str(has_toolchain_info),
     ]
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]

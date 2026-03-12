@@ -66,26 +66,30 @@ use crate::interpreter::rule_defs::provider::ProviderLike;
 #[repr(C)]
 pub struct NativeProviderInstanceGen<V: ValueLifetimeless> {
     /// All keyword arguments stored as a dict value
-    values: V,
-    /// Provider ID index: 0 = PyInfo, 1 = PyRuntimeInfo
+    pub values: V,
+    /// Provider ID index: 0 = PyInfo, 1 = PyRuntimeInfo, 2 = JavaInfo, 3 = JavaPluginInfo
     /// (Using u32 instead of Arc<ProviderId> to keep the type Coerce/Freeze-friendly)
-    provider_idx: u32,
+    pub provider_idx: u32,
 }
 
 starlark_complex_value!(pub NativeProviderInstance);
 
-fn provider_id_for_idx(idx: u32) -> &'static Arc<ProviderId> {
+pub fn provider_id_for_idx(idx: u32) -> &'static Arc<ProviderId> {
     match idx {
         0 => PyInfoProvider::provider_id(),
         1 => PyRuntimeInfoProvider::provider_id(),
+        2 => crate::interpreter::rule_defs::java_common::JavaInfoProvider::provider_id(),
+        3 => crate::interpreter::rule_defs::java_common::JavaPluginInfoProvider::provider_id(),
         _ => panic!("Invalid provider index: {}", idx),
     }
 }
 
-fn provider_name_for_idx(idx: u32) -> &'static str {
+pub fn provider_name_for_idx(idx: u32) -> &'static str {
     match idx {
         0 => "PyInfo",
         1 => "PyRuntimeInfo",
+        2 => "JavaInfo",
+        3 => "JavaPluginInfo",
         _ => "Unknown",
     }
 }
@@ -278,7 +282,7 @@ impl<'v> StarlarkValue<'v> for PyRuntimeInfoProvider {
 // ============================================================================
 
 /// Creates a native provider instance from keyword arguments.
-fn create_native_provider_instance<'v>(
+pub fn create_native_provider_instance<'v>(
     provider_idx: u32,
     args: &Arguments<'v, '_>,
     eval: &mut Evaluator<'v, '_, '_>,

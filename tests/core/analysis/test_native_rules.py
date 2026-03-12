@@ -674,6 +674,13 @@ async def test_java_common_module_available(buck: Buck) -> None:
     assert lines.get("has_boot_class_path") == "True", f"java_common should have boot_class_path: {lines}"
     assert lines.get("java_info_type") == "JavaInfo", f"JavaInfo should be available: {lines}"
     assert lines.get("java_plugin_info_type") == "JavaPluginInfo", f"JavaPluginInfo should be available: {lines}"
+    # JavaInfo is callable and compile()/merge() return proper instances
+    assert lines.get("java_info_callable") == "True", f"JavaInfo should be callable: {lines}"
+    assert lines.get("compile_returns_java_info") == "True", f"compile() should return JavaInfo: {lines}"
+    assert lines.get("merge_returns_java_info") == "True", f"merge() should return JavaInfo: {lines}"
+    assert lines.get("plugin_info_callable") == "True", f"JavaPluginInfo should be callable: {lines}"
+    assert lines.get("has_runtime_info") == "True", f"java_common.JavaRuntimeInfo should exist: {lines}"
+    assert lines.get("has_toolchain_info") == "True", f"java_common.JavaToolchainInfo should exist: {lines}"
 
 
 @buck_test(data_dir="test_native_rules_data")
