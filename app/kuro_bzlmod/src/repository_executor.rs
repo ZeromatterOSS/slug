@@ -161,7 +161,7 @@ fn execute_http_archive(
     for url in &urls {
         match download_and_extract(url, working_dir, sha256, integrity, strip_prefix) {
             Ok(()) => {
-                // Create BUILD.bazel if build_file_content is specified
+                // Create BUILD.bazel if build_file or build_file_content is specified
                 if let Some(content) = attrs.get_optional_string("build_file_content") {
                     std::fs::write(working_dir.join("BUILD.bazel"), content).map_err(|e| {
                         RepositoryExecutionError::ExecutionFailed {
@@ -169,7 +169,28 @@ fn execute_http_archive(
                             reason: format!("Failed to write BUILD.bazel: {}", e),
                         }
                     })?;
+                } else if let Some(build_file) = attrs.get_optional_string("build_file") {
+                    // build_file is a label like "@//path:BUILD.foo" or a file path
+                    let build_file_path = build_file.trim_start_matches("@//").trim_start_matches("//");
+                    let build_file_path = build_file_path.replace(':', "/");
+                    if let Ok(content) = std::fs::read_to_string(&build_file_path) {
+                        std::fs::write(working_dir.join("BUILD.bazel"), content).map_err(|e| {
+                            RepositoryExecutionError::ExecutionFailed {
+                                name: invocation.name.clone(),
+                                reason: format!("Failed to write BUILD.bazel from build_file: {}", e),
+                            }
+                        })?;
+                    } else {
+                        tracing::warn!(
+                            "Could not read build_file '{}' for repository '{}'",
+                            build_file,
+                            invocation.name
+                        );
+                    }
                 }
+
+                // Apply patches if specified
+                apply_patches(invocation, attrs, working_dir)?;
 
                 // Create WORKSPACE if not present
                 if !working_dir.join("WORKSPACE").exists()
@@ -203,6 +224,95 @@ fn execute_http_archive(
         }
         .into()
     }))
+}
+
+/// Apply patches to a repository after extraction.
+///
+/// Supports:
+/// - `patches`: list of patch file paths to apply
+/// - `patch_args`: arguments to pass to `patch` command (default: ["-p1"])
+/// - `patch_cmds`: shell commands to run after patching
+fn apply_patches(
+    invocation: &RepositoryInvocation,
+    attrs: &InvocationAttrs,
+    working_dir: &Path,
+) -> kuro_error::Result<()> {
+    // Apply patch files
+    if let Some(patches) = attrs.get_string_list("patches") {
+        let default_patch_args = ["-p1".to_owned()];
+        let patch_args = attrs
+            .get_string_list("patch_args")
+            .unwrap_or(&default_patch_args);
+
+        for patch_path in patches {
+            tracing::info!(
+                "Applying patch '{}' to repository '{}'",
+                patch_path,
+                invocation.name
+            );
+
+            let mut cmd = Command::new("patch");
+            for arg in patch_args {
+                cmd.arg(arg);
+            }
+            cmd.arg("-i").arg(patch_path);
+            cmd.current_dir(working_dir);
+
+            let output = cmd.output().map_err(|e| {
+                RepositoryExecutionError::ExecutionFailed {
+                    name: invocation.name.clone(),
+                    reason: format!(
+                        "Failed to run patch command for '{}': {}",
+                        patch_path, e
+                    ),
+                }
+            })?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                tracing::warn!(
+                    "Patch '{}' failed (non-fatal): {}",
+                    patch_path,
+                    stderr
+                );
+            }
+        }
+    }
+
+    // Run patch commands
+    if let Some(patch_cmds) = attrs.get_string_list("patch_cmds") {
+        for cmd_str in patch_cmds {
+            tracing::info!(
+                "Running patch_cmd for '{}': {}",
+                invocation.name,
+                cmd_str
+            );
+
+            let shell = if cfg!(windows) { "cmd" } else { "sh" };
+            let flag = if cfg!(windows) { "/c" } else { "-c" };
+
+            let output = Command::new(shell)
+                .arg(flag)
+                .arg(cmd_str)
+                .current_dir(working_dir)
+                .output()
+                .map_err(|e| RepositoryExecutionError::ExecutionFailed {
+                    name: invocation.name.clone(),
+                    reason: format!("Failed to run patch_cmd '{}': {}", cmd_str, e),
+                })?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                tracing::warn!(
+                    "patch_cmd '{}' failed (non-fatal): {}",
+                    cmd_str,
+                    stderr
+                );
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Get URLs from attributes (handles both `url` and `urls`).
