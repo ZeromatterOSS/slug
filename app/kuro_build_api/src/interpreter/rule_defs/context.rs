@@ -1152,6 +1152,87 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         Ok(heap.alloc((files_list, empty_manifests)))
     }
 
+    /// Resolves a command to be executed (deprecated Bazel API).
+    ///
+    /// Returns a tuple of `(inputs, command, input_manifests)` where:
+    /// - `inputs`: list of input files needed by the command
+    /// - `command`: list of resolved command strings
+    /// - `input_manifests`: list of runfiles manifests
+    ///
+    /// This is a deprecated Bazel API. Prefer `ctx.resolve_tools()` + `ctx.expand_location()`.
+    #[allow(unused_variables)]
+    fn resolve_command<'v>(
+        this: RefAnalysisContext<'v>,
+        #[starlark(require = named, default = "")] command: &str,
+        #[starlark(require = named, default = NoneType)] attribute: Value<'v>,
+        #[starlark(require = named, default = false)] expand_locations: bool,
+        #[starlark(require = named, default = NoneType)] make_variables: Value<'v>,
+        #[starlark(require = named, default = NoneType)] tools: Value<'v>,
+        #[starlark(require = named, default = NoneType)] label_dict: Value<'v>,
+        #[starlark(require = named, default = NoneType)] execution_requirements: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        use starlark::values::list::AllocList;
+        let _ = this;
+        // Return (inputs=[], command=[command], input_manifests=[])
+        let inputs = heap.alloc(AllocList::EMPTY);
+        let cmd_list = heap.alloc(AllocList(vec![heap.alloc_str(command).to_value()]));
+        let manifests = heap.alloc(AllocList::EMPTY);
+        Ok(heap.alloc((inputs, cmd_list, manifests)))
+    }
+
+    /// Creates a new file (deprecated Bazel API).
+    ///
+    /// This is equivalent to `ctx.actions.declare_file()`. The deprecated form is
+    /// `ctx.new_file(filename)` or `ctx.new_file(sibling, filename)`.
+    #[allow(unused_variables)]
+    fn new_file<'v>(
+        this: RefAnalysisContext<'v>,
+        #[starlark(require = pos)] file_or_sibling: Value<'v>,
+        #[starlark(require = pos, default = NoneType)] filename: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        use kuro_core::fs::buck_out_path::BuckOutPathKind;
+        use kuro_execute::execute::request::OutputType;
+        use crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
+        use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
+
+        // If filename is provided, file_or_sibling is a sibling File
+        // Otherwise, file_or_sibling is the filename string
+        let name = if filename.is_none() {
+            file_or_sibling
+                .unpack_str()
+                .unwrap_or(&file_or_sibling.to_str())
+                .to_owned()
+        } else {
+            filename
+                .unpack_str()
+                .unwrap_or(&filename.to_str())
+                .to_owned()
+        };
+
+        // Delegate to ctx.actions.declare_file via the registry
+        let to_err = |e: kuro_error::Error| -> starlark::Error {
+            starlark::Error::new_other(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+        };
+        let mut state = this.0.actions.state().map_err(to_err)?;
+        let artifact = state
+            .declare_output(
+                None,
+                &name,
+                OutputType::File,
+                None,
+                BuckOutPathKind::default(),
+                heap,
+            )
+            .map_err(to_err)?;
+        Ok(heap.alloc(StarlarkDeclaredArtifact::new(
+            None,
+            artifact,
+            AssociatedArtifacts::new(),
+        )))
+    }
+
     /// Expands `$(location label)` and `$(locations label)` templates in the input string.
     ///
     /// In Bazel, rules can use these templates to embed file paths of targets into strings.

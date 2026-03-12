@@ -912,3 +912,21 @@ async def test_split_attr(buck: Buck) -> None:
     assert lines["has_default_key"] == "True"
     assert lines["value"] == "hello_split"
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_resolve_command(buck: Buck) -> None:
+    """ctx.resolve_command() returns a 3-tuple of (inputs, command, manifests)."""
+    result = await buck.build("//:resolve_command_test")
+    output = result.get_build_report().output_for_target("//:resolve_command_test")
+    content = output.read_text().replace("\r\n", "\n").strip()
+    assert content == "resolve_command_ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_new_file(buck: Buck) -> None:
+    """ctx.new_file() creates a declared artifact that can be written to."""
+    result = await buck.build("//:new_file_test")
+    output = result.get_build_report().output_for_target("//:new_file_test")
+    content = output.read_text().replace("\r\n", "\n").strip()
+    assert content == "new_file_ok"
+

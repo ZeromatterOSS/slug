@@ -786,3 +786,47 @@ split_attr_test = rule(
         "message": attr.string(default = "hello_split"),
     },
 )
+
+
+def _resolve_command_test_impl(ctx):
+    """Tests ctx.resolve_command() returns a 3-tuple (inputs, command, input_manifests)."""
+    result = ctx.resolve_command(command = "echo hello")
+    if type(result) != "tuple":
+        fail("resolve_command should return tuple, got %s" % type(result))
+    if len(result) != 3:
+        fail("resolve_command tuple should have 3 elements, got %d" % len(result))
+    inputs, command, manifests = result
+    if type(inputs) != "list":
+        fail("inputs should be list, got %s" % type(inputs))
+    if type(command) != "list":
+        fail("command should be list, got %s" % type(command))
+    if len(command) != 1:
+        fail("command should have 1 element, got %d" % len(command))
+    if command[0] != "echo hello":
+        fail("command[0] should be 'echo hello', got '%s'" % command[0])
+    if type(manifests) != "list":
+        fail("manifests should be list, got %s" % type(manifests))
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "resolve_command_ok")
+    return [DefaultInfo(default_output = out)]
+
+
+resolve_command_test = rule(
+    implementation = _resolve_command_test_impl,
+    attrs = {},
+)
+
+
+def _new_file_test_impl(ctx):
+    """Tests ctx.new_file() creates a declared artifact."""
+    f = ctx.new_file(ctx.label.name + "_output.txt")
+    # f should be a declared artifact that we can write to
+    ctx.actions.write(f, "new_file_ok")
+    return [DefaultInfo(default_output = f)]
+
+
+new_file_test = rule(
+    implementation = _new_file_test_impl,
+    attrs = {},
+)
