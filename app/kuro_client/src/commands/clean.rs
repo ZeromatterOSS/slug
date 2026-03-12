@@ -140,9 +140,17 @@ impl BuckSubcommand for InnerCleanCommand {
         let buck_out_dir = paths.buck_out_path();
         let daemon_dir = paths.daemon_dir()?;
         let trash_dir = paths.trash_dir();
+        let project_root = paths.project_root().root().as_path().to_path_buf();
         let console = &self.common_opts.console_opts.final_console();
 
         if self.dry_run {
+            // Show Bazel convenience dirs that would be cleaned
+            for name in &["bazel-bin", "bazel-testlogs", "bazel-external"] {
+                let dir = project_root.join(name);
+                if dir.exists() {
+                    console.print_stderr(&dir.to_string_lossy())?;
+                }
+            }
             return clean(
                 buck_out_dir,
                 daemon_dir,
@@ -173,8 +181,18 @@ impl BuckSubcommand for InnerCleanCommand {
             Some(&lifecycle_lock),
             self.background,
         )
-        .await
-        .into()
+        .await?;
+
+        // Clean Bazel convenience directories (bazel-bin, bazel-testlogs, bazel-external)
+        for name in &["bazel-bin", "bazel-testlogs", "bazel-external"] {
+            let dir = project_root.join(name);
+            if dir.exists() {
+                console.print_stderr(&dir.to_string_lossy())?;
+                let _ = std::fs::remove_dir_all(&dir);
+            }
+        }
+
+        ExitResult::success()
     }
 
     fn event_log_opts(&self) -> &CommonEventLogOptions {
@@ -223,7 +241,7 @@ async fn clean(
         console.print_stderr(
             "Tip: Use Ctrl-Z to put this in the background, or run in a new terminal.",
         )?;
-        console.print_stderr("You can run other buck2 commands while this completes.")?;
+        console.print_stderr("You can run other kuro commands while this completes.")?;
 
         // Delete the moved directory
         let trash_target_normalized = AbsNormPathBuf::new(trash_target.to_path_buf())?;
