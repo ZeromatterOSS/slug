@@ -352,6 +352,9 @@ impl<'a> ServerCommandContext<'a> {
         kuro_build_api::interpreter::rule_defs::build_config::set_collect_code_coverage(
             client_context.collect_code_coverage,
         );
+        kuro_build_api::interpreter::rule_defs::build_config::set_force_pic(
+            client_context.force_pic,
+        );
 
         let oncall = if client_context.oncall.is_empty() {
             None

@@ -33,6 +33,7 @@ static BUILD_CONFIG: RwLock<BuildConfig> = RwLock::new(BuildConfig {
     features: None,
     stamp: false,
     collect_code_coverage: false,
+    force_pic: false,
 });
 
 struct BuildConfig {
@@ -60,6 +61,8 @@ struct BuildConfig {
     stamp: bool,
     /// --collect_code_coverage / --nocollect_code_coverage flag.
     collect_code_coverage: bool,
+    /// --force_pic flag.
+    force_pic: bool,
 }
 
 /// Set the compilation mode for the current build.
@@ -264,4 +267,16 @@ pub fn set_collect_code_coverage(enabled: bool) {
 /// Get --collect_code_coverage flag. Returns false if not set.
 pub fn get_collect_code_coverage() -> bool {
     BUILD_CONFIG.read().ok().map(|c| c.collect_code_coverage).unwrap_or(false)
+}
+
+/// Set --force_pic flag for the current build.
+pub fn set_force_pic(enabled: bool) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        config.force_pic = enabled;
+    }
+}
+
+/// Get --force_pic flag. Returns false if not set.
+pub fn get_force_pic() -> bool {
+    BUILD_CONFIG.read().ok().map(|c| c.force_pic).unwrap_or(false)
 }

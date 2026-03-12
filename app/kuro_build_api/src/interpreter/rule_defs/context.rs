@@ -390,8 +390,10 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         let _ = this;
         // Build configuration fragments using the global compilation mode
         let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+        let force_pic = crate::interpreter::rule_defs::build_config::get_force_pic();
+        let coverage = crate::interpreter::rule_defs::build_config::get_collect_code_coverage();
         let cpp = crate::interpreter::rule_defs::fragments::CppFragment::new(
-            mode, false, false, false,
+            mode, force_pic, coverage, false,
         );
         Ok(heap.alloc(ConfigurationFragments::new(cpp)))
     }
@@ -408,8 +410,10 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
         let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+        let force_pic = crate::interpreter::rule_defs::build_config::get_force_pic();
+        let coverage = crate::interpreter::rule_defs::build_config::get_collect_code_coverage();
         let cpp = crate::interpreter::rule_defs::fragments::CppFragment::new(
-            mode, false, false, false,
+            mode, force_pic, coverage, false,
         );
         Ok(heap.alloc(ConfigurationFragments::new(cpp)))
     }
@@ -819,8 +823,8 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         this: RefAnalysisContext,
         #[starlark(default = NoneType)] dep: Value<'v>,
     ) -> starlark::Result<bool> {
-        // For now, coverage is not enabled
-        Ok(false)
+        let _ = (this, dep);
+        Ok(crate::interpreter::rule_defs::build_config::get_collect_code_coverage())
     }
 
     /// Creates a runfiles object (Bazel-compatible).

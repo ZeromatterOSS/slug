@@ -256,6 +256,7 @@ impl<'a> ClientCommandContext<'a> {
             test_env: config_opts.test_env.clone(),
             stamp: false, // Will be set from CommonBuildOptions.stamp on server side
             collect_code_coverage: config_opts.collect_code_coverage && !config_opts.nocollect_code_coverage,
+            force_pic: config_opts.force_pic,
             ..self.empty_client_context(cmd.logging_name())?
         })
     }
@@ -311,6 +312,7 @@ impl<'a> ClientCommandContext<'a> {
             test_env: Vec::new(),
             stamp: false,
             collect_code_coverage: false,
+            force_pic: false,
         })
     }
 
