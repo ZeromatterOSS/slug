@@ -791,13 +791,13 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
                 for key in iter {
                     if let Some(k) = key.unpack_str() {
                         match k {
-                            "no-remote" => {
+                            "no-remote" | "no-remote-exec" | "local" | "no-sandbox" => {
                                 executor_preference = ExecutorPreference::LocalRequired;
                             }
-                            "no-cache" => {
+                            "no-cache" | "no-remote-cache" => {
                                 effective_allow_cache_upload = NoneOr::Other(false);
                             }
-                            _ => {} // Ignore other keys like "requires-network"
+                            _ => {} // Ignore informational keys: requires-network, block-network, etc.
                         }
                     }
                 }
@@ -986,8 +986,8 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
                 for key in iter {
                     if let Some(k) = key.unpack_str() {
                         match k {
-                            "no-remote" => local_only = true,
-                            "no-cache" => no_cache = true,
+                            "no-remote" | "no-remote-exec" | "local" | "no-sandbox" => local_only = true,
+                            "no-cache" | "no-remote-cache" => no_cache = true,
                             _ => {}
                         }
                     }

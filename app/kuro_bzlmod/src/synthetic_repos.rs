@@ -130,8 +130,59 @@ fn generate_synthetic_repos_for_extension(usage: &ExtensionUsage) -> Option<Vec<
         | ("@rules_python//python/extensions:python.bzl", "python") => {
             Some(generate_rules_python_toolchain_repos(usage))
         }
-        _ => None,
+        _ => {
+            // For unrecognized extensions, generate minimal stub repos for each use_repo name.
+            // This prevents cell-not-found errors when projects use extensions we don't
+            // natively support yet (e.g., rules_go, gazelle, aspect_bazel_lib, protobuf).
+            let repos = generate_stub_repos_for_extension(usage);
+            if repos.is_empty() {
+                None
+            } else {
+                Some(repos)
+            }
+        }
     }
+}
+
+/// Generate minimal stub repos for an unrecognized module extension.
+///
+/// Each use_repo() name gets an empty BUILD file so the cell alias resolves.
+/// The repos won't have real content, but this prevents resolution failures
+/// for extensions whose repos are only transitively referenced.
+fn generate_stub_repos_for_extension(usage: &ExtensionUsage) -> Vec<SyntheticRepo> {
+    let mut repos = Vec::new();
+    for import in &usage.imports {
+        for repo_name in &import.repos {
+            let mut files = HashMap::new();
+            files.insert(
+                "BUILD.bazel".to_owned(),
+                format!(
+                    "# Stub repo for unrecognized extension: {}:{}\nfilegroup(name = \"all\", srcs = glob([\"**\"]), visibility = [\"//visibility:public\"])\n",
+                    usage.extension_bzl_file, usage.extension_name,
+                ),
+            );
+            repos.push(SyntheticRepo {
+                name: repo_name.clone(),
+                files,
+            });
+        }
+        // Also handle keyword remapping (apparent_name -> actual_name)
+        for (apparent_name, _actual_name) in &import.repo_mapping {
+            let mut files = HashMap::new();
+            files.insert(
+                "BUILD.bazel".to_owned(),
+                format!(
+                    "# Stub repo for unrecognized extension: {}:{}\nfilegroup(name = \"all\", srcs = glob([\"**\"]), visibility = [\"//visibility:public\"])\n",
+                    usage.extension_bzl_file, usage.extension_name,
+                ),
+            );
+            repos.push(SyntheticRepo {
+                name: apparent_name.clone(),
+                files,
+            });
+        }
+    }
+    repos
 }
 
 /// Generate the @bazel_features_version and @bazel_features_globals repos.
