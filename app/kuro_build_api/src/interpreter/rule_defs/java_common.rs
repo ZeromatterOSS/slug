@@ -97,7 +97,7 @@ impl<'v> StarlarkValue<'v> for JavaCommonModule {
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "INCOMPATIBLE_ENABLE_JAVA_TOOLCHAIN_RESOLUTION" => Some(Value::new_bool(false)),
+            "INCOMPATIBLE_ENABLE_JAVA_TOOLCHAIN_RESOLUTION" => Some(Value::new_bool(true)),
             "JavaRuntimeInfo" => Some(heap.alloc(JavaRuntimeInfoProvider)),
             "JavaToolchainInfo" => Some(heap.alloc(JavaToolchainInfoProvider)),
             "provider" => Some(heap.alloc(JavaInfoProvider)),
