@@ -1743,6 +1743,12 @@ impl<'v> StarlarkValue<'v> for ToolchainsStub {
             Ok(heap.alloc(RustToolchainInfoStub))
         } else if target_name == "toolchain_type" && (pkg_segment == "cc" || pkg_segment == "cpp") {
             Ok(heap.alloc(CcToolchainInfoStub { is_tool: self.is_tool }))
+        } else if target_name == "toolchain_type" && (pkg_segment == "java" || key_str.contains("rules_java")) {
+            // Java toolchain: ctx.toolchains["@rules_java//java:toolchain_type"].java
+            Ok(heap.alloc(JavaToolchainWrapperStub))
+        } else if target_name == "runtime_toolchain_type" && (pkg_segment == "java" || key_str.contains("rules_java")) {
+            // Java runtime toolchain: ctx.toolchains["@rules_java//java:runtime_toolchain_type"].java_runtime
+            Ok(heap.alloc(JavaRuntimeToolchainWrapperStub))
         } else if target_name == "toolchain_type"
             && key_str.contains("python")
             && !key_str.contains("exec_tools")
@@ -3849,6 +3855,245 @@ impl<'v> StarlarkValue<'v> for PyRuntimeInfoStub {
             "site_init_template" => Some(Value::new_none()),
             _ => None,
         }
+    }
+}
+
+// ============================================================================
+// Java toolchain stubs
+// ============================================================================
+
+/// Stub for the Java toolchain wrapper object.
+/// In Bazel, `ctx.toolchains["@rules_java//java:toolchain_type"]` returns
+/// an object with a `.java` attribute containing the `JavaToolchainInfo`.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct JavaToolchainWrapperStub;
+
+impl std::fmt::Display for JavaToolchainWrapperStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<JavaToolchainWrapper>")
+    }
+}
+
+starlark::starlark_simple_value!(JavaToolchainWrapperStub);
+
+#[starlark::values::starlark_value(type = "JavaToolchainWrapper")]
+impl<'v> StarlarkValue<'v> for JavaToolchainWrapperStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "java" | "java_runtime")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "java" => Some(heap.alloc(JavaToolchainInfoStub)),
+            "java_runtime" => Some(heap.alloc(JavaRuntimeInfoStub)),
+            _ => None,
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec!["java".to_owned(), "java_runtime".to_owned()]
+    }
+}
+
+/// Stub for JavaToolchainInfo providing minimal attributes for rules_java.
+///
+/// Provides the key fields that rules_java Starlark code accesses:
+/// bootclasspath, ijar, java_runtime, jvm_opt, source_version, target_version, etc.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct JavaToolchainInfoStub;
+
+impl std::fmt::Display for JavaToolchainInfoStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<JavaToolchainInfo>")
+    }
+}
+
+starlark::starlark_simple_value!(JavaToolchainInfoStub);
+
+#[starlark::values::starlark_value(type = "JavaToolchainInfo")]
+impl<'v> StarlarkValue<'v> for JavaToolchainInfoStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(
+            attribute,
+            "bootclasspath"
+                | "ijar"
+                | "jacocorunner"
+                | "java_runtime"
+                | "jvm_opt"
+                | "label"
+                | "proguard_allowlister"
+                | "single_jar"
+                | "source_version"
+                | "target_version"
+                | "tools"
+                | "_javabuilder"
+                | "_header_compiler"
+                | "_header_compiler_direct"
+                | "_header_compiler_builtin_processors"
+                | "_javacopts"
+                | "_javacopts_list"
+                | "_compatible_javacopts"
+                | "_javac_supports_workers"
+                | "_javac_supports_multiplex_workers"
+                | "_javac_supports_worker_cancellation"
+                | "_javac_supports_worker_multiplex_sandboxing"
+                | "_gen_class"
+                | "_deps_checker"
+                | "_forcibly_disable_header_compilation"
+                | "_one_version_tool"
+                | "_one_version_allowlist"
+                | "_one_version_allowlist_for_tests"
+                | "_android_linter"
+                | "_bytecode_optimizer"
+                | "_local_java_optimization_config"
+                | "_timezone_data"
+                | "_reduced_classpath_incompatible_processors"
+                | "_package_configuration"
+                | "_jspecify_info"
+                | "_bootclasspath_info"
+        )
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        use starlark::values::list::AllocList;
+        let empty_depset = || heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty());
+        match attribute {
+            "bootclasspath" => Some(empty_depset()),
+            "ijar" => Some(Value::new_none()),
+            "jacocorunner" => Some(Value::new_none()),
+            "java_runtime" => Some(heap.alloc(JavaRuntimeInfoStub)),
+            "jvm_opt" => Some(empty_depset()),
+            "label" => Some(Value::new_none()),
+            "proguard_allowlister" => Some(Value::new_none()),
+            "single_jar" => Some(Value::new_none()),
+            "source_version" => Some(heap.alloc_str("11").to_value()),
+            "target_version" => Some(heap.alloc_str("11").to_value()),
+            "tools" => Some(empty_depset()),
+            // Internal fields used by rules_java Starlark
+            "_javabuilder" => Some(Value::new_none()),
+            "_header_compiler" => Some(Value::new_none()),
+            "_header_compiler_direct" => Some(Value::new_none()),
+            "_header_compiler_builtin_processors" => Some(heap.alloc(AllocList::EMPTY)),
+            "_javacopts" => Some(empty_depset()),
+            "_javacopts_list" => Some(heap.alloc(AllocList::EMPTY)),
+            "_compatible_javacopts" => Some(heap.alloc(starlark::values::dict::Dict::default())),
+            "_javac_supports_workers" => Some(Value::new_bool(true)),
+            "_javac_supports_multiplex_workers" => Some(Value::new_bool(true)),
+            "_javac_supports_worker_cancellation" => Some(Value::new_bool(false)),
+            "_javac_supports_worker_multiplex_sandboxing" => Some(Value::new_bool(false)),
+            "_gen_class" => Some(Value::new_none()),
+            "_deps_checker" => Some(Value::new_none()),
+            "_forcibly_disable_header_compilation" => Some(Value::new_bool(false)),
+            "_one_version_tool" => Some(Value::new_none()),
+            "_one_version_allowlist" => Some(Value::new_none()),
+            "_one_version_allowlist_for_tests" => Some(Value::new_none()),
+            "_android_linter" => Some(Value::new_none()),
+            "_bytecode_optimizer" => Some(Value::new_none()),
+            "_local_java_optimization_config" => Some(Value::new_none()),
+            "_timezone_data" => Some(Value::new_none()),
+            "_reduced_classpath_incompatible_processors" => Some(heap.alloc(AllocList::EMPTY)),
+            "_package_configuration" => Some(heap.alloc(AllocList::EMPTY)),
+            "_jspecify_info" => Some(Value::new_none()),
+            "_bootclasspath_info" => Some(Value::new_none()),
+            _ => None,
+        }
+    }
+}
+
+/// Stub for JavaRuntimeInfo providing minimal attributes for rules_java.
+///
+/// Provides java_home, java_executable paths, files, and version info.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct JavaRuntimeInfoStub;
+
+impl std::fmt::Display for JavaRuntimeInfoStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<JavaRuntimeInfo>")
+    }
+}
+
+starlark::starlark_simple_value!(JavaRuntimeInfoStub);
+
+#[starlark::values::starlark_value(type = "JavaRuntimeInfo")]
+impl<'v> StarlarkValue<'v> for JavaRuntimeInfoStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(
+            attribute,
+            "java_home"
+                | "java_home_runfiles_path"
+                | "java_executable_exec_path"
+                | "java_executable_runfiles_path"
+                | "files"
+                | "hermetic_files"
+                | "hermetic_static_libs"
+                | "lib_modules"
+                | "lib_ct_sym"
+                | "default_cds"
+                | "version"
+        )
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        let empty_depset = || heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty());
+        // Try to detect JAVA_HOME from environment
+        let java_home = std::env::var("JAVA_HOME").unwrap_or_else(|_| {
+            if cfg!(windows) {
+                "C:/Program Files/Java/jdk-11".to_owned()
+            } else {
+                "/usr/lib/jvm/java-11".to_owned()
+            }
+        });
+        let java_exe = if cfg!(windows) {
+            format!("{}/bin/java.exe", java_home)
+        } else {
+            format!("{}/bin/java", java_home)
+        };
+        match attribute {
+            "java_home" => Some(heap.alloc_str(&java_home).to_value()),
+            "java_home_runfiles_path" => Some(heap.alloc_str(&java_home).to_value()),
+            "java_executable_exec_path" => Some(heap.alloc_str(&java_exe).to_value()),
+            "java_executable_runfiles_path" => Some(heap.alloc_str(&java_exe).to_value()),
+            "files" => Some(empty_depset()),
+            "hermetic_files" => Some(empty_depset()),
+            "hermetic_static_libs" => Some(heap.alloc(starlark::values::list::AllocList::EMPTY)),
+            "lib_modules" => Some(Value::new_none()),
+            "lib_ct_sym" => Some(Value::new_none()),
+            "default_cds" => Some(Value::new_none()),
+            "version" => Some(heap.alloc(11)),
+            _ => None,
+        }
+    }
+}
+
+/// Stub for the Java runtime toolchain wrapper.
+/// `ctx.toolchains["@rules_java//java:runtime_toolchain_type"]` returns
+/// an object with `.java_runtime` containing the `JavaRuntimeInfo`.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct JavaRuntimeToolchainWrapperStub;
+
+impl std::fmt::Display for JavaRuntimeToolchainWrapperStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<JavaRuntimeToolchainWrapper>")
+    }
+}
+
+starlark::starlark_simple_value!(JavaRuntimeToolchainWrapperStub);
+
+#[starlark::values::starlark_value(type = "JavaRuntimeToolchainWrapper")]
+impl<'v> StarlarkValue<'v> for JavaRuntimeToolchainWrapperStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "java_runtime")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "java_runtime" => Some(heap.alloc(JavaRuntimeInfoStub)),
+            _ => None,
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec!["java_runtime".to_owned()]
     }
 }
 

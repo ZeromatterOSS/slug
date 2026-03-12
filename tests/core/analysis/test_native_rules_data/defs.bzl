@@ -830,3 +830,40 @@ new_file_test = rule(
     implementation = _new_file_test_impl,
     attrs = {},
 )
+
+
+def _java_toolchain_test_impl(ctx):
+    """Tests that Java toolchain stubs provide expected attributes."""
+    # Test Java toolchain lookup
+    java_tc_wrapper = ctx.toolchains["@rules_java//java:toolchain_type"]
+    results = []
+
+    # The wrapper should have a .java attribute
+    results.append("has_java=" + str(hasattr(java_tc_wrapper, "java")))
+    java_tc = java_tc_wrapper.java
+
+    # JavaToolchainInfo should have source_version, target_version, java_runtime
+    results.append("source_version=" + str(java_tc.source_version))
+    results.append("target_version=" + str(java_tc.target_version))
+    results.append("has_java_runtime=" + str(java_tc.java_runtime != None))
+    results.append("has_bootclasspath=" + str(java_tc.bootclasspath != None))
+    results.append("has_jvm_opt=" + str(java_tc.jvm_opt != None))
+    results.append("worker_support=" + str(java_tc._javac_supports_workers))
+
+    # Test Java runtime toolchain lookup
+    runtime_wrapper = ctx.toolchains["@rules_java//java:runtime_toolchain_type"]
+    results.append("has_java_runtime_attr=" + str(hasattr(runtime_wrapper, "java_runtime")))
+    java_runtime = runtime_wrapper.java_runtime
+    results.append("has_java_home=" + str(java_runtime.java_home != None))
+    results.append("has_java_exe=" + str(java_runtime.java_executable_exec_path != None))
+    results.append("version=" + str(java_runtime.version))
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "\n".join(results) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+java_toolchain_test = rule(
+    implementation = _java_toolchain_test_impl,
+    attrs = {},
+)

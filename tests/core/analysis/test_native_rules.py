@@ -930,3 +930,24 @@ async def test_new_file(buck: Buck) -> None:
     content = output.read_text().replace("\r\n", "\n").strip()
     assert content == "new_file_ok"
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_java_toolchain_stubs(buck: Buck) -> None:
+    """Java toolchain stubs provide expected attributes for rules_java compatibility."""
+    result = await buck.build("//:java_toolchain_test")
+    output = result.get_build_report().output_for_target("//:java_toolchain_test")
+    content = output.read_text().replace("\r\n", "\n")
+    lines = dict(line.split("=", 1) for line in content.strip().split("\n") if "=" in line)
+
+    assert lines["has_java"] == "True"
+    assert lines["source_version"] == "11"
+    assert lines["target_version"] == "11"
+    assert lines["has_java_runtime"] == "True"
+    assert lines["has_bootclasspath"] == "True"
+    assert lines["has_jvm_opt"] == "True"
+    assert lines["worker_support"] == "True"
+    assert lines["has_java_runtime_attr"] == "True"
+    assert lines["has_java_home"] == "True"
+    assert lines["has_java_exe"] == "True"
+    assert lines["version"] == "11"
+
