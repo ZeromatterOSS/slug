@@ -3,9 +3,12 @@ load(
     "depset_consumer",
     "depset_default_infer_rule",
     "depset_keyword_rule",
+    "depset_len_rule",
     "depset_mismatch_rule",
+    "depset_order_attr_rule",
     "depset_order_rule",
     "depset_producer",
+    "depset_union_rule",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -51,4 +54,19 @@ depset_consumer(
 # Test depset() with keyword direct= and transitive= args
 depset_keyword_rule(
     name = "depset_keyword",
+)
+
+# Test depset | operator (union)
+depset_union_rule(
+    name = "depset_union",
+)
+
+# Test depset.order attribute
+depset_order_attr_rule(
+    name = "depset_order_attr",
+)
+
+# Test len(depset)
+depset_len_rule(
+    name = "depset_len",
 )

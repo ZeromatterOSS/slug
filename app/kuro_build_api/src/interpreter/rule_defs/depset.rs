@@ -254,6 +254,44 @@ impl<'v> StarlarkValue<'v> for Depset {
     fn length(&self) -> starlark::Result<i32> {
         Ok(self.len() as i32)
     }
+
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "direct" | "transitive" | "order")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "direct" => {
+                let elems: Vec<Value<'v>> = self.direct.iter().map(|v| v.to_value()).collect();
+                Some(heap.alloc(AllocList(elems)))
+            }
+            "transitive" => {
+                let children: Vec<Value<'v>> =
+                    self.children.iter().map(|v| v.to_value()).collect();
+                Some(heap.alloc(AllocList(children)))
+            }
+            "order" => Some(heap.alloc(self.order.as_str())),
+            _ => None,
+        }
+    }
+
+    fn bit_or(&self, other: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        // depset | depset creates a new depset with both as transitive children
+        let self_val = heap.alloc(Depset::new(
+            self.direct.clone(),
+            self.children.clone(),
+            self.order.clone(),
+        ));
+        let transitive = vec![self_val, other];
+        let effective_order = validate_depset_order(&self.order, &transitive)?;
+        let direct_list = heap.alloc(AllocList::EMPTY);
+        let transitive_list = heap.alloc(AllocList(transitive));
+        Ok(heap.alloc(LiveDepsetGen {
+            direct: direct_list,
+            transitive: transitive_list,
+            order: effective_order,
+        }))
+    }
 }
 
 /// Methods available on frozen depset objects.
@@ -353,16 +391,54 @@ where
         false
     }
 
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "direct" | "transitive")
+    fn length(&self) -> starlark::Result<i32> {
+        // Count direct elements
+        let direct_len = self.direct.to_value().length().unwrap_or(0);
+        // Count transitive elements by summing children lengths
+        let mut total = direct_len;
+        let trans_val = self.transitive.to_value();
+        let trans_len = trans_val.length().unwrap_or(0);
+        for i in 0..trans_len {
+            if let Some(list) = ListRef::from_value(trans_val) {
+                if let Some(child) = list.iter().nth(i as usize) {
+                    total += child.length().unwrap_or(0);
+                }
+            }
+        }
+        Ok(total)
     }
 
-    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "direct" | "transitive" | "order")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "direct" => Some(self.direct.to_value()),
             "transitive" => Some(self.transitive.to_value()),
+            "order" => Some(heap.alloc(self.order.as_str())),
             _ => None,
         }
+    }
+
+    fn bit_or(&self, other: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        // depset | depset creates a new depset with both as transitive children
+        let self_order = self.order.clone();
+        let self_direct = heap.alloc(AllocList::EMPTY);
+        // Create a depset value for self to use as transitive child
+        let self_depset = heap.alloc(LiveDepsetGen {
+            direct: self.direct.to_value(),
+            transitive: self.transitive.to_value(),
+            order: self_order.clone(),
+        });
+        let transitive = vec![self_depset, other];
+        let effective_order = validate_depset_order(&self_order, &transitive)?;
+        let transitive_list = heap.alloc(AllocList(transitive));
+        Ok(heap.alloc(LiveDepsetGen {
+            direct: self_direct,
+            transitive: transitive_list,
+            order: effective_order,
+        }))
     }
 }
 

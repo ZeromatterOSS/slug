@@ -100,3 +100,55 @@ depset_keyword_rule = rule(
     implementation = _depset_keyword_impl,
     attrs = {},
 )
+
+
+# === depset | operator (union) ===
+
+def _depset_union_impl(ctx):
+    """Tests depset | depset union operator."""
+    a = depset(["x", "y"])
+    b = depset(["z"])
+    c = a | b
+    out = ctx.actions.declare_file("union_depset.txt")
+    ctx.actions.write(out, "\n".join(sorted(c.to_list())))
+    return [DefaultInfo(default_output = out)]
+
+
+depset_union_rule = rule(
+    implementation = _depset_union_impl,
+    attrs = {},
+)
+
+
+# === depset .order attribute ===
+
+def _depset_order_attr_impl(ctx):
+    """Tests depset.order attribute access."""
+    a = depset(["x"], order = "preorder")
+    b = depset(["y"])  # default order
+    out = ctx.actions.declare_file("order_attr.txt")
+    ctx.actions.write(out, a.order + "\n" + b.order)
+    return [DefaultInfo(default_output = out)]
+
+
+depset_order_attr_rule = rule(
+    implementation = _depset_order_attr_impl,
+    attrs = {},
+)
+
+
+# === len(depset) ===
+
+def _depset_len_impl(ctx):
+    """Tests len(depset) works."""
+    a = depset(["x", "y"])
+    b = depset(["z"], transitive = [a])
+    out = ctx.actions.declare_file("len_depset.txt")
+    ctx.actions.write(out, str(len(b)))
+    return [DefaultInfo(default_output = out)]
+
+
+depset_len_rule = rule(
+    implementation = _depset_len_impl,
+    attrs = {},
+)

@@ -71,3 +71,30 @@ async def test_depset_keyword_direct_transitive(buck: Buck) -> None:
     output = result.get_build_report().output_for_target("//:depset_keyword")
     content = set(output.read_text().strip().splitlines())
     assert content == {"x", "y", "z"}, f"Expected {{x, y, z}}, got {content}"
+
+
+@buck_test(data_dir="test_depset_order_data")
+async def test_depset_union_operator(buck: Buck) -> None:
+    """depset | depset creates a union of both depsets."""
+    result = await buck.build("//:depset_union")
+    output = result.get_build_report().output_for_target("//:depset_union")
+    content = output.read_text().strip().splitlines()
+    assert content == ["x", "y", "z"], f"Expected [x, y, z], got {content}"
+
+
+@buck_test(data_dir="test_depset_order_data")
+async def test_depset_order_attribute(buck: Buck) -> None:
+    """depset.order returns the traversal order string."""
+    result = await buck.build("//:depset_order_attr")
+    output = result.get_build_report().output_for_target("//:depset_order_attr")
+    content = output.read_text().strip().splitlines()
+    assert content == ["preorder", "default"], f"Expected [preorder, default], got {content}"
+
+
+@buck_test(data_dir="test_depset_order_data")
+async def test_depset_len(buck: Buck) -> None:
+    """len(depset) returns the total number of elements."""
+    result = await buck.build("//:depset_len")
+    output = result.get_build_report().output_for_target("//:depset_len")
+    content = output.read_text().strip()
+    assert content == "3", f"Expected 3, got {content}"
