@@ -41,6 +41,8 @@ use kuro_error::BuckErrorContext;
 use kuro_error::ErrorTag;
 use kuro_error::ExitCode;
 use kuro_error::kuro_error;
+use kuro_event_observer::display::TestOutputMode;
+use kuro_event_observer::display::set_test_output_mode;
 use kuro_event_observer::unpack_event::unpack_event;
 use kuro_fs::fs_util;
 use kuro_fs::working_dir::AbsWorkingDir;
@@ -361,6 +363,14 @@ impl StreamingCommand for TestCommand {
         ctx: &mut ClientCommandContext<'_>,
         events_ctx: &mut EventsCtx,
     ) -> ExitResult {
+        // Set the test output mode so display formatting respects --test_output.
+        let output_mode = self
+            .test_output
+            .as_deref()
+            .map(TestOutputMode::from_str)
+            .unwrap_or(TestOutputMode::Errors);
+        set_test_output_mode(output_mode);
+
         let context = ctx.client_context(matches, &self)?;
 
         // Bazel --test_tag_filters=tag1,tag2,-tag3 compat: split positive/negative entries.

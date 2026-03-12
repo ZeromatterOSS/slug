@@ -13,6 +13,7 @@
 use std::fmt;
 use std::fmt::Write;
 use std::sync::Arc;
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use dupe::Dupe;
@@ -45,6 +46,48 @@ use crate::fmt_duration;
 use crate::verbosity::Verbosity;
 use crate::what_ran::command_to_string;
 use crate::what_ran::worker_command_as_fallback_to_string;
+
+/// Controls how test results are displayed to the user.
+/// Mirrors Bazel's --test_output flag.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TestOutputMode {
+    /// Show only a summary of test results (default for non-test commands).
+    Summary,
+    /// Show output of failing tests only (default).
+    Errors,
+    /// Show output of all tests including passing ones.
+    All,
+    /// Show abbreviated output (status line, no details).
+    Short,
+    /// Stream test output in real-time (currently same as All).
+    Streamed,
+}
+
+impl TestOutputMode {
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "summary" => TestOutputMode::Summary,
+            "errors" => TestOutputMode::Errors,
+            "all" => TestOutputMode::All,
+            "short" => TestOutputMode::Short,
+            "streamed" => TestOutputMode::Streamed,
+            _ => TestOutputMode::Errors,
+        }
+    }
+}
+
+static TEST_OUTPUT_MODE: OnceLock<TestOutputMode> = OnceLock::new();
+
+/// Set the test output mode for this process. Called by the test command
+/// before entering the event loop.
+pub fn set_test_output_mode(mode: TestOutputMode) {
+    let _ = TEST_OUTPUT_MODE.set(mode);
+}
+
+/// Get the current test output mode.
+fn get_test_output_mode() -> TestOutputMode {
+    TEST_OUTPUT_MODE.get().copied().unwrap_or(TestOutputMode::Errors)
+}
 
 #[derive(Copy, Clone, Dupe)]
 pub struct TargetDisplayOptions {
@@ -583,11 +626,22 @@ pub fn format_test_result(
         ..
     } = test_result;
     let status = TestStatus::try_from(*status)?;
+    let mode = get_test_output_mode();
 
-    // Pass results normally have no details, unless the --print-passing-details is set.
-    // Do not display anything for passing tests unless details are present to avoid
-    // cluttering the UI with unimportant test results.
-    if matches!(&status, TestStatus::PASS | TestStatus::LISTING_SUCCESS) && details.is_empty() {
+    // In summary mode, don't show individual test results at all.
+    if mode == TestOutputMode::Summary {
+        return Ok(None);
+    }
+
+    let is_pass = matches!(&status, TestStatus::PASS | TestStatus::LISTING_SUCCESS);
+
+    // In errors mode (default), hide passing tests unless they have details.
+    if mode == TestOutputMode::Errors && is_pass && details.is_empty() {
+        return Ok(None);
+    }
+
+    // In short mode, only show failing tests (no details).
+    if mode == TestOutputMode::Short && is_pass {
         return Ok(None);
     }
 
@@ -614,12 +668,12 @@ pub fn format_test_result(
             ))?);
         }
     }
-    // If a test has details, we always show them. It's the test runner's
-    // responsibility to withhold details when these are not relevant.
-    // For instance, tpx will always withhold details of passing tests
-    // unless the --print-passing-details is set.
+
     let mut lines = vec![base];
-    if !details.is_empty() {
+
+    // In short mode, suppress details even for failing tests.
+    // In all/streamed/errors modes, show details if present.
+    if mode != TestOutputMode::Short && !details.is_empty() {
         lines.append(&mut Lines::from_multiline_string(details, Default::default()).0);
     }
     Ok(Some(Lines(lines)))
