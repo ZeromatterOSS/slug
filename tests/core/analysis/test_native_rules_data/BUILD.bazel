@@ -1,4 +1,4 @@
-load(":defs.bzl", "bool_flag", "capture_existing_rules", "cc_command_line_test", "cc_compilation_context_test", "cc_configure_features_test", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "collect_files", "existing_rules_test", "int_values_test", "java_common_test", "nonempty_deps_test", "nonempty_strings_test", "run_env_info", "select_value", "sibling_file", "stamp_file_info", "string_flag", "write_list")
+load(":defs.bzl", "bool_flag", "capture_existing_rules", "cc_command_line_test", "cc_compilation_context_test", "cc_configure_features_test", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "collect_files", "executable_rule", "existing_rules_test", "int_values_test", "java_common_test", "nonempty_deps_test", "nonempty_strings_test", "non_executable_rule", "run_env_info", "select_value", "sibling_file", "stamp_file_info", "string_flag", "write_list")
 
 # === filegroup tests ===
 
@@ -563,6 +563,16 @@ nonempty_deps_test(
 nonempty_strings_test(
     name = "nonempty_strings_valid",
     items = ["hello", "world"],
+)
+
+# === rule(executable=True) tests ===
+
+executable_rule(
+    name = "my_executable",
+)
+
+non_executable_rule(
+    name = "my_non_executable",
 )
 
 # === existing_rules() / repository_name() test ===

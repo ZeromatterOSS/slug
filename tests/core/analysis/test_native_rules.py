@@ -730,3 +730,21 @@ async def test_allow_empty_string_list_rejects_empty(buck: Buck) -> None:
     with pytest.raises(BuckException):
         await buck.build("//:empty_strings_invalid")
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_rule_executable_true(buck: Buck) -> None:
+    """rule(executable=True) makes ctx.outputs.executable available."""
+    result = await buck.build("//:my_executable")
+    output = result.get_build_report().output_for_target("//:my_executable")
+    content = output.read_text().strip()
+    assert "echo hello" in content
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_rule_non_executable(buck: Buck) -> None:
+    """A rule without executable=True still works normally."""
+    result = await buck.build("//:my_non_executable")
+    output = result.get_build_report().output_for_target("//:my_non_executable")
+    content = output.read_text().strip()
+    assert "not executable" in content
+

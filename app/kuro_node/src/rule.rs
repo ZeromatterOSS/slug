@@ -48,6 +48,10 @@ pub struct Rule {
     /// Test rules auto-generate `ExternalRunnerTestInfo` from `DefaultInfo.executable`
     /// during analysis if no explicit `ExternalRunnerTestInfo` is provided.
     pub is_test: bool,
+    /// Whether this rule produces an executable (created with `rule(executable=True)`).
+    /// Executable rules have `ctx.outputs.executable` auto-declared and can be used
+    /// with `kuro run`.
+    pub is_executable: bool,
     /// Toolchain type labels declared via `rule(toolchains=[...])`.
     /// Used during analysis to populate `ctx.toolchains`.
     pub toolchain_types: Vec<String>,

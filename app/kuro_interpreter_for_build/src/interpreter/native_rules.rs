@@ -108,6 +108,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -121,6 +122,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -151,6 +153,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -200,6 +203,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -238,6 +242,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -310,6 +315,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -324,6 +330,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -364,6 +371,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -378,6 +386,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -472,6 +481,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -532,6 +542,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -554,6 +565,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -578,6 +590,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -658,6 +671,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -670,6 +684,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: true,
             toolchain_types: vec![],
         })
     });
@@ -682,6 +697,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: true,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -703,6 +719,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -760,6 +777,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: true,
             toolchain_types: vec![],
         })
     });
@@ -772,6 +790,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: true,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -784,6 +803,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -799,6 +819,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -813,6 +834,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: true,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -863,6 +885,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -900,6 +923,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -945,6 +969,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -975,6 +1000,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -1037,6 +1063,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -1099,6 +1126,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });
@@ -1137,6 +1165,7 @@ pub(crate) mod rule_defs {
             cfg: RuleIncomingTransition::None,
             uses_plugins: vec![],
             is_test: false,
+            is_executable: false,
             toolchain_types: vec![],
         })
     });

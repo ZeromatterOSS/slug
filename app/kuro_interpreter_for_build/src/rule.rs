@@ -135,6 +135,8 @@ pub struct StarlarkRuleCallable<'v> {
     artifact_promise_mappings: Option<ArtifactPromiseMappings<'v>>,
     /// Whether this is a Bazel test rule (created with `rule(test=True)`).
     is_test: bool,
+    /// Whether this rule produces an executable (created with `rule(executable=True)`).
+    is_executable: bool,
     /// Names of attributes that are `attr.output()` type.
     /// Used to register output file labels for Bazel-compatible dep resolution.
     output_attr_names: Vec<String>,
@@ -216,6 +218,7 @@ impl<'v> StarlarkRuleCallable<'v> {
         uses_plugins: Vec<PluginKind>,
         artifact_promise_mappings: Option<ArtifactPromiseMappings<'v>>,
         is_test: bool,
+        is_executable: bool,
         rule_outputs: Vec<(String, String)>,
         toolchain_types: Vec<String>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -318,6 +321,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             ignore_attrs_for_profiling: build_context.ignore_attrs_for_profiling,
             artifact_promise_mappings,
             is_test,
+            is_executable,
             output_attr_names,
             rule_outputs,
             toolchain_types,
@@ -350,6 +354,7 @@ impl<'v> StarlarkRuleCallable<'v> {
                     .collect::<SmallMap<_, _>>(),
             }),
             false,      // anon rules are never test rules
+            false,      // anon rules are never executable
             Vec::new(), // anon rules have no rule_outputs
             Vec::new(), // anon rules have no toolchain_types
             eval,
@@ -522,6 +527,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
                 rule_kind: self.rule_kind,
                 uses_plugins: self.uses_plugins,
                 is_test: self.is_test,
+                is_executable: self.is_executable,
                 toolchain_types: self.toolchain_types.clone(),
             }),
             rule_type,
@@ -829,14 +835,12 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         // TODO(bazel): Use the subrules parameter for subrule composition
         // TODO(bazel): Use the initializer parameter for pre-analysis attribute validation
         // TODO(bazel): Use the exec_groups parameter for execution groups
-        // TODO(bazel): Use the executable parameter
         let _unused = (
             provides,
             fragments,
             subrules,
             initializer,
             exec_groups,
-            executable,
             extra_kwargs,
         );
 
@@ -999,6 +1003,7 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
                 .collect(),
             None,
             test,
+            executable,
             rule_outputs,
             toolchain_types,
             eval,

@@ -201,6 +201,11 @@ impl TargetNode {
         self.0.rule.is_test
     }
 
+    /// Whether this rule produces an executable (created with `rule(executable=True)`).
+    pub fn is_executable(&self) -> bool {
+        self.0.rule.is_executable
+    }
+
     /// Toolchain type labels declared via `rule(toolchains=[...])`.
     pub fn toolchain_types(&self) -> &[String] {
         &self.0.rule.toolchain_types
@@ -738,6 +743,7 @@ pub mod testing {
                     cfg: RuleIncomingTransition::None,
                     uses_plugins: Vec::new(),
                     is_test: false,
+                    is_executable: false,
                     toolchain_types: Vec::new(),
                 }),
                 Arc::new(Package {

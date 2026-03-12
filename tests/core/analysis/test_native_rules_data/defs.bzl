@@ -448,6 +448,36 @@ int_values_test = rule(
 )
 
 
+def _executable_rule_impl(ctx):
+    """Tests that rule(executable=True) provides ctx.outputs.executable."""
+    exe = ctx.outputs.executable
+    ctx.actions.write(exe, "#!/bin/sh\necho hello\n")
+    return [DefaultInfo(
+        default_output = exe,
+        executable = exe,
+    )]
+
+
+executable_rule = rule(
+    implementation = _executable_rule_impl,
+    executable = True,
+    attrs = {},
+)
+
+
+def _non_executable_rule_impl(ctx):
+    """A rule without executable=True for comparison."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "not executable\n")
+    return [DefaultInfo(default_output = out)]
+
+
+non_executable_rule = rule(
+    implementation = _non_executable_rule_impl,
+    attrs = {},
+)
+
+
 def _nonempty_deps_test_impl(ctx):
     """Tests that allow_empty=False on label_list is enforced."""
     out = ctx.actions.declare_file(ctx.label.name + ".txt")
