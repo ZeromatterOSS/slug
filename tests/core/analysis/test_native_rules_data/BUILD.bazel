@@ -104,6 +104,33 @@ platform(
     constraint_values = [":macos"],
 )
 
+# config_settings for os-based select() matching
+config_setting(
+    name = "is_linux",
+    constraint_values = [":linux"],
+)
+
+config_setting(
+    name = "is_macos",
+    constraint_values = [":macos"],
+)
+
+# select() that matches based on OS platform constraints
+select_value(
+    name = "select_by_platform",
+    value = select({
+        ":is_linux": "linux_matched",
+        ":is_macos": "macos_matched",
+        "//conditions:default": "unknown_platform",
+    }),
+)
+
+# Platform with my_value_a constraint (for testing constraint_values select)
+platform(
+    name = "platform_with_value_a",
+    constraint_values = [":my_value_a"],
+)
+
 # === genrule tests ===
 
 genrule(

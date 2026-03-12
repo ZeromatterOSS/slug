@@ -69,6 +69,42 @@ async def test_select_with_constraint_values_default(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_select_constraint_values_with_platform(buck: Buck) -> None:
+    """select() matches config_setting(constraint_values=...) when --target-platforms is set."""
+    result = await buck.build(
+        "//:select_by_platform",
+        "--target-platforms=//:linux_platform",
+    )
+    output = result.get_build_report().output_for_target("//:select_by_platform")
+    content = output.read_text().strip()
+    assert content == "linux_matched"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_select_constraint_values_with_different_platform(buck: Buck) -> None:
+    """select() matches different config_setting when a different platform is used."""
+    result = await buck.build(
+        "//:select_by_platform",
+        "--target-platforms=//:macos_platform",
+    )
+    output = result.get_build_report().output_for_target("//:select_by_platform")
+    content = output.read_text().strip()
+    assert content == "macos_matched"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_select_constraint_values_custom_platform(buck: Buck) -> None:
+    """select() correctly matches config_a when platform has my_value_a constraint."""
+    result = await buck.build(
+        "//:select_with_constraint",
+        "--target-platforms=//:platform_with_value_a",
+    )
+    output = result.get_build_report().output_for_target("//:select_with_constraint")
+    content = output.read_text().strip()
+    assert content == "config_a_selected"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_constraint_setting_and_value_build(buck: Buck) -> None:
     """constraint_setting and constraint_value rules can be defined and build."""
     # These build successfully as analysis-only rules (no outputs)
