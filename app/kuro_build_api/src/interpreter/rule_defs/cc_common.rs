@@ -231,6 +231,21 @@ fn get_msvc_tool_paths() -> &'static Option<MsvcToolPaths> {
     })
 }
 
+/// Returns the list of built-in include directories for the detected MSVC toolchain.
+/// On non-Windows, returns an empty list (callers provide Unix defaults).
+pub fn get_msvc_include_dirs() -> Vec<String> {
+    if let Some(tools) = get_msvc_tool_paths() {
+        vec![
+            tools.msvc_include.clone(),
+            tools.ucrt_include.clone(),
+            tools.um_include.clone(),
+            tools.shared_include.clone(),
+        ]
+    } else {
+        Vec::new()
+    }
+}
+
 /// Resolve a Windows compiler path. If bare "cl.exe", try to find the full MSVC path.
 fn resolve_windows_compiler(bare_path: &str) -> String {
     if bare_path == "cl.exe" || bare_path == "cl" {
@@ -2474,6 +2489,7 @@ impl<'v> StarlarkValue<'v> for CcCommonModule {
                 | "do_not_use_tools_cpp_compiler_present"
                 | "is_cc_toolchain_resolution_enabled_do_not_use"
                 | "CcToolchainInfo"
+                | "merge_compilation_contexts"
         )
     }
 
@@ -2498,6 +2514,7 @@ impl<'v> StarlarkValue<'v> for CcCommonModule {
             "do_not_use_tools_cpp_compiler_present".to_owned(),
             "is_cc_toolchain_resolution_enabled_do_not_use".to_owned(),
             "CcToolchainInfo".to_owned(),
+            "merge_compilation_contexts".to_owned(),
         ]
     }
 }
@@ -4631,13 +4648,17 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         let mut linking_contexts: Vec<Value<'v>> = Vec::new();
         let mut headers_depsets: Vec<Value<'v>> = Vec::new();
         let mut includes_depsets: Vec<Value<'v>> = Vec::new();
+        let mut quote_includes_depsets: Vec<Value<'v>> = Vec::new();
+        let mut system_includes_depsets: Vec<Value<'v>> = Vec::new();
+        let mut framework_includes_depsets: Vec<Value<'v>> = Vec::new();
         let mut defines_depsets: Vec<Value<'v>> = Vec::new();
+        let mut local_defines_depsets: Vec<Value<'v>> = Vec::new();
 
         // Helper closure to extract contexts from a CcInfo
         let mut process_info = |info: Value<'v>| {
             if let Ok(Some(comp_ctx)) = info.get_attr("compilation_context", heap) {
                 if !comp_ctx.is_none() {
-                    // Extract headers, includes, defines depsets from compilation context
+                    // Extract all depset fields from compilation context
                     if let Ok(Some(h)) = comp_ctx.get_attr("headers", heap) {
                         if !h.is_none() {
                             headers_depsets.push(h);
@@ -4648,9 +4669,29 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                             includes_depsets.push(i);
                         }
                     }
+                    if let Ok(Some(qi)) = comp_ctx.get_attr("quote_includes", heap) {
+                        if !qi.is_none() {
+                            quote_includes_depsets.push(qi);
+                        }
+                    }
+                    if let Ok(Some(si)) = comp_ctx.get_attr("system_includes", heap) {
+                        if !si.is_none() {
+                            system_includes_depsets.push(si);
+                        }
+                    }
+                    if let Ok(Some(fi)) = comp_ctx.get_attr("framework_includes", heap) {
+                        if !fi.is_none() {
+                            framework_includes_depsets.push(fi);
+                        }
+                    }
                     if let Ok(Some(d)) = comp_ctx.get_attr("defines", heap) {
                         if !d.is_none() {
                             defines_depsets.push(d);
+                        }
+                    }
+                    if let Ok(Some(ld)) = comp_ctx.get_attr("local_defines", heap) {
+                        if !ld.is_none() {
+                            local_defines_depsets.push(ld);
                         }
                     }
                 }
@@ -4680,51 +4721,35 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             }
         }
 
-        // Merge compilation contexts by combining headers/includes/defines depsets
-        let merged_compilation_context = if headers_depsets.is_empty()
-            && includes_depsets.is_empty()
-            && defines_depsets.is_empty()
-        {
+        // Merge compilation contexts by combining all depset fields
+        let has_any = !headers_depsets.is_empty()
+            || !includes_depsets.is_empty()
+            || !quote_includes_depsets.is_empty()
+            || !system_includes_depsets.is_empty()
+            || !framework_includes_depsets.is_empty()
+            || !defines_depsets.is_empty()
+            || !local_defines_depsets.is_empty();
+
+        let merged_compilation_context = if !has_any {
             Value::new_none()
         } else {
-            let merged_headers = if headers_depsets.is_empty() {
-                Value::new_none()
-            } else {
-                crate::interpreter::rule_defs::depset::make_depset_from_lists(
-                    heap,
-                    Vec::new(),
-                    headers_depsets,
-                    "default",
-                )?
-            };
-            let merged_includes = if includes_depsets.is_empty() {
-                Value::new_none()
-            } else {
-                crate::interpreter::rule_defs::depset::make_depset_from_lists(
-                    heap,
-                    Vec::new(),
-                    includes_depsets,
-                    "default",
-                )?
-            };
-            let merged_defines = if defines_depsets.is_empty() {
-                Value::new_none()
-            } else {
-                crate::interpreter::rule_defs::depset::make_depset_from_lists(
-                    heap,
-                    Vec::new(),
-                    defines_depsets,
-                    "default",
-                )?
+            let merge_field = |depsets: Vec<Value<'v>>| -> starlark::Result<Value<'v>> {
+                if depsets.is_empty() {
+                    Ok(Value::new_none())
+                } else {
+                    crate::interpreter::rule_defs::depset::make_depset_from_lists(
+                        heap, Vec::new(), depsets, "default",
+                    )
+                }
             };
             heap.alloc(CcCompilationContextGen {
-                headers: merged_headers,
-                includes: merged_includes,
-                quote_includes: Value::new_none(),
-                system_includes: Value::new_none(),
-                framework_includes: Value::new_none(),
-                defines: merged_defines,
-                local_defines: Value::new_none(),
+                headers: merge_field(headers_depsets)?,
+                includes: merge_field(includes_depsets)?,
+                quote_includes: merge_field(quote_includes_depsets)?,
+                system_includes: merge_field(system_includes_depsets)?,
+                framework_includes: merge_field(framework_includes_depsets)?,
+                defines: merge_field(defines_depsets)?,
+                local_defines: merge_field(local_defines_depsets)?,
             })
         };
 
@@ -4755,6 +4780,73 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         Ok(heap.alloc(CcInfoInstanceGen {
             compilation_context: merged_compilation_context,
             linking_context: merged_linking_context,
+        }))
+    }
+
+    /// Merges multiple CcCompilationContexts into one.
+    ///
+    /// Combines headers, includes, quote_includes, system_includes,
+    /// framework_includes, defines, and local_defines from all input contexts.
+    #[allow(unused_variables)]
+    fn merge_compilation_contexts<'v>(
+        #[starlark(this)] _this: &CcCommonModule,
+        #[starlark(require = named, default = NoneType)] compilation_contexts: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let mut headers_depsets: Vec<Value<'v>> = Vec::new();
+        let mut includes_depsets: Vec<Value<'v>> = Vec::new();
+        let mut quote_includes_depsets: Vec<Value<'v>> = Vec::new();
+        let mut system_includes_depsets: Vec<Value<'v>> = Vec::new();
+        let mut framework_includes_depsets: Vec<Value<'v>> = Vec::new();
+        let mut defines_depsets: Vec<Value<'v>> = Vec::new();
+        let mut local_defines_depsets: Vec<Value<'v>> = Vec::new();
+
+        if !compilation_contexts.is_none() {
+            if let Ok(iter) = compilation_contexts.iterate(heap) {
+                for ctx_val in iter {
+                    if let Ok(Some(h)) = ctx_val.get_attr("headers", heap) {
+                        if !h.is_none() { headers_depsets.push(h); }
+                    }
+                    if let Ok(Some(i)) = ctx_val.get_attr("includes", heap) {
+                        if !i.is_none() { includes_depsets.push(i); }
+                    }
+                    if let Ok(Some(qi)) = ctx_val.get_attr("quote_includes", heap) {
+                        if !qi.is_none() { quote_includes_depsets.push(qi); }
+                    }
+                    if let Ok(Some(si)) = ctx_val.get_attr("system_includes", heap) {
+                        if !si.is_none() { system_includes_depsets.push(si); }
+                    }
+                    if let Ok(Some(fi)) = ctx_val.get_attr("framework_includes", heap) {
+                        if !fi.is_none() { framework_includes_depsets.push(fi); }
+                    }
+                    if let Ok(Some(d)) = ctx_val.get_attr("defines", heap) {
+                        if !d.is_none() { defines_depsets.push(d); }
+                    }
+                    if let Ok(Some(ld)) = ctx_val.get_attr("local_defines", heap) {
+                        if !ld.is_none() { local_defines_depsets.push(ld); }
+                    }
+                }
+            }
+        }
+
+        let merge_field = |depsets: Vec<Value<'v>>| -> starlark::Result<Value<'v>> {
+            if depsets.is_empty() {
+                Ok(Value::new_none())
+            } else {
+                crate::interpreter::rule_defs::depset::make_depset_from_lists(
+                    heap, Vec::new(), depsets, "default",
+                )
+            }
+        };
+
+        Ok(heap.alloc(CcCompilationContextGen {
+            headers: merge_field(headers_depsets)?,
+            includes: merge_field(includes_depsets)?,
+            quote_includes: merge_field(quote_includes_depsets)?,
+            system_includes: merge_field(system_includes_depsets)?,
+            framework_includes: merge_field(framework_includes_depsets)?,
+            defines: merge_field(defines_depsets)?,
+            local_defines: merge_field(local_defines_depsets)?,
         }))
     }
 

@@ -1901,6 +1901,7 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
                 | "_link_dynamic_library_tool"
                 | "_grep_includes"
                 | "_compiler_files"
+                | "built_in_include_directories"
         )
     }
 
@@ -2012,6 +2013,23 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
             "gcov_files" | "_gcov_files" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
             }
+            "built_in_include_directories" => {
+                // Return list of built-in include directories from the system compiler.
+                // On Windows (MSVC), return MSVC and Windows SDK include paths.
+                // On Unix, return standard system include paths.
+                let dirs: Vec<Value<'v>> = if cfg!(windows) {
+                    crate::interpreter::rule_defs::cc_common::get_msvc_include_dirs()
+                        .iter()
+                        .map(|d| heap.alloc_str(d).to_value())
+                        .collect()
+                } else {
+                    ["/usr/include", "/usr/local/include"]
+                        .iter()
+                        .map(|d| heap.alloc_str(d).to_value())
+                        .collect()
+                };
+                Some(heap.alloc(dirs))
+            }
             _ => None,
         }
     }
@@ -2035,6 +2053,7 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
             "strip_files".to_owned(),
             "gcov_files".to_owned(),
             "libc".to_owned(),
+            "built_in_include_directories".to_owned(),
         ]
     }
 }

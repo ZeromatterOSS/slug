@@ -1,4 +1,4 @@
-load(":defs.bzl", "actions_fail_test", "bool_flag", "build_config_test", "capture_existing_rules", "cc_command_line_test", "cc_compilation_context_test", "cc_configure_features_test", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "cc_toolchain_config_info_test", "collect_files", "constraint_provider_test", "do_nothing_binds_test", "do_nothing_test", "exec_groups_test", "executable_rule", "existing_rules_test", "files_to_run_test", "fragments_test", "initializer_test", "instrumented_files_empty_test", "instrumented_files_test", "int_values_test", "is_tool_configuration_test", "java_common_test", "java_toolchain_test", "new_file_test", "nonempty_deps_test", "nonempty_strings_test", "non_executable_rule", "provider_callable_test", "provides_valid_rule", "resolve_command_test", "run_env_info", "select_value", "sibling_file", "split_attr_test", "stamp_file_info", "string_flag", "tokenize_test", "write_file_executable_test", "write_file_test", "write_list")
+load(":defs.bzl", "actions_fail_test", "bool_flag", "build_config_test", "built_in_include_dirs_test", "capture_existing_rules", "cc_command_line_test", "cc_compilation_context_test", "cc_configure_features_test", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "cc_toolchain_config_info_test", "collect_files", "constraint_provider_test", "do_nothing_binds_test", "do_nothing_test", "exec_groups_test", "executable_rule", "existing_rules_test", "files_to_run_test", "fragments_test", "initializer_test", "instrumented_files_empty_test", "instrumented_files_test", "int_values_test", "is_tool_configuration_test", "java_common_test", "java_toolchain_test", "merge_cc_infos_full_test", "merge_compilation_contexts_test", "new_file_test", "nonempty_deps_test", "nonempty_strings_test", "non_executable_rule", "provider_callable_test", "provides_valid_rule", "resolve_command_test", "run_env_info", "select_value", "sibling_file", "split_attr_test", "stamp_file_info", "string_flag", "tokenize_test", "write_file_executable_test", "write_file_test", "write_list")
 
 # === filegroup tests ===
 
@@ -713,6 +713,24 @@ tokenize_test(
 files_to_run_test(
     name = "files_to_run_test",
     tool = ":source_files",
+)
+
+# === merge_compilation_contexts test ===
+
+merge_compilation_contexts_test(
+    name = "merge_compilation_contexts_test",
+)
+
+# === built_in_include_directories test ===
+
+built_in_include_dirs_test(
+    name = "built_in_include_dirs_test",
+)
+
+# === merge_cc_infos full test (all include types) ===
+
+merge_cc_infos_full_test(
+    name = "merge_cc_infos_full_test",
 )
 
 # === existing_rules() / repository_name() test ===

@@ -1043,3 +1043,34 @@ async def test_actions_fail(buck: Buck) -> None:
         await buck.build("//:actions_fail_test")
     assert "unsupported platform" in str(exc_info.value)
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_merge_compilation_contexts(buck: Buck) -> None:
+    """cc_common.merge_compilation_contexts() merges all include types and defines."""
+    result = await buck.build("//:merge_compilation_contexts_test")
+    output = result.get_build_report().output_for_target(
+        "//:merge_compilation_contexts_test"
+    )
+    content = output.read_text().strip()
+    assert "merge_compilation_contexts: ok" in content
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_built_in_include_dirs(buck: Buck) -> None:
+    """cc_toolchain.built_in_include_directories returns a list of strings."""
+    result = await buck.build("//:built_in_include_dirs_test")
+    output = result.get_build_report().output_for_target(
+        "//:built_in_include_dirs_test"
+    )
+    content = output.read_text().strip()
+    assert "built_in_include_dirs:" in content
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_merge_cc_infos_full(buck: Buck) -> None:
+    """merge_cc_infos preserves quote_includes, system_includes, framework_includes."""
+    result = await buck.build("//:merge_cc_infos_full_test")
+    output = result.get_build_report().output_for_target("//:merge_cc_infos_full_test")
+    content = output.read_text().strip()
+    assert "merge_cc_infos_full: ok" in content
+

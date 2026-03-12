@@ -1114,3 +1114,126 @@ files_to_run_test = rule(
         "tool": attr.label(),
     },
 )
+
+
+def _merge_compilation_contexts_test_impl(ctx):
+    """Test cc_common.merge_compilation_contexts()."""
+    # Create two compilation contexts with different includes/defines
+    ctx1 = cc_common.create_compilation_context(
+        includes = depset(["inc1"]),
+        defines = depset(["DEF1"]),
+        quote_includes = depset(["qi1"]),
+    )
+    ctx2 = cc_common.create_compilation_context(
+        includes = depset(["inc2"]),
+        defines = depset(["DEF2"]),
+        system_includes = depset(["si1"]),
+    )
+
+    # Merge them
+    merged = cc_common.merge_compilation_contexts(
+        compilation_contexts = [ctx1, ctx2],
+    )
+
+    # Verify merged context has all includes
+    includes_list = merged.includes.to_list()
+    if "inc1" not in includes_list or "inc2" not in includes_list:
+        fail("merged includes missing expected values: %s" % includes_list)
+
+    # Verify merged context has all defines
+    defines_list = merged.defines.to_list()
+    if "DEF1" not in defines_list or "DEF2" not in defines_list:
+        fail("merged defines missing expected values: %s" % defines_list)
+
+    # Verify quote_includes preserved
+    qi_list = merged.quote_includes.to_list()
+    if "qi1" not in qi_list:
+        fail("merged quote_includes missing expected values: %s" % qi_list)
+
+    # Verify system_includes preserved
+    si_list = merged.system_includes.to_list()
+    if "si1" not in si_list:
+        fail("merged system_includes missing expected values: %s" % si_list)
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "merge_compilation_contexts: ok\n")
+    return [DefaultInfo(default_output = out)]
+
+
+merge_compilation_contexts_test = rule(
+    implementation = _merge_compilation_contexts_test_impl,
+    attrs = {},
+)
+
+
+def _built_in_include_dirs_test_impl(ctx):
+    """Test cc_toolchain.built_in_include_directories attribute."""
+    cc_toolchain = ctx.toolchains["@bazel_tools//tools/cpp:toolchain_type"].cc
+
+    # built_in_include_directories should be a list
+    dirs = cc_toolchain.built_in_include_directories
+    if type(dirs) != "list":
+        fail("built_in_include_directories should be a list, got %s" % type(dirs))
+
+    # Should have at least one entry
+    if len(dirs) == 0:
+        fail("built_in_include_directories should not be empty")
+
+    # Each entry should be a string
+    for d in dirs:
+        if type(d) != "string":
+            fail("built_in_include_directories entries should be strings, got %s" % type(d))
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "built_in_include_dirs: %s\n" % str(dirs))
+    return [DefaultInfo(default_output = out)]
+
+
+built_in_include_dirs_test = rule(
+    implementation = _built_in_include_dirs_test_impl,
+    attrs = {},
+    toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
+)
+
+
+def _merge_cc_infos_full_test_impl(ctx):
+    """Test that merge_cc_infos preserves all include types."""
+    # Create CcInfo with quote_includes and system_includes
+    ctx1 = cc_common.create_compilation_context(
+        quote_includes = depset(["qi_a"]),
+        system_includes = depset(["si_a"]),
+        framework_includes = depset(["fi_a"]),
+    )
+    ctx2 = cc_common.create_compilation_context(
+        quote_includes = depset(["qi_b"]),
+        system_includes = depset(["si_b"]),
+    )
+
+    info1 = CcInfo(compilation_context = ctx1)
+    info2 = CcInfo(compilation_context = ctx2)
+
+    merged = cc_common.merge_cc_infos(cc_infos = [info1, info2])
+
+    # Verify all include types are preserved in merged CcInfo
+    mc = merged.compilation_context
+    qi_list = mc.quote_includes.to_list()
+    if "qi_a" not in qi_list or "qi_b" not in qi_list:
+        fail("merged quote_includes missing: %s" % qi_list)
+
+    si_list = mc.system_includes.to_list()
+    if "si_a" not in si_list or "si_b" not in si_list:
+        fail("merged system_includes missing: %s" % si_list)
+
+    fi_list = mc.framework_includes.to_list()
+    if "fi_a" not in fi_list:
+        fail("merged framework_includes missing: %s" % fi_list)
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "merge_cc_infos_full: ok\n")
+    return [DefaultInfo(default_output = out)]
+
+
+merge_cc_infos_full_test = rule(
+    implementation = _merge_cc_infos_full_test_impl,
+    attrs = {},
+)

@@ -208,8 +208,9 @@ These modules must be available as globals in .bzl files.
 | `get_environment_variables()` | Get env vars | ✓ Implemented (returns MSVC INCLUDE/LIB on Windows; 2026-03-11) |
 | `get_execution_requirements()` | Get exec requirements | Stub |
 | `CcToolchainInfo` | Provider | ✓ Implemented |
+| `merge_compilation_contexts()` | Merge CompilationContexts | ✓ Implemented (merges all 7 depset fields: headers, includes, quote_includes, system_includes, framework_includes, defines, local_defines; 2026-03-12) |
 
-**Status**: Nearly complete — all critical functions implemented. Only `get_execution_requirements` returns empty dict (acceptable default). `create_linking_context_from_compilation_outputs` now properly populates linker_inputs depset. `get_memory_inefficient_command_line` now emits compilation-mode-based flags: `-O2 -DNDEBUG` for opt, `-g -O0` for dbg, plus MSVC equivalents and linker strip flags. (2026-03-11)
+**Status**: Nearly complete — all critical functions implemented. Only `get_execution_requirements` returns empty dict (acceptable default). `create_linking_context_from_compilation_outputs` now properly populates linker_inputs depset. `get_memory_inefficient_command_line` now emits compilation-mode-based flags: `-O2 -DNDEBUG` for opt, `-g -O0` for dbg, plus MSVC equivalents and linker strip flags. `merge_cc_infos` now merges all include types (quote_includes, system_includes, framework_includes, local_defines) not just headers/includes/defines. CcToolchainInfo `built_in_include_directories` attribute returns real MSVC/system include paths. (2026-03-12)
 
 ### Module: `config`
 
