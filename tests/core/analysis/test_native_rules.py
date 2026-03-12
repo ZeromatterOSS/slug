@@ -878,3 +878,16 @@ async def test_instrumented_files_info_empty(buck: Buck) -> None:
     assert lines["has_instrumented_files"] == "True"
     assert lines["has_metadata_files"] == "True"
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_is_tool_configuration(buck: Buck) -> None:
+    """ctx.configuration.is_tool_configuration() returns False for normal targets."""
+    result = await buck.build("//:is_tool_configuration_test")
+    output = result.get_build_report().output_for_target("//:is_tool_configuration_test")
+    content = output.read_text().replace("\r\n", "\n")
+    lines = dict(line.split("=", 1) for line in content.strip().split("\n") if "=" in line)
+
+    # Normal targets (not in exec configuration) should return False
+    assert lines["is_tool"] == "False"
+    assert lines["type"] == "bool"
+

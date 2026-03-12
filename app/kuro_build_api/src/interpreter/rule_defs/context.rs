@@ -276,6 +276,15 @@ impl<'v> AnalysisContext<'v> {
             .take()
             .expect("nothing to have stolen state yet")
     }
+
+    /// Returns true if this target is being built in exec (tool) configuration.
+    /// In Bazel, this means the target is a build tool that runs on the host machine.
+    fn is_tool_configuration(&self) -> bool {
+        self.label
+            .as_ref()
+            .map(|l| l.inner().target().exec_cfg().is_some())
+            .unwrap_or(false)
+    }
 }
 
 #[starlark_value(type = "AnalysisContext")]
@@ -431,8 +440,8 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// TODO(toolchains): Implement proper toolchain resolution.
     #[starlark(attribute)]
     fn toolchains<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(ToolchainsStub))
+        let is_tool = this.0.is_tool_configuration();
+        Ok(heap.alloc(ToolchainsStub { is_tool }))
     }
 
     /// Predeclared outputs from the rule definition (Bazel-compatible).
@@ -539,8 +548,8 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(BuildConfigurationStub))
+        let is_tool = this.0.is_tool_configuration();
+        Ok(heap.alloc(BuildConfigurationStub { is_tool }))
     }
 
     /// Files from attributes (Bazel-compatible).
@@ -1586,7 +1595,9 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
 ///
 /// TODO(toolchains): Replace with proper toolchain resolution.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct ToolchainsStub;
+pub struct ToolchainsStub {
+    pub is_tool: bool,
+}
 
 impl std::fmt::Display for ToolchainsStub {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -1633,7 +1644,7 @@ impl<'v> StarlarkValue<'v> for ToolchainsStub {
         {
             Ok(heap.alloc(RustToolchainInfoStub))
         } else if target_name == "toolchain_type" && (pkg_segment == "cc" || pkg_segment == "cpp") {
-            Ok(heap.alloc(CcToolchainInfoStub))
+            Ok(heap.alloc(CcToolchainInfoStub { is_tool: self.is_tool }))
         } else if target_name == "toolchain_type"
             && key_str.contains("python")
             && !key_str.contains("exec_tools")
@@ -1683,7 +1694,9 @@ impl<'v> StarlarkValue<'v> for ToolchainsStub {
 ///
 /// This provides the attributes that rules_cc expects from a CcToolchainInfo provider.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct CcToolchainInfoStub;
+pub struct CcToolchainInfoStub {
+    is_tool: bool,
+}
 
 impl std::fmt::Display for CcToolchainInfoStub {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -1914,8 +1927,7 @@ fn cc_toolchain_info_stub_methods(builder: &mut MethodsBuilder) {
     /// The C++ toolchain provider itself (for cc_provider_in_toolchain pattern).
     #[starlark(attribute)]
     fn cc<'v>(this: &CcToolchainInfoStub, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(CcToolchainInfoStub))
+        Ok(heap.alloc(CcToolchainInfoStub { is_tool: this.is_tool }))
     }
 
     /// Toolchain identifier.
@@ -1928,8 +1940,7 @@ fn cc_toolchain_info_stub_methods(builder: &mut MethodsBuilder) {
     /// Whether the toolchain is for tool execution.
     #[starlark(attribute)]
     fn is_tool_configuration(this: &CcToolchainInfoStub) -> starlark::Result<bool> {
-        let _ = this;
-        Ok(false)
+        Ok(this.is_tool)
     }
 
     /// Compiler type.
@@ -2871,7 +2882,9 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
 /// - `short_id`: Opaque configuration fingerprint
 /// - `test_env`: Dict from --test_env flags
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct BuildConfigurationStub;
+pub struct BuildConfigurationStub {
+    pub is_tool: bool,
+}
 
 impl std::fmt::Display for BuildConfigurationStub {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -2969,9 +2982,7 @@ fn build_configuration_stub_methods(builder: &mut MethodsBuilder) {
     /// Returns whether this is a tool configuration (exec configuration).
     /// Tool configurations are used for build tools that run on the host machine.
     fn is_tool_configuration(this: &BuildConfigurationStub) -> starlark::Result<bool> {
-        let _ = this;
-        // TODO(bazel): Properly determine if this is an exec configuration
-        Ok(false)
+        Ok(this.is_tool)
     }
 
     /// Returns whether this configuration has a separate genfiles directory.
@@ -3079,7 +3090,7 @@ impl<'v> StarlarkValue<'v> for ExecGroupToolchains {
     /// Uses the same logic as ToolchainsStub to resolve known toolchain types.
     fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         // Delegate to ToolchainsStub's resolution logic
-        let stub = ToolchainsStub;
+        let stub = ToolchainsStub { is_tool: false };
         stub.at(index, heap)
     }
 

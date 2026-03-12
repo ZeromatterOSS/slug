@@ -254,7 +254,7 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
     fn toolchains<'v>(this: RefAspectContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         use crate::interpreter::rule_defs::context::ToolchainsStub;
-        Ok(heap.alloc(ToolchainsStub))
+        Ok(heap.alloc(ToolchainsStub { is_tool: false }))
     }
 
     /// Returns the list of features enabled for this target.
@@ -315,7 +315,7 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
         use crate::interpreter::rule_defs::context::BuildConfigurationStub;
-        Ok(heap.alloc(BuildConfigurationStub))
+        Ok(heap.alloc(BuildConfigurationStub { is_tool: false }))
     }
 
     /// Returns whether coverage instrumentation is enabled for this target.

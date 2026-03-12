@@ -698,3 +698,24 @@ instrumented_files_empty_test = rule(
     implementation = _instrumented_files_empty_test_impl,
     attrs = {},
 )
+
+
+# === is_tool_configuration test ===
+
+def _is_tool_configuration_test_impl(ctx):
+    """Tests ctx.configuration.is_tool_configuration() returns a bool."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    config = ctx.configuration
+    is_tool = config.is_tool_configuration()
+    lines = [
+        "is_tool=" + str(is_tool),
+        "type=" + type(is_tool),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+is_tool_configuration_test = rule(
+    implementation = _is_tool_configuration_test_impl,
+    attrs = {},
+)

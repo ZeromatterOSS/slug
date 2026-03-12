@@ -680,7 +680,7 @@ impl<'v> StarlarkValue<'v> for CtxCheatStub {
                 Some(heap.alloc(crate::interpreter::rule_defs::context::ExecGroupsDict))
             }
             "toolchains" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::context::ToolchainsStub))
+                Some(heap.alloc(crate::interpreter::rule_defs::context::ToolchainsStub { is_tool: false }))
             }
             _ => None,
         }
@@ -763,7 +763,7 @@ impl<'v> StarlarkValue<'v> for CtxCheatWithActions<'v> {
                 Some(heap.alloc(crate::interpreter::rule_defs::context::ExecGroupsDict))
             }
             "toolchains" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::context::ToolchainsStub))
+                Some(heap.alloc(crate::interpreter::rule_defs::context::ToolchainsStub { is_tool: false }))
             }
             _ => None,
         }
