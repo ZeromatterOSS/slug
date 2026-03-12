@@ -595,3 +595,35 @@ nonempty_strings_test = rule(
         "items": attr.string_list(allow_empty = False),
     },
 )
+
+
+# === rule(initializer=...) test ===
+
+def _initializer_test_initializer(**kwargs):
+    """Transforms attributes before target creation."""
+    # Convert stamp bool -> int (like rules_cc cc_test does)
+    if "stamp" in kwargs and type(kwargs["stamp"]) == type(True):
+        kwargs["stamp"] = 1 if kwargs["stamp"] else 0
+    # Add a prefix to the message if not already present
+    if "message" in kwargs and not kwargs["message"].startswith("INIT:"):
+        kwargs["message"] = "INIT:" + kwargs["message"]
+    return kwargs
+
+def _initializer_test_impl(ctx):
+    """Implementation that writes the transformed attribute values."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    lines = [
+        "stamp=" + str(ctx.attr.stamp),
+        "message=" + ctx.attr.message,
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+initializer_test = rule(
+    implementation = _initializer_test_impl,
+    initializer = _initializer_test_initializer,
+    attrs = {
+        "stamp": attr.int(default = 0),
+        "message": attr.string(default = "default"),
+    },
+)

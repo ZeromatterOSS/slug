@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+use std::cell::Cell;
 use std::cell::RefCell;
 use std::fmt;
 use std::sync::Arc;
@@ -153,6 +154,9 @@ pub struct StarlarkRuleCallable<'v> {
     exec_group_names: Vec<String>,
     /// Configuration fragment names declared via `rule(fragments=["cpp", "java", ...])`.
     fragments: Vec<String>,
+    /// Optional initializer function from `rule(initializer=...)`.
+    /// Called at load time before target creation to transform attribute values.
+    initializer: Option<Value<'v>>,
 }
 
 /// Mappings of promise artifact name to the starlark function that will produce it, for anon targets.
@@ -230,6 +234,7 @@ impl<'v> StarlarkRuleCallable<'v> {
         toolchain_types: Vec<String>,
         exec_group_names: Vec<String>,
         fragments: Vec<String>,
+        initializer: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> kuro_error::Result<StarlarkRuleCallable<'v>> {
         let build_context = BuildContext::from_context(eval)?;
@@ -337,6 +342,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             toolchain_types,
             exec_group_names,
             fragments,
+            initializer,
         })
     }
 
@@ -372,6 +378,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             Vec::new(), // anon rules have no toolchain_types
             Vec::new(), // anon rules have no exec_groups
             Vec::new(), // anon rules have no fragments
+            None,       // anon rules have no initializer
             eval,
         )
     }
@@ -560,6 +567,10 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
             toolchain_types: self.toolchain_types,
             exec_group_names: self.exec_group_names,
             fragments: self.fragments,
+            initializer: match self.initializer {
+                Some(v) => Some(v.freeze(freezer)?),
+                None => None,
+            },
         })
     }
 }
@@ -589,6 +600,9 @@ pub struct FrozenStarlarkRuleCallable {
     exec_group_names: Vec<String>,
     /// Configuration fragment names declared via `rule(fragments=["cpp", "java", ...])`.
     fragments: Vec<String>,
+    /// Optional initializer function from `rule(initializer=...)`.
+    /// Called at load time before target creation to transform attribute values.
+    initializer: Option<FrozenValue>,
 }
 starlark_simple_value!(FrozenStarlarkRuleCallable);
 
@@ -656,6 +670,66 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRuleCallable {
         args: &Arguments<'v, '_>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
+        // Bazel-compatible: if this rule has an initializer function and we haven't
+        // already applied it (thread-local guard prevents infinite recursion), call
+        // the initializer to transform attribute values, then re-invoke with modified kwargs.
+        thread_local! {
+            static INITIALIZER_APPLIED: Cell<bool> = const { Cell::new(false) };
+        }
+        if let Some(initializer_fn) = &self.initializer {
+            let already_applied = INITIALIZER_APPLIED.with(|flag| flag.get());
+            if !already_applied {
+                // Extract all named args from the call
+                let kwargs = args.names_map()?;
+                let named_pairs: Vec<(&str, Value<'v>)> = kwargs
+                    .iter()
+                    .map(|(k, v)| (k.as_str(), *v))
+                    .collect();
+
+                // Call the initializer: initializer(**kwargs) -> dict
+                let result = eval.eval_function(
+                    initializer_fn.to_value(),
+                    &[],
+                    &named_pairs,
+                )?;
+
+                // The initializer should return a dict of modified attribute values.
+                // Merge the returned dict with the original kwargs.
+                let mut modified_pairs: Vec<(&str, Value<'v>)> = Vec::new();
+                if let Some(result_dict) = DictRef::from_value(result) {
+                    // Start with original kwargs, override with initializer results
+                    let mut merged: SmallMap<&str, Value<'v>> = SmallMap::new();
+                    for (k, v) in &named_pairs {
+                        merged.insert(k, *v);
+                    }
+                    for (k, v) in result_dict.iter() {
+                        if let Some(key_str) = k.unpack_str() {
+                            merged.insert(
+                                // SAFETY: key_str is allocated on the heap which outlives
+                                // this function call since the heap owns the evaluation.
+                                unsafe { &*(key_str as *const str) },
+                                v,
+                            );
+                        }
+                    }
+                    modified_pairs = merged.into_iter().collect();
+                } else {
+                    // If the initializer doesn't return a dict, use original kwargs
+                    modified_pairs = named_pairs;
+                }
+
+                // Re-invoke the rule with modified kwargs, with the guard set
+                INITIALIZER_APPLIED.with(|flag| flag.set(true));
+                let result = eval.eval_function(
+                    _me,
+                    &[],
+                    &modified_pairs,
+                );
+                INITIALIZER_APPLIED.with(|flag| flag.set(false));
+                return result.map_err(Into::into);
+            }
+        }
+
         let record_target_call_stack =
             ModuleInternals::from_context(eval, self.rule.rule_type.name())?
                 .record_target_call_stacks();
@@ -855,10 +929,8 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkRuleCallable<'v>> {
         // TODO(bazel): Use the subrules parameter for subrule composition
-        // TODO(bazel): Use the initializer parameter for pre-analysis attribute validation
         let _unused = (
             subrules,
-            initializer,
             extra_kwargs,
         );
 
@@ -1068,6 +1140,7 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             toolchain_types,
             exec_group_names,
             fragment_names,
+            initializer,
             eval,
         )?)
     }

@@ -792,3 +792,29 @@ async def test_rule_provides_missing_rejects(buck: Buck) -> None:
     with pytest.raises(BuckException):
         await buck.build("//:missing_provider")
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_rule_initializer_prefix(buck: Buck) -> None:
+    """rule(initializer=...) transforms message to add INIT: prefix."""
+    result = await buck.build("//:initializer_prefix_test")
+    output = result.get_build_report().output_for_target("//:initializer_prefix_test")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    # stamp=0 should pass through unchanged
+    assert lines["stamp"] == "0"
+    # The initializer should have added the "INIT:" prefix
+    assert lines["message"] == "INIT:hello"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_rule_initializer_bool_to_int(buck: Buck) -> None:
+    """rule(initializer=...) transforms stamp=True (bool) to stamp=1 (int)."""
+    result = await buck.build("//:initializer_bool_to_int")
+    output = result.get_build_report().output_for_target("//:initializer_bool_to_int")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    # The initializer should have converted True -> 1
+    assert lines["stamp"] == "1"
+    # The initializer should have added the "INIT:" prefix
+    assert lines["message"] == "INIT:hello"
+
