@@ -966,6 +966,23 @@ async def test_constraint_providers_callable(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_provider_callable(buck: Buck) -> None:
+    """DebugPackageInfo and CcSharedLibraryInfo are callable providers, not None."""
+    result = await buck.build("//:provider_callable_test")
+    output = result.get_build_report().output_for_target("//:provider_callable_test")
+    content = output.read_text().replace("\r\n", "\n")
+    lines = dict(line.split("=", 1) for line in content.strip().split("\n") if "=" in line)
+
+    assert lines["debug_is_not_none"] == "True"
+    assert lines["debug_type"] == "DebugPackageInfo"
+    assert lines["debug_instance_ok"] == "True"
+    assert lines["debug_target_label"] == "True"
+    assert lines["shared_is_not_none"] == "True"
+    assert lines["shared_type"] == "CcSharedLibraryInfo"
+    assert lines["shared_instance_ok"] == "True"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_actions_fail(buck: Buck) -> None:
     """ctx.actions.fail() raises an error during analysis."""
     with pytest.raises(Exception) as exc_info:

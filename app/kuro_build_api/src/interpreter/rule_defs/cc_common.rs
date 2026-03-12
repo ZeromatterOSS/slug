@@ -5154,6 +5154,18 @@ impl<'v> StarlarkValue<'v> for CcDebugContext {
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct DebugPackageInfoProvider;
 
+impl DebugPackageInfoProvider {
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "DebugPackageInfo".to_owned(),
+            })
+        })
+    }
+}
+
 impl Display for DebugPackageInfoProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<provider DebugPackageInfo>")
@@ -5162,8 +5174,94 @@ impl Display for DebugPackageInfoProvider {
 
 starlark_simple_value!(DebugPackageInfoProvider);
 
+impl ProviderCallableLike for DebugPackageInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
 #[starlark_value(type = "DebugPackageInfo")]
-impl<'v> StarlarkValue<'v> for DebugPackageInfoProvider {}
+impl<'v> StarlarkValue<'v> for DebugPackageInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &starlark::eval::Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
+        let kwargs = args.names_map()?;
+        let fields = heap.alloc(starlark::values::dict::AllocDict(
+            kwargs.into_iter().map(|(k, v)| (k.as_str(), v)),
+        ));
+        Ok(heap.alloc(DebugPackageInfoInstanceGen { fields }))
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+/// An instance of DebugPackageInfo.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[repr(C)]
+pub struct DebugPackageInfoInstanceGen<V: ValueLifetimeless> {
+    fields: V,
+}
+
+starlark_complex_value!(pub DebugPackageInfoInstance);
+
+impl<V: ValueLifetimeless> Display for DebugPackageInfoInstanceGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "DebugPackageInfo(...)")
+    }
+}
+
+impl<'v, V: ValueLike<'v>> ProviderLike<'v> for DebugPackageInfoInstanceGen<V>
+where
+    Self: fmt::Debug,
+{
+    fn id(&self) -> &Arc<ProviderId> {
+        DebugPackageInfoProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        use starlark::values::dict::DictRef;
+        if let Some(dict) = DictRef::from_value(self.fields.to_value()) {
+            dict.iter()
+                .filter_map(|(k, v)| {
+                    let s: &'v str = k.unpack_str()?;
+                    let s: &str = unsafe { &*(s as *const str) };
+                    Some((s, v))
+                })
+                .collect()
+        } else {
+            vec![]
+        }
+    }
+}
+
+#[starlark::values::starlark_value(type = "DebugPackageInfo")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for DebugPackageInfoInstanceGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        use starlark::values::dict::DictRef;
+        DictRef::from_value(self.fields.to_value())
+            .and_then(|dict| dict.get_str(attribute))
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        use starlark::values::dict::DictRef;
+        DictRef::from_value(self.fields.to_value())
+            .map(|dict| dict.iter().filter_map(|(k, _)| k.unpack_str().map(|s| s.to_owned())).collect())
+            .unwrap_or_default()
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
+    }
+}
 
 // ============================================================================
 // CcSharedLibraryInfo - Shared library information provider
@@ -5173,6 +5271,18 @@ impl<'v> StarlarkValue<'v> for DebugPackageInfoProvider {}
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct CcSharedLibraryInfoProvider;
 
+impl CcSharedLibraryInfoProvider {
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "CcSharedLibraryInfo".to_owned(),
+            })
+        })
+    }
+}
+
 impl Display for CcSharedLibraryInfoProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<provider CcSharedLibraryInfo>")
@@ -5181,8 +5291,94 @@ impl Display for CcSharedLibraryInfoProvider {
 
 starlark_simple_value!(CcSharedLibraryInfoProvider);
 
+impl ProviderCallableLike for CcSharedLibraryInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
 #[starlark_value(type = "CcSharedLibraryInfo")]
-impl<'v> StarlarkValue<'v> for CcSharedLibraryInfoProvider {}
+impl<'v> StarlarkValue<'v> for CcSharedLibraryInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &starlark::eval::Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
+        let kwargs = args.names_map()?;
+        let fields = heap.alloc(starlark::values::dict::AllocDict(
+            kwargs.into_iter().map(|(k, v)| (k.as_str(), v)),
+        ));
+        Ok(heap.alloc(CcSharedLibraryInfoInstanceGen { fields }))
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+/// An instance of CcSharedLibraryInfo.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[repr(C)]
+pub struct CcSharedLibraryInfoInstanceGen<V: ValueLifetimeless> {
+    fields: V,
+}
+
+starlark_complex_value!(pub CcSharedLibraryInfoInstance);
+
+impl<V: ValueLifetimeless> Display for CcSharedLibraryInfoInstanceGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CcSharedLibraryInfo(...)")
+    }
+}
+
+impl<'v, V: ValueLike<'v>> ProviderLike<'v> for CcSharedLibraryInfoInstanceGen<V>
+where
+    Self: fmt::Debug,
+{
+    fn id(&self) -> &Arc<ProviderId> {
+        CcSharedLibraryInfoProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        use starlark::values::dict::DictRef;
+        if let Some(dict) = DictRef::from_value(self.fields.to_value()) {
+            dict.iter()
+                .filter_map(|(k, v)| {
+                    let s: &'v str = k.unpack_str()?;
+                    let s: &str = unsafe { &*(s as *const str) };
+                    Some((s, v))
+                })
+                .collect()
+        } else {
+            vec![]
+        }
+    }
+}
+
+#[starlark::values::starlark_value(type = "CcSharedLibraryInfo")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for CcSharedLibraryInfoInstanceGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        use starlark::values::dict::DictRef;
+        DictRef::from_value(self.fields.to_value())
+            .and_then(|dict| dict.get_str(attribute))
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        use starlark::values::dict::DictRef;
+        DictRef::from_value(self.fields.to_value())
+            .map(|dict| dict.iter().filter_map(|(k, _)| k.unpack_str().map(|s| s.to_owned())).collect())
+            .unwrap_or_default()
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
+    }
+}
 
 // ============================================================================
 // CcToolchainConfigInfo - Toolchain configuration provider
@@ -5400,11 +5596,11 @@ pub fn register_cc_common(globals: &mut GlobalsBuilder) {
     /// Used by cc_common.create_cc_toolchain_config_info().
     const CcToolchainConfigInfo: CcToolchainConfigInfoProvider = CcToolchainConfigInfoProvider;
 
-    /// DebugPackageInfo - None placeholder. Actual provider defined in rules_cc Starlark.
-    const DebugPackageInfo: NoneType = NoneType;
+    /// DebugPackageInfo provider for debug/symbol information.
+    const DebugPackageInfo: DebugPackageInfoProvider = DebugPackageInfoProvider;
 
-    /// CcSharedLibraryInfo - None placeholder. Actual provider defined in rules_cc Starlark.
-    const CcSharedLibraryInfo: NoneType = NoneType;
+    /// CcSharedLibraryInfo provider for shared library information.
+    const CcSharedLibraryInfo: CcSharedLibraryInfoProvider = CcSharedLibraryInfoProvider;
 
     /// OutputGroupInfo - provider for grouping outputs.
     /// This is callable to create instances.

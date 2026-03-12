@@ -908,3 +908,35 @@ actions_fail_test = rule(
     implementation = _actions_fail_test_impl,
     attrs = {},
 )
+
+
+def _provider_callable_test_impl(ctx):
+    """Tests that DebugPackageInfo and CcSharedLibraryInfo are callable providers."""
+    results = []
+
+    # DebugPackageInfo should not be None
+    results.append("debug_is_not_none=" + str(DebugPackageInfo != None))
+    results.append("debug_type=" + str(type(DebugPackageInfo)))
+
+    # Create an instance
+    dpi = DebugPackageInfo(target_label = ctx.label, stripped_file = None)
+    results.append("debug_instance_ok=" + str(dpi != None))
+    results.append("debug_target_label=" + str(dpi.target_label == ctx.label))
+
+    # CcSharedLibraryInfo should not be None
+    results.append("shared_is_not_none=" + str(CcSharedLibraryInfo != None))
+    results.append("shared_type=" + str(type(CcSharedLibraryInfo)))
+
+    # Create an instance
+    sli = CcSharedLibraryInfo(dynamic_library = None, linker_input = None)
+    results.append("shared_instance_ok=" + str(sli != None))
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "\n".join(results) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+provider_callable_test = rule(
+    implementation = _provider_callable_test_impl,
+    attrs = {},
+)
