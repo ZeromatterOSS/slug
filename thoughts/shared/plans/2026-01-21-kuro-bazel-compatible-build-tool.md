@@ -514,6 +514,10 @@ Current status: **~980 pass, ~160 skip, 0 fail** in `tests/core/` (updated 2026-
 - **30+ new Bazel CLI flags accepted**: --host_features, --extra_toolchains, --extra_execution_platforms, --stamp/--nostamp, --enable_bzlmod, --allow_yanked_versions, --output_groups, --java_runtime_version, --java_language_version, --tool_java_*_version, --register_toolchains, --check_direct_dependencies, etc.
 - **New ctx attributes**: ctx.workspace_name (returns cell name), ctx.build_file_path (returns relative BUILD path)
 - **Init test fixed**: Aligned test expectation with Bazel-style genrule syntax (outs/$ instead of out/$OUT)
+- **http_archive patches**: Added patches, patch_args, patch_cmds, build_file attribute support to repository_executor
+- **Fixed duplicate CLI flags**: stamp/nostamp, extra-toolchains, extra-execution-platforms removed from CommonBuildConfigurationOptions (duplicated CommonBuildOptions)
+- **Build setting metadata**: rule(build_setting=config.bool(flag=True)) now stores type and flag info on Rule struct
+- **Starlark build flags**: --//pkg:target=value CLI syntax parsed, stored in BuildConfig, used by ctx.build_setting_value and config_setting(flag_values={})
 
 ### CI Infrastructure (2026-03-05)
 
