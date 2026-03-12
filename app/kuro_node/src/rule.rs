@@ -52,6 +52,10 @@ pub struct Rule {
     /// Executable rules have `ctx.outputs.executable` auto-declared and can be used
     /// with `kuro run`.
     pub is_executable: bool,
+    /// Provider type names declared via `rule(provides=[CcInfo, ...])`.
+    /// After analysis, the returned provider collection is validated to contain
+    /// all declared providers. Empty means no validation.
+    pub provides: Vec<String>,
     /// Toolchain type labels declared via `rule(toolchains=[...])`.
     /// Used during analysis to populate `ctx.toolchains`.
     pub toolchain_types: Vec<String>,

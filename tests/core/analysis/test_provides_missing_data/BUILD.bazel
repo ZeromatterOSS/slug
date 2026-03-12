@@ -1,0 +1,5 @@
+load(":defs.bzl", "provides_missing_rule")
+
+provides_missing_rule(
+    name = "missing_provider",
+)

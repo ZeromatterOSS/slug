@@ -824,6 +824,14 @@ impl<'a> ConfiguredTargetNodeRef<'a> {
         }
     }
 
+    /// Provider type names declared via `rule(provides=[...])`.
+    pub fn provides(self) -> &'a [String] {
+        match &self.0.get().target_node {
+            TargetNodeOrForward::TargetNode(target_node) => target_node.provides(),
+            TargetNodeOrForward::Forward(_, _) => &[],
+        }
+    }
+
     pub fn execution_platform_resolution(self) -> &'a ExecutionPlatformResolution {
         &self.0.get().execution_platform_resolution
     }

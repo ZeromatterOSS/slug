@@ -206,6 +206,12 @@ impl TargetNode {
         self.0.rule.is_executable
     }
 
+    /// Provider type names declared via `rule(provides=[...])`.
+    /// Empty means no validation is required.
+    pub fn provides(&self) -> &[String] {
+        &self.0.rule.provides
+    }
+
     /// Toolchain type labels declared via `rule(toolchains=[...])`.
     pub fn toolchain_types(&self) -> &[String] {
         &self.0.rule.toolchain_types
@@ -744,6 +750,7 @@ pub mod testing {
                     uses_plugins: Vec::new(),
                     is_test: false,
                     is_executable: false,
+                    provides: Vec::new(),
                     toolchain_types: Vec::new(),
                 }),
                 Arc::new(Package {

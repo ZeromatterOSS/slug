@@ -748,3 +748,21 @@ async def test_rule_non_executable(buck: Buck) -> None:
     content = output.read_text().strip()
     assert "not executable" in content
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_rule_provides_valid(buck: Buck) -> None:
+    """rule(provides=[MyInfo]) passes when implementation returns MyInfo."""
+    result = await buck.build("//:provides_valid")
+    output = result.get_build_report().output_for_target("//:provides_valid")
+    content = output.read_text().strip()
+    assert content == "ok"
+
+
+@buck_test(data_dir="test_provides_missing_data")
+async def test_rule_provides_missing_rejects(buck: Buck) -> None:
+    """rule(provides=[MyInfo]) fails when implementation does NOT return MyInfo."""
+    from buck2.tests.e2e_util.api.buck_result import BuckException
+
+    with pytest.raises(BuckException):
+        await buck.build("//:missing_provider")
+

@@ -467,6 +467,25 @@ async fn run_analysis_with_env_underlying(
         // Use try_from_value_subtarget to auto-inject DefaultInfo when missing (Bazel compat:
         // build setting rules like error_format return only custom providers without DefaultInfo)
         let res_typed = ProviderCollection::try_from_value_subtarget(list_res, env.heap())?;
+
+        // Validate rule(provides=[...]) contract: check that the implementation
+        // returned all declared provider types.
+        let required_provides = node.provides();
+        if !required_provides.is_empty() {
+            let returned_names = res_typed.provider_names_generic();
+            for required in required_provides {
+                if !returned_names.iter().any(|name| name == required) {
+                    return Err(kuro_error::kuro_error!(
+                        kuro_error::ErrorTag::Input,
+                        "rule '{}' is declared to provide [{}] but implementation only returns [{}]",
+                        node.label().name(),
+                        required_provides.join(", "),
+                        returned_names.join(", "),
+                    ));
+                }
+            }
+        }
+
         {
             let provider_collection = ValueTypedComplex::new_err(env.heap().alloc(res_typed))
                 .internal_error("Just allocated provider collection")?;

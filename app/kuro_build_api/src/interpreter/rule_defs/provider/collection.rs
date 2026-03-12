@@ -424,6 +424,11 @@ impl<'v, V: ValueLike<'v>> ProviderCollectionGen<V> {
             Either::Right(_) => Ok(NoneOr::None),
         }
     }
+
+    /// Returns the names of all providers in this collection.
+    pub fn provider_names_generic(&self) -> Vec<String> {
+        self.providers.keys().map(|k| k.name.to_owned()).collect()
+    }
 }
 
 impl FrozenProviderCollection {

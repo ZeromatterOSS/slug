@@ -137,6 +137,8 @@ pub struct StarlarkRuleCallable<'v> {
     is_test: bool,
     /// Whether this rule produces an executable (created with `rule(executable=True)`).
     is_executable: bool,
+    /// Provider type names declared via `rule(provides=[CcInfo, ...])`.
+    provides: Vec<String>,
     /// Names of attributes that are `attr.output()` type.
     /// Used to register output file labels for Bazel-compatible dep resolution.
     output_attr_names: Vec<String>,
@@ -219,6 +221,7 @@ impl<'v> StarlarkRuleCallable<'v> {
         artifact_promise_mappings: Option<ArtifactPromiseMappings<'v>>,
         is_test: bool,
         is_executable: bool,
+        provides: Vec<String>,
         rule_outputs: Vec<(String, String)>,
         toolchain_types: Vec<String>,
         eval: &mut Evaluator<'v, '_, '_>,
@@ -322,6 +325,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             artifact_promise_mappings,
             is_test,
             is_executable,
+            provides,
             output_attr_names,
             rule_outputs,
             toolchain_types,
@@ -355,6 +359,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             }),
             false,      // anon rules are never test rules
             false,      // anon rules are never executable
+            Vec::new(), // anon rules have no provides
             Vec::new(), // anon rules have no rule_outputs
             Vec::new(), // anon rules have no toolchain_types
             eval,
@@ -528,6 +533,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
                 uses_plugins: self.uses_plugins,
                 is_test: self.is_test,
                 is_executable: self.is_executable,
+                provides: self.provides.clone(),
                 toolchain_types: self.toolchain_types.clone(),
             }),
             rule_type,
@@ -830,19 +836,34 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         #[starlark(kwargs)] extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkRuleCallable<'v>> {
-        // TODO(bazel): Use the provides parameter to validate rule outputs
         // TODO(bazel): Use the fragments parameter for configuration fragment access
         // TODO(bazel): Use the subrules parameter for subrule composition
         // TODO(bazel): Use the initializer parameter for pre-analysis attribute validation
         // TODO(bazel): Use the exec_groups parameter for execution groups
         let _unused = (
-            provides,
             fragments,
             subrules,
             initializer,
             exec_groups,
             extra_kwargs,
         );
+
+        // Extract provider type names from the provides parameter.
+        // Each item is a provider constructor (e.g., CcInfo, JavaInfo).
+        // We store the provider id names for post-analysis validation.
+        use kuro_interpreter::types::provider::callable::ValueAsProviderCallableLike;
+        let provides_names: Vec<String> = provides
+            .items
+            .iter()
+            .filter_map(|v| {
+                if let Some(callable) = v.as_provider_callable() {
+                    callable.id().ok().map(|id| id.name.clone())
+                } else {
+                    // Fallback: use the string representation
+                    Some(format!("{}", v))
+                }
+            })
+            .collect();
 
         // Extract toolchain type labels from the toolchains parameter.
         // Each item is either a string label, a Label object, or a ToolchainTypeRequirement.
@@ -1004,6 +1025,7 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             None,
             test,
             executable,
+            provides_names,
             rule_outputs,
             toolchain_types,
             eval,

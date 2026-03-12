@@ -109,6 +109,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -123,6 +124,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -154,6 +156,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -204,6 +207,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -243,6 +247,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -316,6 +321,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -331,6 +337,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -372,6 +379,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -387,6 +395,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -482,6 +491,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -543,6 +553,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -566,6 +577,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -591,6 +603,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -672,6 +685,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -685,6 +699,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: true,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -698,6 +713,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: true,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -720,6 +736,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -778,6 +795,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: true,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -791,6 +809,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: true,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -804,6 +823,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -820,6 +840,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -835,6 +856,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: true,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -886,6 +908,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -924,6 +947,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -970,6 +994,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -1001,6 +1026,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -1064,6 +1090,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -1127,6 +1154,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });
@@ -1166,6 +1194,7 @@ pub(crate) mod rule_defs {
             uses_plugins: vec![],
             is_test: false,
             is_executable: false,
+            provides: vec![],
             toolchain_types: vec![],
         })
     });

@@ -448,6 +448,37 @@ int_values_test = rule(
 )
 
 
+MyInfo = provider(fields = ["value"])
+
+
+def _provides_valid_impl(ctx):
+    """A rule that declares and returns the required provider."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "ok\n")
+    return [DefaultInfo(default_output = out), MyInfo(value = "hello")]
+
+
+provides_valid_rule = rule(
+    implementation = _provides_valid_impl,
+    provides = [MyInfo],
+    attrs = {},
+)
+
+
+def _provides_missing_impl(ctx):
+    """A rule that declares MyInfo in provides but does NOT return it."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "missing provider\n")
+    return [DefaultInfo(default_output = out)]
+
+
+provides_missing_rule = rule(
+    implementation = _provides_missing_impl,
+    provides = [MyInfo],
+    attrs = {},
+)
+
+
 def _executable_rule_impl(ctx):
     """Tests that rule(executable=True) provides ctx.outputs.executable."""
     exe = ctx.outputs.executable
