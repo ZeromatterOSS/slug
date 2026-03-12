@@ -146,10 +146,10 @@ let external_path = if module_info.version.is_empty() {
 
 #### Success Criteria (Phase 9b)
 
-- [ ] External paths use `{module}+{version}` format
+- [x] External paths use `{module}+{version}` format (2026-03-12)
 - [ ] Extension repos use `{module}+{version}+{ext}+{repo}` format
-- [ ] Cell aliases map apparent names to canonical paths
-- [ ] `@rules_cc` resolves to `bazel-external/rules_cc+0.2.16/`
+- [x] Cell aliases map apparent names to canonical paths (existing cell alias system)
+- [x] `@rules_cc` resolves to `bazel-external/rules_cc+0.2.16/` (2026-03-12)
 
 ---
 
