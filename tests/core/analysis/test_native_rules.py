@@ -688,3 +688,45 @@ async def test_attr_int_values_invalid(buck: Buck) -> None:
     with pytest.raises(BuckException):
         await buck.build("//:int_values_invalid")
 
+
+# ============================================================================
+# allow_empty=False tests
+# ============================================================================
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_allow_empty_label_list_valid(buck: Buck) -> None:
+    """attr.label_list(allow_empty=False) accepts non-empty lists."""
+    result = await buck.build("//:nonempty_deps_valid")
+    output = result.get_build_report().output_for_target("//:nonempty_deps_valid")
+    content = output.read_text().strip()
+    assert content != ""
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_allow_empty_string_list_valid(buck: Buck) -> None:
+    """attr.string_list(allow_empty=False) accepts non-empty lists."""
+    result = await buck.build("//:nonempty_strings_valid")
+    output = result.get_build_report().output_for_target("//:nonempty_strings_valid")
+    content = output.read_text().strip()
+    assert "hello" in content
+    assert "world" in content
+
+
+@buck_test(data_dir="test_allow_empty_data")
+async def test_allow_empty_label_list_rejects_empty(buck: Buck) -> None:
+    """attr.label_list(allow_empty=False) rejects empty lists."""
+    from buck2.tests.e2e_util.api.buck_result import BuckException
+
+    with pytest.raises(BuckException):
+        await buck.build("//:empty_deps_invalid")
+
+
+@buck_test(data_dir="test_allow_empty_data")
+async def test_allow_empty_string_list_rejects_empty(buck: Buck) -> None:
+    """attr.string_list(allow_empty=False) rejects empty lists."""
+    from buck2.tests.e2e_util.api.buck_result import BuckException
+
+    with pytest.raises(BuckException):
+        await buck.build("//:empty_strings_invalid")
+

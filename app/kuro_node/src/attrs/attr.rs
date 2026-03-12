@@ -44,6 +44,10 @@ pub struct Attribute {
     /// Stored as (fragment, name) when the attr default was a configuration_field().
     /// This preserves the info that would otherwise be lost when the default is coerced to None.
     configuration_field: Option<(String, String)>,
+    /// Bazel `allow_empty` constraint: if false, list attributes must not be empty.
+    /// Only meaningful for list-typed attributes (label_list, string_list, int_list, etc.).
+    /// Default is true (empty lists allowed).
+    allow_empty: bool,
 }
 
 impl Attribute {
@@ -57,6 +61,7 @@ impl Attribute {
             coercer,
             aspects: Vec::new(),
             configuration_field: None,
+            allow_empty: true,
         }
     }
 
@@ -67,6 +72,7 @@ impl Attribute {
             coercer,
             aspects: Vec::new(),
             configuration_field: None,
+            allow_empty: true,
         }
     }
 
@@ -112,6 +118,18 @@ impl Attribute {
     pub fn with_configuration_field(mut self, fragment: String, name: String) -> Self {
         self.configuration_field = Some((fragment, name));
         self
+    }
+
+    /// Set the allow_empty constraint for list attributes.
+    /// When false, the attribute rejects empty lists during coercion.
+    pub fn with_allow_empty(mut self, allow_empty: bool) -> Self {
+        self.allow_empty = allow_empty;
+        self
+    }
+
+    /// Whether empty lists are allowed for this attribute.
+    pub fn allow_empty(&self) -> bool {
+        self.allow_empty
     }
 }
 

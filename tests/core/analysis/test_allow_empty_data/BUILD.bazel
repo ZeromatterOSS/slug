@@ -1,0 +1,13 @@
+load(":defs.bzl", "nonempty_deps_rule", "nonempty_strings_rule")
+
+# This target has empty deps - should fail with allow_empty=False
+nonempty_deps_rule(
+    name = "empty_deps_invalid",
+    deps = [],
+)
+
+# This target has empty strings - should fail with allow_empty=False
+nonempty_strings_rule(
+    name = "empty_strings_invalid",
+    items = [],
+)

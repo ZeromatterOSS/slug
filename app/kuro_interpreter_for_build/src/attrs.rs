@@ -67,13 +67,29 @@ impl AttributeCoerceExt for Attribute {
         }
 
         match self.default() {
-            default if !value.is_none() => self
-                .coercer()
-                .coerce_with_default(configurable, coercer_ctx, value, default.map(|x| &**x))
-                .map(CoercedValue::Custom)
-                .with_buck_error_context(|| {
-                    format!("Error coercing attribute `{param_name}` of type `{self}`")
-                }),
+            default if !value.is_none() => {
+                let coerced = self
+                    .coercer()
+                    .coerce_with_default(configurable, coercer_ctx, value, default.map(|x| &**x))
+                    .with_buck_error_context(|| {
+                        format!("Error coercing attribute `{param_name}` of type `{self}`")
+                    })?;
+
+                // Enforce allow_empty constraint for list attributes
+                if !self.allow_empty() {
+                    if let kuro_node::attrs::coerced_attr::CoercedAttr::List(ref items) = coerced {
+                        if items.is_empty() {
+                            return Err(kuro_error::kuro_error!(
+                                kuro_error::ErrorTag::Input,
+                                "attribute `{}` cannot be empty (allow_empty is False)",
+                                param_name,
+                            ));
+                        }
+                    }
+                }
+
+                Ok(CoercedValue::Custom(coerced))
+            }
             Some(_) => Ok(CoercedValue::Default),
             None => Err(AttrCoerceError::MissingMandatoryParameter(param_name.to_owned()).into()),
         }

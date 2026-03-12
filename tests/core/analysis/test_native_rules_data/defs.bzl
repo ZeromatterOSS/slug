@@ -446,3 +446,34 @@ int_values_test = rule(
         "stamp": attr.int(default = 0, values = [-1, 0, 1]),
     },
 )
+
+
+def _nonempty_deps_test_impl(ctx):
+    """Tests that allow_empty=False on label_list is enforced."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    names = [dep.label.name for dep in ctx.attr.deps]
+    ctx.actions.write(out, ",".join(names) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+nonempty_deps_test = rule(
+    implementation = _nonempty_deps_test_impl,
+    attrs = {
+        "deps": attr.label_list(allow_empty = False),
+    },
+)
+
+
+def _nonempty_strings_test_impl(ctx):
+    """Tests that allow_empty=False on string_list is enforced."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, ",".join(ctx.attr.items) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+nonempty_strings_test = rule(
+    implementation = _nonempty_strings_test_impl,
+    attrs = {
+        "items": attr.string_list(allow_empty = False),
+    },
+)

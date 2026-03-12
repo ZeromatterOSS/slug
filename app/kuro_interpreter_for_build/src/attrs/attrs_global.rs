@@ -1109,9 +1109,8 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
         let allow_files_bool = parse_allow_files_param(allow_files, "allow_files", eval)?;
-        // TODO(bazel): Enforce allow_empty constraint during coercion
         // TODO(bazel): Enforce allow_rules constraint during coercion
-        let _unused = (allow_empty, allow_rules, flags);
+        let _unused = (allow_rules, flags);
 
         // Bazel semantics: if mandatory = False (default) and no default provided,
         // the attribute defaults to an empty list. If mandatory = True, a value must be provided.
@@ -1184,13 +1183,13 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         // Create attribute with aspects attached (Phase 8c)
         let implicit = default.is_none() && !mandatory;
         let base_attr = Attribute::attr(eval, effective_default, doc, coercer)?;
-        Ok(if aspect_types.is_empty() {
-            let mut attr = base_attr;
-            attr.implicit_default = implicit;
-            attr
-        } else {
-            StarlarkAttribute::new(base_attr.clone_attribute().with_aspects(aspect_types))
-        })
+        let mut inner_attr = base_attr.clone_attribute().with_allow_empty(allow_empty);
+        if !aspect_types.is_empty() {
+            inner_attr = inner_attr.with_aspects(aspect_types);
+        }
+        let mut sa = StarlarkAttribute::new(inner_attr);
+        sa.implicit_default = implicit;
+        Ok(sa)
     }
 
     /// Takes a list of strings from the user.
@@ -1203,8 +1202,6 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = true)] allow_empty: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        // TODO(bazel): Enforce allow_empty constraint during coercion
-        let _unused = allow_empty;
         // Bazel semantics: if mandatory = False (default) and no default, use empty list
         let effective_default = match (default, mandatory) {
             (Some(d), _) => Some(d),
@@ -1213,9 +1210,10 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         };
         let implicit = default.is_none() && !mandatory;
         let coercer = AttrType::list(AttrType::string());
-        let mut attr = Attribute::attr(eval, effective_default, doc, coercer)?;
-        attr.implicit_default = implicit;
-        Ok(attr)
+        let base = Attribute::attr(eval, effective_default, doc, coercer)?;
+        let mut sa = StarlarkAttribute::new(base.clone_attribute().with_allow_empty(allow_empty));
+        sa.implicit_default = implicit;
+        Ok(sa)
     }
 
     /// Takes a list of integers from the user.
@@ -1228,8 +1226,6 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = true)] allow_empty: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        // TODO(bazel): Enforce allow_empty constraint during coercion
-        let _unused = allow_empty;
         // Bazel semantics: if mandatory = False (default) and no default, use empty list
         let effective_default = match (default, mandatory) {
             (Some(d), _) => Some(d),
@@ -1238,9 +1234,10 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         };
         let implicit = default.is_none() && !mandatory;
         let coercer = AttrType::list(AttrType::int());
-        let mut attr = Attribute::attr(eval, effective_default, doc, coercer)?;
-        attr.implicit_default = implicit;
-        Ok(attr)
+        let base = Attribute::attr(eval, effective_default, doc, coercer)?;
+        let mut sa = StarlarkAttribute::new(base.clone_attribute().with_allow_empty(allow_empty));
+        sa.implicit_default = implicit;
+        Ok(sa)
     }
 
     /// Takes a dict with string keys and string values.
@@ -1368,8 +1365,9 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = true)] allow_empty: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = (mandatory, allow_empty);
+        let _unused = mandatory;
         let coercer = AttrType::list(AttrType::string());
-        Ok(Attribute::attr(eval, default, doc, coercer)?)
+        let base = Attribute::attr(eval, default, doc, coercer)?;
+        Ok(StarlarkAttribute::new(base.clone_attribute().with_allow_empty(allow_empty)))
     }
 }
