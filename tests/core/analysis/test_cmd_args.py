@@ -112,6 +112,16 @@ async def test_args_add_joined_two_arg_form(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_cmd_args_data")
+async def test_args_add_joined_uniquify(buck: Buck) -> None:
+    """args.add_joined with uniquify=True deduplicates values before joining."""
+    result = await buck.build("//:args_add_joined_uniquify")
+    output = result.get_build_report().output_for_target("//:args_add_joined_uniquify")
+
+    content = output.read_text().strip()
+    assert content == "a,b,c"
+
+
+@buck_test(data_dir="test_cmd_args_data")
 async def test_args_add_format_with_artifact(buck: Buck) -> None:
     """args.add with format= applies a format string to an artifact path."""
     result = await buck.build("//:args_output_artifact")

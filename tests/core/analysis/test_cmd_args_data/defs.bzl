@@ -192,6 +192,23 @@ args_add_joined_two_arg = rule(
 )
 
 
+def _args_add_joined_uniquify_impl(ctx):
+    """Tests args.add_joined() with uniquify=True."""
+    out = ctx.actions.declare_file("args_add_joined_uniquify.txt")
+
+    args = ctx.actions.args()
+    args.add_joined(["a", "b", "a", "c", "b"], join_with = ",", uniquify = True)
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_add_joined_uniquify = rule(
+    implementation = _args_add_joined_uniquify_impl,
+    attrs = {},
+)
+
+
 def _output_artifact_in_relative_to_impl(ctx):
     source = ctx.file.source
     out = ctx.actions.declare_file("relative_to_test.txt")

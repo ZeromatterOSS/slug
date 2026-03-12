@@ -2,6 +2,7 @@ load(
     ":defs.bzl",
     "args_add_all_two_arg",
     "args_add_joined_two_arg",
+    "args_add_joined_uniquify",
     "args_add_two_arg",
     "args_before_each",
     "args_builder",
@@ -57,6 +58,10 @@ args_add_all_two_arg(
 
 args_add_joined_two_arg(
     name = "args_add_joined_two_arg",
+)
+
+args_add_joined_uniquify(
+    name = "args_add_joined_uniquify",
 )
 
 output_artifact_in_relative_to(

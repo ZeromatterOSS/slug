@@ -1089,7 +1089,7 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] allow_closure: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkCommandLineMut<'v>> {
-        let _ = (uniquify, expand_directories, allow_closure);
+        let _ = (expand_directories, allow_closure);
         let heap = eval.heap();
         // Determine if 2-arg form (arg_name, values) or 1-arg form (values)
         let (arg_name, values) = if !maybe_values.is_none() {
@@ -1157,6 +1157,17 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
                 }
             })
             .collect();
+
+        // Deduplicate if requested
+        let items = if uniquify {
+            let mut seen = std::collections::HashSet::new();
+            items
+                .into_iter()
+                .filter(|item| seen.insert(item.clone()))
+                .collect()
+        } else {
+            items
+        };
 
         if omit_if_empty && items.is_empty() {
             return Ok(this);
