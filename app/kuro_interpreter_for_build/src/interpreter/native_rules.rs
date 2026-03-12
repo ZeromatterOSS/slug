@@ -1487,6 +1487,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] deprecation: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         features: UnpackListOrTuple<String>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let _ = (tags, testonly, deprecation, features);
@@ -1536,6 +1537,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] deprecation: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         features: UnpackListOrTuple<String>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let _ = (tags, testonly, deprecation, features);
@@ -1589,6 +1591,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] deprecation: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         features: UnpackListOrTuple<String>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let _ = (tags, testonly, deprecation, features);
@@ -1634,6 +1637,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] deprecation: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         features: UnpackListOrTuple<String>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let _ = (tags, testonly, deprecation, features);
@@ -1709,6 +1713,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] deprecation: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         features: UnpackListOrTuple<String>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let _ = (tags, testonly, deprecation, features);
@@ -1788,6 +1793,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] deprecation: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         features: UnpackListOrTuple<String>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let _unused = (tags, testonly, deprecation, features);
@@ -1928,6 +1934,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] deprecation: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         features: UnpackListOrTuple<String>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let _unused = (tags, testonly, deprecation, features);
@@ -1981,6 +1988,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = "")] deprecation: &str,
         #[starlark(require = named, default = UnpackListOrTuple::default())]
         features: UnpackListOrTuple<String>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let _ = (tags, testonly, deprecation, features);
@@ -2049,6 +2057,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         exec_compatible_with: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)]
         target_compatible_with: Value<'v>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let _unused = (
@@ -2506,6 +2515,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             'v,
         >,
         #[starlark(require = named, default = "")] deprecation: &str,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
         let _ = (
