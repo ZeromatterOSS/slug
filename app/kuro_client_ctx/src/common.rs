@@ -323,6 +323,27 @@ pub struct CommonBuildConfigurationOptions {
     #[clap(long = "features", hide = true, value_name = "FEATURE", num_args = 1)]
     pub global_features: Vec<String>,
 
+    /// Pass environment variable to test actions (Bazel compatibility).
+    ///
+    /// Values are in NAME or NAME=VALUE format. NAME without =VALUE inherits
+    /// from the host environment.
+    #[clap(
+        long = "test-env",
+        alias = "test_env",
+        hide = true,
+        value_name = "NAME[=VALUE]",
+        num_args = 1
+    )]
+    pub test_env: Vec<String>,
+
+    /// Enable code coverage collection (Bazel compatibility).
+    #[clap(long = "collect-code-coverage", alias = "collect_code_coverage", hide = true)]
+    pub collect_code_coverage: bool,
+
+    /// Disable code coverage collection (Bazel compatibility).
+    #[clap(long = "nocollect-code-coverage", alias = "nocollect_code_coverage", hide = true)]
+    pub nocollect_code_coverage: bool,
+
     // ---- Bazel compatibility flags (accepted, some are no-ops) ----
     /// Enable ANSI color output (Bazel compatibility).
     ///
@@ -630,6 +651,9 @@ impl CommonBuildConfigurationOptions {
             linkopts: vec![],
             strip_mode: None,
             global_features: vec![],
+            test_env: vec![],
+            collect_code_coverage: false,
+            nocollect_code_coverage: false,
             color: None,
             show_progress: false,
             strategy: vec![],
@@ -690,6 +714,9 @@ impl CommonBuildConfigurationOptions {
             linkopts: vec![],
             strip_mode: None,
             global_features: vec![],
+            test_env: vec![],
+            collect_code_coverage: false,
+            nocollect_code_coverage: false,
             color: None,
             show_progress: false,
             strategy: vec![],

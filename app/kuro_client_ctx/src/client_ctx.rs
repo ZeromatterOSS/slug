@@ -253,6 +253,9 @@ impl<'a> ClientCommandContext<'a> {
             linkopts: config_opts.linkopts.clone(),
             strip_mode: config_opts.strip_mode.clone().unwrap_or_default(),
             global_features: config_opts.global_features.clone(),
+            test_env: config_opts.test_env.clone(),
+            stamp: false, // Will be set from CommonBuildOptions.stamp on server side
+            collect_code_coverage: config_opts.collect_code_coverage && !config_opts.nocollect_code_coverage,
             ..self.empty_client_context(cmd.logging_name())?
         })
     }
@@ -305,6 +308,9 @@ impl<'a> ClientCommandContext<'a> {
             linkopts: Vec::new(),
             strip_mode: String::new(),
             global_features: Vec::new(),
+            test_env: Vec::new(),
+            stamp: false,
+            collect_code_coverage: false,
         })
     }
 

@@ -818,3 +818,37 @@ async def test_rule_initializer_bool_to_int(buck: Buck) -> None:
     # The initializer should have added the "INIT:" prefix
     assert lines["message"] == "INIT:hello"
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_build_config_defaults(buck: Buck) -> None:
+    """ctx.configuration exposes stamp_binaries, coverage_enabled, test_env defaults."""
+    result = await buck.build("//:build_config_defaults")
+    output = result.get_build_report().output_for_target("//:build_config_defaults")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    # Defaults: stamp off, coverage off, empty test_env
+    assert lines["stamp_binaries"] == "False"
+    assert lines["coverage_enabled"] == "False"
+    assert lines["test_env"] == "{}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_build_config_stamp_flag(buck: Buck) -> None:
+    """--stamp flag sets ctx.configuration.stamp_binaries to True."""
+    result = await buck.build("--stamp", "//:build_config_defaults")
+    output = result.get_build_report().output_for_target("//:build_config_defaults")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    assert lines["stamp_binaries"] == "True"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_build_config_test_env_flag(buck: Buck) -> None:
+    """--test_env flag sets ctx.configuration.test_env."""
+    result = await buck.build("--test_env", "MY_VAR=my_val", "//:build_config_defaults")
+    output = result.get_build_report().output_for_target("//:build_config_defaults")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    assert "MY_VAR" in lines["test_env"]
+    assert "my_val" in lines["test_env"]
+

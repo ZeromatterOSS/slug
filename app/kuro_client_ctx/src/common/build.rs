@@ -356,6 +356,7 @@ impl CommonBuildOptions {
             } else {
                 None
             },
+            stamp: self.stamp && !self.nostamp,
         }
     }
 }

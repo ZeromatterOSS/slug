@@ -219,6 +219,17 @@ message ClientContext {
 
   /// Bazel-compatible --features flags.
   repeated string global_features = 34;
+
+  /// Bazel-compatible --test_env NAME=VALUE pairs.
+  /// Injected into the environment of test actions.
+  repeated string test_env = 35;
+
+  /// Bazel-compatible --stamp / --nostamp flag.
+  /// When true, stamp information is embedded in binaries.
+  bool stamp = 36;
+
+  /// Bazel-compatible --collect_code_coverage / --nocollect_code_coverage flag.
+  bool collect_code_coverage = 37;
 }
 
 message TargetsRequest {
@@ -474,6 +485,9 @@ message CommonBuildOptions {
   /// When true, actions run in a mount namespace where the filesystem is
   /// read-only except for declared output directories.
   optional bool sandbox_enabled = 21;
+
+  /// Bazel-compatible --stamp / --nostamp flag from CommonBuildOptions.
+  bool stamp = 22;
 
   // These should possibly be deleted and never become real options. Let's not
   // pollute the low ids (and then forever need a comment about them). The only

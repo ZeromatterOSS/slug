@@ -339,6 +339,19 @@ impl<'a> ServerCommandContext<'a> {
         kuro_build_api::interpreter::rule_defs::build_config::set_features(
             &client_context.global_features,
         );
+        kuro_build_api::interpreter::rule_defs::build_config::set_test_env(
+            &client_context.test_env,
+        );
+        // Stamp comes from CommonBuildOptions (--stamp/--nostamp) or ClientContext proto
+        let stamp_enabled = build_options
+            .map(|opts| opts.stamp)
+            .unwrap_or(client_context.stamp);
+        kuro_build_api::interpreter::rule_defs::build_config::set_stamp(
+            stamp_enabled,
+        );
+        kuro_build_api::interpreter::rule_defs::build_config::set_collect_code_coverage(
+            client_context.collect_code_coverage,
+        );
 
         let oncall = if client_context.oncall.is_empty() {
             None

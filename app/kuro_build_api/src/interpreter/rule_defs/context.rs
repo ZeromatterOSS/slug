@@ -1834,7 +1834,9 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
                 Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
             }
             "_supports_param_files" => Some(Value::new_bool(true)),
-            "_stamp_binaries" => Some(Value::new_bool(false)),
+            "_stamp_binaries" => Some(Value::new_bool(
+                crate::interpreter::rule_defs::build_config::get_stamp(),
+            )),
             "_is_sibling_repository_layout" => Some(Value::new_bool(false)),
             "_static_runtime_lib_depset" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
@@ -2896,8 +2898,12 @@ impl<'v> StarlarkValue<'v> for BuildConfigurationStub {
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "coverage_enabled" => Some(Value::new_bool(false)),
-            "stamp_binaries" => Some(Value::new_bool(false)),
+            "coverage_enabled" => Some(Value::new_bool(
+                crate::interpreter::rule_defs::build_config::get_collect_code_coverage(),
+            )),
+            "stamp_binaries" => Some(Value::new_bool(
+                crate::interpreter::rule_defs::build_config::get_stamp(),
+            )),
             "host_path_separator" => {
                 let sep = if cfg!(windows) { ";" } else { ":" };
                 Some(heap.alloc_str(sep).to_value())
@@ -2927,8 +2933,21 @@ impl<'v> StarlarkValue<'v> for BuildConfigurationStub {
                 Some(heap.alloc_str(&format!("{cpu}-{comp_mode}")).to_value())
             }
             "test_env" => {
-                // --test_env variables (currently empty, could be wired up)
-                Some(heap.alloc(starlark::values::dict::Dict::default()))
+                // Return --test_env values from build config
+                let env_map =
+                    crate::interpreter::rule_defs::build_config::get_test_env();
+                let dict = starlark::values::dict::Dict::new(
+                    env_map
+                        .into_iter()
+                        .map(|(k, v)| {
+                            (
+                                heap.alloc_str(&k).to_value().get_hashed().unwrap(),
+                                heap.alloc_str(&v).to_value(),
+                            )
+                        })
+                        .collect(),
+                );
+                Some(heap.alloc(dict))
             }
             _ => None,
         }

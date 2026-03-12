@@ -24,12 +24,15 @@ static BUILD_CONFIG: RwLock<BuildConfig> = RwLock::new(BuildConfig {
     compilation_mode: None,
     defines: None,
     action_env: None,
+    test_env: None,
     copts: None,
     cxxopts: None,
     conlyopts: None,
     linkopts: None,
     strip: None,
     features: None,
+    stamp: false,
+    collect_code_coverage: false,
 });
 
 struct BuildConfig {
@@ -39,6 +42,8 @@ struct BuildConfig {
     defines: Option<HashMap<String, String>>,
     /// --action_env NAME=VALUE pairs from the command line.
     action_env: Option<HashMap<String, String>>,
+    /// --test_env NAME=VALUE pairs from the command line.
+    test_env: Option<HashMap<String, String>>,
     /// --copt flags (C/C++ compilation flags).
     copts: Option<Vec<String>>,
     /// --cxxopt flags (C++-specific compilation flags).
@@ -51,6 +56,10 @@ struct BuildConfig {
     strip: Option<String>,
     /// --features flags (enabled/disabled features like "static_link_cpp_runtimes").
     features: Option<Vec<String>>,
+    /// --stamp / --nostamp flag.
+    stamp: bool,
+    /// --collect_code_coverage / --nocollect_code_coverage flag.
+    collect_code_coverage: bool,
 }
 
 /// Set the compilation mode for the current build.
@@ -203,4 +212,56 @@ pub fn set_features(values: &[String]) {
 /// Get --features values.
 pub fn get_features() -> Vec<String> {
     BUILD_CONFIG.read().ok().and_then(|c| c.features.clone()).unwrap_or_default()
+}
+
+/// Set --test_env values for the current build.
+/// Each entry should be "NAME=VALUE" or "NAME" (inherit from environment) format.
+pub fn set_test_env(env_values: &[String]) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        let mut map = HashMap::new();
+        for entry in env_values {
+            if let Some((key, value)) = entry.split_once('=') {
+                map.insert(key.to_owned(), value.to_owned());
+            } else {
+                // NAME without =VALUE means inherit from the process environment
+                if let Ok(value) = std::env::var(entry) {
+                    map.insert(entry.to_owned(), value);
+                }
+            }
+        }
+        config.test_env = if map.is_empty() { None } else { Some(map) };
+    }
+}
+
+/// Get all --test_env values as a map.
+pub fn get_test_env() -> HashMap<String, String> {
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| c.test_env.clone())
+        .unwrap_or_default()
+}
+
+/// Set --stamp flag for the current build.
+pub fn set_stamp(enabled: bool) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        config.stamp = enabled;
+    }
+}
+
+/// Get --stamp flag. Returns false if not set.
+pub fn get_stamp() -> bool {
+    BUILD_CONFIG.read().ok().map(|c| c.stamp).unwrap_or(false)
+}
+
+/// Set --collect_code_coverage flag for the current build.
+pub fn set_collect_code_coverage(enabled: bool) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        config.collect_code_coverage = enabled;
+    }
+}
+
+/// Get --collect_code_coverage flag. Returns false if not set.
+pub fn get_collect_code_coverage() -> bool {
+    BUILD_CONFIG.read().ok().map(|c| c.collect_code_coverage).unwrap_or(false)
 }

@@ -627,3 +627,20 @@ initializer_test = rule(
         "message": attr.string(default = "default"),
     },
 )
+
+
+def _build_config_test_impl(ctx):
+    """Writes build configuration values to an output file."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    lines = [
+        "stamp_binaries=" + str(ctx.configuration.stamp_binaries),
+        "coverage_enabled=" + str(ctx.configuration.coverage_enabled),
+        "test_env=" + str(ctx.configuration.test_env),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+build_config_test = rule(
+    implementation = _build_config_test_impl,
+    attrs = {},
+)
