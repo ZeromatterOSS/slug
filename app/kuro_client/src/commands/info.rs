@@ -26,12 +26,20 @@ const INFO_KEYS: &[(&str, &str)] = &[
         "execution_root",
         "Absolute path to the execution root (buck-out/v2)",
     ),
+    ("output_path", "Absolute path to the output directory"),
     (
         "bazel-bin",
         "Absolute path to the bazel-bin convenience directory",
     ),
+    (
+        "bazel-genfiles",
+        "Absolute path to the bazel-genfiles directory (same as bazel-bin)",
+    ),
     ("bazel-testlogs", "Absolute path to the test logs directory"),
+    ("server_pid", "PID of the running kuro daemon"),
+    ("server_log", "Path to the daemon log file"),
     ("release", "Version info for this Kuro release"),
+    ("build-language", "Starlark build language info"),
 ];
 
 #[derive(Debug, clap::Parser)]
@@ -59,29 +67,51 @@ impl InfoCommand {
         let project_root = ctx.paths()?.project_root().root().as_path().to_path_buf();
         let daemon_dir = ctx.paths()?.daemon_dir()?.path;
 
-        let print_key = |key: &str| -> kuro_error::Result<()> {
-            let value = match key {
-                "workspace" => project_root.to_string_lossy().into_owned(),
-                "output_base" => daemon_dir.to_string_lossy().into_owned(),
-                "execution_root" => project_root
+        let resolve_key = |key: &str| -> kuro_error::Result<String> {
+            match key {
+                "workspace" => Ok(project_root.to_string_lossy().into_owned()),
+                "output_base" => Ok(daemon_dir.to_string_lossy().into_owned()),
+                "execution_root" => Ok(project_root
                     .join("buck-out")
                     .join("v2")
                     .to_string_lossy()
-                    .into_owned(),
-                "bazel-bin" => project_root
+                    .into_owned()),
+                "output_path" => Ok(project_root
+                    .join("buck-out")
+                    .to_string_lossy()
+                    .into_owned()),
+                "bazel-bin" => Ok(project_root
                     .join("bazel-bin")
                     .to_string_lossy()
-                    .into_owned(),
-                "bazel-testlogs" => project_root
+                    .into_owned()),
+                "bazel-genfiles" => Ok(project_root
+                    .join("bazel-bin")
+                    .to_string_lossy()
+                    .into_owned()),
+                "bazel-testlogs" => Ok(project_root
                     .join("bazel-testlogs")
                     .to_string_lossy()
-                    .into_owned(),
+                    .into_owned()),
+                "server_pid" => {
+                    // Try to read the daemon PID from the buckd info file
+                    let pid_file = daemon_dir.as_path().join("buckd.pid");
+                    match std::fs::read_to_string(&pid_file) {
+                        Ok(pid) => Ok(pid.trim().to_owned()),
+                        Err(_) => Ok("(not running)".to_owned()),
+                    }
+                }
+                "server_log" => Ok(daemon_dir
+                    .as_path()
+                    .join("buckd.log")
+                    .to_string_lossy()
+                    .into_owned()),
                 "release" => {
                     let ver = env!("CARGO_PKG_VERSION");
-                    format!("release {ver}")
+                    Ok(format!("release {ver}"))
                 }
+                "build-language" => Ok("Starlark".to_owned()),
                 other => {
-                    return Err(kuro_error::kuro_error!(
+                    Err(kuro_error::kuro_error!(
                         kuro_error::ErrorTag::Input,
                         "Unknown info key: '{}'. Known keys: {}",
                         other,
@@ -90,20 +120,26 @@ impl InfoCommand {
                             .map(|(k, _)| *k)
                             .collect::<Vec<_>>()
                             .join(", ")
-                    ));
+                    ))
                 }
-            };
-            kuro_client_ctx::println!("{}: {}", key, value)?;
-            Ok(())
+            }
         };
 
         if self.keys.is_empty() {
+            // Print all keys with "key: value" format
             for (key, _) in INFO_KEYS {
-                print_key(key)?;
+                let value = resolve_key(key)?;
+                kuro_client_ctx::println!("{}: {}", key, value)?;
             }
+        } else if self.keys.len() == 1 {
+            // Single key: print just the value (Bazel compatibility)
+            let value = resolve_key(&self.keys[0])?;
+            kuro_client_ctx::println!("{}", value)?;
         } else {
+            // Multiple keys: print "key: value" format
             for key in &self.keys {
-                print_key(key)?;
+                let value = resolve_key(key)?;
+                kuro_client_ctx::println!("{}: {}", key, value)?;
             }
         }
         Ok(())
