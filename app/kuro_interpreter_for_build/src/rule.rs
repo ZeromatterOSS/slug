@@ -149,6 +149,8 @@ pub struct StarlarkRuleCallable<'v> {
     /// Toolchain type labels declared via `rule(toolchains=[...])`.
     /// These are stored as Display strings from ToolchainTypeRequirement, Label, or plain strings.
     toolchain_types: Vec<String>,
+    /// Execution group names declared via `rule(exec_groups={...})`.
+    exec_group_names: Vec<String>,
 }
 
 /// Mappings of promise artifact name to the starlark function that will produce it, for anon targets.
@@ -224,6 +226,7 @@ impl<'v> StarlarkRuleCallable<'v> {
         provides: Vec<String>,
         rule_outputs: Vec<(String, String)>,
         toolchain_types: Vec<String>,
+        exec_group_names: Vec<String>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> kuro_error::Result<StarlarkRuleCallable<'v>> {
         let build_context = BuildContext::from_context(eval)?;
@@ -329,6 +332,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             output_attr_names,
             rule_outputs,
             toolchain_types,
+            exec_group_names,
         })
     }
 
@@ -362,6 +366,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             Vec::new(), // anon rules have no provides
             Vec::new(), // anon rules have no rule_outputs
             Vec::new(), // anon rules have no toolchain_types
+            Vec::new(), // anon rules have no exec_groups
             eval,
         )
     }
@@ -535,6 +540,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
                 is_executable: self.is_executable,
                 provides: self.provides.clone(),
                 toolchain_types: self.toolchain_types.clone(),
+                exec_group_names: self.exec_group_names.clone(),
             }),
             rule_type,
             implementation: frozen_impl,
@@ -546,6 +552,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
             output_attr_names: self.output_attr_names,
             rule_outputs: self.rule_outputs,
             toolchain_types: self.toolchain_types,
+            exec_group_names: self.exec_group_names,
         })
     }
 }
@@ -571,6 +578,8 @@ pub struct FrozenStarlarkRuleCallable {
     rule_outputs: Vec<(String, String)>,
     /// Toolchain type labels declared via `rule(toolchains=[...])`.
     toolchain_types: Vec<String>,
+    /// Execution group names declared via `rule(exec_groups={...})`.
+    exec_group_names: Vec<String>,
 }
 starlark_simple_value!(FrozenStarlarkRuleCallable);
 
@@ -839,14 +848,28 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         // TODO(bazel): Use the fragments parameter for configuration fragment access
         // TODO(bazel): Use the subrules parameter for subrule composition
         // TODO(bazel): Use the initializer parameter for pre-analysis attribute validation
-        // TODO(bazel): Use the exec_groups parameter for execution groups
         let _unused = (
             fragments,
             subrules,
             initializer,
-            exec_groups,
             extra_kwargs,
         );
+
+        // Extract execution group names from the exec_groups parameter.
+        // In Bazel, exec_groups is a dict mapping group name → exec_group() value.
+        // We store just the names for metadata; the ExecGroupValue details are
+        // not yet used for real toolchain resolution.
+        let exec_group_names: Vec<String> = if let Some(eg_val) = exec_groups {
+            if let Some(dict) = DictRef::from_value(eg_val) {
+                dict.keys()
+                    .filter_map(|k| k.unpack_str().map(|s| s.to_owned()))
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
 
         // Extract provider type names from the provides parameter.
         // Each item is a provider constructor (e.g., CcInfo, JavaInfo).
@@ -1028,6 +1051,7 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             provides_names,
             rule_outputs,
             toolchain_types,
+            exec_group_names,
             eval,
         )?)
     }

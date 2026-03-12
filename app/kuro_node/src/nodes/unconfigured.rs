@@ -217,6 +217,11 @@ impl TargetNode {
         &self.0.rule.toolchain_types
     }
 
+    /// Execution group names declared via `rule(exec_groups={...})`.
+    pub fn exec_group_names(&self) -> &[String] {
+        &self.0.rule.exec_group_names
+    }
+
     pub fn is_configuration_rule(&self) -> bool {
         self.0.rule.rule_kind == RuleKind::Configuration
     }
@@ -752,6 +757,7 @@ pub mod testing {
                     is_executable: false,
                     provides: Vec::new(),
                     toolchain_types: Vec::new(),
+                    exec_group_names: Vec::new(),
                 }),
                 Arc::new(Package {
                     buildfile_path,

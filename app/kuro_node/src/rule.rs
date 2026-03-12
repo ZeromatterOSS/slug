@@ -59,6 +59,10 @@ pub struct Rule {
     /// Toolchain type labels declared via `rule(toolchains=[...])`.
     /// Used during analysis to populate `ctx.toolchains`.
     pub toolchain_types: Vec<String>,
+    /// Execution group names declared via `rule(exec_groups={...})`.
+    /// Each entry is a group name (e.g., "compile", "link").
+    /// Used to validate `ctx.exec_groups` key lookups at analysis time.
+    pub exec_group_names: Vec<String>,
 }
 
 interner!(INTERNER, BuckHasher, Rule);

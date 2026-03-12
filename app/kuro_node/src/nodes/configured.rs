@@ -832,6 +832,13 @@ impl<'a> ConfiguredTargetNodeRef<'a> {
         }
     }
 
+    pub fn exec_group_names(self) -> &'a [String] {
+        match &self.0.get().target_node {
+            TargetNodeOrForward::TargetNode(target_node) => target_node.exec_group_names(),
+            TargetNodeOrForward::Forward(_, _) => &[],
+        }
+    }
+
     pub fn execution_platform_resolution(self) -> &'a ExecutionPlatformResolution {
         &self.0.get().execution_platform_resolution
     }

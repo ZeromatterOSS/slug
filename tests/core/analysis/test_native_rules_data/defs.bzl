@@ -509,6 +509,40 @@ non_executable_rule = rule(
 )
 
 
+def _exec_groups_test_impl(ctx):
+    """Tests that rule(exec_groups={...}) is accepted and ctx.exec_groups works."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    # Access exec_groups dict
+    eg = ctx.exec_groups
+    has_compile = "compile" in eg
+    has_link = "link" in eg
+    # Access toolchains within an exec group
+    compile_group = eg["compile"]
+    has_toolchains = hasattr(compile_group, "toolchains")
+    lines = [
+        "type=" + type(eg),
+        "has_compile=" + str(has_compile),
+        "has_link=" + str(has_link),
+        "has_toolchains=" + str(has_toolchains),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+exec_groups_test = rule(
+    implementation = _exec_groups_test_impl,
+    exec_groups = {
+        "compile": exec_group(
+            toolchains = [],
+        ),
+        "link": exec_group(
+            toolchains = [],
+        ),
+    },
+    attrs = {},
+)
+
+
 def _nonempty_deps_test_impl(ctx):
     """Tests that allow_empty=False on label_list is enforced."""
     out = ctx.actions.declare_file(ctx.label.name + ".txt")

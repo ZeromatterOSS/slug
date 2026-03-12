@@ -399,6 +399,19 @@ async def test_stamp_files_are_file_objects(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_rule_exec_groups(buck: Buck) -> None:
+    """rule(exec_groups={...}) is accepted and ctx.exec_groups works."""
+    result = await buck.build("//:exec_groups_test")
+    output = result.get_build_report().output_for_target("//:exec_groups_test")
+    content = output.read_text().strip()
+    lines = dict(line.split("=", 1) for line in content.splitlines())
+    assert lines["type"] == "exec_groups"
+    assert lines["has_compile"] == "True"
+    assert lines["has_link"] == "True"
+    assert lines["has_toolchains"] == "True"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_run_environment_info_provider(buck: Buck) -> None:
     """RunEnvironmentInfo returns a proper provider with environment and inherited_environment."""
     result = await buck.build("//:run_env_test")
