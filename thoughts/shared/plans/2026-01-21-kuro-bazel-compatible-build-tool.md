@@ -502,10 +502,13 @@ Example aliases created: `com_google_protobuf -> protobuf`, `com_google_absl -> 
 
 Current status: **~980 pass, ~160 skip, 0 fail** in `tests/core/` (updated 2026-03-12). All test categories (analysis, build, run, test, bzlmod, docs, help, log, completion, interpreter, transitive_sets, validation) pass with 0 failures. analysis/test_native_rules: 106 pass, 0 fail; build/: 177 pass, 95 skip, 0 fail; configurations/: 52 pass, 0 fail; query/: 74 pass, 8 skip, 0 fail; test/: 27 pass, 0 fail.
 
-### Test Runner Improvements (2026-03-12)
+### Test Runner & CLI Improvements (2026-03-12)
 - **Bazel Test Encyclopedia env vars**: TEST_TMPDIR, TEST_SRCDIR, RUNFILES_DIR, XML_OUTPUT_FILE, TEST_BINARY, TEST_SIZE, TEST_SHARD_INDEX, TEST_TOTAL_SHARDS, RUNFILES_MANIFEST_FILE
-- **`--test_output` flag**: Wired from client to server via `test_output_mode` proto field; flag is now visible in help
+- **`--test_output` modes implemented**: summary (hide all), errors (default, show failures), all (show everything), short (no details), streamed (same as all). Uses `TestOutputMode` enum in display.rs with process-level OnceLock
+- **`kuro run` RUNFILES_DIR**: Sets RUNFILES_DIR and RUNFILES_MANIFEST_FILE env vars when runfiles tree exists
+- **`kuro info` improvements**: Single-key queries output value only (Bazel compat); added output_path, bazel-genfiles, server_pid, server_log, build-language keys
 - **Cleaner test output**: Test runner uses proper string conversion (not Debug format), only includes non-empty stdout/stderr sections
+- **Stability fixes**: Replaced panic!() with proper error handling in DefaultInfo provider (for_each_in_list, files attribute) and configuror implicit import lookup
 
 ### CI Infrastructure (2026-03-05)
 
