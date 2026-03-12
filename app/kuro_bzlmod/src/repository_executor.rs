@@ -69,6 +69,8 @@ pub fn execute_repository_rule(
     // Dispatch based on rule name
     let result = match invocation.rule_name.as_str() {
         "http_archive" => execute_http_archive(invocation, &attrs, &working_dir),
+        "http_file" => execute_http_file(invocation, &attrs, &working_dir),
+        "http_jar" => execute_http_jar(invocation, &attrs, &working_dir),
         "git_repository" => execute_git_repository(invocation, &attrs, &working_dir),
         "local_repository" | "new_local_repository" => {
             execute_local_repository(invocation, &attrs, &working_dir)
@@ -311,6 +313,186 @@ fn apply_patches(
             }
         }
     }
+
+    Ok(())
+}
+
+/// Execute http_file repository rule.
+///
+/// Downloads a single file and makes it available as a target.
+/// Creates a BUILD.bazel that exposes the file via `filegroup`.
+fn execute_http_file(
+    invocation: &RepositoryInvocation,
+    attrs: &InvocationAttrs,
+    working_dir: &Path,
+) -> kuro_error::Result<()> {
+    let urls = get_urls(attrs)?;
+    if urls.is_empty() {
+        return Err(RepositoryExecutionError::MissingAttribute {
+            name: invocation.name.clone(),
+            attr: "url or urls".to_owned(),
+        }
+        .into());
+    }
+
+    let sha256 = attrs.get_optional_string("sha256");
+    let integrity = attrs.get_optional_string("integrity");
+    let downloaded_file_path = attrs
+        .get_optional_string("downloaded_file_path")
+        .unwrap_or("downloaded");
+
+    // Download the file
+    let mut last_error = None;
+    let mut data = None;
+    for url in &urls {
+        match download_url(url) {
+            Ok(d) => {
+                data = Some(d);
+                break;
+            }
+            Err(e) => {
+                tracing::warn!("Failed to download from {}: {}", url, e);
+                last_error = Some(e);
+            }
+        }
+    }
+
+    let file_data = data.ok_or_else(|| {
+        last_error.unwrap_or_else(|| {
+            RepositoryExecutionError::ExecutionFailed {
+                name: invocation.name.clone(),
+                reason: "All download URLs failed".to_owned(),
+            }
+            .into()
+        })
+    })?;
+
+    // Verify integrity
+    if let Some(expected) = sha256.as_deref() {
+        verify_sha256(&file_data, expected)?;
+    }
+    if let Some(expected) = integrity.as_deref() {
+        verify_integrity(&file_data, expected)?;
+    }
+
+    // Write the file
+    let dest_path = working_dir.join(downloaded_file_path);
+    if let Some(parent) = dest_path.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    std::fs::write(&dest_path, &file_data).map_err(|e| {
+        RepositoryExecutionError::ExecutionFailed {
+            name: invocation.name.clone(),
+            reason: format!("Failed to write downloaded file: {}", e),
+        }
+    })?;
+
+    // Set executable if requested
+    #[cfg(unix)]
+    {
+        let executable = attrs.get_optional_string("executable").map_or(false, |v| v == "True" || v == "true" || v == "1");
+        if executable {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(0o755));
+        }
+    }
+
+    // Create BUILD.bazel
+    let build_content = format!(
+        r#"package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "file",
+    srcs = ["{}"],
+)
+
+exports_files(["{}"])
+"#,
+        downloaded_file_path, downloaded_file_path
+    );
+    std::fs::write(working_dir.join("BUILD.bazel"), build_content).ok();
+
+    Ok(())
+}
+
+/// Execute http_jar repository rule.
+///
+/// Downloads a JAR file and makes it available as a java_import target.
+/// Falls back to filegroup if java rules not available.
+fn execute_http_jar(
+    invocation: &RepositoryInvocation,
+    attrs: &InvocationAttrs,
+    working_dir: &Path,
+) -> kuro_error::Result<()> {
+    let urls = get_urls(attrs)?;
+    if urls.is_empty() {
+        return Err(RepositoryExecutionError::MissingAttribute {
+            name: invocation.name.clone(),
+            attr: "url or urls".to_owned(),
+        }
+        .into());
+    }
+
+    let sha256 = attrs.get_optional_string("sha256");
+    let integrity = attrs.get_optional_string("integrity");
+
+    // Download the jar
+    let mut last_error = None;
+    let mut data = None;
+    for url in &urls {
+        match download_url(url) {
+            Ok(d) => {
+                data = Some(d);
+                break;
+            }
+            Err(e) => {
+                tracing::warn!("Failed to download from {}: {}", url, e);
+                last_error = Some(e);
+            }
+        }
+    }
+
+    let jar_data = data.ok_or_else(|| {
+        last_error.unwrap_or_else(|| {
+            RepositoryExecutionError::ExecutionFailed {
+                name: invocation.name.clone(),
+                reason: "All download URLs failed".to_owned(),
+            }
+            .into()
+        })
+    })?;
+
+    // Verify integrity
+    if let Some(expected) = sha256.as_deref() {
+        verify_sha256(&jar_data, expected)?;
+    }
+    if let Some(expected) = integrity.as_deref() {
+        verify_integrity(&jar_data, expected)?;
+    }
+
+    // Write the jar file
+    let jar_filename = format!("{}.jar", invocation.name);
+    std::fs::write(working_dir.join(&jar_filename), &jar_data).map_err(|e| {
+        RepositoryExecutionError::ExecutionFailed {
+            name: invocation.name.clone(),
+            reason: format!("Failed to write jar file: {}", e),
+        }
+    })?;
+
+    // Create BUILD.bazel with filegroup (since java_import requires rules_java)
+    let build_content = format!(
+        r#"package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "jar",
+    srcs = ["{}"],
+)
+
+exports_files(["{}"])
+"#,
+        jar_filename, jar_filename
+    );
+    std::fs::write(working_dir.join("BUILD.bazel"), build_content).ok();
 
     Ok(())
 }
