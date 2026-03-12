@@ -2233,23 +2233,6 @@ fn inject_bazel_test_env(
     env.insert("TEST_SHARD_INDEX".to_owned(), "0".to_owned());
     env.insert("TEST_TOTAL_SHARDS".to_owned(), "0".to_owned());
 
-    // RUNFILES_DIR: Path to the runfiles directory for the test executable.
-    // Bazel sets this to <exe>.runfiles/ so test frameworks can locate data files.
-    if let Some(exe_path) = expanded_cmd.first() {
-        let exe = std::path::Path::new(exe_path);
-        let runfiles_dir = if exe.extension().is_some() {
-            // Strip extension then add .runfiles (e.g. foo.exe -> foo.runfiles)
-            exe.with_extension("").with_extension("runfiles")
-        } else {
-            // Just append .runfiles (e.g. foo -> foo.runfiles)
-            std::path::PathBuf::from(format!("{}.runfiles", exe_path))
-        };
-        let runfiles_dir_str = runfiles_dir.to_string_lossy().into_owned();
-        env.insert("RUNFILES_DIR".to_owned(), runfiles_dir_str.clone());
-        // TEST_SRCDIR: Root of the runfiles tree (same as RUNFILES_DIR for Bazel 9+)
-        env.insert("TEST_SRCDIR".to_owned(), runfiles_dir_str);
-    }
-
     // XML_OUTPUT_FILE: Where test frameworks should write JUnit XML results.
     // Many frameworks (gtest, pytest --junitxml, cargo test) honor this.
     // We put it in the test tmpdir so it's easy to find.
@@ -2265,16 +2248,61 @@ fn inject_bazel_test_env(
         env.insert("TEST_BINARY".to_owned(), exe_path.clone());
     }
 
-    // Resolve absolute path for runfiles if possible (helps test frameworks)
+    // Create the runfiles directory tree for the test executable.
+    // Bazel creates <exe>.runfiles/<workspace>/ with symlinks to source files,
+    // enabling test data files to be found via the runfiles library.
     if let Some(exe_path) = expanded_cmd.first() {
-        let abs_runfiles = fs.fs().resolve(
-            &kuro_core::fs::project_rel_path::ProjectRelativePath::unchecked_new(
-                &format!("{}.runfiles", exe_path),
-            ),
-        );
+        let runfiles_suffix = if std::path::Path::new(exe_path).extension().is_some() {
+            let p = std::path::Path::new(exe_path)
+                .with_extension("")
+                .with_extension("runfiles");
+            p.to_string_lossy().into_owned()
+        } else {
+            format!("{}.runfiles", exe_path)
+        };
+        // Resolve to absolute path via the project filesystem
+        let project_root_path = fs.fs().root().as_path().to_path_buf();
+        let abs_runfiles = project_root_path.join(&runfiles_suffix);
+        let ws_dir = abs_runfiles.join("_main");
+        if !ws_dir.exists() {
+            let _ = std::fs::create_dir_all(&ws_dir);
+            // Symlink project root entries into the runfiles workspace dir
+            if let Ok(entries) = std::fs::read_dir(&project_root_path) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name();
+                    let name_str = name.to_string_lossy();
+                    // Skip build outputs, hidden dirs, and external deps
+                    if name_str.starts_with('.')
+                        || name_str == "buck-out"
+                        || name_str == "bazel-external"
+                    {
+                        continue;
+                    }
+                    let target = ws_dir.join(name_str.as_ref());
+                    if !target.exists() {
+                        #[cfg(unix)]
+                        let _ = std::os::unix::fs::symlink(entry.path(), &target);
+                        #[cfg(windows)]
+                        {
+                            if entry.path().is_dir() {
+                                let _ =
+                                    std::os::windows::fs::symlink_dir(entry.path(), &target);
+                            } else {
+                                let _ =
+                                    std::os::windows::fs::symlink_file(entry.path(), &target);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let abs_runfiles_str = abs_runfiles.to_string_lossy().into_owned();
+        // Set absolute RUNFILES_DIR and RUNFILES_MANIFEST_FILE
+        env.insert("RUNFILES_DIR".to_owned(), abs_runfiles_str.clone());
+        env.insert("TEST_SRCDIR".to_owned(), abs_runfiles_str.clone());
         env.insert(
             "RUNFILES_MANIFEST_FILE".to_owned(),
-            format!("{}/MANIFEST", abs_runfiles),
+            format!("{}/MANIFEST", abs_runfiles_str),
         );
     }
 }
