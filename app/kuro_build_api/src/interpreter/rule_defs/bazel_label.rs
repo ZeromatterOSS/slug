@@ -62,6 +62,18 @@ fn bazel_label_methods(builder: &mut MethodsBuilder) {
         let resolved = resolve_relative_label(&this.workspace_name, &this.package, label);
         Ok(BazelLabel::parse(&resolved))
     }
+
+    /// Returns a new Label in the same package with a different target name.
+    ///
+    /// In Bazel: `Label("//pkg:foo").same_package_label("bar")` → `Label("//pkg:bar")`
+    fn same_package_label<'v>(
+        this: &BazelLabel,
+        target_name: &str,
+    ) -> starlark::Result<BazelLabel> {
+        let resolved =
+            resolve_relative_label(&this.workspace_name, &this.package, target_name);
+        Ok(BazelLabel::parse(&resolved))
+    }
 }
 
 /// Resolve a label string relative to a given repository and package.

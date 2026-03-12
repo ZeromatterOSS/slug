@@ -17,6 +17,8 @@ use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::NonDefaultProvidersName;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::provider::label::ProvidersName;
+use kuro_core::target::label::label::TargetLabel;
+use kuro_core::target::name::TargetNameRef;
 use pagable::Pagable;
 use serde::Serialize;
 use serde::Serializer;
@@ -243,6 +245,57 @@ fn configured_label_methods(builder: &mut MethodsBuilder) {
         Ok(StarlarkConfiguredTargetLabel::new(
             (*this.label.target()).dupe(),
         ))
+    }
+
+    /// Resolves a label string relative to this label's package.
+    /// If the given string is an absolute label (starts with // or @), it is
+    /// returned as-is (as a string). If it starts with ":", it's resolved
+    /// relative to this label's package.
+    fn relative<'v>(
+        this: &StarlarkConfiguredProvidersLabel,
+        rel_name: &str,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        if rel_name.starts_with("//") || rel_name.starts_with('@') {
+            // Absolute label - return as Label with same config
+            // For now, return as string since we can't parse arbitrary labels
+            // without a cell resolver
+            Ok(heap.alloc(rel_name))
+        } else {
+            // Relative label - resolve against this package
+            let name = if let Some(stripped) = rel_name.strip_prefix(':') {
+                stripped
+            } else {
+                rel_name
+            };
+            let target_name = TargetNameRef::new(name).map_err(|e| {
+                starlark::Error::from(starlark::values::ValueError::IncorrectParameterTypeNamed(
+                    format!("Invalid target name '{}': {}", name, e),
+                ))
+            })?;
+            let new_target = TargetLabel::new(this.label.target().pkg(), target_name);
+            let configured = new_target.configure_pair(this.label.target().cfg_pair().dupe());
+            let new_label = ConfiguredProvidersLabel::new(configured, ProvidersName::Default);
+            Ok(heap.alloc(StarlarkConfiguredProvidersLabel::new(new_label)))
+        }
+    }
+
+    /// Returns a new Label in the same package with a different target name.
+    /// Equivalent to `Label("//pkg:new_name")` but preserves configuration.
+    fn same_package_label<'v>(
+        this: &StarlarkConfiguredProvidersLabel,
+        name: &str,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let target_name = TargetNameRef::new(name).map_err(|e| {
+            starlark::Error::from(starlark::values::ValueError::IncorrectParameterTypeNamed(
+                format!("Invalid target name '{}': {}", name, e),
+            ))
+        })?;
+        let new_target = TargetLabel::new(this.label.target().pkg(), target_name);
+        let configured = new_target.configure_pair(this.label.target().cfg_pair().dupe());
+        let new_label = ConfiguredProvidersLabel::new(configured, ProvidersName::Default);
+        Ok(heap.alloc(StarlarkConfiguredProvidersLabel::new(new_label)))
     }
 }
 

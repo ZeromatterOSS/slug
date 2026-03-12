@@ -130,3 +130,25 @@ label_str_rule = rule(
     implementation = _label_str_rule_impl,
     attrs = {},
 )
+
+
+# ============================================================================
+# Label() - same_package_label() method
+# ============================================================================
+
+def _label_same_package_rule_impl(ctx):
+    """Tests Label.same_package_label() to create sibling labels."""
+    lbl = Label("//my/pkg:original")
+    sibling = lbl.same_package_label("sibling_target")
+    out = ctx.actions.declare_file("label_same_pkg.txt")
+    ctx.actions.write(
+        out,
+        "name={}\npackage={}".format(sibling.name, sibling.package),
+    )
+    return [DefaultInfo(default_output = out)]
+
+
+label_same_package_rule = rule(
+    implementation = _label_same_package_rule_impl,
+    attrs = {},
+)

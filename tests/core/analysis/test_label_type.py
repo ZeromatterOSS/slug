@@ -100,3 +100,15 @@ async def test_label_str_conversion(buck: Buck) -> None:
     content = output.read_text().strip()
     assert "my/package" in content, f"Expected package in str(label), got: {content!r}"
     assert "my_target" in content, f"Expected target in str(label), got: {content!r}"
+
+
+@buck_test(data_dir="test_label_type_data")
+async def test_label_same_package_label(buck: Buck) -> None:
+    """Label.same_package_label() creates a label in the same package."""
+    result = await buck.build("//:label_same_pkg")
+    output = result.get_build_report().output_for_target("//:label_same_pkg")
+    lines = dict(
+        line.split("=", 1) for line in output.read_text().strip().splitlines()
+    )
+    assert lines["name"] == "sibling_target", f"Expected 'sibling_target', got: {lines['name']!r}"
+    assert lines["package"] == "my/pkg", f"Expected 'my/pkg', got: {lines['package']!r}"

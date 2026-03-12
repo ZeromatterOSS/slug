@@ -4,6 +4,7 @@ load(":defs.bzl",
      "label_external_rule",
      "label_relative_rule",
      "label_root_rule",
+     "label_same_package_rule",
      "label_str_rule")
 
 # Test Label() with package path
@@ -23,3 +24,6 @@ label_eq_rule(name = "label_eq")
 
 # Test str(Label())
 label_str_rule(name = "label_str")
+
+# Test Label.same_package_label()
+label_same_package_rule(name = "label_same_pkg")
