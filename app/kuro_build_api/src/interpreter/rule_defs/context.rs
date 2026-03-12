@@ -848,6 +848,21 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         Ok(crate::interpreter::rule_defs::build_config::get_collect_code_coverage())
     }
 
+    /// Splits a shell command string into a list of tokens.
+    ///
+    /// Bazel-compatible: splits option_string according to Bourne shell tokenization rules.
+    /// Handles single-quoted, double-quoted, and unquoted strings.
+    /// Whitespace is used as delimiter outside of quotes.
+    #[allow(unused_variables)]
+    fn tokenize<'v>(
+        this: RefAnalysisContext<'v>,
+        option_string: &str,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let tokens = shell_tokenize(option_string);
+        Ok(heap.alloc(tokens))
+    }
+
     /// Creates a runfiles object (Bazel-compatible).
     ///
     /// Returns a runfiles object that can be merged with other runfiles.
@@ -4564,4 +4579,72 @@ pub static ANALYSIS_ACTIONS_METHODS_ANON_TARGET: LateBinding<fn(&mut MethodsBuil
 
 pub(crate) fn init_analysis_context_ty() {
     AnalysisContextReprLate::init(AnalysisContext::starlark_type_repr());
+}
+
+/// Shell-tokenize a string following Bourne shell rules.
+///
+/// Handles single-quoted strings (no escape), double-quoted strings (\\ and \"
+/// escapes), and unquoted strings (whitespace is delimiter).
+fn shell_tokenize(s: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut chars = s.chars().peekable();
+    let mut in_token = false;
+
+    while let Some(c) = chars.next() {
+        match c {
+            '\'' => {
+                // Single-quoted: everything until closing quote, no escapes
+                in_token = true;
+                while let Some(c2) = chars.next() {
+                    if c2 == '\'' {
+                        break;
+                    }
+                    current.push(c2);
+                }
+            }
+            '"' => {
+                // Double-quoted: handle \\ and \" escapes
+                in_token = true;
+                while let Some(c2) = chars.next() {
+                    if c2 == '"' {
+                        break;
+                    } else if c2 == '\\' {
+                        if let Some(&next) = chars.peek() {
+                            if next == '"' || next == '\\' || next == '$' || next == '`' {
+                                current.push(chars.next().unwrap());
+                            } else {
+                                current.push('\\');
+                            }
+                        }
+                    } else {
+                        current.push(c2);
+                    }
+                }
+            }
+            '\\' => {
+                // Backslash escape outside quotes
+                in_token = true;
+                if let Some(next) = chars.next() {
+                    current.push(next);
+                }
+            }
+            c if c.is_ascii_whitespace() => {
+                if in_token {
+                    tokens.push(std::mem::take(&mut current));
+                    in_token = false;
+                }
+            }
+            _ => {
+                in_token = true;
+                current.push(c);
+            }
+        }
+    }
+
+    if in_token || !current.is_empty() {
+        tokens.push(current);
+    }
+
+    tokens
 }

@@ -1019,6 +1019,24 @@ async def test_cc_toolchain_config_info(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_tokenize(buck: Buck) -> None:
+    """ctx.tokenize() splits shell command strings."""
+    result = await buck.build("//:tokenize_test")
+    output = result.get_build_report().output_for_target("//:tokenize_test")
+    content = output.read_text().strip()
+    assert "tokenize: ok" in content
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_files_to_run(buck: Buck) -> None:
+    """DefaultInfo.files_to_run returns struct with executable and runfiles_manifest."""
+    result = await buck.build("//:files_to_run_test")
+    output = result.get_build_report().output_for_target("//:files_to_run_test")
+    content = output.read_text().strip()
+    assert "files_to_run: ok" in content
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_actions_fail(buck: Buck) -> None:
     """ctx.actions.fail() raises an error during analysis."""
     with pytest.raises(Exception) as exc_info:

@@ -1045,3 +1045,72 @@ cc_toolchain_config_info_test = rule(
     implementation = _cc_toolchain_config_info_test_impl,
     attrs = {},
 )
+
+
+def _tokenize_test_impl(ctx):
+    """Tests ctx.tokenize() splits shell command strings."""
+    # Test basic tokenization
+    tokens = ctx.tokenize("hello world")
+    if tokens != ["hello", "world"]:
+        fail("Expected ['hello', 'world'], got %s" % tokens)
+
+    # Test single-quoted strings
+    tokens = ctx.tokenize("'hello world' foo")
+    if tokens != ["hello world", "foo"]:
+        fail("Expected ['hello world', 'foo'], got %s" % tokens)
+
+    # Test double-quoted strings
+    tokens = ctx.tokenize('"hello world" foo')
+    if tokens != ["hello world", "foo"]:
+        fail("Expected ['hello world', 'foo'], got %s" % tokens)
+
+    # Test empty string
+    tokens = ctx.tokenize("")
+    if tokens != []:
+        fail("Expected [], got %s" % tokens)
+
+    # Test multiple whitespace
+    tokens = ctx.tokenize("a   b   c")
+    if tokens != ["a", "b", "c"]:
+        fail("Expected ['a', 'b', 'c'], got %s" % tokens)
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "tokenize: ok\n")
+    return [DefaultInfo(default_output = out)]
+
+
+tokenize_test = rule(
+    implementation = _tokenize_test_impl,
+    attrs = {},
+)
+
+
+def _files_to_run_test_impl(ctx):
+    """Tests DefaultInfo.files_to_run attribute."""
+    dep = ctx.attr.tool
+    di = dep[DefaultInfo]
+
+    # files_to_run should exist on DefaultInfo
+    ftr = di.files_to_run
+    if ftr == None:
+        fail("DefaultInfo.files_to_run should not be None")
+
+    # files_to_run should have executable attribute
+    if not hasattr(ftr, "executable"):
+        fail("files_to_run missing 'executable' attribute")
+
+    # files_to_run should have runfiles_manifest attribute
+    if not hasattr(ftr, "runfiles_manifest"):
+        fail("files_to_run missing 'runfiles_manifest' attribute")
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "files_to_run: ok\n")
+    return [DefaultInfo(default_output = out)]
+
+
+files_to_run_test = rule(
+    implementation = _files_to_run_test_impl,
+    attrs = {
+        "tool": attr.label(),
+    },
+)

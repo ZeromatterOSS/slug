@@ -644,6 +644,28 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
         }
         Ok(Value::new_none())
     }
+
+    /// Returns a FilesToRunProvider-like struct with executable and runfiles_manifest.
+    ///
+    /// In Bazel, `DefaultInfo.files_to_run` returns an object with:
+    /// - `executable`: the executable File (or None)
+    /// - `runfiles_manifest`: the runfiles manifest File (always None in Kuro)
+    #[starlark(attribute)]
+    fn files_to_run<'v>(this: &DefaultInfo<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let executable = {
+            let list_val = this.executable.get();
+            if let Some(list) = ListRef::from_value(list_val.to_value()) {
+                list.iter().next().unwrap_or(Value::new_none())
+            } else {
+                Value::new_none()
+            }
+        };
+        // Return a struct with executable and runfiles_manifest fields
+        Ok(heap.alloc(starlark::values::structs::AllocStruct([
+            ("executable", executable),
+            ("runfiles_manifest", Value::new_none()),
+        ])))
+    }
 }
 
 /// A depset wrapper that holds an unfrozen list internally.
