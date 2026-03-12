@@ -852,3 +852,29 @@ async def test_build_config_test_env_flag(buck: Buck) -> None:
     assert "MY_VAR" in lines["test_env"]
     assert "my_val" in lines["test_env"]
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_instrumented_files_info(buck: Buck) -> None:
+    """coverage_common.instrumented_files_info() returns provider with depset fields."""
+    result = await buck.build("//:instrumented_files_test")
+    output = result.get_build_report().output_for_target("//:instrumented_files_test")
+    content = output.read_text().replace("\r\n", "\n")
+    lines = dict(line.split("=", 1) for line in content.strip().split("\n") if "=" in line)
+
+    assert "InstrumentedFilesInfo" in lines["type"]
+    assert lines["has_instrumented_files"] == "True"
+    assert lines["has_metadata_files"] == "True"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_instrumented_files_info_empty(buck: Buck) -> None:
+    """coverage_common.instrumented_files_info() with no args returns empty depsets."""
+    result = await buck.build("//:instrumented_files_empty_test")
+    output = result.get_build_report().output_for_target("//:instrumented_files_empty_test")
+    content = output.read_text().replace("\r\n", "\n")
+    lines = dict(line.split("=", 1) for line in content.strip().split("\n") if "=" in line)
+
+    assert "InstrumentedFilesInfo" in lines["type"]
+    assert lines["has_instrumented_files"] == "True"
+    assert lines["has_metadata_files"] == "True"
+

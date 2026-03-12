@@ -644,3 +644,57 @@ build_config_test = rule(
     implementation = _build_config_test_impl,
     attrs = {},
 )
+
+
+def _instrumented_files_test_impl(ctx):
+    """Tests coverage_common.instrumented_files_info() with source files."""
+    info = coverage_common.instrumented_files_info(
+        ctx,
+        source_attributes = ["srcs"],
+        dependency_attributes = ["deps"],
+        extensions = ["c", "h", "cc"],
+    )
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+
+    inst_files = info.instrumented_files.to_list() if hasattr(info.instrumented_files, "to_list") else []
+    meta_files = info.metadata_files.to_list() if hasattr(info.metadata_files, "to_list") else []
+
+    lines = [
+        "type=" + type(info),
+        "has_instrumented_files=" + str(hasattr(info, "instrumented_files")),
+        "has_metadata_files=" + str(hasattr(info, "metadata_files")),
+        "instrumented_count=" + str(len(inst_files)),
+        "metadata_count=" + str(len(meta_files)),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+instrumented_files_test = rule(
+    implementation = _instrumented_files_test_impl,
+    attrs = {
+        "srcs": attr.label_list(allow_files = True),
+        "deps": attr.label_list(),
+    },
+)
+
+
+def _instrumented_files_empty_test_impl(ctx):
+    """Tests coverage_common.instrumented_files_info() with no args."""
+    info = coverage_common.instrumented_files_info(ctx)
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    lines = [
+        "type=" + type(info),
+        "has_instrumented_files=" + str(hasattr(info, "instrumented_files")),
+        "has_metadata_files=" + str(hasattr(info, "metadata_files")),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+instrumented_files_empty_test = rule(
+    implementation = _instrumented_files_empty_test_impl,
+    attrs = {},
+)
