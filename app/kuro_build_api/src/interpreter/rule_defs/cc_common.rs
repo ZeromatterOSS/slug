@@ -2471,6 +2471,7 @@ impl<'v> StarlarkValue<'v> for CcCommonModule {
                 | "get_environment_variables"
                 | "empty_variables"
                 | "do_not_use_tools_cpp_compiler_present"
+                | "is_cc_toolchain_resolution_enabled_do_not_use"
                 | "CcToolchainInfo"
         )
     }
@@ -2493,6 +2494,7 @@ impl<'v> StarlarkValue<'v> for CcCommonModule {
             "get_environment_variables".to_owned(),
             "empty_variables".to_owned(),
             "do_not_use_tools_cpp_compiler_present".to_owned(),
+            "is_cc_toolchain_resolution_enabled_do_not_use".to_owned(),
             "CcToolchainInfo".to_owned(),
         ]
     }
@@ -2508,6 +2510,20 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
     fn internal_DO_NOT_USE(this: &CcCommonModule) -> starlark::Result<CcCommonInternal> {
         let _ = this;
         Ok(CcCommonInternal)
+    }
+
+    /// Returns whether C++ toolchain resolution is enabled.
+    ///
+    /// In Bazel 9.0+, this always returns True (toolchain resolution is the default).
+    /// Used by rules_cc's find_cc_toolchain() to determine whether to use
+    /// ctx.toolchains[CC_TOOLCHAIN_TYPE] (modern) or ctx.attr._cc_toolchain (legacy).
+    #[allow(unused_variables)]
+    fn is_cc_toolchain_resolution_enabled_do_not_use<'v>(
+        #[starlark(this)] this: &CcCommonModule,
+        #[starlark(require = named)] ctx: Value<'v>,
+    ) -> starlark::Result<bool> {
+        // Kuro always uses toolchain resolution (Bazel 9.0+ behavior)
+        Ok(true)
     }
 
     /// Configures C++ features based on toolchain and requested features.
