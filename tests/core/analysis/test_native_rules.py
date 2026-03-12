@@ -656,6 +656,8 @@ async def test_cc_command_line_generation(buck: Buck) -> None:
     # Both should have non-zero length command lines
     assert int(lines.get("compile_cmdline_len", "0")) > 0, f"compile cmdline should be non-empty: {lines}"
     assert int(lines.get("link_cmdline_len", "0")) > 0, f"link cmdline should be non-empty: {lines}"
+    # Link command should contain output file from create_link_variables(output_file=...)
+    assert lines.get("has_output_in_link") == "True", f"link cmdline should contain my_binary: {lines}"
 
 
 @buck_test(data_dir="test_native_rules_data")

@@ -4311,8 +4311,26 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         }
         if !include_directories.is_none() {
             map.insert_hashed(
-                heap.alloc_str("include_directories").to_value().get_hashed().unwrap(),
+                heap.alloc_str("include_paths").to_value().get_hashed().unwrap(),
                 include_directories,
+            );
+        }
+        if !quote_include_directories.is_none() {
+            map.insert_hashed(
+                heap.alloc_str("quote_include_paths").to_value().get_hashed().unwrap(),
+                quote_include_directories,
+            );
+        }
+        if !system_include_directories.is_none() {
+            map.insert_hashed(
+                heap.alloc_str("system_include_paths").to_value().get_hashed().unwrap(),
+                system_include_directories,
+            );
+        }
+        if !framework_include_directories.is_none() {
+            map.insert_hashed(
+                heap.alloc_str("framework_include_directories").to_value().get_hashed().unwrap(),
+                framework_include_directories,
             );
         }
         if !preprocessor_defines.is_none() {
@@ -4323,9 +4341,20 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         }
         if use_pic {
             map.insert_hashed(
-                heap.alloc_str("use_pic").to_value().get_hashed().unwrap(),
+                heap.alloc_str("pic").to_value().get_hashed().unwrap(),
                 Value::new_bool(true),
             );
+        }
+
+        // Merge variables_extension dict into the variables
+        if !variables_extension.is_none() {
+            if let Some(dict_ref) = DictRef::from_value(variables_extension) {
+                for (k, v) in dict_ref.iter() {
+                    if let Ok(hashed) = k.get_hashed() {
+                        map.insert_hashed(hashed, v);
+                    }
+                }
+            }
         }
 
         let vars = heap.alloc(Dict::new(map));
@@ -4345,12 +4374,43 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         runtime_library_search_directories: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)]
         user_link_flags: Value<'v>,
+        // Bazel-compatible: output file path for the linker output.
+        // Sets `output_execpath` variable used by get_memory_inefficient_command_line.
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        output_file: Value<'v>,
+        // Bazel-compatible: library search directories for -L flags.
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        library_search_directories: Value<'v>,
+        // Bazel-compatible: param file path for long command lines.
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        param_file: Value<'v>,
+        // Bazel-compatible: whether the linker (not archiver) is being used.
+        #[starlark(require = named, default = true)] is_using_linker: bool,
+        // Bazel-compatible: whether to keep debug symbols.
+        #[starlark(require = named, default = true)] must_keep_debug: bool,
+        // Bazel-compatible: whether to use test-only flags.
+        #[starlark(require = named, default = false)] use_test_only_flags: bool,
+        // Bazel-compatible: vestigial parameter (unused in modern Bazel).
+        #[starlark(require = named, default = true)] is_static_linking_mode: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = (feature_configuration, cc_toolchain);
+        let _ = (feature_configuration, cc_toolchain, is_using_linker, is_static_linking_mode);
         let heap = eval.heap();
         // Build a dict with the link variables for get_memory_inefficient_command_line
         let mut map: SmallMap<Value<'v>, Value<'v>> = SmallMap::new();
+
+        // output_file sets output_execpath - critical for /OUT: or -o flags
+        if !output_file.is_none() {
+            let path_str = if let Some(s) = output_file.unpack_str() {
+                s.to_owned()
+            } else {
+                format!("{}", output_file)
+            };
+            map.insert_hashed(
+                heap.alloc_str("output_execpath").to_value().get_hashed().unwrap(),
+                heap.alloc_str(&path_str).to_value(),
+            );
+        }
 
         if !user_link_flags.is_none() {
             map.insert_hashed(
@@ -4369,12 +4429,46 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             );
         }
 
+        if !library_search_directories.is_none() {
+            map.insert_hashed(
+                heap.alloc_str("library_search_directories")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
+                library_search_directories,
+            );
+        }
+
         if is_linking_dynamic_library {
             map.insert_hashed(
                 heap.alloc_str("is_linking_dynamic_library")
                     .to_value()
                     .get_hashed()
                     .unwrap(),
+                Value::new_bool(true),
+            );
+        }
+
+        if !param_file.is_none() {
+            map.insert_hashed(
+                heap.alloc_str("linker_param_file")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
+                param_file,
+            );
+        }
+
+        if use_test_only_flags {
+            map.insert_hashed(
+                heap.alloc_str("is_cc_test").to_value().get_hashed().unwrap(),
+                Value::new_bool(true),
+            );
+        }
+
+        if !must_keep_debug {
+            map.insert_hashed(
+                heap.alloc_str("strip_debug_symbols").to_value().get_hashed().unwrap(),
                 Value::new_bool(true),
             );
         }

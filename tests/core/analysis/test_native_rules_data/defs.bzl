@@ -384,13 +384,14 @@ def _cc_command_line_test_impl(ctx):
         action_name = "c++-link-executable",
     )
 
-    # Get command line for a link action
+    # Get command line for a link action (with output_file)
     link_cmdline = cc_common.get_memory_inefficient_command_line(
         feature_configuration = fc,
         action_name = "c++-link-executable",
         variables = cc_common.create_link_variables(
             cc_toolchain = None,
             feature_configuration = fc,
+            output_file = "my_binary.exe",
         ),
     )
 
@@ -402,6 +403,7 @@ def _cc_command_line_test_impl(ctx):
         "has_output_in_compile=" + str(any(["test.o" in str(a) for a in compile_cmdline])),
         "linker_path=" + linker_path,
         "link_cmdline_len=" + str(len(link_cmdline)),
+        "has_output_in_link=" + str(any(["my_binary" in str(a) for a in link_cmdline])),
     ]
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
