@@ -36,6 +36,17 @@ select_value(
     }),
 )
 
+# select() with no_match_error parameter (Bazel-compatible)
+select_value(
+    name = "select_no_match_error",
+    value = select(
+        {
+            "//conditions:default": "matched_default",
+        },
+        no_match_error = "Please build with a supported platform",
+    ),
+)
+
 # === constraint_setting + constraint_value + config_setting ===
 
 constraint_setting(name = "my_setting")

@@ -94,6 +94,9 @@ impl fmt::Display for CoercedSelectorKeyRef<'_> {
 pub struct CoercedSelector {
     pub(crate) entries: ArcSlice<(ConfigurationSettingKey, CoercedAttr)>,
     pub(crate) default: Option<CoercedAttr>,
+    /// Bazel-compatible: custom error message shown when no condition matches
+    /// and no default is set. Set via `select({...}, no_match_error = "...")`.
+    pub(crate) no_match_error: Option<Box<str>>,
 }
 
 impl AttrDisplayWithContext for CoercedSelector {
@@ -136,7 +139,24 @@ impl CoercedSelector {
         default: Option<CoercedAttr>,
     ) -> kuro_error::Result<CoercedSelector> {
         Self::check_all_keys_unique(&entries)?;
-        Ok(CoercedSelector { entries, default })
+        Ok(CoercedSelector {
+            entries,
+            default,
+            no_match_error: None,
+        })
+    }
+
+    pub fn new_with_no_match_error(
+        entries: ArcSlice<(ConfigurationSettingKey, CoercedAttr)>,
+        default: Option<CoercedAttr>,
+        no_match_error: Option<Box<str>>,
+    ) -> kuro_error::Result<CoercedSelector> {
+        Self::check_all_keys_unique(&entries)?;
+        Ok(CoercedSelector {
+            entries,
+            default,
+            no_match_error,
+        })
     }
 
     fn check_all_keys_unique(
@@ -437,7 +457,7 @@ impl CoercedAttr {
         traversal: &mut dyn CoercedAttrTraversal<'a>,
     ) -> kuro_error::Result<()> {
         match CoercedAttrWithType::pack(self, t)? {
-            CoercedAttrWithType::Selector(CoercedSelector { entries, default }, t) => {
+            CoercedAttrWithType::Selector(CoercedSelector { entries, default, .. }, t) => {
                 for (condition, value) in entries.iter() {
                     traversal.configuration_dep(&condition.0, ConfigurationDepKind::SelectKey)?;
                     value.traverse(t, pkg, traversal)?;
@@ -641,7 +661,7 @@ impl CoercedAttr {
         ctx: &dyn AttrConfigurationContext,
         select: &'a CoercedSelector,
     ) -> kuro_error::Result<&'a CoercedAttr> {
-        let CoercedSelector { entries, default } = select;
+        let CoercedSelector { entries, default, .. } = select;
         let matched_cfg_keys = ctx.matched_cfg_keys();
         let resolved_entries: Vec<_> = entries
             .iter()
@@ -669,13 +689,22 @@ impl CoercedAttr {
             Ok(v)
         } else {
             default.as_ref().ok_or_else(|| {
-                kuro_error!(
-                    kuro_error::ErrorTag::Input,
-                    "None of {} conditions matched configuration `{}` and no default was set:\n{}",
-                    entries.len(),
-                    ctx.cfg().cfg(),
-                    entries.iter().map(|(s, _)| format!("  {s}")).join("\n"),
-                )
+                if let Some(ref no_match_error) = select.no_match_error {
+                    kuro_error!(
+                        kuro_error::ErrorTag::Input,
+                        "{}\nConditions checked:\n{}",
+                        no_match_error,
+                        entries.iter().map(|(s, _)| format!("  {s}")).join("\n"),
+                    )
+                } else {
+                    kuro_error!(
+                        kuro_error::ErrorTag::Input,
+                        "None of {} conditions matched configuration `{}` and no default was set:\n{}",
+                        entries.len(),
+                        ctx.cfg().cfg(),
+                        entries.iter().map(|(s, _)| format!("  {s}")).join("\n"),
+                    )
+                }
             })
         }
     }

@@ -53,14 +53,18 @@ use starlark::values::starlark_value_as_type::StarlarkValueAsType;
 pub enum StarlarkSelectorGen<V: ValueLifetimeless> {
     /// Simplest form, backed by dictionary representation
     /// wrapped into `select` function call.
-    Primary(ValueOfUncheckedGeneric<V, DictType<FrozenStringValue, FrozenValue>>),
+    /// The optional String holds the `no_match_error` message from Bazel's select().
+    Primary(
+        ValueOfUncheckedGeneric<V, DictType<FrozenStringValue, FrozenValue>>,
+        Option<Box<str>>,
+    ),
     Sum(V, V),
 }
 
 impl<V: ValueLifetimeless> Display for StarlarkSelectorGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StarlarkSelectorGen::Primary(v) => {
+            StarlarkSelectorGen::Primary(v, _no_match_error) => {
                 f.write_str("select(")?;
                 Display::fmt(v, f)?;
                 f.write_str(")")
@@ -83,7 +87,14 @@ starlark_complex_value!(pub StarlarkSelector);
 
 impl<'v> StarlarkSelector<'v> {
     pub fn new(d: ValueOf<'v, DictType<StringValue<'v>, Value<'v>>>) -> Self {
-        StarlarkSelector::Primary(d.as_unchecked().cast())
+        StarlarkSelector::Primary(d.as_unchecked().cast(), None)
+    }
+
+    pub fn new_with_no_match_error(
+        d: ValueOf<'v, DictType<StringValue<'v>, Value<'v>>>,
+        no_match_error: Option<Box<str>>,
+    ) -> Self {
+        StarlarkSelector::Primary(d.as_unchecked().cast(), no_match_error)
     }
 
     fn sum(left: Value<'v>, right: Value<'v>, heap: Heap<'v>) -> Value<'v> {
@@ -145,7 +156,8 @@ impl<'v> StarlarkSelector<'v> {
 
         if let Some(selector) = StarlarkSelector::from_value(val) {
             match *selector {
-                StarlarkSelectorGen::Primary(selector) => {
+                StarlarkSelectorGen::Primary(selector, ref no_match_error) => {
+                    let no_match_error = no_match_error.clone();
                     let selector = DictRef::from_value(selector.get()).unwrap();
                     let mut mapped = SmallMap::with_capacity(selector.len());
                     for (k, v) in selector.iter_hashed() {
@@ -158,9 +170,10 @@ impl<'v> StarlarkSelector<'v> {
                             }?,
                         );
                     }
-                    Ok(eval.heap().alloc(StarlarkSelector::new(
+                    Ok(eval.heap().alloc(StarlarkSelector::new_with_no_match_error(
                         ValueOf::unpack_value_err(eval.heap().alloc(Dict::new(mapped)))
                             .internal_error("validated at construction")?,
+                        no_match_error,
                     )))
                 }
                 StarlarkSelectorGen::Sum(left, right) => {
@@ -198,7 +211,7 @@ impl<'v> StarlarkSelector<'v> {
 
         if let Some(selector) = StarlarkSelector::from_value(val) {
             match *selector {
-                StarlarkSelectorGen::Primary(selector) => {
+                StarlarkSelectorGen::Primary(selector, ref _no_match_error) => {
                     let selector = DictRef::from_value(selector.get()).unwrap();
                     for v in selector.values() {
                         let result = invoke(eval, func, v)?;
@@ -230,7 +243,7 @@ impl<'v> StarlarkSelectorBase<'v> for StarlarkSelector<'v> {
 unsafe impl<'v> Trace<'v> for StarlarkSelector<'v> {
     fn trace(&mut self, tracer: &Tracer<'v>) {
         match self {
-            Self::Primary(a) => a.trace(tracer),
+            Self::Primary(a, _no_match_error) => a.trace(tracer),
             Self::Sum(a, b) => {
                 tracer.trace(a);
                 tracer.trace(b);
@@ -243,7 +256,9 @@ impl<'v> Freeze for StarlarkSelector<'v> {
     type Frozen = FrozenStarlarkSelector;
     fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
         Ok(match self {
-            StarlarkSelector::Primary(v) => FrozenStarlarkSelector::Primary(v.freeze(freezer)?),
+            StarlarkSelector::Primary(v, no_match_error) => {
+                FrozenStarlarkSelector::Primary(v.freeze(freezer)?, no_match_error)
+            }
             StarlarkSelector::Sum(l, r) => {
                 FrozenStarlarkSelector::Sum(l.freeze(freezer)?, r.freeze(freezer)?)
             }
@@ -266,7 +281,9 @@ where
 
     fn radd(&self, left: Value<'v>, heap: Heap<'v>) -> Option<starlark::Result<Value<'v>>> {
         let right = heap.alloc(match self {
-            StarlarkSelectorGen::Primary(x) => StarlarkSelectorGen::Primary(x.to_value()),
+            StarlarkSelectorGen::Primary(x, nme) => {
+                StarlarkSelectorGen::Primary(x.to_value(), nme.clone())
+            }
             StarlarkSelectorGen::Sum(x, y) => StarlarkSelectorGen::Sum(x.to_value(), y.to_value()),
         });
         Some(Ok(StarlarkSelector::sum(left, right, heap)))
@@ -274,7 +291,7 @@ where
 
     fn add(&self, other: Value<'v>, heap: Heap<'v>) -> Option<starlark::Result<Value<'v>>> {
         match self {
-            Self::Primary(v) => match ValueOf::unpack_value_err(v.get().to_value()) {
+            Self::Primary(v, _nme) => match ValueOf::unpack_value_err(v.get().to_value()) {
                 Ok(v) => {
                     let this = heap.alloc(StarlarkSelector::new(v));
                     Some(Ok(StarlarkSelector::sum(this, other, heap)))
@@ -301,12 +318,16 @@ pub fn register_select(globals: &mut GlobalsBuilder) {
 
     fn select<'v>(
         #[starlark(require = pos)] d: Value<'v>,
-        // Bazel-compatible: no_match_error is shown when no condition matches.
-        // We accept but ignore it for now.
+        // Bazel-compatible: no_match_error is shown when no condition matches
+        // and no default is set.
         #[starlark(require = named, default = "")] no_match_error: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkSelector<'v>> {
-        let _ = no_match_error;
+        let nme = if no_match_error.is_empty() {
+            None
+        } else {
+            Some(no_match_error.into())
+        };
         // Normalize dict keys: Label() objects (BazelLabel type) should be converted
         // to strings, since select() keys are always label strings.
         // In Bazel, `select({Label("//foo:bar"): val})` is common and valid.
@@ -328,12 +349,12 @@ pub fn register_select(globals: &mut GlobalsBuilder) {
                 }
                 let new_dict = heap.alloc(Dict::new(starlark::coerce::coerce(normalized)));
                 let typed = ValueOf::unpack_value_err(new_dict)?;
-                return Ok(StarlarkSelector::new(typed));
+                return Ok(StarlarkSelector::new_with_no_match_error(typed, nme));
             }
         }
         let typed: ValueOf<'v, DictType<StringValue<'v>, Value<'v>>> =
             ValueOf::unpack_value_err(d)?;
-        Ok(StarlarkSelector::new(typed))
+        Ok(StarlarkSelector::new_with_no_match_error(typed, nme))
     }
 
     /// Maps a selector.

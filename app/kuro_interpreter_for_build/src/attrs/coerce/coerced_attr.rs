@@ -74,7 +74,7 @@ impl CoercedAttrExr for CoercedAttr {
             }
 
             match *selector {
-                StarlarkSelectorGen::Primary(v) => {
+                StarlarkSelectorGen::Primary(v, ref no_match_error) => {
                     if let Some(dict) = DictRef::from_value(v.get()) {
                         let has_default = dict.get_str("DEFAULT").is_some()
                             || dict.get_str("//conditions:default").is_some();
@@ -113,10 +113,13 @@ impl CoercedAttrExr for CoercedAttr {
 
                         assert_eq!(entries.capacity(), entries.len());
 
-                        Ok(CoercedAttr::Selector(Box::new(CoercedSelector::new(
-                            ctx.intern_select(entries),
-                            default,
-                        )?)))
+                        Ok(CoercedAttr::Selector(Box::new(
+                            CoercedSelector::new_with_no_match_error(
+                                ctx.intern_select(entries),
+                                default,
+                                no_match_error.clone(),
+                            )?,
+                        )))
                     } else {
                         Err(SelectError::ValueNotDict(v.get().to_repr()).into())
                     }

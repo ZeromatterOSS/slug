@@ -48,6 +48,16 @@ async def test_select_conditions_default(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_select_no_match_error_param(buck: Buck) -> None:
+    """select() accepts no_match_error parameter (Bazel-compatible)."""
+    result = await buck.build("//:select_no_match_error")
+    output = result.get_build_report().output_for_target("//:select_no_match_error")
+
+    content = output.read_text().strip()
+    assert content == "matched_default"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_select_with_constraint_values_default(buck: Buck) -> None:
     """select() with constraint_values config_settings falls back to default
     when no platform is specified."""
