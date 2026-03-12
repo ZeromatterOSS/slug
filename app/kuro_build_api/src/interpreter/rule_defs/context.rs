@@ -407,6 +407,52 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         }
     }
 
+    /// The workspace name (Bazel-compatible).
+    ///
+    /// In Bazel, `ctx.workspace_name` returns the name of the workspace
+    /// (repository) containing the current target. Returns the root cell name
+    /// or empty string for the main workspace.
+    #[starlark(attribute)]
+    fn workspace_name<'v>(
+        this: RefAnalysisContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        if let Some(label) = this.0.label {
+            let cell = label.label().target().pkg().cell_name().as_str();
+            // In Bazel, the main repo returns "" or the module name
+            if cell == "root" {
+                Ok(heap.alloc_str("").to_value())
+            } else {
+                Ok(heap.alloc_str(cell).to_value())
+            }
+        } else {
+            Ok(heap.alloc_str("").to_value())
+        }
+    }
+
+    /// The path to the BUILD file for the current target (Bazel-compatible).
+    ///
+    /// In Bazel, `ctx.build_file_path` returns a path like "pkg/BUILD.bazel"
+    /// relative to the workspace root.
+    #[starlark(attribute)]
+    fn build_file_path<'v>(
+        this: RefAnalysisContext<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        if let Some(label) = this.0.label {
+            let pkg = label.label().target().pkg();
+            let pkg_path = pkg.cell_relative_path().as_str();
+            let path = if pkg_path.is_empty() {
+                "BUILD.bazel".to_owned()
+            } else {
+                format!("{}/BUILD.bazel", pkg_path)
+            };
+            Ok(heap.alloc_str(&path).to_value())
+        } else {
+            Ok(heap.alloc_str("BUILD.bazel").to_value())
+        }
+    }
+
     /// Configuration fragments for this target.
     ///
     /// Provides access to language-specific configuration like `ctx.fragments.cpp`,
