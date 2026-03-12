@@ -521,6 +521,78 @@ pub struct CommonBuildConfigurationOptions {
     /// Run under (Bazel compatibility, accepted but ignored).
     #[clap(long = "run-under", alias = "run_under", hide = true, value_name = "COMMAND")]
     pub run_under: Option<String>,
+
+    /// Host features (Bazel compatibility, accepted but ignored).
+    #[clap(long = "host-features", alias = "host_features", hide = true, value_name = "FEATURE", num_args = 1)]
+    pub host_features: Vec<String>,
+
+    /// Extra toolchains to consider (Bazel compatibility, accepted but ignored).
+    #[clap(long = "extra-toolchains", alias = "extra_toolchains", hide = true, value_name = "LABEL", num_args = 1)]
+    pub extra_toolchains: Vec<String>,
+
+    /// Extra execution platforms (Bazel compatibility, accepted but ignored).
+    #[clap(long = "extra-execution-platforms", alias = "extra_execution_platforms", hide = true, value_name = "LABEL", num_args = 1)]
+    pub extra_execution_platforms: Vec<String>,
+
+    /// Register toolchains for toolchain resolution (Bazel compatibility, accepted but ignored).
+    #[clap(long = "register-toolchains", alias = "register_toolchains", hide = true)]
+    pub register_toolchains: bool,
+
+    /// Whether to check direct dependencies (Bazel compatibility, accepted but ignored).
+    #[clap(long = "check-direct-dependencies", alias = "check_direct_dependencies", hide = true, value_name = "MODE")]
+    pub check_direct_dependencies: Option<String>,
+
+    /// Modify execution info (Bazel compatibility, accepted but ignored).
+    #[clap(long = "modify-execution-info", alias = "modify_execution_info", hide = true, value_name = "SPEC")]
+    pub modify_execution_info: Option<String>,
+
+    /// Output filter regex (Bazel compatibility, accepted but ignored).
+    #[clap(long = "output-filter", alias = "output_filter", hide = true, value_name = "REGEX")]
+    pub output_filter: Option<String>,
+
+    /// Stamp binaries with version info (Bazel compatibility, accepted but ignored).
+    #[clap(long = "stamp", hide = true)]
+    pub stamp: bool,
+
+    /// Don't stamp binaries (Bazel compatibility, accepted but ignored).
+    #[clap(long = "nostamp", hide = true)]
+    pub nostamp: bool,
+
+    /// Build runfiles (Bazel compatibility, accepted but ignored).
+    #[clap(long = "build-runfile-links", alias = "build_runfile_links", hide = true)]
+    pub build_runfile_links: bool,
+
+    /// Don't build runfiles (Bazel compatibility, accepted but ignored).
+    #[clap(long = "nobuild-runfile-links", alias = "nobuild_runfile_links", hide = true)]
+    pub nobuild_runfile_links: bool,
+
+    /// Enable bzlmod (Bazel compatibility, accepted but ignored - always on).
+    #[clap(long = "enable-bzlmod", alias = "enable_bzlmod", hide = true)]
+    pub enable_bzlmod: bool,
+
+    /// Allow yanked versions (Bazel compatibility, accepted but ignored).
+    #[clap(long = "allow-yanked-versions", alias = "allow_yanked_versions", hide = true, value_name = "MODULE", num_args = 1)]
+    pub allow_yanked_versions: Vec<String>,
+
+    /// Output groups to build (Bazel compatibility, accepted but ignored).
+    #[clap(long = "output-groups", alias = "output_groups", hide = true, value_name = "GROUPS")]
+    pub output_groups: Option<String>,
+
+    /// Java runtime version (Bazel compatibility, accepted but ignored).
+    #[clap(long = "java-runtime-version", alias = "java_runtime_version", hide = true, value_name = "VERSION")]
+    pub java_runtime_version: Option<String>,
+
+    /// Java language version (Bazel compatibility, accepted but ignored).
+    #[clap(long = "java-language-version", alias = "java_language_version", hide = true, value_name = "VERSION")]
+    pub java_language_version: Option<String>,
+
+    /// Tool Java runtime version (Bazel compatibility, accepted but ignored).
+    #[clap(long = "tool-java-runtime-version", alias = "tool_java_runtime_version", hide = true, value_name = "VERSION")]
+    pub tool_java_runtime_version: Option<String>,
+
+    /// Tool Java language version (Bazel compatibility, accepted but ignored).
+    #[clap(long = "tool-java-language-version", alias = "tool_java_language_version", hide = true, value_name = "VERSION")]
+    pub tool_java_language_version: Option<String>,
 }
 
 impl CommonBuildConfigurationOptions {
@@ -690,6 +762,25 @@ impl CommonBuildConfigurationOptions {
             build_tag_filter: None,
             test_tag_filter: None,
             run_under: None,
+            host_features: vec![],
+            extra_toolchains: vec![],
+            extra_execution_platforms: vec![],
+            register_toolchains: false,
+            check_direct_dependencies: None,
+            modify_execution_info: None,
+            output_filter: None,
+
+            stamp: false,
+            nostamp: false,
+            build_runfile_links: false,
+            nobuild_runfile_links: false,
+            enable_bzlmod: false,
+            allow_yanked_versions: vec![],
+            output_groups: None,
+            java_runtime_version: None,
+            java_language_version: None,
+            tool_java_runtime_version: None,
+            tool_java_language_version: None,
         };
         &DEFAULT
     }
@@ -753,6 +844,25 @@ impl CommonBuildConfigurationOptions {
             build_tag_filter: None,
             test_tag_filter: None,
             run_under: None,
+            host_features: vec![],
+            extra_toolchains: vec![],
+            extra_execution_platforms: vec![],
+            register_toolchains: false,
+            check_direct_dependencies: None,
+            modify_execution_info: None,
+            output_filter: None,
+
+            stamp: false,
+            nostamp: false,
+            build_runfile_links: false,
+            nobuild_runfile_links: false,
+            enable_bzlmod: false,
+            allow_yanked_versions: vec![],
+            output_groups: None,
+            java_runtime_version: None,
+            java_language_version: None,
+            tool_java_runtime_version: None,
+            tool_java_language_version: None,
         };
         &OPTS
     }
