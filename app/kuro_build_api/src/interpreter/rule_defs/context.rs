@@ -420,7 +420,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         if let Some(label) = this.0.label {
             let cell = label.label().target().pkg().cell_name().as_str();
             // In Bazel, the main repo returns "" or the module name
-            if cell == "root" {
+            if kuro_core::cells::is_root_cell_name(cell) {
                 Ok(heap.alloc_str("").to_value())
             } else {
                 Ok(heap.alloc_str(cell).to_value())

@@ -912,20 +912,37 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
         let format_str = named.get("format").and_then(|v| v.unpack_str());
 
         let values: Vec<Value<'v>> = args.positions(heap)?.collect();
-        if let Some(fmt) = format_str {
-            for val in values {
-                // For artifacts, resolve to path instead of using Display format
-                let val_str = if let Ok(Some(path_val)) = val.get_attr("path", heap) {
+        match (values.len(), format_str) {
+            // 2-arg form with format: add("--flag", value, format="%s")
+            // In Bazel, format only applies to the value (second arg), not the flag name.
+            (2, Some(fmt)) => {
+                // Add arg_name as-is
+                this.borrow.add_from_iterator(std::iter::once(values[0]))?;
+                // Format and add value
+                let val_str = if let Ok(Some(path_val)) = values[1].get_attr("path", heap) {
                     path_val.to_str()
                 } else {
-                    val.to_str()
+                    values[1].to_str()
                 };
                 let formatted = fmt.replace("%s", &val_str);
                 this.borrow
                     .add_from_iterator(std::iter::once(heap.alloc_str(&formatted).to_value()))?;
             }
-        } else {
-            this.borrow.add_from_iterator(values.into_iter())?;
+            // 1-arg form with format: add(value, format="%s")
+            (1, Some(fmt)) => {
+                let val_str = if let Ok(Some(path_val)) = values[0].get_attr("path", heap) {
+                    path_val.to_str()
+                } else {
+                    values[0].to_str()
+                };
+                let formatted = fmt.replace("%s", &val_str);
+                this.borrow
+                    .add_from_iterator(std::iter::once(heap.alloc_str(&formatted).to_value()))?;
+            }
+            // No format: add all positional args as-is
+            _ => {
+                this.borrow.add_from_iterator(values.into_iter())?;
+            }
         }
         Ok(this)
     }
@@ -952,7 +969,8 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] expand_directories: bool,
         #[starlark(require = named, default = false)] terminate_with: Value<'v>,
         #[starlark(require = named, default = false)] allow_closure: bool,
-        #[starlark(require = named, default = false)] omit_if_empty: bool,
+        // Bazel default is True: if empty, omit the arg_name prefix too
+        #[starlark(require = named, default = true)] omit_if_empty: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkCommandLineMut<'v>> {
         let _ = (expand_directories, allow_closure);
@@ -1083,7 +1101,8 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = starlark::values::none::NoneType)] map_each: Value<
             'v,
         >,
-        #[starlark(require = named, default = false)] omit_if_empty: bool,
+        // Bazel default is True: if empty, omit the arg_name prefix too
+        #[starlark(require = named, default = true)] omit_if_empty: bool,
         #[starlark(require = named, default = false)] uniquify: bool,
         #[starlark(require = named, default = false)] expand_directories: bool,
         #[starlark(require = named, default = false)] allow_closure: bool,
