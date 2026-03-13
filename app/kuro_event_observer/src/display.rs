@@ -233,6 +233,7 @@ pub fn display_action_key(
 
 pub fn display_action_name_opt(name: Option<&ActionName>) -> String {
     match name {
+        Some(name) if !name.progress_message.is_empty() => name.progress_message.clone(),
         Some(name) if name.identifier.is_empty() => name.category.clone(),
         Some(name) => format!("{} {}", name.category, name.identifier),
         _ => "unknown".to_owned(),
@@ -249,9 +250,13 @@ pub fn display_action_identity(
         None => Err(ParseEventError::MissingActionKey.into()),
     }?;
     let action_string = match name {
+        Some(name) if !name.progress_message.is_empty() => {
+            format!(" ({})", name.progress_message)
+        }
         Some(ActionName {
             category,
             identifier,
+            ..
         }) if !identifier.is_empty() => format!(" ({category} {identifier})"),
         Some(ActionName { category, .. }) => format!(" ({category})"),
         None => String::new(),

@@ -84,6 +84,7 @@ impl CommandExecutionTarget for ActionExecutionTarget<'_> {
         kuro_data::ActionName {
             category: self.action.category().as_str().to_owned(),
             identifier: self.action.identifier().unwrap_or("").to_owned(),
+            progress_message: self.action.progress_message().unwrap_or("").to_owned(),
         }
     }
 }

@@ -1,7 +1,8 @@
 load(":defs.bzl", "bin_dir_rule", "declare_dir_rule", "expand_template_rule",
-     "label_info_rule", "provider_consumer_rule", "provider_test_rule",
-     "run_shell_inputs_rule", "run_shell_env_rule", "run_shell_string_rule",
-     "write_multiline_rule", "runfiles_rule", "write_exec_rule")
+     "label_info_rule", "progress_message_rule", "provider_consumer_rule",
+     "provider_test_rule", "run_shell_inputs_rule", "run_shell_env_rule",
+     "run_shell_string_rule", "write_multiline_rule", "runfiles_rule",
+     "write_exec_rule")
 
 # Test 1: ctx.actions.write with is_executable
 write_exec_rule(
@@ -67,4 +68,9 @@ provider_consumer_rule(
 # Test 11: ctx.actions.run_shell with env parameter
 run_shell_env_rule(
     name = "shell_env",
+)
+
+# Test 12: actions.run/run_shell with progress_message
+progress_message_rule(
+    name = "progress_test",
 )

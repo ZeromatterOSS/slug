@@ -2181,6 +2181,7 @@ impl CommandExecutionTarget for TestTarget<'_> {
         kuro_data::ActionName {
             category: "test".to_owned(),
             identifier: "".to_owned(),
+            progress_message: String::new(),
         }
     }
 }
@@ -2356,6 +2357,7 @@ impl CommandExecutionTarget for LocalResourceTarget<'_> {
         kuro_data::ActionName {
             category: "setup_local_resource".to_owned(),
             identifier: "".to_owned(),
+            progress_message: String::new(),
         }
     }
 }

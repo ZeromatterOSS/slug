@@ -128,3 +128,12 @@ async def test_actions_run_shell_env(buck: Buck) -> None:
     content = output.read_text().strip()
     assert "hello_env" in content, f"Expected 'hello_env' in '{content}'"
     assert "world_env" in content, f"Expected 'world_env' in '{content}'"
+
+
+@buck_test(data_dir="test_ctx_actions_data")
+async def test_actions_progress_message(buck: Buck) -> None:
+    """actions.run/run_shell with progress_message builds successfully."""
+    result = await buck.build("//:progress_test")
+    output = result.get_build_report().output_for_target("//:progress_test")
+    content = output.read_text().strip()
+    assert content == "progress_works", f"Expected 'progress_works', got '{content}'"

@@ -142,6 +142,7 @@ async fn build_action_no_redirect(
         name: Some(kuro_data::ActionName {
             category: action.category().as_str().to_owned(),
             identifier: action.identifier().unwrap_or("").to_owned(),
+            progress_message: action.progress_message().unwrap_or("").to_owned(),
         }),
     };
 
@@ -251,6 +252,7 @@ async fn build_action_inner(
     let action_name = kuro_data::ActionName {
         category: action.category().as_str().to_owned(),
         identifier: action.identifier().unwrap_or("").to_owned(),
+        progress_message: action.progress_message().unwrap_or("").to_owned(),
     };
 
     let action_result;

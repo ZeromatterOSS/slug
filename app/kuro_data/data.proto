@@ -1434,6 +1434,11 @@ message ActionName {
   // If only one action is expected in a single category, this field may be
   // empty.
   string identifier = 2;
+
+  // An optional human-readable progress message for this action (Bazel compat).
+  // When set, displayed instead of category+identifier in build output.
+  // May contain %{input} and %{output} placeholders.
+  string progress_message = 3;
 }
 
 // The beginning of execution for a particular action.

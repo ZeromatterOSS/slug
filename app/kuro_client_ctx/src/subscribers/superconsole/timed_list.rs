@@ -711,6 +711,7 @@ mod tests {
                         name: Some(kuro_data::ActionName {
                             category: "category".into(),
                             identifier: "identifier".into(),
+                            progress_message: String::new(),
                         }),
                         kind: kuro_data::ActionKind::NotSet as i32,
                     }

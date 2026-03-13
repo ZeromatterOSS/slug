@@ -189,6 +189,7 @@ mod tests {
             kuro_data::ActionName {
                 category: "category".to_owned(),
                 identifier: "identifier".to_owned(),
+                progress_message: String::new(),
             },
             kuro_data::ActionKey {
                 id: vec![],

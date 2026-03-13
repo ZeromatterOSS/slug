@@ -285,6 +285,7 @@ pub(crate) struct StarlarkRunActionValues<'v> {
     pub(crate) remote_worker: Option<ValueTypedComplex<'v, WorkerInfo<'v>>>,
     pub(crate) category: StringValue<'v>,
     pub(crate) identifier: Option<StringValue<'v>>,
+    pub(crate) progress_message: Option<StringValue<'v>>,
     pub(crate) outputs_for_error_handler: Vec<ValueTyped<'v, StarlarkOutputArtifact<'v>>>,
     // Bazel compatibility: extra input artifacts from the Bazel `inputs` parameter.
     // These are tracked as dependencies but don't appear on the command line.
@@ -302,6 +303,7 @@ pub(crate) struct FrozenStarlarkRunActionValues {
     pub(crate) remote_worker: Option<FrozenValueTyped<'static, FrozenWorkerInfo>>,
     pub(crate) category: FrozenStringValue,
     pub(crate) identifier: Option<FrozenStringValue>,
+    pub(crate) progress_message: Option<FrozenStringValue>,
     pub(crate) outputs_for_error_handler:
         Vec<FrozenValueTyped<'static, FrozenStarlarkOutputArtifact>>,
     // Bazel compatibility: extra input artifacts from the Bazel `inputs` parameter.
@@ -327,6 +329,7 @@ impl<'v> Freeze for StarlarkRunActionValues<'v> {
             remote_worker,
             category,
             identifier,
+            progress_message,
             outputs_for_error_handler,
             bazel_inputs,
         } = self;
@@ -338,6 +341,7 @@ impl<'v> Freeze for StarlarkRunActionValues<'v> {
             remote_worker: remote_worker.freeze(freezer)?,
             category: category.freeze(freezer)?,
             identifier: identifier.freeze(freezer)?,
+            progress_message: progress_message.freeze(freezer)?,
             outputs_for_error_handler: outputs_for_error_handler
                 .iter()
                 .copied()
@@ -1435,6 +1439,10 @@ impl Action for RunAction {
 
     fn identifier(&self) -> Option<&str> {
         self.starlark_values.identifier.map(|x| x.as_str())
+    }
+
+    fn progress_message(&self) -> Option<&str> {
+        self.starlark_values.progress_message.map(|x| x.as_str())
     }
 
     fn always_print_stderr(&self) -> bool {

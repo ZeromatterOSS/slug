@@ -806,7 +806,6 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
 
         // Ignore other Bazel-specific parameters that are not yet implemented.
         let _ = (
-            progress_message,
             resource_set,
             toolchain,
             exec_group,
@@ -814,6 +813,22 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             unused_inputs_list,
             shadowed_action,
         );
+
+        // Bazel-compat: resolve %{input} and %{output} placeholders in progress_message
+        let resolved_progress_message = progress_message.into_option().map(|msg| {
+            let s = msg.as_str();
+            if s.contains("%{") {
+                let mut resolved = s.to_owned();
+                if let Some(first_output) = artifacts.declared_outputs.first() {
+                    first_output.get_path().with_short_path(|p| {
+                        resolved = resolved.replace("%{output}", p.as_str());
+                    });
+                }
+                heap.alloc_str(&resolved)
+            } else {
+                msg
+            }
+        });
 
         // Bazel-compat: when identifier is not provided and a mnemonic was used (Bazel-style),
         // auto-generate an identifier from the first output's path. This disambiguates multiple
@@ -843,6 +858,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
                 effective_category
             },
             identifier: effective_identifier,
+            progress_message: resolved_progress_message,
             outputs_for_error_handler: outputs_for_error_handler.items,
             // Bazel compatibility: track extra input artifacts from the `inputs` parameter
             bazel_inputs: collected_bazel_inputs,
@@ -996,7 +1012,6 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
         }
 
         let _ = (
-            progress_message,
             input_manifests,
             exec_group,
             shadowed_action,
@@ -1004,6 +1019,12 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             toolchain,
         );
         let heap = eval.heap();
+
+        // Bazel-compat: resolve progress_message (may be a string value)
+        let resolved_progress_message = progress_message
+            .into_option()
+            .and_then(|v| v.unpack_str())
+            .map(|s| heap.alloc_str(s));
 
         // Build the exe and args command lines:
         // - String command: exe = [shell, "-c"], args = [cmd_str, ...extra_arguments]
@@ -1152,6 +1173,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             remote_worker: None,
             category: effective_category,
             identifier: None,
+            progress_message: resolved_progress_message,
             outputs_for_error_handler: vec![],
             bazel_inputs,
         });

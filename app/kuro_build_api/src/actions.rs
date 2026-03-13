@@ -154,6 +154,12 @@ pub trait Action: Allocative + Debug + Send + Sync + 'static {
     /// be given either control over the identifier or the category.
     fn identifier(&self) -> Option<&str>;
 
+    /// An optional human-readable progress message for this action (Bazel compat).
+    /// When set, displayed instead of category+identifier in build output.
+    fn progress_message(&self) -> Option<&str> {
+        None
+    }
+
     /// Whether to always print stderr, or only print when a user asks for it.
     fn always_print_stderr(&self) -> bool {
         false
@@ -418,6 +424,10 @@ impl RegisteredAction {
 
     pub fn identifier(&self) -> Option<&str> {
         self.action.identifier()
+    }
+
+    pub fn progress_message(&self) -> Option<&str> {
+        self.action.progress_message()
     }
 
     pub fn is_expected_eligible_for_dedupe(&self) -> Option<bool> {

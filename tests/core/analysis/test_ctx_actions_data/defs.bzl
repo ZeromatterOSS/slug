@@ -218,3 +218,19 @@ run_shell_env_rule = rule(
     implementation = _run_shell_env_impl,
     attrs = {},
 )
+
+# === Test actions.run with progress_message ===
+def _progress_message_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.run_shell(
+        outputs = [out],
+        command = "echo progress_works > " + out.path,
+        mnemonic = "TestProgress",
+        progress_message = "Testing progress message for %{output}",
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+progress_message_rule = rule(
+    implementation = _progress_message_impl,
+    attrs = {},
+)
