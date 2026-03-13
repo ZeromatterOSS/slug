@@ -474,7 +474,7 @@ impl Action for GenruleAction {
         // Build the execution request using the appropriate shell interpreter.
         let req = match &self.shell {
             GenruleShell::Bash => CommandExecutionRequest::new(
-                vec!["bash".to_owned()],
+                vec![kuro_execute::shell::find_bash().to_owned()],
                 vec!["-c".to_owned(), expanded_cmd],
                 paths,
                 SortedVectorMap::default(),

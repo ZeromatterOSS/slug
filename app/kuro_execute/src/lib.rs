@@ -28,3 +28,4 @@ pub mod materialize;
 pub mod output_size;
 pub mod path;
 pub mod re;
+pub mod shell;

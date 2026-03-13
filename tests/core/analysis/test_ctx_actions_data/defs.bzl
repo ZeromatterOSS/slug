@@ -200,3 +200,21 @@ provider_consumer_rule = rule(
         "dep": attr.label(providers = [MyInfo]),
     },
 )
+
+# === Test ctx.actions.run_shell with env parameter ===
+def _run_shell_env_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.run_shell(
+        outputs = [out],
+        command = 'echo "${MY_VAR}|${OTHER_VAR}" > ' + out.path,
+        env = {
+            "MY_VAR": "hello_env",
+            "OTHER_VAR": "world_env",
+        },
+    )
+    return [DefaultInfo(files = depset([out]))]
+
+run_shell_env_rule = rule(
+    implementation = _run_shell_env_impl,
+    attrs = {},
+)

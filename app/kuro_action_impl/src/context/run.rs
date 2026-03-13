@@ -1009,8 +1009,9 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
         // - String command: exe = [shell, "-c"], args = [cmd_str, ...extra_arguments]
         // - List command: exe = the list, args = extra_arguments
         let (starlark_exe, starlark_args) = if let Some(cmd_str) = command.unpack_str() {
-            // Use platform-appropriate shell
-            let shell = if cfg!(windows) { "bash.exe" } else { "/bin/bash" };
+            // Use platform-appropriate shell.
+            // On Windows, we must use MSYS2/Git bash (not WSL bash) so env vars propagate.
+            let shell = kuro_execute::shell::find_bash();
             let exe_list = heap.alloc(vec![
                 heap.alloc_str(shell).to_value(),
                 heap.alloc_str("-c").to_value(),
@@ -1211,3 +1212,4 @@ fn collect_items_from_value<'v>(
     // Single value
     Ok(vec![val])
 }
+

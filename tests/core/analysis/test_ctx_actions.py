@@ -118,3 +118,13 @@ async def test_provider_propagation(buck: Buck) -> None:
     )
     assert lines["val"] == "my_provider_value", f"Expected 'my_provider_value', got '{lines['val']}'"
     assert lines["count"] == "42", f"Expected '42', got '{lines['count']}'"
+
+
+@buck_test(data_dir="test_ctx_actions_data")
+async def test_actions_run_shell_env(buck: Buck) -> None:
+    """ctx.actions.run_shell() with env parameter propagates environment variables."""
+    result = await buck.build("//:shell_env")
+    output = result.get_build_report().output_for_target("//:shell_env")
+    content = output.read_text().strip()
+    assert "hello_env" in content, f"Expected 'hello_env' in '{content}'"
+    assert "world_env" in content, f"Expected 'world_env' in '{content}'"
