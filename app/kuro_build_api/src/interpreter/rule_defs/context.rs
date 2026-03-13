@@ -1262,7 +1262,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         use crate::interpreter::rule_defs::provider::dependency::Dependency;
         use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
 
-        let _ = (attribute, make_variables, execution_requirements);
+        let _ = (attribute, execution_requirements);
 
         // Collect tool files as inputs
         let mut tool_files: Vec<Value<'v>> = Vec::new();
@@ -1305,7 +1305,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         }
 
         // Expand $(location ...) in command string if requested
-        let resolved_command = if expand_locations && !command.is_empty() {
+        let mut resolved_command = if expand_locations && !command.is_empty() {
             // Build combined targets list from tools + label_dict for location expansion
             let mut all_targets: Vec<Value<'v>> = Vec::new();
             if !tools.is_none() {
@@ -1324,6 +1324,22 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         } else {
             command.to_owned()
         };
+
+        // Expand $(VAR) make variables in command string
+        if !make_variables.is_none() {
+            if let Ok(iter) = make_variables.iterate(heap) {
+                for key_val in iter {
+                    if let Some(key) = key_val.unpack_str() {
+                        if let Ok(val) = make_variables.at(key_val, heap) {
+                            if let Some(val_str) = val.unpack_str() {
+                                let pattern = format!("$({})", key);
+                                resolved_command = resolved_command.replace(&pattern, val_str);
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         let inputs = heap.alloc(AllocList(tool_files));
         let cmd_list = heap.alloc(AllocList(vec![heap.alloc_str(&resolved_command).to_value()]));
