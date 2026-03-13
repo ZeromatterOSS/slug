@@ -814,7 +814,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             shadowed_action,
         );
 
-        // Bazel-compat: resolve %{input} and %{output} placeholders in progress_message
+        // Bazel-compat: resolve %{output} and %{input} placeholders in progress_message
         let resolved_progress_message = progress_message.into_option().map(|msg| {
             let s = msg.as_str();
             if s.contains("%{") {
@@ -823,6 +823,16 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
                     first_output.get_path().with_short_path(|p| {
                         resolved = resolved.replace("%{output}", p.as_str());
                     });
+                }
+                if resolved.contains("%{input}") {
+                    for input in artifacts.inputs.iter() {
+                        if let ArtifactGroup::Artifact(a) = input {
+                            a.get_path().with_short_path(|p| {
+                                resolved = resolved.replace("%{input}", p.as_str());
+                            });
+                            break;
+                        }
+                    }
                 }
                 heap.alloc_str(&resolved)
             } else {
@@ -1020,11 +1030,11 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
         );
         let heap = eval.heap();
 
-        // Bazel-compat: resolve progress_message (may be a string value)
-        let resolved_progress_message = progress_message
+        // Save progress_message string for later resolution (after outputs/inputs are processed)
+        let progress_message_str = progress_message
             .into_option()
             .and_then(|v| v.unpack_str())
-            .map(|s| heap.alloc_str(s));
+            .map(|s| s.to_owned());
 
         // Build the exe and args command lines:
         // - String command: exe = [shell, "-c"], args = [cmd_str, ...extra_arguments]
@@ -1164,6 +1174,31 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
                 Some(env_val.as_unchecked().cast())
             }
         };
+
+        // Resolve progress_message placeholders now that outputs/inputs are available
+        let resolved_progress_message = progress_message_str.map(|s| {
+            if s.contains("%{") {
+                let mut resolved = s;
+                if let Some(first_output) = artifact_visitor.declared_outputs.iter().next() {
+                    first_output.get_path().with_short_path(|p| {
+                        resolved = resolved.replace("%{output}", p.as_str());
+                    });
+                }
+                if resolved.contains("%{input}") {
+                    for input in artifact_visitor.inputs.iter() {
+                        if let ArtifactGroup::Artifact(a) = input {
+                            a.get_path().with_short_path(|p| {
+                                resolved = resolved.replace("%{input}", p.as_str());
+                            });
+                            break;
+                        }
+                    }
+                }
+                heap.alloc_str(&resolved)
+            } else {
+                heap.alloc_str(&s)
+            }
+        });
 
         let starlark_values = heap.alloc_complex(StarlarkRunActionValues {
             exe: heap.alloc_typed(starlark_exe),

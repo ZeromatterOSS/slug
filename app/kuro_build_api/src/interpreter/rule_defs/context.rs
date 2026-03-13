@@ -2733,6 +2733,10 @@ impl<'v> StarlarkValue<'v> for CtxFiles<'v> {
         self.attrs.has_attr(attribute, heap)
     }
 
+    fn dir_attr(&self) -> Vec<String> {
+        self.attrs.dir_attr()
+    }
+
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         use starlark::values::list::AllocList;
         use starlark::values::list::ListRef;
@@ -2824,6 +2828,10 @@ impl<'v> StarlarkValue<'v> for CtxFile<'v> {
         self.attrs.has_attr(attribute, heap)
     }
 
+    fn dir_attr(&self) -> Vec<String> {
+        self.attrs.dir_attr()
+    }
+
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         use starlark::values::list::ListRef;
 
@@ -2907,6 +2915,10 @@ impl<'v> std::fmt::Display for CtxExecutable<'v> {
 impl<'v> StarlarkValue<'v> for CtxExecutable<'v> {
     fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
         self.attrs.has_attr(attribute, heap)
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        self.attrs.dir_attr()
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
