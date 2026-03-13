@@ -1284,3 +1284,20 @@ write_mnemonic_test = rule(
     implementation = _write_mnemonic_test_impl,
     attrs = {},
 )
+
+
+def _dir_ctx_files_impl(ctx):
+    """Tests that dir(ctx.files) returns attribute names."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    attrs = sorted(dir(ctx.files))
+    ctx.actions.write(out, "\n".join(attrs) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+dir_ctx_files_rule = rule(
+    implementation = _dir_ctx_files_impl,
+    attrs = {
+        "srcs": attr.label_list(allow_files = True, default = []),
+        "data": attr.label_list(allow_files = True, default = []),
+    },
+)

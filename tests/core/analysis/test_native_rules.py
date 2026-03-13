@@ -1164,3 +1164,15 @@ async def test_write_mnemonic(buck: Buck) -> None:
     content = output.read_text().strip()
     assert "write_mnemonic: ok" in content
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_dir_ctx_files(buck: Buck) -> None:
+    """dir(ctx.files) returns attribute names (Bazel compat)."""
+    result = await buck.build("//:dir_ctx_files_test")
+    output = result.get_build_report().output_for_target("//:dir_ctx_files_test")
+    content = output.read_text().strip()
+    attrs = content.split("\n")
+    # Should include at least 'data' and 'srcs' from the rule definition
+    assert "data" in attrs, f"Expected 'data' in dir(ctx.files), got: {attrs}"
+    assert "srcs" in attrs, f"Expected 'srcs' in dir(ctx.files), got: {attrs}"
+
