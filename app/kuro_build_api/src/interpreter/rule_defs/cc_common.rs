@@ -3131,6 +3131,14 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 .and_then(|method| eval.eval_function(method, &[], &[]).ok())
                 .unwrap_or(out);
 
+            // Get output path as string for MSVC /OUT: flag
+            let output_path_str = out
+                .get_attr("path", heap)
+                .ok()
+                .flatten()
+                .and_then(|v| v.unpack_str().map(|s| s.to_owned()))
+                .unwrap_or_else(|| output_name.clone());
+
             // Get linker tool path
             let linker_tool = match std::env::consts::OS {
                 "windows" => {
@@ -3163,13 +3171,13 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     // MSVC lib.exe: /OUT:output.lib obj1.obj obj2.obj
                     // Replace the last push with /OUT: flag
                     args.pop();
-                    let out_flag = format!("/OUT:{}", output_artifact);
+                    let out_flag = format!("/OUT:{}", output_path_str);
                     args.push(heap.alloc_str(&out_flag).to_value());
                 }
             } else {
                 // Executable or shared library
                 if is_windows_host() {
-                    args.push(heap.alloc_str(&format!("/OUT:{}", output_artifact)).to_value());
+                    args.push(heap.alloc_str(&format!("/OUT:{}", output_path_str)).to_value());
                     if is_dynamic {
                         args.push(heap.alloc_str("/DLL").to_value());
                     }
