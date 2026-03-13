@@ -205,9 +205,8 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
     ///
     /// Bazel-compatible: available as a direct global in BUILD files.
     ///
-    /// The keys are rule names, and the values are dicts containing rule attributes.
-    /// Note: Currently returns minimal information (name only). Full attribute introspection
-    /// is not yet implemented.
+    /// The keys are rule names, and the values are dicts containing rule attributes
+    /// (name, kind, and all user-defined attributes serialized via JSON).
     ///
     /// See: https://bazel.build/rules/lib/globals/build#existing_rules
     fn existing_rules<'v>(eval: &mut Evaluator<'v, '_, '_>) -> starlark::Result<Value<'v>> {

@@ -122,8 +122,8 @@ These functions must be available in all .bzl files without any `load()` stateme
 | Function | Description | Kuro Status | Location |
 |----------|-------------|-------------|----------|
 | `depset` | Creates depset | ✓ Available | |
-| `existing_rule` | Retrieves rule instance | ✓ Implemented | `path.rs` (direct BUILD global + `natives.rs`) |
-| `existing_rules` | Returns all rules in package | ✓ Implemented | `path.rs` (direct BUILD global + `natives.rs`) |
+| `existing_rule` | Retrieves rule instance | ✓ Implemented (returns name, kind, all user-defined attrs; 2026-03-12) | `path.rs` (direct BUILD global + `natives.rs`) |
+| `existing_rules` | Returns all rules in package | ✓ Implemented (returns name, kind, all user-defined attrs; 2026-03-12) | `path.rs` (direct BUILD global + `natives.rs`) |
 | `exports_files` | Marks files as exported | ✓ Implemented (2026-02-25) | `native_rules.rs` |
 | `glob` | Returns files matching patterns | ✓ Implemented | `path.rs` |
 | `module_name` | Returns module name | ✓ Implemented | `natives.rs` |
@@ -133,8 +133,8 @@ These functions must be available in all .bzl files without any `load()` stateme
 | `package_group` | Defines package set for visibility | ✓ Registered (visibility enforcement unverified) | `native_rules.rs` |
 | `package_name` | Returns package name | ✓ Implemented | `path.rs` |
 | `package_relative_label` | Converts string to Label | ✓ Implemented (2026-02-25) | `path.rs` (direct BUILD global) |
-| `repo_name` | Returns canonical repo name | ✓ Implemented (2026-02-25) | `path.rs` (direct BUILD global) |
-| `repository_name` | Deprecated variant | ✓ Implemented | `path.rs` |
+| `repo_name` | Returns canonical repo name | ✓ Implemented (returns "" for root cell, canonical name for external; 2026-03-12) | `path.rs` (direct BUILD global) |
+| `repository_name` | Deprecated variant | ✓ Implemented (returns "@" for root cell, "@<name>" for external; 2026-03-12) | `path.rs` |
 | `select` | Configurable attributes | ✓ Implemented | |
 | `subpackages` | Lists direct subpackages | ✓ Implemented (2026-02-25) | `path.rs` |
 
@@ -261,9 +261,9 @@ These modules must be available as globals in .bzl files.
 
 | Function | Description | Kuro Status |
 |----------|-------------|-------------|
-| `proto.encode_text()` | Encode proto to text | Not implemented |
+| `proto.encode_text()` | Encode proto to text | ✓ Implemented (full textproto serialization with nested structs, repeated fields, None omission; 2026-03-12) |
 
-**Status**: Not implemented (low priority)
+**Status**: Implemented (proto_common.rs)
 
 ### Module: `java_common`
 

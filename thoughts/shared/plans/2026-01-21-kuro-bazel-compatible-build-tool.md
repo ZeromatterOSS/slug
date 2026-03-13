@@ -500,7 +500,7 @@ Example aliases created: `com_google_protobuf -> protobuf`, `com_google_absl -> 
 
 ## Test Suite TODO (as of 2026-03-03)
 
-Current status: **~980 pass, ~160 skip, 0 fail** in `tests/core/` (updated 2026-03-12). All test categories (analysis, build, run, test, bzlmod, docs, help, log, completion, interpreter, transitive_sets, validation) pass with 0 failures. analysis/test_native_rules: 106 pass, 0 fail; build/: 177 pass, 95 skip, 0 fail; configurations/: 52 pass, 0 fail; query/: 74 pass, 8 skip, 0 fail; test/: 27 pass, 0 fail.
+Current status: **~1050 pass, ~160 skip, 0 fail** in `tests/core/` (updated 2026-03-12). All test categories (analysis, build, run, test, bzlmod, docs, help, log, completion, interpreter, transitive_sets, validation) pass with 0 failures. analysis/test_native_rules: 106 pass, 0 fail; analysis/test_starlark_builtins: 7 pass; analysis/test_select_config_setting: 14 pass; analysis/test_rule_advanced: 5 pass; analysis/test_genrule_features: 9 pass; analysis/test_build_globals: 12 pass; analysis/test_ctx_actions: 10 pass; build/: 177 pass, 95 skip, 0 fail; configurations/: 52 pass, 0 fail; query/: 74 pass, 8 skip, 0 fail; test/: 27 pass, 0 fail.
 
 ### Test Runner & CLI Improvements (2026-03-12)
 - **Bazel Test Encyclopedia env vars**: TEST_TMPDIR, TEST_SRCDIR, RUNFILES_DIR, XML_OUTPUT_FILE, TEST_BINARY, TEST_SIZE, TEST_SHARD_INDEX, TEST_TOTAL_SHARDS, RUNFILES_MANIFEST_FILE
