@@ -62,12 +62,8 @@ async fn parse_and_analyze_label(
     // Extract repo (cell), package, and target name
     let label_str = label_str.trim();
 
-    // Strip @ prefix if present
-    let label_no_at = if let Some(stripped) = label_str.strip_prefix('@') {
-        stripped
-    } else {
-        label_str
-    };
+    // Strip @@ or @ prefix if present (Bazel 9 uses @@ for canonical labels)
+    let label_no_at = label_str.trim_start_matches('@');
 
     // Split on //
     let (cell_str, path_and_target) = label_no_at.split_once("//").ok_or_else(|| {

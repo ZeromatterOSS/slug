@@ -1301,9 +1301,24 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         aspects: UnpackListOrTuple<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = (allow_files, allow_empty, cfg, aspects);
+        let _unused = (allow_files, allow_empty, aspects);
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
-        let label_type = AttrType::dep(required_providers, PluginKindSet::EMPTY);
+        // Handle cfg parameter: "exec" or config.exec(...) means use exec_dep
+        let is_exec = match cfg {
+            Some(v) => {
+                if let Some(s) = v.unpack_str() {
+                    s == "exec"
+                } else {
+                    v.to_repr().contains("exec")
+                }
+            }
+            None => false,
+        };
+        let label_type = if is_exec {
+            AttrType::exec_dep(required_providers)
+        } else {
+            AttrType::dep(required_providers, PluginKindSet::EMPTY)
+        };
         let coercer = AttrType::dict(label_type, AttrType::string(), false);
         // Bazel semantics: non-mandatory dicts default to empty dict
         let effective_default = match (default, mandatory) {

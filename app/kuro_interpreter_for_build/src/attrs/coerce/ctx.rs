@@ -86,7 +86,7 @@ enum BuildAttrCoercionContextError {
 fn try_make_placeholder_label(value: &str) -> Option<ProvidersLabel> {
     let stripped = value.strip_prefix('@')?;
     let sep_idx = stripped.find("//")?;
-    let cell_alias = &stripped[..sep_idx];
+    let cell_alias = stripped[..sep_idx].trim_start_matches('@');
     if cell_alias.is_empty() {
         return None;
     }

@@ -798,7 +798,7 @@ fn lex_provider_pattern(
     strip_package_trailing_slash: bool,
 ) -> kuro_error::Result<PatternParts<'_, ProvidersPatternExtra>> {
     let (cell_alias, pattern) = match split1_opt_ascii(pattern, AsciiStr2::new("//")) {
-        Some((a, p)) => (Some(trim_prefix_ascii(a, AsciiChar::new('@'))), p),
+        Some((a, p)) => (Some(a.trim_start_matches('@')), p),
         None => (None, pattern),
     };
 
