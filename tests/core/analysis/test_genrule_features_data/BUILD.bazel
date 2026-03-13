@@ -73,6 +73,14 @@ genrule(
     cmd = "echo ok > $(RULEDIR)/ruledir_out.txt",
 )
 
+# === genrule $(BINDIR) vs $(@D) ===
+
+genrule(
+    name = "bindir_vs_outdir",
+    outs = ["bindir_cmp.txt"],
+    cmd = "printf '%s\\n%s\\n' $(BINDIR) $(@D) > $@",
+)
+
 # === genrule visibility public ===
 
 genrule(

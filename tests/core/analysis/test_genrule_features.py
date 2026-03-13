@@ -99,3 +99,19 @@ async def test_genrule_ruledir(buck: Buck) -> None:
     output = result.get_build_report().output_for_target("//:ruledir_genrule")
     content = output.read_text().strip()
     assert content == "ok"
+
+
+@buck_test(data_dir="test_genrule_features_data")
+async def test_genrule_bindir_is_root(buck: Buck) -> None:
+    """$(BINDIR) is the bin output root, shorter than $(@D) which includes package/target."""
+    result = await buck.build("//:bindir_vs_outdir")
+    output = result.get_build_report().output_for_target("//:bindir_vs_outdir")
+    lines = output.read_text().strip().splitlines()
+    bindir = lines[0].replace("\r", "")
+    outdir = lines[1].replace("\r", "")
+    # $(BINDIR) should be a prefix of $(@D) but shorter
+    assert "buck-out" in bindir, f"$(BINDIR) should contain buck-out: {bindir!r}"
+    assert "buck-out" in outdir, f"$(@D) should contain buck-out: {outdir!r}"
+    assert len(bindir) < len(outdir), (
+        f"$(BINDIR) should be shorter than $(@D): BINDIR={bindir!r} vs @D={outdir!r}"
+    )

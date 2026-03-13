@@ -189,14 +189,30 @@ fn expand_genrule_cmd(
         .unwrap_or("");
     let out_dir = quote_fn(out_dir_raw);
 
+    // Compute $(GENDIR) / $(BINDIR): the bin_dir root (buck-out/v2/gen/<cell>/<cfg_hash>).
+    // Output paths look like: buck-out/v2/gen/<cell>/<cfg_hash>/<package>/__<target>__/<file>
+    // The bin_dir is the first 5 path components (up to and including cfg_hash).
+    let bin_dir_raw = {
+        let parts: Vec<&str> = first_out_raw.split('/').collect();
+        if parts.len() >= 5 {
+            // buck-out/v2/gen/<cell>/<cfg_hash>
+            parts[..5].join("/")
+        } else {
+            out_dir_raw.to_owned()
+        }
+    };
+    let bin_dir = quote_fn(&bin_dir_raw);
+
     // Expand $(VARNAME) style make variables
+    // $(GENDIR) / $(BINDIR) = bin output root (buck-out/v2/gen/<cell>/<cfg_hash>)
+    // $(RULEDIR) / $(@D) = directory containing this rule's outputs
     let mut cmd = cmd
         .replace("$(SRCS)", &srcs_str)
         .replace("$(OUTS)", &outs_str)
         .replace("$(@D)", &out_dir)
         .replace("$(RULEDIR)", &out_dir)
-        .replace("$(GENDIR)", &out_dir)
-        .replace("$(BINDIR)", &out_dir)
+        .replace("$(GENDIR)", &bin_dir)
+        .replace("$(BINDIR)", &bin_dir)
         .replace("$(TARGET)", ""); // Not easily available at exec time, skip
 
     // Expand single-char $ substitutions
