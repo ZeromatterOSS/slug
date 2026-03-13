@@ -1,0 +1,116 @@
+load(":defs.bzl", "write_value_rule", "write_list_rule", "write_deps_rule")
+
+# === config_setting with values ===
+
+config_setting(
+    name = "is_opt",
+    values = {"compilation_mode": "opt"},
+)
+
+config_setting(
+    name = "is_dbg",
+    values = {"compilation_mode": "dbg"},
+)
+
+# Basic select() on compilation_mode
+write_value_rule(
+    name = "select_compilation_mode",
+    value = select({
+        ":is_opt": "optimized",
+        ":is_dbg": "debug",
+        "//conditions:default": "fastbuild",
+    }),
+)
+
+# === config_setting with define_values ===
+
+config_setting(
+    name = "enable_feature_x",
+    define_values = {"FEATURE_X": "1"},
+)
+
+config_setting(
+    name = "disable_feature_x",
+    define_values = {"FEATURE_X": "0"},
+)
+
+# select() on define values
+write_value_rule(
+    name = "select_define",
+    value = select({
+        ":enable_feature_x": "feature_x_enabled",
+        ":disable_feature_x": "feature_x_disabled",
+        "//conditions:default": "feature_x_default",
+    }),
+)
+
+# === select() concatenation (list + select) ===
+
+write_list_rule(
+    name = "select_list_concat",
+    items = ["always"] + select({
+        ":is_opt": ["opt_item"],
+        "//conditions:default": ["default_item"],
+    }),
+)
+
+# === select() with no_match_error ===
+
+write_value_rule(
+    name = "select_with_default",
+    value = select(
+        {
+            ":is_opt": "opt_value",
+            ":is_dbg": "dbg_value",
+        },
+        no_match_error = "Must specify --compilation_mode",
+    ),
+)
+
+# === config_setting with cpu values ===
+
+config_setting(
+    name = "is_x86_64",
+    values = {"cpu": "x86_64"},
+)
+
+write_value_rule(
+    name = "select_cpu",
+    value = select({
+        ":is_x86_64": "x86_64",
+        "//conditions:default": "other_cpu",
+    }),
+)
+
+# === Multiple select() in same attribute (concatenation) ===
+
+write_list_rule(
+    name = "multi_select_concat",
+    items = select({
+        ":is_opt": ["opt"],
+        "//conditions:default": ["default"],
+    }) + select({
+        ":is_dbg": ["dbg"],
+        "//conditions:default": ["not_dbg"],
+    }),
+)
+
+# === Dependency target for select on deps ===
+
+write_value_rule(
+    name = "helper_lib",
+    value = "helper",
+)
+
+write_value_rule(
+    name = "opt_lib",
+    value = "opt_helper",
+)
+
+write_deps_rule(
+    name = "select_deps",
+    deps = [":helper_lib"] + select({
+        ":is_opt": [":opt_lib"],
+        "//conditions:default": [],
+    }),
+)
