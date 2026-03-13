@@ -1,0 +1,66 @@
+load(
+    ":defs.bzl",
+    "CompileInfo",
+    "compile_rule",
+    "count_rules",
+    "executable_rule",
+    "link_rule",
+    "my_test_rule",
+    "processed_rule",
+    "with_private_rule",
+)
+
+# === Provider propagation through deps ===
+
+compile_rule(
+    name = "obj_a",
+    defines = ["DEBUG", "FEATURE_A"],
+)
+
+compile_rule(
+    name = "obj_b",
+    defines = ["FEATURE_B"],
+)
+
+link_rule(
+    name = "linked",
+    deps = [":obj_a", ":obj_b"],
+)
+
+# === Rule with initializer ===
+
+processed_rule(
+    name = "processed_target",
+    value = "hello",
+)
+
+# === Rule with private attributes ===
+
+with_private_rule(
+    name = "private_attrs_target",
+    public_val = "user_value",
+)
+
+# === Executable rule ===
+
+executable_rule(
+    name = "my_exe",
+)
+
+# === Test rule ===
+
+my_test_rule(
+    name = "my_passing_test",
+    exit_code = 0,
+)
+
+# === existing_rules() count ===
+# At this point, 7 rules have been defined above.
+# count_rules() is called during BUILD file evaluation.
+_rule_count = count_rules()
+
+genrule(
+    name = "rule_count_check",
+    outs = ["rule_count.txt"],
+    cmd = "echo " + str(_rule_count) + " > $@",
+)
