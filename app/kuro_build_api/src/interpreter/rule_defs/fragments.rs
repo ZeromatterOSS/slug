@@ -374,6 +374,127 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     fn output_assembly(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
         Ok(false)
     }
+
+    /// Returns the compiler identifier string.
+    ///
+    /// Used by rules_cc configure_features.bzl for compiler-specific feature setup.
+    /// Returns "msvc-cl" on Windows with MSVC, "clang" on macOS, "gcc" on Linux.
+    fn compiler(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<String> {
+        Ok(detect_compiler())
+    }
+
+    /// Returns the target CPU for the current configuration.
+    ///
+    /// Common values: "k8" (x86_64 Linux), "darwin_x86_64", "darwin_arm64",
+    /// "x64_windows", "aarch64".
+    fn cpu(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<String> {
+        Ok(detect_cpu())
+    }
+
+    /// Returns the target CPU (alias for cpu()).
+    fn target_cpu(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<String> {
+        Ok(detect_cpu())
+    }
+
+    /// Returns the host system name.
+    fn host_system_name(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<String> {
+        Ok(detect_host_system_name())
+    }
+
+    /// Returns the target system name.
+    fn target_system_name(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<String> {
+        Ok(detect_host_system_name())
+    }
+
+    /// Returns the target C library identifier.
+    fn target_libc(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<String> {
+        if cfg!(target_os = "linux") {
+            Ok("glibc_2.17".to_owned())
+        } else if cfg!(target_os = "macos") {
+            Ok("macosx".to_owned())
+        } else if cfg!(target_os = "windows") {
+            Ok("msvcrt".to_owned())
+        } else {
+            Ok("local".to_owned())
+        }
+    }
+
+    /// Returns the ABI version string.
+    fn abi_version(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<String> {
+        Ok("local".to_owned())
+    }
+
+    /// Returns the ABI glibc version string.
+    fn abi_glibc_version(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<String> {
+        Ok("local".to_owned())
+    }
+
+    /// Returns the sysroot path, or None if not set.
+    fn sysroot(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+        // TODO(fragments): Support --sysroot flag
+        Ok(NoneType)
+    }
+
+    /// Returns built-in include directories for the compiler.
+    fn built_in_include_directories<'v>(
+        #[allow(unused_variables)] this: &CppFragment,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(heap.alloc(AllocList::EMPTY))
+    }
+}
+
+/// Detect the compiler identifier for the current platform.
+fn detect_compiler() -> String {
+    if cfg!(target_os = "windows") {
+        // On Windows, default to MSVC if available (vswhere detection happens in cc_common)
+        "msvc-cl".to_owned()
+    } else if cfg!(target_os = "macos") {
+        "clang".to_owned()
+    } else {
+        "gcc".to_owned()
+    }
+}
+
+/// Detect the target CPU for the current platform.
+fn detect_cpu() -> String {
+    if cfg!(target_os = "windows") {
+        if cfg!(target_arch = "x86_64") {
+            "x64_windows".to_owned()
+        } else if cfg!(target_arch = "aarch64") {
+            "arm64_windows".to_owned()
+        } else {
+            "x64_windows".to_owned()
+        }
+    } else if cfg!(target_os = "macos") {
+        if cfg!(target_arch = "aarch64") {
+            "darwin_arm64".to_owned()
+        } else {
+            "darwin_x86_64".to_owned()
+        }
+    } else {
+        // Linux
+        if cfg!(target_arch = "aarch64") {
+            "aarch64".to_owned()
+        } else {
+            "k8".to_owned()
+        }
+    }
+}
+
+/// Detect the host system name.
+fn detect_host_system_name() -> String {
+    if cfg!(target_os = "windows") {
+        "local".to_owned()
+    } else if cfg!(target_os = "macos") {
+        "local".to_owned()
+    } else {
+        "local".to_owned()
+    }
 }
 
 // ============================================================================
