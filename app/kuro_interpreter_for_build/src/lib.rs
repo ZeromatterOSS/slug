@@ -21,6 +21,7 @@ pub mod call_stack;
 pub mod extension_execution;
 pub mod interpreter;
 pub mod label;
+pub mod macro_callable;
 pub mod module_ctx;
 pub mod module_extension;
 pub mod module_extension_executor_impl;

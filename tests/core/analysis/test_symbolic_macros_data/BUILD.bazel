@@ -1,0 +1,27 @@
+load(":defs.bzl", "multi_target_macro", "no_attrs_macro", "simple_macro")
+
+# === Basic symbolic macro ===
+
+simple_macro(
+    name = "basic_macro_test",
+    greeting = "macro_works",
+)
+
+# === Multi-target macro ===
+
+multi_target_macro(
+    name = "multi_test",
+    content = "multi_content",
+)
+
+# === No-attrs macro ===
+
+no_attrs_macro(
+    name = "no_attrs_test",
+)
+
+# === Macro with default attr value ===
+
+simple_macro(
+    name = "default_attr_test",
+)

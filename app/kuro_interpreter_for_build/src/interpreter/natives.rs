@@ -41,6 +41,7 @@ use crate::interpreter::build_context::BuildContext;
 use crate::interpreter::build_context::PerFileTypeContext;
 use crate::interpreter::globspec::GlobSpec;
 use crate::interpreter::module_internals::ModuleInternals;
+use crate::macro_callable::StarlarkMacroCallable;
 
 fn depset_to_transitive_set<'v>(
     depset: Value<'v>,
@@ -303,8 +304,8 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
     /// In Bazel, `macro()` defines a symbolic macro, similar to `rule()` but for macros.
     /// Symbolic macros provide better introspection than legacy macros (function-based macros).
     ///
-    /// Currently a stub that returns a callable wrapping the implementation function.
-    /// This is needed for `bazel_features.globals.macro` detection (must not be None).
+    /// Returns a callable `MacroCallable` that, when invoked in BUILD files, calls the
+    /// implementation function with the provided arguments (name, visibility, attrs).
     ///
     /// See: https://bazel.build/rules/lib/globals/bzl#macro
     fn r#macro<'v>(
@@ -313,18 +314,16 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = NoneOr::None)] attrs: NoneOr<Value<'v>>,
         #[starlark(require = named, default = NoneOr::None)] inherit_attrs: NoneOr<Value<'v>>,
         #[starlark(require = named, default = false)] finalizer: bool,
+        #[allow(unused_variables)]
         eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<Value<'v>> {
-        // TODO(macro): Implement proper symbolic macro support.
-        // For now, return the implementation function directly as the macro callable.
-        // This allows code to define macros and call them, though without the
-        // introspection benefits of proper symbolic macros.
-        let _ = (doc, attrs, inherit_attrs, finalizer);
-        let entries = vec![
-            ("_type", eval.heap().alloc("macro")),
-            ("implementation", implementation),
-        ];
-        Ok(eval.heap().alloc(AllocDict(entries)))
+    ) -> starlark::Result<StarlarkMacroCallable<'v>> {
+        // TODO(macro): Wire attrs/inherit_attrs for attribute validation.
+        let _ = (attrs, inherit_attrs);
+        let doc_str = match doc {
+            NoneOr::Other(d) if !d.is_empty() => Some(d.to_owned()),
+            _ => None,
+        };
+        Ok(StarlarkMacroCallable::new(implementation, finalizer, doc_str))
     }
 
     /// Bazel's `AnalysisFailureInfo` provider for analysis failure detection.

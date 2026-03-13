@@ -106,7 +106,7 @@ These functions must be available in all .bzl files without any `load()` stateme
 | `depset` | Creates dependency set | ✓ Implemented | `transitive_set/globals.rs` |
 | `exec_group` | Establishes execution group | ✓ Stub | `rule.rs` |
 | `exec_transition` | Defines exec transition (internal) | Not implemented | Low priority |
-| `macro` | Defines symbolic macro | Not implemented | Future |
+| `macro` | Defines symbolic macro | ✓ Implemented (callable MacroCallable; invokes impl function with args; 2026-03-12) | `macro_callable.rs` |
 | `materializer_rule` | Creates materializer rule | Not implemented | Low priority |
 | `module_extension` | Creates module extension | ✓ Implemented | `bzlmod/` |
 | `provider` | Defines provider type | ✓ Implemented | `provider.rs` |
