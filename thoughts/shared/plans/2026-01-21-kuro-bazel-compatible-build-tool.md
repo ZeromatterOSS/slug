@@ -518,6 +518,10 @@ Current status: **~980 pass, ~160 skip, 0 fail** in `tests/core/` (updated 2026-
 - **Fixed duplicate CLI flags**: stamp/nostamp, extra-toolchains, extra-execution-platforms removed from CommonBuildConfigurationOptions (duplicated CommonBuildOptions)
 - **Build setting metadata**: rule(build_setting=config.bool(flag=True)) now stores type and flag info on Rule struct
 - **Starlark build flags**: --//pkg:target=value CLI syntax parsed, stored in BuildConfig, used by ctx.build_setting_value and config_setting(flag_values={})
+- **git_override/archive_override**: Fully functional bzlmod overrides - fetch sources during resolution, parse MODULE.bazel for transitive deps, cache with .complete markers
+- **http_file/http_jar**: New repository rules for downloading individual files and JARs with integrity verification
+- **Bazel-style transition inputs/outputs**: Transitions now store inputs/outputs lists; Bazel-style transitions use (settings, attr) calling convention with settings dict built from inputs and return value applied to BuildConfig
+- **set_starlark_flag()**: Singular function for setting individual build flags (used by transitions)
 
 ### CI Infrastructure (2026-03-05)
 
