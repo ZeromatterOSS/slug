@@ -1301,3 +1301,39 @@ dir_ctx_files_rule = rule(
         "data": attr.label_list(allow_files = True, default = []),
     },
 )
+
+
+def _psi_test_impl(ctx):
+    """Tests that PackageSpecificationInfo is callable and returns an instance."""
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    psi = PackageSpecificationInfo(packages = ["//foo", "//bar/..."])
+    lines = [
+        "type:" + type(psi),
+        "packages:" + str(psi.packages),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+psi_test_rule = rule(
+    implementation = _psi_test_impl,
+    attrs = {},
+)
+
+
+def _macro_test_impl(name, greeting, visibility = None):
+    """Implementation function for symbolic macro test."""
+    native.genrule(
+        name = name,
+        outs = [name + ".txt"],
+        cmd = "echo '{}' > $@".format(greeting),
+        visibility = visibility,
+    )
+
+
+macro_test = macro(
+    implementation = _macro_test_impl,
+    attrs = {
+        "greeting": attr.string(default = "hello"),
+    },
+)

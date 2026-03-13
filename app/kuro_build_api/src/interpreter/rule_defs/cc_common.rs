@@ -6013,10 +6013,11 @@ pub fn register_cc_common(globals: &mut GlobalsBuilder) {
     /// This is callable to create instances.
     const OutputGroupInfo: OutputGroupInfoProvider = OutputGroupInfoProvider;
 
-    /// PackageSpecificationInfo - None placeholder.
-    /// This is a Bazel built-in provider for package visibility/allowlisting.
+    /// PackageSpecificationInfo - provider for package visibility/allowlisting.
     /// Used by cc_toolchain.bzl for visibility_public_presubmit attribute.
-    const PackageSpecificationInfo: NoneType = NoneType;
+    /// See: https://bazel.build/rules/lib/providers/PackageSpecificationInfo
+    const PackageSpecificationInfo: PackageSpecificationInfoProvider =
+        PackageSpecificationInfoProvider;
 
     /// RunEnvironmentInfo - Provider for specifying environment variables
     /// that should be set when running binaries or tests.
@@ -6393,6 +6394,136 @@ where
 }
 
 // ============================================================================
+// PackageSpecificationInfo - Bazel provider for package visibility
+// ============================================================================
+
+/// PackageSpecificationInfo provider callable.
+///
+/// In Bazel, PackageSpecificationInfo is used for package visibility allowlisting,
+/// primarily by cc_toolchain.bzl. It stores package specifications that determine
+/// which packages can access a target.
+///
+/// Reference: https://bazel.build/rules/lib/providers/PackageSpecificationInfo
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct PackageSpecificationInfoProvider;
+
+impl PackageSpecificationInfoProvider {
+    /// Get the static provider ID for PackageSpecificationInfo.
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "PackageSpecificationInfo".to_owned(),
+            })
+        })
+    }
+}
+
+impl Display for PackageSpecificationInfoProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PackageSpecificationInfo")
+    }
+}
+
+starlark_simple_value!(PackageSpecificationInfoProvider);
+
+#[starlark_value(type = "PackageSpecificationInfo")]
+impl<'v> StarlarkValue<'v> for PackageSpecificationInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let kwargs = args.names_map()?;
+        let packages = kwargs
+            .iter()
+            .find_map(|(k, v)| {
+                if k.as_str() == "packages" {
+                    Some(*v)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_else(|| eval.heap().alloc(AllocList::EMPTY));
+        Ok(eval.heap().alloc(PackageSpecificationInfoInstanceGen {
+            packages,
+        }))
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+impl ProviderCallableLike for PackageSpecificationInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(PackageSpecificationInfoProvider::provider_id())
+    }
+}
+
+/// An instance of PackageSpecificationInfo.
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    starlark::values::Trace,
+    starlark::coerce::Coerce,
+    starlark::values::Freeze
+)]
+#[repr(C)]
+pub struct PackageSpecificationInfoInstanceGen<V: ValueLifetimeless> {
+    /// List of package specifications (strings like "//pkg", "//pkg/...").
+    packages: V,
+}
+
+starlark_complex_value!(pub PackageSpecificationInfoInstance);
+
+impl<V: ValueLifetimeless> Display for PackageSpecificationInfoInstanceGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "PackageSpecificationInfo(...)")
+    }
+}
+
+impl<'v, V: ValueLike<'v>> ProviderLike<'v> for PackageSpecificationInfoInstanceGen<V>
+where
+    Self: fmt::Debug,
+{
+    fn id(&self) -> &Arc<ProviderId> {
+        PackageSpecificationInfoProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        vec![("packages", self.packages.to_value())]
+    }
+}
+
+#[starlark_value(type = "PackageSpecificationInfo")]
+impl<'v, V: ValueLike<'v> + 'v> StarlarkValue<'v> for PackageSpecificationInfoInstanceGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    type Canonical = PackageSpecificationInfoInstance<'v>;
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
+    }
+
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "packages" => Some(self.packages.to_value()),
+            _ => None,
+        }
+    }
+
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "packages")
+    }
+}
+
+// ============================================================================
 // ANALYSIS_TEST_REGISTER - Late binding for registering analysis test targets
 // ============================================================================
 
@@ -6623,3 +6754,4 @@ where
         }
     }
 }
+

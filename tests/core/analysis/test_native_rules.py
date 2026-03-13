@@ -1176,3 +1176,24 @@ async def test_dir_ctx_files(buck: Buck) -> None:
     assert "data" in attrs, f"Expected 'data' in dir(ctx.files), got: {attrs}"
     assert "srcs" in attrs, f"Expected 'srcs' in dir(ctx.files), got: {attrs}"
 
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_package_specification_info(buck: Buck) -> None:
+    """PackageSpecificationInfo is callable and returns an instance with packages."""
+    result = await buck.build("//:psi_test")
+    output = result.get_build_report().output_for_target("//:psi_test")
+    content = output.read_text().strip()
+    lines = content.split("\n")
+    assert lines[0] == "type:PackageSpecificationInfo", f"Wrong type: {lines[0]}"
+    assert "//foo" in lines[1], f"Expected //foo in packages: {lines[1]}"
+    assert "//bar/..." in lines[1], f"Expected //bar/... in packages: {lines[1]}"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_symbolic_macro(buck: Buck) -> None:
+    """macro() built-in creates callable symbolic macros (Bazel 8.0+)."""
+    result = await buck.build("//:macro_greeting")
+    output = result.get_build_report().output_for_target("//:macro_greeting")
+    content = output.read_text().strip()
+    assert "hello from macro" in content, f"Expected greeting in output: {content}"
+
