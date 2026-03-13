@@ -61,9 +61,13 @@ use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
+use starlark::values::dict::DictRef;
+use starlark::values::list::ListRef;
 use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
+use starlark::values::structs::StructRef;
+use starlark::values::tuple::TupleRef;
 
 use crate::interpreter::rule_defs::py_common::create_native_provider_instance;
 
@@ -375,6 +379,9 @@ fn proto_module_methods(builder: &mut MethodsBuilder) {
     /// Encodes a value to text proto format.
     ///
     /// Converts a Starlark struct or dict to a textproto string representation.
+    /// Fields are emitted in sorted key order. None values are omitted.
+    /// Lists/tuples become repeated fields. Dicts become repeated messages
+    /// with `key` and `value` sub-fields.
     ///
     /// Reference: https://bazel.build/rules/lib/toplevel/proto#encode_text
     fn encode_text<'v>(
@@ -382,11 +389,120 @@ fn proto_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] x: Value<'v>,
         #[allow(unused_variables)] eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<String> {
-        // Simple textproto encoding: just use display for now
-        // A full implementation would recursively format struct fields
-        Ok(format!("{}", x))
+        let mut buf = String::new();
+        encode_text_value(&mut buf, x, "")?;
+        Ok(buf)
     }
 }
+
+/// Recursively encode a Starlark value to textproto format.
+fn encode_text_value(buf: &mut String, v: Value, indent: &str) -> Result<(), starlark::Error> {
+    if v.is_none() {
+        // None values are omitted
+        return Ok(());
+    }
+
+    if let Some(s) = StructRef::from_value(v) {
+        // Struct: emit each field sorted by key name
+        let mut fields: Vec<(String, Value)> = s.iter().map(|(k, v)| (k.as_str().to_owned(), v)).collect();
+        fields.sort_by(|a, b| a.0.cmp(&b.0));
+        for (key, val) in fields {
+            if val.is_none() {
+                continue;
+            }
+            encode_text_field(buf, &key, val, indent)?;
+        }
+    } else if let Some(dict) = DictRef::from_value(v) {
+        // Dict: emit each entry sorted by key
+        let mut entries: Vec<(String, Value)> = dict
+            .iter()
+            .map(|(k, v)| (format!("{}", k), v))
+            .collect();
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        for (key, val) in entries {
+            if val.is_none() {
+                continue;
+            }
+            encode_text_field(buf, &key, val, indent)?;
+        }
+    } else {
+        return Err(starlark::Error::from(
+            starlark::values::ValueError::IncorrectParameterTypeNamed(
+                format!("proto.encode_text: expected struct or dict, got {}", v.get_type()),
+            ),
+        ));
+    }
+    Ok(())
+}
+
+/// Encode a single field (key: value) in textproto format.
+fn encode_text_field(
+    buf: &mut String,
+    key: &str,
+    val: Value,
+    indent: &str,
+) -> Result<(), starlark::Error> {
+    if val.is_none() {
+        return Ok(());
+    }
+
+    // Lists/tuples become repeated fields
+    if let Some(list) = ListRef::from_value(val) {
+        for item in list.iter() {
+            encode_text_field(buf, key, item, indent)?;
+        }
+        return Ok(());
+    }
+    if let Some(tuple) = TupleRef::from_value(val) {
+        for item in tuple.iter() {
+            encode_text_field(buf, key, item, indent)?;
+        }
+        return Ok(());
+    }
+
+    // Struct or dict values become nested messages
+    if StructRef::from_value(val).is_some() || DictRef::from_value(val).is_some() {
+        buf.push_str(indent);
+        buf.push_str(key);
+        buf.push_str(" {\n");
+        let child_indent = format!("{}  ", indent);
+        encode_text_value(buf, val, &child_indent)?;
+        buf.push_str(indent);
+        buf.push_str("}\n");
+        return Ok(());
+    }
+
+    // Scalar values
+    buf.push_str(indent);
+    buf.push_str(key);
+    buf.push_str(": ");
+
+    if let Some(s) = val.unpack_str() {
+        // String: quote and escape
+        buf.push('"');
+        for c in s.chars() {
+            match c {
+                '"' => buf.push_str("\\\""),
+                '\\' => buf.push_str("\\\\"),
+                '\n' => buf.push_str("\\n"),
+                '\r' => buf.push_str("\\r"),
+                '\t' => buf.push_str("\\t"),
+                _ => buf.push(c),
+            }
+        }
+        buf.push('"');
+    } else if let Some(b) = val.unpack_bool() {
+        // Bool: lowercase true/false
+        buf.push_str(if b { "true" } else { "false" });
+    } else {
+        // Int or other: use display
+        buf.push_str(&format!("{}", val));
+    }
+
+    buf.push('\n');
+    Ok(())
+}
+
 
 // ============================================================================
 // Registration

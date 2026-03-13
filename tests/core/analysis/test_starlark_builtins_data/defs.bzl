@@ -127,3 +127,48 @@ type_and_dir_rule = rule(
     implementation = _type_and_dir_impl,
     attrs = {},
 )
+
+
+# ============================================================================
+# proto.encode_text() tests
+# ============================================================================
+
+def _proto_encode_text_impl(ctx):
+    """Tests proto.encode_text() with structs and various types."""
+    out = ctx.actions.declare_file("proto_encode_text.txt")
+
+    # Simple struct with scalar fields
+    s = struct(name = "hello", count = 42, enabled = True)
+    result = proto.encode_text(s)
+
+    # Nested struct
+    inner = struct(value = "nested")
+    outer = struct(child = inner, label = "top")
+    nested_result = proto.encode_text(outer)
+
+    # Struct with list (repeated field)
+    repeated = struct(items = [1, 2, 3])
+    repeated_result = proto.encode_text(repeated)
+
+    # Struct with None (should be omitted)
+    with_none = struct(present = "yes", absent = None)
+    none_result = proto.encode_text(with_none)
+
+    lines = [
+        "SIMPLE:",
+        result,
+        "NESTED:",
+        nested_result,
+        "REPEATED:",
+        repeated_result,
+        "NONE:",
+        none_result,
+    ]
+    ctx.actions.write(out, "\n".join(lines))
+    return [DefaultInfo(default_output = out)]
+
+
+proto_encode_text_rule = rule(
+    implementation = _proto_encode_text_impl,
+    attrs = {},
+)

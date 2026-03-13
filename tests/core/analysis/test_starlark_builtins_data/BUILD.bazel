@@ -2,6 +2,7 @@ load(
     ":defs.bzl",
     "json_decode_rule",
     "json_encode_rule",
+    "proto_encode_text_rule",
     "struct_fields_rule",
     "struct_hasattr_rule",
     "struct_nested_rule",
@@ -25,3 +26,7 @@ json_decode_rule(name = "json_decode")
 # === type() and dir() tests ===
 
 type_and_dir_rule(name = "type_dir")
+
+# === proto tests ===
+
+proto_encode_text_rule(name = "proto_encode_text")

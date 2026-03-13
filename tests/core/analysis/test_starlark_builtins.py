@@ -81,6 +81,52 @@ async def test_json_decode(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_starlark_builtins_data")
+async def test_proto_encode_text(buck: Buck) -> None:
+    """proto.encode_text() serializes structs to textproto format."""
+    result = await buck.build("//:proto_encode_text")
+    output = result.get_build_report().output_for_target("//:proto_encode_text")
+    content = output.read_text().strip()
+
+    # Parse sections
+    sections = {}
+    current_section = None
+    current_lines = []
+    for line in content.splitlines():
+        if line.endswith(":") and line[:-1].isupper():
+            if current_section:
+                sections[current_section] = "\n".join(current_lines)
+            current_section = line[:-1]
+            current_lines = []
+        else:
+            current_lines.append(line)
+    if current_section:
+        sections[current_section] = "\n".join(current_lines)
+
+    # Simple struct: fields sorted by key name
+    simple = sections["SIMPLE"]
+    assert "count: 42" in simple
+    assert "enabled: true" in simple
+    assert 'name: "hello"' in simple
+
+    # Nested struct: child is a nested message
+    nested = sections["NESTED"]
+    assert "child {" in nested
+    assert 'value: "nested"' in nested
+    assert 'label: "top"' in nested
+
+    # Repeated: list becomes repeated fields
+    repeated = sections["REPEATED"]
+    assert "items: 1" in repeated
+    assert "items: 2" in repeated
+    assert "items: 3" in repeated
+
+    # None values omitted
+    none_section = sections["NONE"]
+    assert 'present: "yes"' in none_section
+    assert "absent" not in none_section
+
+
+@buck_test(data_dir="test_starlark_builtins_data")
 async def test_type_and_dir(buck: Buck) -> None:
     """type() returns the type name and dir() lists struct fields."""
     result = await buck.build("//:type_dir")
