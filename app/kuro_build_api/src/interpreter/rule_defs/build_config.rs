@@ -308,6 +308,19 @@ pub fn set_starlark_flags(flags: &[String]) {
     }
 }
 
+/// Set a single Starlark build flag. Used by transitions to apply setting changes.
+pub fn set_starlark_flag(label: &str, value: &str) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        let flags = config.starlark_flags.get_or_insert_with(HashMap::new);
+        let label = if label.starts_with("//") || label.starts_with("@") {
+            label.to_owned()
+        } else {
+            format!("//{}", label)
+        };
+        flags.insert(label, value.to_owned());
+    }
+}
+
 /// Get the value of a Starlark build flag, or None if not set.
 /// The label should be in "//pkg:target" format.
 pub fn get_starlark_flag(label: &str) -> Option<String> {

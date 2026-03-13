@@ -60,6 +60,30 @@ impl TransitionData {
             TransitionData::Target(_) => false,
         }
     }
+
+    /// Check if this is a Bazel-style transition (has inputs/outputs).
+    pub(crate) fn is_bazel_style(&self) -> bool {
+        match self {
+            TransitionData::MagicObject(v) => !v.inputs.is_empty() || !v.outputs.is_empty(),
+            TransitionData::Target(_) => false,
+        }
+    }
+
+    /// Get the inputs list for Bazel-style transitions.
+    pub(crate) fn inputs(&self) -> &[String] {
+        match self {
+            TransitionData::MagicObject(v) => &v.inputs,
+            TransitionData::Target(_) => &[],
+        }
+    }
+
+    /// Get the outputs list for Bazel-style transitions.
+    pub(crate) fn outputs(&self) -> &[String] {
+        match self {
+            TransitionData::MagicObject(v) => &v.outputs,
+            TransitionData::Target(_) => &[],
+        }
+    }
 }
 
 /// Fetch transition object (function plus context) by id.

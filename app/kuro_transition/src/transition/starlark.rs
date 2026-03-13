@@ -88,6 +88,11 @@ pub(crate) struct Transition<'v> {
     attrs: Option<Vec<StringValue<'v>>>,
     /// Is this split transition? I. e. transition to multiple configurations.
     split: bool,
+    /// Bazel-compatible: build settings that the transition reads.
+    /// If non-empty, this is a Bazel-style transition with (settings, attr) signature.
+    inputs: Vec<String>,
+    /// Bazel-compatible: build settings that the transition writes.
+    outputs: Vec<String>,
 }
 
 #[derive(Debug, Display, ProvidesStaticType, NoSerialize, Allocative)]
@@ -98,6 +103,10 @@ pub(crate) struct FrozenTransition {
     pub(crate) refs: SmallMap<FrozenStringValue, ProvidersLabel>,
     pub(crate) attrs_names: Option<Vec<FrozenStringValue>>,
     pub(crate) split: bool,
+    /// Bazel-compatible: build settings that the transition reads.
+    pub(crate) inputs: Vec<String>,
+    /// Bazel-compatible: build settings that the transition writes.
+    pub(crate) outputs: Vec<String>,
 }
 
 #[starlark_value(type = "Transition")]
@@ -175,12 +184,16 @@ impl Freeze for Transition<'_> {
             .map(|a| a.into_try_map(|a| a.freeze(freezer)))
             .transpose()?;
         let split = self.split;
+        let inputs = self.inputs;
+        let outputs = self.outputs;
         Ok(FrozenTransition {
             id,
             implementation,
             refs,
             attrs_names: attrs,
             split,
+            inputs,
+            outputs,
         })
     }
 }
@@ -304,7 +317,8 @@ fn register_transition_function(builder: &mut GlobalsBuilder) {
         outputs: UnpackListOrTuple<&str>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Transition<'v>> {
-        let _unused = (inputs, outputs);
+        let input_settings: Vec<String> = inputs.items.iter().map(|s| s.to_string()).collect();
+        let output_settings: Vec<String> = outputs.items.iter().map(|s| s.to_string()).collect();
 
         // Support both `implementation` (Bazel) and `impl` (Kuro) parameter names
         let impl_value = match (r#impl, implementation) {
@@ -361,6 +375,8 @@ fn register_transition_function(builder: &mut GlobalsBuilder) {
             refs,
             attrs: attrs.map(|a| a.items),
             split,
+            inputs: input_settings,
+            outputs: output_settings,
         })
     }
 }

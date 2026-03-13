@@ -43,6 +43,7 @@ use kuro_node::attrs::display::AttrDisplayWithContextExt;
 use starlark::eval::Evaluator;
 use starlark::values::UnpackValue;
 use starlark::values::Value;
+use starlark::values::dict::DictRef;
 use starlark::values::dict::UnpackDictEntries;
 use starlark::values::structs::AllocStruct;
 use starlark_map::ordered_map::OrderedMap;
@@ -78,6 +79,11 @@ fn call_transition_function<'v>(
     attrs: Option<Value<'v>>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> kuro_error::Result<TransitionApplied> {
+    // Bazel-style transitions have inputs/outputs and use (settings, attr) signature
+    if transition.is_bazel_style() {
+        return call_bazel_transition_function(transition, conf, attrs, eval);
+    }
+
     let mut args = vec![(
         "platform",
         eval.heap()
@@ -120,6 +126,162 @@ fn call_transition_function<'v>(
             .into()),
         }
     }
+}
+
+/// Call a Bazel-style transition function.
+///
+/// Bazel transitions have the signature `def impl(settings, attr)` where:
+/// - `settings` is a dict of {input_setting_label: current_value}
+/// - `attr` is a struct of attribute values (or None if no attrs declared)
+///
+/// Returns a dict of {output_setting_label: new_value}, or {} for no-op.
+fn call_bazel_transition_function<'v>(
+    transition: &TransitionData,
+    conf: &ConfigurationData,
+    attrs: Option<Value<'v>>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> kuro_error::Result<TransitionApplied> {
+    let impl_ = match transition {
+        TransitionData::MagicObject(v) => v.implementation.to_value(),
+        TransitionData::Target(v) => v.r#impl.to_value().get(),
+    };
+
+    // Build the settings dict from the transition's inputs list.
+    // Each input is a label like "//command_line_option:cpu" or "//pkg:flag".
+    let inputs = transition.inputs();
+    let mut settings_entries: Vec<(&str, Value<'v>)> = Vec::new();
+    for input in inputs {
+        let value = resolve_setting_value(input, conf, eval)?;
+        // We need to alloc the key string on the heap for the dict
+        settings_entries.push((eval.heap().alloc_str(input).as_str(), value));
+    }
+    let settings_dict = eval.heap().alloc(starlark::values::dict::AllocDict(settings_entries.into_iter()));
+
+    // Build the attr struct (or None if no attrs declared)
+    let attr_value = attrs.unwrap_or_else(|| eval.heap().alloc(AllocStruct(Vec::<(&str, Value)>::new())));
+
+    // Call the transition implementation: impl(settings, attr)
+    let result = eval
+        .eval_function(impl_, &[settings_dict, attr_value], &[])
+        .map_err(kuro_error::Error::from)?;
+
+    // Parse the return value.
+    // Bazel transitions return a dict of {setting_label: new_value}
+    // or {} / None for no changes.
+    if result.is_none() {
+        // No-op transition - return current configuration unchanged
+        return Ok(TransitionApplied::Single(conf.dupe()));
+    }
+
+    // Check if it's a dict
+    if let Some(dict) = DictRef::from_value(result) {
+        if dict.is_empty() {
+            // Empty dict = no-op
+            return Ok(TransitionApplied::Single(conf.dupe()));
+        }
+
+        // For split transitions, the return is a dict of {split_key: {setting: value}}
+        if transition.is_split() {
+            let mut split = OrderedMap::new();
+            for (k, _v) in dict.iter() {
+                let key = k.unpack_str().unwrap_or_default();
+                // For split Bazel transitions, each value should be a dict of settings.
+                // For now, pass through the current configuration since we don't yet
+                // apply setting changes to the configuration.
+                split.insert(key.to_owned(), conf.dupe());
+            }
+            return Ok(TransitionApplied::Split(SortedMap::from(split)));
+        }
+
+        // Non-split: the returned dict maps setting labels to new values.
+        // Store the setting changes in the build config for later resolution.
+        let outputs = transition.outputs();
+        for (k, v) in dict.iter() {
+            let key = k.unpack_str().unwrap_or_default();
+            // Validate that returned keys are in outputs
+            if !outputs.is_empty() && !outputs.iter().any(|o| o.as_str() == key) {
+                // Setting not declared in outputs - log but don't error
+                eprintln!(
+                    "Warning: transition returned setting '{}' not declared in outputs",
+                    key
+                );
+            }
+            // Apply the setting value to the build config
+            let value_str = if v.is_none() {
+                continue; // None means no change
+            } else if let Some(b) = v.unpack_bool() {
+                if b { "True" } else { "False" }.to_owned()
+            } else {
+                v.unpack_str().map(|s| s.to_owned()).unwrap_or_else(|| format!("{}", v))
+            };
+            // Store in the global build config so ctx.build_setting_value picks it up
+            kuro_build_api::interpreter::rule_defs::build_config::set_starlark_flag(
+                key, &value_str,
+            );
+        }
+
+        // Return the current configuration (settings are applied via BuildConfig)
+        return Ok(TransitionApplied::Single(conf.dupe()));
+    }
+
+    // Try treating as PlatformInfo (compatibility with mixed-style transitions)
+    match <&PlatformInfo>::unpack_value_err(result) {
+        Ok(platform) => Ok(TransitionApplied::Single(platform.to_configuration()?)),
+        Err(_) => {
+            // If it's not a dict and not PlatformInfo, return current config as no-op
+            // Unexpected return type - treat as no-op
+            Ok(TransitionApplied::Single(conf.dupe()))
+        }
+    }
+}
+
+/// Resolve the current value of a build setting for transition inputs.
+fn resolve_setting_value<'v>(
+    setting_label: &str,
+    _conf: &ConfigurationData,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> kuro_error::Result<Value<'v>> {
+    // Check for command_line_option settings
+    if setting_label.starts_with("//command_line_option:") {
+        let option_name = &setting_label["//command_line_option:".len()..];
+        let value = match option_name {
+            "compilation_mode" => kuro_build_api::interpreter::rule_defs::build_config::get_compilation_mode(),
+            "cpu" => {
+                if cfg!(target_arch = "x86_64") {
+                    "k8".to_owned()
+                } else if cfg!(target_arch = "aarch64") {
+                    "aarch64".to_owned()
+                } else {
+                    "unknown".to_owned()
+                }
+            }
+            "crosstool_top" => "".to_owned(),
+            "compiler" => "".to_owned(),
+            "platforms" => "".to_owned(),
+            "host_platform" => "".to_owned(),
+            _ => {
+                // Check if there's a Starlark flag override
+                kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(
+                    &format!("//command_line_option:{}", option_name),
+                )
+                .unwrap_or_default()
+            }
+        };
+        return Ok(eval.heap().alloc_str(&value).to_value());
+    }
+
+    // Check for user-defined build settings (Starlark flags)
+    if let Some(value) = kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(setting_label) {
+        // Parse the value appropriately
+        return Ok(match value.as_str() {
+            "True" | "true" => eval.heap().alloc(true),
+            "False" | "false" => eval.heap().alloc(false),
+            s => eval.heap().alloc_str(s).to_value(),
+        });
+    }
+
+    // Default: return empty string for unknown settings
+    Ok(eval.heap().alloc_str("").to_value())
 }
 
 async fn do_apply_transition(
