@@ -47,7 +47,18 @@ pub struct BazelLabel {
 
 impl fmt::Display for BazelLabel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.full)
+        // Bazel 9.0+ with bzlmod uses canonical label format with @@ prefix.
+        // - "@@repo//pkg:target" for external repos
+        // - "@@//pkg:target" for the root repo
+        // This is critical for bazel_features is_bzlmod_enabled detection:
+        //   str(Label("//:invalid")).startswith("@@") must be True
+        if self.workspace_name.is_empty()
+            || kuro_core::cells::is_root_cell_name(&self.workspace_name)
+        {
+            write!(f, "@@//{}:{}", self.package, self.name)
+        } else {
+            write!(f, "@@{}//{}:{}", self.workspace_name, self.package, self.name)
+        }
     }
 }
 
@@ -78,27 +89,28 @@ fn bazel_label_methods(builder: &mut MethodsBuilder) {
 
 /// Resolve a label string relative to a given repository and package.
 pub(crate) fn resolve_relative_label(workspace_name: &str, package: &str, label: &str) -> String {
-    if label.starts_with('@') || label.starts_with("//") {
+    // Use @@ prefix for canonical labels (Bazel 9.0+ bzlmod format)
+    if label.starts_with("@@") || label.starts_with('@') || label.starts_with("//") {
         // Absolute label - return as-is (possibly prepend repo if starts with //)
         if label.starts_with("//") && !workspace_name.is_empty() {
-            // "//pkg:target" relative to "@repo" → "@repo//pkg:target"
-            format!("@{}{}", workspace_name, label)
+            // "//pkg:target" relative to "@repo" → "@@repo//pkg:target"
+            format!("@@{}{}", workspace_name, label)
         } else {
             label.to_owned()
         }
     } else if let Some(target) = label.strip_prefix(':') {
-        // ":target" → "@repo//pkg:target"
+        // ":target" → "@@repo//pkg:target"
         if workspace_name.is_empty() {
-            format!("//{}:{}", package, target)
+            format!("@@//{}:{}", package, target)
         } else {
-            format!("@{}//{}:{}", workspace_name, package, target)
+            format!("@@{}//{}:{}", workspace_name, package, target)
         }
     } else {
         // Bare label - treat as target within same package
         if workspace_name.is_empty() {
-            format!("//{}:{}", package, label)
+            format!("@@//{}:{}", package, label)
         } else {
-            format!("@{}//{}:{}", workspace_name, package, label)
+            format!("@@{}//{}:{}", workspace_name, package, label)
         }
     }
 }
@@ -168,17 +180,21 @@ impl BazelLabel {
     ///
     /// The label_str is assumed to be already resolved (absolute, not relative).
     pub fn parse(label_str: &str) -> Self {
-        // Parse "@repo//pkg:target" format
-        let (workspace, rest) = if let Some(stripped) = label_str.strip_prefix('@') {
-            if let Some(idx) = stripped.find("//") {
-                (stripped[..idx].to_owned(), &stripped[idx + 2..])
-            } else {
-                (stripped.to_owned(), "")
-            }
-        } else if let Some(stripped) = label_str.strip_prefix("//") {
-            (String::new(), stripped)
+        // Parse "@@repo//pkg:target" or "@repo//pkg:target" format
+        // Strip leading @@ or @ prefix to get the repo name
+        let stripped = label_str
+            .strip_prefix("@@")
+            .or_else(|| label_str.strip_prefix('@'))
+            .unwrap_or(label_str);
+
+        let (workspace, rest) = if let Some(idx) = stripped.find("//") {
+            (stripped[..idx].to_owned(), &stripped[idx + 2..])
+        } else if stripped.starts_with("//") {
+            (String::new(), &stripped[2..])
+        } else if !stripped.is_empty() && !stripped.contains('/') && !stripped.contains(':') {
+            (stripped.to_owned(), "")
         } else {
-            (String::new(), label_str)
+            (String::new(), stripped)
         };
 
         let (package, name) = if let Some(colon_idx) = rest.find(':') {
@@ -194,8 +210,17 @@ impl BazelLabel {
             (rest.to_owned(), last.to_owned())
         };
 
+        // Store canonical form with @@ prefix (Bazel 9.0+ bzlmod format)
+        let full = if workspace.is_empty()
+            || kuro_core::cells::is_root_cell_name(&workspace)
+        {
+            format!("@@//{}:{}", package, name)
+        } else {
+            format!("@@{}//{}:{}", workspace, package, name)
+        };
+
         BazelLabel {
-            full: label_str.to_owned(),
+            full,
             name,
             package,
             workspace_name: workspace,

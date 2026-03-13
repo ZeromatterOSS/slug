@@ -4,6 +4,7 @@ A build system
 
 Documentation: https://kuro.build/docs/
 
+
 Usage: kuro [OPTIONS] <COMMAND>
 
 Commands:

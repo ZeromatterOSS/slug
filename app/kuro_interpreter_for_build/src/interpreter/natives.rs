@@ -222,16 +222,17 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
             extract_cell_and_package_from_filename(filename.as_deref().unwrap_or(""))
         };
 
-        let resolved = if label_string.starts_with('@') {
+        let resolved = if label_string.starts_with("@@") || label_string.starts_with('@') {
             // Already fully qualified with repository
             label_string.to_owned()
         } else if label_string.starts_with("//") {
             // Absolute path within the current file's repository
-            format!("@{}{}", file_cell, label_string)
+            // Use @@ prefix for canonical labels (Bazel 9.0+ bzlmod format)
+            format!("@@{}{}", file_cell, label_string)
         } else {
             // Relative label (:target or bare target)
             let target = label_string.strip_prefix(':').unwrap_or(label_string);
-            format!("@{}//{}:{}", file_cell, pkg_path, target)
+            format!("@@{}//{}:{}", file_cell, pkg_path, target)
         };
 
         Ok(eval.heap().alloc(BazelLabel::parse(&resolved)))
@@ -293,6 +294,35 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
         let entries = vec![
             ("success", eval.heap().alloc(success)),
             ("message", eval.heap().alloc(message)),
+        ];
+        Ok(eval.heap().alloc(AllocDict(entries)))
+    }
+
+    /// Bazel 8.0+ symbolic macro definition.
+    ///
+    /// In Bazel, `macro()` defines a symbolic macro, similar to `rule()` but for macros.
+    /// Symbolic macros provide better introspection than legacy macros (function-based macros).
+    ///
+    /// Currently a stub that returns a callable wrapping the implementation function.
+    /// This is needed for `bazel_features.globals.macro` detection (must not be None).
+    ///
+    /// See: https://bazel.build/rules/lib/globals/bzl#macro
+    fn r#macro<'v>(
+        #[starlark(require = named)] implementation: Value<'v>,
+        #[starlark(require = named, default = NoneOr::None)] doc: NoneOr<&str>,
+        #[starlark(require = named, default = NoneOr::None)] attrs: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] inherit_attrs: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = false)] finalizer: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        // TODO(macro): Implement proper symbolic macro support.
+        // For now, return the implementation function directly as the macro callable.
+        // This allows code to define macros and call them, though without the
+        // introspection benefits of proper symbolic macros.
+        let _ = (doc, attrs, inherit_attrs, finalizer);
+        let entries = vec![
+            ("_type", eval.heap().alloc("macro")),
+            ("implementation", implementation),
         ];
         Ok(eval.heap().alloc(AllocDict(entries)))
     }

@@ -67,6 +67,7 @@
 ## label\_flag
 ## licenses
 ## load\_symbols
+## macro
 ## module\_extension
 ## package
 ## package\_default\_visibility
