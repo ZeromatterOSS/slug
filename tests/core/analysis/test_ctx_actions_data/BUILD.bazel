@@ -1,0 +1,65 @@
+load(":defs.bzl", "bin_dir_rule", "declare_dir_rule", "expand_template_rule",
+     "label_info_rule", "provider_consumer_rule", "provider_test_rule",
+     "run_shell_inputs_rule", "run_shell_string_rule", "write_multiline_rule",
+     "runfiles_rule", "write_exec_rule")
+
+# Test 1: ctx.actions.write with is_executable
+write_exec_rule(
+    name = "write_executable",
+)
+
+# Test 2: ctx.actions.expand_template
+expand_template_rule(
+    name = "template_expansion",
+    template = "template.txt.tpl",
+    name_val = "developer",
+)
+
+# Test 3: ctx.actions.run_shell with string command
+run_shell_string_rule(
+    name = "shell_string",
+)
+
+# Test 4: ctx.actions.run_shell with inputs
+run_shell_inputs_rule(
+    name = "shell_inputs",
+    srcs = ["input_a.txt", "input_b.txt"],
+)
+
+# Test 5: ctx.actions.declare_directory
+declare_dir_rule(
+    name = "declared_dir",
+)
+
+# Test 6: ctx.actions.write with multiple lines
+write_multiline_rule(
+    name = "multiline_write",
+    lines = ["line_one", "line_two", "line_three"],
+)
+
+# Test 7: ctx.label attributes
+label_info_rule(
+    name = "label_info",
+)
+
+# Test 8: ctx.bin_dir
+bin_dir_rule(
+    name = "bin_dir_test",
+)
+
+# Test 9: ctx.runfiles
+runfiles_rule(
+    name = "runfiles_test",
+    data = ["input_a.txt", "input_b.txt"],
+)
+
+# Test 10: provider() and provider consumer
+provider_test_rule(
+    name = "provider_source",
+    value = "my_provider_value",
+)
+
+provider_consumer_rule(
+    name = "provider_consumer",
+    dep = ":provider_source",
+)

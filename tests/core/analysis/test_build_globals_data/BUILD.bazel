@@ -1,0 +1,105 @@
+load(":defs.bzl", "count_rules_macro", "get_rule_kind_macro", "glob_count_macro",
+     "package_name_macro", "repo_name_macro", "resolve_label_macro",
+     "write_list_rule", "write_value_rule")
+
+# === exports_files: make source files available as targets ===
+exports_files(["helper.txt", "data1.txt", "data2.txt"])
+
+# === Test 1: existing_rules() returns all rules defined so far ===
+# At this point, exports_files has created 3 file targets.
+# Define a genrule first, then count using macro.
+
+genrule(
+    name = "setup_target",
+    outs = ["setup.txt"],
+    cmd = "echo setup > $@",
+)
+
+# Count should include exports_files targets + setup_target
+write_value_rule(
+    name = "existing_rules_count",
+    value = count_rules_macro(),
+)
+
+# === Test 2: existing_rule() returns specific rule attributes ===
+write_value_rule(
+    name = "existing_rule_kind",
+    value = get_rule_kind_macro("setup_target"),
+)
+
+# === Test 3: package_name() returns current package ===
+write_value_rule(
+    name = "package_name_test",
+    value = package_name_macro(),
+)
+
+# === Test 4: repository_name() returns repo name ===
+write_value_rule(
+    name = "repo_name_test",
+    value = repo_name_macro(),
+)
+
+# === Test 5: glob() matching ===
+write_value_rule(
+    name = "glob_txt_count",
+    value = glob_count_macro(["*.txt"]),
+)
+
+# === Test 6: glob() with exclude ===
+write_value_rule(
+    name = "glob_exclude_count",
+    value = str(len(glob(["*.txt"], exclude = ["helper.txt"]))),
+)
+
+# === Test 7: existing_rule() on nonexistent target ===
+write_value_rule(
+    name = "existing_rule_missing",
+    value = get_rule_kind_macro("nonexistent_target"),
+)
+
+# === Test 8: package_relative_label() ===
+write_value_rule(
+    name = "relative_label_test",
+    value = resolve_label_macro(":setup_target"),
+)
+
+# === Test 9: filegroup with glob ===
+filegroup(
+    name = "all_data",
+    srcs = glob(["data*.txt"]),
+)
+
+# Verify filegroup output contains expected files
+genrule(
+    name = "filegroup_glob_test",
+    srcs = [":all_data"],
+    outs = ["filegroup_glob_out.txt"],
+    cmd = "echo $(SRCS) | tr ' ' '\\n' | wc -l | tr -d ' ' > $@",
+)
+
+# === Test 10: existing_rules() includes attribute data ===
+# Define a rule with specific attributes, then verify existing_rule() returns them
+genrule(
+    name = "attributed_rule",
+    srcs = ["helper.txt"],
+    outs = ["attributed_out.txt"],
+    cmd = "cat $(SRCS) > $@",
+    visibility = ["//visibility:public"],
+)
+
+write_value_rule(
+    name = "existing_rule_has_srcs",
+    value = str("srcs" in (native.existing_rule("attributed_rule") or {})),
+)
+
+# === Test 11: module_name() and module_version() ===
+write_value_rule(
+    name = "module_name_test",
+    value = str(native.module_name()),
+)
+
+# === Test 12: repo_name() (BUILD global) ===
+write_value_rule(
+    name = "repo_name_direct_test",
+    value = repo_name(),
+)

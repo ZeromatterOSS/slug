@@ -118,23 +118,27 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
         let name_str = cell_name.as_str();
         // In Bazel, the root repository has repo_name() == "" (empty string).
         // External repos return their canonical name.
-        // In Kuro, the root cell is named "root" or matches the module name.
-        // We treat the cell name directly as the repo name; root is special-cased below.
-        // TODO: For multi-cell setups, check if this is the root cell and return "".
-        let _ = name_str;
-        Ok(name_str.to_owned())
+        if kuro_core::cells::is_root_cell_name(name_str) {
+            Ok(String::new())
+        } else {
+            Ok(name_str.to_owned())
+        }
     }
 
     /// Like `get_cell_name()` but prepends a leading `@` for compatibility with Buck1.
     /// You should call `get_cell_name()` instead, and if you really want the `@`,
     /// prepend it yourself.
     fn repository_name(eval: &mut Evaluator) -> starlark::Result<String> {
-        // In Buck v1 the repository name has a leading `@` on it, so match that with v2.
-        // In practice, most users do `repository_name()[1:]` to drop it.
-        Ok(format!(
-            "@{}",
-            BuildContext::from_context(eval)?.cell_info().name()
-        ))
+        // In Bazel, repository_name() returns "@" for the root repository
+        // and "@<repo_name>" for external repositories.
+        // In practice, most users do `repository_name()[1:]` to drop the leading `@`.
+        let cell_name = BuildContext::from_context(eval)?.cell_info().name().name();
+        let name_str = cell_name.as_str();
+        if kuro_core::cells::is_root_cell_name(name_str) {
+            Ok("@".to_owned())
+        } else {
+            Ok(format!("@{}", name_str))
+        }
     }
 
     /// `get_cell_name()` can be called from either a `BUCK` file or a `.bzl` file,
