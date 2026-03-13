@@ -2055,6 +2055,11 @@ impl<'v> StarlarkValue<'v> for ToolchainsStub {
         } else {
             // For unrecognized toolchain keys, return a generic stub rather than None.
             // This prevents AttributeError crashes when rules access toolchain attributes.
+            tracing::warn!(
+                "ctx.toolchains[{:?}]: unrecognized toolchain type, returning stub. \
+                 Attribute accesses on this toolchain will return None.",
+                key_str
+            );
             Ok(heap.alloc(GenericToolchainStub))
         }
     }

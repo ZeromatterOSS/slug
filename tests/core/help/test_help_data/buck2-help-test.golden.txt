@@ -78,6 +78,11 @@ Options:
       --skip-run-info
           Do not build RunInfo provider (this is the default)
 
+      --test-output <MODE>
+          Control test output verbosity (Bazel compatibility).
+
+          Bazel's --test_output controls whether test stdout/stderr is shown: - `summary`: Show only test status and timing (default) - `errors`: Show output for failed tests only - `all`: Show output for all tests - `short`: Show first few lines for failed tests - `streamed`: Stream all output in real-time
+
       --build-report <PATH>
           Print a build report
 

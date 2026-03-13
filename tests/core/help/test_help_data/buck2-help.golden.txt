@@ -38,6 +38,9 @@ Commands:
   log                   Commands for interacting with kuro logs
   lsp                   Start an LSP server for starlark files
   subscribe             Subscribe to updates from the Kuro daemon
+  version               Print version information (Bazel `bazel version` compatibility)
+  shutdown              Alias for `kill` (Bazel `bazel shutdown` compatibility)
+  fetch                 Fetch external repositories (Bazel `bazel fetch` compatibility)
   help                  Print this message or the help of the given subcommand(s)
 
 Options:
