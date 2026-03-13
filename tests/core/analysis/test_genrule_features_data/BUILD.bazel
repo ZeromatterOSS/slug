@@ -1,0 +1,83 @@
+# === Basic genrule ===
+
+genrule(
+    name = "basic_genrule",
+    outs = ["basic_out.txt"],
+    cmd = "echo basic_output > $@",
+)
+
+# === genrule with srcs ===
+
+genrule(
+    name = "genrule_with_srcs",
+    srcs = ["input.txt"],
+    outs = ["copy_out.txt"],
+    cmd = "cat $(SRCS) > $@",
+)
+
+# === genrule with multiple outs ===
+
+genrule(
+    name = "multi_out",
+    outs = ["out_a.txt", "out_b.txt"],
+    cmd = "echo a > $(@D)/out_a.txt && echo b > $(@D)/out_b.txt",
+)
+
+# === genrule cmd_bash ===
+
+genrule(
+    name = "bash_genrule",
+    outs = ["bash_out.txt"],
+    cmd_bash = "echo bash_specific > $@",
+    cmd = "echo fallback > $@",
+)
+
+# === genrule with $(location) on tool dep ===
+
+genrule(
+    name = "tool_genrule",
+    tools = [":basic_genrule"],
+    outs = ["tool_out.txt"],
+    cmd = "cat $(location :basic_genrule) > $@",
+)
+
+# === genrule with select() ===
+
+config_setting(
+    name = "is_opt",
+    values = {"compilation_mode": "opt"},
+)
+
+genrule(
+    name = "select_genrule",
+    outs = ["select_out.txt"],
+    cmd = select({
+        ":is_opt": "echo optimized > $@",
+        "//conditions:default": "echo default > $@",
+    }),
+)
+
+# === genrule with $(OUTS) ===
+
+genrule(
+    name = "outs_var_genrule",
+    outs = ["outs_var_out.txt"],
+    cmd = "echo content > $(OUTS)",
+)
+
+# === genrule with $(RULEDIR) ===
+
+genrule(
+    name = "ruledir_genrule",
+    outs = ["ruledir_out.txt"],
+    cmd = "echo ok > $(RULEDIR)/ruledir_out.txt",
+)
+
+# === genrule visibility public ===
+
+genrule(
+    name = "public_genrule",
+    outs = ["public_out.txt"],
+    cmd = "echo public > $@",
+    visibility = ["//visibility:public"],
+)
