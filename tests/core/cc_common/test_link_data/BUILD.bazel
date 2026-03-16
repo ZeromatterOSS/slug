@@ -5,6 +5,7 @@ load(":defs.bzl",
     "link_with_linking_contexts_test",
     "create_library_to_link_test",
     "linker_input_test",
+    "link_deps_statically_test",
 )
 
 link_executable_test(
@@ -29,4 +30,8 @@ create_library_to_link_test(
 
 linker_input_test(
     name = "linker_input",
+)
+
+link_deps_statically_test(
+    name = "link_deps_statically",
 )

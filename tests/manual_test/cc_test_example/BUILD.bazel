@@ -15,5 +15,11 @@ cc_test(
     name = "hello_test",
     srcs = ["hello_test.c"],
     deps = [":hello_lib"],
-    linkstatic = True,  # Default=False hits dynamic linking bug in cc_common.link
+)
+
+cc_test(
+    name = "hello_test_static",
+    srcs = ["hello_test.c"],
+    deps = [":hello_lib"],
+    linkstatic = True,
 )

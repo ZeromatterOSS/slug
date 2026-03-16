@@ -3241,28 +3241,73 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                             );
                                             for lib in lib_elements {
                                                 // Library_to_link has static_library, dynamic_library, objects, etc.
-                                                if let Ok(Some(static_lib)) =
-                                                    lib.get_attr("static_library", heap)
-                                                {
-                                                    if !static_lib.is_none() {
-                                                        args.push(static_lib);
+                                                // Respect link_deps_statically to choose between static/dynamic.
+                                                let mut linked = false;
+                                                if link_deps_statically {
+                                                    // Prefer static_library when linking statically
+                                                    if let Ok(Some(static_lib)) =
+                                                        lib.get_attr("static_library", heap)
+                                                    {
+                                                        if !static_lib.is_none() {
+                                                            args.push(static_lib);
+                                                            linked = true;
+                                                        }
                                                     }
-                                                }
-                                                if let Ok(Some(dynamic_lib)) =
-                                                    lib.get_attr("dynamic_library", heap)
-                                                {
-                                                    if !dynamic_lib.is_none() {
-                                                        args.push(dynamic_lib);
+                                                    // Fallback to pic_static_library
+                                                    if !linked {
+                                                        if let Ok(Some(pic_static_lib)) =
+                                                            lib.get_attr("pic_static_library", heap)
+                                                        {
+                                                            if !pic_static_lib.is_none() {
+                                                                args.push(pic_static_lib);
+                                                                linked = true;
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    // Prefer dynamic_library when linking dynamically
+                                                    if let Ok(Some(dynamic_lib)) =
+                                                        lib.get_attr("dynamic_library", heap)
+                                                    {
+                                                        if !dynamic_lib.is_none() {
+                                                            args.push(dynamic_lib);
+                                                            linked = true;
+                                                        }
+                                                    }
+                                                    // Fallback: interface_library (import lib on Windows)
+                                                    if !linked {
+                                                        if let Ok(Some(iface_lib)) =
+                                                            lib.get_attr("interface_library", heap)
+                                                        {
+                                                            if !iface_lib.is_none() {
+                                                                args.push(iface_lib);
+                                                                linked = true;
+                                                            }
+                                                        }
+                                                    }
+                                                    // Fallback to static_library if no dynamic available
+                                                    if !linked {
+                                                        if let Ok(Some(static_lib)) =
+                                                            lib.get_attr("static_library", heap)
+                                                        {
+                                                            if !static_lib.is_none() {
+                                                                args.push(static_lib);
+                                                                linked = true;
+                                                            }
+                                                        }
                                                     }
                                                 }
                                                 // Also include objects from library_to_link
-                                                if let Ok(Some(objects)) =
-                                                    lib.get_attr("objects", heap)
-                                                {
-                                                    if !objects.is_none() {
-                                                        if let Ok(obj_iter) = objects.iterate(heap) {
-                                                            for obj in obj_iter {
-                                                                args.push(obj);
+                                                // (only if no library was found above)
+                                                if !linked {
+                                                    if let Ok(Some(objects)) =
+                                                        lib.get_attr("objects", heap)
+                                                    {
+                                                        if !objects.is_none() {
+                                                            if let Ok(obj_iter) = objects.iterate(heap) {
+                                                                for obj in obj_iter {
+                                                                    args.push(obj);
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -3305,6 +3350,20 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 for opt in crate::interpreter::rule_defs::build_config::get_linkopts() {
                     args.push(heap.alloc_str(&opt).to_value());
                 }
+            }
+
+            // Add RPATH for dynamic library dependencies on non-Windows platforms.
+            // This allows the runtime linker to find shared libraries relative to
+            // the executable ($ORIGIN on Linux, @loader_path on macOS).
+            if !is_static && !link_deps_statically && !is_windows_host() {
+                let rpath_origin = if std::env::consts::OS == "macos" {
+                    "@loader_path"
+                } else {
+                    "$ORIGIN"
+                };
+                // Add rpath pointing to the output directory itself and common lib locations
+                args.push(heap.alloc_str(&format!("-Wl,-rpath,{}", rpath_origin)).to_value());
+                args.push(heap.alloc_str(&format!("-Wl,-rpath,{}/lib", rpath_origin)).to_value());
             }
 
             let args_val = heap.alloc(args);

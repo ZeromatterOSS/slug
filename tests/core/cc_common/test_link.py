@@ -78,6 +78,20 @@ async def test_create_library_to_link(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_link_data")
+async def test_link_deps_statically(buck: Buck) -> None:
+    """cc_common.link() respects link_deps_statically parameter."""
+    result = await buck.build("//:link_deps_statically")
+    output = result.get_build_report().output_for_target("//:link_deps_statically")
+    content = output.read_text().replace("\r\n", "\n")
+    lines = dict(line.split("=", 1) for line in content.strip().split("\n") if "=" in line)
+
+    assert lines["static_type"] == "CcLinkingOutputs"
+    assert lines["static_has_executable"] == "True"
+    assert lines["dynamic_type"] == "CcLinkingOutputs"
+    assert lines["dynamic_has_executable"] == "True"
+
+
+@buck_test(data_dir="test_link_data")
 async def test_linker_input(buck: Buck) -> None:
     """cc_common.create_linker_input() preserves user_link_flags and owner."""
     result = await buck.build("//:linker_input")
