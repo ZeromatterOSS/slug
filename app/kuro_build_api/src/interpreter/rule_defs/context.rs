@@ -2056,8 +2056,11 @@ impl<'v> StarlarkValue<'v> for ToolchainsStub {
         } else if target_name == "test_runner_toolchain_type"
             || (target_name == "toolchain_type" && pkg_segment == "test_runner")
         {
-            // Test runner toolchain - return a generic toolchain with test runner info
-            Ok(heap.alloc(GenericToolchainStub))
+            // Test runner toolchain - return None so rules_cc cc_test.bzl falls back
+            // to the legacy cc_test implementation path. Without a real test runner
+            // toolchain registered, returning a stub would cause attribute access
+            // errors (e.g., cc_test_info.linkopts on NoneType).
+            Ok(Value::new_none())
         } else if key_str.contains("exec_tools") {
             // exec_tools toolchains (e.g., rules_python exec_tools, rules_rust exec_tools)
             // These provide tools for execution, return a generic toolchain
@@ -2282,6 +2285,11 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
                 heap.alloc_str("@bazel_tools//tools/cpp:toolchain")
                     .to_value(),
             ),
+            "_cc_test_info" | "cc_test_info" => {
+                // CcTestInfo provides default linkopts and linkstatic for cc_test targets.
+                // rules_cc cc_test.bzl accesses cc_test_info.linkopts and cc_test_info.linkstatic.
+                Some(heap.alloc(CcTestInfoStub))
+            }
             "_link_dynamic_library_tool" => Some(Value::new_none()),
             "_grep_includes" => Some(Value::new_none()),
             "_compiler_files" => {
@@ -2515,6 +2523,44 @@ impl<'v> StarlarkValue<'v> for CcInfoStub {
         match attribute {
             "compilation_context" => Some(heap.alloc(CompilationContextStub)),
             "linking_context" => Some(heap.alloc(LinkingContextStub)),
+            _ => None,
+        }
+    }
+}
+
+/// A stub for CcTestInfo providing default linkopts and linkstatic for cc_test.
+/// In Bazel, CcTestInfo is part of the CcToolchainProvider and controls how
+/// cc_test targets are linked. rules_cc cc_test.bzl accesses:
+/// - cc_test_info.linkopts: additional linker flags for test binaries
+/// - cc_test_info.linkstatic: whether to link test binaries statically (default True)
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct CcTestInfoStub;
+
+impl std::fmt::Display for CcTestInfoStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<CcTestInfo>")
+    }
+}
+
+starlark::starlark_simple_value!(CcTestInfoStub);
+
+#[starlark::values::starlark_value(type = "CcTestInfo")]
+impl<'v> StarlarkValue<'v> for CcTestInfoStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "linkopts" | "linkstatic")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "linkopts" => {
+                // Default: no extra linker flags for test binaries
+                let empty: Vec<Value<'v>> = Vec::new();
+                Some(heap.alloc(empty))
+            }
+            "linkstatic" => {
+                // Default: link test binaries statically (matches Bazel default)
+                Some(Value::new_bool(true))
+            }
             _ => None,
         }
     }

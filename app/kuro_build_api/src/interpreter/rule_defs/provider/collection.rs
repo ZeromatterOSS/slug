@@ -298,6 +298,20 @@ impl<'v, V: ValueLike<'v>> ProviderCollectionGen<V> {
                     };
                 }
                 None => {
+                    // For Bazel compatibility: skip known Bazel provider types that
+                    // implement ProviderLike via provide() but aren't recognized by
+                    // the standard unpack path. These include test-related providers
+                    // like RunEnvironmentInfo and testing.ExecutionInfo.
+                    let type_name = value.get_type();
+                    if type_name == "RunEnvironmentInfo"
+                        || type_name == "ExecutionInfo"
+                        || type_name == "InstrumentedFilesInfo"
+                        || type_name == "DebugPackageInfo"
+                        || type_name == "OutputGroupInfo"
+                    {
+                        // Skip silently — these are handled by test infrastructure
+                        continue;
+                    }
                     return Err(ProviderCollectionError::CollectionElementNotAProvider {
                         repr: value.to_repr(),
                     }
