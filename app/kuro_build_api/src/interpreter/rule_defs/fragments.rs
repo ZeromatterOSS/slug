@@ -333,11 +333,60 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
         Ok(false)
     }
 
+    /// Whether disable_nocopts is active.
+    ///
+    /// In Bazel, this controls whether nocopts filtering is disabled.
+    /// Always return true for Bazel 9.0+ compatibility (nocopts was removed).
+    fn disable_nocopts(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
+        Ok(true)
+    }
+
+    /// Whether C++20 modules support is enabled.
+    ///
+    /// Returns false since C++20 modules are experimental in Bazel.
+    fn experimental_cpp_modules(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Whether to link static libraries only once.
+    ///
+    /// Returns true for Bazel 9.0+ behavior where static libraries are
+    /// linked only once even when depended on by multiple targets.
+    fn experimental_link_static_libraries_once(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
+        Ok(true)
+    }
+
+    /// Whether shared native deps linking is enabled.
+    fn share_native_deps(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
     /// Whether legacy whole archive behavior is removed.
     fn incompatible_remove_legacy_whole_archive(
         #[allow(unused_variables)] this: &CppFragment,
     ) -> starlark::Result<bool> {
         Ok(true) // Use the modern behavior
+    }
+
+    /// Whether to generate .d dependency files for Objective-C.
+    fn objc_should_generate_dotd_files(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
+        Ok(true)
+    }
+
+    /// Objective-C compilation options.
+    #[starlark(attribute)]
+    fn objccopts(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<Vec<String>> {
+        Ok(Vec::new())
     }
 
     /// Returns the dynamic linking mode: "FULLY", "OFF", or "DEFAULT".
