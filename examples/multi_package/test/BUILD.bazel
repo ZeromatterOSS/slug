@@ -5,3 +5,8 @@ cc_test(
     srcs = ["math_test.cpp"],
     deps = ["//lib:math"],
 )
+
+test_suite(
+    name = "all_tests",
+    tests = [":math_test"],
+)
