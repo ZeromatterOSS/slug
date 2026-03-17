@@ -200,6 +200,64 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
         ))
     }
 
+    /// Bazel-compatible: declares a shareable artifact.
+    ///
+    /// In Bazel, shareable artifacts can be shared across configurations (e.g.,
+    /// Android split configurations). In Kuro, this is an alias for `declare_file`
+    /// since we don't yet implement cross-configuration artifact sharing.
+    /// Used by rules_cc for virtual includes, linkstamp objects, and LTO artifacts.
+    fn declare_shareable_artifact<'v>(
+        this: &AnalysisActions<'v>,
+        #[starlark(require = pos)] filename: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        sibling: starlark::values::Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<StarlarkDeclaredArtifact<'v>> {
+        let prefix = sibling_to_prefix(sibling)?;
+        let artifact = this.state()?.declare_output(
+            prefix.as_deref(),
+            filename,
+            OutputType::FileOrDirectory,
+            eval.call_stack_top_location(),
+            BuckOutPathKind::Configuration,
+            eval.heap(),
+        )?;
+
+        Ok(StarlarkDeclaredArtifact::new(
+            eval.call_stack_top_location(),
+            artifact,
+            AssociatedArtifacts::new(),
+        ))
+    }
+
+    /// Bazel-compatible: declares a shareable directory artifact.
+    ///
+    /// Like `declare_shareable_artifact` but for directory outputs.
+    /// Used by rules_cc's LTO backend for creating tree artifacts.
+    fn declare_shareable_directory<'v>(
+        this: &AnalysisActions<'v>,
+        #[starlark(require = pos)] filename: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        sibling: starlark::values::Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<StarlarkDeclaredArtifact<'v>> {
+        let prefix = sibling_to_prefix(sibling)?;
+        let artifact = this.state()?.declare_output(
+            prefix.as_deref(),
+            filename,
+            OutputType::Directory,
+            eval.call_stack_top_location(),
+            BuckOutPathKind::Configuration,
+            eval.heap(),
+        )?;
+
+        Ok(StarlarkDeclaredArtifact::new(
+            eval.call_stack_top_location(),
+            artifact,
+            AssociatedArtifacts::new(),
+        ))
+    }
+
     /// Bazel-compatible: declares a symlink artifact.
     ///
     /// In Bazel, this is only available with `--experimental_allow_unresolved_symlinks`.
