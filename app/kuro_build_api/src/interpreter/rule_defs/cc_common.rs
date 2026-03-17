@@ -102,6 +102,19 @@ fn is_windows_host() -> bool {
     std::env::consts::OS == "windows"
 }
 
+/// Normalize action names from rules_cc: both underscore (cpp_link_dynamic_library)
+/// and hyphen (c++-link-dynamic-library) variants are used. Convert to hyphen form
+/// for consistent matching.
+fn normalize_action_name(name: &str) -> String {
+    name.replace("cpp_", "c++-")
+        .replace("_link_", "-link-")
+        .replace("_compile", "-compile")
+        .replace("_dynamic_library", "-dynamic-library")
+        .replace("_static_library", "-static-library")
+        .replace("_nodeps_", "-nodeps-")
+        .replace("_executable", "-executable")
+}
+
 /// Cached MSVC tool paths detected via vswhere.
 /// Maps tool name ("cl.exe", "link.exe", "lib.exe") to full path.
 static MSVC_TOOL_CACHE: std::sync::OnceLock<Option<MsvcToolPaths>> = std::sync::OnceLock::new();
@@ -1888,8 +1901,10 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         let heap = eval.heap();
 
-        // Get action name as string
-        let action_name_str = action_name.unpack_str().unwrap_or("c++-link-executable");
+        // Get action name as string, normalized to hyphen form
+        let raw_action_name = action_name.unpack_str().unwrap_or("c++-link-executable");
+        let normalized_name = normalize_action_name(raw_action_name);
+        let action_name_str = normalized_name.as_str();
 
         let mut args: Vec<Value<'v>> = Vec::new();
 
@@ -3435,43 +3450,64 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] action_name: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<String> {
-        // TODO(cc_common): Implement proper tool lookup from feature configuration
-        // For now, return platform-appropriate tool names
+        // Normalize action name: rules_cc uses both hyphen (c++-link-executable) and
+        // underscore (cpp_link_executable) variants. Normalize to hyphen form for matching.
+        let normalized = normalize_action_name(action_name);
+        let name = normalized.as_str();
         let tool = match std::env::consts::OS {
             "windows" => {
                 let msvc = get_msvc_tool_paths();
-                match action_name {
-                    "c-compile" | "c++-compile" => {
-                        msvc.as_ref().map(|t| t.cl.as_str()).unwrap_or("cl.exe")
-                    }
-                    "c++-link-executable" | "c++-link-dynamic-library" => {
-                        msvc.as_ref().map(|t| t.link.as_str()).unwrap_or("link.exe")
-                    }
-                    "c++-link-static-library" => {
-                        msvc.as_ref().map(|t| t.lib.as_str()).unwrap_or("lib.exe")
-                    }
-                    "strip" | "objcopy" => "",
-                    _ => msvc.as_ref().map(|t| t.cl.as_str()).unwrap_or("cl.exe"),
+                if name.contains("compile") {
+                    msvc.as_ref().map(|t| t.cl.as_str()).unwrap_or("cl.exe")
+                } else if name.contains("link") && name.contains("static-library") {
+                    msvc.as_ref().map(|t| t.lib.as_str()).unwrap_or("lib.exe")
+                } else if name.contains("link") {
+                    // executable or dynamic library linking → use link.exe
+                    msvc.as_ref().map(|t| t.link.as_str()).unwrap_or("link.exe")
+                } else if name == "strip" || name == "objcopy" {
+                    ""
+                } else {
+                    msvc.as_ref().map(|t| t.cl.as_str()).unwrap_or("cl.exe")
                 }
             }
-            "macos" => match action_name {
-                "c-compile" => "/usr/bin/clang",
-                "c++-compile" => "/usr/bin/clang++",
-                "c++-link-executable" | "c++-link-dynamic-library" => "/usr/bin/clang++",
-                "c++-link-static-library" => "/usr/bin/ar",
-                "strip" => "/usr/bin/strip",
-                "objcopy" => "/usr/bin/objcopy",
-                _ => "/usr/bin/clang",
-            },
-            _ => match action_name {
-                "c-compile" => "/usr/bin/gcc",
-                "c++-compile" => "/usr/bin/g++",
-                "c++-link-executable" | "c++-link-dynamic-library" => "/usr/bin/g++",
-                "c++-link-static-library" => "/usr/bin/ar",
-                "strip" => "/usr/bin/strip",
-                "objcopy" => "/usr/bin/objcopy",
-                _ => "/usr/bin/gcc",
-            },
+            "macos" => {
+                if name.contains("compile") {
+                    if name.starts_with("c-") || name.starts_with("c_") {
+                        "/usr/bin/clang"
+                    } else {
+                        "/usr/bin/clang++"
+                    }
+                } else if name.contains("link") && name.contains("static-library") {
+                    "/usr/bin/ar"
+                } else if name.contains("link") {
+                    "/usr/bin/clang++"
+                } else if name == "strip" {
+                    "/usr/bin/strip"
+                } else if name == "objcopy" {
+                    "/usr/bin/objcopy"
+                } else {
+                    "/usr/bin/clang"
+                }
+            }
+            _ => {
+                if name.contains("compile") {
+                    if name.starts_with("c-") || name.starts_with("c_") {
+                        "/usr/bin/gcc"
+                    } else {
+                        "/usr/bin/g++"
+                    }
+                } else if name.contains("link") && name.contains("static-library") {
+                    "/usr/bin/ar"
+                } else if name.contains("link") {
+                    "/usr/bin/g++"
+                } else if name == "strip" {
+                    "/usr/bin/strip"
+                } else if name == "objcopy" {
+                    "/usr/bin/objcopy"
+                } else {
+                    "/usr/bin/gcc"
+                }
+            }
         };
         Ok(tool.to_owned())
     }
@@ -3531,6 +3567,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let heap = eval.heap();
+        // Normalize action name (rules_cc uses both underscore and hyphen variants)
+        let normalized = normalize_action_name(action_name);
+        let action_name = normalized.as_str();
         let mut args: Vec<Value<'v>> = Vec::new();
 
         // Helper to get a variable value from CcToolchainVariables or dict
