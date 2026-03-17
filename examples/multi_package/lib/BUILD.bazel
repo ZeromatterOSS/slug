@@ -6,3 +6,14 @@ cc_library(
     hdrs = ["math.h"],
     visibility = ["//visibility:public"],
 )
+
+cc_library(
+    name = "platform",
+    srcs = select({
+        "@platforms//os:windows": ["platform_windows.cpp"],
+        "@platforms//os:linux": ["platform_linux.cpp"],
+        "@platforms//os:macos": ["platform_macos.cpp"],
+    }),
+    hdrs = ["platform.h"],
+    visibility = ["//visibility:public"],
+)
