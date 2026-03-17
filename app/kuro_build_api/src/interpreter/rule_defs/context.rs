@@ -2499,6 +2499,45 @@ fn cc_toolchain_info_stub_methods(builder: &mut MethodsBuilder) {
         // Return false - use PIC everywhere
         Ok(false)
     }
+
+    /// Returns the solib directory for dynamic runtime libraries.
+    ///
+    /// Used by rules_cc's finalize_link_action.bzl for finding runtime shared libraries.
+    #[starlark(attribute)]
+    fn dynamic_runtime_solib_dir(this: &CcToolchainInfoStub) -> starlark::Result<String> {
+        let _ = this;
+        if cfg!(target_arch = "aarch64") {
+            Ok("_solib_aarch64".to_owned())
+        } else {
+            Ok("_solib_k8".to_owned())
+        }
+    }
+
+    /// Returns the module map generation tool, or None.
+    ///
+    /// Used by rules_cc's compile.bzl for C++ module map generation.
+    #[starlark(attribute)]
+    fn generate_modmap<'v>(
+        this: &CcToolchainInfoStub,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = (this, heap);
+        Ok(Value::new_none())
+    }
+
+    /// Sysroot path for cross-compilation, or None for native builds.
+    #[starlark(attribute)]
+    fn sysroot(this: &CcToolchainInfoStub) -> starlark::Result<NoneType> {
+        let _ = this;
+        Ok(NoneType)
+    }
+
+    /// Returns the libc_top label, or None.
+    #[starlark(attribute)]
+    fn libc_top(this: &CcToolchainInfoStub) -> starlark::Result<NoneType> {
+        let _ = this;
+        Ok(NoneType)
+    }
 }
 
 /// A stub for CcInfo with compilation_context and linking_context.
