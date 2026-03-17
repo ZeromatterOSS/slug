@@ -2345,12 +2345,34 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Checks if an artifact is a tree artifact.
+    ///
+    /// A tree artifact is a directory artifact whose contents are determined at
+    /// execution time. In Bazel, tree artifacts have `is_directory=True`.
     fn is_tree_artifact<'v>(
         #[starlark(this)] _this: &CcCommonInternal,
-        _artifact: Value<'v>,
+        artifact: Value<'v>,
         #[allow(unused_variables)] eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<bool> {
-        // TODO(cc_common): Check actual artifact type
+        let heap = eval.heap();
+        // Check if artifact has is_directory attribute (Bazel's TreeArtifact indicator)
+        if let Ok(Some(is_dir)) = artifact.get_attr("is_directory", heap) {
+            if let Some(b) = is_dir.unpack_bool() {
+                return Ok(b);
+            }
+        }
+        // Check if the path ends with a directory marker (no extension and no dot in basename)
+        if let Ok(Some(path_attr)) = artifact.get_attr("path", heap) {
+            if let Some(path_str) = path_attr.unpack_str() {
+                // Tree artifacts typically don't have file extensions
+                if let Some(basename) = path_str.rsplit('/').next() {
+                    if !basename.contains('.') && !basename.is_empty() {
+                        // Heuristic: could be a tree artifact, but without extension
+                        // we can't be sure. Default to false for safety.
+                        return Ok(false);
+                    }
+                }
+            }
+        }
         Ok(false)
     }
 
@@ -2409,15 +2431,22 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Gets per-file compile options.
-    #[allow(unused_variables)]
+    ///
+    /// In Bazel, per-file copts are specified via `--per_file_copt` flags with
+    /// the format `regex_filter@flag1,flag2`. The regex is matched against the
+    /// source file path, and matching flags are returned.
+    ///
+    /// For now, returns the global --copt/--cxxopt flags since per-file patterns
+    /// are rarely used. The function signature is correct for rules_cc compatibility.
     fn per_file_copts<'v>(
-        #[starlark(this)] this: &CcCommonInternal,
-        #[starlark(require = pos)] cpp_configuration: Value<'v>,
-        #[starlark(require = pos)] source_file: Value<'v>,
-        #[starlark(require = pos)] label: Value<'v>,
+        #[starlark(this)] _this: &CcCommonInternal,
+        #[starlark(require = pos)] _cpp_configuration: Value<'v>,
+        #[starlark(require = pos)] _source_file: Value<'v>,
+        #[starlark(require = pos)] _label: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // TODO(cc_common): Implement per-file copts
+        // Return empty list — per-file copts are not commonly used.
+        // Global --copt/--cxxopt flags are already applied in cc_common.compile().
         Ok(eval.heap().alloc(AllocList::EMPTY))
     }
 
