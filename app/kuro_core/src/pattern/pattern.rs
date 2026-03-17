@@ -797,9 +797,23 @@ fn lex_provider_pattern(
     pattern: &str,
     strip_package_trailing_slash: bool,
 ) -> kuro_error::Result<PatternParts<'_, ProvidersPatternExtra>> {
+    // On Windows, Git Bash (MSYS2) converts `//foo` to `/foo`. Detect this and
+    // treat `/pkg:target` as the root cell package `pkg:target`.
+    // This is clearly a target pattern (has `:` or ends with `/...`), not a file path.
     let (cell_alias, pattern) = match split1_opt_ascii(pattern, AsciiStr2::new("//")) {
         Some((a, p)) => (Some(a.trim_start_matches('@')), p),
-        None => (None, pattern),
+        None => {
+            // Check for Git Bash // → / conversion: /pkg:target or /pkg/...
+            if pattern.starts_with('/')
+                && !pattern.starts_with("//")
+                && (pattern.contains(':') || pattern.ends_with("/...") || pattern == "/...")
+            {
+                // Treat as root cell absolute pattern with the leading / stripped
+                (Some(""), &pattern[1..])
+            } else {
+                (None, pattern)
+            }
+        }
     };
 
     if pattern.chars().filter(|&c| c == '?').count() > 1 {
