@@ -363,7 +363,10 @@ impl ExitResultVariant {
                         // No logging for those.
                     }
                     _ => {
-                        let _ignored = writeln!(io::stderr().lock(), "Command failed: {e:?}");
+                        // Use {:#} (alternate Display) to show the error chain without
+                        // the full backtrace. This provides a clean user-facing error
+                        // message. Set RUST_BACKTRACE=1 for full debug output.
+                        let _ignored = writeln!(io::stderr().lock(), "Command failed: {e:#}");
                     }
                 }
 
