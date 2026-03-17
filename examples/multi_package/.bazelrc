@@ -1,2 +1,1 @@
-build --compilation_mode=fastbuild
 build --define=EXAMPLE=true
