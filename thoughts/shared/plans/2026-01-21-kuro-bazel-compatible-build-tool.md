@@ -500,7 +500,7 @@ Example aliases created: `com_google_protobuf -> protobuf`, `com_google_absl -> 
 
 ## Test Suite TODO (as of 2026-03-03)
 
-Current status: **~1070 pass, ~260 skip, 0 fail** across all `tests/core/` (updated 2026-03-12). Comprehensive sweep of all test directories confirms 0 failures. Key suites: analysis/: 289 pass, 3 skip; build/: 177 pass, 95 skip; configurations/: 52 pass; query/: 71+ pass, 8 skip; run/: 13 pass, 8 skip; test/: 27 pass; bxl/: 81 pass; bzlmod/: 13 pass; cc_common/: 17 pass; interpreter/: 35 pass, 4 skip; clean/: 9 pass; help/: 135 pass, 17 skip; docs/: 4 pass; audit/: varies by category.
+Current status: **~789 pass, ~128 skip, 0 fail** across verified `tests/core/` suites (updated 2026-03-16). Key suites: analysis/: 298 pass, 3 skip; build/: 177 pass, 95 skip; configurations/: 52 pass; query+run+test+config: 166 pass, 16 skip; bxl+bzlmod+interpreter+clean: 130 pass, 14 skip; cc_common/: 18 pass; help/docs/: 7 pass.
 
 ### Test Runner & CLI Improvements (2026-03-12)
 - **Bazel Test Encyclopedia env vars**: TEST_TMPDIR, TEST_SRCDIR, RUNFILES_DIR, XML_OUTPUT_FILE, TEST_BINARY, TEST_SIZE, TEST_SHARD_INDEX, TEST_TOTAL_SHARDS, RUNFILES_MANIFEST_FILE
@@ -522,6 +522,15 @@ Current status: **~1070 pass, ~260 skip, 0 fail** across all `tests/core/` (upda
 - **http_file/http_jar**: New repository rules for downloading individual files and JARs with integrity verification
 - **Bazel-style transition inputs/outputs**: Transitions now store inputs/outputs lists; Bazel-style transitions use (settings, attr) calling convention with settings dict built from inputs and return value applied to BuildConfig
 - **set_starlark_flag()**: Singular function for setting individual build flags (used by transitions)
+
+### C++ Build Improvements (2026-03-16)
+- **cc_common.link() link_deps_statically**: Now respects the parameter — prefers static or dynamic libraries from deps accordingly; RPATH flags added for dynamic linking on Linux/macOS
+- **cc_test end-to-end**: Fixed three issues: test_runner_toolchain_type returns None (legacy path), CcTestInfoStub added for future use, RunEnvironmentInfo/ExecutionInfo accepted in provider collections
+- **Workspace root include path**: Added `-I.` / `/I.` to compile commands so `#include "pkg/header.h"` works for cross-package headers (standard Bazel behavior)
+- **Windows Git Bash `//` fix**: `/pkg:target` patterns (where Git Bash strips one `/`) now auto-detected and treated as `//pkg:target`
+- **DLL linking on Windows**: Fixed action name mismatch — rules_cc uses underscore-separated names (cpp_link_dynamic_library) while kuro expected hyphen-separated (c++-link-dynamic-library); normalize_action_name() helper added
+- **select() with @platforms//os**: Verified working for platform-specific source selection
+- **Multi-package C++ example**: New `examples/multi_package/` with cc_library, cc_binary, cc_test, select(), genrule, exports_files, cross-package deps
 
 ### CI Infrastructure (2026-03-05)
 
