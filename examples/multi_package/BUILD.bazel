@@ -1,11 +1,5 @@
 # Root BUILD file
 
-filegroup(
-    name = "version_file",
-    srcs = ["lib/version.txt"],
-    visibility = ["//visibility:public"],
-)
-
 genrule(
     name = "gen_version_header",
     srcs = ["//lib:version.txt"],
