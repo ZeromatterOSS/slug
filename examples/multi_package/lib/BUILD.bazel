@@ -1,4 +1,5 @@
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load(":platform_config.bzl", "platform_specific_copts")
 
 exports_files(
     ["version.txt"],
@@ -9,6 +10,7 @@ cc_library(
     name = "math",
     srcs = ["math.cpp"],
     hdrs = ["math.h"],
+    copts = platform_specific_copts(),
     visibility = ["//visibility:public"],
 )
 
