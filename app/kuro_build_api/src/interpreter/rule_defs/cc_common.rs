@@ -1387,8 +1387,16 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             args_vec.push(heap.alloc_str("-fPIC").to_value());
         }
 
-        // Add include directories from compilation context (deduplicated)
+        // Add workspace root as include path (Bazel always includes the workspace root
+        // so that `#include "pkg/header.h"` works for any package in the workspace).
         let mut seen_include_dirs = std::collections::HashSet::new();
+        {
+            let flag = if msvc { "/I." } else { "-I." };
+            args_vec.push(heap.alloc_str(flag).to_value());
+            seen_include_dirs.insert(".".to_string());
+        }
+
+        // Add include directories from compilation context (deduplicated)
         if !cc_compilation_context.is_none() {
             for attr_name in &["includes", "system_includes", "quote_includes"] {
                 if let Ok(Some(includes_val)) = cc_compilation_context.get_attr(attr_name, heap) {

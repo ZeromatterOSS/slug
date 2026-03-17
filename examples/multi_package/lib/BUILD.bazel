@@ -1,0 +1,9 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "math",
+    srcs = ["math.cpp"],
+    hdrs = ["math.h"],
+    linkstatic = True,
+    visibility = ["//visibility:public"],
+)
