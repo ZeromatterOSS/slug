@@ -531,6 +531,13 @@ Current status: **~789 pass, ~128 skip, 0 fail** across verified `tests/core/` s
 - **DLL linking on Windows**: Fixed action name mismatch — rules_cc uses underscore-separated names (cpp_link_dynamic_library) while kuro expected hyphen-separated (c++-link-dynamic-library); normalize_action_name() helper added
 - **select() with @platforms//os**: Verified working for platform-specific source selection
 - **Multi-package C++ example**: New `examples/multi_package/` with cc_library, cc_binary, cc_test, select(), genrule, exports_files, cross-package deps
+- **actions.declare_shareable_artifact/directory()**: Added for rules_cc compatibility (virtual includes, linkstamp objects, LTO artifacts)
+- **CcToolchainInfoStub methods**: Added dynamic_runtime_solib_dir, generate_modmap, sysroot, libc_top
+- **CppFragment methods**: Added disable_nocopts, experimental_cpp_modules, experimental_link_static_libraries_once, share_native_deps, objc_should_generate_dotd_files, objccopts
+- **is_tree_artifact()**: Now checks is_directory attribute instead of always returning false
+- **Clean error messages**: Suppressed Rust stack traces in user-facing errors
+- **Bazel info keys**: Added starlark-semantics, command_log, character-encoding, used-heap-size-after-gc, package_path
+- **Improved kuro init**: Better BUILD template, Bazel docs links, bazel-external/bin/testlogs in .gitignore
 
 ### CI Infrastructure (2026-03-05)
 
