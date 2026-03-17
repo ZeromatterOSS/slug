@@ -153,26 +153,26 @@ fn initialize_root_build(repo_root: &AbsPath, prelude: bool) -> kuro_error::Resu
     let mut build = std::fs::File::create(repo_root.join("BUILD.bazel"))?;
 
     if prelude {
-        writeln!(
-            build,
-            "# A list of available rules and their signatures can be found here: https://kuro.build/docs/prelude/globals/"
-        )?;
+        writeln!(build, "# Kuro build file - compatible with Bazel syntax")?;
+        writeln!(build, "# See: https://bazel.build/concepts/build-files")?;
         writeln!(build)?;
         writeln!(build, "genrule(")?;
         writeln!(build, "    name = \"hello_world\",")?;
         writeln!(build, "    outs = [\"out.txt\"],")?;
-        writeln!(build, "    cmd = \"echo BUILT BY KURO> $@\",")?;
+        writeln!(
+            build,
+            "    cmd = \"echo 'Built by Kuro!' > $@\","
+        )?;
         writeln!(build, ")")?;
     }
-    // TODO: Add a doc pointers for rules
     Ok(())
 }
 
 fn set_up_gitignore(repo_root: &AbsPath) -> kuro_error::Result<()> {
     let gitignore = repo_root.join(".gitignore");
-    // If .gitignore is empty or doesn't exist, add in buck-out
+    // If .gitignore is empty or doesn't exist, add build output dirs
     if !gitignore.exists() || fs_util::metadata(&gitignore)?.len() == 0 {
-        fs_util::write(gitignore, "/buck-out\n")?;
+        fs_util::write(gitignore, "/buck-out\n/bazel-external\n/bazel-bin\n/bazel-testlogs\n")?;
     }
     Ok(())
 }
