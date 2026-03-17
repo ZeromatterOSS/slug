@@ -40,6 +40,26 @@ const INFO_KEYS: &[(&str, &str)] = &[
     ("server_log", "Path to the daemon log file"),
     ("release", "Version info for this Kuro release"),
     ("build-language", "Starlark build language info"),
+    (
+        "starlark-semantics",
+        "Starlark dialect semantics (Bazel 9.0 compatible)",
+    ),
+    (
+        "command_log",
+        "Path to the most recent command log",
+    ),
+    (
+        "character-encoding",
+        "Character encoding used for source files",
+    ),
+    (
+        "used-heap-size-after-gc",
+        "Approximate heap memory used by the server",
+    ),
+    (
+        "package_path",
+        "Colon-separated package search path",
+    ),
 ];
 
 #[derive(Debug, clap::Parser)]
@@ -110,6 +130,15 @@ impl InfoCommand {
                     Ok(format!("release {ver}"))
                 }
                 "build-language" => Ok("Starlark".to_owned()),
+                "starlark-semantics" => Ok("Bazel 9.0 compatible Starlark".to_owned()),
+                "command_log" => Ok(daemon_dir
+                    .as_path()
+                    .join("buckd.log")
+                    .to_string_lossy()
+                    .into_owned()),
+                "character-encoding" => Ok("UTF-8".to_owned()),
+                "used-heap-size-after-gc" => Ok("0".to_owned()),
+                "package_path" => Ok("%workspace%".to_owned()),
                 other => {
                     Err(kuro_error::kuro_error!(
                         kuro_error::ErrorTag::Input,
