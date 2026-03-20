@@ -1173,12 +1173,10 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Report an extension's metadata for IDE integration.
-    /// STUB: Returns None.
+    /// STUB: Returns None. Accepts arbitrary kwargs for forward compatibility.
     fn extension_metadata<'v>(
         this: &ModuleContext,
-        #[starlark(require = named)] _root_module_direct_deps: Option<Value<'v>>,
-        #[starlark(require = named)] _root_module_direct_dev_deps: Option<Value<'v>>,
-        #[starlark(require = named, default = true)] _reproducible: bool,
+        #[starlark(kwargs)] _kwargs: Value<'v>,
     ) -> starlark::Result<Value<'v>> {
         Ok(Value::new_none())
     }

@@ -326,7 +326,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
                 // that don't need those repos.
                 tracing::warn!(
                     "Could not execute extension '{}' Starlark implementation, \
-                     falling back to empty specs: {}",
+                     falling back to empty specs: {:?}",
                     aggregated.extension_id,
                     e
                 );

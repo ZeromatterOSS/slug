@@ -506,7 +506,10 @@ impl Key for ModuleExtensionExecutionKey {
             result.repo_count()
         );
 
-        // 8. Update lockfile cache (if project_root is set)
+        // 8. Update lockfile cache (if project_root is set and we have real specs)
+        // Don't cache empty results — they likely indicate a failed extension execution
+        // (graceful fallback), and caching them would poison future builds.
+        if !output.generated_repo_specs.is_empty() {
         if let Some(project_root) = &self.project_root {
             let lock_path = lockfile_path(project_root);
             match update_lockfile_extension_cache(
@@ -530,6 +533,7 @@ impl Key for ModuleExtensionExecutionKey {
                     );
                 }
             }
+        }
         }
 
         Ok(Arc::new(result))

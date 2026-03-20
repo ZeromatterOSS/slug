@@ -498,7 +498,7 @@ pub fn register_repository_rule_function(builder: &mut GlobalsBuilder) {
     /// my_repo(name = "my_external_repo", url = "https://example.com/file.txt")
     /// ```
     fn repository_rule<'v>(
-        #[starlark(require = named)] implementation: Value<'v>,
+        implementation: Value<'v>,
         #[starlark(require = named, default = UnpackDictEntries::default())]
         attrs: UnpackDictEntries<&'v str, &'v StarlarkAttribute>,
         #[starlark(require = named, default = false)] local: bool,
