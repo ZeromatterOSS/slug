@@ -202,11 +202,18 @@ starlark_complex_values!(Transition);
 
 impl TransitionValue for Transition<'_> {
     fn transition_id(&self) -> kuro_error::Result<Arc<TransitionId>> {
-        self.id
-            .borrow()
-            .as_ref()
-            .map(Dupe::dupe)
-            .ok_or_else(|| TransitionError::TransitionNotAssigned.into())
+        let id = self.id.borrow();
+        if let Some(id) = id.as_ref() {
+            Ok(id.dupe())
+        } else {
+            // In Bazel, transitions don't need to be assigned to top-level variables.
+            // They can be created inline (e.g., inside a function or rule() call).
+            // Generate a synthetic ID based on the module path.
+            Ok(Arc::new(TransitionId::MagicObject {
+                path: self.path.clone(),
+                name: "_anonymous_transition".to_owned(),
+            }))
+        }
     }
 }
 

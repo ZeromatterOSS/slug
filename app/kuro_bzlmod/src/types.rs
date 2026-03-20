@@ -332,6 +332,14 @@ pub struct ExtensionUsage {
 
     /// Repositories imported via `use_repo()` for this extension.
     pub imports: Vec<UseRepo>,
+
+    /// Repository overrides from `override_repo()`.
+    /// Each entry is (repo_name_in_extension, dep_name_from_bazel_dep).
+    pub repo_overrides: Vec<(String, String)>,
+
+    /// Injected repos from `inject_repo()`.
+    /// Names of bazel_dep repos to make visible to this extension.
+    pub injected_repos: Vec<String>,
 }
 
 impl ExtensionUsage {
@@ -344,6 +352,8 @@ impl ExtensionUsage {
             isolate: false,
             tags: Vec::new(),
             imports: Vec::new(),
+            repo_overrides: Vec::new(),
+            injected_repos: Vec::new(),
         }
     }
 

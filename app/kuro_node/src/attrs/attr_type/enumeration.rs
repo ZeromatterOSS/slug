@@ -34,9 +34,9 @@ impl EnumAttrType {
     pub fn new(variants: Vec<String>) -> kuro_error::Result<Self> {
         let mut result = OrderedSet::with_capacity(variants.len());
         for x in variants {
-            if x != x.to_lowercase() {
-                return Err(EnumAttrError::NotLowercase(x).into());
-            }
+            // Bazel allows any-case string values in attr.string(values=[...]),
+            // so we don't enforce lowercase. This differs from Buck2's
+            // attrs.enum() which required lowercase.
             let x = ArcStr::from(x);
             if result.contains(&x) {
                 return Err(EnumAttrError::DuplicateVariant(x.as_str().to_owned()).into());

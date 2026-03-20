@@ -29,10 +29,13 @@ impl AttrTypeCoerce for EnumAttrType {
         value: Value,
     ) -> kuro_error::Result<CoercedAttr> {
         let s = value.unpack_str_err()?;
-        // Enum names in Buck can be specified upper or lower case,
-        // so we normalise them to lowercase to make rule implementations easier
-        let s = s.to_lowercase();
-        if let Some(s) = self.variants.get(s.as_str()) {
+        // Try exact match first (Bazel allows any-case enum values)
+        if let Some(s) = self.variants.get(s) {
+            return Ok(CoercedAttr::EnumVariant(StringLiteral(s.dupe())));
+        }
+        // Fall back to case-insensitive match for Buck2 compatibility
+        let s_lower = s.to_lowercase();
+        if let Some(s) = self.variants.get(s_lower.as_str()) {
             Ok(CoercedAttr::EnumVariant(StringLiteral(s.dupe())))
         } else {
             let wanted = self
@@ -40,7 +43,7 @@ impl AttrTypeCoerce for EnumAttrType {
                 .iter()
                 .map(|x| x.as_str().to_owned())
                 .collect();
-            Err(CoercionError::InvalidEnumVariant(s, wanted).into())
+            Err(CoercionError::InvalidEnumVariant(s.to_owned(), wanted).into())
         }
     }
 

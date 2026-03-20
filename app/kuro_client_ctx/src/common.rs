@@ -579,6 +579,99 @@ pub struct CommonBuildConfigurationOptions {
     /// Tool Java language version (Bazel compatibility, accepted but ignored).
     #[clap(long = "tool-java-language-version", alias = "tool_java_language_version", hide = true, value_name = "VERSION")]
     pub tool_java_language_version: Option<String>,
+
+    /// Enable platform-specific config (Bazel compatibility).
+    /// Auto-activates build:<os> config in .bazelrc based on host OS.
+    #[clap(long = "enable-platform-specific-config", alias = "enable_platform_specific_config", hide = true)]
+    pub enable_platform_specific_config: bool,
+
+    /// Show progress rate limit (Bazel compatibility, accepted but ignored).
+    #[clap(long = "show-progress-rate-limit", alias = "show_progress_rate_limit", hide = true, value_name = "SECONDS")]
+    pub show_progress_rate_limit: Option<f64>,
+
+    /// Convenience symlinks mode (Bazel compatibility, accepted but ignored).
+    #[clap(long = "experimental-convenience-symlinks", alias = "experimental_convenience_symlinks", hide = true, value_name = "MODE")]
+    pub convenience_symlinks: Option<String>,
+
+    /// Heap dump on OOM (Bazel JVM compatibility, accepted but ignored).
+    #[clap(long = "heap-dump-on-oom", alias = "heap_dump_on_oom", hide = true)]
+    pub heap_dump_on_oom: bool,
+
+    /// Curses output mode (Bazel compatibility, accepted but ignored).
+    #[clap(long = "curses", hide = true, value_name = "MODE")]
+    pub curses: Option<String>,
+
+    /// Flaky test retry attempts (Bazel compatibility, accepted but ignored).
+    #[clap(long = "flaky-test-attempts", alias = "flaky_test_attempts", hide = true, value_name = "N")]
+    pub flaky_test_attempts: Option<String>,
+
+    /// gRPC keepalive time (Bazel compatibility, accepted but ignored).
+    #[clap(long = "grpc-keepalive-time", alias = "grpc_keepalive_time", hide = true, value_name = "DURATION")]
+    pub grpc_keepalive_time: Option<String>,
+
+    /// Lockfile mode (Bazel compatibility, accepted but ignored).
+    #[clap(long = "lockfile-mode", alias = "lockfile_mode", hide = true, value_name = "MODE")]
+    pub lockfile_mode: Option<String>,
+
+    /// Module mirrors for BCR (Bazel compatibility, accepted but ignored).
+    #[clap(long = "module-mirrors", alias = "module_mirrors", hide = true, value_name = "URL")]
+    pub module_mirrors: Option<String>,
+
+    /// Remote download outputs mode (Bazel compatibility, accepted but ignored).
+    #[clap(long = "remote-download-outputs", alias = "remote_download_outputs", hide = true, value_name = "MODE")]
+    pub remote_download_outputs: Option<String>,
+
+    /// Remote local fallback (Bazel compatibility, accepted but ignored).
+    #[clap(long = "remote-local-fallback", alias = "remote_local_fallback", hide = true)]
+    pub remote_local_fallback: bool,
+
+    /// Reuse sandbox directories (Bazel compatibility, accepted but ignored).
+    #[clap(long = "reuse-sandbox-directories", alias = "reuse_sandbox_directories", hide = true)]
+    pub reuse_sandbox_directories: bool,
+
+    /// Sandbox default allow network (Bazel compatibility, accepted but ignored).
+    #[clap(long = "sandbox-default-allow-network", alias = "sandbox_default_allow_network", hide = true)]
+    pub sandbox_default_allow_network: bool,
+
+    /// No sandbox default allow network (Bazel compatibility, accepted but ignored).
+    #[clap(long = "nosandbox-default-allow-network", alias = "nosandbox_default_allow_network", hide = true)]
+    pub nosandbox_default_allow_network: bool,
+
+    /// Show result count (Bazel compatibility, accepted but ignored).
+    #[clap(long = "show-result", alias = "show_result", hide = true, value_name = "N")]
+    pub show_result: Option<i32>,
+
+    /// Show timestamps (Bazel compatibility, accepted but ignored).
+    #[clap(long = "show-timestamps", alias = "show_timestamps", hide = true)]
+    pub show_timestamps: bool,
+
+    /// Terminal columns (Bazel compatibility, accepted but ignored).
+    #[clap(long = "terminal-columns", alias = "terminal_columns", hide = true, value_name = "N")]
+    pub terminal_columns: Option<i32>,
+
+    /// Test strategy (Bazel compatibility, accepted but ignored).
+    #[clap(long = "test-strategy", alias = "test_strategy", hide = true, value_name = "STRATEGY")]
+    pub test_strategy: Option<String>,
+
+    /// Test summary mode (Bazel compatibility, accepted but ignored).
+    #[clap(long = "test-summary", alias = "test_summary", hide = true, value_name = "MODE")]
+    pub test_summary: Option<String>,
+
+    /// Test timeout (Bazel compatibility, accepted but ignored).
+    #[clap(long = "test-timeout", alias = "test_timeout", hide = true, value_name = "SECONDS")]
+    pub test_timeout: Option<String>,
+
+    /// Cache test results (Bazel compatibility, accepted but ignored).
+    #[clap(long = "cache-test-results", alias = "cache_test_results", hide = true)]
+    pub cache_test_results: bool,
+
+    /// No cache test results (Bazel compatibility, accepted but ignored).
+    #[clap(long = "nocache-test-results", alias = "nocache_test_results", hide = true)]
+    pub nocache_test_results: bool,
+
+    /// Workspace status command (Bazel compatibility, accepted but ignored).
+    #[clap(long = "workspace-status-command", alias = "workspace_status_command", hide = true, value_name = "CMD")]
+    pub workspace_status_command: Option<String>,
 }
 
 impl CommonBuildConfigurationOptions {
@@ -763,6 +856,29 @@ impl CommonBuildConfigurationOptions {
             java_language_version: None,
             tool_java_runtime_version: None,
             tool_java_language_version: None,
+            enable_platform_specific_config: false,
+            show_progress_rate_limit: None,
+            convenience_symlinks: None,
+            heap_dump_on_oom: false,
+            curses: None,
+            flaky_test_attempts: None,
+            grpc_keepalive_time: None,
+            lockfile_mode: None,
+            module_mirrors: None,
+            remote_download_outputs: None,
+            remote_local_fallback: false,
+            reuse_sandbox_directories: false,
+            sandbox_default_allow_network: false,
+            nosandbox_default_allow_network: false,
+            show_result: None,
+            show_timestamps: false,
+            terminal_columns: None,
+            test_strategy: None,
+            test_summary: None,
+            test_timeout: None,
+            cache_test_results: false,
+            nocache_test_results: false,
+            workspace_status_command: None,
         };
         &DEFAULT
     }
@@ -841,6 +957,29 @@ impl CommonBuildConfigurationOptions {
             java_language_version: None,
             tool_java_runtime_version: None,
             tool_java_language_version: None,
+            enable_platform_specific_config: false,
+            show_progress_rate_limit: None,
+            convenience_symlinks: None,
+            heap_dump_on_oom: false,
+            curses: None,
+            flaky_test_attempts: None,
+            grpc_keepalive_time: None,
+            lockfile_mode: None,
+            module_mirrors: None,
+            remote_download_outputs: None,
+            remote_local_fallback: false,
+            reuse_sandbox_directories: false,
+            sandbox_default_allow_network: false,
+            nosandbox_default_allow_network: false,
+            show_result: None,
+            show_timestamps: false,
+            terminal_columns: None,
+            test_strategy: None,
+            test_summary: None,
+            test_timeout: None,
+            cache_test_results: false,
+            nocache_test_results: false,
+            workspace_status_command: None,
         };
         &OPTS
     }

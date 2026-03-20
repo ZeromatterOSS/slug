@@ -277,6 +277,12 @@ The detailed implementation is split into focused sub-plans:
 | [07-rules-integration.md](./kuro-bazel-subplans/07-rules-integration.md)           | 10-14  | rules_cc, rules_rust, rules_python, protobuf, rules_oci       | **Complete**    |
 | [08-infrastructure.md](./kuro-bazel-subplans/08-infrastructure.md)                 | 16-18  | Sandboxing, platform support, query                           | **Functional**  |
 
+### Real-World Compatibility Testing
+
+| Sub-Plan                                                                                             | Description                                                      | Status          |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------- |
+| [2026-03-19-real-world-bazel9-compatibility.md](./2026-03-19-real-world-bazel9-compatibility.md)      | Real-world Bazel 9 project compatibility testing | **In Progress** |
+
 ### Related Research Documents
 
 - [bzlmod Resolution Algorithm](../research/2026-01-21-bzlmod-resolution-algorithm.md) - In-depth MVS algorithm documentation

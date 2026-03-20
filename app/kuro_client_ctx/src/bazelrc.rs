@@ -204,11 +204,50 @@ struct BazelRcData {
     entries: Vec<(String, Option<String>, Vec<String>)>,
 }
 
+/// Flags that are processed during bazelrc loading and should not be passed to clap.
+/// These are either handled by the bazelrc system itself or conflict with
+/// Buck2/kuro's own flag definitions.
+const BAZELRC_ONLY_FLAGS: &[&str] = &[
+    "--enable-platform-specific-config",
+    "--enable_platform_specific_config",
+    "--config", // Bazel named config - conflicts with Buck2's `-c SECTION.KEY=VALUE`
+];
+
+/// Flags that are only valid on the `test` command and should be stripped
+/// when injecting `common` flags into other commands like `build`.
+const TEST_ONLY_FLAGS: &[&str] = &[
+    "--test-output",
+    "--test_output",
+    "--flaky-test-attempts",
+    "--flaky_test_attempts",
+    "--test-strategy",
+    "--test_strategy",
+    "--test-summary",
+    "--test_summary",
+    "--test-timeout",
+    "--test_timeout",
+    "--runs-per-test",
+    "--runs_per_test",
+    "--test-sharding-strategy",
+    "--test_sharding_strategy",
+];
+
+/// Check if a flag is a test-only flag (should not be applied to non-test commands).
+fn is_test_only_flag(flag: &str) -> bool {
+    let flag_name = flag.split('=').next().unwrap_or(flag);
+    TEST_ONLY_FLAGS
+        .iter()
+        .any(|f| flag_name == *f)
+}
+
 impl BazelRcData {
     /// Extract flags applicable to `command`. Returns flags from:
     /// - `common` lines (no config)
     /// - `<command>` lines (no config)
     /// - `<command>:<config>` lines for each `config` in `active_configs`
+    ///
+    /// When `common` flags are applied to a non-test command, test-specific
+    /// flags are filtered out to avoid "unknown argument" errors.
     fn flags_for(&self, command: &str, active_configs: &[String]) -> Vec<String> {
         let mut result = Vec::new();
         for (cmd, cfg, flags) in &self.entries {
@@ -216,10 +255,33 @@ impl BazelRcData {
             if !matches_command {
                 continue;
             }
+            let is_from_common = cmd == "common";
             match cfg {
-                None => result.extend_from_slice(flags),
+                None => {
+                    for flag in flags {
+                        let flag_name = flag.split('=').next().unwrap_or(flag);
+                        // Strip flags that are processed during bazelrc loading
+                        if BAZELRC_ONLY_FLAGS.contains(&flag_name) {
+                            continue;
+                        }
+                        // Strip test-only flags when injecting `common` into non-test commands
+                        if is_from_common && command != "test" && is_test_only_flag(flag) {
+                            continue;
+                        }
+                        result.push(flag.clone());
+                    }
+                }
                 Some(config_name) if active_configs.contains(config_name) => {
-                    result.extend_from_slice(flags)
+                    for flag in flags {
+                        let flag_name = flag.split('=').next().unwrap_or(flag);
+                        if BAZELRC_ONLY_FLAGS.contains(&flag_name) {
+                            continue;
+                        }
+                        if is_from_common && command != "test" && is_test_only_flag(flag) {
+                            continue;
+                        }
+                        result.push(flag.clone());
+                    }
                 }
                 _ => {}
             }
@@ -228,9 +290,24 @@ impl BazelRcData {
     }
 }
 
+/// Substitute `%workspace%` with the workspace root in a path string.
+fn substitute_workspace(s: &str, workspace_root: Option<&Path>) -> String {
+    if let Some(root) = workspace_root {
+        s.replace("%workspace%", &root.to_string_lossy())
+    } else {
+        s.to_owned()
+    }
+}
+
 /// Parse a `.bazelrc` file at `path`, merging results into `data`.
 /// If `required` is false (try-import), silently ignores missing files.
-fn parse_bazelrc_file(path: &Path, data: &mut BazelRcData, required: bool) {
+/// `workspace_root` is used to substitute `%workspace%` in paths and flag values.
+fn parse_bazelrc_file(
+    path: &Path,
+    data: &mut BazelRcData,
+    required: bool,
+    workspace_root: Option<&Path>,
+) {
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
         Err(_) => {
@@ -248,9 +325,19 @@ fn parse_bazelrc_file(path: &Path, data: &mut BazelRcData, required: bool) {
                 config,
                 flags,
             }) => {
+                // Substitute %workspace% in flag values
+                let flags = flags
+                    .into_iter()
+                    .map(|f| substitute_workspace(&f, workspace_root))
+                    .collect();
                 data.entries.push((command, config, flags));
             }
             Some(BazelRcLine::Import(import_path)) => {
+                let substituted = substitute_workspace(
+                    &import_path.to_string_lossy(),
+                    workspace_root,
+                );
+                let import_path = PathBuf::from(substituted);
                 let resolved = if import_path.is_absolute() {
                     import_path
                 } else {
@@ -258,9 +345,14 @@ fn parse_bazelrc_file(path: &Path, data: &mut BazelRcData, required: bool) {
                         .map(|p| p.join(&import_path))
                         .unwrap_or(import_path)
                 };
-                parse_bazelrc_file(&resolved, data, true);
+                parse_bazelrc_file(&resolved, data, true, workspace_root);
             }
             Some(BazelRcLine::TryImport(import_path)) => {
+                let substituted = substitute_workspace(
+                    &import_path.to_string_lossy(),
+                    workspace_root,
+                );
+                let import_path = PathBuf::from(substituted);
                 let resolved = if import_path.is_absolute() {
                     import_path
                 } else {
@@ -268,7 +360,7 @@ fn parse_bazelrc_file(path: &Path, data: &mut BazelRcData, required: bool) {
                         .map(|p| p.join(&import_path))
                         .unwrap_or(import_path)
                 };
-                parse_bazelrc_file(&resolved, data, false);
+                parse_bazelrc_file(&resolved, data, false, workspace_root);
             }
             None => {}
         }
@@ -354,7 +446,15 @@ pub fn normalize_args(args: Vec<String>) -> Vec<String> {
             // Extract and store, don't pass to clap
             starlark_flags.push(arg[2..].to_owned()); // strip leading --
         } else if !is_bazel_transitional_flag(&arg) {
-            result.push(normalize_flag(&arg));
+            // Handle Bazel --noflag_name boolean negation pattern
+            if let Some(replacement) = normalize_bazel_negation(&arg) {
+                if !replacement.is_empty() {
+                    result.push(replacement);
+                }
+                // else: drop the flag entirely (negation of a boolean = default)
+            } else {
+                result.push(normalize_flag(&arg));
+            }
         }
     }
     let _ = STARLARK_FLAGS.set(starlark_flags);
@@ -385,6 +485,54 @@ fn is_bazel_transitional_flag(arg: &str) -> bool {
         || base.starts_with("legacy-")
         || base.starts_with("experimental_")
         || base.starts_with("experimental-")
+}
+
+/// Convert Bazel `--noflag_name` boolean negation to a form clap can handle.
+///
+/// Bazel supports `--noflag_name` as negation of `--flag_name` for all boolean flags.
+/// Clap doesn't understand this pattern, so we either:
+/// - Strip it entirely (the flag was just "set to false" which is the default), or
+/// - Map it to a known negation alias.
+///
+/// Returns `Some(normalized)` if the flag was a `--no<name>` pattern, `None` otherwise.
+fn normalize_bazel_negation(arg: &str) -> Option<String> {
+    // Must start with --no (but not --no-something which is already a valid clap long flag)
+    let flag_part = arg.strip_prefix("--no")?;
+    // Skip if it starts with '-' (already a --no-flag form) or is empty
+    if flag_part.is_empty() || flag_part.starts_with('-') {
+        return None;
+    }
+    // Get just the flag name part (before =)
+    let flag_name = flag_part.split('=').next().unwrap_or(flag_part);
+    // Known boolean flags that Bazel uses --no<name> for.
+    // We silently drop these since the default behavior is already "off".
+    let known_negatable = [
+        "remote_upload_local_results",
+        "remote-upload-local-results",
+        "build_runfile_links",
+        "build-runfile-links",
+        "sandbox_default_allow_network",
+        "sandbox-default-allow-network",
+        "cache_test_results",
+        "cache-test-results",
+        "remote_accept_cached",
+        "remote-accept-cached",
+        "stamp",
+        "check_visibility",
+        "check-visibility",
+    ];
+    // Normalize underscores to hyphens for comparison
+    let normalized_name = flag_name.replace('_', "-");
+    let hyphen_names: Vec<String> = known_negatable
+        .iter()
+        .map(|n| n.replace('_', "-"))
+        .collect();
+    if hyphen_names.contains(&normalized_name) {
+        // Drop the flag - it's just "set this boolean to false" which is the default
+        Some(String::new())
+    } else {
+        None
+    }
 }
 
 /// Inject flags from `.bazelrc` files into the args list.
@@ -433,7 +581,7 @@ pub fn inject_bazelrc_args(mut args: Vec<String>, project_root: Option<&Path>) -
     if let Some(home) = dirs::home_dir() {
         let user_bazelrc = home.join(".bazelrc");
         if user_bazelrc.exists() {
-            parse_bazelrc_file(&user_bazelrc, &mut data, false);
+            parse_bazelrc_file(&user_bazelrc, &mut data, false, project_root);
         }
     }
 
@@ -441,12 +589,52 @@ pub fn inject_bazelrc_args(mut args: Vec<String>, project_root: Option<&Path>) -
     if let Some(root) = project_root {
         let workspace_bazelrc = root.join(".bazelrc");
         if workspace_bazelrc.exists() {
-            parse_bazelrc_file(&workspace_bazelrc, &mut data, false);
+            parse_bazelrc_file(&workspace_bazelrc, &mut data, false, project_root);
         }
     }
 
     // Collect active --config= names from the user's command-line args
-    let active_configs = find_active_configs(&args);
+    let mut active_configs = find_active_configs(&args);
+
+    // Also find --config= in the bazelrc data itself (unconditional entries)
+    // This handles `build --config=dev` in .bazelrc
+    for (cmd, cfg, flags) in &data.entries {
+        if cfg.is_none() && (cmd == "common" || cmd == &command_name) {
+            for flag in flags {
+                if let Some(config) = flag.strip_prefix("--config=") {
+                    if !active_configs.contains(&config.to_owned()) {
+                        active_configs.push(config.to_owned());
+                    }
+                }
+            }
+        }
+    }
+
+    // --enable_platform_specific_config: auto-activate build:<os> config
+    // Check if this flag is present anywhere in the args or bazelrc data
+    let has_platform_config = args.iter().any(|a| {
+        a == "--enable-platform-specific-config"
+            || a == "--enable_platform_specific_config"
+    }) || data.entries.iter().any(|(_, _, flags)| {
+        flags.iter().any(|f| {
+            f == "--enable-platform-specific-config"
+                || f == "--enable_platform_specific_config"
+        })
+    });
+    if has_platform_config {
+        let os_config = if cfg!(target_os = "linux") {
+            "linux"
+        } else if cfg!(target_os = "windows") {
+            "windows"
+        } else if cfg!(target_os = "macos") {
+            "macos"
+        } else {
+            ""
+        };
+        if !os_config.is_empty() && !active_configs.contains(&os_config.to_owned()) {
+            active_configs.push(os_config.to_owned());
+        }
+    }
 
     // Get flags applicable to this command
     let bazelrc_flags = data.flags_for(&command_name, &active_configs);

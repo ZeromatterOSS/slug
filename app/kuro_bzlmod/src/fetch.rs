@@ -19,12 +19,14 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
 
+use bzip2::read::BzDecoder;
 use flate2::read::GzDecoder;
 use kuro_error::BuckErrorContext;
 use kuro_http::HttpClient;
 use kuro_http::HttpClientBuilder;
 use kuro_http::to_bytes;
 use tar::Archive;
+use xz2::read::XzDecoder;
 use zip::ZipArchive;
 
 use crate::cache::ModuleCache;
@@ -273,13 +275,40 @@ impl SourceFetcher {
             return Ok(());
         }
 
+        // Try XZ-compressed tar
+        if let Ok(()) = self.extract_tar_xz(data, dest_dir, strip_prefix) {
+            return Ok(());
+        }
+
+        // Try bzip2-compressed tar
+        if let Ok(()) = self.extract_tar_bz2(data, dest_dir, strip_prefix) {
+            return Ok(());
+        }
+
         // Try zip
         if let Ok(()) = self.extract_zip(data, dest_dir, strip_prefix) {
             return Ok(());
         }
 
+        // Log some bytes for debugging
+        let preview = if data.len() > 100 {
+            String::from_utf8_lossy(&data[..100]).to_string()
+        } else {
+            String::from_utf8_lossy(data).to_string()
+        };
+        tracing::warn!(
+            "Archive extraction failed for {} bytes at {:?}. First bytes: {:?}",
+            data.len(),
+            dest_dir,
+            preview
+        );
+
         Err(FetchError::ExtractionFailed {
-            reason: "Unknown archive format".to_string(),
+            reason: format!(
+                "Unknown archive format ({} bytes, starts with {:02x?})",
+                data.len(),
+                &data[..data.len().min(8)]
+            ),
         }
         .into())
     }
@@ -292,6 +321,28 @@ impl SourceFetcher {
         strip_prefix: Option<&str>,
     ) -> kuro_error::Result<()> {
         extract_tar_gz_impl(data, dest_dir, strip_prefix)
+    }
+
+    /// Extract an XZ-compressed tar archive (.tar.xz).
+    fn extract_tar_xz(
+        &self,
+        data: &[u8],
+        dest_dir: &Path,
+        strip_prefix: Option<&str>,
+    ) -> kuro_error::Result<()> {
+        let decoder = XzDecoder::new(data);
+        extract_tar_from_reader(decoder, dest_dir, strip_prefix)
+    }
+
+    /// Extract a bzip2-compressed tar archive (.tar.bz2).
+    fn extract_tar_bz2(
+        &self,
+        data: &[u8],
+        dest_dir: &Path,
+        strip_prefix: Option<&str>,
+    ) -> kuro_error::Result<()> {
+        let decoder = BzDecoder::new(data);
+        extract_tar_from_reader(decoder, dest_dir, strip_prefix)
     }
 
     /// Extract a plain tar archive (not implemented, placeholder).
@@ -536,7 +587,16 @@ fn extract_tar_gz_impl(
     strip_prefix: Option<&str>,
 ) -> kuro_error::Result<()> {
     let decoder = GzDecoder::new(data);
-    let mut archive = Archive::new(decoder);
+    extract_tar_from_reader(decoder, dest_dir, strip_prefix)
+}
+
+/// Extract a tar archive from any reader (generic over decompression).
+fn extract_tar_from_reader<R: std::io::Read>(
+    reader: R,
+    dest_dir: &Path,
+    strip_prefix: Option<&str>,
+) -> kuro_error::Result<()> {
+    let mut archive = Archive::new(reader);
 
     for entry_result in archive
         .entries()

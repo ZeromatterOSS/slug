@@ -275,7 +275,9 @@ impl PartialOrd for Version {
 impl fmt::Display for Version {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_empty {
-            write!(f, "<empty>")
+            // Use "override" instead of "<empty>" to avoid invalid path
+            // characters on Windows (angle brackets are forbidden in paths)
+            write!(f, "override")
         } else {
             write!(f, "{}", self.original)
         }
