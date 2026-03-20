@@ -29,6 +29,13 @@ impl AttrTypeCoerce for EnumAttrType {
         value: Value,
     ) -> kuro_error::Result<CoercedAttr> {
         let s = value.unpack_str_err()?;
+        // Bazel allows empty string as a special "unset" value for enum attrs,
+        // even when "" is not in the values list.
+        if s.is_empty() {
+            return Ok(CoercedAttr::EnumVariant(StringLiteral(
+                kuro_util::arc_str::ArcStr::from(""),
+            )));
+        }
         // Try exact match first (Bazel allows any-case enum values)
         if let Some(s) = self.variants.get(s) {
             return Ok(CoercedAttr::EnumVariant(StringLiteral(s.dupe())));

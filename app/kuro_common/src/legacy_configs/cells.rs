@@ -23,7 +23,7 @@ use kuro_bzlmod::MvsResolver;
 use kuro_bzlmod::ResolvedGraph;
 use kuro_bzlmod::parse_module_bazel;
 use kuro_bzlmod::resolve_local_modules;
-use kuro_bzlmod::synthetic_repos::collect_synthetic_repos;
+use kuro_bzlmod::synthetic_repos::collect_synthetic_repos_with_root;
 use kuro_bzlmod::synthetic_repos::materialize_synthetic_repos;
 use kuro_bzlmod::types::ParsedModuleFile;
 use kuro_core::cells::CellAliasResolver;
@@ -1304,7 +1304,10 @@ impl BuckConfigBasedCells {
         }
 
         // Collect synthetic repos from all extension usages
-        let synthetic_repos = collect_synthetic_repos(&parsed_modules);
+        let synthetic_repos = collect_synthetic_repos_with_root(
+            &parsed_modules,
+            Some(project_root.root().as_path()),
+        );
         if synthetic_repos.is_empty() {
             return Ok(Vec::new());
         }

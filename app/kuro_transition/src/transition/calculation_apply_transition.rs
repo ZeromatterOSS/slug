@@ -52,6 +52,8 @@ use starlark_map::sorted_map::SortedMap;
 use crate::transition::calculation_fetch_transition::FetchTransition;
 use crate::transition::calculation_fetch_transition::TransitionData;
 
+
+
 #[derive(kuro_error::Error, Debug)]
 #[kuro(tag = Tier0)]
 enum ApplyTransitionError {
@@ -157,7 +159,7 @@ fn call_bazel_transition_function<'v>(
     }
     let settings_dict = eval.heap().alloc(starlark::values::dict::AllocDict(settings_entries.into_iter()));
 
-    // Build the attr struct (or None if no attrs declared)
+    // Build the attr struct.
     let attr_value = attrs.unwrap_or_else(|| eval.heap().alloc(AllocStruct(Vec::<(&str, Value)>::new())));
 
     // Call the transition implementation: impl(settings, attr)
@@ -290,6 +292,7 @@ async fn do_apply_transition(
     conf: &ConfigurationData,
     transition_id: &TransitionId,
     cancellation: &CancellationContext,
+    bazel_all_attrs: Option<&[(String, Arc<ConfiguredAttr>)]>,
 ) -> kuro_error::Result<TransitionApplied> {
     // For unbound/unspecified platforms, transitions are no-ops.
     // Bazel always has a bound platform, but in Kuro the platform may be
@@ -319,34 +322,51 @@ async fn do_apply_transition(
                 eval.set_print_handler(&print);
                 eval.set_soft_error_handler(&KuroStarlarkSoftErrorHandler);
                 let refs = module.heap().alloc(AllocStruct(refs));
-                let attrs = match (transition.attr_names(), attrs) {
-                    (Some(names), Some(values)) => {
-                        let mut attrs = Vec::new();
-                        for (name, value) in names.into_iter().zip_eq(values.iter()) {
-                            let value = match value {
-                                Some(value) => (CONFIGURED_ATTR_TO_VALUE.get()?)(
-                                    &value,
-                                    PackageLabelOption::TransitionAttr,
-                                    module.heap(),
-                                )
-                                .with_buck_error_context(|| {
-                                    format!(
-                                        "Error converting attribute `{}={}` to Starlark value",
-                                        name,
-                                        value.as_display_no_ctx(),
-                                    )
-                                })?,
-                                None => Value::new_none(),
-                            };
-                            attrs.push((name, value));
-                        }
-                        Some(module.heap().alloc(AllocStruct(attrs)))
+                let attrs = if let Some(bazel_attrs) = bazel_all_attrs {
+                    // Bazel-style: build attrs struct from all rule attributes
+                    let mut attr_pairs: Vec<(&str, Value)> = Vec::new();
+                    for (name, value) in bazel_attrs {
+                        let v = match (CONFIGURED_ATTR_TO_VALUE.get()?)(
+                            value,
+                            PackageLabelOption::TransitionAttr,
+                            module.heap(),
+                        ) {
+                            Ok(v) => v,
+                            Err(_) => Value::new_none(),
+                        };
+                        attr_pairs.push((name.as_str(), v));
                     }
-                    (None, None) => None,
-                    (Some(_), None) | (None, Some(_)) => {
-                        return Err(
-                            ApplyTransitionError::InconsistentTransitionAndComputation.into()
-                        );
+                    Some(module.heap().alloc(AllocStruct(attr_pairs)))
+                } else {
+                    match (transition.attr_names(), attrs) {
+                        (Some(names), Some(values)) => {
+                            let mut attrs = Vec::new();
+                            for (name, value) in names.into_iter().zip_eq(values.iter()) {
+                                let value = match value {
+                                    Some(value) => (CONFIGURED_ATTR_TO_VALUE.get()?)(
+                                        &value,
+                                        PackageLabelOption::TransitionAttr,
+                                        module.heap(),
+                                    )
+                                    .with_buck_error_context(|| {
+                                        format!(
+                                            "Error converting attribute `{}={}` to Starlark value",
+                                            name,
+                                            value.as_display_no_ctx(),
+                                        )
+                                    })?,
+                                    None => Value::new_none(),
+                                };
+                                attrs.push((name, value));
+                            }
+                            Some(module.heap().alloc(AllocStruct(attrs)))
+                        }
+                        (None, None) => None,
+                        (Some(_), None) | (None, Some(_)) => {
+                            return Err(
+                                ApplyTransitionError::InconsistentTransitionAndComputation.into()
+                            );
+                        }
                     }
                 };
                 match call_transition_function(&transition, conf, refs, attrs, eval)? {
@@ -431,6 +451,9 @@ impl TransitionCalculation for TransitionCalculationImpl {
             /// Attributes are added here so multiple targets with the equal attributes
             /// (e.g. the same `java_version = 14`) share the transition computation.
             attrs: Option<Vec<Option<Arc<ConfiguredAttr>>>>,
+            /// For Bazel-style transitions: all rule attributes as (name, value) pairs.
+            /// Bazel transitions can access any rule attribute via `attr.xxx`.
+            bazel_all_attrs: Option<Vec<(String, Arc<ConfiguredAttr>)>>,
         }
 
         impl TransitionKey {
@@ -471,6 +494,7 @@ impl TransitionCalculation for TransitionCalculationImpl {
                         &self.cfg,
                         &self.transition_id,
                         cancellation,
+                        self.bazel_all_attrs.as_deref(),
                     )
                     .await?
                 };
@@ -503,10 +527,25 @@ impl TransitionCalculation for TransitionCalculationImpl {
             None
         };
 
+        // For Bazel-style transitions, store all rule attrs as named pairs
+        // so the transition can access them via `attr.xxx`.
+        let bazel_all_attrs: Option<Vec<(String, Arc<ConfiguredAttr>)>> =
+            if transition.is_bazel_style() {
+                Some(
+                    configured_attrs
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.dupe()))
+                        .collect(),
+                )
+            } else {
+                None
+            };
+
         let key = TransitionKey {
             cfg: cfg.dupe(),
             transition_id: transition_id.clone(),
             attrs,
+            bazel_all_attrs,
         };
 
         ctx.compute(&key).await?.map_err(kuro_error::Error::from)

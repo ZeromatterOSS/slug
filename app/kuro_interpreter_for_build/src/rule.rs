@@ -30,6 +30,7 @@ use kuro_interpreter::types::rule::FROZEN_RULE_GET_OUTPUTS;
 use kuro_interpreter::types::transition::transition_id_from_value;
 use kuro_node::attrs::attr::Attribute;
 use kuro_node::attrs::attr_type::AttrType;
+use kuro_node::attrs::attr_type::any::AnyAttrType;
 use kuro_node::attrs::attr_type::list::ListLiteral;
 use kuro_node::attrs::attr_type::string::StringLiteral;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
@@ -278,6 +279,43 @@ impl<'v> StarlarkRuleCallable<'v> {
                 }
             })
             .collect::<kuro_error::Result<Vec<(String, Attribute)>>>()?;
+
+        // Bazel automatically adds `args` and `env` attributes to executable and test rules.
+        // Inject them if not already defined by the rule author.
+        let sorted_validated_attrs = if is_executable || is_test {
+            let mut attrs = sorted_validated_attrs;
+            let has_args = attrs.iter().any(|(n, _)| n == "args");
+            let has_env = attrs.iter().any(|(n, _)| n == "env");
+            if !has_args {
+                attrs.push((
+                    "args".to_owned(),
+                    Attribute::new(
+                        Some(Arc::new(AnyAttrType::empty_list())),
+                        "command line arguments for the executable/test",
+                        AttrType::list(AttrType::string()),
+                    ),
+                ));
+            }
+            if !has_env {
+                attrs.push((
+                    "env".to_owned(),
+                    Attribute::new(
+                        Some(Arc::new(CoercedAttr::Dict(
+                            kuro_node::attrs::attr_type::dict::DictLiteral(
+                                kuro_util::arc_str::ArcSlice::new([]),
+                            ),
+                        ))),
+                        "environment variables for the executable/test",
+                        AttrType::dict(AttrType::string(), AttrType::string(), false),
+                    ),
+                ));
+            }
+            // Re-sort after injection
+            attrs.sort_by(|(k1, _), (k2, _)| Ord::cmp(k1, k2));
+            attrs
+        } else {
+            sorted_validated_attrs
+        };
 
         let cfg = match (cfg, supports_incoming_transition) {
             (Some(_), Some(_)) => return Err(RuleError::CfgAndSupportsIncomingTransition.into()),

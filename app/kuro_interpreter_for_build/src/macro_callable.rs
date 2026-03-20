@@ -175,10 +175,26 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkMacroCallable {
         // In Bazel, the implementation function receives:
         //   def _impl(name, visibility, attr1, attr2, ..., **kwargs):
         //
-        // We pass through all arguments directly. The implementation function
-        // is expected to call native rules (e.g., native.cc_library()) to create
-        // the actual targets.
-        self.implementation.invoke(args, eval)
+        // Bazel's macro framework automatically injects `visibility` if not
+        // provided by the caller. We replicate this: check if visibility is
+        // among the named args, and if not, inject it as None (package default).
+        let names_map = args.names_map()?;
+        let has_visibility = names_map.keys().any(|k| k.as_str() == "visibility");
+
+        if has_visibility {
+            // All good, pass through directly
+            self.implementation.invoke(args, eval)
+        } else {
+            // Inject visibility=None and call via eval_function
+            let positional: Vec<Value<'v>> = args.positions(eval.heap())?.collect();
+            let mut named: Vec<(&str, Value<'v>)> = Vec::new();
+            for (k, v) in names_map.iter() {
+                named.push((k.as_str(), *v));
+            }
+            named.push(("visibility", Value::new_none()));
+            eval.eval_function(self.implementation.to_value(), &positional, &named)
+                .map_err(Into::into)
+        }
     }
 
     fn get_type_starlark_repr() -> Ty {

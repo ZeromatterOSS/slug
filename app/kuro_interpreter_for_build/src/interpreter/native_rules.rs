@@ -1759,7 +1759,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
     /// See: https://bazel.build/rules/lib/toplevel/label_flag
     fn label_flag<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named)] build_setting_default: &str,
+        #[starlark(require = named)] build_setting_default: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
@@ -1777,13 +1777,16 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let _ = (tags, testonly, deprecation, features);
         let internals = ModuleInternals::from_context(eval, "label_flag")?;
 
-        // Store build_setting_default as a plain string - NOT as a dep.
-        // In Bazel, label_flag is a build setting (configuration flag) whose value is resolved
-        // at configuration time. The build_setting_default is just the DEFAULT VALUE of the flag,
-        // not a regular dep edge. If we stored it as a dep, we'd create false cycles in the
-        // dependency graph (e.g., rules_rust's import macro bootstrapping cycle).
+        // Accept both string and Label types for build_setting_default.
+        // In Bazel, label_flag accepts Label("//pkg:target") or "//pkg:target" string.
+        let default_str = if let Some(s) = build_setting_default.unpack_str() {
+            s.to_owned()
+        } else {
+            // For Label or other types, use str() representation
+            format!("{}", build_setting_default)
+        };
         let coerced_default =
-            CoercedAttr::String(StringLiteral(ArcStr::from(build_setting_default)));
+            CoercedAttr::String(StringLiteral(ArcStr::from(default_str.as_str())));
 
         let target_node = create_native_target_node(
             rule_defs::LABEL_FLAG_RULE.clone(),

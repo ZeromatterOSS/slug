@@ -743,6 +743,7 @@ async fn resolve_transition_attrs<'a>(
             .make_toolchain(&ConfigurationNoExec::unbound_exec()),
     };
     let mut result = OrderedMap::default();
+    let mut any_bazel_style = false;
     for tr in transitions {
         let attrs = TRANSITION_ATTRS_PROVIDER
             .get()?
@@ -769,8 +770,30 @@ async fn resolve_transition_attrs<'a>(
                     }
                 }
             }
+        } else {
+            // No declared attrs - might be a Bazel-style transition that needs all attrs
+            any_bazel_style = true;
         }
     }
+
+    // For Bazel-style transitions (no declared attrs), include ALL target node attributes.
+    // Bazel transitions can access any rule attribute via `attr.xxx`.
+    if any_bazel_style && result.is_empty() {
+        for coerced_attr in target_node.attrs(AttrInspectOptions::All) {
+            if result.contains_key(coerced_attr.name) {
+                continue;
+            }
+            match coerced_attr.configure(&cfg_ctx) {
+                Ok(configured_attr) => {
+                    result.insert(configured_attr.name, Arc::new(configured_attr.value));
+                }
+                Err(_) => {
+                    // Skip attrs that can't be configured (e.g., labels that don't resolve)
+                }
+            }
+        }
+    }
+
     Ok(result)
 }
 

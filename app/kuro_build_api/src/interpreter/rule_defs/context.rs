@@ -32,6 +32,8 @@ use kuro_util::late_binding::LateBinding;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::SmallMap;
 use starlark::environment::GlobalsBuilder;
+use starlark::eval::Arguments;
+use starlark::eval::Evaluator;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
@@ -2555,13 +2557,27 @@ starlark::starlark_simple_value!(CcInfoStub);
 #[starlark::values::starlark_value(type = "CcInfo")]
 impl<'v> StarlarkValue<'v> for CcInfoStub {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "compilation_context" | "linking_context")
+        matches!(
+            attribute,
+            "compilation_context"
+                | "linking_context"
+                | "_debug_context"
+                | "_legacy_transitive_native_libraries"
+        )
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "compilation_context" => Some(heap.alloc(CompilationContextStub)),
             "linking_context" => Some(heap.alloc(LinkingContextStub)),
+            // rules_cc expects _debug_context (CcDebugContext) on CcInfo objects
+            "_debug_context" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::cc_common::CcDebugContext))
+            }
+            // rules_cc expects _legacy_transitive_native_libraries (depset) on CcInfo objects
+            "_legacy_transitive_native_libraries" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
             _ => None,
         }
     }
@@ -3936,13 +3952,14 @@ starlark::starlark_simple_value!(RustCompilationModeOptsStub);
 #[starlark::values::starlark_value(type = "rust_compilation_mode_opts")]
 impl<'v> StarlarkValue<'v> for RustCompilationModeOptsStub {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "debug_info" | "opt_level")
+        matches!(attribute, "debug_info" | "opt_level" | "strip_level")
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
             "debug_info" => Some(heap.alloc_str("2").to_value()),
             "opt_level" => Some(heap.alloc_str("0").to_value()),
+            "strip_level" => Some(heap.alloc_str("none").to_value()),
             _ => None,
         }
     }
@@ -3950,61 +3967,25 @@ impl<'v> StarlarkValue<'v> for RustCompilationModeOptsStub {
 
 #[starlark::values::starlark_value(type = "RustToolchainInfo")]
 impl<'v> StarlarkValue<'v> for RustToolchainInfoStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(
-            attribute,
-            "rustc"
-                | "rust_doc"
-                | "rustfmt"
-                | "cargo"
-                | "clippy_driver"
-                | "llvm_cov"
-                | "llvm_profdata"
-                | "rustc_lib"
-                | "rust_std"
-                | "rust_std_paths"
-                | "all_files"
-                | "binary_ext"
-                | "staticlib_ext"
-                | "dylib_ext"
-                | "default_edition"
-                | "exec_triple"
-                | "target_triple"
-                | "target_arch"
-                | "target_os"
-                | "target_flag_value"
-                | "target_json"
-                | "sysroot"
-                | "sysroot_short_path"
-                | "env"
-                | "extra_rustc_flags"
-                | "extra_exec_rustc_flags"
-                | "per_crate_rustc_flags"
-                | "compilation_mode_opts"
-                | "stdlib_linkflags"
-                | "libstd_and_allocator_ccinfo"
-                | "libstd_and_global_allocator_ccinfo"
-                | "nostd_and_global_allocator_cc_info"
-                | "_rename_first_party_crates"
-                | "_third_party_dir"
-                | "_pipelined_compilation"
-                | "_no_std"
-                | "_experimental_link_std_dylib"
-                | "_experimental_toolchain_generated_sysroot"
-                | "_experimental_use_cc_common_link"
-                | "_experimental_use_coverage_metadata_files"
-                | "_experimental_use_global_allocator"
-                | "_incompatible_no_rustc_sysroot_env"
-                | "_incompatible_test_attr_crate_and_srcs_mutually_exclusive"
-        )
+    fn has_attr(&self, _attribute: &str, _heap: Heap<'v>) -> bool {
+        // Accept any attribute - the Rust toolchain has many fields and methods
+        // that vary across rules_rust versions. Return true for all to avoid
+        // breaking on unrecognized attributes.
+        true
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         use starlark::values::list::AllocList;
         match attribute {
-            // Tool paths - return file-like stubs with .path attribute
-            "rustc" => Some(heap.alloc(RustToolStub("rustc"))),
-            "rust_doc" => Some(heap.alloc(RustToolStub("rustdoc"))),
+            // Tool paths - return path strings so they're compatible with cmd_args.add()
+            "rustc" => {
+                let path = detect_rust_tool_path("rustc");
+                Some(heap.alloc_str(&path).to_value())
+            }
+            "rust_doc" => {
+                let path = detect_rust_tool_path("rustdoc");
+                Some(heap.alloc_str(&path).to_value())
+            }
             "rustfmt" => Some(Value::new_none()),
             "cargo" => Some(Value::new_none()),
             "clippy_driver" => Some(Value::new_none()),
@@ -4070,23 +4051,90 @@ impl<'v> StarlarkValue<'v> for RustToolchainInfoStub {
             "libstd_and_allocator_ccinfo" => Some(Value::new_none()),
             "libstd_and_global_allocator_ccinfo" => Some(Value::new_none()),
             "nostd_and_global_allocator_cc_info" => Some(Value::new_none()),
+            // make_libstd_and_allocator_ccinfo is a closure in real toolchains
+            // that takes (label, actions, allocator_library, std) and returns CcInfo or None.
+            // Return a stub function that always returns None.
+            "make_libstd_and_allocator_ccinfo" => {
+                Some(heap.alloc(MakeAllocatorCcInfoStub))
+            }
 
-            // Internal/experimental flags
+            // Additional flags and attributes from rules_rust toolchain
+            "extra_rustc_flags_for_crate_types" => {
+                let map: SmallMap<Value, Value> = SmallMap::new();
+                Some(heap.alloc(Dict::new(map)))
+            }
+            "linker" => Some(Value::new_none()),
+            "linker_files" => Some(Value::new_none()),
+            "_linker_files" => Some(Value::new_none()),
+            "linker_preference" => Some(heap.alloc_str("cc").to_value()),
+            "linker_type" => Some(Value::new_none()),
+            "llvm_lib" => Some(Value::new_none()),
+            "dynamic_runtime_lib" => Some(Value::new_none()),
+            "static_runtime_lib" => Some(Value::new_none()),
+            "needs_pic_for_dynamic_libraries" => Some(Value::new_bool(true)),
+            "require_explicit_unstable_features" => Some(Value::new_bool(false)),
+            "make_variables" => {
+                let map: SmallMap<Value, Value> = SmallMap::new();
+                Some(heap.alloc(Dict::new(map)))
+            }
+            "lto" => {
+                // lto is a struct with a mode field, not a dict
+                use starlark::values::structs::AllocStruct;
+                Some(heap.alloc(AllocStruct([("mode", heap.alloc_str("off").to_value())])))
+            }
+            "proc_macro_srv" => Some(Value::new_none()),
+            "rust_analyzer" => Some(Value::new_none()),
+            "rustc_srcs" => Some(Value::new_none()),
+            "rustc_srcs_path" => Some(Value::new_none()),
+            "cargo_clippy" => Some(Value::new_none()),
+            "sysroot_anchor" => Some(Value::new_none()),
+
+            // Internal/experimental flags - all default to false or safe values
             "_rename_first_party_crates" => Some(Value::new_bool(false)),
             "_third_party_dir" => Some(heap.alloc_str("").to_value()),
             "_pipelined_compilation" => Some(Value::new_bool(false)),
             "_no_std" => Some(heap.alloc_str("off").to_value()),
-            "_experimental_link_std_dylib" => Some(Value::new_bool(false)),
-            "_experimental_toolchain_generated_sysroot" => Some(Value::new_bool(false)),
-            "_experimental_use_cc_common_link" => Some(Value::new_bool(false)),
-            "_experimental_use_coverage_metadata_files" => Some(Value::new_bool(false)),
-            "_experimental_use_global_allocator" => Some(Value::new_bool(false)),
-            "_incompatible_no_rustc_sysroot_env" => Some(Value::new_bool(false)),
-            "_incompatible_test_attr_crate_and_srcs_mutually_exclusive" => {
+            "_codegen_units" => Some(heap.alloc(0)),
+
+            // Integer-valued experimental flags
+            "_experimental_use_allocator_libraries_with_mangled_symbols" => Some(heap.alloc(0)),
+            "_experimental_use_allocator_libraries_with_mangled_symbols_setting" => {
                 Some(Value::new_bool(false))
             }
-            _ => None,
+
+            // Catch-all: attributes starting with _ are likely boolean flags
+            // Other unknown attributes get None
+            _ if attribute.starts_with("_experimental_") || attribute.starts_with("_incompatible_") => {
+                Some(Value::new_bool(false))
+            }
+            _ if attribute.starts_with("_") => Some(Value::new_bool(false)),
+            _ => Some(Value::new_none()),
         }
+    }
+}
+
+/// Stub callable for `make_libstd_and_allocator_ccinfo` on the Rust toolchain.
+/// Returns None when called (no actual CcInfo available in stub toolchain).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct MakeAllocatorCcInfoStub;
+
+impl std::fmt::Display for MakeAllocatorCcInfoStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<make_libstd_and_allocator_ccinfo>")
+    }
+}
+
+starlark::starlark_simple_value!(MakeAllocatorCcInfoStub);
+
+#[starlark::values::starlark_value(type = "make_libstd_and_allocator_ccinfo")]
+impl<'v> StarlarkValue<'v> for MakeAllocatorCcInfoStub {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        _args: &Arguments<'v, '_>,
+        _eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(Value::new_none())
     }
 }
 
