@@ -188,7 +188,12 @@ impl ConcreteModuleExtensionExecutor {
         // 2. Parse the bzl path
         let import_path = parse_bzlmod_bzl_path(&aggregated.extension_bzl_file, &cell_resolver)?;
 
-        tracing::debug!("Loading extension module from: {}", import_path);
+        tracing::debug!(
+            "Extension execution: bzl_file='{}' -> import_path='{}' (cell='{}')",
+            aggregated.extension_bzl_file,
+            import_path,
+            import_path.cell()
+        );
 
         // 3. Load the module via DICE
         let loaded_module = ctx
@@ -316,11 +321,12 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         let specs = match self.try_execute_starlark(ctx, aggregated, module_ctx).await {
             Ok(specs) => specs,
             Err(e) => {
-                // If we can't load/execute the extension (e.g., cell not registered yet),
-                // fall back to returning empty specs with a warning
+                // Fall back to empty specs - some extensions (e.g., test-only ones)
+                // may legitimately fail to load, and hard-failing would break builds
+                // that don't need those repos.
                 tracing::warn!(
-                    "Could not execute extension '{}' Starlark implementation: {}. \
-                     Falling back to empty repo specs.",
+                    "Could not execute extension '{}' Starlark implementation, \
+                     falling back to empty specs: {}",
                     aggregated.extension_id,
                     e
                 );

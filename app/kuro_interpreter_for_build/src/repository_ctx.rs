@@ -546,7 +546,7 @@ impl RepositoryContext {
 ///
 /// Given a label like "@repo//pkg:file" or "//pkg:file", returns
 /// a path relative to the workspace root.
-fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> String {
+pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> String {
     let stripped = label_str.trim_start_matches('@');
     let (repo, rest) = if let Some(idx) = stripped.find("//") {
         (&stripped[..idx], &stripped[idx + 2..])

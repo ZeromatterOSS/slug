@@ -71,6 +71,7 @@ use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
+use starlark::values::ValueLike;
 use starlark::values::dict::Dict;
 use starlark::values::starlark_value;
 use starlark::values::starlark_value_as_type::StarlarkValueAsType;
@@ -81,6 +82,7 @@ use crate::repository_ctx::ExecutionResult;
 use crate::repository_ctx::RepositoryPath;
 use crate::repository_ctx::download_url;
 use crate::repository_ctx::extract_archive;
+use crate::repository_ctx::resolve_label_to_path;
 use crate::repository_ctx::get_urls_from_value;
 use crate::repository_ctx::verify_integrity;
 use crate::repository_ctx::verify_sha256;
@@ -1065,18 +1067,41 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
         }
     }
 
-    /// Convert a path to a repository path object.
+    /// Convert a path or Label to a repository path object.
+    ///
+    /// Accepts both strings and Label objects. For Labels like
+    /// `Label("@repo//:bin/cargo")`, resolves via cell/external paths.
     fn path<'v>(
         this: &ModuleContext,
-        #[starlark(require = pos)] path: &str,
+        #[starlark(require = pos)] path: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let resolved = if Path::new(path).is_absolute() {
-            PathBuf::from(path)
-        } else if let Some(ref wd) = this.working_dir {
-            wd.join(path)
+        let path_str = if let Some(s) = path.unpack_str() {
+            s.to_owned()
+        } else if let Some(repo_path) = path.downcast_ref::<RepositoryPath>() {
+            repo_path.path_str().to_owned()
+        } else if path.get_type() == "Label" {
+            // Handle Label objects: resolve to workspace-relative path.
+            let label_str = format!("{}", path);
+            let workspace_root = this
+                .working_dir
+                .as_ref()
+                .map(|wd| wd.as_ref().as_path())
+                .unwrap_or_else(|| Path::new("."));
+            resolve_label_to_path(&label_str, workspace_root)
         } else {
-            PathBuf::from(path)
+            return Err(starlark::Error::new_other(anyhow!(
+                "module_ctx.path() requires a string, Label, or path object, got {}",
+                path.get_type()
+            )));
+        };
+
+        let resolved = if Path::new(&path_str).is_absolute() {
+            PathBuf::from(&path_str)
+        } else if let Some(ref wd) = this.working_dir {
+            wd.join(&path_str)
+        } else {
+            PathBuf::from(&path_str)
         };
         Ok(heap.alloc(RepositoryPath::new(
             resolved.to_string_lossy().to_string(),
