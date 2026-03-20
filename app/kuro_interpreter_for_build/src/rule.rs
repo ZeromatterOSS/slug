@@ -317,6 +317,25 @@ impl<'v> StarlarkRuleCallable<'v> {
             sorted_validated_attrs
         };
 
+        // Bazel implicitly adds a `toolchains` attribute to all rules that lists
+        // the toolchain types the rule depends on. Inject it if not already defined.
+        let sorted_validated_attrs = {
+            let mut attrs = sorted_validated_attrs;
+            let has_toolchains = attrs.iter().any(|(n, _)| n == "toolchains");
+            if !has_toolchains {
+                attrs.push((
+                    "toolchains".to_owned(),
+                    Attribute::new(
+                        Some(Arc::new(AnyAttrType::empty_list())),
+                        "implicit toolchains attribute",
+                        AttrType::list(AttrType::any()),
+                    ),
+                ));
+                attrs.sort_by(|(k1, _), (k2, _)| Ord::cmp(k1, k2));
+            }
+            attrs
+        };
+
         let cfg = match (cfg, supports_incoming_transition) {
             (Some(_), Some(_)) => return Err(RuleError::CfgAndSupportsIncomingTransition.into()),
             (Some(cfg), None) => {

@@ -1415,7 +1415,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     fn expand_location<'v>(
         this: RefAnalysisContext<'v>,
         input: &str,
-        #[starlark(require = named, default = NoneType)] targets: Value<'v>,
+        #[starlark(default = NoneType)] targets: Value<'v>,
         #[starlark(require = named, default = false)] short_paths: bool,
         heap: Heap<'v>,
     ) -> starlark::Result<String> {
@@ -1692,6 +1692,18 @@ pub fn host_target_cpu() -> &'static str {
         ("windows", "x86_64") => "x64_windows",
         ("windows", "aarch64") => "arm64_windows",
         _ => "k8",
+    }
+}
+
+/// Returns the Rust target triple for the host platform.
+fn host_rust_triple() -> &'static str {
+    match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("windows", "x86_64") => "x86_64-pc-windows-msvc",
+        ("windows", "aarch64") => "aarch64-pc-windows-msvc",
+        ("macos", "x86_64") => "x86_64-apple-darwin",
+        ("macos", "aarch64") => "aarch64-apple-darwin",
+        ("linux", "aarch64") => "aarch64-unknown-linux-gnu",
+        _ => "x86_64-unknown-linux-gnu",
     }
 }
 
@@ -3977,15 +3989,9 @@ impl<'v> StarlarkValue<'v> for RustToolchainInfoStub {
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         use starlark::values::list::AllocList;
         match attribute {
-            // Tool paths - return path strings so they're compatible with cmd_args.add()
-            "rustc" => {
-                let path = detect_rust_tool_path("rustc");
-                Some(heap.alloc_str(&path).to_value())
-            }
-            "rust_doc" => {
-                let path = detect_rust_tool_path("rustdoc");
-                Some(heap.alloc_str(&path).to_value())
-            }
+            // Tool paths - return file-like stubs with .path and cmd_args compatibility
+            "rustc" => Some(heap.alloc(RustToolStub("rustc"))),
+            "rust_doc" => Some(heap.alloc(RustToolStub("rustdoc"))),
             "rustfmt" => Some(Value::new_none()),
             "cargo" => Some(Value::new_none()),
             "clippy_driver" => Some(Value::new_none()),
@@ -4000,22 +4006,37 @@ impl<'v> StarlarkValue<'v> for RustToolchainInfoStub {
             }
             "all_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
 
-            // File extensions
-            "binary_ext" => Some(heap.alloc_str("").to_value()),
-            "staticlib_ext" => Some(heap.alloc_str(".a").to_value()),
-            "dylib_ext" => Some(heap.alloc_str(".so").to_value()),
+            // File extensions (platform-specific)
+            "binary_ext" => {
+                let ext = if cfg!(windows) { ".exe" } else { "" };
+                Some(heap.alloc_str(ext).to_value())
+            }
+            "staticlib_ext" => {
+                let ext = if cfg!(windows) { ".lib" } else { ".a" };
+                Some(heap.alloc_str(ext).to_value())
+            }
+            "dylib_ext" => {
+                let ext = if cfg!(windows) { ".dll" } else if cfg!(target_os = "macos") { ".dylib" } else { ".so" };
+                Some(heap.alloc_str(ext).to_value())
+            }
 
-            // Edition and triples
+            // Edition and triples (platform-specific)
             "default_edition" => Some(heap.alloc_str("2021").to_value()),
             "exec_triple" => Some(heap.alloc(RustTripleStub {
-                triple_str: "x86_64-unknown-linux-gnu",
+                triple_str: host_rust_triple(),
             })),
             "target_triple" => Some(heap.alloc(RustTripleStub {
-                triple_str: "x86_64-unknown-linux-gnu",
+                triple_str: host_rust_triple(),
             })),
-            "target_arch" => Some(heap.alloc_str("x86_64").to_value()),
-            "target_os" => Some(heap.alloc_str("linux").to_value()),
-            "target_flag_value" => Some(heap.alloc_str("x86_64-unknown-linux-gnu").to_value()),
+            "target_arch" => {
+                let arch = if cfg!(target_arch = "aarch64") { "aarch64" } else { "x86_64" };
+                Some(heap.alloc_str(arch).to_value())
+            }
+            "target_os" => {
+                let os = if cfg!(windows) { "windows" } else if cfg!(target_os = "macos") { "macos" } else { "linux" };
+                Some(heap.alloc_str(os).to_value())
+            }
+            "target_flag_value" => Some(heap.alloc_str(host_rust_triple()).to_value()),
             "target_json" => Some(Value::new_none()),
 
             // Sysroot
@@ -4144,26 +4165,57 @@ pub struct RustToolStub(&'static str);
 
 /// Detect the path to a Rust tool by checking common locations.
 fn detect_rust_tool_path(tool_name: &str) -> String {
-    // Try `which` first via PATH lookup
-    if let Ok(output) = std::process::Command::new("which").arg(tool_name).output() {
-        if output.status.success() {
-            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !path.is_empty() {
-                return path;
+    // On Windows, use where.exe to find the tool (returns native Windows path)
+    #[cfg(windows)]
+    {
+        let exe_name = if tool_name.ends_with(".exe") {
+            tool_name.to_string()
+        } else {
+            format!("{}.exe", tool_name)
+        };
+        if let Ok(output) = std::process::Command::new("where.exe").arg(&exe_name).output() {
+            if output.status.success() {
+                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                // `where` may return multiple lines; take the first
+                if let Some(first) = path.lines().next() {
+                    if !first.is_empty() {
+                        return first.to_string();
+                    }
+                }
             }
         }
+        // Fallback to USERPROFILE/.cargo/bin
+        let home = std::env::var("USERPROFILE").unwrap_or_default();
+        let cargo_path = format!("{}\\.cargo\\bin\\{}", home, exe_name);
+        if std::path::Path::new(&cargo_path).exists() {
+            return cargo_path;
+        }
+        return exe_name;
     }
-    // Fallback to common locations
-    let home = std::env::var("HOME").unwrap_or_default();
-    let cargo_path = format!("{}/.cargo/bin/{}", home, tool_name);
-    if std::path::Path::new(&cargo_path).exists() {
-        return cargo_path;
+
+    #[cfg(not(windows))]
+    {
+        // Try `which` first via PATH lookup
+        if let Ok(output) = std::process::Command::new("which").arg(tool_name).output() {
+            if output.status.success() {
+                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if !path.is_empty() {
+                    return path;
+                }
+            }
+        }
+        // Fallback to common locations
+        let home = std::env::var("HOME").unwrap_or_default();
+        let cargo_path = format!("{}/.cargo/bin/{}", home, tool_name);
+        if std::path::Path::new(&cargo_path).exists() {
+            return cargo_path;
+        }
+        let usr_local = format!("/usr/local/bin/{}", tool_name);
+        if std::path::Path::new(&usr_local).exists() {
+            return usr_local;
+        }
+        format!("/usr/bin/{}", tool_name)
     }
-    let usr_local = format!("/usr/local/bin/{}", tool_name);
-    if std::path::Path::new(&usr_local).exists() {
-        return usr_local;
-    }
-    format!("/usr/bin/{}", tool_name)
 }
 
 impl std::fmt::Display for RustToolStub {
@@ -4211,6 +4263,41 @@ impl<'v> StarlarkValue<'v> for RustToolStub {
             "owner" => Some(Value::new_none()),
             _ => None,
         }
+    }
+
+    fn provide(&'v self, demand: &mut starlark::values::Demand<'_, 'v>) {
+        demand.provide_value::<&dyn crate::interpreter::rule_defs::cmd_args::CommandLineArgLike>(
+            self,
+        );
+    }
+}
+
+impl<'v> crate::interpreter::rule_defs::cmd_args::CommandLineArgLike<'v> for RustToolStub {
+    fn register_me(&self) {
+        use crate::interpreter::rule_defs::cmd_args::command_line_arg_like_type::command_line_arg_like_impl;
+        command_line_arg_like_impl!(starlark::typing::Ty::string());
+    }
+
+    fn add_to_command_line(
+        &self,
+        cli: &mut dyn crate::interpreter::rule_defs::cmd_args::CommandLineBuilder,
+        _context: &mut dyn crate::interpreter::rule_defs::cmd_args::CommandLineContext,
+        _artifact_path_mapping: &dyn crate::interpreter::rule_defs::cmd_args::ArtifactPathMapper,
+    ) -> kuro_error::Result<()> {
+        cli.push_arg(detect_rust_tool_path(self.0));
+        Ok(())
+    }
+
+    fn contains_arg_attr(&self) -> bool {
+        false
+    }
+
+    fn visit_write_to_file_macros(
+        &self,
+        _visitor: &mut dyn crate::interpreter::rule_defs::cmd_args::WriteToFileMacroVisitor,
+        _artifact_path_mapping: &dyn crate::interpreter::rule_defs::cmd_args::ArtifactPathMapper,
+    ) -> kuro_error::Result<()> {
+        Ok(())
     }
 }
 
@@ -5001,9 +5088,25 @@ impl<'v> StarlarkValue<'v> for GenericToolchainStub {
         true
     }
 
-    fn get_attr(&self, _attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
-        // Return None for any attribute - callers should check for None
-        Some(Value::new_none())
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        // For known toolchain info fields, return another stub so
+        // chained attribute access (e.g., toolchain.coreutils_info.bin) works.
+        match attribute {
+            // Info-suffix fields return another stub for chaining
+            a if a.ends_with("_info") => Some(heap.alloc(GenericToolchainStub)),
+            // Tool paths return a string so they work with ctx.actions.run(executable=...)
+            "bin" | "path" | "short_path" => {
+                // Return a placeholder path - the action won't actually execute during analysis
+                let path = if cfg!(windows) {
+                    "C:\\Windows\\System32\\cmd.exe"
+                } else {
+                    "/bin/sh"
+                };
+                Some(heap.alloc_str(path).to_value())
+            }
+            "basename" => Some(heap.alloc_str("tool").to_value()),
+            _ => Some(Value::new_none()),
+        }
     }
 }
 

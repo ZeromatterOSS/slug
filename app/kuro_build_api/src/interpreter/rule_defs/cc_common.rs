@@ -140,6 +140,34 @@ struct MsvcToolPaths {
 }
 
 /// Detect and cache MSVC tool paths on Windows.
+/// Convert a path to its Windows 8.3 short form to avoid spaces in args.
+/// `_spawnvp` in bootstrap_process_wrapper.cc doesn't quote args with spaces,
+/// so we must use short paths to avoid argument splitting.
+/// Falls back to the original path if conversion fails.
+#[cfg(target_os = "windows")]
+fn to_short_path(path: &str) -> String {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+
+    unsafe extern "system" {
+        fn GetShortPathNameW(lpszLongPath: *const u16, lpszShortPath: *mut u16, cchBuffer: u32) -> u32;
+    }
+
+    let wide: Vec<u16> = OsStr::new(path).encode_wide().chain(std::iter::once(0)).collect();
+    unsafe {
+        let len = GetShortPathNameW(wide.as_ptr(), std::ptr::null_mut(), 0);
+        if len == 0 {
+            return path.to_string();
+        }
+        let mut buf = vec![0u16; len as usize];
+        let written = GetShortPathNameW(wide.as_ptr(), buf.as_mut_ptr(), len);
+        if written == 0 || written >= len {
+            return path.to_string();
+        }
+        String::from_utf16_lossy(&buf[..written as usize])
+    }
+}
+
 fn get_msvc_tool_paths() -> &'static Option<MsvcToolPaths> {
     MSVC_TOOL_CACHE.get_or_init(|| {
         #[cfg(target_os = "windows")]
@@ -225,16 +253,16 @@ fn get_msvc_tool_paths() -> &'static Option<MsvcToolPaths> {
             let um_lib_dir = sdk_lib.join(&sdk_ver).join("um").join("x64");
 
             Some(MsvcToolPaths {
-                cl: format!("{}\\cl.exe", base),
-                link: format!("{}\\link.exe", base),
-                lib: format!("{}\\lib.exe", base),
-                msvc_include: msvc_include.to_string_lossy().to_string(),
-                ucrt_include: ucrt_inc.to_string_lossy().to_string(),
-                um_include: um_inc.to_string_lossy().to_string(),
-                shared_include: shared_inc.to_string_lossy().to_string(),
-                ucrt_lib: ucrt_lib_dir.to_string_lossy().to_string(),
-                um_lib: um_lib_dir.to_string_lossy().to_string(),
-                msvc_lib: msvc_lib.to_string_lossy().to_string(),
+                cl: to_short_path(&format!("{}\\cl.exe", base)),
+                link: to_short_path(&format!("{}\\link.exe", base)),
+                lib: to_short_path(&format!("{}\\lib.exe", base)),
+                msvc_include: to_short_path(&msvc_include.to_string_lossy()),
+                ucrt_include: to_short_path(&ucrt_inc.to_string_lossy()),
+                um_include: to_short_path(&um_inc.to_string_lossy()),
+                shared_include: to_short_path(&shared_inc.to_string_lossy()),
+                ucrt_lib: to_short_path(&ucrt_lib_dir.to_string_lossy()),
+                um_lib: to_short_path(&um_lib_dir.to_string_lossy()),
+                msvc_lib: to_short_path(&msvc_lib.to_string_lossy()),
             })
         }
         #[cfg(not(target_os = "windows"))]

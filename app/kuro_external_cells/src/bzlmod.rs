@@ -21,6 +21,7 @@ use async_trait::async_trait;
 use cmp_any::PartialEqAny;
 use compact_str::CompactString;
 use dice::DiceComputations;
+use kuro_build_api::actions::artifact::get_artifact_fs::GetArtifactFs;
 use kuro_common::external_symlink::ExternalSymlink;
 use kuro_common::file_ops::delegate::FileOpsDelegate;
 use kuro_common::file_ops::dice::ReadFileProxy;
@@ -32,11 +33,14 @@ use kuro_common::file_ops::metadata::RawSymlink;
 use kuro_common::file_ops::metadata::TrackedFileDigest;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::cells::external::BzlmodCellSetup;
+use kuro_core::cells::external::ExternalCellOrigin;
 use kuro_core::cells::name::CellName;
 use kuro_core::cells::paths::CellRelativePath;
 use kuro_core::cells::paths::CellRelativePathBuf;
 use kuro_execute::digest_config::DigestConfig;
 use kuro_execute::digest_config::HasDigestConfig;
+use kuro_execute::materialize::materializer::HasMaterializer;
+use kuro_execute::materialize::materializer::WriteRequest;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 
 /// File operations delegate for bzlmod cells from registries.
@@ -232,6 +236,109 @@ impl FileOpsDelegate for BzlmodFileOpsDelegate {
     }
 }
 
+/// Declare all source files from a bzlmod cell with the materializer.
+///
+/// This walks the source directory recursively and registers all files via
+/// `declare_write` so they exist at `buck-out/v2/external_cells/bzlmod/...`
+/// paths when actions try to use them as inputs.
+async fn declare_all_source_artifacts(
+    ctx: &mut DiceComputations<'_>,
+    cell_name: CellName,
+    setup: &BzlmodCellSetup,
+    source_path: &std::path::Path,
+) -> kuro_error::Result<()> {
+    let artifact_fs = ctx.get_artifact_fs().await?;
+    let buck_out_resolver = artifact_fs.buck_out_path_resolver();
+
+    // Walk the source directory recursively and collect all files
+    let mut requests = Vec::new();
+    let mut stack: Vec<PathBuf> = vec![source_path.to_path_buf()];
+
+    while let Some(dir) = stack.pop() {
+        let mut read_dir = match tokio::fs::read_dir(&dir).await {
+            Ok(rd) => rd,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => {
+                return Err(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Environment,
+                    "Failed to read bzlmod directory {:?}: {}",
+                    dir,
+                    e
+                ));
+            }
+        };
+
+        while let Some(entry) = read_dir.next_entry().await.map_err(|e| {
+            kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Environment,
+                "Failed to read directory entry: {}",
+                e
+            )
+        })? {
+            let file_type = entry.file_type().await.map_err(|e| {
+                kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Environment,
+                    "Failed to get file type: {}",
+                    e
+                )
+            })?;
+
+            if file_type.is_dir() {
+                stack.push(entry.path());
+                continue;
+            }
+
+            if !file_type.is_file() {
+                continue;
+            }
+
+            // Compute cell-relative path
+            let abs_path = entry.path();
+            let rel = abs_path
+                .strip_prefix(source_path)
+                .map_err(|e| {
+                    kuro_error::kuro_error!(
+                        kuro_error::ErrorTag::Environment,
+                        "Failed to compute relative path: {}",
+                        e
+                    )
+                })?;
+            let rel_str = rel.to_string_lossy().replace('\\', "/");
+            let cell_rel = CellRelativePath::unchecked_new(&rel_str);
+
+            let path = buck_out_resolver.resolve_external_cell_source(
+                cell_rel,
+                ExternalCellOrigin::Bzlmod(setup.clone()),
+            );
+
+            let content = tokio::fs::read(&abs_path).await.map_err(|e| {
+                kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Environment,
+                    "Failed to read bzlmod file {:?}: {}",
+                    abs_path,
+                    e
+                )
+            })?;
+
+            requests.push(WriteRequest {
+                path,
+                content,
+                is_executable: false,
+            });
+        }
+    }
+
+    if !requests.is_empty() {
+        let materializer = ctx.per_transaction_data().get_materializer();
+        materializer
+            .declare_write(Box::new(move || Ok(requests)))
+            .await
+            .map(|_| ())?;
+    }
+
+    Ok(())
+}
+
 /// Get the file ops delegate for a bzlmod cell.
 pub(crate) async fn get_file_ops_delegate(
     ctx: &mut DiceComputations<'_>,
@@ -240,6 +347,10 @@ pub(crate) async fn get_file_ops_delegate(
 ) -> kuro_error::Result<Arc<dyn FileOpsDelegate>> {
     let digest_config = ctx.global_data().get_digest_config();
     let source_path = PathBuf::from(setup.source_path.as_ref());
+
+    // Declare all source files with the materializer so they exist
+    // at buck-out/v2/external_cells/bzlmod/... paths during action execution.
+    declare_all_source_artifacts(ctx, cell_name, &setup, &source_path).await?;
 
     Ok(Arc::new(BzlmodFileOpsDelegate::new(
         cell_name,

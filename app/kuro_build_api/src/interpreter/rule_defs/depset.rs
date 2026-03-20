@@ -698,6 +698,11 @@ fn depset_order_from_value<'v>(value: Value<'v>) -> Option<&'v str> {
     if let Some(depset) = value.downcast_ref::<Depset>() {
         return Some(depset.order_str());
     }
+    // Fallback: accept any value whose Starlark type is "depset" (e.g. DepsetWithListGen
+    // from DefaultInfo.files). Assume "default" order since we can't extract the actual order.
+    if value.get_type() == "depset" {
+        return Some("default");
+    }
     None
 }
 
