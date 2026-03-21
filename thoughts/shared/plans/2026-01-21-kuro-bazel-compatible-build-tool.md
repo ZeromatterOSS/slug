@@ -281,7 +281,7 @@ The detailed implementation is split into focused sub-plans:
 
 | Sub-Plan                                                                                             | Description                                                      | Status          |
 | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------- |
-| [2026-03-19-real-world-bazel9-compatibility.md](./2026-03-19-real-world-bazel9-compatibility.md)      | Real-world Bazel 9 project compatibility testing | **In Progress** |
+| [10-module-extension-execution.md](./kuro-bazel-subplans/10-module-extension-execution.md)           | Let real module extensions execute via DICE instead of synthetic stubs | **In Progress** |
 
 ### Related Research Documents
 
