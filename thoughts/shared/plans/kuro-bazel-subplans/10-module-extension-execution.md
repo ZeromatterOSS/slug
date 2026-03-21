@@ -368,15 +368,38 @@ With all rules_rust/rules_rs extensions un-intercepted, run `kuro build
 This is iterative. Run the build, read the first error, fix it, repeat. Each
 fix should be minimal and targeted.
 
+### Progress (2026-03-20)
+
+#### Bugs Fixed (multi_package example now builds):
+1. **AttrValue::Dict → Starlark struct (should be dict)**: `repository_ctx.rs` used `AllocStruct`
+   for dict attrs, breaking `rctx.attr.globals.items()`. Fixed: use `AllocDict`.
+2. **Starlark errors silently fell through to stub**: `repository_execution.rs` logged warnings
+   and fell through to native executor. Fixed: propagate error.
+3. **Canonical name prefix wrong for transitive modules**: `pre_compute_extension_repo_cells`
+   and `build_canonical_names` always used root module name. Fixed: extract owning module from
+   extension ID (`@bazel_features//...` → `bazel_features`).
+4. **Missing top-level Bazel globals**: `CcSharedLibraryHintInfo`, `CcSharedLibraryInfo`,
+   `PackageSpecificationInfo`, `RunEnvironmentInfo` were only in `cc_common` module, not
+   top-level. Fixed: added `register_bazel_provider_globals()` and created `CcSharedLibraryHintInfo`.
+5. **`module_extension()` required named `implementation`**: `rules_cc` passes it positionally.
+   Fixed: removed `require = named` constraint.
+
+#### Verified:
+- `kuro build //app:calculator` in `examples/multi_package` — **BUILD SUCCEEDED**
+- Extension repos materialized with real content:
+  - `bazel_features+version_extension+bazel_features_version/version.bzl`: `version = '9.0.0'`
+  - `bazel_features+version_extension+bazel_features_globals/globals.bzl`: real `globals = struct(...)`
+  - `rules_cc+compatibility_proxy+cc_compatibility_proxy` created via real DICE execution
+
 ### Success Criteria
 
 #### Automated Verification:
 - [ ] `kuro build //sdk:sdk` in zeromatter progresses past extension execution
-- [ ] Extension repos are materialized in `bazel-external/` with real content
+- [x] Extension repos are materialized in `bazel-external/` with real content
 - [ ] `@crates` hub repo contains `defs.bzl` with real crate dependency data
 
 #### Manual Verification:
-- [ ] Verify extension execution logs show real `.bzl` evaluation (not stubs)
+- [x] Verify extension execution logs show real `.bzl` evaluation (not stubs)
 - [ ] Verify downloaded crate sources match Cargo.lock versions
 - [ ] Compare generated BUILD files with what `bazel build` produces
 

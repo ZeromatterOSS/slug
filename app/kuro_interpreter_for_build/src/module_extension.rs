@@ -538,7 +538,7 @@ pub fn register_module_extension_function(builder: &mut GlobalsBuilder) {
     /// defined and its tag_classes are recorded, but the implementation function is
     /// not yet called during module resolution.
     fn module_extension<'v>(
-        #[starlark(require = named)] implementation: Value<'v>,
+        implementation: Value<'v>,
         #[starlark(require = named, default = UnpackDictEntries::default())]
         tag_classes: UnpackDictEntries<&'v str, Value<'v>>,
         #[starlark(require = named, default = false)] os_dependent: bool,

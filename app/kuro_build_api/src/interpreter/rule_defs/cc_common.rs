@@ -5831,6 +5831,126 @@ where
 }
 
 // ============================================================================
+// CcSharedLibraryHintInfo - Shared library hint provider (Bazel 7.0+)
+// ============================================================================
+
+/// CcSharedLibraryHintInfo provider for shared library dependency hints.
+///
+/// In Bazel, this provider carries hints about shared library dependencies.
+/// Available as a top-level global since Bazel 7.0.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct CcSharedLibraryHintInfoProvider;
+
+impl CcSharedLibraryHintInfoProvider {
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "CcSharedLibraryHintInfo".to_owned(),
+            })
+        })
+    }
+}
+
+impl Display for CcSharedLibraryHintInfoProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<provider CcSharedLibraryHintInfo>")
+    }
+}
+
+starlark_simple_value!(CcSharedLibraryHintInfoProvider);
+
+impl ProviderCallableLike for CcSharedLibraryHintInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
+#[starlark_value(type = "CcSharedLibraryHintInfo")]
+impl<'v> StarlarkValue<'v> for CcSharedLibraryHintInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &starlark::eval::Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
+        let kwargs = args.names_map()?;
+        let fields = heap.alloc(starlark::values::dict::AllocDict(
+            kwargs.into_iter().map(|(k, v)| (k.as_str(), v)),
+        ));
+        Ok(heap.alloc(CcSharedLibraryHintInfoInstanceGen { fields }))
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+/// An instance of CcSharedLibraryHintInfo.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[repr(C)]
+pub struct CcSharedLibraryHintInfoInstanceGen<V: ValueLifetimeless> {
+    fields: V,
+}
+
+starlark_complex_value!(pub CcSharedLibraryHintInfoInstance);
+
+impl<V: ValueLifetimeless> Display for CcSharedLibraryHintInfoInstanceGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CcSharedLibraryHintInfo(...)")
+    }
+}
+
+impl<'v, V: ValueLike<'v>> ProviderLike<'v> for CcSharedLibraryHintInfoInstanceGen<V>
+where
+    Self: fmt::Debug,
+{
+    fn id(&self) -> &Arc<ProviderId> {
+        CcSharedLibraryHintInfoProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        use starlark::values::dict::DictRef;
+        if let Some(dict) = DictRef::from_value(self.fields.to_value()) {
+            dict.iter()
+                .filter_map(|(k, v)| {
+                    let s: &'v str = k.unpack_str()?;
+                    let s: &str = unsafe { &*(s as *const str) };
+                    Some((s, v))
+                })
+                .collect()
+        } else {
+            vec![]
+        }
+    }
+}
+
+#[starlark::values::starlark_value(type = "CcSharedLibraryHintInfo")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for CcSharedLibraryHintInfoInstanceGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        use starlark::values::dict::DictRef;
+        DictRef::from_value(self.fields.to_value())
+            .and_then(|dict| dict.get_str(attribute))
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        use starlark::values::dict::DictRef;
+        DictRef::from_value(self.fields.to_value())
+            .map(|dict| dict.iter().filter_map(|(k, _)| k.unpack_str().map(|s| s.to_owned())).collect())
+            .unwrap_or_default()
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
+    }
+}
+
+// ============================================================================
 // CcToolchainConfigInfo - Toolchain configuration provider
 // ============================================================================
 
@@ -6924,5 +7044,23 @@ where
             _ => None,
         }
     }
+}
+
+// ============================================================================
+// Top-level Bazel globals registration
+// ============================================================================
+
+/// Register Bazel provider globals that should be available at the top level.
+///
+/// In Bazel 6+, these providers are available as top-level globals in .bzl files.
+/// The `bazel_features` package generates `globals.bzl` referencing them by name.
+#[starlark_module]
+pub fn register_bazel_provider_globals(globals: &mut GlobalsBuilder) {
+    const CcSharedLibraryInfo: CcSharedLibraryInfoProvider = CcSharedLibraryInfoProvider;
+    const CcSharedLibraryHintInfo: CcSharedLibraryHintInfoProvider =
+        CcSharedLibraryHintInfoProvider;
+    const PackageSpecificationInfo: PackageSpecificationInfoProvider =
+        PackageSpecificationInfoProvider;
+    const RunEnvironmentInfo: RunEnvironmentInfoProvider = RunEnvironmentInfoProvider;
 }
 

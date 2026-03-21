@@ -54,7 +54,6 @@ use flate2::read::GzDecoder;
 use sha2::Digest;
 use sha2::Sha256;
 use starlark::any::ProvidesStaticType;
-use starlark::collections::SmallMap;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -69,7 +68,7 @@ use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::starlark_value;
 use starlark::values::starlark_value_as_type::StarlarkValueAsType;
-use starlark::values::structs::AllocStruct;
+use starlark::values::dict::AllocDict;
 use tar::Archive;
 use zip::ZipArchive;
 
@@ -115,11 +114,11 @@ impl AttrValue {
             }
             AttrValue::Label(s) => heap.alloc(s.as_str()),
             AttrValue::Dict(entries) => {
-                let fields: SmallMap<&str, Value<'v>> = entries
+                let pairs: Vec<(&str, Value<'v>)> = entries
                     .iter()
                     .map(|(k, v)| (k.as_str(), v.to_starlark(heap)))
                     .collect();
-                heap.alloc(AllocStruct(fields.into_iter()))
+                heap.alloc(AllocDict(pairs))
             }
         }
     }

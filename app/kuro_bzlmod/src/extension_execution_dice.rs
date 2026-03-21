@@ -142,6 +142,9 @@ pub struct ModuleExtensionResult {
 
 impl ModuleExtensionResult {
     /// Create a new extension result.
+    ///
+    /// `root_module_name` is the name of the root module (from MODULE.bazel `module(name=...)`).
+    /// It's used as a fallback when the extension is declared by the root module.
     pub fn new(
         extension_id: Arc<str>,
         input_hash: String,
@@ -608,13 +611,39 @@ pub fn build_canonical_names(
     specs: &HashMap<String, RepoSpec>,
 ) -> HashMap<String, String> {
     let ext_name = extract_extension_name(extension_id);
+    let owning_module = extract_owning_module(extension_id);
     specs
         .keys()
         .map(|internal| {
-            let canonical = format!("_main+{}+{}", ext_name, internal);
+            let canonical = format!("{}+{}+{}", owning_module, ext_name, internal);
             (internal.clone(), canonical)
         })
         .collect()
+}
+
+/// Extract the owning module name from an extension ID.
+///
+/// Extension ID formats:
+/// - `@bazel_features//private:extensions.bzl%version_extension` → `bazel_features`
+/// - `@@rules_cc//cc:extensions.bzl%cc_configure` → `rules_cc`
+/// - `//path:file.bzl%ext` → `_main` (root module, no repo prefix)
+///
+/// Falls back to `_main` if the format doesn't match.
+pub fn extract_owning_module(extension_id: &str) -> String {
+    // Strip the extension name part (after %)
+    let bzl_part = extension_id.split('%').next().unwrap_or(extension_id);
+
+    // Look for @module// or @@module// pattern
+    let stripped = bzl_part.trim_start_matches('@');
+    if let Some(pos) = stripped.find("//") {
+        let module = &stripped[..pos];
+        if !module.is_empty() {
+            return module.to_owned();
+        }
+    }
+
+    // No module prefix (e.g., "//path:file.bzl") means root module
+    "_main".to_owned()
 }
 
 /// Extract the extension name from an extension ID.
@@ -755,8 +784,8 @@ mod tests {
             specs,
         );
 
-        assert_eq!(result.canonical_name("foo"), Some("_main+my_extension+foo"));
-        assert_eq!(result.canonical_name("bar"), Some("_main+my_extension+bar"));
+        assert_eq!(result.canonical_name("foo"), Some("module+my_extension+foo"));
+        assert_eq!(result.canonical_name("bar"), Some("module+my_extension+bar"));
         assert_eq!(result.canonical_name("baz"), None);
     }
 
@@ -772,11 +801,11 @@ mod tests {
         );
 
         assert_eq!(
-            result.internal_name_from_canonical("_main+pip+numpy"),
+            result.internal_name_from_canonical("rules_python+pip+numpy"),
             Some("numpy")
         );
         assert_eq!(
-            result.internal_name_from_canonical("_main+pip+pandas"),
+            result.internal_name_from_canonical("rules_python+pip+pandas"),
             None
         );
     }
@@ -808,8 +837,8 @@ mod tests {
 
         let names = build_canonical_names("@@rules_python//pip:pip.bzl%pip", &specs);
 
-        assert_eq!(names.get("numpy"), Some(&"_main+pip+numpy".to_owned()));
-        assert_eq!(names.get("pandas"), Some(&"_main+pip+pandas".to_owned()));
+        assert_eq!(names.get("numpy"), Some(&"rules_python+pip+numpy".to_owned()));
+        assert_eq!(names.get("pandas"), Some(&"rules_python+pip+pandas".to_owned()));
     }
 
     #[test]

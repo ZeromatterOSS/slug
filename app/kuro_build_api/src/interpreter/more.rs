@@ -44,6 +44,7 @@ use crate::interpreter::rule_defs::artifact::starlark_promise_artifact::register
 use crate::interpreter::rule_defs::artifact_tagging::artifact_tag::register_artifact_tag;
 use crate::interpreter::rule_defs::artifact_tagging::register_tagged_command_line;
 use crate::interpreter::rule_defs::artifact_tagging::register_tagged_value;
+use crate::interpreter::rule_defs::cc_common::register_bazel_provider_globals;
 use crate::interpreter::rule_defs::cc_common::register_cc_common;
 use crate::interpreter::rule_defs::cmd_args::register_cmd_args;
 use crate::interpreter::rule_defs::cmd_args::register_command_line_inputs;
@@ -74,6 +75,7 @@ fn register_build_api_globals(globals: &mut GlobalsBuilder) {
     register_builtin_providers(globals);
     register_apple_common(globals);
     register_cc_common(globals);
+    register_bazel_provider_globals(globals);
     register_config_common(globals);
     register_coverage_common(globals);
     register_java_common(globals);

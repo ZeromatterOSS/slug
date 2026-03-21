@@ -383,12 +383,16 @@ impl Key for ExtensionRepoExecutionKey {
                                 )));
                             }
                             Err(e) => {
-                                tracing::warn!(
-                                    "Starlark execution of '{}' failed, falling back to native: {}",
-                                    rule_fn_name,
-                                    e
+                                return Err(
+                                    RepositoryExecutionError::ExecutionFailed {
+                                        name: self.canonical_name.to_string(),
+                                        reason: format!(
+                                            "Starlark repository rule '{}' from '{}' failed: {}",
+                                            rule_fn_name, rule_bzl_path, e
+                                        ),
+                                    }
+                                    .into(),
                                 );
-                                // Fall through to native executor
                             }
                         }
                     }
