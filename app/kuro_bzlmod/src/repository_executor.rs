@@ -173,13 +173,18 @@ fn execute_http_archive(
                     })?;
                 } else if let Some(build_file) = attrs.get_optional_string("build_file") {
                     // build_file is a label like "@//path:BUILD.foo" or a file path
-                    let build_file_path = build_file.trim_start_matches("@//").trim_start_matches("//");
+                    let build_file_path = build_file
+                        .trim_start_matches("@//")
+                        .trim_start_matches("//");
                     let build_file_path = build_file_path.replace(':', "/");
                     if let Ok(content) = std::fs::read_to_string(&build_file_path) {
                         std::fs::write(working_dir.join("BUILD.bazel"), content).map_err(|e| {
                             RepositoryExecutionError::ExecutionFailed {
                                 name: invocation.name.clone(),
-                                reason: format!("Failed to write BUILD.bazel from build_file: {}", e),
+                                reason: format!(
+                                    "Failed to write BUILD.bazel from build_file: {}",
+                                    e
+                                ),
                             }
                         })?;
                     } else {
@@ -260,23 +265,16 @@ fn apply_patches(
             cmd.arg("-i").arg(patch_path);
             cmd.current_dir(working_dir);
 
-            let output = cmd.output().map_err(|e| {
-                RepositoryExecutionError::ExecutionFailed {
+            let output = cmd
+                .output()
+                .map_err(|e| RepositoryExecutionError::ExecutionFailed {
                     name: invocation.name.clone(),
-                    reason: format!(
-                        "Failed to run patch command for '{}': {}",
-                        patch_path, e
-                    ),
-                }
-            })?;
+                    reason: format!("Failed to run patch command for '{}': {}", patch_path, e),
+                })?;
 
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                tracing::warn!(
-                    "Patch '{}' failed (non-fatal): {}",
-                    patch_path,
-                    stderr
-                );
+                tracing::warn!("Patch '{}' failed (non-fatal): {}", patch_path, stderr);
             }
         }
     }
@@ -284,11 +282,7 @@ fn apply_patches(
     // Run patch commands
     if let Some(patch_cmds) = attrs.get_string_list("patch_cmds") {
         for cmd_str in patch_cmds {
-            tracing::info!(
-                "Running patch_cmd for '{}': {}",
-                invocation.name,
-                cmd_str
-            );
+            tracing::info!("Running patch_cmd for '{}': {}", invocation.name, cmd_str);
 
             let shell = if cfg!(windows) { "cmd" } else { "sh" };
             let flag = if cfg!(windows) { "/c" } else { "-c" };
@@ -305,11 +299,7 @@ fn apply_patches(
 
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
-                tracing::warn!(
-                    "patch_cmd '{}' failed (non-fatal): {}",
-                    cmd_str,
-                    stderr
-                );
+                tracing::warn!("patch_cmd '{}' failed (non-fatal): {}", cmd_str, stderr);
             }
         }
     }
@@ -375,11 +365,11 @@ fn execute_http_file(
         verify_integrity(&file_data, expected)?;
     }
 
-    // Write the file
-    let dest_path = working_dir.join(downloaded_file_path);
-    if let Some(parent) = dest_path.parent() {
-        std::fs::create_dir_all(parent).ok();
-    }
+    // Write the file. Bazel's http_file places the downloaded file in a
+    // "file/" subdirectory so Label("@repo//file:downloaded") resolves correctly.
+    let file_dir = working_dir.join("file");
+    std::fs::create_dir_all(&file_dir).ok();
+    let dest_path = file_dir.join(downloaded_file_path);
     std::fs::write(&dest_path, &file_data).map_err(|e| {
         RepositoryExecutionError::ExecutionFailed {
             name: invocation.name.clone(),
@@ -390,27 +380,25 @@ fn execute_http_file(
     // Set executable if requested
     #[cfg(unix)]
     {
-        let executable = attrs.get_optional_string("executable").map_or(false, |v| v == "True" || v == "true" || v == "1");
+        let executable = attrs.get_bool("executable", false);
         if executable {
             use std::os::unix::fs::PermissionsExt;
             let _ = std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(0o755));
         }
     }
 
-    // Create BUILD.bazel
-    let build_content = format!(
-        r#"package(default_visibility = ["//visibility:public"])
+    // Create root BUILD.bazel (empty package)
+    std::fs::write(working_dir.join("BUILD.bazel"), "").ok();
 
-filegroup(
-    name = "file",
-    srcs = ["{}"],
-)
+    // Create file/BUILD.bazel (Bazel http_file convention)
+    let file_build = format!(
+        r#"package(default_visibility = ["//visibility:public"])
 
 exports_files(["{}"])
 "#,
-        downloaded_file_path, downloaded_file_path
+        downloaded_file_path
     );
-    std::fs::write(working_dir.join("BUILD.bazel"), build_content).ok();
+    std::fs::write(file_dir.join("BUILD.bazel"), file_build).ok();
 
     Ok(())
 }

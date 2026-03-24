@@ -139,6 +139,7 @@ pub fn parse_module_bazel_content(
         module: module_info,
         has_module_directive,
         extension_usages: ctx.extensions.clone(),
+        repo_rule_invocations: ctx.repo_rule_invocations.clone(),
     })
 }
 

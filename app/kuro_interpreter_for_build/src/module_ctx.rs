@@ -514,6 +514,14 @@ pub struct ModuleContext {
     /// Whether the working directory should be deleted when the context is dropped.
     /// Always true for module_ctx (key difference from repository_ctx).
     delete_on_close: bool,
+    /// Project root path for resolving Labels to filesystem paths.
+    /// Set via `with_label_resolution()`.
+    #[allocative(skip)]
+    project_root: Option<PathBuf>,
+    /// Map of cell_name → absolute filesystem path for Label resolution.
+    /// Built from CellResolver before entering Starlark eval.
+    #[allocative(skip)]
+    cell_paths: HashMap<String, PathBuf>,
 }
 
 starlark_simple_value!(ModuleContext);
@@ -534,7 +542,9 @@ impl ModuleContext {
             modules: serialized_modules,
             root_module_has_non_dev_dependency,
             working_dir: None,
-            delete_on_close: true, // Always true for module_ctx
+            delete_on_close: true,
+            project_root: None,
+            cell_paths: HashMap::new(),
         }
     }
 
@@ -547,7 +557,9 @@ impl ModuleContext {
             modules,
             root_module_has_non_dev_dependency,
             working_dir: None,
-            delete_on_close: true, // Always true for module_ctx
+            delete_on_close: true,
+            project_root: None,
+            cell_paths: HashMap::new(),
         }
     }
 
@@ -557,7 +569,9 @@ impl ModuleContext {
             modules: Vec::new(),
             root_module_has_non_dev_dependency: false,
             working_dir: None,
-            delete_on_close: true, // Always true for module_ctx
+            delete_on_close: true,
+            project_root: None,
+            cell_paths: HashMap::new(),
         }
     }
 
@@ -580,6 +594,21 @@ impl ModuleContext {
     pub fn with_temp_working_dir(mut self, dir: PathBuf) -> Self {
         self.working_dir = Some(Arc::new(dir));
         self.delete_on_close = true; // Ensure this is always true
+        self
+    }
+
+    /// Set the project root and cell path map for Label-to-path resolution.
+    ///
+    /// This enables `module_ctx.path(Label)` and `module_ctx.execute([Label, ...])`
+    /// to resolve Label arguments to filesystem paths. The cell_paths map is built
+    /// from the CellResolver before entering Starlark evaluation.
+    pub fn with_label_resolution(
+        mut self,
+        project_root: PathBuf,
+        cell_paths: HashMap<String, PathBuf>,
+    ) -> Self {
+        self.project_root = Some(project_root);
+        self.cell_paths = cell_paths;
         self
     }
 
@@ -609,6 +638,95 @@ impl ModuleContext {
                 base.join(path)
             }
         })
+    }
+
+    /// Resolve a Label string to an absolute filesystem path.
+    ///
+    /// This is the kuro equivalent of Bazel's `getPathFromLabel()` from
+    /// `StarlarkBaseExternalContext`. In Bazel, this triggers Skyframe-based
+    /// repo materialization. In kuro, we use a pre-built cell path map.
+    ///
+    /// Label format: `@@repo//pkg:target` or `@repo//pkg:target`
+    /// Returns None if the label can't be resolved.
+    pub fn resolve_label_to_filesystem_path(&self, label_str: &str) -> Option<PathBuf> {
+        let project_root = self.project_root.as_ref()?;
+
+        // Parse @@repo//pkg:target or @repo//pkg:target
+        let stripped = label_str.trim_start_matches('@');
+        let (repo, rest) = if let Some(pos) = stripped.find("//") {
+            (&stripped[..pos], &stripped[pos + 2..])
+        } else {
+            // No // separator — not a valid label
+            return None;
+        };
+        let (pkg, target) = if let Some(colon_pos) = rest.find(':') {
+            (&rest[..colon_pos], &rest[colon_pos + 1..])
+        } else {
+            // No colon — package path is the whole thing, target = last component
+            (rest, rest.rsplit('/').next().unwrap_or(rest))
+        };
+
+        if repo.is_empty() {
+            // Root repo label: @@//pkg:target → project_root/pkg/target
+            let mut path = project_root.clone();
+            if !pkg.is_empty() {
+                path.push(pkg);
+            }
+            path.push(target);
+            Some(path)
+        } else {
+            // External repo label: @@repo//pkg:target
+            // Look up repo in cell_paths (exact match first, then fuzzy)
+            let repo_path = self
+                .cell_paths
+                .get(repo)
+                .or_else(|| {
+                    // Try matching cell names that start with "repo+" (versioned cells)
+                    // e.g., repo="rules_rs" matches cell "rules_rs+override"
+                    self.cell_paths
+                        .iter()
+                        .find(|(k, _)| k.starts_with(&format!("{}+", repo)))
+                        .map(|(_, v)| v)
+                })
+                .cloned();
+
+            // If found in cell_paths, use it
+            if let Some(rp) = repo_path {
+                let mut path = rp;
+                if !pkg.is_empty() {
+                    path.push(pkg);
+                }
+                path.push(target);
+                return Some(path);
+            }
+
+            // Fallback: scan bazel-external/ for extension repos with matching
+            // internal name. Extension repos have canonical names like
+            // "module+ext+repo_name". The repo_name portion matches the apparent
+            // name in the Label. This handles repos created by extensions that
+            // aren't in use_repo() but are referenced by other extensions.
+            let bazel_external = project_root.join("bazel-external");
+            if bazel_external.is_dir() {
+                let suffix = format!("+{}", repo);
+                if let Ok(entries) = std::fs::read_dir(&bazel_external) {
+                    for entry in entries.filter_map(|e| e.ok()) {
+                        let name = entry.file_name().to_string_lossy().to_string();
+                        if name.ends_with(&suffix)
+                            && entry.file_type().map(|t| t.is_dir()).unwrap_or(false)
+                        {
+                            let mut path = entry.path();
+                            if !pkg.is_empty() {
+                                path.push(pkg);
+                            }
+                            path.push(target);
+                            return Some(path);
+                        }
+                    }
+                }
+            }
+
+            None
+        }
     }
 
     /// Get the modules.
@@ -688,6 +806,16 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
 /// Watch/template/patch methods remain as no-ops (acceptable for most extensions).
 #[starlark_module]
 fn module_ctx_methods(builder: &mut MethodsBuilder) {
+    /// Report progress to the user.
+    #[allow(unused_variables)]
+    fn report_progress<'v>(
+        this: &ModuleContext,
+        #[starlark(require = pos)] status: &str,
+    ) -> starlark::Result<Value<'v>> {
+        tracing::info!("Extension progress: {}", status);
+        Ok(Value::new_none())
+    }
+
     /// Returns whether the given module uses this extension as a dev dependency.
     ///
     /// In Bazel, module extensions can check if a particular bazel_module has
@@ -1001,10 +1129,17 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
             if let Some(list) = starlark::values::list::ListRef::from_value(arguments) {
                 list.iter()
                     .map(|v| {
-                        // Use unpack_str for strings, to_str() for Label and other types
-                        v.unpack_str()
-                            .map(|s| s.to_owned())
-                            .unwrap_or_else(|| v.to_str())
+                        if v.get_type() == "Label" {
+                            // Resolve Labels via cell path map (Bazel's getPathFromLabel)
+                            let label_str = v.to_str();
+                            this.resolve_label_to_filesystem_path(&label_str)
+                                .map(|p| p.to_string_lossy().to_string())
+                                .unwrap_or(label_str)
+                        } else {
+                            v.unpack_str()
+                                .map(|s| s.to_owned())
+                                .unwrap_or_else(|| v.to_str())
+                        }
                     })
                     .collect()
             } else {
@@ -1143,8 +1278,12 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
         } else if let Some(repo_path) = path.downcast_ref::<RepositoryPath>() {
             repo_path.path_str().to_owned()
         } else if path.get_type() == "Label" {
-            // Handle Label objects: resolve to workspace-relative path.
+            // Handle Label objects: resolve via cell path map (Bazel's getPathFromLabel).
             let label_str = format!("{}", path);
+            if let Some(resolved) = this.resolve_label_to_filesystem_path(&label_str) {
+                return Ok(heap.alloc(RepositoryPath::new(resolved.to_string_lossy().to_string())));
+            }
+            // Fallback to legacy resolution if cell paths not available
             let workspace_root = this
                 .working_dir
                 .as_ref()

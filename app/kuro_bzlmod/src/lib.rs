@@ -47,6 +47,12 @@ pub mod synthetic_repos;
 pub mod types;
 pub mod version;
 
+// ============================================================================
+// Module version registry
+// ============================================================================
+use std::collections::HashMap;
+use std::sync::RwLock;
+
 pub use cache::ModuleCache;
 pub use extension_execution_dice::ModuleExtensionError;
 pub use extension_execution_dice::ModuleExtensionExecutionKey;
@@ -55,6 +61,7 @@ pub use extension_execution_dice::build_canonical_names;
 pub use extension_execution_dice::compute_bzl_transitive_digest;
 pub use extension_execution_dice::create_extension_execution_key;
 pub use extension_execution_dice::extract_extension_name;
+pub use extension_execution_dice::extract_owning_module;
 pub use extension_execution_dice::set_extension_aggregations;
 pub use extensions::AggregatedExtension;
 pub use extensions::aggregate_extensions;
@@ -117,13 +124,6 @@ pub use types::BazelDep;
 pub use types::Module;
 pub use types::UseRepo;
 pub use version::Version;
-
-// ============================================================================
-// Module version registry
-// ============================================================================
-
-use std::collections::HashMap;
-use std::sync::RwLock;
 
 /// Global registry mapping cell/module names to their resolved versions.
 /// Populated during bzlmod resolution, read by module_version() builtin.

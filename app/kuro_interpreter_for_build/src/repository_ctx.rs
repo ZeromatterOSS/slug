@@ -266,15 +266,21 @@ fn repository_path_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Read directory contents.
-    fn readdir(this: &RepositoryPath) -> starlark::Result<Vec<String>> {
+    fn readdir(this: &RepositoryPath) -> starlark::Result<Vec<RepositoryPath>> {
         let abs_path = this.absolute_path();
         if abs_path.is_dir() {
-            let entries: Vec<String> = std::fs::read_dir(&abs_path)
+            let entries: Vec<RepositoryPath> = std::fs::read_dir(&abs_path)
                 .map_err(|e| {
                     starlark::Error::new_other(anyhow!("Failed to read directory: {}", e))
                 })?
                 .filter_map(|entry| entry.ok())
-                .map(|entry| entry.file_name().to_string_lossy().to_string())
+                .map(|entry| {
+                    let child_path = abs_path.join(entry.file_name());
+                    RepositoryPath {
+                        path: child_path.to_string_lossy().to_string(),
+                        base_dir: None,
+                    }
+                })
                 .collect();
             Ok(entries)
         } else {

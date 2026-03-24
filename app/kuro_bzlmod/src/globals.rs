@@ -76,6 +76,21 @@ pub struct ModuleFileContext {
     /// Counter for extension IDs (used to link use_repo to use_extension).
     #[allow(dead_code)]
     extension_counter: usize,
+
+    /// Repository rule invocations from use_repo_rule() calls in MODULE.bazel.
+    /// e.g., http_file(name = "toml2json_linux_amd64", ...)
+    pub repo_rule_invocations: Vec<RepoRuleInvocation>,
+}
+
+/// A repository rule invocation from MODULE.bazel (via use_repo_rule).
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RepoRuleInvocation {
+    /// The repo name (from `name` attribute).
+    pub name: String,
+    /// The rule source: "bzl_path%rule_name".
+    pub rule_source: String,
+    /// Attribute values (excluding name).
+    pub attrs: std::collections::HashMap<String, TagValue>,
 }
 
 /// The module() declaration.
@@ -877,11 +892,39 @@ impl<'v> StarlarkValue<'v> for RepoRuleProxy {
     fn invoke(
         &self,
         _me: Value<'v>,
-        _args: &starlark::eval::Arguments<'v, '_>,
-        _eval: &mut Evaluator<'v, '_, '_>,
+        args: &starlark::eval::Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // No-op: repo rule invocations in MODULE.bazel are handled by
-        // synthetic repos in Kuro, not by executing the actual repo rule.
+        // Record the repo rule invocation so it can be materialized later.
+        // This is called when e.g. http_file(name="toml2json_linux_amd64", ...)
+        // appears in MODULE.bazel via use_repo_rule().
+        let kwargs = args.names_map()?;
+        let name = kwargs
+            .get("name")
+            .and_then(|v| v.unpack_str())
+            .unwrap_or("");
+
+        if !name.is_empty() {
+            // Record in the module context so it can be processed as a cell
+            if let Ok(module_ctx) = get_module_context(eval) {
+                let mut ctx = module_ctx.borrow_mut();
+                // Store as a repo rule invocation with rule source info
+                let rule_source = format!("{}%{}", self.rule_bzl_file, self.rule_name);
+                let mut attrs = std::collections::HashMap::new();
+                for (key, value) in kwargs.iter() {
+                    let key_str = key.as_str();
+                    if key_str != "name" {
+                        attrs.insert(key_str.to_owned(), starlark_to_tag_value(*value)?);
+                    }
+                }
+                ctx.repo_rule_invocations.push(RepoRuleInvocation {
+                    name: name.to_owned(),
+                    rule_source,
+                    attrs,
+                });
+            }
+        }
+
         Ok(Value::new_none())
     }
 }

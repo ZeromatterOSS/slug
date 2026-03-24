@@ -26,6 +26,7 @@ use kuro_bzlmod::resolve_local_modules;
 use kuro_bzlmod::synthetic_repos::collect_synthetic_repos_with_root;
 use kuro_bzlmod::synthetic_repos::materialize_synthetic_repos;
 use kuro_bzlmod::types::ParsedModuleFile;
+use kuro_bzlmod::types::TagValue;
 use kuro_core::cells::CellAliasResolver;
 use kuro_core::cells::CellResolver;
 use kuro_core::cells::alias::NonEmptyCellAlias;
@@ -1151,6 +1152,72 @@ impl BuckConfigBasedCells {
 
         // Add extension aliases to the main aliases list
         aliases.extend(ext_aliases);
+
+        // Process use_repo_rule() invocations from MODULE.bazel files.
+        // These are direct repo rule calls like http_file(name="toml2json_linux_amd64", ...).
+        // They need to be materialized eagerly and registered as cells.
+        {
+            let project_root_path = project_root.root().to_path_buf();
+            for (_module_name, parsed_mod) in &parsed_modules {
+                let module_name = if parsed_mod.module.name.is_empty() {
+                    "_main"
+                } else {
+                    &parsed_mod.module.name
+                };
+                for invocation in &parsed_mod.repo_rule_invocations {
+                    let cell_name_str = invocation.name.clone();
+                    let cell_path_str = format!("bazel-external/{}", cell_name_str);
+
+                    // Skip if already registered
+                    if existing_cell_names.contains(cell_name_str.as_str()) {
+                        continue;
+                    }
+
+                    // Convert TagValue attrs to RepositoryInvocation attrs for the executor
+                    let mut inv = kuro_bzlmod::RepositoryInvocation::new(
+                        invocation.name.clone(),
+                        invocation
+                            .rule_source
+                            .split('%')
+                            .last()
+                            .unwrap_or("unknown")
+                            .to_owned(),
+                    );
+                    inv.rule_source = Some(invocation.rule_source.clone());
+                    for (k, v) in &invocation.attrs {
+                        inv.attrs.insert(k.clone(), tag_value_to_repo_attr(v));
+                    }
+
+                    // Materialize the repo
+                    match kuro_bzlmod::execute_repository_rule(&inv, &project_root_path) {
+                        Ok(_result) => {
+                            tracing::info!(
+                                "Materialized MODULE.bazel repo '{}' from '{}'",
+                                cell_name_str,
+                                module_name
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to materialize MODULE.bazel repo '{}': {}",
+                                cell_name_str,
+                                e
+                            );
+                            continue;
+                        }
+                    }
+
+                    // Register as a cell
+                    if let Ok(cell_name) = CellName::unchecked_new(&cell_name_str) {
+                        if let Ok(cell_path) = ProjectRelativePath::new(&cell_path_str)
+                            .map(|p| CellRootPathBuf::new(p.to_owned()))
+                        {
+                            cells.push((cell_name, cell_path, None));
+                        }
+                    }
+                }
+            }
+        }
 
         let root_module_name = if parsed.module.name.is_empty() {
             "_main".to_owned()
@@ -2356,5 +2423,39 @@ mod tests {
         assert!(e.contains("not a valid SHA1 digest"), "error: {e}");
 
         Ok(())
+    }
+}
+
+/// Convert a TagValue to a repository invocation AttrValue.
+fn tag_value_to_repo_attr(tv: &TagValue) -> kuro_bzlmod::RepoAttrValue {
+    match tv {
+        TagValue::String(s) => {
+            if s.starts_with("//") || s.starts_with("@") || s.starts_with(":") {
+                kuro_bzlmod::RepoAttrValue::Label(s.clone())
+            } else {
+                kuro_bzlmod::RepoAttrValue::String(s.clone())
+            }
+        }
+        TagValue::Int(i) => kuro_bzlmod::RepoAttrValue::Int(*i),
+        TagValue::Bool(b) => kuro_bzlmod::RepoAttrValue::Bool(*b),
+        TagValue::None => kuro_bzlmod::RepoAttrValue::None,
+        TagValue::Label(s) => kuro_bzlmod::RepoAttrValue::Label(s.clone()),
+        TagValue::List(items) => {
+            let strings: Vec<String> = items
+                .iter()
+                .filter_map(|v| match v {
+                    TagValue::String(s) | TagValue::Label(s) => Some(s.clone()),
+                    _ => None,
+                })
+                .collect();
+            kuro_bzlmod::RepoAttrValue::StringList(strings)
+        }
+        TagValue::Dict(entries) => {
+            let map: std::collections::HashMap<String, kuro_bzlmod::RepoAttrValue> = entries
+                .iter()
+                .map(|(k, v)| (k.clone(), tag_value_to_repo_attr(v)))
+                .collect();
+            kuro_bzlmod::RepoAttrValue::Dict(map)
+        }
     }
 }

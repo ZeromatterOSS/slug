@@ -294,6 +294,10 @@ pub struct ParsedModuleFile {
 
     /// Extension usages from `use_extension()` calls.
     pub extension_usages: Vec<ExtensionUsage>,
+
+    /// Repository rule invocations from `use_repo_rule()` calls.
+    /// e.g., http_file(name = "toml2json_linux_amd64", ...)
+    pub repo_rule_invocations: Vec<crate::globals::RepoRuleInvocation>,
 }
 
 // ============================================================================
