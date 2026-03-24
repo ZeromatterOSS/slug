@@ -444,6 +444,265 @@ fix should be minimal and targeted.
 
 ---
 
+## Phase 4: Label-to-Path Resolution in module_ctx
+
+### Overview
+
+In Bazel, `module_ctx.path(Label("@repo//:file"))` and
+`module_ctx.execute([Label("@repo//:tool"), arg1])` resolve Label arguments to
+**filesystem paths** by triggering materialization of the referenced repository.
+This is how the `crate` extension from `rules_rs` runs `toml2json` — it calls
+`ctx.execute([Label(toml2json), toml_file])` where `toml2json` is a Label
+pointing to a tool inside `@rules_rs`.
+
+Currently, kuro's `ModuleContext` has no knowledge of project root, cell paths,
+or how to materialize repos. Label arguments get converted to canonical strings
+like `@@rules_rs//rs/private:toml2json` which aren't valid filesystem paths.
+
+### How Bazel Does It (Reference Architecture)
+
+In Bazel, both `module_ctx` and `repository_ctx` inherit label resolution from
+`StarlarkBaseExternalContext`:
+
+```
+path(Label("@repo//:bin/cargo"))
+  → getPathFromLabel(label)
+    → RepositoryUtils.getRootedPathFromLabel(label, env)
+      → env.getValue(PackageLookupValue.key(@repo//))
+        → PackageLookupFunction requests RepositoryDirectoryValue(@repo)
+          → RepositoryFunction runs: downloads, extracts, runs repo rule
+          → Returns materialized path: output_base/external/@repo/
+        → Returns RootedPath: output_base/external/@repo/bin/cargo
+      → If null (not yet computed): throws NeedsSkyframeRestartException
+        → Skyframe re-queues extension evaluation after repo is ready
+```
+
+Key behaviors:
+1. **Implicit repo materialization**: accessing a Label from another repo
+   automatically fetches/materializes that repo
+2. **Skyframe restart**: if the dependency isn't ready, the extension is
+   suspended and re-run (kuro can't do this — see Design section)
+3. **Labels must be source files**: only files that exist in the fetched repo
+   tree are valid; build outputs are NOT supported
+4. **Same code path for `repository_ctx` and `module_ctx`**: they share the
+   implementation via `StarlarkBaseExternalContext`
+
+### Design: Kuro's Approach
+
+Kuro cannot do Skyframe-style restarts because Starlark evaluation is
+synchronous within `eval_function()`. Instead, we use a **pre-resolution +
+on-demand materialization** approach:
+
+1. **Thread project root + cell path map into `ModuleContext`**: Before entering
+   Starlark evaluation, `try_execute_starlark()` obtains the `CellResolver` from
+   DICE and builds a map of `cell_name → filesystem_path`. This map, along with
+   the project root, is stored on `ModuleContext`.
+
+2. **Resolve Labels via cell path lookup**: When `module_ctx.path(Label)` is
+   called, extract the repo name from the label, look it up in the cell path
+   map, and construct the filesystem path.
+
+3. **On-demand extension repo materialization**: If the repo is an extension
+   repo (lives under `bazel-external/`) and hasn't been materialized yet (no
+   `.kuro_repo_complete` marker), trigger synchronous materialization. This is
+   the kuro equivalent of Bazel's `RepositoryDirectoryValue` dependency.
+
+4. **Same resolution for `execute()` and `path()`**: Both methods use the same
+   label resolution function, matching Bazel's shared `StarlarkBaseExternalContext`
+   pattern.
+
+### Changes Required
+
+#### 1. Add project root and cell path map to `ModuleContext`
+**File**: `app/kuro_interpreter_for_build/src/module_ctx.rs`
+
+Add fields to `ModuleContext`:
+```rust
+pub struct ModuleContext {
+    modules: Vec<SerializedModule>,
+    root_module_has_non_dev_dependency: bool,
+    working_dir: Option<Arc<PathBuf>>,
+    delete_on_close: bool,
+    // NEW: for Label-to-path resolution
+    project_root: Option<PathBuf>,
+    cell_paths: HashMap<String, PathBuf>,  // cell_name → absolute path
+}
+```
+
+Add a builder method:
+```rust
+pub fn with_label_resolution(
+    mut self,
+    project_root: PathBuf,
+    cell_paths: HashMap<String, PathBuf>,
+) -> Self {
+    self.project_root = Some(project_root);
+    self.cell_paths = cell_paths;
+    self
+}
+```
+
+#### 2. Build cell path map in `try_execute_starlark()`
+**File**: `app/kuro_interpreter_for_build/src/module_extension_executor_impl.rs`
+
+After obtaining the `CellResolver` (line ~186), build the cell path map:
+```rust
+let cell_resolver = ctx.get_cell_resolver().await?;
+let io = ctx.global_data().get_io_provider();
+let project_root = io.project_root().root().to_path_buf();
+
+// Build cell_name → absolute_path map for Label resolution
+let mut cell_paths = HashMap::new();
+for cell_name in cell_resolver.cells() {
+    if let Ok(cell_instance) = cell_resolver.get(cell_name) {
+        let rel_path = cell_instance.path().as_project_relative_path();
+        cell_paths.insert(
+            cell_name.as_str().to_owned(),
+            project_root.join(rel_path.as_str()),
+        );
+    }
+}
+```
+
+Then in `execute_extension()`, chain this onto the module_ctx:
+```rust
+let module_ctx = build_module_context(aggregated, root_module_name)
+    .with_temp_working_dir(working_dir.clone())
+    .with_label_resolution(project_root, cell_paths);
+```
+
+This requires restructuring so the cell_paths are built in `execute_extension()`
+(which has DICE access) rather than after `build_module_context()` is called.
+
+#### 3. Implement `resolve_label_to_filesystem_path()` on `ModuleContext`
+**File**: `app/kuro_interpreter_for_build/src/module_ctx.rs`
+
+Add a method to `ModuleContext` that resolves a label string or BazelLabel to
+an absolute filesystem path:
+
+```rust
+fn resolve_label_to_filesystem_path(&self, label_str: &str) -> Option<PathBuf> {
+    let project_root = self.project_root.as_ref()?;
+
+    // Parse @@repo//pkg:target format
+    let stripped = label_str.trim_start_matches('@');
+    let (repo, rest) = stripped.split_once("//")?;
+    let (pkg, target) = rest.split_once(':').unwrap_or((rest, rest.rsplit('/').next()?));
+
+    if repo.is_empty() {
+        // Root repo: project_root/pkg/target
+        Some(project_root.join(pkg).join(target))
+    } else {
+        // External repo: look up in cell_paths
+        // Try exact match first, then try with version suffix patterns
+        self.cell_paths.get(repo)
+            .or_else(|| {
+                // Try matching cell names that start with repo+ (versioned)
+                self.cell_paths.iter()
+                    .find(|(k, _)| k.starts_with(&format!("{}+", repo)))
+                    .map(|(_, v)| v)
+            })
+            .map(|repo_path| {
+                if pkg.is_empty() {
+                    repo_path.join(target)
+                } else {
+                    repo_path.join(pkg).join(target)
+                }
+            })
+    }
+}
+```
+
+#### 4. Update `path()` to use cell-based resolution
+**File**: `app/kuro_interpreter_for_build/src/module_ctx.rs`
+
+Replace the current `resolve_label_to_path()` call with the new method:
+```rust
+// In the Label branch of path():
+if let Some(resolved) = this.resolve_label_to_filesystem_path(&label_str) {
+    let path_str = resolved.to_string_lossy().to_string();
+    return Ok(heap.alloc(RepositoryPath::with_base_dir(path_str.clone(), resolved)));
+}
+// Fallback to working_dir-relative resolution for compatibility
+```
+
+#### 5. Update `execute()` to resolve Label arguments to paths
+**File**: `app/kuro_interpreter_for_build/src/module_ctx.rs`
+
+In the `execute()` method, when building the args list, resolve Labels:
+```rust
+let args: Vec<String> = if let Some(list) = ListRef::from_value(arguments) {
+    list.iter()
+        .map(|v| {
+            if v.get_type() == "Label" {
+                let label_str = v.to_str();
+                this.resolve_label_to_filesystem_path(&label_str)
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or(label_str)
+            } else {
+                v.unpack_str()
+                    .map(|s| s.to_owned())
+                    .unwrap_or_else(|| v.to_str())
+            }
+        })
+        .collect()
+} else { ... };
+```
+
+#### 6. Handle on-demand extension repo materialization (optional, may defer)
+**File**: `app/kuro_interpreter_for_build/src/module_ctx.rs`
+
+When `resolve_label_to_filesystem_path()` returns a path under `bazel-external/`
+and the directory doesn't exist or lacks `.kuro_repo_complete`, we need to
+trigger materialization. Since we don't have DICE access inside the Starlark
+eval, there are two options:
+
+**Option A (simpler, recommended for initial implementation):**
+Require that all referenced repos are already materialized. Extension repos
+that are needed by other extensions should be materialized as part of the DICE
+dependency chain — i.e., the extension execution for the dependency should
+complete before the dependent extension starts.
+
+For the `crate` extension's use of `Label("@rules_rs//rs/private:toml2json")`:
+this is a **source file** inside the `rules_rs` repo (fetched via
+`archive_override`). It should already exist at
+`bazel-external/rules_rs+override/rs/private/toml2json`. No extension repo
+materialization is needed — the repo is a regular bzlmod cell, not an extension
+repo.
+
+**Option B (full Bazel parity, future work):**
+Store a callback/handle that can trigger synchronous DICE execution for repo
+materialization. This would require threading a `tokio::Runtime` handle and a
+DICE transaction reference into `ModuleContext` so the synchronous Starlark
+code can block on an async materialization. This is complex and should only be
+done if Option A proves insufficient.
+
+### Key Insight: The toml2json Case
+
+The current blocker `ctx.execute([Label(toml2json), toml_file])` is actually
+**Option A** — `toml2json` is a source file within the `rules_rs` repo, not an
+extension-generated repo. The `rules_rs` module was fetched via
+`archive_override` and should already exist at
+`bazel-external/rules_rs+override/`. The only missing piece is that
+`ModuleContext.resolve_label_to_filesystem_path()` needs to know where
+`rules_rs` lives on disk. Threading the cell path map solves this.
+
+### Success Criteria
+
+#### Automated Verification:
+- [ ] `cargo check` passes
+- [ ] `cargo test -p kuro_interpreter_for_build` — all tests pass
+- [ ] `module_ctx.path("some/path")` still works (string case)
+- [ ] `module_ctx.path(Label("@repo//:file"))` resolves to correct filesystem path
+- [ ] `module_ctx.execute([Label("@repo//:tool")])` resolves label to path before exec
+
+#### Manual Verification:
+- [ ] `kuro build //sdk:sdk` in zeromatter progresses past `toml2json` execution
+- [ ] The `crate` extension can locate and run `toml2json` from `@rules_rs`
+- [ ] Extension repos that depend on other extension repos' source files work
+
+---
+
 ## Anti-Patterns to Avoid
 
 ### DO NOT write synthetic Rust code that reimplements extension logic
