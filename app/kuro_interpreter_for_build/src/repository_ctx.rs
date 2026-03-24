@@ -1041,12 +1041,12 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     fn download_and_extract<'v>(
         this: &RepositoryContext,
         #[starlark(require = pos)] url: Value<'v>,
-        #[starlark(require = pos, default = "")] output: &str,
-        #[starlark(require = pos, default = "")] sha256: &str,
+        #[starlark(default = "")] output: &str,
+        #[starlark(default = "")] sha256: &str,
         #[allow(unused_variables)]
-        #[starlark(require = pos, default = "")]
+        #[starlark(default = "")]
         r#type: &str,
-        #[starlark(require = pos, default = "")] strip_prefix: &str,
+        #[starlark(default = "")] strip_prefix: &str,
         #[starlark(require = named, default = false)] allow_fail: bool,
         #[allow(unused_variables)]
         #[starlark(require = named, default = "")]
