@@ -172,6 +172,41 @@ fn starlark_to_repo_attr_value(value: Value) -> RepoAttrValue {
     RepoAttrValue::String(value.to_repr())
 }
 
+/// Convert a CoercedAttr default value to RepoAttrValue.
+///
+/// This handles common cases so that repository rule attribute defaults are
+/// included in RepoSpecs. In Bazel, defaults are automatically applied;
+/// in kuro, we need to extract them from the attr definition.
+fn coerced_attr_to_repo_attr_value(
+    attr: &kuro_node::attrs::coerced_attr::CoercedAttr,
+) -> Option<RepoAttrValue> {
+    use kuro_node::attrs::coerced_attr::CoercedAttr;
+    match attr {
+        CoercedAttr::String(s) => {
+            let s = s.as_str().to_owned();
+            if s.starts_with("//") || s.starts_with("@") || s.starts_with(":") {
+                Some(RepoAttrValue::Label(s))
+            } else {
+                Some(RepoAttrValue::String(s))
+            }
+        }
+        CoercedAttr::Int(i) => Some(RepoAttrValue::Int(*i)),
+        CoercedAttr::Bool(b) => Some(RepoAttrValue::Bool(b.0)),
+        CoercedAttr::None => Some(RepoAttrValue::None),
+        CoercedAttr::List(list) => {
+            let items: Vec<String> = list
+                .iter()
+                .filter_map(|v| match v {
+                    CoercedAttr::String(s) => Some(s.as_str().to_owned()),
+                    _ => None,
+                })
+                .collect();
+            Some(RepoAttrValue::StringList(items))
+        }
+        _ => None, // Other types not yet needed
+    }
+}
+
 // ============================================================================
 // StarlarkRepositoryRule - The value returned from repository_rule()
 // ============================================================================
@@ -434,6 +469,19 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRepositoryRule {
                 if key_str != "name" {
                     let attr_value = starlark_to_repo_attr_value(*value);
                     spec.attributes.insert(key_str.to_owned(), attr_value);
+                }
+            }
+
+            // Apply default values from the rule's declared attrs.
+            // This ensures attrs like `urls = attr.string_list(default = [...])` are
+            // present in the RepoSpec even when not explicitly passed by the caller.
+            for (attr_name, attr_def) in &self.attrs {
+                if !spec.attributes.contains_key(attr_name) {
+                    if let Some(default) = attr_def.default() {
+                        if let Some(default_val) = coerced_attr_to_repo_attr_value(default) {
+                            spec.attributes.insert(attr_name.clone(), default_val);
+                        }
+                    }
                 }
             }
 

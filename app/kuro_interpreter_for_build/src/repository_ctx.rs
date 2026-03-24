@@ -243,6 +243,7 @@ fn repository_path_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Check if a file/directory exists at this path.
+    #[starlark(attribute)]
     fn exists(this: &RepositoryPath) -> starlark::Result<bool> {
         Ok(this.absolute_path().exists())
     }
@@ -919,11 +920,19 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos, default = "")] sha256: &str,
         #[starlark(require = named, default = false)] executable: bool,
         #[starlark(require = named, default = false)] allow_fail: bool,
-        #[starlark(require = named, default = "")] _canonical_id: &str,
-        #[starlark(require = named)] _auth: Option<Value<'v>>,
+        #[allow(unused_variables)]
+        #[starlark(require = named, default = "")]
+        canonical_id: &str,
+        #[allow(unused_variables)]
+        #[starlark(require = named)]
+        auth: Option<Value<'v>>,
         #[starlark(require = named, default = "")] integrity: &str,
-        #[starlark(require = named)] _headers: Option<Value<'v>>,
-        #[starlark(require = named, default = 0)] _block: i32,
+        #[allow(unused_variables)]
+        #[starlark(require = named)]
+        headers: Option<Value<'v>>,
+        #[allow(unused_variables)]
+        #[starlark(require = named, default = true)]
+        block: bool,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let urls = get_urls_from_value(url);
@@ -1034,14 +1043,24 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] url: Value<'v>,
         #[starlark(require = pos, default = "")] output: &str,
         #[starlark(require = pos, default = "")] sha256: &str,
-        #[starlark(require = pos, default = "")] _type: &str,
+        #[allow(unused_variables)]
+        #[starlark(require = pos, default = "")]
+        r#type: &str,
         #[starlark(require = pos, default = "")] strip_prefix: &str,
         #[starlark(require = named, default = false)] allow_fail: bool,
-        #[starlark(require = named, default = "")] _canonical_id: &str,
-        #[starlark(require = named)] _auth: Option<Value<'v>>,
+        #[allow(unused_variables)]
+        #[starlark(require = named, default = "")]
+        canonical_id: &str,
+        #[allow(unused_variables)]
+        #[starlark(require = named)]
+        auth: Option<Value<'v>>,
         #[starlark(require = named, default = "")] integrity: &str,
-        #[starlark(require = named)] _rename_files: Option<Value<'v>>,
-        #[starlark(require = named)] _headers: Option<Value<'v>>,
+        #[allow(unused_variables)]
+        #[starlark(require = named)]
+        rename_files: Option<Value<'v>>,
+        #[allow(unused_variables)]
+        #[starlark(require = named)]
+        headers: Option<Value<'v>>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let urls = get_urls_from_value(url);
@@ -1372,10 +1391,11 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Read a file and return its contents.
+    #[allow(unused_variables)]
     fn read(
         this: &RepositoryContext,
         #[starlark(require = pos)] path: &str,
-        #[starlark(require = named, default = "auto")] _watch: &str,
+        #[starlark(require = named, default = "auto")] watch: &str,
     ) -> starlark::Result<String> {
         let file_path = this.resolve_path(path);
         std::fs::read_to_string(&file_path)
