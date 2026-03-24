@@ -402,10 +402,26 @@ fix should be minimal and targeted.
     string, breaking `type(value) == "Label"` checks and `str()` canonical form. Fixed: allocate as
     `BazelLabel::parse(s)` so `type()` returns `"Label"` and `str()` includes `@@` prefix.
 
+#### Additional bugs fixed (2026-03-24 continued):
+11. **Select | dict merge**: Implemented `bit_or` for StarlarkSelector.
+12. **Transitive deps of overridden modules not resolved**: archive_override modules' deps were
+    never queued for BFS resolution. Fixed: queue overridden modules' deps after override resolution.
+13. **Stub repos for failed extensions**: When extensions fail gracefully, create stub repos with
+    BUILD.bazel + defs.bzl so dependent extensions can still load.
+14. **module_ctx.read() watch parameter**: starlark macro keeps underscore prefix. Renamed `_watch` to `watch`.
+15. **download() output param must be positional**: Changed from named-only to positional.
+16. **DownloadToken for async downloads**: When `block=False`, return token with `.wait()` method.
+17. **BazelModuleTags unknown tag classes**: Return empty list for classes not used by module.
+18. **TagInstance with None defaults**: Missing tag attrs now return None instead of erroring.
+19. **module_ctx.execute() Label objects**: Convert Labels to strings via `to_str()`.
+
 #### Current blocker (2026-03-24):
-- `Select | dict` merge operation not supported. `rules_python` py_executable.bzl uses
-  `default | config_settings` where `default` is `select({...})` and `config_settings` is a dict.
-  This requires implementing dict union on Select values in Starlark.
+- `module_ctx.execute()` with Label args: The crate extension calls
+  `ctx.execute([Label(toml2json), ...])` where `toml2json` is a build target label. The Label
+  gets converted to a canonical string like `@@rules_rs//rs/private:toml2json` which isn't a
+  valid filesystem path. In Bazel, `module_ctx.execute()` resolves Labels to physical paths by
+  materializing the referenced repo/target. This requires building the label resolution + repo
+  materialization pipeline for module_ctx.
 
 #### Verified:
 - `kuro build //app:calculator` in `examples/multi_package` — **BUILD SUCCEEDED**
