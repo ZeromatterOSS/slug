@@ -79,6 +79,7 @@ use starlark::values::starlark_value_as_type::StarlarkValueAsType;
 use starlark::values::structs::AllocStruct;
 
 use crate::repository_ctx::DownloadInfo;
+use crate::repository_ctx::DownloadToken;
 use crate::repository_ctx::ExecutionResult;
 use crate::repository_ctx::RepositoryPath;
 use crate::repository_ctx::download_url;
@@ -234,12 +235,58 @@ impl SerializedTag {
 
     /// Convert to a Starlark struct value.
     pub fn to_starlark_struct<'v>(&self, heap: Heap<'v>) -> Value<'v> {
-        let fields: SmallMap<&str, Value<'v>> = self
+        let fields: HashMap<String, SerializedTagValue> = self
             .kwargs
             .iter()
-            .map(|(k, v)| (k.as_str(), v.to_starlark(heap)))
+            .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
-        heap.alloc(AllocStruct(fields.into_iter()))
+        heap.alloc(TagInstance { fields })
+    }
+}
+
+// ============================================================================
+// TagInstance - A tag instance that returns None for missing attributes
+// ============================================================================
+
+/// A tag instance from module extension tags. Unlike regular structs, accessing
+/// a missing attribute returns None (matching Bazel behavior where tag attrs
+/// have default values, typically None for optional attrs).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Clone)]
+pub struct TagInstance {
+    fields: HashMap<String, SerializedTagValue>,
+}
+
+impl std::fmt::Display for TagInstance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "tag_instance({})",
+            self.fields.keys().cloned().collect::<Vec<_>>().join(", ")
+        )
+    }
+}
+
+starlark_simple_value!(TagInstance);
+
+#[starlark_value(type = "struct")]
+impl<'v> StarlarkValue<'v> for TagInstance {
+    fn has_attr(&self, _attribute: &str, _heap: Heap<'v>) -> bool {
+        true
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match self.fields.get(attribute) {
+            Some(v) => Some(v.to_starlark(heap)),
+            None => Some(Value::new_none()),
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        self.fields.keys().cloned().collect()
+    }
+
+    fn get_type_starlark_repr() -> starlark::typing::Ty {
+        starlark::typing::Ty::any()
     }
 }
 
@@ -291,18 +338,19 @@ impl BazelModuleTags {
 
 #[starlark_value(type = "bazel_module_tags")]
 impl<'v> StarlarkValue<'v> for BazelModuleTags {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        self.tags_by_class.contains_key(attribute)
+    fn has_attr(&self, _attribute: &str, _heap: Heap<'v>) -> bool {
+        // All tag class names are valid attributes. Unknown ones return empty lists.
+        // This is needed because the tag class names are defined by the extension
+        // (in tag_classes={}), and a module may not use all tag classes.
+        true
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        self.tags_by_class.get(attribute).map(|tags| {
-            let structs: Vec<Value<'v>> = tags
-                .iter()
-                .map(|tag| tag.to_starlark_struct(heap))
-                .collect();
-            heap.alloc(structs)
-        })
+        let tags = self.tags_by_class.get(attribute);
+        let structs: Vec<Value<'v>> = tags
+            .map(|t| t.iter().map(|tag| tag.to_starlark_struct(heap)).collect())
+            .unwrap_or_default();
+        Some(heap.alloc(structs))
     }
 
     fn dir_attr(&self) -> Vec<String> {
@@ -656,10 +704,11 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Read a file and return its contents as a string.
+    #[allow(unused_variables)]
     fn read(
         this: &ModuleContext,
         #[starlark(require = pos)] path: Value,
-        #[starlark(require = named, default = "auto")] _watch: &str,
+        #[starlark(require = named, default = "auto")] watch: &str,
     ) -> starlark::Result<String> {
         let path_str = path.unpack_str().unwrap_or("");
         let resolved = if Path::new(path_str).is_absolute() {
@@ -731,15 +780,23 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
     fn download<'v>(
         this: &ModuleContext,
         #[starlark(require = pos)] url: Value<'v>,
-        #[starlark(require = named, default = "")] output: &str,
+        #[starlark(require = pos, default = "")] output: &str,
         #[starlark(require = named, default = "")] sha256: &str,
         #[starlark(require = named, default = "")] integrity: &str,
         #[starlark(require = named, default = false)] executable: bool,
         #[starlark(require = named, default = true)] allow_fail: bool,
-        #[starlark(require = named, default = "")] _canonical_id: &str,
-        #[starlark(require = named)] _auth: Option<Value<'v>>,
-        #[starlark(require = named)] _headers: Option<Value<'v>>,
-        #[starlark(require = named, default = 0)] _block: i32,
+        #[allow(unused_variables)]
+        #[starlark(require = named, default = "")]
+        canonical_id: &str,
+        #[allow(unused_variables)]
+        #[starlark(require = named)]
+        auth: Option<Value<'v>>,
+        #[allow(unused_variables)]
+        #[starlark(require = named)]
+        headers: Option<Value<'v>>,
+        #[allow(unused_variables)]
+        #[starlark(require = named, default = true)]
+        block: bool,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let urls = get_urls_from_value(url);
@@ -825,7 +882,12 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
                     #[cfg(not(unix))]
                     let _ = executable;
 
-                    return Ok(heap.alloc(DownloadInfo::new(true, &data)));
+                    let info = DownloadInfo::new(true, &data);
+                    if block {
+                        return Ok(heap.alloc(info));
+                    } else {
+                        return Ok(heap.alloc(DownloadToken { info }));
+                    }
                 }
                 Err(e) => {
                     last_error = Some(e);
@@ -938,7 +1000,12 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
         let args: Vec<String> =
             if let Some(list) = starlark::values::list::ListRef::from_value(arguments) {
                 list.iter()
-                    .filter_map(|v| v.unpack_str().map(|s| s.to_owned()))
+                    .map(|v| {
+                        // Use unpack_str for strings, to_str() for Label and other types
+                        v.unpack_str()
+                            .map(|s| s.to_owned())
+                            .unwrap_or_else(|| v.to_str())
+                    })
                     .collect()
             } else {
                 return Err(starlark::Error::new_other(anyhow!(

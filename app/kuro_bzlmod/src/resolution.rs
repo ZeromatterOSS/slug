@@ -398,6 +398,30 @@ impl MvsResolver {
                 .await?;
         }
 
+        // Queue transitive deps of overridden modules (they won't be visited
+        // during BFS since overridden modules are skipped in the queue).
+        let overridden_deps: Vec<BazelDep> = self
+            .overridden_modules
+            .values()
+            .flat_map(|discovered| {
+                discovered
+                    .module
+                    .bazel_deps
+                    .iter()
+                    .filter(|d| !d.dev_dependency)
+                    .filter(|d| !self.overridden_modules.contains_key(&d.name))
+                    .map(|d| BazelDep {
+                        name: d.name.clone(),
+                        version: self.get_effective_version(d),
+                        repo_name: d.repo_name.clone(),
+                        dev_dependency: d.dev_dependency,
+                    })
+            })
+            .collect();
+        for dep in overridden_deps {
+            queue.push_back((dep, None));
+        }
+
         // Add root's direct dependencies to queue
         for dep in &root.bazel_deps {
             if dep.dev_dependency {
@@ -528,15 +552,26 @@ impl MvsResolver {
             Override::Git(g) => {
                 // Fetch the git repo to a cache directory and parse its MODULE.bazel
                 let cache_key = format!("git-{}", g.commit);
-                let dest_dir = self.cache.base_dir().join("overrides").join(&g.module_name).join(&cache_key);
+                let dest_dir = self
+                    .cache
+                    .base_dir()
+                    .join("overrides")
+                    .join(&g.module_name)
+                    .join(&cache_key);
                 let complete_marker = dest_dir.join(".complete");
 
                 if !complete_marker.exists() {
-                    tracing::info!("Fetching git override for {} from {} at {}", g.module_name, g.remote, g.commit);
+                    tracing::info!(
+                        "Fetching git override for {} from {} at {}",
+                        g.module_name,
+                        g.remote,
+                        g.commit
+                    );
                     if dest_dir.exists() {
                         let _ = std::fs::remove_dir_all(&dest_dir);
                     }
-                    std::fs::create_dir_all(&dest_dir).buck_error_context("Failed to create git override dir")?;
+                    std::fs::create_dir_all(&dest_dir)
+                        .buck_error_context("Failed to create git override dir")?;
 
                     let source_info = crate::registry::SourceInfo {
                         source_type: Some("git_repository".to_string()),
@@ -551,8 +586,11 @@ impl MvsResolver {
                         shallow_since: g.shallow_since.clone(),
                     };
 
-                    self.source_fetcher.fetch_git_direct(&source_info, &dest_dir).await?;
-                    std::fs::write(&complete_marker, "").buck_error_context("Failed to write git override marker")?;
+                    self.source_fetcher
+                        .fetch_git_direct(&source_info, &dest_dir)
+                        .await?;
+                    std::fs::write(&complete_marker, "")
+                        .buck_error_context("Failed to write git override marker")?;
                 } else {
                     tracing::debug!("Using cached git override for {}", g.module_name);
                 }
@@ -560,9 +598,13 @@ impl MvsResolver {
                 // Parse MODULE.bazel from the fetched source
                 let module_bazel_path = dest_dir.join("MODULE.bazel");
                 let parsed_module = if module_bazel_path.exists() {
-                    let parsed = parse_module_bazel(&module_bazel_path).with_buck_error_context(|| {
-                        format!("Failed to parse MODULE.bazel for git override '{}'", g.module_name)
-                    })?;
+                    let parsed =
+                        parse_module_bazel(&module_bazel_path).with_buck_error_context(|| {
+                            format!(
+                                "Failed to parse MODULE.bazel for git override '{}'",
+                                g.module_name
+                            )
+                        })?;
                     parsed.module
                 } else {
                     let mut module = Module::empty();
@@ -591,29 +633,43 @@ impl MvsResolver {
                 // Fetch the archive to a cache directory and parse its MODULE.bazel
                 let cache_key = format!("archive-{:x}", {
                     use std::collections::hash_map::DefaultHasher;
-                    use std::hash::{Hash, Hasher};
+                    use std::hash::Hash;
+                    use std::hash::Hasher;
                     let mut h = DefaultHasher::new();
                     a.urls.hash(&mut h);
                     a.integrity.hash(&mut h);
                     h.finish()
                 });
-                let dest_dir = self.cache.base_dir().join("overrides").join(&a.module_name).join(&cache_key);
+                let dest_dir = self
+                    .cache
+                    .base_dir()
+                    .join("overrides")
+                    .join(&a.module_name)
+                    .join(&cache_key);
                 let complete_marker = dest_dir.join(".complete");
 
                 if !complete_marker.exists() {
-                    tracing::info!("Fetching archive override for {} from {:?}", a.module_name, a.urls);
+                    tracing::info!(
+                        "Fetching archive override for {} from {:?}",
+                        a.module_name,
+                        a.urls
+                    );
                     if dest_dir.exists() {
                         let _ = std::fs::remove_dir_all(&dest_dir);
                     }
-                    std::fs::create_dir_all(&dest_dir).buck_error_context("Failed to create archive override dir")?;
+                    std::fs::create_dir_all(&dest_dir)
+                        .buck_error_context("Failed to create archive override dir")?;
 
-                    self.source_fetcher.fetch_archive_direct(
-                        &a.urls,
-                        a.integrity.as_deref(),
-                        a.strip_prefix.as_deref(),
-                        &dest_dir,
-                    ).await?;
-                    std::fs::write(&complete_marker, "").buck_error_context("Failed to write archive override marker")?;
+                    self.source_fetcher
+                        .fetch_archive_direct(
+                            &a.urls,
+                            a.integrity.as_deref(),
+                            a.strip_prefix.as_deref(),
+                            &dest_dir,
+                        )
+                        .await?;
+                    std::fs::write(&complete_marker, "")
+                        .buck_error_context("Failed to write archive override marker")?;
                 } else {
                     tracing::debug!("Using cached archive override for {}", a.module_name);
                 }
@@ -621,9 +677,13 @@ impl MvsResolver {
                 // Parse MODULE.bazel from the fetched source
                 let module_bazel_path = dest_dir.join("MODULE.bazel");
                 let parsed_module = if module_bazel_path.exists() {
-                    let parsed = parse_module_bazel(&module_bazel_path).with_buck_error_context(|| {
-                        format!("Failed to parse MODULE.bazel for archive override '{}'", a.module_name)
-                    })?;
+                    let parsed =
+                        parse_module_bazel(&module_bazel_path).with_buck_error_context(|| {
+                            format!(
+                                "Failed to parse MODULE.bazel for archive override '{}'",
+                                a.module_name
+                            )
+                        })?;
                     parsed.module
                 } else {
                     let mut module = Module::empty();

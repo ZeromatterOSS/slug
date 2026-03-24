@@ -40,8 +40,8 @@ use kuro_common::file_ops::metadata::RawPathMetadata;
 use kuro_common::file_ops::metadata::RawSymlink;
 use kuro_common::file_ops::metadata::TrackedFileDigest;
 use kuro_core::cells::cell_path::CellPath;
-use kuro_core::cells::external::ExternalCellOrigin;
 use kuro_core::cells::external::ExtensionRepoCellSetup;
+use kuro_core::cells::external::ExternalCellOrigin;
 use kuro_core::cells::name::CellName;
 use kuro_core::cells::paths::CellRelativePath;
 use kuro_core::cells::paths::CellRelativePathBuf;
@@ -306,7 +306,9 @@ async fn declare_all_source_artifacts_ext(
     setup: &ExtensionRepoCellSetup,
     source_path: &std::path::Path,
 ) -> kuro_error::Result<()> {
-    let artifact_fs = kuro_build_api::actions::artifact::get_artifact_fs::GetArtifactFs::get_artifact_fs(ctx).await?;
+    let artifact_fs =
+        kuro_build_api::actions::artifact::get_artifact_fs::GetArtifactFs::get_artifact_fs(ctx)
+            .await?;
     let buck_out_resolver = artifact_fs.buck_out_path_resolver();
 
     let mut requests = Vec::new();
@@ -459,18 +461,30 @@ pub(crate) async fn get_file_ops_delegate(
                 reason: format!("Extension '{}' execution failed: {}", setup.extension_id, e),
             })?;
 
-            ext_result
-                .get_repo_spec(&setup.internal_name)
-                .cloned()
-                .ok_or_else(|| ExtensionRepoError::MaterializationFailed {
-                    canonical_name: setup.canonical_name.to_string(),
-                    reason: format!(
-                        "Extension '{}' did not generate repo '{}' (available: {:?})",
+            match ext_result.get_repo_spec(&setup.internal_name).cloned() {
+                Some(spec) => spec,
+                None => {
+                    // Extension didn't generate this repo. This commonly happens when an
+                    // optional extension (e.g., telemetry) fails gracefully. Create a
+                    // minimal stub repo so that load() calls don't crash.
+                    tracing::warn!(
+                        "Extension '{}' did not generate repo '{}' (available: {:?}). \
+                         Creating stub repo.",
                         setup.extension_id,
                         setup.internal_name,
                         ext_result.repo_names().collect::<Vec<_>>()
-                    ),
-                })?
+                    );
+                    materialize_stub_repo(&project_root_path, &setup.canonical_name)?;
+                    // The stub repo is now on disk; create file ops delegate from it
+                    declare_all_source_artifacts_ext(ctx, &setup, &source_path).await?;
+                    return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
+                        cell_name,
+                        setup.canonical_name.to_string(),
+                        source_path.clone(),
+                        digest_config,
+                    )));
+                }
+            }
         };
 
         // Create the execution key for lazy materialization
@@ -553,4 +567,81 @@ pub(crate) async fn copy_to_destination(
 
     // Copy recursively using the same helper as repository_rule
     crate::repository_rule::copy_to_destination_impl(&source_path, dest_path).await
+}
+
+/// Create a minimal stub repo for an extension that failed to generate a repo.
+///
+/// This creates a directory with a BUILD.bazel and WORKSPACE.bazel so that
+/// load() calls referencing this repo will find valid (empty) files rather
+/// than causing "cell not found" errors.
+fn materialize_stub_repo(
+    project_root: &std::path::Path,
+    canonical_name: &str,
+) -> kuro_error::Result<()> {
+    let dest = project_root.join("bazel-external").join(canonical_name);
+    if !dest.exists() {
+        std::fs::create_dir_all(&dest).map_err(|e| {
+            kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Environment,
+                "Failed to create stub repo dir for '{}': {}",
+                canonical_name,
+                e
+            )
+        })?;
+    }
+
+    // Write a minimal BUILD.bazel
+    let build_path = dest.join("BUILD.bazel");
+    if !build_path.exists() {
+        std::fs::write(
+            &build_path,
+            "# Stub repo (extension did not generate this repo)\n",
+        )
+        .map_err(|e| {
+            kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Environment,
+                "Failed to write stub BUILD.bazel for '{}': {}",
+                canonical_name,
+                e
+            )
+        })?;
+    }
+
+    // Write WORKSPACE.bazel
+    let ws_path = dest.join("WORKSPACE.bazel");
+    if !ws_path.exists() {
+        std::fs::write(&ws_path, "").map_err(|e| {
+            kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Environment,
+                "Failed to write stub WORKSPACE.bazel for '{}': {}",
+                canonical_name,
+                e
+            )
+        })?;
+    }
+
+    // Write defs.bzl with empty TELEMETRY value (common pattern for telemetry repos)
+    let defs_path = dest.join("defs.bzl");
+    if !defs_path.exists() {
+        std::fs::write(
+            &defs_path,
+            "# Stub defs.bzl (extension did not generate this repo)\nTELEMETRY = struct(enabled = False)\n",
+        )
+        .map_err(|e| {
+            kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Environment,
+                "Failed to write stub defs.bzl for '{}': {}",
+                canonical_name,
+                e
+            )
+        })?;
+    }
+
+    // Mark as complete
+    let marker = dest.join(".kuro_repo_complete");
+    let _ = std::fs::write(&marker, "stub");
+
+    tracing::info!("Created stub repo for '{}' at {:?}", canonical_name, dest);
+
+    Ok(())
 }

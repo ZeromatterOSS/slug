@@ -305,6 +305,19 @@ where
         }
     }
 
+    /// Bazel supports `select({...}) | dict` for dict union on select values.
+    /// This works the same as `+` — creates a concatenation that is resolved
+    /// during configuration.
+    fn bit_or(&self, other: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        match self.add(other, heap) {
+            Some(result) => result,
+            None => Err(starlark::Error::new_other(anyhow::anyhow!(
+                "Operation `|` not supported for types `Select` and `{}`",
+                other.get_type()
+            ))),
+        }
+    }
+
     // used to provide the type documentation here
     fn get_methods() -> Option<&'static Methods> {
         static RES: MethodsStatic = MethodsStatic::new();

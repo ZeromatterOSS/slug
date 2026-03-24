@@ -362,6 +362,61 @@ impl<'v> StarlarkValue<'v> for DownloadInfo {
 }
 
 // ============================================================================
+// DownloadToken - Async download token with .wait() method
+// ============================================================================
+
+/// Token returned from download() when block=False.
+/// Calling .wait() returns the DownloadInfo.
+#[derive(Debug, Display, ProvidesStaticType, NoSerialize, Allocative, Clone)]
+#[display("<download_token>")]
+pub struct DownloadToken {
+    pub info: DownloadInfo,
+}
+
+starlark_simple_value!(DownloadToken);
+
+#[starlark_value(type = "download_token")]
+impl<'v> StarlarkValue<'v> for DownloadToken {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "wait" | "success" | "integrity" | "sha256")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "success" => Some(Value::new_bool(self.info.success)),
+            "integrity" => Some(heap.alloc(&self.info.integrity as &str)),
+            "sha256" => Some(heap.alloc(&self.info.sha256 as &str)),
+            _ => None,
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec![
+            "wait".to_owned(),
+            "success".to_owned(),
+            "integrity".to_owned(),
+            "sha256".to_owned(),
+        ]
+    }
+
+    fn get_type_starlark_repr() -> Ty {
+        Ty::any()
+    }
+
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(download_token_methods)
+    }
+}
+
+#[starlark_module]
+fn download_token_methods(builder: &mut MethodsBuilder) {
+    fn wait<'v>(this: &DownloadToken, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        Ok(heap.alloc(this.info.clone()))
+    }
+}
+
+// ============================================================================
 // ExecutionResult - Result of executing a command
 // ============================================================================
 
