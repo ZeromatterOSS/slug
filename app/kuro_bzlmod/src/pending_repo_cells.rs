@@ -149,10 +149,16 @@ pub fn pre_compute_extension_repo_cells(
             let ext_id = usage.extension_id();
             let ext_name = extract_extension_name(&ext_id);
 
+            // The canonical name prefix is the module that OWNS the .bzl file, not
+            // the module that uses the extension. For `@bazel_features//private:ext.bzl`,
+            // the owning module is `bazel_features`. For `//local:ext.bzl`, it's the
+            // current module.
+            let owner_module = extract_owning_module(&usage.extension_bzl_file, module_name);
+
             for import in &usage.imports {
                 // Positional repos: use_repo(ext, "numpy", "requests")
                 for repo_name in &import.repos {
-                    let canonical = format!("{}+{}+{}", module_name, ext_name, repo_name);
+                    let canonical = format!("{}+{}+{}", owner_module, ext_name, repo_name);
 
                     if seen_canonical.insert(canonical.clone()) {
                         let path = format!("bazel-external/{}", canonical);
@@ -177,7 +183,7 @@ pub fn pre_compute_extension_repo_cells(
 
                 // Keyword repos: use_repo(ext, myname = "actual_repo")
                 for (apparent_name, actual_name) in &import.repo_mapping {
-                    let canonical = format!("{}+{}+{}", module_name, ext_name, actual_name);
+                    let canonical = format!("{}+{}+{}", owner_module, ext_name, actual_name);
 
                     if seen_canonical.insert(canonical.clone()) {
                         let path = format!("bazel-external/{}", canonical);
@@ -208,6 +214,25 @@ pub fn pre_compute_extension_repo_cells(
     );
 
     Ok((cells, aliases))
+}
+
+/// Extract the owning module name from an extension bzl file path.
+///
+/// In Bazel, the canonical name prefix for extension repos is the module that
+/// *owns* the .bzl file, not the module that calls `use_extension()`.
+/// - `@bazel_features//private:extensions.bzl` → `bazel_features`
+/// - `//private:extensions.bzl` → current module (returned as `current_module`)
+fn extract_owning_module<'a>(extension_bzl_file: &'a str, current_module: &'a str) -> &'a str {
+    if let Some(rest) = extension_bzl_file.strip_prefix('@') {
+        // @module_name//path:file.bzl → module_name
+        if let Some(pos) = rest.find("//") {
+            let module_name = &rest[..pos];
+            if !module_name.is_empty() {
+                return module_name;
+            }
+        }
+    }
+    current_module
 }
 
 /// Build cell definitions from a module extension result.
@@ -522,7 +547,10 @@ mod tests {
             .collect();
 
         assert_eq!(alias_map.get("numpy"), Some(&"rules_python+pip+numpy"));
-        assert_eq!(alias_map.get("requests"), Some(&"rules_python+pip+requests"));
+        assert_eq!(
+            alias_map.get("requests"),
+            Some(&"rules_python+pip+requests")
+        );
     }
 
     #[test]
@@ -572,7 +600,9 @@ mod tests {
     fn test_is_extension_repo_canonical_name() {
         assert!(is_extension_repo_canonical_name("rules_python+pip+numpy"));
         assert!(is_extension_repo_canonical_name("_main+go_deps+gazelle"));
-        assert!(is_extension_repo_canonical_name("bazel_features+version_extension+bazel_features_version"));
+        assert!(is_extension_repo_canonical_name(
+            "bazel_features+version_extension+bazel_features_version"
+        ));
         assert!(!is_extension_repo_canonical_name("rules_cc"));
         assert!(!is_extension_repo_canonical_name("_main"));
     }
@@ -589,7 +619,11 @@ mod tests {
         );
         assert_eq!(
             parse_canonical_name("bazel_features+version_extension+bazel_features_version"),
-            Some(("bazel_features", "version_extension", "bazel_features_version"))
+            Some((
+                "bazel_features",
+                "version_extension",
+                "bazel_features_version"
+            ))
         );
         assert_eq!(parse_canonical_name("rules_cc"), None);
         assert_eq!(parse_canonical_name("_main~pip"), None);

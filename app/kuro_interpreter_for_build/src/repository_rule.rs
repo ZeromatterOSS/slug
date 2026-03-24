@@ -90,6 +90,7 @@ use starlark::values::list::ListRef;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::starlark_value;
 use starlark::values::starlark_value_as_type::StarlarkValueAsType;
+use starlark::values::tuple::TupleRef;
 
 use crate::attrs::starlark_attribute::StarlarkAttribute;
 use crate::interpreter::build_context::BuildContext;
@@ -133,12 +134,28 @@ fn starlark_to_repo_attr_value(value: Value) -> RepoAttrValue {
         return RepoAttrValue::Int(i as i64);
     }
 
-    if let Some(list) = ListRef::from_value(value) {
-        let items: Vec<String> = list
+    // Handle both lists and tuples as sequences
+    let seq_iter: Option<Vec<Value>> = if let Some(list) = ListRef::from_value(value) {
+        Some(list.iter().collect())
+    } else if let Some(tuple) = TupleRef::from_value(value) {
+        Some(tuple.iter().collect())
+    } else {
+        None
+    };
+
+    if let Some(items) = seq_iter {
+        // Check if all items are strings - if so, use StringList
+        let all_strings: Vec<String> = items
             .iter()
             .filter_map(|v| v.unpack_str().map(|s| s.to_owned()))
             .collect();
-        return RepoAttrValue::StringList(items);
+        if all_strings.len() == items.len() {
+            return RepoAttrValue::StringList(all_strings);
+        }
+        // Otherwise, treat as a list of mixed values - convert recursively
+        // For now, fall through to repr since RepoAttrValue doesn't have a List(Vec<RepoAttrValue>) variant
+        let string_items: Vec<String> = items.iter().map(|v| v.to_repr().to_string()).collect();
+        return RepoAttrValue::StringList(string_items);
     }
 
     if let Some(dict) = DictRef::from_value(value) {

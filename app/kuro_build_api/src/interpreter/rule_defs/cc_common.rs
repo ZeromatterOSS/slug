@@ -91,10 +91,7 @@ pub fn get_external_include_dirs() -> Vec<String> {
 /// Detect whether the compiler is MSVC (cl.exe) based on the compiler path.
 fn is_msvc_compiler(compiler_path: &str) -> bool {
     let lower = compiler_path.to_lowercase();
-    lower == "cl.exe"
-        || lower == "cl"
-        || lower.ends_with("\\cl.exe")
-        || lower.ends_with("/cl.exe")
+    lower == "cl.exe" || lower == "cl" || lower.ends_with("\\cl.exe") || lower.ends_with("/cl.exe")
 }
 
 /// Returns true if the host OS is Windows.
@@ -150,10 +147,17 @@ fn to_short_path(path: &str) -> String {
     use std::os::windows::ffi::OsStrExt;
 
     unsafe extern "system" {
-        fn GetShortPathNameW(lpszLongPath: *const u16, lpszShortPath: *mut u16, cchBuffer: u32) -> u32;
+        fn GetShortPathNameW(
+            lpszLongPath: *const u16,
+            lpszShortPath: *mut u16,
+            cchBuffer: u32,
+        ) -> u32;
     }
 
-    let wide: Vec<u16> = OsStr::new(path).encode_wide().chain(std::iter::once(0)).collect();
+    let wide: Vec<u16> = OsStr::new(path)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
     unsafe {
         let len = GetShortPathNameW(wide.as_ptr(), std::ptr::null_mut(), 0);
         if len == 0 {
@@ -205,7 +209,10 @@ fn get_msvc_tool_paths() -> &'static Option<MsvcToolPaths> {
             }
 
             let vs_path = vs_path_opt?;
-            let vc_tools = PathBuf::from(&vs_path).join("VC").join("Tools").join("MSVC");
+            let vc_tools = PathBuf::from(&vs_path)
+                .join("VC")
+                .join("Tools")
+                .join("MSVC");
 
             let mut versions: Vec<String> = std::fs::read_dir(&vc_tools)
                 .ok()?
@@ -713,15 +720,23 @@ impl<'v> StarlarkValue<'v> for CtxCheatStub {
             "bin_dir" => {
                 let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
                 Some(heap.alloc(CtxCheatDirStub {
-                    path: format!("bazel-out/{}-{}/bin", crate::interpreter::rule_defs::context::host_target_cpu(), m),
+                    path: format!(
+                        "bazel-out/{}-{}/bin",
+                        crate::interpreter::rule_defs::context::host_target_cpu(),
+                        m
+                    ),
                 }))
-            },
+            }
             "genfiles_dir" => {
                 let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
                 Some(heap.alloc(CtxCheatDirStub {
-                    path: format!("bazel-out/{}-{}/genfiles", crate::interpreter::rule_defs::context::host_target_cpu(), m),
+                    path: format!(
+                        "bazel-out/{}-{}/genfiles",
+                        crate::interpreter::rule_defs::context::host_target_cpu(),
+                        m
+                    ),
                 }))
-            },
+            }
             "configuration" => Some(heap.alloc(CtxCheatConfigStub)),
             "actions" => Some(heap.alloc(CtxCheatActionsStub)),
             "fragments" => {
@@ -730,14 +745,16 @@ impl<'v> StarlarkValue<'v> for CtxCheatStub {
                     mode, false, false, false,
                 );
                 Some(heap.alloc(ConfigurationFragments::new(cpp)))
-            },
+            }
             "workspace_name" => Some(heap.alloc_str("").to_value()),
             "exec_groups" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::context::ExecGroupsDict))
             }
-            "toolchains" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::context::ToolchainsStub { is_tool: false }))
-            }
+            "toolchains" => Some(
+                heap.alloc(crate::interpreter::rule_defs::context::ToolchainsStub {
+                    is_tool: false,
+                }),
+            ),
             _ => None,
         }
     }
@@ -795,15 +812,23 @@ impl<'v> StarlarkValue<'v> for CtxCheatWithActions<'v> {
             "bin_dir" => {
                 let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
                 Some(heap.alloc(CtxCheatDirStub {
-                    path: format!("bazel-out/{}-{}/bin", crate::interpreter::rule_defs::context::host_target_cpu(), m),
+                    path: format!(
+                        "bazel-out/{}-{}/bin",
+                        crate::interpreter::rule_defs::context::host_target_cpu(),
+                        m
+                    ),
                 }))
-            },
+            }
             "genfiles_dir" => {
                 let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
                 Some(heap.alloc(CtxCheatDirStub {
-                    path: format!("bazel-out/{}-{}/genfiles", crate::interpreter::rule_defs::context::host_target_cpu(), m),
+                    path: format!(
+                        "bazel-out/{}-{}/genfiles",
+                        crate::interpreter::rule_defs::context::host_target_cpu(),
+                        m
+                    ),
                 }))
-            },
+            }
             "configuration" => Some(heap.alloc(CtxCheatConfigStub)),
             // Return the REAL actions object here
             "actions" => Some(self.actions),
@@ -813,14 +838,16 @@ impl<'v> StarlarkValue<'v> for CtxCheatWithActions<'v> {
                     mode, false, false, false,
                 );
                 Some(heap.alloc(ConfigurationFragments::new(cpp)))
-            },
+            }
             "workspace_name" => Some(heap.alloc_str("").to_value()),
             "exec_groups" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::context::ExecGroupsDict))
             }
-            "toolchains" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::context::ToolchainsStub { is_tool: false }))
-            }
+            "toolchains" => Some(
+                heap.alloc(crate::interpreter::rule_defs::context::ToolchainsStub {
+                    is_tool: false,
+                }),
+            ),
             _ => None,
         }
     }
@@ -981,9 +1008,13 @@ impl<'v> StarlarkValue<'v> for CtxCheatArtifactStub {
             "root" => {
                 let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
                 Some(heap.alloc(CtxCheatArtifactRootStub {
-                    path: format!("bazel-out/{}-{}/bin", crate::interpreter::rule_defs::context::host_target_cpu(), m),
+                    path: format!(
+                        "bazel-out/{}-{}/bin",
+                        crate::interpreter::rule_defs::context::host_target_cpu(),
+                        m
+                    ),
                 }))
-            },
+            }
             _ => None,
         }
     }
@@ -1364,7 +1395,13 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                 }
             }
             "macos" => "/usr/bin/clang++",
-            _ => if is_cpp { "/usr/bin/g++" } else { "/usr/bin/gcc" },
+            _ => {
+                if is_cpp {
+                    "/usr/bin/g++"
+                } else {
+                    "/usr/bin/gcc"
+                }
+            }
         };
         let compiler_path = if !cc_toolchain.is_none() {
             // Try to get compiler path from toolchain
@@ -1375,7 +1412,11 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                 .and_then(|v| v.unpack_str().map(|s| s.to_owned()))
                 .unwrap_or_else(|| default_compiler.to_owned());
             // Resolve bare "cl.exe" to full path on Windows
-            if is_windows_host() { resolve_windows_compiler(&raw) } else { raw }
+            if is_windows_host() {
+                resolve_windows_compiler(&raw)
+            } else {
+                raw
+            }
         } else {
             default_compiler.to_owned()
         };
@@ -1408,11 +1449,19 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             args_vec.push(heap.alloc_str("/EHsc").to_value());
             args_vec.push(heap.alloc_str("/c").to_value());
             args_vec.push(source);
-            args_vec.push(heap.alloc_str(&format!("/Fo{}", output_path_str)).to_value());
+            args_vec.push(
+                heap.alloc_str(&format!("/Fo{}", output_path_str))
+                    .to_value(),
+            );
 
             // Add MSVC system include paths (STL headers, Windows SDK)
             if let Some(tools) = get_msvc_tool_paths() {
-                for inc in [&tools.msvc_include, &tools.ucrt_include, &tools.um_include, &tools.shared_include] {
+                for inc in [
+                    &tools.msvc_include,
+                    &tools.ucrt_include,
+                    &tools.um_include,
+                    &tools.shared_include,
+                ] {
                     if !inc.is_empty() {
                         args_vec.push(heap.alloc_str(&format!("/I{}", inc)).to_value());
                     }
@@ -1506,7 +1555,11 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                     register_external_include_dir(repo_dir);
                 }
                 if seen_include_dirs.insert("external/".to_owned()) {
-                    let ext_flag = if msvc { "/Iexternal/" } else { "-isystemexternal/" };
+                    let ext_flag = if msvc {
+                        "/Iexternal/"
+                    } else {
+                        "-isystemexternal/"
+                    };
                     args_vec.push(heap.alloc_str(ext_flag).to_value());
                 }
                 register_external_include_dir("external/");
@@ -1552,7 +1605,10 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                         for elem in &elements {
                             let def = elem.to_str();
                             if !def.is_empty() {
-                                args_vec.push(heap.alloc_str(&format!("{}{}", define_prefix, def)).to_value());
+                                args_vec.push(
+                                    heap.alloc_str(&format!("{}{}", define_prefix, def))
+                                        .to_value(),
+                                );
                             }
                         }
                     }
@@ -1668,18 +1724,66 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         let windows = is_windows_host();
         let result = match category.to_uppercase().as_str() {
             // Object files
-            "OBJECT_FILE" => if windows { format!("{}.obj", name) } else { format!("{}.o", name) },
-            "PIC_OBJECT_FILE" => if windows { format!("{}.obj", name) } else { format!("{}.pic.o", name) },
-            "PIC_FILE" => if windows { format!("{}.obj", name) } else { format!("{}.pic", name) },
+            "OBJECT_FILE" => {
+                if windows {
+                    format!("{}.obj", name)
+                } else {
+                    format!("{}.o", name)
+                }
+            }
+            "PIC_OBJECT_FILE" => {
+                if windows {
+                    format!("{}.obj", name)
+                } else {
+                    format!("{}.pic.o", name)
+                }
+            }
+            "PIC_FILE" => {
+                if windows {
+                    format!("{}.obj", name)
+                } else {
+                    format!("{}.pic", name)
+                }
+            }
 
             // Libraries
-            "STATIC_LIBRARY" => if windows { format!("{}.lib", name) } else { format!("lib{}.a", name) },
-            "ALWAYSLINK_STATIC_LIBRARY" => if windows { format!("{}.lo.lib", name) } else { format!("lib{}.lo", name) },
-            "DYNAMIC_LIBRARY" => if windows { format!("{}.dll", name) } else { format!("lib{}.so", name) },
-            "INTERFACE_LIBRARY" => if windows { format!("{}.if.lib", name) } else { format!("lib{}.so", name) },
+            "STATIC_LIBRARY" => {
+                if windows {
+                    format!("{}.lib", name)
+                } else {
+                    format!("lib{}.a", name)
+                }
+            }
+            "ALWAYSLINK_STATIC_LIBRARY" => {
+                if windows {
+                    format!("{}.lo.lib", name)
+                } else {
+                    format!("lib{}.lo", name)
+                }
+            }
+            "DYNAMIC_LIBRARY" => {
+                if windows {
+                    format!("{}.dll", name)
+                } else {
+                    format!("lib{}.so", name)
+                }
+            }
+            "INTERFACE_LIBRARY" => {
+                if windows {
+                    format!("{}.if.lib", name)
+                } else {
+                    format!("lib{}.so", name)
+                }
+            }
 
             // Executables
-            "EXECUTABLE" => if windows { format!("{}.exe", name) } else { name.to_owned() },
+            "EXECUTABLE" => {
+                if windows {
+                    format!("{}.exe", name)
+                } else {
+                    name.to_owned()
+                }
+            }
 
             // Dependency tracking
             "INCLUDED_FILE_LIST" => format!("{}.d", name),
@@ -2089,13 +2193,22 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         if msvc {
             if let Some(tools) = get_msvc_tool_paths() {
                 if !tools.msvc_lib.is_empty() {
-                    args.push(heap.alloc_str(&format!("/LIBPATH:{}", tools.msvc_lib)).to_value());
+                    args.push(
+                        heap.alloc_str(&format!("/LIBPATH:{}", tools.msvc_lib))
+                            .to_value(),
+                    );
                 }
                 if !tools.ucrt_lib.is_empty() {
-                    args.push(heap.alloc_str(&format!("/LIBPATH:{}", tools.ucrt_lib)).to_value());
+                    args.push(
+                        heap.alloc_str(&format!("/LIBPATH:{}", tools.ucrt_lib))
+                            .to_value(),
+                    );
                 }
                 if !tools.um_lib.is_empty() {
-                    args.push(heap.alloc_str(&format!("/LIBPATH:{}", tools.um_lib)).to_value());
+                    args.push(
+                        heap.alloc_str(&format!("/LIBPATH:{}", tools.um_lib))
+                            .to_value(),
+                    );
                 }
             }
         }
@@ -2317,7 +2430,6 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] configuration: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-
         let heap = eval.heap();
         let _ = (label, configuration); // Unused for now
 
@@ -2346,9 +2458,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         // Call declare_file(output_name) using Starlark's function evaluation
         let filename = heap.alloc_str(output_name).to_value();
         match eval.eval_function(declare_file_method, &[filename], &[]) {
-            Ok(artifact) => {
-                Ok(artifact)
-            }
+            Ok(artifact) => Ok(artifact),
             Err(_) => {
                 // Fallback to stub on error
                 Ok(heap.alloc(CtxCheatArtifactStub {
@@ -2415,7 +2525,6 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] purpose: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<String> {
-
         // The purpose is typically the target name or a unique identifier.
         // Object files should go in `_objs/{purpose}/` directory.
         if purpose.is_none() {
@@ -2760,7 +2869,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             if !val.is_none() {
                 let mut elements = Vec::new();
                 crate::interpreter::rule_defs::depset::collect_depset_elements(
-                    *val, &mut elements, heap,
+                    *val,
+                    &mut elements,
+                    heap,
                 );
                 for elem in &elements {
                     let dir = elem.to_str();
@@ -2777,7 +2888,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             if !def_val.is_none() {
                 let mut elements = Vec::new();
                 crate::interpreter::rule_defs::depset::collect_depset_elements(
-                    *def_val, &mut elements, heap,
+                    *def_val,
+                    &mut elements,
+                    heap,
                 );
                 for elem in &elements {
                     let d = elem.to_str();
@@ -2989,7 +3102,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                         }
                                     }
                                 }
-                                for opt in crate::interpreter::rule_defs::build_config::get_cxxopts() {
+                                for opt in
+                                    crate::interpreter::rule_defs::build_config::get_cxxopts()
+                                {
                                     args_vec.push(heap.alloc_str(&opt).to_value());
                                 }
                             } else {
@@ -3000,7 +3115,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                         }
                                     }
                                 }
-                                for opt in crate::interpreter::rule_defs::build_config::get_conlyopts() {
+                                for opt in
+                                    crate::interpreter::rule_defs::build_config::get_conlyopts()
+                                {
                                     args_vec.push(heap.alloc_str(&opt).to_value());
                                 }
                             }
@@ -3042,7 +3159,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                         }
                                     }
                                 }
-                                for opt in crate::interpreter::rule_defs::build_config::get_cxxopts() {
+                                for opt in
+                                    crate::interpreter::rule_defs::build_config::get_cxxopts()
+                                {
                                     pic_args_vec.push(heap.alloc_str(&opt).to_value());
                                 }
                             } else {
@@ -3053,7 +3172,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                         }
                                     }
                                 }
-                                for opt in crate::interpreter::rule_defs::build_config::get_conlyopts() {
+                                for opt in
+                                    crate::interpreter::rule_defs::build_config::get_conlyopts()
+                                {
                                     pic_args_vec.push(heap.alloc_str(&opt).to_value());
                                 }
                             }
@@ -3091,27 +3212,32 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 
         // Create compilation context with the provided headers/includes/defines
         // Merge public_hdrs, private_hdrs, and textual_hdrs into headers depset
-        let merged_headers = if public_hdrs.is_none() && private_hdrs.is_none() && textual_hdrs.is_none() {
-            Value::new_none()
-        } else {
-            let mut direct: Vec<Value<'v>> = Vec::new();
-            for hdr_val in &[public_hdrs, private_hdrs, textual_hdrs] {
-                if !hdr_val.is_none() {
-                    if let Ok(iter) = hdr_val.iterate(heap) {
-                        for h in iter {
-                            direct.push(h);
+        let merged_headers =
+            if public_hdrs.is_none() && private_hdrs.is_none() && textual_hdrs.is_none() {
+                Value::new_none()
+            } else {
+                let mut direct: Vec<Value<'v>> = Vec::new();
+                for hdr_val in &[public_hdrs, private_hdrs, textual_hdrs] {
+                    if !hdr_val.is_none() {
+                        if let Ok(iter) = hdr_val.iterate(heap) {
+                            for h in iter {
+                                direct.push(h);
+                            }
                         }
                     }
                 }
-            }
-            if direct.is_empty() {
-                Value::new_none()
-            } else {
-                crate::interpreter::rule_defs::depset::make_depset_from_lists(
-                    heap, direct, Vec::new(), "default",
-                ).unwrap_or(Value::new_none())
-            }
-        };
+                if direct.is_empty() {
+                    Value::new_none()
+                } else {
+                    crate::interpreter::rule_defs::depset::make_depset_from_lists(
+                        heap,
+                        direct,
+                        Vec::new(),
+                        "default",
+                    )
+                    .unwrap_or(Value::new_none())
+                }
+            };
 
         let compilation_context = heap.alloc(CcCompilationContextGen {
             headers: merged_headers,
@@ -3184,7 +3310,13 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         let output_ext = if is_static {
             if is_windows_host() { ".lib" } else { ".a" }
         } else if is_dynamic {
-            if is_windows_host() { ".dll" } else if std::env::consts::OS == "macos" { ".dylib" } else { ".so" }
+            if is_windows_host() {
+                ".dll"
+            } else if std::env::consts::OS == "macos" {
+                ".dylib"
+            } else {
+                ".so"
+            }
         } else {
             if is_windows_host() { ".exe" } else { "" }
         };
@@ -3224,16 +3356,28 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 "windows" => {
                     let msvc = get_msvc_tool_paths();
                     if is_static {
-                        msvc.as_ref().map(|t| t.lib.clone()).unwrap_or_else(|| "lib.exe".to_owned())
+                        msvc.as_ref()
+                            .map(|t| t.lib.clone())
+                            .unwrap_or_else(|| "lib.exe".to_owned())
                     } else {
-                        msvc.as_ref().map(|t| t.link.clone()).unwrap_or_else(|| "link.exe".to_owned())
+                        msvc.as_ref()
+                            .map(|t| t.link.clone())
+                            .unwrap_or_else(|| "link.exe".to_owned())
                     }
                 }
                 "macos" => {
-                    if is_static { "/usr/bin/ar".to_owned() } else { "/usr/bin/clang++".to_owned() }
+                    if is_static {
+                        "/usr/bin/ar".to_owned()
+                    } else {
+                        "/usr/bin/clang++".to_owned()
+                    }
                 }
                 _ => {
-                    if is_static { "/usr/bin/ar".to_owned() } else { "/usr/bin/g++".to_owned() }
+                    if is_static {
+                        "/usr/bin/ar".to_owned()
+                    } else {
+                        "/usr/bin/g++".to_owned()
+                    }
                 }
             };
 
@@ -3257,7 +3401,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             } else {
                 // Executable or shared library
                 if is_windows_host() {
-                    args.push(heap.alloc_str(&format!("/OUT:{}", output_path_str)).to_value());
+                    args.push(
+                        heap.alloc_str(&format!("/OUT:{}", output_path_str))
+                            .to_value(),
+                    );
                     if is_dynamic {
                         args.push(heap.alloc_str("/DLL").to_value());
                     }
@@ -3384,7 +3531,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                                         lib.get_attr("objects", heap)
                                                     {
                                                         if !objects.is_none() {
-                                                            if let Ok(obj_iter) = objects.iterate(heap) {
+                                                            if let Ok(obj_iter) =
+                                                                objects.iterate(heap)
+                                                            {
                                                                 for obj in obj_iter {
                                                                     args.push(obj);
                                                                 }
@@ -3396,7 +3545,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                         }
                                     }
                                     // Extract user_link_flags from linker inputs (e.g., -lpthread)
-                                    if let Ok(Some(dep_link_flags)) = input.get_attr("user_link_flags", heap) {
+                                    if let Ok(Some(dep_link_flags)) =
+                                        input.get_attr("user_link_flags", heap)
+                                    {
                                         if !dep_link_flags.is_none() {
                                             let mut flag_elements = Vec::new();
                                             crate::interpreter::rule_defs::depset::collect_depset_elements(
@@ -3442,8 +3593,14 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     "$ORIGIN"
                 };
                 // Add rpath pointing to the output directory itself and common lib locations
-                args.push(heap.alloc_str(&format!("-Wl,-rpath,{}", rpath_origin)).to_value());
-                args.push(heap.alloc_str(&format!("-Wl,-rpath,{}/lib", rpath_origin)).to_value());
+                args.push(
+                    heap.alloc_str(&format!("-Wl,-rpath,{}", rpath_origin))
+                        .to_value(),
+                );
+                args.push(
+                    heap.alloc_str(&format!("-Wl,-rpath,{}/lib", rpath_origin))
+                        .to_value(),
+                );
             }
 
             let args_val = heap.alloc(args);
@@ -3486,8 +3643,15 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             };
 
             // Return CcLinkingOutputs
-            let executable = if !is_static && !is_dynamic { out } else { Value::new_none() };
-            let linking_outputs = heap.alloc(CcLinkingOutputsGen { library_to_link, executable });
+            let executable = if !is_static && !is_dynamic {
+                out
+            } else {
+                Value::new_none()
+            };
+            let linking_outputs = heap.alloc(CcLinkingOutputsGen {
+                library_to_link,
+                executable,
+            });
 
             Ok(linking_outputs)
         } else {
@@ -3601,8 +3765,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             // Some actions correspond directly to features
             let feature_name = match action_name {
                 "c++-compile" | "c-compile" | "cc-flags-make-variable" => None, // Always enabled
-                "c++-link-executable" | "c++-link-dynamic-library"
-                | "c++-link-nodeps-dynamic-library" | "c++-link-static-library" => None, // Always enabled
+                "c++-link-executable"
+                | "c++-link-dynamic-library"
+                | "c++-link-nodeps-dynamic-library"
+                | "c++-link-static-library" => None, // Always enabled
                 // For other action names, check if there's a matching feature
                 other => Some(other),
             };
@@ -3989,10 +4155,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 heap.alloc_str(&include_val).to_value(),
             );
 
-            let lib_val = format!(
-                "{};{};{}",
-                tools.msvc_lib, tools.ucrt_lib, tools.um_lib
-            );
+            let lib_val = format!("{};{};{}", tools.msvc_lib, tools.ucrt_lib, tools.um_lib);
             map.insert_hashed(
                 heap.alloc_str("LIB").to_value().get_hashed().unwrap(),
                 heap.alloc_str(&lib_val).to_value(),
@@ -4112,7 +4275,13 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 }
             }
             "macos" => "/usr/bin/clang++".to_owned(),
-            _ => if is_cpp { "/usr/bin/g++".to_owned() } else { "/usr/bin/gcc".to_owned() },
+            _ => {
+                if is_cpp {
+                    "/usr/bin/g++".to_owned()
+                } else {
+                    "/usr/bin/gcc".to_owned()
+                }
+            }
         };
 
         let compiler_path = if !cc_toolchain.is_none() {
@@ -4149,7 +4318,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             args_vec.push(heap.alloc_str("/EHsc").to_value());
             args_vec.push(heap.alloc_str("/c").to_value());
             args_vec.push(source_file);
-            args_vec.push(heap.alloc_str(&format!("/Fo{}", output_path_str)).to_value());
+            args_vec.push(
+                heap.alloc_str(&format!("/Fo{}", output_path_str))
+                    .to_value(),
+            );
         } else {
             args_vec.push(heap.alloc_str("-c").to_value());
             args_vec.push(source_file);
@@ -4190,10 +4362,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         eval.eval_function(
             run_method,
             &[args_list],
-            &[
-                ("executable", executable),
-                ("mnemonic", mnemonic),
-            ],
+            &[("executable", executable), ("mnemonic", mnemonic)],
         )
         .ok();
 
@@ -4215,7 +4384,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // Store user_link_flags as-is (depset or list); wrap list in depset if needed
         let user_flags = if user_link_flags.is_none() {
             Value::new_none()
-        } else if user_link_flags.request_value::<crate::interpreter::rule_defs::depset::Depset>().is_some() {
+        } else if user_link_flags
+            .request_value::<crate::interpreter::rule_defs::depset::Depset>()
+            .is_some()
+        {
             // Already a depset
             user_link_flags
         } else {
@@ -4593,10 +4765,12 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(this)] _this: &CcCommonModule,
         #[starlark(require = named)] feature_configuration: Value<'v>,
         #[starlark(require = named)] cc_toolchain: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        source_file: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        output_file: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] source_file: Value<
+            'v,
+        >,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] output_file: Value<
+            'v,
+        >,
         #[starlark(require = named, default = starlark::values::none::NoneType)]
         user_compile_flags: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)]
@@ -4620,49 +4794,73 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 
         if !source_file.is_none() {
             map.insert_hashed(
-                heap.alloc_str("source_file").to_value().get_hashed().unwrap(),
+                heap.alloc_str("source_file")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
                 source_file,
             );
         }
         if !output_file.is_none() {
             map.insert_hashed(
-                heap.alloc_str("output_file").to_value().get_hashed().unwrap(),
+                heap.alloc_str("output_file")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
                 output_file,
             );
         }
         if !user_compile_flags.is_none() {
             map.insert_hashed(
-                heap.alloc_str("user_compile_flags").to_value().get_hashed().unwrap(),
+                heap.alloc_str("user_compile_flags")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
                 user_compile_flags,
             );
         }
         if !include_directories.is_none() {
             map.insert_hashed(
-                heap.alloc_str("include_paths").to_value().get_hashed().unwrap(),
+                heap.alloc_str("include_paths")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
                 include_directories,
             );
         }
         if !quote_include_directories.is_none() {
             map.insert_hashed(
-                heap.alloc_str("quote_include_paths").to_value().get_hashed().unwrap(),
+                heap.alloc_str("quote_include_paths")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
                 quote_include_directories,
             );
         }
         if !system_include_directories.is_none() {
             map.insert_hashed(
-                heap.alloc_str("system_include_paths").to_value().get_hashed().unwrap(),
+                heap.alloc_str("system_include_paths")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
                 system_include_directories,
             );
         }
         if !framework_include_directories.is_none() {
             map.insert_hashed(
-                heap.alloc_str("framework_include_directories").to_value().get_hashed().unwrap(),
+                heap.alloc_str("framework_include_directories")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
                 framework_include_directories,
             );
         }
         if !preprocessor_defines.is_none() {
             map.insert_hashed(
-                heap.alloc_str("preprocessor_defines").to_value().get_hashed().unwrap(),
+                heap.alloc_str("preprocessor_defines")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
                 preprocessor_defines,
             );
         }
@@ -4703,14 +4901,16 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         user_link_flags: Value<'v>,
         // Bazel-compatible: output file path for the linker output.
         // Sets `output_execpath` variable used by get_memory_inefficient_command_line.
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        output_file: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] output_file: Value<
+            'v,
+        >,
         // Bazel-compatible: library search directories for -L flags.
         #[starlark(require = named, default = starlark::values::none::NoneType)]
         library_search_directories: Value<'v>,
         // Bazel-compatible: param file path for long command lines.
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        param_file: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] param_file: Value<
+            'v,
+        >,
         // Bazel-compatible: whether the linker (not archiver) is being used.
         #[starlark(require = named, default = true)] is_using_linker: bool,
         // Bazel-compatible: whether to keep debug symbols.
@@ -4721,7 +4921,12 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = true)] is_static_linking_mode: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = (feature_configuration, cc_toolchain, is_using_linker, is_static_linking_mode);
+        let _ = (
+            feature_configuration,
+            cc_toolchain,
+            is_using_linker,
+            is_static_linking_mode,
+        );
         let heap = eval.heap();
         // Build a dict with the link variables for get_memory_inefficient_command_line
         let mut map: SmallMap<Value<'v>, Value<'v>> = SmallMap::new();
@@ -4734,14 +4939,20 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 format!("{}", output_file)
             };
             map.insert_hashed(
-                heap.alloc_str("output_execpath").to_value().get_hashed().unwrap(),
+                heap.alloc_str("output_execpath")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
                 heap.alloc_str(&path_str).to_value(),
             );
         }
 
         if !user_link_flags.is_none() {
             map.insert_hashed(
-                heap.alloc_str("user_link_flags").to_value().get_hashed().unwrap(),
+                heap.alloc_str("user_link_flags")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
                 user_link_flags,
             );
         }
@@ -4788,14 +4999,20 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 
         if use_test_only_flags {
             map.insert_hashed(
-                heap.alloc_str("is_cc_test").to_value().get_hashed().unwrap(),
+                heap.alloc_str("is_cc_test")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
                 Value::new_bool(true),
             );
         }
 
         if !must_keep_debug {
             map.insert_hashed(
-                heap.alloc_str("strip_debug_symbols").to_value().get_hashed().unwrap(),
+                heap.alloc_str("strip_debug_symbols")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
                 Value::new_bool(true),
             );
         }
@@ -4909,7 +5126,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     Ok(Value::new_none())
                 } else {
                     crate::interpreter::rule_defs::depset::make_depset_from_lists(
-                        heap, Vec::new(), depsets, "default",
+                        heap,
+                        Vec::new(),
+                        depsets,
+                        "default",
                     )
                 }
             };
@@ -4937,12 +5157,13 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     }
                 }
             }
-            let merged_linker_inputs = crate::interpreter::rule_defs::depset::make_depset_from_lists(
-                heap,
-                Vec::new(),
-                transitive_depsets,
-                "default",
-            )?;
+            let merged_linker_inputs =
+                crate::interpreter::rule_defs::depset::make_depset_from_lists(
+                    heap,
+                    Vec::new(),
+                    transitive_depsets,
+                    "default",
+                )?;
             heap.alloc(LinkingContextWithInputsGen {
                 linker_inputs: merged_linker_inputs,
             })
@@ -4976,25 +5197,39 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             if let Ok(iter) = compilation_contexts.iterate(heap) {
                 for ctx_val in iter {
                     if let Ok(Some(h)) = ctx_val.get_attr("headers", heap) {
-                        if !h.is_none() { headers_depsets.push(h); }
+                        if !h.is_none() {
+                            headers_depsets.push(h);
+                        }
                     }
                     if let Ok(Some(i)) = ctx_val.get_attr("includes", heap) {
-                        if !i.is_none() { includes_depsets.push(i); }
+                        if !i.is_none() {
+                            includes_depsets.push(i);
+                        }
                     }
                     if let Ok(Some(qi)) = ctx_val.get_attr("quote_includes", heap) {
-                        if !qi.is_none() { quote_includes_depsets.push(qi); }
+                        if !qi.is_none() {
+                            quote_includes_depsets.push(qi);
+                        }
                     }
                     if let Ok(Some(si)) = ctx_val.get_attr("system_includes", heap) {
-                        if !si.is_none() { system_includes_depsets.push(si); }
+                        if !si.is_none() {
+                            system_includes_depsets.push(si);
+                        }
                     }
                     if let Ok(Some(fi)) = ctx_val.get_attr("framework_includes", heap) {
-                        if !fi.is_none() { framework_includes_depsets.push(fi); }
+                        if !fi.is_none() {
+                            framework_includes_depsets.push(fi);
+                        }
                     }
                     if let Ok(Some(d)) = ctx_val.get_attr("defines", heap) {
-                        if !d.is_none() { defines_depsets.push(d); }
+                        if !d.is_none() {
+                            defines_depsets.push(d);
+                        }
                     }
                     if let Ok(Some(ld)) = ctx_val.get_attr("local_defines", heap) {
-                        if !ld.is_none() { local_defines_depsets.push(ld); }
+                        if !ld.is_none() {
+                            local_defines_depsets.push(ld);
+                        }
                     }
                 }
             }
@@ -5005,7 +5240,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 Ok(Value::new_none())
             } else {
                 crate::interpreter::rule_defs::depset::make_depset_from_lists(
-                    heap, Vec::new(), depsets, "default",
+                    heap,
+                    Vec::new(),
+                    depsets,
+                    "default",
                 )
             }
         };
@@ -5077,14 +5315,56 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             ("compiler", heap.alloc(compiler)),
             ("abi_version", heap.alloc(abi_version)),
             ("abi_libc_version", heap.alloc(abi_libc_version)),
-            ("tool_paths", if tool_paths.is_none() { heap.alloc(Vec::<Value>::new()) } else { tool_paths }),
-            ("make_variables", if make_variables.is_none() { heap.alloc(Vec::<Value>::new()) } else { make_variables }),
+            (
+                "tool_paths",
+                if tool_paths.is_none() {
+                    heap.alloc(Vec::<Value>::new())
+                } else {
+                    tool_paths
+                },
+            ),
+            (
+                "make_variables",
+                if make_variables.is_none() {
+                    heap.alloc(Vec::<Value>::new())
+                } else {
+                    make_variables
+                },
+            ),
             ("builtin_sysroot", heap.alloc(builtin_sysroot)),
             ("cc_target_os", heap.alloc(cc_target_os)),
-            ("features", if features.is_none() { heap.alloc(Vec::<Value>::new()) } else { features }),
-            ("action_configs", if action_configs.is_none() { heap.alloc(Vec::<Value>::new()) } else { action_configs }),
-            ("artifact_name_patterns", if artifact_name_patterns.is_none() { heap.alloc(Vec::<Value>::new()) } else { artifact_name_patterns }),
-            ("cxx_builtin_include_directories", if cxx_builtin_include_directories.is_none() { heap.alloc(Vec::<Value>::new()) } else { cxx_builtin_include_directories }),
+            (
+                "features",
+                if features.is_none() {
+                    heap.alloc(Vec::<Value>::new())
+                } else {
+                    features
+                },
+            ),
+            (
+                "action_configs",
+                if action_configs.is_none() {
+                    heap.alloc(Vec::<Value>::new())
+                } else {
+                    action_configs
+                },
+            ),
+            (
+                "artifact_name_patterns",
+                if artifact_name_patterns.is_none() {
+                    heap.alloc(Vec::<Value>::new())
+                } else {
+                    artifact_name_patterns
+                },
+            ),
+            (
+                "cxx_builtin_include_directories",
+                if cxx_builtin_include_directories.is_none() {
+                    heap.alloc(Vec::<Value>::new())
+                } else {
+                    cxx_builtin_include_directories
+                },
+            ),
         ]));
         Ok(heap.alloc(CcToolchainConfigInfoInstanceGen { fields }))
     }
@@ -5652,7 +5932,15 @@ impl<'v> StarlarkValue<'v> for DebugPackageInfoProvider {
 }
 
 /// An instance of DebugPackageInfo.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
 #[repr(C)]
 pub struct DebugPackageInfoInstanceGen<V: ValueLifetimeless> {
     fields: V,
@@ -5697,14 +5985,17 @@ where
 {
     fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         use starlark::values::dict::DictRef;
-        DictRef::from_value(self.fields.to_value())
-            .and_then(|dict| dict.get_str(attribute))
+        DictRef::from_value(self.fields.to_value()).and_then(|dict| dict.get_str(attribute))
     }
 
     fn dir_attr(&self) -> Vec<String> {
         use starlark::values::dict::DictRef;
         DictRef::from_value(self.fields.to_value())
-            .map(|dict| dict.iter().filter_map(|(k, _)| k.unpack_str().map(|s| s.to_owned())).collect())
+            .map(|dict| {
+                dict.iter()
+                    .filter_map(|(k, _)| k.unpack_str().map(|s| s.to_owned()))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -5769,7 +6060,15 @@ impl<'v> StarlarkValue<'v> for CcSharedLibraryInfoProvider {
 }
 
 /// An instance of CcSharedLibraryInfo.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
 #[repr(C)]
 pub struct CcSharedLibraryInfoInstanceGen<V: ValueLifetimeless> {
     fields: V,
@@ -5814,14 +6113,17 @@ where
 {
     fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         use starlark::values::dict::DictRef;
-        DictRef::from_value(self.fields.to_value())
-            .and_then(|dict| dict.get_str(attribute))
+        DictRef::from_value(self.fields.to_value()).and_then(|dict| dict.get_str(attribute))
     }
 
     fn dir_attr(&self) -> Vec<String> {
         use starlark::values::dict::DictRef;
         DictRef::from_value(self.fields.to_value())
-            .map(|dict| dict.iter().filter_map(|(k, _)| k.unpack_str().map(|s| s.to_owned())).collect())
+            .map(|dict| {
+                dict.iter()
+                    .filter_map(|(k, _)| k.unpack_str().map(|s| s.to_owned()))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -5889,7 +6191,15 @@ impl<'v> StarlarkValue<'v> for CcSharedLibraryHintInfoProvider {
 }
 
 /// An instance of CcSharedLibraryHintInfo.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace, Coerce, Freeze)]
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
 #[repr(C)]
 pub struct CcSharedLibraryHintInfoInstanceGen<V: ValueLifetimeless> {
     fields: V,
@@ -5934,14 +6244,17 @@ where
 {
     fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         use starlark::values::dict::DictRef;
-        DictRef::from_value(self.fields.to_value())
-            .and_then(|dict| dict.get_str(attribute))
+        DictRef::from_value(self.fields.to_value()).and_then(|dict| dict.get_str(attribute))
     }
 
     fn dir_attr(&self) -> Vec<String> {
         use starlark::values::dict::DictRef;
         DictRef::from_value(self.fields.to_value())
-            .map(|dict| dict.iter().filter_map(|(k, _)| k.unpack_str().map(|s| s.to_owned())).collect())
+            .map(|dict| {
+                dict.iter()
+                    .filter_map(|(k, _)| k.unpack_str().map(|s| s.to_owned()))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -6262,7 +6575,11 @@ where
     fn dir_attr(&self) -> Vec<String> {
         use starlark::values::dict::DictRef;
         DictRef::from_value(self.fields.to_value())
-            .map(|dict| dict.iter().filter_map(|(k, _)| k.unpack_str().map(|s| s.to_owned())).collect())
+            .map(|dict| {
+                dict.iter()
+                    .filter_map(|(k, _)| k.unpack_str().map(|s| s.to_owned()))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -6586,7 +6903,13 @@ impl<'v> StarlarkValue<'v> for RunEnvironmentInfoProvider {
         let kwargs = args.names_map()?;
         let environment = kwargs
             .iter()
-            .find_map(|(k, v)| if k.as_str() == "environment" { Some(*v) } else { None })
+            .find_map(|(k, v)| {
+                if k.as_str() == "environment" {
+                    Some(*v)
+                } else {
+                    None
+                }
+            })
             .unwrap_or_else(|| {
                 eval.heap()
                     .alloc(AllocDict(std::iter::empty::<(&str, Value)>()))
@@ -6655,7 +6978,10 @@ where
     fn items(&self) -> Vec<(&str, Value<'v>)> {
         vec![
             ("environment", self.environment.to_value()),
-            ("inherited_environment", self.inherited_environment.to_value()),
+            (
+                "inherited_environment",
+                self.inherited_environment.to_value(),
+            ),
         ]
     }
 }
@@ -6738,9 +7064,9 @@ impl<'v> StarlarkValue<'v> for PackageSpecificationInfoProvider {
                 }
             })
             .unwrap_or_else(|| eval.heap().alloc(AllocList::EMPTY));
-        Ok(eval.heap().alloc(PackageSpecificationInfoInstanceGen {
-            packages,
-        }))
+        Ok(eval
+            .heap()
+            .alloc(PackageSpecificationInfoInstanceGen { packages }))
     }
 
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
@@ -7062,5 +7388,79 @@ pub fn register_bazel_provider_globals(globals: &mut GlobalsBuilder) {
     const PackageSpecificationInfo: PackageSpecificationInfoProvider =
         PackageSpecificationInfoProvider;
     const RunEnvironmentInfo: RunEnvironmentInfoProvider = RunEnvironmentInfoProvider;
+    const py_internal: PyInternalStub = PyInternalStub;
 }
 
+// ============================================================================
+// PyInternal stub - Bazel's internal Python helper
+// ============================================================================
+
+/// Stub for Bazel's `py_internal` native global.
+///
+/// `py_internal` is an internal API that rules_python uses for accessing
+/// Bazel-private Python rule implementation details. We provide a stub
+/// so that .bzl files can load without errors.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Clone, Copy)]
+pub struct PyInternalStub;
+
+impl std::fmt::Display for PyInternalStub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "py_internal")
+    }
+}
+
+starlark_simple_value!(PyInternalStub);
+
+#[starlark_value(type = "py_internal")]
+impl<'v> StarlarkValue<'v> for PyInternalStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(
+            attribute,
+            "cc_toolchain_build_info_files"
+                | "copy_without_caching"
+                | "create_repo_mapping_manifest"
+                | "declare_shareable_artifact"
+                | "get_label_repo_runfiles_path"
+                | "get_legacy_external_runfiles"
+                | "is_bzlmod_enabled"
+                | "is_tool_configuration"
+                | "link"
+                | "linkstamp_file"
+                | "regex_match"
+                | "runfiles_enabled"
+                | "share_native_deps"
+                | "stamp_binaries"
+        )
+    }
+
+    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
+        if self.has_attr(attribute, _heap) {
+            Some(Value::new_none())
+        } else {
+            None
+        }
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        vec![
+            "cc_toolchain_build_info_files".to_owned(),
+            "copy_without_caching".to_owned(),
+            "create_repo_mapping_manifest".to_owned(),
+            "declare_shareable_artifact".to_owned(),
+            "get_label_repo_runfiles_path".to_owned(),
+            "get_legacy_external_runfiles".to_owned(),
+            "is_bzlmod_enabled".to_owned(),
+            "is_tool_configuration".to_owned(),
+            "link".to_owned(),
+            "linkstamp_file".to_owned(),
+            "regex_match".to_owned(),
+            "runfiles_enabled".to_owned(),
+            "share_native_deps".to_owned(),
+            "stamp_binaries".to_owned(),
+        ]
+    }
+
+    fn get_type_starlark_repr() -> starlark::typing::Ty {
+        starlark::typing::Ty::any()
+    }
+}

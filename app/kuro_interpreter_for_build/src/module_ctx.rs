@@ -58,6 +58,7 @@ use std::sync::Arc;
 use allocative::Allocative;
 use anyhow::anyhow;
 use derive_more::Display;
+use kuro_build_api::interpreter::rule_defs::bazel_label::BazelLabel;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::SmallMap;
 use starlark::environment::GlobalsBuilder;
@@ -82,8 +83,8 @@ use crate::repository_ctx::ExecutionResult;
 use crate::repository_ctx::RepositoryPath;
 use crate::repository_ctx::download_url;
 use crate::repository_ctx::extract_archive;
-use crate::repository_ctx::resolve_label_to_path;
 use crate::repository_ctx::get_urls_from_value;
+use crate::repository_ctx::resolve_label_to_path;
 use crate::repository_ctx::verify_integrity;
 use crate::repository_ctx::verify_sha256;
 
@@ -197,7 +198,7 @@ impl SerializedTagValue {
             SerializedTagValue::Int(i) => heap.alloc(*i as i32),
             SerializedTagValue::Bool(b) => Value::new_bool(*b),
             SerializedTagValue::None => Value::new_none(),
-            SerializedTagValue::Label(s) => heap.alloc(s.as_str()),
+            SerializedTagValue::Label(s) => heap.alloc(BazelLabel::parse(s)),
             SerializedTagValue::List(items) => {
                 let values: Vec<Value<'v>> = items.iter().map(|v| v.to_starlark(heap)).collect();
                 heap.alloc(values)
@@ -401,9 +402,7 @@ impl<'v> StarlarkValue<'v> for BazelModule {
             "tags" => Some(heap.alloc(BazelModuleTags::with_tags(self.tags_by_class.clone()))),
             // The canonical repo name used for the module's repository.
             // For root module this is usually "" or the module name.
-            "repo_name" | "bazel_module_repo_name" => {
-                Some(heap.alloc(&self.name as &str))
-            }
+            "repo_name" | "bazel_module_repo_name" => Some(heap.alloc(&self.name as &str)),
             _ => None,
         }
     }
@@ -708,7 +707,11 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
         }
 
         std::fs::write(&resolved, content).map_err(|e| {
-            starlark::Error::new_other(anyhow!("Failed to write file {}: {}", resolved.display(), e))
+            starlark::Error::new_other(anyhow!(
+                "Failed to write file {}: {}",
+                resolved.display(),
+                e
+            ))
         })?;
 
         // Set executable permission on Unix
@@ -721,9 +724,7 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[cfg(not(unix))]
         let _ = executable;
 
-        Ok(heap.alloc(RepositoryPath::new(
-            resolved.to_string_lossy().to_string(),
-        )))
+        Ok(heap.alloc(RepositoryPath::new(resolved.to_string_lossy().to_string())))
     }
 
     /// Download a file from a URL.
@@ -803,10 +804,7 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
 
                     if let Some(parent) = output_path.parent() {
                         std::fs::create_dir_all(parent).map_err(|e| {
-                            starlark::Error::new_other(anyhow!(
-                                "Failed to create directory: {}",
-                                e
-                            ))
+                            starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
                         })?;
                     }
 
@@ -902,10 +900,7 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
                     }
 
                     std::fs::create_dir_all(&output_dir).map_err(|e| {
-                        starlark::Error::new_other(anyhow!(
-                            "Failed to create directory: {}",
-                            e
-                        ))
+                        starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
                     })?;
 
                     let strip = if strip_prefix.is_empty() {
@@ -1103,9 +1098,7 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
         } else {
             PathBuf::from(&path_str)
         };
-        Ok(heap.alloc(RepositoryPath::new(
-            resolved.to_string_lossy().to_string(),
-        )))
+        Ok(heap.alloc(RepositoryPath::new(resolved.to_string_lossy().to_string())))
     }
 
     /// Extract a local archive.

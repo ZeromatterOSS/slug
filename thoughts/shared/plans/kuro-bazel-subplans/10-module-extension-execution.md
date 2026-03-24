@@ -384,6 +384,29 @@ fix should be minimal and targeted.
 5. **`module_extension()` required named `implementation`**: `rules_cc` passes it positionally.
    Fixed: removed `require = named` constraint.
 
+#### Bugs Fixed (zeromatter progress, 2026-03-24):
+6. **Tuples not captured as lists in RepoSpec attrs**: `starlark_to_repo_attr_value()` only checked
+   `ListRef::from_value()` which doesn't match tuples. Added `TupleRef::from_value()` handling.
+   This fixed `bazel_features` globals_repo where `attr.string_list_dict()` values were tuples.
+7. **Canonical name prefix wrong for cross-module extension usage**: `pre_compute_extension_repo_cells`
+   used the *using* module's name, not the *owning* module's name. E.g., `bazelrc-preset.bzl` using
+   `@bazel_features//private:extensions.bzl` got prefix `bazelrc-preset.bzl` instead of `bazel_features`.
+   Fixed: extract owning module from `extension_bzl_file` (`@bazel_features//...` → `bazel_features`).
+8. **Module name in aggregation used cell name with version**: `parsed_modules` key was cell name
+   `bazel_features+1.42.0` instead of declared module name `bazel_features`. This caused extension ID
+   mismatch between self-referencing (`//path:ext.bzl`) and cross-referencing (`@bazel_features//path:ext.bzl`)
+   modules. Fixed: use `dep_parsed.module.name` as key.
+9. **Missing `py_internal` global**: `rules_python` .bzl files reference `py_internal` which is a Bazel
+   native global. Added `PyInternalStub` struct with stub attribute methods.
+10. **Label tag values returned as strings**: `SerializedTagValue::Label(s)` was allocated as a plain
+    string, breaking `type(value) == "Label"` checks and `str()` canonical form. Fixed: allocate as
+    `BazelLabel::parse(s)` so `type()` returns `"Label"` and `str()` includes `@@` prefix.
+
+#### Current blocker (2026-03-24):
+- `Select | dict` merge operation not supported. `rules_python` py_executable.bzl uses
+  `default | config_settings` where `default` is `select({...})` and `config_settings` is a dict.
+  This requires implementing dict union on Select values in Starlark.
+
 #### Verified:
 - `kuro build //app:calculator` in `examples/multi_package` — **BUILD SUCCEEDED**
 - Extension repos materialized with real content:

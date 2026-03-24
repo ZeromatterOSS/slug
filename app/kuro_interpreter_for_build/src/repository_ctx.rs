@@ -66,9 +66,9 @@ use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
 use starlark::values::ValueLike;
+use starlark::values::dict::AllocDict;
 use starlark::values::starlark_value;
 use starlark::values::starlark_value_as_type::StarlarkValueAsType;
-use starlark::values::dict::AllocDict;
 use tar::Archive;
 use zip::ZipArchive;
 
@@ -790,7 +790,11 @@ fn extract_zip(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> Resu
 }
 
 /// Extract an archive, detecting format automatically.
-pub(crate) fn extract_archive(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> Result<(), String> {
+pub(crate) fn extract_archive(
+    data: &[u8],
+    dest_dir: &Path,
+    strip_prefix: Option<&str>,
+) -> Result<(), String> {
     // Try tar.gz first
     if extract_tar_gz(data, dest_dir, strip_prefix).is_ok() {
         return Ok(());

@@ -141,10 +141,7 @@ fn cleanup_stale_symlinks(
     let entries = match std::fs::read_dir(external_base_dir) {
         Ok(entries) => entries,
         Err(e) => {
-            tracing::debug!(
-                "Could not read bazel-external/ for cleanup: {}",
-                e
-            );
+            tracing::debug!("Could not read bazel-external/ for cleanup: {}", e);
             return;
         }
     };
@@ -166,10 +163,7 @@ fn cleanup_stale_symlinks(
                         e
                     );
                 } else {
-                    tracing::info!(
-                        "Removed stale symlink: bazel-external/{}",
-                        name
-                    );
+                    tracing::info!("Removed stale symlink: bazel-external/{}", name);
                 }
             }
         }
@@ -790,8 +784,7 @@ impl BuckConfigBasedCells {
                                     .as_path()
                                     .join("buck-out/v2/external_cells/bzlmod");
                                 // Track valid symlink names for stale cleanup
-                                let mut valid_symlink_names =
-                                    std::collections::HashSet::new();
+                                let mut valid_symlink_names = std::collections::HashSet::new();
                                 for (module_name, module_info) in &resolved_graph.modules {
                                     // Skip root module and local overrides
                                     if module_name == &parsed.module.name
@@ -802,14 +795,10 @@ impl BuckConfigBasedCells {
 
                                     // Only create symlinks for modules with cached source paths
                                     if let Some(source_path) = &module_info.source_path {
-                                        let entry_name = format!(
-                                            "{}+{}",
-                                            module_name, module_info.version
-                                        );
-                                        valid_symlink_names
-                                            .insert(entry_name.clone());
-                                        let link_path =
-                                            external_base_dir.join(&entry_name);
+                                        let entry_name =
+                                            format!("{}+{}", module_name, module_info.version);
+                                        valid_symlink_names.insert(entry_name.clone());
+                                        let link_path = external_base_dir.join(&entry_name);
 
                                         match ensure_symlink(&link_path, source_path) {
                                             Ok(()) => {
@@ -849,10 +838,7 @@ impl BuckConfigBasedCells {
 
                                 // Remove stale symlinks from previous resolutions
                                 // (e.g., modules removed from MODULE.bazel or version changes)
-                                cleanup_stale_symlinks(
-                                    &external_base_dir,
-                                    &valid_symlink_names,
-                                );
+                                cleanup_stale_symlinks(&external_base_dir, &valid_symlink_names);
                                 cleanup_stale_symlinks(
                                     &buck_out_external_cells_dir,
                                     &valid_symlink_names,
@@ -1036,8 +1022,7 @@ impl BuckConfigBasedCells {
                                     );
                                     // Add all resolved external modules
                                     for (name, info) in &resolved_graph.modules {
-                                        version_map
-                                            .insert(name.clone(), info.version.clone());
+                                        version_map.insert(name.clone(), info.version.clone());
                                     }
                                     kuro_bzlmod::set_module_versions(version_map);
                                 }
@@ -1080,7 +1065,17 @@ impl BuckConfigBasedCells {
                     .join("MODULE.bazel");
                 if module_bazel_path.exists() {
                     if let Ok(dep_parsed) = parse_module_bazel(&module_bazel_path) {
-                        parsed_modules.push((cell_name.as_str().to_string(), dep_parsed));
+                        // Use the module's declared name for aggregation, not the cell name
+                        // (which includes version suffix like "bazel_features+1.42.0").
+                        // This ensures extension IDs are consistent: "//private:ext.bzl" from
+                        // bazel_features resolves to "@bazel_features//private:ext.bzl", matching
+                        // what other modules use when referencing this extension.
+                        let module_key = if dep_parsed.module.name.is_empty() {
+                            cell_name.as_str().to_string()
+                        } else {
+                            dep_parsed.module.name.clone()
+                        };
+                        parsed_modules.push((module_key, dep_parsed));
                     }
                 }
             }
@@ -1289,7 +1284,12 @@ impl BuckConfigBasedCells {
                 if module_bazel_path.exists() {
                     match parse_module_bazel(&module_bazel_path) {
                         Ok(dep_parsed) => {
-                            parsed_modules.push((cell_name.as_str().to_string(), dep_parsed));
+                            let module_key = if dep_parsed.module.name.is_empty() {
+                                cell_name.as_str().to_string()
+                            } else {
+                                dep_parsed.module.name.clone()
+                            };
+                            parsed_modules.push((module_key, dep_parsed));
                         }
                         Err(e) => {
                             tracing::debug!(
@@ -1304,10 +1304,8 @@ impl BuckConfigBasedCells {
         }
 
         // Collect synthetic repos from all extension usages
-        let synthetic_repos = collect_synthetic_repos_with_root(
-            &parsed_modules,
-            Some(project_root.root().as_path()),
-        );
+        let synthetic_repos =
+            collect_synthetic_repos_with_root(&parsed_modules, Some(project_root.root().as_path()));
         if synthetic_repos.is_empty() {
             return Ok(Vec::new());
         }
