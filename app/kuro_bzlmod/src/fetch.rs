@@ -28,6 +28,7 @@ use kuro_http::to_bytes;
 use tar::Archive;
 use xz2::read::XzDecoder;
 use zip::ZipArchive;
+use zstd::stream::read::Decoder as ZstdDecoder;
 
 use crate::cache::ModuleCache;
 use crate::integrity::verify_integrity;
@@ -280,6 +281,11 @@ impl SourceFetcher {
             return Ok(());
         }
 
+        // Try zstd-compressed tar
+        if let Ok(()) = self.extract_tar_zst(data, dest_dir, strip_prefix) {
+            return Ok(());
+        }
+
         // Try bzip2-compressed tar
         if let Ok(()) = self.extract_tar_bz2(data, dest_dir, strip_prefix) {
             return Ok(());
@@ -331,6 +337,17 @@ impl SourceFetcher {
         strip_prefix: Option<&str>,
     ) -> kuro_error::Result<()> {
         let decoder = XzDecoder::new(data);
+        extract_tar_from_reader(decoder, dest_dir, strip_prefix)
+    }
+
+    /// Extract a zstd-compressed tar archive (.tar.zst).
+    fn extract_tar_zst(
+        &self,
+        data: &[u8],
+        dest_dir: &Path,
+        strip_prefix: Option<&str>,
+    ) -> kuro_error::Result<()> {
+        let decoder = ZstdDecoder::new(data).buck_error_context("Failed to create zstd decoder")?;
         extract_tar_from_reader(decoder, dest_dir, strip_prefix)
     }
 

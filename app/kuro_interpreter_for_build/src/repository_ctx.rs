@@ -918,6 +918,72 @@ fn extract_tar_xz(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> R
     Ok(())
 }
 
+/// Extract a tar.zst (Zstandard-compressed) archive to a destination directory.
+fn extract_tar_zst(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> Result<(), String> {
+    let decoder = zstd::stream::read::Decoder::new(data).map_err(|e| e.to_string())?;
+    let mut archive = Archive::new(decoder);
+
+    for entry_result in archive.entries().map_err(|e| e.to_string())? {
+        let mut entry = entry_result.map_err(|e| e.to_string())?;
+        let path = entry.path().map_err(|e| e.to_string())?;
+
+        let dest_path = if let Some(prefix) = strip_prefix {
+            let path_str = path.to_string_lossy();
+            if let Some(stripped) = path_str.strip_prefix(prefix) {
+                let stripped = stripped.trim_start_matches('/');
+                if stripped.is_empty() {
+                    continue;
+                }
+                dest_dir.join(stripped)
+            } else if path_str.starts_with(prefix.trim_end_matches('/')) {
+                let prefix_with_slash = format!("{}/", prefix.trim_end_matches('/'));
+                if let Some(stripped) = path_str.strip_prefix(&prefix_with_slash) {
+                    if stripped.is_empty() {
+                        continue;
+                    }
+                    dest_dir.join(stripped)
+                } else {
+                    continue;
+                }
+            } else {
+                continue;
+            }
+        } else {
+            dest_dir.join(&*path)
+        };
+
+        if let Some(parent) = dest_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+
+        let entry_type = entry.header().entry_type();
+        if entry_type.is_dir() {
+            std::fs::create_dir_all(&dest_path).map_err(|e| e.to_string())?;
+        } else if entry_type.is_file() {
+            let mut file = std::fs::File::create(&dest_path).map_err(|e| e.to_string())?;
+            std::io::copy(&mut entry, &mut file).map_err(|e| e.to_string())?;
+
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(mode) = entry.header().mode() {
+                    let _ =
+                        std::fs::set_permissions(&dest_path, std::fs::Permissions::from_mode(mode));
+                }
+            }
+        } else if entry_type.is_symlink() {
+            #[cfg(unix)]
+            if let Ok(link_name) = entry.link_name() {
+                if let Some(link_target) = link_name {
+                    let _ = std::os::unix::fs::symlink(&*link_target, &dest_path);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 pub(crate) fn extract_archive(
     data: &[u8],
     dest_dir: &Path,
@@ -933,12 +999,20 @@ pub(crate) fn extract_archive(
         return Ok(());
     }
 
+    // Try tar.zst
+    if extract_tar_zst(data, dest_dir, strip_prefix).is_ok() {
+        return Ok(());
+    }
+
     // Try zip
     if extract_zip(data, dest_dir, strip_prefix).is_ok() {
         return Ok(());
     }
 
-    Err("Failed to extract archive: unknown format (tried tar.gz, tar.xz, and zip)".to_owned())
+    Err(
+        "Failed to extract archive: unknown format (tried tar.gz, tar.xz, tar.zst, and zip)"
+            .to_owned(),
+    )
 }
 
 /// Get URLs from a Starlark value (string or list of strings).

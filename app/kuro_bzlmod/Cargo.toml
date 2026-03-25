@@ -28,6 +28,7 @@ tar = { workspace = true }
 tokio = { workspace = true }
 xz2 = { workspace = true }
 zip = { workspace = true }
+zstd = { workspace = true }
 tracing = { workspace = true }
 
 kuro_error = { workspace = true }

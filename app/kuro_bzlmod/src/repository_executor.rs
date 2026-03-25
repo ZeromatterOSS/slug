@@ -634,6 +634,16 @@ fn extract_archive(
         return Ok(());
     }
 
+    // Try tar.xz
+    if extract_tar_xz(data, dest_dir, strip_prefix).is_ok() {
+        return Ok(());
+    }
+
+    // Try tar.zst
+    if extract_tar_zst(data, dest_dir, strip_prefix).is_ok() {
+        return Ok(());
+    }
+
     // Try zip
     if extract_zip(data, dest_dir, strip_prefix).is_ok() {
         return Ok(());
@@ -641,19 +651,22 @@ fn extract_archive(
 
     Err(RepositoryExecutionError::ExecutionFailed {
         name: "extract".to_owned(),
-        reason: "Unknown archive format (tried tar.gz and zip)".to_owned(),
+        reason: format!(
+            "Unknown archive format ({} bytes, starts with {:02x?})",
+            data.len(),
+            &data[..data.len().min(8)]
+        ),
     }
     .into())
 }
 
-/// Extract tar.gz archive.
-fn extract_tar_gz(
-    data: &[u8],
+/// Extract a tar archive from any reader.
+fn extract_tar_from_reader<R: std::io::Read>(
+    reader: R,
     dest_dir: &Path,
     strip_prefix: Option<&str>,
 ) -> kuro_error::Result<()> {
-    let decoder = GzDecoder::new(data);
-    let mut archive = Archive::new(decoder);
+    let mut archive = Archive::new(reader);
 
     for entry_result in
         archive
@@ -739,6 +752,39 @@ fn extract_tar_gz(
     }
 
     Ok(())
+}
+
+/// Extract tar.gz archive.
+fn extract_tar_gz(
+    data: &[u8],
+    dest_dir: &Path,
+    strip_prefix: Option<&str>,
+) -> kuro_error::Result<()> {
+    extract_tar_from_reader(GzDecoder::new(data), dest_dir, strip_prefix)
+}
+
+/// Extract tar.xz archive.
+fn extract_tar_xz(
+    data: &[u8],
+    dest_dir: &Path,
+    strip_prefix: Option<&str>,
+) -> kuro_error::Result<()> {
+    extract_tar_from_reader(xz2::read::XzDecoder::new(data), dest_dir, strip_prefix)
+}
+
+/// Extract tar.zst archive.
+fn extract_tar_zst(
+    data: &[u8],
+    dest_dir: &Path,
+    strip_prefix: Option<&str>,
+) -> kuro_error::Result<()> {
+    let decoder = zstd::stream::read::Decoder::new(data).map_err(|e| {
+        RepositoryExecutionError::ExecutionFailed {
+            name: "extract".to_owned(),
+            reason: e.to_string(),
+        }
+    })?;
+    extract_tar_from_reader(decoder, dest_dir, strip_prefix)
 }
 
 /// Extract zip archive.
