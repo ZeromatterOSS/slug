@@ -416,12 +416,12 @@ fix should be minimal and targeted.
 19. **module_ctx.execute() Label objects**: Convert Labels to strings via `to_str()`.
 
 #### Current blocker (2026-03-24):
-- `module_ctx.execute()` with Label args: The crate extension calls
-  `ctx.execute([Label(toml2json), ...])` where `toml2json` is a build target label. The Label
-  gets converted to a canonical string like `@@rules_rs//rs/private:toml2json` which isn't a
-  valid filesystem path. In Bazel, `module_ctx.execute()` resolves Labels to physical paths by
-  materializing the referenced repo/target. This requires building the label resolution + repo
-  materialization pipeline for module_ctx.
+- ~~`module_ctx.execute()` with Label args~~ — **RESOLVED** in Phase 4.
+- `crate` extension fails on missing Label/RepositoryPath API methods:
+  `same_package_label` (on Label), `get_child` (on RepositoryPath returned from
+  `module_ctx.path()`). These are Bazel API surface gaps, not architectural issues.
+  The extension downloads Rust toolchains and runs toml2json successfully, but fails
+  when processing crate metadata.
 
 #### Verified:
 - `kuro build //app:calculator` in `examples/multi_package` — **BUILD SUCCEEDED**
@@ -687,19 +687,50 @@ extension-generated repo. The `rules_rs` module was fetched via
 `ModuleContext.resolve_label_to_filesystem_path()` needs to know where
 `rules_rs` lives on disk. Threading the cell path map solves this.
 
+### Additional changes made during Phase 4 implementation
+
+Beyond the planned changes, the following were also needed:
+
+20. **`use_repo_rule()` invocations in MODULE.bazel now recorded**: `RepoRuleProxy::invoke()`
+    was a no-op. Now records invocations in `ParsedModuleFile.repo_rule_invocations`.
+    `cells.rs` processes them into cells and materializes via `execute_repository_rule()`.
+    This enabled `http_file(name="toml2json_linux_amd64", ...)` to create real repos.
+21. **Eager materialization of ALL extension repos via DICE**: After an extension executes,
+    all its RepoSpecs are materialized via `ExtensionRepoExecutionKey::compute()`. This
+    ensures repos created by one extension (e.g., `cargo_linux_x86_64_1_92_0` from
+    `toolchains`) are on disk when referenced by another extension (e.g., `crate`).
+22. **Repository rule attr defaults applied to RepoSpec**: `coerced_attr_to_repo_attr_value()`
+    extracts default values from the rule's `attrs` definition. Fixes `cargo_repository`
+    which relies on `urls = attr.string_list(default = DEFAULT_STATIC_RUST_URL_TEMPLATES)`.
+23. **`http_file` puts file in `file/` subdirectory**: Matches Bazel convention for
+    `Label("@repo//file:downloaded")`. Fixed executable permission via `get_bool()`.
+24. **`repository_ctx` underscore param names fixed**: `_watch`, `_canonical_id`, `_auth`,
+    `_headers`, `_block` all kept underscore in Starlark param name. Renamed.
+25. **`download_and_extract` params allow named usage**: `sha256`, `strip_prefix` changed
+    from positional-only to allow named.
+26. **`path.exists` is now an attribute**: `#[starlark(attribute)]` annotation makes
+    `ctx.path(file).exists` work without `()` (Bazel uses structField property).
+27. **`readdir()` returns `RepositoryPath` objects**: Was returning strings, breaking
+    `.basename` and `.get_child()` on results.
+28. **`report_progress()` stub on module_ctx**: No-op stub for progress reporting.
+29. **tar.xz decompression support**: Rust toolchain archives use `.tar.xz`. Added
+    `extract_tar_xz()` using `xz2` crate.
+30. **`resolve_label_to_filesystem_path` fallback scan**: When repo not in cell_paths,
+    scan `bazel-external/` for `*+repo_name` directories (extension repos not in `use_repo()`).
+
 ### Success Criteria
 
 #### Automated Verification:
-- [ ] `cargo check` passes
-- [ ] `cargo test -p kuro_interpreter_for_build` — all tests pass
-- [ ] `module_ctx.path("some/path")` still works (string case)
-- [ ] `module_ctx.path(Label("@repo//:file"))` resolves to correct filesystem path
-- [ ] `module_ctx.execute([Label("@repo//:tool")])` resolves label to path before exec
+- [x] `cargo check` passes
+- [x] `cargo test -p kuro_interpreter_for_build` — all tests pass
+- [x] `module_ctx.path("some/path")` still works (string case)
+- [x] `module_ctx.path(Label("@repo//:file"))` resolves to correct filesystem path
+- [x] `module_ctx.execute([Label("@repo//:tool")])` resolves label to path before exec
 
 #### Manual Verification:
-- [ ] `kuro build //sdk:sdk` in zeromatter progresses past `toml2json` execution
-- [ ] The `crate` extension can locate and run `toml2json` from `@rules_rs`
-- [ ] Extension repos that depend on other extension repos' source files work
+- [x] `kuro build //sdk:sdk` in zeromatter progresses past `toml2json` execution
+- [x] The `crate` extension can locate and run `toml2json` from `@rules_rs`
+- [x] Extension repos that depend on other extension repos' source files work
 
 ---
 
