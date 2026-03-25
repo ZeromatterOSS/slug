@@ -461,6 +461,51 @@ pub(crate) async fn get_file_ops_delegate(
                 reason: format!("Extension '{}' execution failed: {}", setup.extension_id, e),
             })?;
 
+            // Eagerly materialize ALL repos from this extension, not just the one
+            // being requested. In Bazel, accessing any repo from an extension triggers
+            // evaluation of the entire extension and materialization of all repos.
+            // Spoke repos (e.g., crates__tempfile-3.26.0) are not in use_repo() and
+            // thus have no ExtensionRepoCellSetup, so they'd never be lazily triggered.
+            let ext_name = kuro_bzlmod::extract_extension_name(&setup.extension_id);
+            let owner_module = kuro_bzlmod::extract_owning_module(&setup.extension_id);
+            for (internal_name, spec) in ext_result.generated_repo_specs.iter() {
+                let canonical = format!("{}+{}+{}", owner_module, ext_name, internal_name);
+                let repo_dir = project_root_path.join("bazel-external").join(&canonical);
+
+                // Register in dynamic cell registry for cell resolution
+                kuro_core::cells::register_dynamic_extension_cell(
+                    canonical.clone(),
+                    format!("bazel-external/{}", canonical),
+                );
+
+                // Skip if already materialized
+                if repo_dir.join(".kuro_repo_complete").exists() {
+                    continue;
+                }
+
+                let key = ExtensionRepoExecutionKey::new(
+                    canonical.clone(),
+                    setup.extension_id.to_string(),
+                    spec.clone(),
+                    project_root_path.clone(),
+                );
+                match ctx.compute(&key).await {
+                    Ok(Ok(_)) => {
+                        tracing::debug!("Materialized extension spoke repo '{}'", canonical);
+                    }
+                    Ok(Err(e)) => {
+                        tracing::debug!("Could not materialize spoke repo '{}': {}", canonical, e);
+                    }
+                    Err(e) => {
+                        tracing::debug!(
+                            "DICE error materializing spoke repo '{}': {}",
+                            canonical,
+                            e
+                        );
+                    }
+                }
+            }
+
             match ext_result.get_repo_spec(&setup.internal_name).cloned() {
                 Some(spec) => spec,
                 None => {
@@ -487,7 +532,7 @@ pub(crate) async fn get_file_ops_delegate(
             }
         };
 
-        // Create the execution key for lazy materialization
+        // Create the execution key for lazy materialization of this specific repo
         let key = ExtensionRepoExecutionKey::new(
             setup.canonical_name.to_string(),
             setup.extension_id.to_string(),

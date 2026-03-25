@@ -443,10 +443,27 @@ fix should be minimal and targeted.
     - Extension repos register all RepoSpec repos in the dynamic registry during materialization
 
 #### Current blocker (2026-03-25):
-- Spoke repos (e.g., `crates__tempfile-3.26.0`) are downloaded but lack BUILD.bazel files.
-  The `crate_repository` repo rule should generate BUILD.bazel during materialization, but
-  the generated content only contains source files. The rule's build script generation
-  (which creates `rust_library()` targets) is not running properly.
+- **Spoke repos not being created during extension execution**. Investigation revealed:
+  - The `crate` extension executes and produces the hub repo `rules_rs+crate+crates` with
+    real aliases (7752 lines of BUILD.bazel). The hub references `@crates__tempfile-3.26.0//:tempfile`.
+  - But spoke repos (individual crate downloads) are NOT materialized. The eager materialization
+    loop in `execute_extension()` never runs because the extension execution path goes through
+    `get_file_ops_delegate()` → `ModuleExtensionExecutionKey::compute()` which returns the
+    `ModuleExtensionResult` to `get_file_ops_delegate`. That function only materializes the
+    SPECIFIC repo being requested (the hub), not all repos from the extension.
+  - The eager materialization in `execute_extension()` fires from `MODULE_EXTENSION_EXECUTOR_IMPL`
+    which runs the extension's `.bzl` code. But analysis doesn't wait for all spoke repos —
+    it only triggers lazy materialization for repos that are actually `ExtensionRepoCellSetup` cells.
+  - **Root cause**: Spoke repos are not in `use_repo()`, so they have no `ExtensionRepoCellSetup`.
+    They can't be lazily materialized because the cell resolver doesn't know about them. The
+    dynamic cell resolution finds the directory but there's no content because the extension's
+    `ModuleExtensionResult` has the RepoSpecs but they're never executed.
+  - **Fix applied**: `get_file_ops_delegate()` now iterates ALL repos from the extension result
+    and materializes them via `ExtensionRepoExecutionKey`. This creates 1234 spoke repos from
+    the crate extension. But BUILD.bazel generation inside `crate_repository` rule still fails
+    because `generate_build_file()` / `run_toml2json()` require working `rctx.execute()` and
+    `rctx.path()` for the toml2json tool. The Starlark repo rule executor needs to handle
+    custom `.bzl`-defined repository rules (not just builtins like http_archive).
 
 #### Verified:
 - `kuro build //app:calculator` in `examples/multi_package` — **BUILD SUCCEEDED**
