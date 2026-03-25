@@ -415,16 +415,30 @@ fix should be minimal and targeted.
 18. **TagInstance with None defaults**: Missing tag attrs now return None instead of erroring.
 19. **module_ctx.execute() Label objects**: Convert Labels to strings via `to_str()`.
 
-#### Current blocker (2026-03-24):
-- ~~`module_ctx.execute()` with Label args~~ — **RESOLVED** in Phase 4.
-- `crate` extension fails on missing Label/RepositoryPath API methods:
-  `same_package_label` (on Label), `get_child` (on RepositoryPath returned from
-  `module_ctx.path()`). These are Bazel API surface gaps, not architectural issues.
-  The extension downloads Rust toolchains and runs toml2json successfully, but fails
-  when processing crate metadata.
+#### Bugs fixed (2026-03-25):
+20. **`mctx.execute()` with RepositoryPath args**: `mctx.path(Label)` returns a `RepositoryPath` object
+    whose Display format is `<repository_path /path>`, not a valid path. Fixed: `execute()` now checks
+    for `RepositoryPath` type and extracts the path string via `path_str()`.
+21. **Tag class defaults not applied**: Missing tag attrs returned `None` instead of declared defaults
+    (e.g., `attr.string_list_dict()` should default to `{}`). Fixed: extract defaults from
+    `FrozenStarlarkTagClass.attrs()` and apply to `SerializedTag` before evaluation. For attrs without
+    explicit defaults, synthesize type-appropriate empties (list→[], dict→{}, string→"").
+22. **`set.difference_update()` missing**: Starlark `set` type lacked `difference_update()`. Added
+    in-place method to `starlark-rust/starlark/src/values/types/set/methods.rs`.
+23. **`set.intersection_update()` missing**: Similarly added `intersection_update()` method.
+
+#### Current blocker (2026-03-25):
+- `crate_repository` repo rules fail with "No such file or directory" during execution. These are
+  individual crate repos being materialized via RepoSpec — likely `repository_ctx.execute()` trying
+  to run a command where Label resolution for tools isn't working in repository_ctx (same issue that
+  was fixed for module_ctx).
+- Build progresses to analysis phase where `Missing parameter proc_macro_deps` error occurs in
+  rules_rust rule definitions. This is a rules_rust API compatibility issue, not an extension issue.
 
 #### Verified:
 - `kuro build //app:calculator` in `examples/multi_package` — **BUILD SUCCEEDED**
+- **`@crates` hub repo generated with real content** — `defs.bzl` contains `all_crate_deps`,
+  `aliases`, `data.bzl` contains `DEP_DATA` with real crate dependency data from Cargo.lock.
 - Extension repos materialized with real content:
   - `bazel_features+version_extension+bazel_features_version/version.bzl`: `version = '9.0.0'`
   - `bazel_features+version_extension+bazel_features_globals/globals.bzl`: real `globals = struct(...)`
@@ -433,9 +447,9 @@ fix should be minimal and targeted.
 ### Success Criteria
 
 #### Automated Verification:
-- [ ] `kuro build //sdk:sdk` in zeromatter progresses past extension execution
+- [x] `kuro build //sdk:sdk` in zeromatter progresses past extension execution
 - [x] Extension repos are materialized in `bazel-external/` with real content
-- [ ] `@crates` hub repo contains `defs.bzl` with real crate dependency data
+- [x] `@crates` hub repo contains `defs.bzl` with real crate dependency data
 
 #### Manual Verification:
 - [x] Verify extension execution logs show real `.bzl` evaluation (not stubs)

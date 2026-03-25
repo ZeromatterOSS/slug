@@ -181,7 +181,7 @@ impl ConcreteModuleExtensionExecutor {
         &self,
         ctx: &mut DiceComputations<'_>,
         aggregated: &AggregatedExtension,
-        module_ctx: crate::module_ctx::ModuleContext,
+        mut module_ctx: crate::module_ctx::ModuleContext,
     ) -> kuro_error::Result<std::collections::HashMap<String, kuro_bzlmod::RepoSpec>> {
         // 1. Get the cell resolver to parse the bzl path
         let cell_resolver = ctx.get_cell_resolver().await?;
@@ -221,6 +221,46 @@ impl ConcreteModuleExtensionExecutor {
             })?;
 
         tracing::debug!("Found extension '{}' in module", frozen_extension.name());
+
+        // 5b. Extract tag class defaults and apply to module_ctx
+        // This ensures missing tag attributes get their declared default values
+        // (e.g., attr.string_list_dict(default={}) → {} instead of None)
+        {
+            let mut tag_class_defaults = std::collections::HashMap::new();
+            for (class_name, class_value) in frozen_extension.tag_classes() {
+                if let Some(tag_class) = class_value
+                    .downcast_frozen_ref::<crate::module_extension::FrozenStarlarkTagClass>()
+                {
+                    let tag_class = &*tag_class;
+                    let defaults: Vec<(String, crate::module_ctx::SerializedTagValue)> = tag_class
+                        .attrs()
+                        .iter()
+                        .filter_map(|(attr_name, attr)| {
+                            // Try explicit default first
+                            if let Some(default) = attr.default() {
+                                let value =
+                                    crate::module_ctx::coerced_attr_to_serialized_tag_value(
+                                        default,
+                                    )?;
+                                return Some((attr_name.clone(), value));
+                            }
+                            // For attrs with no explicit default, use type-appropriate empty
+                            // value (Bazel defaults list/dict attrs to []/{}):
+                            let type_default = crate::module_ctx::default_for_attr_type(
+                                &attr.coercer_for_default_only(),
+                            );
+                            type_default.map(|v| (attr_name.clone(), v))
+                        })
+                        .collect();
+                    if !defaults.is_empty() {
+                        tag_class_defaults.insert(class_name.clone(), defaults);
+                    }
+                }
+            }
+            if !tag_class_defaults.is_empty() {
+                module_ctx.apply_tag_class_defaults(&tag_class_defaults);
+            }
+        }
 
         // 6. Execute with RepoSpec capture registry active
         let (result, specs) = with_repo_spec_registry(|| {

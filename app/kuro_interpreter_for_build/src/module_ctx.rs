@@ -220,6 +220,65 @@ impl SerializedTagValue {
     }
 }
 
+/// Convert a CoercedAttr (from tag class attr default) to a SerializedTagValue.
+///
+/// This handles common attr types. For complex/unsupported types, returns None
+/// (the attr will keep its existing "missing = None" behavior).
+pub fn coerced_attr_to_serialized_tag_value(
+    attr: &kuro_node::attrs::coerced_attr::CoercedAttr,
+) -> Option<SerializedTagValue> {
+    use kuro_node::attrs::coerced_attr::CoercedAttr;
+    match attr {
+        CoercedAttr::String(s) => Some(SerializedTagValue::String(s.to_string())),
+        CoercedAttr::Int(i) => Some(SerializedTagValue::Int(*i)),
+        CoercedAttr::Bool(b) => Some(SerializedTagValue::Bool(b.0)),
+        CoercedAttr::None => Some(SerializedTagValue::None),
+        CoercedAttr::List(list) => {
+            let items: Vec<SerializedTagValue> = list
+                .iter()
+                .filter_map(coerced_attr_to_serialized_tag_value)
+                .collect();
+            Some(SerializedTagValue::List(items))
+        }
+        CoercedAttr::Dict(dict) => {
+            let entries: Vec<(String, SerializedTagValue)> = dict
+                .iter()
+                .filter_map(|(k, v)| {
+                    let key = coerced_attr_to_serialized_tag_value(k)?;
+                    let val = coerced_attr_to_serialized_tag_value(v)?;
+                    // Dict keys should be strings
+                    if let SerializedTagValue::String(s) = key {
+                        Some((s, val))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            Some(SerializedTagValue::Dict(entries))
+        }
+        _ => None,
+    }
+}
+
+/// Return a sensible empty default for a given attr type.
+///
+/// In Bazel, list/dict attrs without an explicit `default` parameter get `[]`/`{}`.
+/// This function provides those implicit defaults so tag instances don't return None
+/// for unspecified container attributes.
+pub fn default_for_attr_type(
+    attr_type: &kuro_node::attrs::attr_type::AttrType,
+) -> Option<SerializedTagValue> {
+    use kuro_node::attrs::attr_type::AttrTypeInner;
+    match &attr_type.0.inner {
+        AttrTypeInner::List(_) => Some(SerializedTagValue::List(vec![])),
+        AttrTypeInner::Dict(_) => Some(SerializedTagValue::Dict(vec![])),
+        AttrTypeInner::String(_) => Some(SerializedTagValue::String(String::new())),
+        AttrTypeInner::Bool(_) => Some(SerializedTagValue::Bool(false)),
+        AttrTypeInner::Int(_) => Some(SerializedTagValue::Int(0)),
+        _ => None,
+    }
+}
+
 /// Serialized extension tag with its attribute values.
 #[derive(Debug, Clone, Allocative)]
 pub struct SerializedTag {
@@ -610,6 +669,35 @@ impl ModuleContext {
         self.project_root = Some(project_root);
         self.cell_paths = cell_paths;
         self
+    }
+
+    /// Apply tag class defaults from a frozen extension's tag classes.
+    ///
+    /// In Bazel, tag attributes have declared defaults (e.g., `attr.string_list_dict(default={})`).
+    /// When a tag is used in MODULE.bazel without specifying all attributes, the missing
+    /// attributes get their default values. Kuro's tag serialization only stores explicitly
+    /// provided values. This method fills in missing values from the tag class schema.
+    ///
+    /// `defaults` maps tag_class_name → (attr_name → SerializedTagValue).
+    pub fn apply_tag_class_defaults(
+        &mut self,
+        defaults: &HashMap<String, Vec<(String, SerializedTagValue)>>,
+    ) {
+        for module in &mut self.modules {
+            for (class_name, tags) in &mut module.tags_by_class {
+                if let Some(class_defaults) = defaults.get(class_name) {
+                    for tag in tags.iter_mut() {
+                        let existing_keys: std::collections::HashSet<String> =
+                            tag.kwargs.iter().map(|(k, _)| k.clone()).collect();
+                        for (attr_name, default_val) in class_defaults {
+                            if !existing_keys.contains(attr_name) {
+                                tag.kwargs.push((attr_name.clone(), default_val.clone()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Get the working directory, if set.
@@ -1135,6 +1223,11 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
                             this.resolve_label_to_filesystem_path(&label_str)
                                 .map(|p| p.to_string_lossy().to_string())
                                 .unwrap_or(label_str)
+                        } else if let Some(rp) =
+                            v.downcast_ref::<crate::repository_ctx::RepositoryPath>()
+                        {
+                            // RepositoryPath objects (from mctx.path()) → extract path string
+                            rp.path_str().to_owned()
                         } else {
                             v.unpack_str()
                                 .map(|s| s.to_owned())
