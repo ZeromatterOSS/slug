@@ -326,7 +326,9 @@ impl Key for ExtensionRepoExecutionKey {
             .join(self.canonical_name.as_ref());
 
         // For non-builtin rules with a known Starlark source, try Starlark execution
-        if !crate::starlark_repo_rule_executor::is_builtin_repo_rule(&invocation.rule_name) {
+        let is_builtin =
+            crate::starlark_repo_rule_executor::is_builtin_repo_rule(&invocation.rule_name);
+        if !is_builtin {
             if let Some(rule_source) = &invocation.rule_source {
                 // Extract bzl_path and rule_name from rule_source
                 // Format: "@@module//path:file.bzl%rule_name"

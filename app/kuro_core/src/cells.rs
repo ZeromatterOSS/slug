@@ -146,6 +146,11 @@ pub fn set_dynamic_project_root(root: std::path::PathBuf) {
     let _ = DYNAMIC_PROJECT_ROOT.set(root);
 }
 
+/// Get the project root (if set).
+pub fn get_dynamic_project_root() -> Option<std::path::PathBuf> {
+    DYNAMIC_PROJECT_ROOT.get().cloned()
+}
+
 /// Look up a dynamically-registered extension repo cell path.
 pub fn get_dynamic_extension_cell(name: &str) -> Option<String> {
     DYNAMIC_EXTENSION_CELLS

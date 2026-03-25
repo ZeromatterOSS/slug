@@ -629,13 +629,76 @@ pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> S
             format!("{}/{}", pkg, target)
         }
     } else {
-        // External repo: look under workspace_root/external/<repo>
-        let external_dir = workspace_root.join("external").join(repo);
-        if external_dir.exists() {
-            format!("external/{}/{}/{}", repo, pkg, target)
+        // External repo: try multiple locations
+        // 1. Check dynamic cell registry for absolute path
+        if let Some(cell_path) = kuro_core::cells::get_dynamic_extension_cell(repo) {
+            // cell_path is project-relative like "bazel-external/repo_name"
+            let project_root = kuro_core::cells::get_dynamic_project_root();
+            if let Some(root) = project_root {
+                let abs_path = if pkg.is_empty() {
+                    root.join(&cell_path).join(target)
+                } else {
+                    root.join(&cell_path).join(pkg).join(target)
+                };
+                if abs_path.exists() {
+                    return abs_path.to_string_lossy().to_string();
+                }
+            }
+        }
+        // 2. Check bazel-external/ with exact name
+        let bazel_ext = workspace_root.join("bazel-external").join(repo);
+        if bazel_ext.exists() {
+            let path = if pkg.is_empty() {
+                bazel_ext.join(target)
+            } else {
+                bazel_ext.join(pkg).join(target)
+            };
+            return path.to_string_lossy().to_string();
+        }
+        // 3. Scan bazel-external/ for matching repo (handles versioned names)
+        if let Ok(entries) = std::fs::read_dir(workspace_root.join("bazel-external")) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                // Match exact name or name+version
+                if name_str == repo || name_str.starts_with(&format!("{}+", repo)) {
+                    let path = if pkg.is_empty() {
+                        entry.path().join(target)
+                    } else {
+                        entry.path().join(pkg).join(target)
+                    };
+                    if path.exists() {
+                        return path.to_string_lossy().to_string();
+                    }
+                }
+            }
+        }
+        // 4. Check project root for source repos (non-external)
+        let project_root = kuro_core::cells::get_dynamic_project_root();
+        if let Some(root) = project_root {
+            // Also scan bazel-external from project root (workspace_root may be repo dir)
+            if let Ok(entries) = std::fs::read_dir(root.join("bazel-external")) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name();
+                    let name_str = name.to_string_lossy();
+                    if name_str == repo || name_str.starts_with(&format!("{}+", repo)) {
+                        let path = if pkg.is_empty() {
+                            entry.path().join(target)
+                        } else {
+                            entry.path().join(pkg).join(target)
+                        };
+                        if path.exists() {
+                            return path.to_string_lossy().to_string();
+                        }
+                    }
+                }
+            }
+        }
+        // 5. Fallback
+        if pkg.is_empty() {
+            format!("{}/{}", repo, target)
         } else {
-            // Fall back to just the label path
-            format!("{}/{}", pkg, target)
+            format!("{}/{}/{}", repo, pkg, target)
         }
     }
 }
@@ -1352,11 +1415,25 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = "")] working_directory: &str,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        // Get arguments as list of strings
+        // Get arguments as list of strings, resolving Label and RepositoryPath objects
         let args: Vec<String> =
             if let Some(list) = starlark::values::list::ListRef::from_value(arguments) {
                 list.iter()
-                    .filter_map(|v| v.unpack_str().map(|s| s.to_owned()))
+                    .map(|v| {
+                        if let Some(s) = v.unpack_str() {
+                            s.to_owned()
+                        } else if let Some(repo_path) = v.downcast_ref::<RepositoryPath>() {
+                            // RepositoryPath: use absolute path
+                            repo_path.absolute_path().to_string_lossy().to_string()
+                        } else if v.get_type() == "Label" {
+                            // Label: resolve to filesystem path via cell paths
+                            let label_str = v.to_str();
+                            resolve_label_to_path(&label_str, &this.working_dir)
+                        } else {
+                            // Other: convert to string
+                            v.to_str()
+                        }
+                    })
                     .collect()
             } else {
                 return Err(starlark::Error::new_other(anyhow!(

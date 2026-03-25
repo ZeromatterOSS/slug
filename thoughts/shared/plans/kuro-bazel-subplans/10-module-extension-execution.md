@@ -460,10 +460,20 @@ fix should be minimal and targeted.
     `ModuleExtensionResult` has the RepoSpecs but they're never executed.
   - **Fix applied**: `get_file_ops_delegate()` now iterates ALL repos from the extension result
     and materializes them via `ExtensionRepoExecutionKey`. This creates 1234 spoke repos from
-    the crate extension. But BUILD.bazel generation inside `crate_repository` rule still fails
-    because `generate_build_file()` / `run_toml2json()` require working `rctx.execute()` and
-    `rctx.path()` for the toml2json tool. The Starlark repo rule executor needs to handle
-    custom `.bzl`-defined repository rules (not just builtins like http_archive).
+    the crate extension. But BUILD.bazel generation inside `crate_repository` rule still fails.
+27. **`repository_ctx.execute()` drops Label/RepositoryPath args**: The args list used
+    `filter_map(unpack_str)` which silently drops non-string values. Fixed: now handles
+    `RepositoryPath` (via `absolute_path()`) and `Label` (via `resolve_label_to_path()`).
+28. **`resolve_label_to_path` improved for kuro repo layout**: Now checks dynamic cell registry,
+    `bazel-external/` directory, and scans for versioned repo names. Needed for `run_toml2json`
+    which calls `ctx.execute([Label("@toml2json_linux_amd64//file:downloaded"), toml_file])`.
+
+#### Current blocker (2026-03-25, continued):
+  - Spoke repos (1234) have source but no BUILD.bazel. `ExtensionRepoExecutionKey::compute()` is
+    called via the eager loop but the Starlark repo rule executor may be failing silently. The
+    `crate_repository` impl calls `run_toml2json` which needs `rctx.execute([Label(...)])` — the
+    Label resolution in repo_ctx now works but the underlying execution may still fail due to
+    toml2json binary not being found or permission issues.
 
 #### Verified:
 - `kuro build //app:calculator` in `examples/multi_package` — **BUILD SUCCEEDED**
