@@ -427,13 +427,26 @@ fix should be minimal and targeted.
     in-place method to `starlark-rust/starlark/src/values/types/set/methods.rs`.
 23. **`set.intersection_update()` missing**: Similarly added `intersection_update()` method.
 
+#### Bugs fixed (2026-03-25 continued):
+24. **`Missing parameter proc_macro_deps`**: `bazel_features.globals.macro` evaluated truthy (kuro has
+    `macro()` builtin), causing rules_rust to use `_symbolic_rule_wrapper` which requires
+    `proc_macro_deps` as a required param. Fixed: `FrozenStarlarkMacroCallable::invoke()` now stores
+    the `attrs` dict from `macro()` and applies attr defaults for missing parameters.
+25. **tar.zst decompression**: LLVM toolchain downloads use `.tar.zst` (Zstandard). Added `zstd` crate
+    and `extract_tar_zst()` to `fetch.rs`, `repository_ctx.rs`, and `repository_executor.rs`.
+26. **Dynamic cell resolution for extension spoke repos**: Crate spoke repos (e.g.,
+    `crates__tempfile-3.26.0`) aren't in `use_repo()` so they weren't registered as cells. Added:
+    - Global dynamic cell registry (`DYNAMIC_EXTENSION_CELLS`) populated during extension execution
+    - `CellAliasResolver::resolve()` fallback: tries `X+Y+{alias}` for extension repo contexts
+    - `CellResolver::get()` fallback: checks dynamic registry (exact + suffix match) and scans
+      `bazel-external/` directory for matching repos
+    - Extension repos register all RepoSpec repos in the dynamic registry during materialization
+
 #### Current blocker (2026-03-25):
-- `crate_repository` repo rules fail with "No such file or directory" during execution. These are
-  individual crate repos being materialized via RepoSpec — likely `repository_ctx.execute()` trying
-  to run a command where Label resolution for tools isn't working in repository_ctx (same issue that
-  was fixed for module_ctx).
-- Build progresses to analysis phase where `Missing parameter proc_macro_deps` error occurs in
-  rules_rust rule definitions. This is a rules_rust API compatibility issue, not an extension issue.
+- Spoke repos (e.g., `crates__tempfile-3.26.0`) are downloaded but lack BUILD.bazel files.
+  The `crate_repository` repo rule should generate BUILD.bazel during materialization, but
+  the generated content only contains source files. The rule's build script generation
+  (which creates `rust_library()` targets) is not running properly.
 
 #### Verified:
 - `kuro build //app:calculator` in `examples/multi_package` — **BUILD SUCCEEDED**

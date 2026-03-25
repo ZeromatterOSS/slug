@@ -93,6 +93,7 @@ use std::collections::HashMap;
 use std::collections::hash_map;
 use std::fmt::Debug;
 use std::sync::Arc;
+use std::sync::RwLock;
 
 use allocative::Allocative;
 use dupe::Dupe;
@@ -121,6 +122,37 @@ static ROOT_CELL_NAME: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
 /// Global storage for non-root cell names (external repos).
 static EXTERNAL_CELL_NAMES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+/// Dynamic cell registry for extension repos created at runtime.
+/// Maps canonical name → bazel-external path for repos not known at startup
+/// (e.g., spoke repos created by the crate extension).
+static DYNAMIC_EXTENSION_CELLS: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<String, String>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
+/// Global project root for dynamic cell filesystem operations.
+static DYNAMIC_PROJECT_ROOT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
+/// Register a dynamically-discovered extension repo cell.
+/// Called after extension execution materializes repos.
+pub fn register_dynamic_extension_cell(canonical_name: String, path: String) {
+    if let Ok(mut cells) = DYNAMIC_EXTENSION_CELLS.lock() {
+        cells.insert(canonical_name, path);
+    }
+}
+
+/// Set the project root for dynamic cell filesystem scanning.
+pub fn set_dynamic_project_root(root: std::path::PathBuf) {
+    let _ = DYNAMIC_PROJECT_ROOT.set(root);
+}
+
+/// Look up a dynamically-registered extension repo cell path.
+pub fn get_dynamic_extension_cell(name: &str) -> Option<String> {
+    DYNAMIC_EXTENSION_CELLS
+        .lock()
+        .ok()
+        .and_then(|cells| cells.get(name).cloned())
+}
 
 /// Check if a cell name is the root cell (main workspace).
 pub fn is_root_cell_name(cell_name: &str) -> bool {
@@ -211,13 +243,47 @@ impl CellAliasResolver {
         if alias.is_empty() {
             return Ok(self.current);
         }
-        self.aliases.get(alias).duped().ok_or_else(|| {
-            kuro_error::Error::from(CellError::UnknownCellAlias(
-                CellAlias::new(alias.to_owned()),
-                self.current,
-                self.aliases.keys().cloned().collect(),
-            ))
-        })
+        if let Some(name) = self.aliases.get(alias).duped() {
+            return Ok(name);
+        }
+
+        // Fallback: For extension repos, sibling repos in the same extension
+        // can reference each other. If current cell is "X+Y+Z" and the alias is
+        // "foo", try "X+Y+foo" as a canonical cell name.
+        let current_str = self.current.as_str();
+        if let Some(prefix_end) = current_str.rfind('+') {
+            let prefix = &current_str[..=prefix_end]; // "X+Y+"
+            let candidate = format!("{}{}", prefix, alias);
+            // Check if this is a known alias (canonical names are their own aliases)
+            if let Some(name) = self.aliases.get(candidate.as_str()).duped() {
+                return Ok(name);
+            }
+            // Check the global dynamic registry
+            if get_dynamic_extension_cell(&candidate).is_some() {
+                if let Ok(cell_name) = CellName::unchecked_new(&candidate) {
+                    // Register the apparent name as an alias for this cell too
+                    register_dynamic_extension_cell(
+                        candidate.clone(),
+                        format!("bazel-external/{}", candidate),
+                    );
+                    return Ok(cell_name);
+                }
+            }
+            // Check if a bazel-external directory exists for this candidate
+            let candidate_path = format!("bazel-external/{}", candidate);
+            if std::path::Path::new(&candidate_path).exists() {
+                if let Ok(cell_name) = CellName::unchecked_new(&candidate) {
+                    register_dynamic_extension_cell(candidate, candidate_path);
+                    return Ok(cell_name);
+                }
+            }
+        }
+
+        Err(kuro_error::Error::from(CellError::UnknownCellAlias(
+            CellAlias::new(alias.to_owned()),
+            self.current,
+            self.aliases.keys().cloned().collect(),
+        )))
     }
 
     /// finds the 'CellName' for the current cell (with the alias `""`. See module docs)
@@ -232,12 +298,24 @@ impl CellAliasResolver {
 
 /// Resolves 'CellName's into 'CellInstance's.
 // TODO(bobyf) we need to check if cells changed
-#[derive(Clone, Dupe, PartialEq, Eq, Debug, Allocative)]
+#[derive(Clone, Dupe, Debug, Allocative)]
 pub struct CellResolver(Arc<CellResolverInternals>);
 
-#[derive(PartialEq, Eq, Debug, Allocative)]
+impl PartialEq for CellResolver {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.cells == other.0.cells
+            && self.0.root_cell == other.0.root_cell
+            && self.0.root_cell_alias_resolver == other.0.root_cell_alias_resolver
+    }
+}
+impl Eq for CellResolver {}
+
+#[derive(Debug, Allocative)]
 struct CellResolverInternals {
     cells: HashMap<CellName, CellInstance>,
+    /// Dynamically-added cells from extension execution (spoke repos, etc.)
+    #[allocative(skip)]
+    dynamic_cells: RwLock<HashMap<CellName, CellInstance>>,
     #[allocative(visit = crate::cells::sequence_trie_allocative::visit_sequence_trie)]
     path_mappings: SequenceTrie<FileNameBuf, CellName>,
     root_cell: CellName,
@@ -294,6 +372,7 @@ impl CellResolver {
         }
         Ok(CellResolver(Arc::new(CellResolverInternals {
             cells: cells_map,
+            dynamic_cells: RwLock::new(HashMap::new()),
             root_cell,
             path_mappings,
             root_cell_alias_resolver,
@@ -302,12 +381,109 @@ impl CellResolver {
 
     /// Get a `Cell` from the `CellMap`
     pub fn get(&self, cell: CellName) -> kuro_error::Result<&CellInstance> {
-        self.0.cells.get(&cell).ok_or_else(|| {
-            kuro_error::Error::from(CellError::UnknownCellName(
+        if let Some(instance) = self.0.cells.get(&cell) {
+            return Ok(instance);
+        }
+
+        // Check dynamic cells from extension execution.
+        // If found, promote to "static" by leaking the reference (safe: cells live for
+        // the duration of the build). This avoids holding the RwLock across returns.
+        if let Ok(dynamic) = self.0.dynamic_cells.read() {
+            if dynamic.contains_key(&cell) {
+                // Drop the read lock, get a write lock, and leak a reference
+                drop(dynamic);
+                return self.get_or_create_dynamic_cell(cell);
+            }
+        }
+
+        // Check global dynamic registry (populated by extension execution).
+        // First try exact match, then try finding canonical name by suffix match
+        // (handles placeholder labels that use bare names like "crates__tempfile-3.26.0"
+        // instead of canonical "rules_rs+crate+crates__tempfile-3.26.0").
+        let dynamic_path = get_dynamic_extension_cell(cell.as_str()).or_else(|| {
+            let suffix = format!("+{}", cell.as_str());
+            if let Ok(cells) = DYNAMIC_EXTENSION_CELLS.lock() {
+                for (canonical, path) in cells.iter() {
+                    if canonical.ends_with(&suffix) {
+                        return Some(path.clone());
+                    }
+                }
+            }
+            None
+        });
+        if let Some(path) = dynamic_path {
+            // Auto-register this cell
+            if let Ok(rel_path) = ProjectRelativePath::new(&path) {
+                let cell_path = CellRootPathBuf::new(rel_path.to_owned());
+                let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
+                if let Ok(instance) = CellInstance::new(cell, cell_path, None, nested) {
+                    if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
+                        dynamic.insert(cell, instance);
+                    }
+                    return self.get_or_create_dynamic_cell(cell);
+                }
+            }
+        }
+
+        // Last resort: scan bazel-external/ for a directory matching *+{cell_name}
+        // This handles spoke repos from extensions that may not be in the dynamic
+        // registry yet (e.g., the first time an extension is triggered).
+        // Use the root cell's path to determine the project root directory.
+        {
+            let cell_str = cell.as_str();
+            let suffix = format!("+{}", cell_str);
+            let bazel_ext_dir = DYNAMIC_PROJECT_ROOT
+                .get()
+                .map(|root| root.join("bazel-external"))
+                .unwrap_or_else(|| std::path::PathBuf::from("bazel-external"));
+            if let Ok(entries) = std::fs::read_dir(&bazel_ext_dir) {
+                for entry in entries.flatten() {
+                    let dir_name = entry.file_name();
+                    let dir_name_str = dir_name.to_string_lossy();
+                    if dir_name_str.ends_with(&suffix) && entry.path().is_dir() {
+                        let path = format!("bazel-external/{}", dir_name_str);
+                        if let Ok(rel_path) = ProjectRelativePath::new(&path) {
+                            let cell_path = CellRootPathBuf::new(rel_path.to_owned());
+                            let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
+                            if let Ok(instance) = CellInstance::new(cell, cell_path, None, nested) {
+                                // Also register in dynamic registry for future lookups
+                                register_dynamic_extension_cell(dir_name_str.to_string(), path);
+                                if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
+                                    dynamic.insert(cell, instance);
+                                }
+                                return self.get_or_create_dynamic_cell(cell);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Err(kuro_error::Error::from(CellError::UnknownCellName(
+            cell,
+            self.0.cells.keys().copied().collect(),
+        )))
+    }
+
+    /// Helper to get a reference to a dynamic cell, using unsafe to extend the lifetime.
+    /// This is safe because dynamic cells are never removed and the CellResolver outlives
+    /// all references to its cells within a build session.
+    fn get_or_create_dynamic_cell(&self, cell: CellName) -> kuro_error::Result<&CellInstance> {
+        let dynamic = self.0.dynamic_cells.read().map_err(|_| {
+            CellError::UnknownCellName(cell, self.0.cells.keys().copied().collect())
+        })?;
+        if let Some(instance) = dynamic.get(&cell) {
+            // SAFETY: The CellResolver (and its dynamic_cells) lives for the entire build.
+            // Dynamic cells are append-only (never removed). The returned reference will
+            // be valid as long as the CellResolver exists.
+            let instance_ref: &CellInstance = unsafe { &*(instance as *const CellInstance) };
+            Ok(instance_ref)
+        } else {
+            Err(kuro_error::Error::from(CellError::UnknownCellName(
                 cell,
                 self.0.cells.keys().copied().collect(),
-            ))
-        })
+            )))
+        }
     }
 
     pub fn is_root_cell(&self, name: CellName) -> bool {

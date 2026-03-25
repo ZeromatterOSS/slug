@@ -416,6 +416,14 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
                 let canonical = format!("{}+{}+{}", owning_module, ext_name, internal_name);
                 let repo_dir = project_root.join("bazel-external").join(&canonical);
 
+                // Register in dynamic cell registry so cell resolution can find
+                // extension spoke repos (e.g., crates__tempfile-3.26.0) that
+                // aren't explicitly in use_repo().
+                kuro_core::cells::register_dynamic_extension_cell(
+                    canonical.clone(),
+                    format!("bazel-external/{}", canonical),
+                );
+
                 // Skip if already materialized
                 if repo_dir.join(".kuro_repo_complete").exists() {
                     continue;

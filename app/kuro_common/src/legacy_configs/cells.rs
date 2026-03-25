@@ -1111,6 +1111,9 @@ impl BuckConfigBasedCells {
             project_root.root().to_path_buf(),
         );
 
+        // Set project root for dynamic cell filesystem scanning
+        kuro_core::cells::set_dynamic_project_root(project_root.root().to_path_buf());
+
         // Convert pre-computed cells to the format expected by BzlmodResolutionResult
         let mut ext_cells = Vec::new();
         for cell in pre_computed_cells {
