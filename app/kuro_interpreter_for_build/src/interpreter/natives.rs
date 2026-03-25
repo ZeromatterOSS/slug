@@ -322,16 +322,21 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] finalizer: bool,
         #[allow(unused_variables)] eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkMacroCallable<'v>> {
-        // TODO(macro): Wire attrs/inherit_attrs for attribute validation.
-        let _ = (attrs, inherit_attrs);
+        // TODO(macro): Wire inherit_attrs for attribute validation.
+        let _ = inherit_attrs;
         let doc_str = match doc {
             NoneOr::Other(d) if !d.is_empty() => Some(d.to_owned()),
             _ => None,
+        };
+        let attrs_val = match attrs {
+            NoneOr::Other(v) => Some(v),
+            NoneOr::None => None,
         };
         Ok(StarlarkMacroCallable::new(
             implementation,
             finalizer,
             doc_str,
+            attrs_val,
         ))
     }
 

@@ -37,7 +37,9 @@ use std::fmt;
 
 use allocative::Allocative;
 use derive_more::Display;
+use kuro_node::attrs::coerced_attr::CoercedAttr;
 use starlark::any::ProvidesStaticType;
+use starlark::collections::SmallMap;
 use starlark::eval::Arguments;
 use starlark::eval::Evaluator;
 use starlark::typing::ParamSpec;
@@ -54,7 +56,11 @@ use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
 use starlark::values::ValueLike;
+use starlark::values::dict::DictRef;
+use starlark::values::list::AllocList;
 use starlark::values::starlark_value;
+
+use crate::attrs::starlark_attribute::StarlarkAttribute;
 
 /// Errors around macro declaration and invocation.
 #[derive(Debug, kuro_error::Error)]
@@ -78,6 +84,9 @@ pub struct StarlarkMacroCallable<'v> {
     finalizer: bool,
     /// Documentation string.
     doc: Option<String>,
+    /// The `attrs` dict from `macro(attrs={...})`. Used to apply defaults for
+    /// parameters not provided by the caller.
+    attrs: Option<Value<'v>>,
 }
 
 impl<'v> fmt::Display for StarlarkMacroCallable<'v> {
@@ -133,6 +142,8 @@ pub struct FrozenStarlarkMacroCallable {
     finalizer: bool,
     /// Documentation string.
     doc: Option<String>,
+    /// The `attrs` dict from `macro(attrs={...})`. Used to apply defaults.
+    attrs: Option<FrozenValue>,
 }
 
 starlark::starlark_simple_value!(FrozenStarlarkMacroCallable);
@@ -153,6 +164,7 @@ impl<'v> Freeze for StarlarkMacroCallable<'v> {
             implementation: self.implementation.freeze(freezer)?,
             finalizer: self.finalizer,
             doc: self.doc,
+            attrs: self.attrs.freeze(freezer)?,
         })
     }
 }
@@ -174,22 +186,66 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkMacroCallable {
         //   def _impl(name, visibility, attr1, attr2, ..., **kwargs):
         //
         // Bazel's macro framework automatically injects `visibility` if not
-        // provided by the caller. We replicate this: check if visibility is
-        // among the named args, and if not, inject it as None (package default).
+        // provided by the caller, and applies defaults from attrs={...} for
+        // any declared attributes not provided by the caller.
         let names_map = args.names_map()?;
         let has_visibility = names_map.keys().any(|k| k.as_str() == "visibility");
 
-        if has_visibility {
-            // All good, pass through directly
+        // Collect attr defaults that need injection
+        let mut need_defaults = false;
+        if !has_visibility {
+            need_defaults = true;
+        }
+        if let Some(attrs_val) = &self.attrs {
+            if let Some(dict) = DictRef::from_value(attrs_val.to_value()) {
+                for (k, _) in dict.iter() {
+                    if let Some(name) = k.unpack_str() {
+                        if !names_map.keys().any(|n| n.as_str() == name) {
+                            need_defaults = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if !need_defaults {
             self.implementation.invoke(args, eval)
         } else {
-            // Inject visibility=None and call via eval_function
-            let positional: Vec<Value<'v>> = args.positions(eval.heap())?.collect();
+            // Collect attr defaults that need to be injected (name, CoercedAttr pairs)
+            let mut attr_defaults: Vec<(String, &CoercedAttr)> = Vec::new();
+            if let Some(attrs_val) = &self.attrs {
+                if let Some(dict) = DictRef::from_value(attrs_val.to_value()) {
+                    for (k, v) in dict.iter() {
+                        if let Some(attr_name) = k.unpack_str() {
+                            if names_map.keys().any(|n| n.as_str() == attr_name) {
+                                continue;
+                            }
+                            if let Some(sa) = v.downcast_ref::<StarlarkAttribute>() {
+                                if let Some(default) = sa.default() {
+                                    attr_defaults.push((attr_name.to_owned(), default.as_ref()));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            let heap = eval.heap();
+            let positional: Vec<Value<'v>> = args.positions(heap)?.collect();
             let mut named: Vec<(&str, Value<'v>)> = Vec::new();
             for (k, v) in names_map.iter() {
                 named.push((k.as_str(), *v));
             }
-            named.push(("visibility", Value::new_none()));
+            if !has_visibility {
+                named.push(("visibility", Value::new_none()));
+            }
+            // Inject collected defaults
+            for (attr_name, default) in &attr_defaults {
+                let default_val = coerced_attr_default_to_value(default, heap);
+                let name_ref = heap.alloc_str(attr_name);
+                named.push((name_ref.as_str(), default_val));
+            }
             eval.eval_function(self.implementation.to_value(), &positional, &named)
                 .map_err(Into::into)
         }
@@ -217,12 +273,45 @@ impl<'v> StarlarkMacroCallable<'v> {
         implementation: Value<'v>,
         finalizer: bool,
         doc: Option<String>,
+        attrs: Option<Value<'v>>,
     ) -> StarlarkMacroCallable<'v> {
         StarlarkMacroCallable {
             name: RefCell::new(None),
             implementation,
             finalizer,
             doc,
+            attrs,
         }
+    }
+}
+
+/// Convert a CoercedAttr default to a Starlark Value for injection into macro calls.
+/// Handles common default types; complex cases (labels, deps) fall back to None.
+fn coerced_attr_default_to_value<'v>(default: &CoercedAttr, heap: Heap<'v>) -> Value<'v> {
+    match default {
+        CoercedAttr::None => Value::new_none(),
+        CoercedAttr::Bool(b) => heap.alloc(b.0),
+        CoercedAttr::Int(i) => heap.alloc(*i),
+        CoercedAttr::String(s) | CoercedAttr::EnumVariant(s) => heap.alloc(s.as_str()),
+        CoercedAttr::List(list) => {
+            let items: Vec<Value<'v>> = list
+                .iter()
+                .map(|v| coerced_attr_default_to_value(v, heap))
+                .collect();
+            heap.alloc(AllocList(items))
+        }
+        CoercedAttr::Dict(map) => {
+            let mut res = SmallMap::with_capacity(map.len());
+            for pair in map.iter() {
+                let kv = coerced_attr_default_to_value(&pair.0, heap);
+                let vv = coerced_attr_default_to_value(&pair.1, heap);
+                if let Ok(hashed) = kv.get_hashed() {
+                    res.insert_hashed(hashed, vv);
+                }
+            }
+            heap.alloc(starlark::values::dict::Dict::new(res))
+        }
+        // For labels, deps, and other complex types, fall back to None
+        _ => Value::new_none(),
     }
 }
