@@ -337,11 +337,19 @@ pub struct CommonBuildConfigurationOptions {
     pub test_env: Vec<String>,
 
     /// Enable code coverage collection (Bazel compatibility).
-    #[clap(long = "collect-code-coverage", alias = "collect_code_coverage", hide = true)]
+    #[clap(
+        long = "collect-code-coverage",
+        alias = "collect_code_coverage",
+        hide = true
+    )]
     pub collect_code_coverage: bool,
 
     /// Disable code coverage collection (Bazel compatibility).
-    #[clap(long = "nocollect-code-coverage", alias = "nocollect_code_coverage", hide = true)]
+    #[clap(
+        long = "nocollect-code-coverage",
+        alias = "nocollect_code_coverage",
+        hide = true
+    )]
     pub nocollect_code_coverage: bool,
 
     // ---- Bazel compatibility flags (accepted, some are no-ops) ----
@@ -406,56 +414,122 @@ pub struct CommonBuildConfigurationOptions {
     pub remote_retries: Option<u32>,
 
     /// Spawn strategy (Bazel compatibility, accepted but ignored).
-    #[clap(long = "spawn-strategy", alias = "spawn_strategy", hide = true, value_name = "STRATEGY")]
+    #[clap(
+        long = "spawn-strategy",
+        alias = "spawn_strategy",
+        hide = true,
+        value_name = "STRATEGY"
+    )]
     pub spawn_strategy: Option<String>,
 
     /// Dynamic local strategy (Bazel compatibility, accepted but ignored).
-    #[clap(long = "dynamic-local-strategy", alias = "dynamic_local_strategy", hide = true, value_name = "MNEMONIC=STRATEGY", num_args = 1)]
+    #[clap(
+        long = "dynamic-local-strategy",
+        alias = "dynamic_local_strategy",
+        hide = true,
+        value_name = "MNEMONIC=STRATEGY",
+        num_args = 1
+    )]
     pub dynamic_local_strategy: Vec<String>,
 
     /// Dynamic remote strategy (Bazel compatibility, accepted but ignored).
-    #[clap(long = "dynamic-remote-strategy", alias = "dynamic_remote_strategy", hide = true, value_name = "MNEMONIC=STRATEGY", num_args = 1)]
+    #[clap(
+        long = "dynamic-remote-strategy",
+        alias = "dynamic_remote_strategy",
+        hide = true,
+        value_name = "MNEMONIC=STRATEGY",
+        num_args = 1
+    )]
     pub dynamic_remote_strategy: Vec<String>,
 
     /// Disk cache directory (Bazel compatibility, accepted but ignored).
-    #[clap(long = "disk-cache", alias = "disk_cache", hide = true, value_name = "PATH")]
+    #[clap(
+        long = "disk-cache",
+        alias = "disk_cache",
+        hide = true,
+        value_name = "PATH"
+    )]
     pub disk_cache: Option<String>,
 
     /// Repository cache directory (Bazel compatibility, accepted but ignored).
-    #[clap(long = "repository-cache", alias = "repository_cache", hide = true, value_name = "PATH")]
+    #[clap(
+        long = "repository-cache",
+        alias = "repository_cache",
+        hide = true,
+        value_name = "PATH"
+    )]
     pub repository_cache: Option<String>,
 
     /// Symlink prefix for output directories (Bazel compatibility, accepted but ignored).
-    #[clap(long = "symlink-prefix", alias = "symlink_prefix", hide = true, value_name = "PREFIX")]
+    #[clap(
+        long = "symlink-prefix",
+        alias = "symlink_prefix",
+        hide = true,
+        value_name = "PREFIX"
+    )]
     pub symlink_prefix: Option<String>,
 
     /// Remote timeout (Bazel compatibility, accepted but ignored).
-    #[clap(long = "remote-timeout", alias = "remote_timeout", hide = true, value_name = "SECONDS")]
+    #[clap(
+        long = "remote-timeout",
+        alias = "remote_timeout",
+        hide = true,
+        value_name = "SECONDS"
+    )]
     pub remote_timeout: Option<String>,
 
     /// Loading phase threads (Bazel compatibility, accepted but ignored).
-    #[clap(long = "loading-phase-threads", alias = "loading_phase_threads", hide = true, value_name = "N")]
+    #[clap(
+        long = "loading-phase-threads",
+        alias = "loading_phase_threads",
+        hide = true,
+        value_name = "N"
+    )]
     pub loading_phase_threads: Option<String>,
 
     /// Build event text file (Bazel compatibility, accepted but ignored).
-    #[clap(long = "build-event-text-file", alias = "build_event_text_file", hide = true, value_name = "PATH")]
+    #[clap(
+        long = "build-event-text-file",
+        alias = "build_event_text_file",
+        hide = true,
+        value_name = "PATH"
+    )]
     pub build_event_text_file: Option<String>,
 
     /// Build event binary file (Bazel compatibility, accepted but ignored).
-    #[clap(long = "build-event-binary-file", alias = "build_event_binary_file", hide = true, value_name = "PATH")]
+    #[clap(
+        long = "build-event-binary-file",
+        alias = "build_event_binary_file",
+        hide = true,
+        value_name = "PATH"
+    )]
     pub build_event_binary_file: Option<String>,
 
     /// --repo_env NAME=VALUE pairs (Bazel compatibility).
     /// Sets environment variables for repository rules.
-    #[clap(long = "repo-env", alias = "repo_env", hide = true, value_name = "NAME=VALUE", num_args = 1)]
+    #[clap(
+        long = "repo-env",
+        alias = "repo_env",
+        hide = true,
+        value_name = "NAME=VALUE",
+        num_args = 1
+    )]
     pub repo_env: Vec<String>,
 
     /// Remote upload local results (Bazel compatibility, accepted but ignored).
-    #[clap(long = "remote-upload-local-results", alias = "remote_upload_local_results", hide = true)]
+    #[clap(
+        long = "remote-upload-local-results",
+        alias = "remote_upload_local_results",
+        hide = true
+    )]
     pub remote_upload_local_results: bool,
 
     /// Remote accept cached results (Bazel compatibility, accepted but ignored).
-    #[clap(long = "remote-accept-cached", alias = "remote_accept_cached", hide = true)]
+    #[clap(
+        long = "remote-accept-cached",
+        alias = "remote_accept_cached",
+        hide = true
+    )]
     pub remote_accept_cached: bool,
 
     /// Announce RC (Bazel compatibility, accepted but ignored).
@@ -467,15 +541,33 @@ pub struct CommonBuildConfigurationOptions {
     pub tool_tag: Option<String>,
 
     /// Host C compiler flags (Bazel compatibility, accepted but ignored).
-    #[clap(long = "host-copt", alias = "host_copt", hide = true, value_name = "FLAG", num_args = 1)]
+    #[clap(
+        long = "host-copt",
+        alias = "host_copt",
+        hide = true,
+        value_name = "FLAG",
+        num_args = 1
+    )]
     pub host_copt: Vec<String>,
 
     /// Host C++ compiler flags (Bazel compatibility, accepted but ignored).
-    #[clap(long = "host-cxxopt", alias = "host_cxxopt", hide = true, value_name = "FLAG", num_args = 1)]
+    #[clap(
+        long = "host-cxxopt",
+        alias = "host_cxxopt",
+        hide = true,
+        value_name = "FLAG",
+        num_args = 1
+    )]
     pub host_cxxopt: Vec<String>,
 
     /// Host linker flags (Bazel compatibility, accepted but ignored).
-    #[clap(long = "host-linkopt", alias = "host_linkopt", hide = true, value_name = "FLAG", num_args = 1)]
+    #[clap(
+        long = "host-linkopt",
+        alias = "host_linkopt",
+        hide = true,
+        value_name = "FLAG",
+        num_args = 1
+    )]
     pub host_linkopt: Vec<String>,
 
     /// Force position-independent code (Bazel compatibility, accepted but ignored).
@@ -483,15 +575,31 @@ pub struct CommonBuildConfigurationOptions {
     pub force_pic: bool,
 
     /// Per-file compiler options (Bazel compatibility, accepted but ignored).
-    #[clap(long = "per-file-copt", alias = "per_file_copt", hide = true, value_name = "REGEX=OPTS", num_args = 1)]
+    #[clap(
+        long = "per-file-copt",
+        alias = "per_file_copt",
+        hide = true,
+        value_name = "REGEX=OPTS",
+        num_args = 1
+    )]
     pub per_file_copt: Vec<String>,
 
     /// Local CPU resources (Bazel compatibility, accepted but ignored).
-    #[clap(long = "local-cpu-resources", alias = "local_cpu_resources", hide = true, value_name = "N")]
+    #[clap(
+        long = "local-cpu-resources",
+        alias = "local_cpu_resources",
+        hide = true,
+        value_name = "N"
+    )]
     pub local_cpu_resources: Option<String>,
 
     /// Local RAM resources in MB (Bazel compatibility, accepted but ignored).
-    #[clap(long = "local-ram-resources", alias = "local_ram_resources", hide = true, value_name = "MB")]
+    #[clap(
+        long = "local-ram-resources",
+        alias = "local_ram_resources",
+        hide = true,
+        value_name = "MB"
+    )]
     pub local_ram_resources: Option<String>,
 
     /// Show subcommands (Bazel compatibility, accepted but ignored).
@@ -503,53 +611,109 @@ pub struct CommonBuildConfigurationOptions {
     pub sandbox_debug: bool,
 
     /// Host platform (Bazel compatibility, accepted but ignored).
-    #[clap(long = "host-platform", alias = "host_platform", hide = true, value_name = "LABEL")]
+    #[clap(
+        long = "host-platform",
+        alias = "host_platform",
+        hide = true,
+        value_name = "LABEL"
+    )]
     pub host_platform: Option<String>,
 
     /// Host compilation mode (Bazel compatibility, accepted but ignored).
-    #[clap(long = "host-compilation-mode", alias = "host_compilation_mode", hide = true, value_name = "MODE")]
+    #[clap(
+        long = "host-compilation-mode",
+        alias = "host_compilation_mode",
+        hide = true,
+        value_name = "MODE"
+    )]
     pub host_compilation_mode: Option<String>,
 
     /// Build tag filter (Bazel compatibility, accepted but ignored).
-    #[clap(long = "build-tag-filter", alias = "build_tag_filter", hide = true, value_name = "TAGS")]
+    #[clap(
+        long = "build-tag-filter",
+        alias = "build_tag_filter",
+        hide = true,
+        value_name = "TAGS"
+    )]
     pub build_tag_filter: Option<String>,
 
     /// Test tag filter (Bazel compatibility, accepted but ignored).
-    #[clap(long = "test-tag-filter", alias = "test_tag_filter", hide = true, value_name = "TAGS")]
+    #[clap(
+        long = "test-tag-filter",
+        alias = "test_tag_filter",
+        hide = true,
+        value_name = "TAGS"
+    )]
     pub test_tag_filter: Option<String>,
 
     /// Run under (Bazel compatibility, accepted but ignored).
-    #[clap(long = "run-under", alias = "run_under", hide = true, value_name = "COMMAND")]
+    #[clap(
+        long = "run-under",
+        alias = "run_under",
+        hide = true,
+        value_name = "COMMAND"
+    )]
     pub run_under: Option<String>,
 
     /// Host features (Bazel compatibility, accepted but ignored).
-    #[clap(long = "host-features", alias = "host_features", hide = true, value_name = "FEATURE", num_args = 1)]
+    #[clap(
+        long = "host-features",
+        alias = "host_features",
+        hide = true,
+        value_name = "FEATURE",
+        num_args = 1
+    )]
     pub host_features: Vec<String>,
 
-
     /// Register toolchains for toolchain resolution (Bazel compatibility, accepted but ignored).
-    #[clap(long = "register-toolchains", alias = "register_toolchains", hide = true)]
+    #[clap(
+        long = "register-toolchains",
+        alias = "register_toolchains",
+        hide = true
+    )]
     pub register_toolchains: bool,
 
     /// Whether to check direct dependencies (Bazel compatibility, accepted but ignored).
-    #[clap(long = "check-direct-dependencies", alias = "check_direct_dependencies", hide = true, value_name = "MODE")]
+    #[clap(
+        long = "check-direct-dependencies",
+        alias = "check_direct_dependencies",
+        hide = true,
+        value_name = "MODE"
+    )]
     pub check_direct_dependencies: Option<String>,
 
     /// Modify execution info (Bazel compatibility, accepted but ignored).
-    #[clap(long = "modify-execution-info", alias = "modify_execution_info", hide = true, value_name = "SPEC")]
+    #[clap(
+        long = "modify-execution-info",
+        alias = "modify_execution_info",
+        hide = true,
+        value_name = "SPEC"
+    )]
     pub modify_execution_info: Option<String>,
 
     /// Output filter regex (Bazel compatibility, accepted but ignored).
-    #[clap(long = "output-filter", alias = "output_filter", hide = true, value_name = "REGEX")]
+    #[clap(
+        long = "output-filter",
+        alias = "output_filter",
+        hide = true,
+        value_name = "REGEX"
+    )]
     pub output_filter: Option<String>,
 
-
     /// Build runfiles (Bazel compatibility, accepted but ignored).
-    #[clap(long = "build-runfile-links", alias = "build_runfile_links", hide = true)]
+    #[clap(
+        long = "build-runfile-links",
+        alias = "build_runfile_links",
+        hide = true
+    )]
     pub build_runfile_links: bool,
 
     /// Don't build runfiles (Bazel compatibility, accepted but ignored).
-    #[clap(long = "nobuild-runfile-links", alias = "nobuild_runfile_links", hide = true)]
+    #[clap(
+        long = "nobuild-runfile-links",
+        alias = "nobuild_runfile_links",
+        hide = true
+    )]
     pub nobuild_runfile_links: bool,
 
     /// Enable bzlmod (Bazel compatibility, accepted but ignored - always on).
@@ -557,40 +721,85 @@ pub struct CommonBuildConfigurationOptions {
     pub enable_bzlmod: bool,
 
     /// Allow yanked versions (Bazel compatibility, accepted but ignored).
-    #[clap(long = "allow-yanked-versions", alias = "allow_yanked_versions", hide = true, value_name = "MODULE", num_args = 1)]
+    #[clap(
+        long = "allow-yanked-versions",
+        alias = "allow_yanked_versions",
+        hide = true,
+        value_name = "MODULE",
+        num_args = 1
+    )]
     pub allow_yanked_versions: Vec<String>,
 
     /// Output groups to build (Bazel compatibility, accepted but ignored).
-    #[clap(long = "output-groups", alias = "output_groups", hide = true, value_name = "GROUPS")]
+    #[clap(
+        long = "output-groups",
+        alias = "output_groups",
+        hide = true,
+        value_name = "GROUPS"
+    )]
     pub output_groups: Option<String>,
 
     /// Java runtime version (Bazel compatibility, accepted but ignored).
-    #[clap(long = "java-runtime-version", alias = "java_runtime_version", hide = true, value_name = "VERSION")]
+    #[clap(
+        long = "java-runtime-version",
+        alias = "java_runtime_version",
+        hide = true,
+        value_name = "VERSION"
+    )]
     pub java_runtime_version: Option<String>,
 
     /// Java language version (Bazel compatibility, accepted but ignored).
-    #[clap(long = "java-language-version", alias = "java_language_version", hide = true, value_name = "VERSION")]
+    #[clap(
+        long = "java-language-version",
+        alias = "java_language_version",
+        hide = true,
+        value_name = "VERSION"
+    )]
     pub java_language_version: Option<String>,
 
     /// Tool Java runtime version (Bazel compatibility, accepted but ignored).
-    #[clap(long = "tool-java-runtime-version", alias = "tool_java_runtime_version", hide = true, value_name = "VERSION")]
+    #[clap(
+        long = "tool-java-runtime-version",
+        alias = "tool_java_runtime_version",
+        hide = true,
+        value_name = "VERSION"
+    )]
     pub tool_java_runtime_version: Option<String>,
 
     /// Tool Java language version (Bazel compatibility, accepted but ignored).
-    #[clap(long = "tool-java-language-version", alias = "tool_java_language_version", hide = true, value_name = "VERSION")]
+    #[clap(
+        long = "tool-java-language-version",
+        alias = "tool_java_language_version",
+        hide = true,
+        value_name = "VERSION"
+    )]
     pub tool_java_language_version: Option<String>,
 
     /// Enable platform-specific config (Bazel compatibility).
     /// Auto-activates build:<os> config in .bazelrc based on host OS.
-    #[clap(long = "enable-platform-specific-config", alias = "enable_platform_specific_config", hide = true)]
+    #[clap(
+        long = "enable-platform-specific-config",
+        alias = "enable_platform_specific_config",
+        hide = true
+    )]
     pub enable_platform_specific_config: bool,
 
     /// Show progress rate limit (Bazel compatibility, accepted but ignored).
-    #[clap(long = "show-progress-rate-limit", alias = "show_progress_rate_limit", hide = true, value_name = "SECONDS")]
+    #[clap(
+        long = "show-progress-rate-limit",
+        alias = "show_progress_rate_limit",
+        hide = true,
+        value_name = "SECONDS"
+    )]
     pub show_progress_rate_limit: Option<f64>,
 
     /// Convenience symlinks mode (Bazel compatibility, accepted but ignored).
-    #[clap(long = "experimental-convenience-symlinks", alias = "experimental_convenience_symlinks", hide = true, value_name = "MODE")]
+    #[clap(
+        long = "experimental-convenience-symlinks",
+        alias = "experimental_convenience_symlinks",
+        hide = true,
+        value_name = "MODE"
+    )]
     pub convenience_symlinks: Option<String>,
 
     /// Heap dump on OOM (Bazel JVM compatibility, accepted but ignored).
@@ -602,43 +811,89 @@ pub struct CommonBuildConfigurationOptions {
     pub curses: Option<String>,
 
     /// Flaky test retry attempts (Bazel compatibility, accepted but ignored).
-    #[clap(long = "flaky-test-attempts", alias = "flaky_test_attempts", hide = true, value_name = "N")]
+    #[clap(
+        long = "flaky-test-attempts",
+        alias = "flaky_test_attempts",
+        hide = true,
+        value_name = "N"
+    )]
     pub flaky_test_attempts: Option<String>,
 
     /// gRPC keepalive time (Bazel compatibility, accepted but ignored).
-    #[clap(long = "grpc-keepalive-time", alias = "grpc_keepalive_time", hide = true, value_name = "DURATION")]
+    #[clap(
+        long = "grpc-keepalive-time",
+        alias = "grpc_keepalive_time",
+        hide = true,
+        value_name = "DURATION"
+    )]
     pub grpc_keepalive_time: Option<String>,
 
     /// Lockfile mode (Bazel compatibility, accepted but ignored).
-    #[clap(long = "lockfile-mode", alias = "lockfile_mode", hide = true, value_name = "MODE")]
+    #[clap(
+        long = "lockfile-mode",
+        alias = "lockfile_mode",
+        hide = true,
+        value_name = "MODE"
+    )]
     pub lockfile_mode: Option<String>,
 
     /// Module mirrors for BCR (Bazel compatibility, accepted but ignored).
-    #[clap(long = "module-mirrors", alias = "module_mirrors", hide = true, value_name = "URL")]
+    #[clap(
+        long = "module-mirrors",
+        alias = "module_mirrors",
+        hide = true,
+        value_name = "URL"
+    )]
     pub module_mirrors: Option<String>,
 
     /// Remote download outputs mode (Bazel compatibility, accepted but ignored).
-    #[clap(long = "remote-download-outputs", alias = "remote_download_outputs", hide = true, value_name = "MODE")]
+    #[clap(
+        long = "remote-download-outputs",
+        alias = "remote_download_outputs",
+        hide = true,
+        value_name = "MODE"
+    )]
     pub remote_download_outputs: Option<String>,
 
     /// Remote local fallback (Bazel compatibility, accepted but ignored).
-    #[clap(long = "remote-local-fallback", alias = "remote_local_fallback", hide = true)]
+    #[clap(
+        long = "remote-local-fallback",
+        alias = "remote_local_fallback",
+        hide = true
+    )]
     pub remote_local_fallback: bool,
 
     /// Reuse sandbox directories (Bazel compatibility, accepted but ignored).
-    #[clap(long = "reuse-sandbox-directories", alias = "reuse_sandbox_directories", hide = true)]
+    #[clap(
+        long = "reuse-sandbox-directories",
+        alias = "reuse_sandbox_directories",
+        hide = true
+    )]
     pub reuse_sandbox_directories: bool,
 
     /// Sandbox default allow network (Bazel compatibility, accepted but ignored).
-    #[clap(long = "sandbox-default-allow-network", alias = "sandbox_default_allow_network", hide = true)]
+    #[clap(
+        long = "sandbox-default-allow-network",
+        alias = "sandbox_default_allow_network",
+        hide = true
+    )]
     pub sandbox_default_allow_network: bool,
 
     /// No sandbox default allow network (Bazel compatibility, accepted but ignored).
-    #[clap(long = "nosandbox-default-allow-network", alias = "nosandbox_default_allow_network", hide = true)]
+    #[clap(
+        long = "nosandbox-default-allow-network",
+        alias = "nosandbox_default_allow_network",
+        hide = true
+    )]
     pub nosandbox_default_allow_network: bool,
 
     /// Show result count (Bazel compatibility, accepted but ignored).
-    #[clap(long = "show-result", alias = "show_result", hide = true, value_name = "N")]
+    #[clap(
+        long = "show-result",
+        alias = "show_result",
+        hide = true,
+        value_name = "N"
+    )]
     pub show_result: Option<i32>,
 
     /// Show timestamps (Bazel compatibility, accepted but ignored).
@@ -646,19 +901,39 @@ pub struct CommonBuildConfigurationOptions {
     pub show_timestamps: bool,
 
     /// Terminal columns (Bazel compatibility, accepted but ignored).
-    #[clap(long = "terminal-columns", alias = "terminal_columns", hide = true, value_name = "N")]
+    #[clap(
+        long = "terminal-columns",
+        alias = "terminal_columns",
+        hide = true,
+        value_name = "N"
+    )]
     pub terminal_columns: Option<i32>,
 
     /// Test strategy (Bazel compatibility, accepted but ignored).
-    #[clap(long = "test-strategy", alias = "test_strategy", hide = true, value_name = "STRATEGY")]
+    #[clap(
+        long = "test-strategy",
+        alias = "test_strategy",
+        hide = true,
+        value_name = "STRATEGY"
+    )]
     pub test_strategy: Option<String>,
 
     /// Test summary mode (Bazel compatibility, accepted but ignored).
-    #[clap(long = "test-summary", alias = "test_summary", hide = true, value_name = "MODE")]
+    #[clap(
+        long = "test-summary",
+        alias = "test_summary",
+        hide = true,
+        value_name = "MODE"
+    )]
     pub test_summary: Option<String>,
 
     /// Test timeout (Bazel compatibility, accepted but ignored).
-    #[clap(long = "test-timeout", alias = "test_timeout", hide = true, value_name = "SECONDS")]
+    #[clap(
+        long = "test-timeout",
+        alias = "test_timeout",
+        hide = true,
+        value_name = "SECONDS"
+    )]
     pub test_timeout: Option<String>,
 
     /// Cache test results (Bazel compatibility, accepted but ignored).
@@ -666,11 +941,20 @@ pub struct CommonBuildConfigurationOptions {
     pub cache_test_results: bool,
 
     /// No cache test results (Bazel compatibility, accepted but ignored).
-    #[clap(long = "nocache-test-results", alias = "nocache_test_results", hide = true)]
+    #[clap(
+        long = "nocache-test-results",
+        alias = "nocache_test_results",
+        hide = true
+    )]
     pub nocache_test_results: bool,
 
     /// Workspace status command (Bazel compatibility, accepted but ignored).
-    #[clap(long = "workspace-status-command", alias = "workspace_status_command", hide = true, value_name = "CMD")]
+    #[clap(
+        long = "workspace-status-command",
+        alias = "workspace_status_command",
+        hide = true,
+        value_name = "CMD"
+    )]
     pub workspace_status_command: Option<String>,
 }
 

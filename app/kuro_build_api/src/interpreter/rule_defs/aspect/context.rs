@@ -223,9 +223,8 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
     fn fragments<'v>(this: RefAspectContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
         let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
-        let cpp = crate::interpreter::rule_defs::fragments::CppFragment::new(
-            mode, false, false, false,
-        );
+        let cpp =
+            crate::interpreter::rule_defs::fragments::CppFragment::new(mode, false, false, false);
         Ok(heap.alloc(ConfigurationFragments::new(cpp)))
     }
 
@@ -240,9 +239,8 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
         let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
-        let cpp = crate::interpreter::rule_defs::fragments::CppFragment::new(
-            mode, false, false, false,
-        );
+        let cpp =
+            crate::interpreter::rule_defs::fragments::CppFragment::new(mode, false, false, false);
         Ok(heap.alloc(ConfigurationFragments::new(cpp)))
     }
 

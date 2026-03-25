@@ -3,6 +3,43 @@
   "registryFileHashes": {},
   "selectedYankedVersions": {},
   "moduleExtensions": {
+    "//private:extensions.bzl%version_extension": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-MI+r/Hb11CFy2VpXcMb9wifsZ4fwZDR5xYosTp8ez4E=",
+        "usagesDigest": "sha256-g7odpjyP17m4cdGeS/bn7qujCiO2P020c27ahq4kHPA=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {
+          "bazel_features_version": {
+            "repoRuleId": "bazel_features//private/version_repo.bzl%version_repo",
+            "attributes": {}
+          },
+          "bazel_features_globals": {
+            "repoRuleId": "bazel_features//private/globals_repo.bzl%globals_repo",
+            "attributes": {
+              "globals": {
+                "CcSharedLibraryHintInfo": "7.0.0-pre.20230316.2",
+                "CcSharedLibraryInfo": "6.0.0-pre.20220630.1",
+                "DefaultInfo": "0.0.1",
+                "PackageSpecificationInfo": "6.4.0",
+                "RunEnvironmentInfo": "5.3.0",
+                "__TestingOnly_NeverAvailable": "1000000000.0.0",
+                "macro": "8.0.0",
+                "subrule": "7.0.0"
+              },
+              "legacy_globals": {
+                "JavaInfo": "8.0.0",
+                "JavaPluginInfo": "8.0.0",
+                "ProtoInfo": "8.0.0",
+                "PyCcLinkParamsProvider": "8.0.0",
+                "PyInfo": "8.0.0",
+                "PyRuntimeInfo": "8.0.0",
+                "cc_proto_aspect": "8.0.0"
+              }
+            }
+          }
+        }
+      }
+    },
     "//cc:extensions.bzl%compatibility_proxy": {
       "general": {
         "bzlTransitiveDigest": "sha256-paDx7Xl9dOclbuBQsHmF7pLOiXGY+UF7PUkEN6Eub1E=",

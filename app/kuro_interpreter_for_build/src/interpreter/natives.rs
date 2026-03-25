@@ -82,7 +82,10 @@ fn depset_to_transitive_set<'v>(
 /// Convert a serde_json::Value to a Starlark Value on the given heap.
 /// Used by existing_rules()/existing_rule() to convert CoercedAttr JSON representations
 /// to Starlark values that can be returned to .bzl code.
-pub(crate) fn json_to_starlark_value<'v>(heap: starlark::values::Heap<'v>, json: &serde_json::Value) -> Value<'v> {
+pub(crate) fn json_to_starlark_value<'v>(
+    heap: starlark::values::Heap<'v>,
+    json: &serde_json::Value,
+) -> Value<'v> {
     match json {
         serde_json::Value::Null => Value::new_none(),
         serde_json::Value::Bool(b) => Value::new_bool(*b),
@@ -97,7 +100,10 @@ pub(crate) fn json_to_starlark_value<'v>(heap: starlark::values::Heap<'v>, json:
         }
         serde_json::Value::String(s) => heap.alloc_str(s).to_value(),
         serde_json::Value::Array(arr) => {
-            let items: Vec<Value<'v>> = arr.iter().map(|v| json_to_starlark_value(heap, v)).collect();
+            let items: Vec<Value<'v>> = arr
+                .iter()
+                .map(|v| json_to_starlark_value(heap, v))
+                .collect();
             heap.alloc(AllocList(items))
         }
         serde_json::Value::Object(map) => {
@@ -314,8 +320,7 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = NoneOr::None)] attrs: NoneOr<Value<'v>>,
         #[starlark(require = named, default = NoneOr::None)] inherit_attrs: NoneOr<Value<'v>>,
         #[starlark(require = named, default = false)] finalizer: bool,
-        #[allow(unused_variables)]
-        eval: &mut Evaluator<'v, '_, '_>,
+        #[allow(unused_variables)] eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkMacroCallable<'v>> {
         // TODO(macro): Wire attrs/inherit_attrs for attribute validation.
         let _ = (attrs, inherit_attrs);
@@ -323,7 +328,11 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
             NoneOr::Other(d) if !d.is_empty() => Some(d.to_owned()),
             _ => None,
         };
-        Ok(StarlarkMacroCallable::new(implementation, finalizer, doc_str))
+        Ok(StarlarkMacroCallable::new(
+            implementation,
+            finalizer,
+            doc_str,
+        ))
     }
 
     /// Bazel's `AnalysisFailureInfo` provider for analysis failure detection.
@@ -563,13 +572,20 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
         let extra = ModuleInternals::from_context(eval, "native.glob")?;
         let spec = GlobSpec::new(&include.items, &exclude.items)?;
         if !allow_empty {
-            let results: Vec<_> = extra.resolve_glob(&spec).map(|path| path.as_str().to_owned()).collect();
+            let results: Vec<_> = extra
+                .resolve_glob(&spec)
+                .map(|path| path.as_str().to_owned())
+                .collect();
             if results.is_empty() {
-                return Err(starlark::Error::new_other(
-                    anyhow::anyhow!("glob pattern '{}' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with package(default_glob_allow_empty = ...))", include.items.join(", "))
-                ));
+                return Err(starlark::Error::new_other(anyhow::anyhow!(
+                    "glob pattern '{}' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with package(default_glob_allow_empty = ...))",
+                    include.items.join(", ")
+                )));
             }
-            Ok(eval.heap().alloc_typed_unchecked(AllocList(results.iter().map(|s| s.as_str()))).cast())
+            Ok(eval
+                .heap()
+                .alloc_typed_unchecked(AllocList(results.iter().map(|s| s.as_str())))
+                .cast())
         } else {
             let res = extra.resolve_glob(&spec).map(|path| path.as_str());
             Ok(eval.heap().alloc_typed_unchecked(AllocList(res)).cast())

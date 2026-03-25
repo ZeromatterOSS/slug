@@ -129,7 +129,9 @@ impl<'a, 't> CoercedAttrWithType<'a, 't> {
             (a, AttrTypeInner::Any(_)) => Self::pack_any(a),
 
             (CoercedAttr::Bool(b), AttrTypeInner::Bool(t)) => Ok(CoercedAttrWithType::Bool(*b, *t)),
-            (CoercedAttr::Int(i), AttrTypeInner::Int(t)) => Ok(CoercedAttrWithType::Int(*i, t.clone())),
+            (CoercedAttr::Int(i), AttrTypeInner::Int(t)) => {
+                Ok(CoercedAttrWithType::Int(*i, t.clone()))
+            }
             (CoercedAttr::String(s), AttrTypeInner::String(t)) => {
                 Ok(CoercedAttrWithType::String(s, *t))
             }

@@ -169,7 +169,12 @@ pub(crate) fn analysis_actions_methods_copy(methods: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] use_exec_root_for_source: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = (is_executable, progress_message, use_exec_root_for_source, target_type);
+        let _ = (
+            is_executable,
+            progress_message,
+            use_exec_root_for_source,
+            target_type,
+        );
 
         match (target_file.into_option(), target_path.into_option()) {
             (Some(target_file), None) => {

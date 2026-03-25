@@ -875,7 +875,13 @@ impl TestOrchestrator for BuckTestOrchestrator<'_> {
         } = test_executable_expanded;
 
         // Inject Bazel-compatible test environment variables
-        inject_bazel_test_env(&mut expanded_env, &test_target, Duration::default(), &fs, &expanded_cmd);
+        inject_bazel_test_env(
+            &mut expanded_env,
+            &test_target,
+            Duration::default(),
+            &fs,
+            &expanded_cmd,
+        );
 
         let execution_request = Self::create_command_execution_request(
             self.dice.dupe().deref_mut(),
@@ -2286,11 +2292,9 @@ fn inject_bazel_test_env(
                         #[cfg(windows)]
                         {
                             if entry.path().is_dir() {
-                                let _ =
-                                    std::os::windows::fs::symlink_dir(entry.path(), &target);
+                                let _ = std::os::windows::fs::symlink_dir(entry.path(), &target);
                             } else {
-                                let _ =
-                                    std::os::windows::fs::symlink_file(entry.path(), &target);
+                                let _ = std::os::windows::fs::symlink_file(entry.path(), &target);
                             }
                         }
                     }

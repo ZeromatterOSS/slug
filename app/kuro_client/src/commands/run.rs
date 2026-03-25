@@ -265,7 +265,10 @@ impl StreamingCommand for RunCommand {
                                         #[cfg(unix)]
                                         let _ = std::os::unix::fs::symlink(entry.path(), &target);
                                         #[cfg(windows)]
-                                        let _ = std::os::windows::fs::symlink_dir(entry.path(), &target);
+                                        let _ = std::os::windows::fs::symlink_dir(
+                                            entry.path(),
+                                            &target,
+                                        );
                                     }
                                 }
                             }
@@ -279,7 +282,8 @@ impl StreamingCommand for RunCommand {
                                 #[cfg(unix)]
                                 let _ = std::os::unix::fs::symlink(workspace_name, &main_link);
                                 #[cfg(windows)]
-                                let _ = std::os::windows::fs::symlink_dir(workspace_name, &main_link);
+                                let _ =
+                                    std::os::windows::fs::symlink_dir(workspace_name, &main_link);
                             }
                         }
                     }
@@ -302,10 +306,7 @@ impl StreamingCommand for RunCommand {
                 ));
                 env_vars.push((
                     "RUNFILES_MANIFEST_FILE".to_owned(),
-                    format!(
-                        "{}/MANIFEST",
-                        abs_runfiles.to_string_lossy()
-                    ),
+                    format!("{}/MANIFEST", abs_runfiles.to_string_lossy()),
                 ));
             }
         }

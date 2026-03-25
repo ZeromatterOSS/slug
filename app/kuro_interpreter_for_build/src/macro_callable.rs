@@ -144,9 +144,7 @@ impl<'v> Freeze for StarlarkMacroCallable<'v> {
         let name = match self.name.into_inner() {
             Some(name) => name,
             None => {
-                return Err(FreezeError::new(
-                    MacroError::MacroNotAssigned.to_string(),
-                ));
+                return Err(FreezeError::new(MacroError::MacroNotAssigned.to_string()));
             }
         };
 

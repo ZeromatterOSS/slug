@@ -212,7 +212,7 @@ impl AttributeExt for Attribute {
                             // without a BuildContext), fall back to None default. The rule will
                             // re-coerce the default from BUILD file context when instantiated.
                             Some(Arc::new(kuro_node::attrs::coerced_attr::CoercedAttr::None))
-                        },
+                        }
                         Ok(coerce_ctx) => {
                             match coercer.coerce(AttrIsConfigurable::Yes, &coerce_ctx, x) {
                                 Ok(coerced) => Some(Arc::new(coerced)),
@@ -872,9 +872,8 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
             let variants: Vec<String> = values.items.iter().map(|s| s.to_string()).collect();
             // If the default is empty string and it's not in the values list,
             // use the first value as default (Bazel behavior)
-            AttrType::enumeration(variants).map_err(|e| {
-                starlark::Error::new_other(anyhow::anyhow!("{}", e))
-            })?
+            AttrType::enumeration(variants)
+                .map_err(|e| starlark::Error::new_other(anyhow::anyhow!("{}", e)))?
         };
 
         let mut attr = Attribute::attr(eval, effective_default, doc, attr_type)?;
@@ -1383,6 +1382,8 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         let _unused = mandatory;
         let coercer = AttrType::list(AttrType::string());
         let base = Attribute::attr(eval, default, doc, coercer)?;
-        Ok(StarlarkAttribute::new(base.clone_attribute().with_allow_empty(allow_empty)))
+        Ok(StarlarkAttribute::new(
+            base.clone_attribute().with_allow_empty(allow_empty),
+        ))
     }
 }

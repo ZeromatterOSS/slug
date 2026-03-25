@@ -275,7 +275,11 @@ fn proto_common_module_methods(builder: &mut MethodsBuilder) {
         #[allow(unused_variables)] eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<String> {
         // TODO(proto_common): Extract from toolchain
-        let path = if cfg!(windows) { "protoc.exe" } else { "/usr/bin/protoc" };
+        let path = if cfg!(windows) {
+            "protoc.exe"
+        } else {
+            "/usr/bin/protoc"
+        };
         Ok(path.to_owned())
     }
 
@@ -404,7 +408,8 @@ fn encode_text_value(buf: &mut String, v: Value, indent: &str) -> Result<(), sta
 
     if let Some(s) = StructRef::from_value(v) {
         // Struct: emit each field sorted by key name
-        let mut fields: Vec<(String, Value)> = s.iter().map(|(k, v)| (k.as_str().to_owned(), v)).collect();
+        let mut fields: Vec<(String, Value)> =
+            s.iter().map(|(k, v)| (k.as_str().to_owned(), v)).collect();
         fields.sort_by(|a, b| a.0.cmp(&b.0));
         for (key, val) in fields {
             if val.is_none() {
@@ -414,10 +419,8 @@ fn encode_text_value(buf: &mut String, v: Value, indent: &str) -> Result<(), sta
         }
     } else if let Some(dict) = DictRef::from_value(v) {
         // Dict: emit each entry sorted by key
-        let mut entries: Vec<(String, Value)> = dict
-            .iter()
-            .map(|(k, v)| (format!("{}", k), v))
-            .collect();
+        let mut entries: Vec<(String, Value)> =
+            dict.iter().map(|(k, v)| (format!("{}", k), v)).collect();
         entries.sort_by(|a, b| a.0.cmp(&b.0));
         for (key, val) in entries {
             if val.is_none() {
@@ -427,9 +430,10 @@ fn encode_text_value(buf: &mut String, v: Value, indent: &str) -> Result<(), sta
         }
     } else {
         return Err(starlark::Error::from(
-            starlark::values::ValueError::IncorrectParameterTypeNamed(
-                format!("proto.encode_text: expected struct or dict, got {}", v.get_type()),
-            ),
+            starlark::values::ValueError::IncorrectParameterTypeNamed(format!(
+                "proto.encode_text: expected struct or dict, got {}",
+                v.get_type()
+            )),
         ));
     }
     Ok(())
@@ -502,7 +506,6 @@ fn encode_text_field(
     buf.push('\n');
     Ok(())
 }
-
 
 // ============================================================================
 // Registration

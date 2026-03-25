@@ -14,10 +14,10 @@ use crate::interpreter::rule_defs::provider::registration::register_builtin_prov
 
 pub mod apple_common;
 pub mod artifact;
-pub mod build_config;
 pub mod artifact_tagging;
 pub mod aspect;
 pub mod bazel_label;
+pub mod build_config;
 pub mod cc_common;
 pub mod cmd_args;
 pub mod command_executor_config;
@@ -27,9 +27,9 @@ pub mod configuration_field;
 pub mod context;
 pub mod coverage_common;
 pub mod depset;
-pub mod java_common;
 pub mod digest_config;
 pub mod fragments;
+pub mod java_common;
 pub mod label_relative_path;
 pub mod platform_common;
 pub mod plugins;

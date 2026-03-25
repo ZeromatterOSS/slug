@@ -291,9 +291,7 @@ impl<'v> ActionsRegistry<'v> {
                             .or_insert_with(HashSet::<String>::new);
                         // If the category already has any actions (identified or unidentified),
                         // having an unidentified action is ambiguous.
-                        if !existing_identifiers.is_empty()
-                            || existing_identifiers.contains("")
-                        {
+                        if !existing_identifiers.is_empty() || existing_identifiers.contains("") {
                             return Err(ActionErrors::ActionCategoryDuplicateSingleton(
                                 category.to_owned(),
                             )

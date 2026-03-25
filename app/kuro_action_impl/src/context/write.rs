@@ -604,18 +604,15 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
         >,
     > {
         let mut state = this.state()?;
-        let (declaration, output_artifact) = state.get_or_declare_output(
-            eval,
-            output,
-            OutputType::File,
-            None,
-        )?;
+        let (declaration, output_artifact) =
+            state.get_or_declare_output(eval, output, OutputType::File, None)?;
 
         let (content_cli, mut associated_artifacts) = match content {
             WriteContentArg::CommandLineArg(content) => {
                 let content_arg = content.as_command_line_arg();
                 if !allow_args && content_arg.contains_arg_attr() {
-                    let e: kuro_error::Error = WriteActionError::ArgAttrsDetectedButNotAllowed.into();
+                    let e: kuro_error::Error =
+                        WriteActionError::ArgAttrsDetectedButNotAllowed.into();
                     return Err(e.into());
                 }
                 let mut visitor = CommandLineInputVisitor::new(false);
@@ -625,7 +622,8 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
             WriteContentArg::StarlarkCommandLineValueUnpack(content) => {
                 let cli = StarlarkCmdArgs::try_from_value_typed(content)?;
                 if !allow_args && cli.contains_arg_attr() {
-                    let e: kuro_error::Error = WriteActionError::ArgAttrsDetectedButNotAllowed.into();
+                    let e: kuro_error::Error =
+                        WriteActionError::ArgAttrsDetectedButNotAllowed.into();
                     return Err(e.into());
                 }
                 let mut visitor = CommandLineInputVisitor::new(false);

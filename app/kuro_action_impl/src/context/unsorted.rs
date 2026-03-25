@@ -22,18 +22,18 @@ use kuro_build_api::interpreter::rule_defs::transitive_set::FrozenTransitiveSetD
 use kuro_build_api::interpreter::rule_defs::transitive_set::TransitiveSet;
 use kuro_core::fs::buck_out_path::BuckOutPathKind;
 use kuro_execute::execute::request::OutputType;
-
-use crate::actions::impls::write::UnregisteredWriteAction;
 use starlark::environment::MethodsBuilder;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::values::FrozenValueTyped;
+use starlark::values::UnpackValue;
 use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::ValueOfUnchecked;
 use starlark::values::ValueTyped;
-use starlark::values::UnpackValue;
 use starlark::values::typing::StarlarkIter;
+
+use crate::actions::impls::write::UnregisteredWriteAction;
 
 /// Extract the parent directory from a sibling artifact to use as prefix.
 ///
@@ -49,21 +49,27 @@ fn sibling_to_prefix<'v>(sibling: Value<'v>) -> starlark::Result<Option<String>>
     if let Some(artifact_like) = <&dyn StarlarkArtifactLike<'v>>::unpack_value(sibling)? {
         // Use Cell to extract the parent dir from within the with_short_path closure
         let parent_dir = std::cell::Cell::new(None);
-        artifact_like.with_short_path(&|path| {
-            if let Some(parent) = path.parent() {
-                let s = parent.as_str();
-                if !s.is_empty() {
-                    parent_dir.set(Some(s.to_owned()));
+        artifact_like
+            .with_short_path(&|path| {
+                if let Some(parent) = path.parent() {
+                    let s = parent.as_str();
+                    if !s.is_empty() {
+                        parent_dir.set(Some(s.to_owned()));
+                    }
                 }
-            }
-            // The return value is required by the trait but we don't use it.
-            starlark::values::StringValue::default()
-        }).map_err(starlark::Error::from)?;
+                // The return value is required by the trait but we don't use it.
+                starlark::values::StringValue::default()
+            })
+            .map_err(starlark::Error::from)?;
         Ok(parent_dir.into_inner())
     } else if let Some(s) = sibling.unpack_str() {
         if let Some(idx) = s.rfind('/') {
             let parent = &s[..idx];
-            if parent.is_empty() { Ok(None) } else { Ok(Some(parent.to_owned())) }
+            if parent.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(parent.to_owned()))
+            }
         } else {
             Ok(None)
         }
@@ -72,7 +78,8 @@ fn sibling_to_prefix<'v>(sibling: Value<'v>) -> starlark::Result<Option<String>>
             kuro_error::ErrorTag::Input,
             "Expected File or declared artifact for `sibling`, got `{}`",
             sibling.get_type()
-        ).into())
+        )
+        .into())
     }
 }
 
@@ -478,9 +485,12 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
             if let Ok(iter) = outputs.iterate(eval.heap()) {
                 let mut state = this.state()?;
                 for output_val in iter {
-                    let output_artifact = if let Some(declared) = output_val.downcast_ref::<StarlarkDeclaredArtifact>() {
+                    let output_artifact = if let Some(declared) =
+                        output_val.downcast_ref::<StarlarkDeclaredArtifact>()
+                    {
                         declared.output_artifact()
-                    } else if let Some(output) = output_val.downcast_ref::<StarlarkOutputArtifact>() {
+                    } else if let Some(output) = output_val.downcast_ref::<StarlarkOutputArtifact>()
+                    {
                         output.artifact()
                     } else {
                         continue;

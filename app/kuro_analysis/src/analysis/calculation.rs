@@ -301,7 +301,9 @@ async fn check_config_setting_flag_values(
             format!("//{}:{}", flag_pkg, flag_name)
         };
 
-        let actual_val = if let Some(cli_val) = kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(&flag_label_str) {
+        let actual_val = if let Some(cli_val) =
+            kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(&flag_label_str)
+        {
             cli_val
         } else {
             // Fall back to build_setting_default
@@ -478,8 +480,8 @@ fn resolve_bazel_config_value(key: &str, expected: &str) -> bool {
         "define" => {
             // Check if expected is "KEY=VALUE" format and match against --define flags
             if let Some((def_key, def_val)) = expected.split_once('=') {
-                kuro_build_api::interpreter::rule_defs::build_config::get_define(def_key)
-                    .as_deref() == Some(def_val)
+                kuro_build_api::interpreter::rule_defs::build_config::get_define(def_key).as_deref()
+                    == Some(def_val)
             } else {
                 // Just check if the key exists
                 kuro_build_api::interpreter::rule_defs::build_config::get_define(expected).is_some()

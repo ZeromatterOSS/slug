@@ -294,22 +294,18 @@ async fn declare_all_source_artifacts(
 
             // Compute cell-relative path
             let abs_path = entry.path();
-            let rel = abs_path
-                .strip_prefix(source_path)
-                .map_err(|e| {
-                    kuro_error::kuro_error!(
-                        kuro_error::ErrorTag::Environment,
-                        "Failed to compute relative path: {}",
-                        e
-                    )
-                })?;
+            let rel = abs_path.strip_prefix(source_path).map_err(|e| {
+                kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Environment,
+                    "Failed to compute relative path: {}",
+                    e
+                )
+            })?;
             let rel_str = rel.to_string_lossy().replace('\\', "/");
             let cell_rel = CellRelativePath::unchecked_new(&rel_str);
 
-            let path = buck_out_resolver.resolve_external_cell_source(
-                cell_rel,
-                ExternalCellOrigin::Bzlmod(setup.clone()),
-            );
+            let path = buck_out_resolver
+                .resolve_external_cell_source(cell_rel, ExternalCellOrigin::Bzlmod(setup.clone()));
 
             let content = tokio::fs::read(&abs_path).await.map_err(|e| {
                 kuro_error::kuro_error!(

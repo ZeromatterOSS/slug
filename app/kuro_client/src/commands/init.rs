@@ -159,10 +159,7 @@ fn initialize_root_build(repo_root: &AbsPath, prelude: bool) -> kuro_error::Resu
         writeln!(build, "genrule(")?;
         writeln!(build, "    name = \"hello_world\",")?;
         writeln!(build, "    outs = [\"out.txt\"],")?;
-        writeln!(
-            build,
-            "    cmd = \"echo 'Built by Kuro!' > $@\","
-        )?;
+        writeln!(build, "    cmd = \"echo 'Built by Kuro!' > $@\",")?;
         writeln!(build, ")")?;
     }
     Ok(())
@@ -172,7 +169,10 @@ fn set_up_gitignore(repo_root: &AbsPath) -> kuro_error::Result<()> {
     let gitignore = repo_root.join(".gitignore");
     // If .gitignore is empty or doesn't exist, add build output dirs
     if !gitignore.exists() || fs_util::metadata(&gitignore)?.len() == 0 {
-        fs_util::write(gitignore, "/buck-out\n/bazel-external\n/bazel-bin\n/bazel-testlogs\n")?;
+        fs_util::write(
+            gitignore,
+            "/buck-out\n/bazel-external\n/bazel-bin\n/bazel-testlogs\n",
+        )?;
     }
     Ok(())
 }

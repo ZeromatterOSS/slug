@@ -127,8 +127,7 @@ impl ArtifactPath<'_> {
             Either::Right(source) => {
                 // For source files, display uses the cell-relative path
                 // e.g., file "artifacts/DATA" in package "artifacts" -> "artifacts/DATA"
-                let pkg_path: &ForwardRelativePath =
-                    source.package().cell_relative_path().as_ref();
+                let pkg_path: &ForwardRelativePath = source.package().cell_relative_path().as_ref();
                 let file_rel: &ForwardRelativePath = source.path().as_ref();
                 let cell_name = source.package().cell_name();
                 if pkg_path.is_empty() {

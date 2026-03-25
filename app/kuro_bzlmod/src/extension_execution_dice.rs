@@ -513,30 +513,30 @@ impl Key for ModuleExtensionExecutionKey {
         // Don't cache empty results — they likely indicate a failed extension execution
         // (graceful fallback), and caching them would poison future builds.
         if !output.generated_repo_specs.is_empty() {
-        if let Some(project_root) = &self.project_root {
-            let lock_path = lockfile_path(project_root);
-            match update_lockfile_extension_cache(
-                &lock_path,
-                &self.extension_id,
-                &bzl_transitive_digest,
-                &usages_digest,
-                &output.generated_repo_specs,
-            ) {
-                Ok(()) => {
-                    tracing::debug!(
-                        "Updated lockfile cache for extension '{}'",
-                        self.extension_id
-                    );
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "Failed to update lockfile cache for extension '{}': {}",
-                        self.extension_id,
-                        e
-                    );
+            if let Some(project_root) = &self.project_root {
+                let lock_path = lockfile_path(project_root);
+                match update_lockfile_extension_cache(
+                    &lock_path,
+                    &self.extension_id,
+                    &bzl_transitive_digest,
+                    &usages_digest,
+                    &output.generated_repo_specs,
+                ) {
+                    Ok(()) => {
+                        tracing::debug!(
+                            "Updated lockfile cache for extension '{}'",
+                            self.extension_id
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to update lockfile cache for extension '{}': {}",
+                            self.extension_id,
+                            e
+                        );
+                    }
                 }
             }
-        }
         }
 
         Ok(Arc::new(result))
@@ -784,8 +784,14 @@ mod tests {
             specs,
         );
 
-        assert_eq!(result.canonical_name("foo"), Some("module+my_extension+foo"));
-        assert_eq!(result.canonical_name("bar"), Some("module+my_extension+bar"));
+        assert_eq!(
+            result.canonical_name("foo"),
+            Some("module+my_extension+foo")
+        );
+        assert_eq!(
+            result.canonical_name("bar"),
+            Some("module+my_extension+bar")
+        );
         assert_eq!(result.canonical_name("baz"), None);
     }
 
@@ -837,8 +843,14 @@ mod tests {
 
         let names = build_canonical_names("@@rules_python//pip:pip.bzl%pip", &specs);
 
-        assert_eq!(names.get("numpy"), Some(&"rules_python+pip+numpy".to_owned()));
-        assert_eq!(names.get("pandas"), Some(&"rules_python+pip+pandas".to_owned()));
+        assert_eq!(
+            names.get("numpy"),
+            Some(&"rules_python+pip+numpy".to_owned())
+        );
+        assert_eq!(
+            names.get("pandas"),
+            Some(&"rules_python+pip+pandas".to_owned())
+        );
     }
 
     #[test]

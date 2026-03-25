@@ -457,7 +457,12 @@ impl CoercedAttr {
         traversal: &mut dyn CoercedAttrTraversal<'a>,
     ) -> kuro_error::Result<()> {
         match CoercedAttrWithType::pack(self, t)? {
-            CoercedAttrWithType::Selector(CoercedSelector { entries, default, .. }, t) => {
+            CoercedAttrWithType::Selector(
+                CoercedSelector {
+                    entries, default, ..
+                },
+                t,
+            ) => {
                 for (condition, value) in entries.iter() {
                     traversal.configuration_dep(&condition.0, ConfigurationDepKind::SelectKey)?;
                     value.traverse(t, pkg, traversal)?;
@@ -661,7 +666,9 @@ impl CoercedAttr {
         ctx: &dyn AttrConfigurationContext,
         select: &'a CoercedSelector,
     ) -> kuro_error::Result<&'a CoercedAttr> {
-        let CoercedSelector { entries, default, .. } = select;
+        let CoercedSelector {
+            entries, default, ..
+        } = select;
         let matched_cfg_keys = ctx.matched_cfg_keys();
         let resolved_entries: Vec<_> = entries
             .iter()

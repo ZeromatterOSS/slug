@@ -138,11 +138,14 @@ fn java_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneOr::None)] exported_plugins: NoneOr<Value<'v>>,
         #[starlark(require = named, default = NoneOr::None)] native_libraries: NoneOr<Value<'v>>,
         #[starlark(require = named, default = NoneOr::None)] annotation_processor_additional_inputs: NoneOr<Value<'v>>,
-        #[starlark(require = named, default = NoneOr::None)] annotation_processor_additional_outputs: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)]
+        annotation_processor_additional_outputs: NoneOr<Value<'v>>,
         #[starlark(require = named, default = NoneOr::None)] strict_deps: NoneOr<Value<'v>>,
         #[starlark(require = named, default = NoneOr::None)] java_toolchain: NoneOr<Value<'v>>,
         #[starlark(require = named, default = NoneOr::None)] neverlink: NoneOr<bool>,
-        #[starlark(require = named, default = NoneOr::None)] enable_compile_jar_action: NoneOr<bool>,
+        #[starlark(require = named, default = NoneOr::None)] enable_compile_jar_action: NoneOr<
+            bool,
+        >,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let heap = eval.heap();
@@ -157,10 +160,18 @@ fn java_common_module_methods(builder: &mut MethodsBuilder) {
         // - transitive_runtime_jars: depset of jars needed at runtime
         let output_val = output.into_option().unwrap_or(Value::new_none());
         let source_jar_val = output_source_jar.into_option().unwrap_or(Value::new_none());
-        let deps_val = deps.into_option().unwrap_or_else(|| heap.alloc(AllocList::EMPTY));
-        let runtime_deps_val = runtime_deps.into_option().unwrap_or_else(|| heap.alloc(AllocList::EMPTY));
-        let exports_val = exports.into_option().unwrap_or_else(|| heap.alloc(AllocList::EMPTY));
-        let plugins_val = plugins.into_option().unwrap_or_else(|| heap.alloc(AllocList::EMPTY));
+        let deps_val = deps
+            .into_option()
+            .unwrap_or_else(|| heap.alloc(AllocList::EMPTY));
+        let runtime_deps_val = runtime_deps
+            .into_option()
+            .unwrap_or_else(|| heap.alloc(AllocList::EMPTY));
+        let exports_val = exports
+            .into_option()
+            .unwrap_or_else(|| heap.alloc(AllocList::EMPTY));
+        let plugins_val = plugins
+            .into_option()
+            .unwrap_or_else(|| heap.alloc(AllocList::EMPTY));
         let neverlink_val = Value::new_bool(neverlink.into_option().unwrap_or(false));
 
         // Create empty depsets for transitive jars (would be populated by real compilation)
@@ -174,14 +185,29 @@ fn java_common_module_methods(builder: &mut MethodsBuilder) {
             (heap.alloc_str("exports").to_value(), exports_val),
             (heap.alloc_str("plugins").to_value(), plugins_val),
             (heap.alloc_str("neverlink").to_value(), neverlink_val),
-            (heap.alloc_str("transitive_compile_time_jars").to_value(), empty_depset),
-            (heap.alloc_str("transitive_runtime_jars").to_value(), empty_depset),
+            (
+                heap.alloc_str("transitive_compile_time_jars").to_value(),
+                empty_depset,
+            ),
+            (
+                heap.alloc_str("transitive_runtime_jars").to_value(),
+                empty_depset,
+            ),
             (heap.alloc_str("compile_jars").to_value(), empty_depset),
             (heap.alloc_str("full_compile_jars").to_value(), empty_depset),
             (heap.alloc_str("source_jars").to_value(), empty_depset),
-            (heap.alloc_str("runtime_output_jars").to_value(), empty_depset),
-            (heap.alloc_str("transitive_source_jars").to_value(), empty_depset),
-            (heap.alloc_str("transitive_native_libraries").to_value(), empty_depset),
+            (
+                heap.alloc_str("runtime_output_jars").to_value(),
+                empty_depset,
+            ),
+            (
+                heap.alloc_str("transitive_source_jars").to_value(),
+                empty_depset,
+            ),
+            (
+                heap.alloc_str("transitive_native_libraries").to_value(),
+                empty_depset,
+            ),
             (heap.alloc_str("outputs").to_value(), empty_depset),
         ];
         let dict = heap.alloc(AllocDict(pairs));
@@ -212,15 +238,24 @@ fn java_common_module_methods(builder: &mut MethodsBuilder) {
             (heap.alloc_str("runtime_deps").to_value(), empty),
             (heap.alloc_str("exports").to_value(), empty),
             (heap.alloc_str("plugins").to_value(), empty),
-            (heap.alloc_str("neverlink").to_value(), Value::new_bool(false)),
-            (heap.alloc_str("transitive_compile_time_jars").to_value(), empty),
+            (
+                heap.alloc_str("neverlink").to_value(),
+                Value::new_bool(false),
+            ),
+            (
+                heap.alloc_str("transitive_compile_time_jars").to_value(),
+                empty,
+            ),
             (heap.alloc_str("transitive_runtime_jars").to_value(), empty),
             (heap.alloc_str("compile_jars").to_value(), empty),
             (heap.alloc_str("full_compile_jars").to_value(), empty),
             (heap.alloc_str("source_jars").to_value(), empty),
             (heap.alloc_str("runtime_output_jars").to_value(), empty),
             (heap.alloc_str("transitive_source_jars").to_value(), empty),
-            (heap.alloc_str("transitive_native_libraries").to_value(), empty),
+            (
+                heap.alloc_str("transitive_native_libraries").to_value(),
+                empty,
+            ),
             (heap.alloc_str("outputs").to_value(), empty),
         ];
         let dict = heap.alloc(AllocDict(pairs));

@@ -76,8 +76,7 @@ impl PackageSpec {
         match self {
             PackageSpec::Exact(p) => pkg_path == p,
             PackageSpec::Recursive(prefix) => {
-                pkg_path == prefix.as_str()
-                    || pkg_path.starts_with(&format!("{}/", prefix))
+                pkg_path == prefix.as_str() || pkg_path.starts_with(&format!("{}/", prefix))
             }
             PackageSpec::AllPackages => true,
             PackageSpec::Public => true,
@@ -244,18 +243,10 @@ impl VisibilityPatternList {
                     // If the pattern is a Target (e.g. //some:package_group), check if
                     // it's a registered package_group and resolve it
                     if let ParsedPattern::Target(pkg, name, TargetPatternExtra) = &pattern.0 {
-                        let group_label = format!(
-                            "{}//{}:{}",
-                            pkg.cell_name(),
-                            pkg.cell_relative_path(),
-                            name
-                        );
+                        let group_label =
+                            format!("{}//{}:{}", pkg.cell_name(), pkg.cell_relative_path(), name);
                         // Also try without cell name for root cell
-                        let group_label_short = format!(
-                            "//{}:{}",
-                            pkg.cell_relative_path(),
-                            name
-                        );
+                        let group_label_short = format!("//{}:{}", pkg.cell_relative_path(), name);
                         if let Some(true) = check_package_group(&group_label, target)
                             .or_else(|| check_package_group(&group_label_short, target))
                         {

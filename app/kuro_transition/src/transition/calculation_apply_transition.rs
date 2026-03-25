@@ -52,8 +52,6 @@ use starlark_map::sorted_map::SortedMap;
 use crate::transition::calculation_fetch_transition::FetchTransition;
 use crate::transition::calculation_fetch_transition::TransitionData;
 
-
-
 #[derive(kuro_error::Error, Debug)]
 #[kuro(tag = Tier0)]
 enum ApplyTransitionError {
@@ -157,10 +155,13 @@ fn call_bazel_transition_function<'v>(
         // We need to alloc the key string on the heap for the dict
         settings_entries.push((eval.heap().alloc_str(input).as_str(), value));
     }
-    let settings_dict = eval.heap().alloc(starlark::values::dict::AllocDict(settings_entries.into_iter()));
+    let settings_dict = eval.heap().alloc(starlark::values::dict::AllocDict(
+        settings_entries.into_iter(),
+    ));
 
     // Build the attr struct.
-    let attr_value = attrs.unwrap_or_else(|| eval.heap().alloc(AllocStruct(Vec::<(&str, Value)>::new())));
+    let attr_value =
+        attrs.unwrap_or_else(|| eval.heap().alloc(AllocStruct(Vec::<(&str, Value)>::new())));
 
     // Call the transition implementation: impl(settings, attr)
     let result = eval
@@ -214,7 +215,9 @@ fn call_bazel_transition_function<'v>(
             } else if let Some(b) = v.unpack_bool() {
                 if b { "True" } else { "False" }.to_owned()
             } else {
-                v.unpack_str().map(|s| s.to_owned()).unwrap_or_else(|| format!("{}", v))
+                v.unpack_str()
+                    .map(|s| s.to_owned())
+                    .unwrap_or_else(|| format!("{}", v))
             };
             // Store in the global build config so ctx.build_setting_value picks it up
             kuro_build_api::interpreter::rule_defs::build_config::set_starlark_flag(
@@ -247,7 +250,9 @@ fn resolve_setting_value<'v>(
     if setting_label.starts_with("//command_line_option:") {
         let option_name = &setting_label["//command_line_option:".len()..];
         let value = match option_name {
-            "compilation_mode" => kuro_build_api::interpreter::rule_defs::build_config::get_compilation_mode(),
+            "compilation_mode" => {
+                kuro_build_api::interpreter::rule_defs::build_config::get_compilation_mode()
+            }
             "cpu" => {
                 if cfg!(target_arch = "x86_64") {
                     "k8".to_owned()
@@ -263,9 +268,10 @@ fn resolve_setting_value<'v>(
             "host_platform" => "".to_owned(),
             _ => {
                 // Check if there's a Starlark flag override
-                kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(
-                    &format!("//command_line_option:{}", option_name),
-                )
+                kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(&format!(
+                    "//command_line_option:{}",
+                    option_name
+                ))
                 .unwrap_or_default()
             }
         };
@@ -273,7 +279,9 @@ fn resolve_setting_value<'v>(
     }
 
     // Check for user-defined build settings (Starlark flags)
-    if let Some(value) = kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(setting_label) {
+    if let Some(value) =
+        kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(setting_label)
+    {
         // Parse the value appropriately
         return Ok(match value.as_str() {
             "True" | "true" => eval.heap().alloc(true),

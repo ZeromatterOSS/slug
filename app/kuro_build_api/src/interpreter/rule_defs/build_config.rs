@@ -153,73 +153,121 @@ pub fn get_action_env() -> HashMap<String, String> {
 /// Set --copt values for the current build.
 pub fn set_copts(values: &[String]) {
     if let Ok(mut config) = BUILD_CONFIG.write() {
-        config.copts = if values.is_empty() { None } else { Some(values.to_vec()) };
+        config.copts = if values.is_empty() {
+            None
+        } else {
+            Some(values.to_vec())
+        };
     }
 }
 
 /// Get --copt values.
 pub fn get_copts() -> Vec<String> {
-    BUILD_CONFIG.read().ok().and_then(|c| c.copts.clone()).unwrap_or_default()
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| c.copts.clone())
+        .unwrap_or_default()
 }
 
 /// Set --cxxopt values for the current build.
 pub fn set_cxxopts(values: &[String]) {
     if let Ok(mut config) = BUILD_CONFIG.write() {
-        config.cxxopts = if values.is_empty() { None } else { Some(values.to_vec()) };
+        config.cxxopts = if values.is_empty() {
+            None
+        } else {
+            Some(values.to_vec())
+        };
     }
 }
 
 /// Get --cxxopt values.
 pub fn get_cxxopts() -> Vec<String> {
-    BUILD_CONFIG.read().ok().and_then(|c| c.cxxopts.clone()).unwrap_or_default()
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| c.cxxopts.clone())
+        .unwrap_or_default()
 }
 
 /// Set --conlyopt values for the current build.
 pub fn set_conlyopts(values: &[String]) {
     if let Ok(mut config) = BUILD_CONFIG.write() {
-        config.conlyopts = if values.is_empty() { None } else { Some(values.to_vec()) };
+        config.conlyopts = if values.is_empty() {
+            None
+        } else {
+            Some(values.to_vec())
+        };
     }
 }
 
 /// Get --conlyopt values.
 pub fn get_conlyopts() -> Vec<String> {
-    BUILD_CONFIG.read().ok().and_then(|c| c.conlyopts.clone()).unwrap_or_default()
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| c.conlyopts.clone())
+        .unwrap_or_default()
 }
 
 /// Set --linkopt values for the current build.
 pub fn set_linkopts(values: &[String]) {
     if let Ok(mut config) = BUILD_CONFIG.write() {
-        config.linkopts = if values.is_empty() { None } else { Some(values.to_vec()) };
+        config.linkopts = if values.is_empty() {
+            None
+        } else {
+            Some(values.to_vec())
+        };
     }
 }
 
 /// Get --linkopt values.
 pub fn get_linkopts() -> Vec<String> {
-    BUILD_CONFIG.read().ok().and_then(|c| c.linkopts.clone()).unwrap_or_default()
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| c.linkopts.clone())
+        .unwrap_or_default()
 }
 
 /// Set --strip value for the current build.
 pub fn set_strip(value: &str) {
     if let Ok(mut config) = BUILD_CONFIG.write() {
-        config.strip = if value.is_empty() { None } else { Some(value.to_owned()) };
+        config.strip = if value.is_empty() {
+            None
+        } else {
+            Some(value.to_owned())
+        };
     }
 }
 
 /// Get --strip value. Returns "sometimes" if not set.
 pub fn get_strip() -> String {
-    BUILD_CONFIG.read().ok().and_then(|c| c.strip.clone()).unwrap_or_else(|| "sometimes".to_owned())
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| c.strip.clone())
+        .unwrap_or_else(|| "sometimes".to_owned())
 }
 
 /// Set --features values for the current build.
 pub fn set_features(values: &[String]) {
     if let Ok(mut config) = BUILD_CONFIG.write() {
-        config.features = if values.is_empty() { None } else { Some(values.to_vec()) };
+        config.features = if values.is_empty() {
+            None
+        } else {
+            Some(values.to_vec())
+        };
     }
 }
 
 /// Get --features values.
 pub fn get_features() -> Vec<String> {
-    BUILD_CONFIG.read().ok().and_then(|c| c.features.clone()).unwrap_or_default()
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| c.features.clone())
+        .unwrap_or_default()
 }
 
 /// Set --test_env values for the current build.
@@ -271,7 +319,11 @@ pub fn set_collect_code_coverage(enabled: bool) {
 
 /// Get --collect_code_coverage flag. Returns false if not set.
 pub fn get_collect_code_coverage() -> bool {
-    BUILD_CONFIG.read().ok().map(|c| c.collect_code_coverage).unwrap_or(false)
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .map(|c| c.collect_code_coverage)
+        .unwrap_or(false)
 }
 
 /// Set --force_pic flag for the current build.
@@ -283,7 +335,11 @@ pub fn set_force_pic(enabled: bool) {
 
 /// Get --force_pic flag. Returns false if not set.
 pub fn get_force_pic() -> bool {
-    BUILD_CONFIG.read().ok().map(|c| c.force_pic).unwrap_or(false)
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .map(|c| c.force_pic)
+        .unwrap_or(false)
 }
 
 /// Set Starlark build flags from --//pkg:target=value on the command line.
@@ -324,10 +380,11 @@ pub fn set_starlark_flag(label: &str, value: &str) {
 /// Get the value of a Starlark build flag, or None if not set.
 /// The label should be in "//pkg:target" format.
 pub fn get_starlark_flag(label: &str) -> Option<String> {
-    BUILD_CONFIG
-        .read()
-        .ok()
-        .and_then(|c| c.starlark_flags.as_ref().and_then(|f| f.get(label).cloned()))
+    BUILD_CONFIG.read().ok().and_then(|c| {
+        c.starlark_flags
+            .as_ref()
+            .and_then(|f| f.get(label).cloned())
+    })
 }
 
 /// Get all Starlark build flags as a map.

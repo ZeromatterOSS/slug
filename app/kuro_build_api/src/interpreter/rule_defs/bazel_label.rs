@@ -57,7 +57,11 @@ impl fmt::Display for BazelLabel {
         {
             write!(f, "@@//{}:{}", self.package, self.name)
         } else {
-            write!(f, "@@{}//{}:{}", self.workspace_name, self.package, self.name)
+            write!(
+                f,
+                "@@{}//{}:{}",
+                self.workspace_name, self.package, self.name
+            )
         }
     }
 }
@@ -81,8 +85,7 @@ fn bazel_label_methods(builder: &mut MethodsBuilder) {
         this: &BazelLabel,
         target_name: &str,
     ) -> starlark::Result<BazelLabel> {
-        let resolved =
-            resolve_relative_label(&this.workspace_name, &this.package, target_name);
+        let resolved = resolve_relative_label(&this.workspace_name, &this.package, target_name);
         Ok(BazelLabel::parse(&resolved))
     }
 }
@@ -211,9 +214,7 @@ impl BazelLabel {
         };
 
         // Store canonical form with @@ prefix (Bazel 9.0+ bzlmod format)
-        let full = if workspace.is_empty()
-            || kuro_core::cells::is_root_cell_name(&workspace)
-        {
+        let full = if workspace.is_empty() || kuro_core::cells::is_root_cell_name(&workspace) {
             format!("@@//{}:{}", package, name)
         } else {
             format!("@@{}//{}:{}", workspace, package, name)

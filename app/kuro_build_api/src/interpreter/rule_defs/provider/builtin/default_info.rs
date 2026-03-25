@@ -528,8 +528,9 @@ impl FrozenDefaultInfo {
         value: FrozenValue,
         mut processor: impl FnMut(Value) -> kuro_error::Result<()>,
     ) -> kuro_error::Result<()> {
-        let outputs_list = ListRef::from_frozen_value(value)
-            .with_internal_error(|| format!("expected list, got `{value:?}` from info `{self:?}`"))?;
+        let outputs_list = ListRef::from_frozen_value(value).with_internal_error(|| {
+            format!("expected list, got `{value:?}` from info `{self:?}`")
+        })?;
 
         for value in outputs_list.iter() {
             processor(value)?;

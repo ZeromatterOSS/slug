@@ -279,7 +279,8 @@ fn analyze_genrule(
     }
 
     // Create the genrule action
-    let genrule_action = GenruleAction::new(cmd, inputs, output_artifacts, location_mappings, shell);
+    let genrule_action =
+        GenruleAction::new(cmd, inputs, output_artifacts, location_mappings, shell);
 
     // Register the action
     let registered_action = Arc::new(RegisteredAction::new(

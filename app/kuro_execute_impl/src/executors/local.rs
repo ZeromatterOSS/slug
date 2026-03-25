@@ -60,7 +60,6 @@ use kuro_execute::directory::extract_artifact_value;
 use kuro_execute::directory::insert_entry;
 use kuro_execute::entry::HashingInfo;
 use kuro_execute::entry::build_entry_from_disk;
-use kuro_execute::output_size::OutputSize;
 use kuro_execute::execute::action_digest::ActionDigest;
 use kuro_execute::execute::blocking::BlockingExecutor;
 use kuro_execute::execute::clean_output_paths::CleanOutputPaths;
@@ -87,6 +86,7 @@ use kuro_execute::materialize::materializer::CopiedArtifact;
 use kuro_execute::materialize::materializer::DeclareArtifactPayload;
 use kuro_execute::materialize::materializer::MaterializationError;
 use kuro_execute::materialize::materializer::Materializer;
+use kuro_execute::output_size::OutputSize;
 use kuro_execute_local::CommandResult;
 use kuro_execute_local::DefaultKillProcess;
 use kuro_execute_local::GatherOutputStatus;
@@ -653,12 +653,18 @@ impl LocalExecutor {
 
             // Bazel-compatible: TEST_TMPDIR is set for all test actions
             if request.is_test() {
-                env.push(("TEST_TMPDIR", StrOrOsStr::OsStr(scratch_path_abs.as_os_str())));
+                env.push((
+                    "TEST_TMPDIR",
+                    StrOrOsStr::OsStr(scratch_path_abs.as_os_str()),
+                ));
             }
         } else if request.is_test() {
             // For test commands without a scratch path, use system temp dir for TEST_TMPDIR
             test_tmpdir_fallback = std::env::temp_dir();
-            env.push(("TEST_TMPDIR", StrOrOsStr::OsStr(test_tmpdir_fallback.as_os_str())));
+            env.push((
+                "TEST_TMPDIR",
+                StrOrOsStr::OsStr(test_tmpdir_fallback.as_os_str()),
+            ));
         }
         env.extend(
             request
@@ -1153,7 +1159,9 @@ impl LocalExecutor {
             for (path, file_count, total_bytes) in matl_stats {
                 let path_str = path.as_str().to_owned();
                 dispatcher.span(
-                    kuro_data::MaterializationStart { action_digest: None },
+                    kuro_data::MaterializationStart {
+                        action_digest: None,
+                    },
                     || {
                         (
                             (),
@@ -1164,9 +1172,7 @@ impl LocalExecutor {
                                 path: path_str,
                                 success: true,
                                 error: None,
-                                method: Some(
-                                    kuro_data::MaterializationMethod::Write as i32,
-                                ),
+                                method: Some(kuro_data::MaterializationMethod::Write as i32),
                             },
                         )
                     },

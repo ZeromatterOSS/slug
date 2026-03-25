@@ -43,6 +43,7 @@ use kuro_core::execution_types::executor_config::ReGangWorker;
 use kuro_core::execution_types::executor_config::RemoteExecutorDependency;
 use kuro_error::BuckErrorContext;
 use kuro_error::conversion::from_any_with_tag;
+use kuro_execute::execute::request::ExecutorPreference;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use starlark::collections::SmallSet;
 use starlark::environment::MethodsBuilder;
@@ -69,7 +70,6 @@ use crate::actions::impls::run::StarlarkRunActionValues;
 use crate::actions::impls::run::UnregisteredRunAction;
 use crate::actions::impls::run::dep_files::RunActionDepFiles;
 use crate::actions::impls::run::new_executor_preference;
-use kuro_execute::execute::request::ExecutorPreference;
 
 #[derive(Debug, kuro_error::Error)]
 #[kuro(tag = Input)]
@@ -450,7 +450,8 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             }
         }
 
-        let mut executor_preference = new_executor_preference(local_only, prefer_local, prefer_remote)?;
+        let mut executor_preference =
+            new_executor_preference(local_only, prefer_local, prefer_remote)?;
 
         let mut artifact_visitor = RunCommandArtifactVisitor::new(&dep_files);
 
@@ -729,8 +730,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
                     {
                         let args_value = heap.alloc_complex(std::mem::take(&mut starlark_args));
                         if let Ok(Some(add_method)) = args_value.get_attr("add", heap) {
-                            if let Ok(new_args) =
-                                eval.eval_function(add_method, &[hidden_cmd], &[])
+                            if let Ok(new_args) = eval.eval_function(add_method, &[hidden_cmd], &[])
                             {
                                 if let Ok(typed_args) = StarlarkCmdArgs::try_from_value(new_args) {
                                     starlark_args = typed_args;
@@ -748,8 +748,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
                     artifacts
                         .inputs
                         .insert(ArtifactGroup::Artifact(artifact.artifact().dupe()));
-                } else if let Some(declared) =
-                    input_val.downcast_ref::<StarlarkDeclaredArtifact>()
+                } else if let Some(declared) = input_val.downcast_ref::<StarlarkDeclaredArtifact>()
                 {
                     if let Ok(artifact_group) = declared.get_artifact_group() {
                         artifacts.inputs.insert(artifact_group);
@@ -1012,7 +1011,9 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
                 for key in iter {
                     if let Some(k) = key.unpack_str() {
                         match k {
-                            "no-remote" | "no-remote-exec" | "local" | "no-sandbox" => local_only = true,
+                            "no-remote" | "no-remote-exec" | "local" | "no-sandbox" => {
+                                local_only = true
+                            }
                             "no-cache" | "no-remote-cache" => no_cache = true,
                             _ => {}
                         }
@@ -1269,4 +1270,3 @@ fn collect_items_from_value<'v>(
     // Single value
     Ok(vec![val])
 }
-

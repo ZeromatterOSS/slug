@@ -89,8 +89,7 @@ impl EventSubscriber for XmlTestResultWriter {
                 // Listing results are metadata, not test executions — skip them.
                 if matches!(
                     status_enum,
-                    kuro_data::TestStatus::ListingSuccess
-                        | kuro_data::TestStatus::ListingFailed
+                    kuro_data::TestStatus::ListingSuccess | kuro_data::TestStatus::ListingFailed
                 ) {
                     continue;
                 }
@@ -309,11 +308,7 @@ Example: --test_tag_filters=small,-slow (include 'small', exclude 'slow')"
     /// - `short`: Show first few lines for failed tests
     /// - `streamed`: Stream all output in real-time
     ///
-    #[clap(
-        long = "test-output",
-        alias = "test_output",
-        value_name = "MODE"
-    )]
+    #[clap(long = "test-output", alias = "test_output", value_name = "MODE")]
     test_output: Option<String>,
 
     /// Control test summary format (Bazel compatibility).

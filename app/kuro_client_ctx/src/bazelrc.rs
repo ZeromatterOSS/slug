@@ -235,9 +235,7 @@ const TEST_ONLY_FLAGS: &[&str] = &[
 /// Check if a flag is a test-only flag (should not be applied to non-test commands).
 fn is_test_only_flag(flag: &str) -> bool {
     let flag_name = flag.split('=').next().unwrap_or(flag);
-    TEST_ONLY_FLAGS
-        .iter()
-        .any(|f| flag_name == *f)
+    TEST_ONLY_FLAGS.iter().any(|f| flag_name == *f)
 }
 
 impl BazelRcData {
@@ -333,10 +331,8 @@ fn parse_bazelrc_file(
                 data.entries.push((command, config, flags));
             }
             Some(BazelRcLine::Import(import_path)) => {
-                let substituted = substitute_workspace(
-                    &import_path.to_string_lossy(),
-                    workspace_root,
-                );
+                let substituted =
+                    substitute_workspace(&import_path.to_string_lossy(), workspace_root);
                 let import_path = PathBuf::from(substituted);
                 let resolved = if import_path.is_absolute() {
                     import_path
@@ -348,10 +344,8 @@ fn parse_bazelrc_file(
                 parse_bazelrc_file(&resolved, data, true, workspace_root);
             }
             Some(BazelRcLine::TryImport(import_path)) => {
-                let substituted = substitute_workspace(
-                    &import_path.to_string_lossy(),
-                    workspace_root,
-                );
+                let substituted =
+                    substitute_workspace(&import_path.to_string_lossy(), workspace_root);
                 let import_path = PathBuf::from(substituted);
                 let resolved = if import_path.is_absolute() {
                     import_path
@@ -613,12 +607,10 @@ pub fn inject_bazelrc_args(mut args: Vec<String>, project_root: Option<&Path>) -
     // --enable_platform_specific_config: auto-activate build:<os> config
     // Check if this flag is present anywhere in the args or bazelrc data
     let has_platform_config = args.iter().any(|a| {
-        a == "--enable-platform-specific-config"
-            || a == "--enable_platform_specific_config"
+        a == "--enable-platform-specific-config" || a == "--enable_platform_specific_config"
     }) || data.entries.iter().any(|(_, _, flags)| {
         flags.iter().any(|f| {
-            f == "--enable-platform-specific-config"
-                || f == "--enable_platform_specific_config"
+            f == "--enable-platform-specific-config" || f == "--enable_platform_specific_config"
         })
     });
     if has_platform_config {

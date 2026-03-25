@@ -44,10 +44,7 @@ const INFO_KEYS: &[(&str, &str)] = &[
         "starlark-semantics",
         "Starlark dialect semantics (Bazel 9.0 compatible)",
     ),
-    (
-        "command_log",
-        "Path to the most recent command log",
-    ),
+    ("command_log", "Path to the most recent command log"),
     (
         "character-encoding",
         "Character encoding used for source files",
@@ -56,10 +53,7 @@ const INFO_KEYS: &[(&str, &str)] = &[
         "used-heap-size-after-gc",
         "Approximate heap memory used by the server",
     ),
-    (
-        "package_path",
-        "Colon-separated package search path",
-    ),
+    ("package_path", "Colon-separated package search path"),
 ];
 
 #[derive(Debug, clap::Parser)]
@@ -96,10 +90,7 @@ impl InfoCommand {
                     .join("v2")
                     .to_string_lossy()
                     .into_owned()),
-                "output_path" => Ok(project_root
-                    .join("buck-out")
-                    .to_string_lossy()
-                    .into_owned()),
+                "output_path" => Ok(project_root.join("buck-out").to_string_lossy().into_owned()),
                 "bazel-bin" => Ok(project_root
                     .join("bazel-bin")
                     .to_string_lossy()
@@ -139,18 +130,16 @@ impl InfoCommand {
                 "character-encoding" => Ok("UTF-8".to_owned()),
                 "used-heap-size-after-gc" => Ok("0".to_owned()),
                 "package_path" => Ok("%workspace%".to_owned()),
-                other => {
-                    Err(kuro_error::kuro_error!(
-                        kuro_error::ErrorTag::Input,
-                        "Unknown info key: '{}'. Known keys: {}",
-                        other,
-                        INFO_KEYS
-                            .iter()
-                            .map(|(k, _)| *k)
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ))
-                }
+                other => Err(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Unknown info key: '{}'. Known keys: {}",
+                    other,
+                    INFO_KEYS
+                        .iter()
+                        .map(|(k, _)| *k)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )),
             }
         };
 

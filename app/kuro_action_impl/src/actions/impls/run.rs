@@ -1309,8 +1309,7 @@ impl PreparedRunAction {
 
         // Inject --action_env values from the build config.
         // These are set as base env vars; per-action env takes precedence (already in `env`).
-        let action_env =
-            kuro_build_api::interpreter::rule_defs::build_config::get_action_env();
+        let action_env = kuro_build_api::interpreter::rule_defs::build_config::get_action_env();
         for (k, v) in action_env {
             env.entry(k).or_insert(v);
         }

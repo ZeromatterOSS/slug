@@ -32,11 +32,11 @@ use kuro_util::late_binding::LateBinding;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::SmallMap;
 use starlark::environment::GlobalsBuilder;
-use starlark::eval::Arguments;
-use starlark::eval::Evaluator;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
+use starlark::eval::Arguments;
+use starlark::eval::Evaluator;
 use starlark::typing::Ty;
 use starlark::values::AllocValue;
 use starlark::values::Heap;
@@ -399,10 +399,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// Since Kuro does not implement split transitions, each attribute value is
     /// wrapped in a single-entry dict with key `"//conditions:default"`.
     #[starlark(attribute)]
-    fn split_attr<'v>(
-        this: RefAnalysisContext<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
+    fn split_attr<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         match this.0.attrs {
             Some(attrs) => Ok(heap.alloc(CtxSplitAttr::new(attrs))),
             None => Ok(heap.alloc(CtxSplitAttrStub)),
@@ -821,7 +818,14 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             ("COMPILATION_MODE", comp_mode.as_str()),
             ("CC", host_cc_path()),
             ("CC_FLAGS", ""),
-            ("JAVA", if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }),
+            (
+                "JAVA",
+                if cfg!(windows) {
+                    "java.exe"
+                } else {
+                    "/usr/bin/java"
+                },
+            ),
             ("JAVA_RUNFILES", ""),
             ("JAVABASE", ""),
             ("ABI_GLIBC_VERSION", "2.17"),
@@ -854,9 +858,12 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         // Check if this build setting allows multiple values
-        let allows_multiple = this.0.attrs
+        let allows_multiple = this
+            .0
+            .attrs
             .and_then(|attrs| {
-                attrs.get()
+                attrs
+                    .get()
                     .get_attr("_build_setting_allows_multiple", heap)
                     .ok()
                     .flatten()
@@ -876,7 +883,9 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
                 format!("//{}:{}", pkg_path, target_name)
             };
 
-            if let Some(cli_value) = crate::interpreter::rule_defs::build_config::get_starlark_flag(&label_str) {
+            if let Some(cli_value) =
+                crate::interpreter::rule_defs::build_config::get_starlark_flag(&label_str)
+            {
                 // Parse the CLI string value into the appropriate type
                 // For bool settings, convert "True"/"False"/"true"/"false" to bool
                 // For int settings, parse as int
@@ -1112,14 +1121,23 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             ("COMPILATION_MODE", comp_mode.as_str()),
             ("CC", host_cc_path()),
             ("CC_FLAGS", ""),
-            ("JAVA", if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }),
+            (
+                "JAVA",
+                if cfg!(windows) {
+                    "java.exe"
+                } else {
+                    "/usr/bin/java"
+                },
+            ),
             ("JAVA_RUNFILES", ""),
             ("JAVABASE", ""),
             ("ABI_GLIBC_VERSION", "2.17"),
             ("ABI", "local"),
         ];
         for (k, v) in builtins {
-            substitutions.entry(k.to_string()).or_insert_with(|| v.to_string());
+            substitutions
+                .entry(k.to_string())
+                .or_insert_with(|| v.to_string());
         }
 
         // Merge --define KEY=VALUE entries (lowest priority, after user subs and builtins)
@@ -1261,6 +1279,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         use starlark::values::list::AllocList;
+
         use crate::interpreter::rule_defs::provider::dependency::Dependency;
         use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
 
@@ -1272,7 +1291,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             '_,
             crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection,
         >,
-                            files: &mut Vec<Value<'v>>| {
+                             files: &mut Vec<Value<'v>>| {
             if let Ok(di) = pc.as_ref().default_info() {
                 for art in di.default_outputs() {
                     files.push(heap.alloc(art));
@@ -1344,7 +1363,9 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         }
 
         let inputs = heap.alloc(AllocList(tool_files));
-        let cmd_list = heap.alloc(AllocList(vec![heap.alloc_str(&resolved_command).to_value()]));
+        let cmd_list = heap.alloc(AllocList(vec![
+            heap.alloc_str(&resolved_command).to_value(),
+        ]));
         let manifests = heap.alloc(AllocList::EMPTY);
         Ok(heap.alloc((inputs, cmd_list, manifests)))
     }
@@ -1362,6 +1383,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         use kuro_core::fs::buck_out_path::BuckOutPathKind;
         use kuro_execute::execute::request::OutputType;
+
         use crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
         use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 
@@ -1381,7 +1403,10 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
 
         // Delegate to ctx.actions.declare_file via the registry
         let to_err = |e: kuro_error::Error| -> starlark::Error {
-            starlark::Error::new_other(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+            starlark::Error::new_other(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                e.to_string(),
+            ))
         };
         let mut state = this.0.actions.state().map_err(to_err)?;
         let artifact = state
@@ -1492,26 +1517,25 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             remaining = &remaining[start..];
 
             // Try each keyword variant: (prefix, is_multi)
-            let pattern: Option<(usize, bool)> =
-                if remaining.starts_with("$(locations ") {
-                    Some(("$(locations ".len(), true))
-                } else if remaining.starts_with("$(location ") {
-                    Some(("$(location ".len(), false))
-                } else if remaining.starts_with("$(execpaths ") {
-                    Some(("$(execpaths ".len(), true))
-                } else if remaining.starts_with("$(execpath ") {
-                    Some(("$(execpath ".len(), false))
-                } else if remaining.starts_with("$(rootpaths ") {
-                    Some(("$(rootpaths ".len(), true))
-                } else if remaining.starts_with("$(rootpath ") {
-                    Some(("$(rootpath ".len(), false))
-                } else if remaining.starts_with("$(rlocationpaths ") {
-                    Some(("$(rlocationpaths ".len(), true))
-                } else if remaining.starts_with("$(rlocationpath ") {
-                    Some(("$(rlocationpath ".len(), false))
-                } else {
-                    None
-                };
+            let pattern: Option<(usize, bool)> = if remaining.starts_with("$(locations ") {
+                Some(("$(locations ".len(), true))
+            } else if remaining.starts_with("$(location ") {
+                Some(("$(location ".len(), false))
+            } else if remaining.starts_with("$(execpaths ") {
+                Some(("$(execpaths ".len(), true))
+            } else if remaining.starts_with("$(execpath ") {
+                Some(("$(execpath ".len(), false))
+            } else if remaining.starts_with("$(rootpaths ") {
+                Some(("$(rootpaths ".len(), true))
+            } else if remaining.starts_with("$(rootpath ") {
+                Some(("$(rootpath ".len(), false))
+            } else if remaining.starts_with("$(rlocationpaths ") {
+                Some(("$(rlocationpaths ".len(), true))
+            } else if remaining.starts_with("$(rlocationpath ") {
+                Some(("$(rlocationpath ".len(), false))
+            } else {
+                None
+            };
 
             if let Some((prefix_len, is_multi)) = pattern {
                 if let Some(end) = remaining.find(')') {
@@ -1889,6 +1913,7 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
 
         use kuro_core::fs::buck_out_path::BuckOutPathKind;
         use kuro_execute::execute::request::OutputType;
+
         use crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
         use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 
@@ -1932,7 +1957,9 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
                     .filter_map(|f| declare_file(f.as_str()))
                     .collect();
                 let result = heap.alloc(artifacts);
-                self.declared.borrow_mut().insert(attribute.to_owned(), result);
+                self.declared
+                    .borrow_mut()
+                    .insert(attribute.to_owned(), result);
                 return Some(result);
             }
         }
@@ -1942,8 +1969,8 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
         // Case 2: rule(outputs={...}) pattern - expand using target name
         // Case 3: well-known fallback patterns
         let filename_owned: String;
-        let filename: &str = if let Some(v) = raw_attr_val
-            .and_then(|v| v.unpack_str().map(|s| s.to_owned()))
+        let filename: &str = if let Some(v) =
+            raw_attr_val.and_then(|v| v.unpack_str().map(|s| s.to_owned()))
         {
             filename_owned = v;
             &filename_owned
@@ -2038,11 +2065,17 @@ impl<'v> StarlarkValue<'v> for ToolchainsStub {
         {
             Ok(heap.alloc(RustToolchainInfoStub))
         } else if target_name == "toolchain_type" && (pkg_segment == "cc" || pkg_segment == "cpp") {
-            Ok(heap.alloc(CcToolchainInfoStub { is_tool: self.is_tool }))
-        } else if target_name == "toolchain_type" && (pkg_segment == "java" || key_str.contains("rules_java")) {
+            Ok(heap.alloc(CcToolchainInfoStub {
+                is_tool: self.is_tool,
+            }))
+        } else if target_name == "toolchain_type"
+            && (pkg_segment == "java" || key_str.contains("rules_java"))
+        {
             // Java toolchain: ctx.toolchains["@rules_java//java:toolchain_type"].java
             Ok(heap.alloc(JavaToolchainWrapperStub))
-        } else if target_name == "runtime_toolchain_type" && (pkg_segment == "java" || key_str.contains("rules_java")) {
+        } else if target_name == "runtime_toolchain_type"
+            && (pkg_segment == "java" || key_str.contains("rules_java"))
+        {
             // Java runtime toolchain: ctx.toolchains["@rules_java//java:runtime_toolchain_type"].java_runtime
             Ok(heap.alloc(JavaRuntimeToolchainWrapperStub))
         } else if target_name == "toolchain_type"
@@ -2204,17 +2237,35 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
             "cc_provider_in_toolchain" => Some(Value::new_bool(false)),
             "toolchain_id" => Some(heap.alloc_str("local_cc_toolchain").to_value()),
             "compiler" => {
-                let compiler = if cfg!(windows) { "msvc" } else if cfg!(target_os = "macos") { "clang" } else { "gcc" };
+                let compiler = if cfg!(windows) {
+                    "msvc"
+                } else if cfg!(target_os = "macos") {
+                    "clang"
+                } else {
+                    "gcc"
+                };
                 Some(heap.alloc_str(compiler).to_value())
             }
             "cpu" => Some(heap.alloc_str(host_target_cpu()).to_value()),
             "target_gnu_system_name" => {
                 let name = if cfg!(windows) {
-                    if cfg!(target_arch = "aarch64") { "aarch64-w64-windows-msvc" } else { "x86_64-w64-windows-msvc" }
+                    if cfg!(target_arch = "aarch64") {
+                        "aarch64-w64-windows-msvc"
+                    } else {
+                        "x86_64-w64-windows-msvc"
+                    }
                 } else if cfg!(target_os = "macos") {
-                    if cfg!(target_arch = "aarch64") { "aarch64-apple-darwin" } else { "x86_64-apple-darwin" }
+                    if cfg!(target_arch = "aarch64") {
+                        "aarch64-apple-darwin"
+                    } else {
+                        "x86_64-apple-darwin"
+                    }
                 } else {
-                    if cfg!(target_arch = "aarch64") { "aarch64-linux-gnu" } else { "x86_64-linux-gnu" }
+                    if cfg!(target_arch = "aarch64") {
+                        "aarch64-linux-gnu"
+                    } else {
+                        "x86_64-linux-gnu"
+                    }
                 };
                 Some(heap.alloc_str(name).to_value())
             }
@@ -2229,7 +2280,13 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
             "_is_tool_configuration" => Some(Value::new_bool(false)),
             "_fdo_context" => Some(Value::new_none()),
             "libc" => {
-                let libc = if cfg!(windows) { "msvcrt" } else if cfg!(target_os = "macos") { "macosx" } else { "glibc" };
+                let libc = if cfg!(windows) {
+                    "msvcrt"
+                } else if cfg!(target_os = "macos") {
+                    "macosx"
+                } else {
+                    "glibc"
+                };
                 Some(heap.alloc_str(libc).to_value())
             }
             "_abi_glibc_version" => Some(heap.alloc_str("2.17").to_value()),
@@ -2248,7 +2305,11 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
             "_cpp_configuration" => Some(heap.alloc(CppFragment::default())),
             "_if_so_builder" => Some(Value::new_none()),
             "_solib_dir" => {
-                let solib = if cfg!(target_arch = "aarch64") { "_solib_aarch64" } else { "_solib_k8" };
+                let solib = if cfg!(target_arch = "aarch64") {
+                    "_solib_aarch64"
+                } else {
+                    "_solib_k8"
+                };
                 Some(heap.alloc_str(solib).to_value())
             }
             "_build_variables_dict" => {
@@ -2362,7 +2423,9 @@ fn cc_toolchain_info_stub_methods(builder: &mut MethodsBuilder) {
     /// The C++ toolchain provider itself (for cc_provider_in_toolchain pattern).
     #[starlark(attribute)]
     fn cc<'v>(this: &CcToolchainInfoStub, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        Ok(heap.alloc(CcToolchainInfoStub { is_tool: this.is_tool }))
+        Ok(heap.alloc(CcToolchainInfoStub {
+            is_tool: this.is_tool,
+        }))
     }
 
     /// Toolchain identifier.
@@ -3331,15 +3394,19 @@ impl<'v> StarlarkValue<'v> for CtxVarDict {
             "COMPILATION_MODE" => comp_mode,
             "CC" => cc.to_owned(),
             "CC_FLAGS" => String::new(),
-            "JAVA" => if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }.to_owned(),
+            "JAVA" => if cfg!(windows) {
+                "java.exe"
+            } else {
+                "/usr/bin/java"
+            }
+            .to_owned(),
             "JAVA_RUNFILES" => String::new(),
             "JAVABASE" => String::new(),
             "ABI_GLIBC_VERSION" => "2.17".to_owned(),
             "ABI" => "local".to_owned(),
             _ => {
                 // Check --define values for unknown keys
-                crate::interpreter::rule_defs::build_config::get_define(key)
-                    .unwrap_or_default()
+                crate::interpreter::rule_defs::build_config::get_define(key).unwrap_or_default()
             }
         };
         Ok(heap.alloc_str(&value).to_value())
@@ -3391,7 +3458,14 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
             "COMPILATION_MODE" => Some(comp_mode),
             "CC" => Some(cc.to_owned()),
             "CC_FLAGS" => Some(String::new()),
-            "JAVA" => Some(if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }.to_owned()),
+            "JAVA" => Some(
+                if cfg!(windows) {
+                    "java.exe"
+                } else {
+                    "/usr/bin/java"
+                }
+                .to_owned(),
+            ),
             "JAVA_RUNFILES" => Some(String::new()),
             "JAVABASE" => Some(String::new()),
             "ABI_GLIBC_VERSION" => Some("2.17".to_owned()),
@@ -3440,16 +3514,23 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
         let cc = host_cc_path();
         let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
         let mut result: Vec<Value> = vec![
-            heap.alloc_str(&format!("bazel-out/{cpu}-{comp_mode}/bin")).to_value(),
-            heap.alloc_str(&format!("bazel-out/{cpu}-{comp_mode}/genfiles")).to_value(),
+            heap.alloc_str(&format!("bazel-out/{cpu}-{comp_mode}/bin"))
+                .to_value(),
+            heap.alloc_str(&format!("bazel-out/{cpu}-{comp_mode}/genfiles"))
+                .to_value(),
             heap.alloc_str(cpu).to_value(),
             heap.alloc_str(&comp_mode).to_value(),
             heap.alloc_str(cc).to_value(),
             heap.alloc_str("").to_value(), // CC_FLAGS
-            heap.alloc_str(if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }).to_value(),
-            heap.alloc_str("").to_value(), // JAVA_RUNFILES
-            heap.alloc_str("").to_value(), // JAVABASE
-            heap.alloc_str("2.17").to_value(), // ABI_GLIBC_VERSION
+            heap.alloc_str(if cfg!(windows) {
+                "java.exe"
+            } else {
+                "/usr/bin/java"
+            })
+            .to_value(),
+            heap.alloc_str("").to_value(),      // JAVA_RUNFILES
+            heap.alloc_str("").to_value(),      // JAVABASE
+            heap.alloc_str("2.17").to_value(),  // ABI_GLIBC_VERSION
             heap.alloc_str("local").to_value(), // ABI
         ];
         for (_, v) in crate::interpreter::rule_defs::build_config::get_all_defines() {
@@ -3472,7 +3553,15 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
             ("COMPILATION_MODE", comp_mode),
             ("CC", cc.to_owned()),
             ("CC_FLAGS", String::new()),
-            ("JAVA", if cfg!(windows) { "java.exe" } else { "/usr/bin/java" }.to_owned()),
+            (
+                "JAVA",
+                if cfg!(windows) {
+                    "java.exe"
+                } else {
+                    "/usr/bin/java"
+                }
+                .to_owned(),
+            ),
             ("JAVA_RUNFILES", String::new()),
             ("JAVABASE", String::new()),
             ("ABI_GLIBC_VERSION", "2.17".to_owned()),
@@ -3545,8 +3634,7 @@ impl<'v> StarlarkValue<'v> for BuildConfigurationStub {
             }
             "default_shell_env" => {
                 // Return --action_env values from build config
-                let env_map =
-                    crate::interpreter::rule_defs::build_config::get_action_env();
+                let env_map = crate::interpreter::rule_defs::build_config::get_action_env();
                 let dict = starlark::values::dict::Dict::new(
                     env_map
                         .into_iter()
@@ -3562,15 +3650,13 @@ impl<'v> StarlarkValue<'v> for BuildConfigurationStub {
             }
             "short_id" => {
                 // Opaque configuration fingerprint based on compilation mode + CPU
-                let comp_mode =
-                    crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
                 let cpu = host_target_cpu();
                 Some(heap.alloc_str(&format!("{cpu}-{comp_mode}")).to_value())
             }
             "test_env" => {
                 // Return --test_env values from build config
-                let env_map =
-                    crate::interpreter::rule_defs::build_config::get_test_env();
+                let env_map = crate::interpreter::rule_defs::build_config::get_test_env();
                 let dict = starlark::values::dict::Dict::new(
                     env_map
                         .into_iter()
@@ -4016,7 +4102,13 @@ impl<'v> StarlarkValue<'v> for RustToolchainInfoStub {
                 Some(heap.alloc_str(ext).to_value())
             }
             "dylib_ext" => {
-                let ext = if cfg!(windows) { ".dll" } else if cfg!(target_os = "macos") { ".dylib" } else { ".so" };
+                let ext = if cfg!(windows) {
+                    ".dll"
+                } else if cfg!(target_os = "macos") {
+                    ".dylib"
+                } else {
+                    ".so"
+                };
                 Some(heap.alloc_str(ext).to_value())
             }
 
@@ -4029,11 +4121,21 @@ impl<'v> StarlarkValue<'v> for RustToolchainInfoStub {
                 triple_str: host_rust_triple(),
             })),
             "target_arch" => {
-                let arch = if cfg!(target_arch = "aarch64") { "aarch64" } else { "x86_64" };
+                let arch = if cfg!(target_arch = "aarch64") {
+                    "aarch64"
+                } else {
+                    "x86_64"
+                };
                 Some(heap.alloc_str(arch).to_value())
             }
             "target_os" => {
-                let os = if cfg!(windows) { "windows" } else if cfg!(target_os = "macos") { "macos" } else { "linux" };
+                let os = if cfg!(windows) {
+                    "windows"
+                } else if cfg!(target_os = "macos") {
+                    "macos"
+                } else {
+                    "linux"
+                };
                 Some(heap.alloc_str(os).to_value())
             }
             "target_flag_value" => Some(heap.alloc_str(host_rust_triple()).to_value()),
@@ -4075,9 +4177,7 @@ impl<'v> StarlarkValue<'v> for RustToolchainInfoStub {
             // make_libstd_and_allocator_ccinfo is a closure in real toolchains
             // that takes (label, actions, allocator_library, std) and returns CcInfo or None.
             // Return a stub function that always returns None.
-            "make_libstd_and_allocator_ccinfo" => {
-                Some(heap.alloc(MakeAllocatorCcInfoStub))
-            }
+            "make_libstd_and_allocator_ccinfo" => Some(heap.alloc(MakeAllocatorCcInfoStub)),
 
             // Additional flags and attributes from rules_rust toolchain
             "extra_rustc_flags_for_crate_types" => {
@@ -4125,7 +4225,9 @@ impl<'v> StarlarkValue<'v> for RustToolchainInfoStub {
 
             // Catch-all: attributes starting with _ are likely boolean flags
             // Other unknown attributes get None
-            _ if attribute.starts_with("_experimental_") || attribute.starts_with("_incompatible_") => {
+            _ if attribute.starts_with("_experimental_")
+                || attribute.starts_with("_incompatible_") =>
+            {
                 Some(Value::new_bool(false))
             }
             _ if attribute.starts_with("_") => Some(Value::new_bool(false)),
@@ -4173,7 +4275,10 @@ fn detect_rust_tool_path(tool_name: &str) -> String {
         } else {
             format!("{}.exe", tool_name)
         };
-        if let Ok(output) = std::process::Command::new("where.exe").arg(&exe_name).output() {
+        if let Ok(output) = std::process::Command::new("where.exe")
+            .arg(&exe_name)
+            .output()
+        {
             if output.status.success() {
                 let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 // `where` may return multiple lines; take the first
@@ -4815,8 +4920,7 @@ impl<'v> StarlarkValue<'v> for StampFile {
             "owner" => Some(Value::new_none()),
             "root" => {
                 // Root is the prefix before the short_path
-                let root_path = if let Some(prefix) =
-                    self.full_path.strip_suffix(&self.short_path)
+                let root_path = if let Some(prefix) = self.full_path.strip_suffix(&self.short_path)
                 {
                     prefix.trim_end_matches('/').to_owned()
                 } else {

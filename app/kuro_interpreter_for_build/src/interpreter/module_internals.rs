@@ -260,12 +260,7 @@ impl ModuleInternals {
             .recorder
             .targets
             .iter()
-            .map(|(name, node)| {
-                (
-                    name.as_str().to_owned(),
-                    node.rule_type().name().to_owned(),
-                )
-            })
+            .map(|(name, node)| (name.as_str().to_owned(), node.rule_type().name().to_owned()))
             .collect()
     }
 

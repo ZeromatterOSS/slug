@@ -68,13 +68,20 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
         let spec = GlobSpec::new(&include.items, &exclude.items)?;
         if !allow_empty {
             // Collect results to check emptiness
-            let results: Vec<_> = extra.resolve_glob(&spec).map(|path| path.as_str().to_owned()).collect();
+            let results: Vec<_> = extra
+                .resolve_glob(&spec)
+                .map(|path| path.as_str().to_owned())
+                .collect();
             if results.is_empty() {
-                return Err(starlark::Error::new_other(
-                    anyhow::anyhow!("glob pattern '{}' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with package(default_glob_allow_empty = ...))", include.items.join(", "))
-                ));
+                return Err(starlark::Error::new_other(anyhow::anyhow!(
+                    "glob pattern '{}' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with package(default_glob_allow_empty = ...))",
+                    include.items.join(", ")
+                )));
             }
-            Ok(eval.heap().alloc_typed_unchecked(AllocList(results.iter().map(|s| s.as_str()))).cast())
+            Ok(eval
+                .heap()
+                .alloc_typed_unchecked(AllocList(results.iter().map(|s| s.as_str())))
+                .cast())
         } else {
             let res = extra.resolve_glob(&spec).map(|path| path.as_str());
             Ok(eval.heap().alloc_typed_unchecked(AllocList(res)).cast())
@@ -180,7 +187,10 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
         // Return direct subpackage paths relative to this package.
         // In Bazel, subpackages() returns strings like "bar", "baz" (just the last path component
         // or the package-relative path to the subpackage).
-        let all_packages: Vec<String> = extra.sub_packages().map(|p| p.as_str().to_owned()).collect();
+        let all_packages: Vec<String> = extra
+            .sub_packages()
+            .map(|p| p.as_str().to_owned())
+            .collect();
 
         // Apply include/exclude glob filtering if patterns are provided
         let include_patterns = &include.items;

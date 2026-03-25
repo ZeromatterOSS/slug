@@ -86,7 +86,10 @@ pub fn set_test_output_mode(mode: TestOutputMode) {
 
 /// Get the current test output mode.
 fn get_test_output_mode() -> TestOutputMode {
-    TEST_OUTPUT_MODE.get().copied().unwrap_or(TestOutputMode::Errors)
+    TEST_OUTPUT_MODE
+        .get()
+        .copied()
+        .unwrap_or(TestOutputMode::Errors)
 }
 
 #[derive(Copy, Clone, Dupe)]

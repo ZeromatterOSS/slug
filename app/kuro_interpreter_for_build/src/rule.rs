@@ -750,17 +750,11 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRuleCallable {
             if !already_applied {
                 // Extract all named args from the call
                 let kwargs = args.names_map()?;
-                let named_pairs: Vec<(&str, Value<'v>)> = kwargs
-                    .iter()
-                    .map(|(k, v)| (k.as_str(), *v))
-                    .collect();
+                let named_pairs: Vec<(&str, Value<'v>)> =
+                    kwargs.iter().map(|(k, v)| (k.as_str(), *v)).collect();
 
                 // Call the initializer: initializer(**kwargs) -> dict
-                let result = eval.eval_function(
-                    initializer_fn.to_value(),
-                    &[],
-                    &named_pairs,
-                )?;
+                let result = eval.eval_function(initializer_fn.to_value(), &[], &named_pairs)?;
 
                 // The initializer should return a dict of modified attribute values.
                 // Merge the returned dict with the original kwargs.
@@ -789,11 +783,7 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRuleCallable {
 
                 // Re-invoke the rule with modified kwargs, with the guard set
                 INITIALIZER_APPLIED.with(|flag| flag.set(true));
-                let result = eval.eval_function(
-                    _me,
-                    &[],
-                    &modified_pairs,
-                );
+                let result = eval.eval_function(_me, &[], &modified_pairs);
                 INITIALIZER_APPLIED.with(|flag| flag.set(false));
                 return result.map_err(Into::into);
             }
@@ -998,18 +988,12 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkRuleCallable<'v>> {
         // TODO(bazel): Use the subrules parameter for subrule composition
-        let _unused = (
-            subrules,
-            extra_kwargs,
-        );
+        let _unused = (subrules, extra_kwargs);
 
         // Extract configuration fragment names from the fragments parameter.
         // In Bazel, fragments=["cpp", "java"] declares which config fragments a rule needs.
-        let fragment_names: Vec<String> = fragments
-            .items
-            .into_iter()
-            .map(|s| s.to_owned())
-            .collect();
+        let fragment_names: Vec<String> =
+            fragments.items.into_iter().map(|s| s.to_owned()).collect();
 
         // Extract execution group names from the exec_groups parameter.
         // In Bazel, exec_groups is a dict mapping group name → exec_group() value.

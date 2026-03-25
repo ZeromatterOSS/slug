@@ -130,7 +130,7 @@ impl<'v> StarlarkValue<'v> for InstrumentedFilesInfoProvider {
     Allocative,
     Trace,
     Coerce,
-    Freeze,
+    Freeze
 )]
 #[repr(C)]
 pub struct InstrumentedFilesInfoInstanceGen<V: ValueLifetimeless> {
@@ -176,10 +176,7 @@ where
     }
 
     fn dir_attr(&self) -> Vec<String> {
-        vec![
-            "instrumented_files".to_owned(),
-            "metadata_files".to_owned(),
-        ]
+        vec!["instrumented_files".to_owned(), "metadata_files".to_owned()]
     }
 
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
@@ -329,8 +326,7 @@ fn coverage_common_module_methods(builder: &mut MethodsBuilder) {
                     for attr_name in iter {
                         if let Some(name) = attr_name.unpack_str() {
                             if let Ok(Some(attr_val)) = ctx_attr.get_attr(name, heap) {
-                                let files =
-                                    collect_files_from_attr(attr_val, &ext_filter, heap);
+                                let files = collect_files_from_attr(attr_val, &ext_filter, heap);
                                 all_instrumented_files.extend(files);
                             }
                         }

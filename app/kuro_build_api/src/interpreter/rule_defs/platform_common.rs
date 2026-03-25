@@ -292,7 +292,9 @@ impl<'v> StarlarkValue<'v> for ConstraintSettingInfoProvider {
         let fields = eval
             .heap()
             .alloc(AllocDict(kwargs.into_iter().map(|(k, v)| (k.as_str(), v))));
-        Ok(eval.heap().alloc(ConstraintSettingInfoInstanceGen { fields }))
+        Ok(eval
+            .heap()
+            .alloc(ConstraintSettingInfoInstanceGen { fields }))
     }
 
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {

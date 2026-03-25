@@ -266,8 +266,7 @@ impl<'v> StarlarkValue<'v> for Depset {
                 Some(heap.alloc(AllocList(elems)))
             }
             "transitive" => {
-                let children: Vec<Value<'v>> =
-                    self.children.iter().map(|v| v.to_value()).collect();
+                let children: Vec<Value<'v>> = self.children.iter().map(|v| v.to_value()).collect();
                 Some(heap.alloc(AllocList(children)))
             }
             "order" => Some(heap.alloc(self.order.as_str())),

@@ -1105,7 +1105,11 @@ pub(crate) mod rule_defs {
         let toolchains_attr = Attribute::new(
             Some(Arc::new(CoercedAttr::None)),
             "toolchains",
-            AttrType::option(AttrType::dict(AttrType::string(), AttrType::string(), false)),
+            AttrType::option(AttrType::dict(
+                AttrType::string(),
+                AttrType::string(),
+                false,
+            )),
         );
 
         AttributeSpec::from(
@@ -1154,7 +1158,9 @@ pub(crate) mod rule_defs {
             AttrType::option(AttrType::source(false)),
         );
         let hdrs_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(ListLiteral(ArcSlice::default())))),
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
             "Header files for this library",
             AttrType::list(AttrType::source(false)),
         );
@@ -1207,22 +1213,30 @@ pub(crate) mod rule_defs {
     /// cc_shared_library produces a shared library from cc_library dependencies.
     fn cc_shared_library_attributes() -> AttributeSpec {
         let deps_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(ListLiteral(ArcSlice::default())))),
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
             "Direct dependencies to include in the shared library",
             AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
         );
         let exports_filter_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(ListLiteral(ArcSlice::default())))),
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
             "Labels of targets whose symbols should be exported",
             AttrType::list(AttrType::string()),
         );
         let dynamic_deps_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(ListLiteral(ArcSlice::default())))),
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
             "Other cc_shared_library dependencies",
             AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
         );
         let roots_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(ListLiteral(ArcSlice::default())))),
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
             "Root targets from which to start dependency collection",
             AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
         );
@@ -1232,7 +1246,9 @@ pub(crate) mod rule_defs {
             AttrType::option(AttrType::string()),
         );
         let user_link_flags_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(ListLiteral(ArcSlice::default())))),
+            Some(Arc::new(CoercedAttr::List(
+                ListLiteral(ArcSlice::default()),
+            ))),
             "Additional linker flags",
             AttrType::list(AttrType::string()),
         );
@@ -1314,7 +1330,6 @@ pub(crate) mod rule_defs {
             build_setting_is_flag: false,
         })
     });
-
 }
 
 /// Extract visibility strings from a Starlark value.
@@ -2005,11 +2020,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let pkg_label = internals.package().buildfile_path.package();
         let pkg_path = pkg_label.cell_relative_path().as_str();
         let group_label = format!("//{}:{}", pkg_path, name);
-        kuro_node::visibility::register_package_group(
-            &group_label,
-            packages.items,
-            includes.items,
-        );
+        kuro_node::visibility::register_package_group(&group_label, packages.items, includes.items);
 
         let target_node = create_native_target_node(
             rule_defs::PACKAGE_GROUP_RULE.clone(),
@@ -2778,11 +2789,11 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let coercion_ctx = internals.attr_coercion_context();
 
         // Coerce expression (required string)
-        let coerced_expression =
-            CoercedAttr::String(StringLiteral(ArcStr::from(expression)));
+        let coerced_expression = CoercedAttr::String(StringLiteral(ArcStr::from(expression)));
 
         // Coerce scope (list of dep labels, optional - default to empty list)
-        let scope_attr_type = AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY));
+        let scope_attr_type =
+            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY));
         let scope_value = if scope.is_none() {
             eval.heap().alloc(Vec::<Value>::new())
         } else {
@@ -2846,8 +2857,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let coercion_ctx = internals.attr_coercion_context();
 
         // Coerce src (required dep label)
-        let src_attr_type =
-            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY);
+        let src_attr_type = AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY);
         let coerced_src = src_attr_type.coerce(AttrIsConfigurable::No, coercion_ctx, src)?;
 
         // Coerce symbol_names (list of strings, optional)
@@ -2891,8 +2901,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         shared_library: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)]
         interface_library: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        hdrs: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] hdrs: Value<'v>,
         #[starlark(require = named, default = false)] system_provided: bool,
         #[starlark(require = named, default = false)] alwayslink: bool,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
@@ -2910,15 +2919,18 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let opt_source_type = AttrType::option(AttrType::source(false));
 
         if !static_library.is_none() {
-            let coerced = opt_source_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, static_library)?;
+            let coerced =
+                opt_source_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, static_library)?;
             attrs.push(("static_library".to_owned(), coerced));
         }
         if !shared_library.is_none() {
-            let coerced = opt_source_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, shared_library)?;
+            let coerced =
+                opt_source_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, shared_library)?;
             attrs.push(("shared_library".to_owned(), coerced));
         }
         if !interface_library.is_none() {
-            let coerced = opt_source_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, interface_library)?;
+            let coerced =
+                opt_source_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, interface_library)?;
             attrs.push(("interface_library".to_owned(), coerced));
         }
 
@@ -2933,8 +2945,14 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         attrs.push(("hdrs".to_owned(), coerced_hdrs));
 
         // Bool attributes
-        attrs.push(("system_provided".to_owned(), CoercedAttr::Bool(BoolLiteral(system_provided))));
-        attrs.push(("alwayslink".to_owned(), CoercedAttr::Bool(BoolLiteral(alwayslink))));
+        attrs.push((
+            "system_provided".to_owned(),
+            CoercedAttr::Bool(BoolLiteral(system_provided)),
+        ));
+        attrs.push((
+            "alwayslink".to_owned(),
+            CoercedAttr::Bool(BoolLiteral(alwayslink)),
+        ));
 
         let target_node = create_native_target_node(
             rule_defs::CC_IMPORT_RULE.clone(),
@@ -3015,8 +3033,7 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         } else {
             roots
         };
-        let coerced_roots =
-            deps_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, roots_value)?;
+        let coerced_roots = deps_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, roots_value)?;
         attrs.push(("roots".to_owned(), coerced_roots));
 
         let target_node = create_native_target_node(
@@ -3089,7 +3106,6 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         internals.record(target_node)?;
         Ok(NoneType)
     }
-
 }
 
 /// Initialize the ANALYSIS_TEST_REGISTER late binding.

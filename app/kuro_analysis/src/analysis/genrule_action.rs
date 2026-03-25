@@ -30,13 +30,13 @@ use kuro_build_api::artifact_groups::ArtifactGroup;
 use kuro_build_signals::env::WaitingData;
 use kuro_core::category::CategoryRef;
 use kuro_core::content_hash::ContentBasedPathHash;
+use kuro_error::BuckErrorContext;
 use kuro_execute::artifact::artifact_dyn::ArtifactDyn;
 use kuro_execute::execute::request::CommandExecutionInput;
 use kuro_execute::execute::request::CommandExecutionOutput;
 use kuro_execute::execute::request::CommandExecutionPaths;
 use kuro_execute::execute::request::CommandExecutionRequest;
 use kuro_execute::execute::request::ExecutorPreference;
-use kuro_error::BuckErrorContext;
 use sorted_vector_map::SortedVectorMap;
 
 /// Which shell interpreter to use for executing the genrule command.
@@ -125,12 +125,19 @@ fn shell_quote_path(path: &str) -> String {
     // Backslash-escape shell-special characters (including spaces).
     // Using backslash escapes rather than double-quoting sidesteps the MSYS2
     // path-translation issue described in the doc comment above.
-    let needs_escape = normalized
-        .contains(|c: char| matches!(c, ' ' | '\'' | '"' | '(' | ')' | '&' | ';' | '|' | '<' | '>'));
+    let needs_escape = normalized.contains(|c: char| {
+        matches!(
+            c,
+            ' ' | '\'' | '"' | '(' | ')' | '&' | ';' | '|' | '<' | '>'
+        )
+    });
     if needs_escape {
         let mut result = String::with_capacity(normalized.len() + 8);
         for c in normalized.chars() {
-            if matches!(c, ' ' | '\'' | '"' | '(' | ')' | '&' | ';' | '|' | '<' | '>') {
+            if matches!(
+                c,
+                ' ' | '\'' | '"' | '(' | ')' | '&' | ';' | '|' | '<' | '>'
+            ) {
                 result.push('\\');
             }
             result.push(c);
@@ -174,8 +181,16 @@ fn expand_genrule_cmd(
     locations: &[(String, Vec<String>)],
     quote_fn: fn(&str) -> String,
 ) -> String {
-    let srcs_str = srcs.iter().map(|s| quote_fn(s)).collect::<Vec<_>>().join(" ");
-    let outs_str = outs.iter().map(|s| quote_fn(s)).collect::<Vec<_>>().join(" ");
+    let srcs_str = srcs
+        .iter()
+        .map(|s| quote_fn(s))
+        .collect::<Vec<_>>()
+        .join(" ");
+    let outs_str = outs
+        .iter()
+        .map(|s| quote_fn(s))
+        .collect::<Vec<_>>()
+        .join(" ");
     let first_out_raw = outs.first().map(|s| s.as_str()).unwrap_or("");
     let first_src_raw = srcs.first().map(|s| s.as_str()).unwrap_or("");
     let first_out = quote_fn(first_out_raw);
@@ -325,7 +340,11 @@ fn resolve_location(
         // Exact match
         if key == label {
             return if multi {
-                paths.iter().map(|p| quote_fn(p)).collect::<Vec<_>>().join(" ")
+                paths
+                    .iter()
+                    .map(|p| quote_fn(p))
+                    .collect::<Vec<_>>()
+                    .join(" ")
             } else {
                 paths.first().map(|p| quote_fn(p)).unwrap_or_default()
             };
@@ -334,7 +353,11 @@ fn resolve_location(
         let key_name = key.rsplit(':').next().unwrap_or(key.as_str());
         if key_name == label_name {
             return if multi {
-                paths.iter().map(|p| quote_fn(p)).collect::<Vec<_>>().join(" ")
+                paths
+                    .iter()
+                    .map(|p| quote_fn(p))
+                    .collect::<Vec<_>>()
+                    .join(" ")
             } else {
                 paths.first().map(|p| quote_fn(p)).unwrap_or_default()
             };

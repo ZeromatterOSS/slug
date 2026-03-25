@@ -133,12 +133,17 @@ impl KuroTestRunner {
         let target_handle = spec.target.handle.clone();
         let host_sharing_requirements = HostSharingRequirements::default();
 
-        let config_args: Vec<ArgValue> = self.config.test_arg.iter().map(|arg| ArgValue {
-            content: ArgValueContent::ExternalRunnerSpecValue(ExternalRunnerSpecValue::Verbatim(
-                arg.to_owned(),
-            )),
-            format: None,
-        }).collect();
+        let config_args: Vec<ArgValue> = self
+            .config
+            .test_arg
+            .iter()
+            .map(|arg| ArgValue {
+                content: ArgValueContent::ExternalRunnerSpecValue(
+                    ExternalRunnerSpecValue::Verbatim(arg.to_owned()),
+                ),
+                format: None,
+            })
+            .collect();
 
         let base_command: Vec<ArgValue> = spec
             .command

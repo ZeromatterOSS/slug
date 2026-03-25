@@ -383,16 +383,14 @@ impl Key for ExtensionRepoExecutionKey {
                                 )));
                             }
                             Err(e) => {
-                                return Err(
-                                    RepositoryExecutionError::ExecutionFailed {
-                                        name: self.canonical_name.to_string(),
-                                        reason: format!(
-                                            "Starlark repository rule '{}' from '{}' failed: {}",
-                                            rule_fn_name, rule_bzl_path, e
-                                        ),
-                                    }
-                                    .into(),
-                                );
+                                return Err(RepositoryExecutionError::ExecutionFailed {
+                                    name: self.canonical_name.to_string(),
+                                    reason: format!(
+                                        "Starlark repository rule '{}' from '{}' failed: {}",
+                                        rule_fn_name, rule_bzl_path, e
+                                    ),
+                                }
+                                .into());
                             }
                         }
                     }

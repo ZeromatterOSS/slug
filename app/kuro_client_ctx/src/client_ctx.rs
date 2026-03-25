@@ -241,10 +241,7 @@ impl<'a> ClientCommandContext<'a> {
             }
             .into(),
             profile_pattern_opts: starlark_opts.profile_pattern_opts(&self.working_dir),
-            compilation_mode: config_opts
-                .compilation_mode
-                .clone()
-                .unwrap_or_default(),
+            compilation_mode: config_opts.compilation_mode.clone().unwrap_or_default(),
             define_values: config_opts.define.clone(),
             action_env: config_opts.action_env.clone(),
             copts: config_opts.copts.clone(),
@@ -255,7 +252,8 @@ impl<'a> ClientCommandContext<'a> {
             global_features: config_opts.global_features.clone(),
             test_env: config_opts.test_env.clone(),
             stamp: false, // Will be set from CommonBuildOptions.stamp on server side
-            collect_code_coverage: config_opts.collect_code_coverage && !config_opts.nocollect_code_coverage,
+            collect_code_coverage: config_opts.collect_code_coverage
+                && !config_opts.nocollect_code_coverage,
             force_pic: config_opts.force_pic,
             starlark_flags: crate::bazelrc::get_starlark_flags_from_args().to_vec(),
             ..self.empty_client_context(cmd.logging_name())?

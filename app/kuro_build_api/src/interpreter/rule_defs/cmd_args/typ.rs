@@ -958,8 +958,9 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
         mut this: StarlarkCommandLineMut<'v>,
         #[starlark(require = pos, default = starlark::values::none::NoneType)]
         arg_name_or_values: Value<'v>,
-        #[starlark(require = pos, default = starlark::values::none::NoneType)]
-        maybe_values: Value<'v>,
+        #[starlark(require = pos, default = starlark::values::none::NoneType)] maybe_values: Value<
+            'v,
+        >,
         #[starlark(require = named, default = "")] before_each: &str,
         #[starlark(require = named, default = "")] format_each: &str,
         #[starlark(require = named, default = starlark::values::none::NoneType)] map_each: Value<

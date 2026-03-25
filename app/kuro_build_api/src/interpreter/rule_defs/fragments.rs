@@ -337,9 +337,7 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     ///
     /// In Bazel, this controls whether nocopts filtering is disabled.
     /// Always return true for Bazel 9.0+ compatibility (nocopts was removed).
-    fn disable_nocopts(
-        #[allow(unused_variables)] this: &CppFragment,
-    ) -> starlark::Result<bool> {
+    fn disable_nocopts(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
         Ok(true)
     }
 
@@ -363,9 +361,7 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Whether shared native deps linking is enabled.
-    fn share_native_deps(
-        #[allow(unused_variables)] this: &CppFragment,
-    ) -> starlark::Result<bool> {
+    fn share_native_deps(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
         Ok(false)
     }
 
@@ -751,7 +747,9 @@ fn platform_fragment_methods(builder: &mut MethodsBuilder) {
 
     /// Returns the host platform label.
     #[starlark(attribute)]
-    fn host_platform(#[allow(unused_variables)] this: &PlatformFragment) -> starlark::Result<String> {
+    fn host_platform(
+        #[allow(unused_variables)] this: &PlatformFragment,
+    ) -> starlark::Result<String> {
         Ok("@local_config_platform//:host".to_owned())
     }
 }
@@ -804,13 +802,16 @@ impl<'v> StarlarkValue<'v> for JavaFragment {
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "default_javac_flags" | "default_jvm_opts" | "plugins"
+            "default_javac_flags"
+            | "default_jvm_opts"
+            | "plugins"
             | "default_javac_flags_depset" => Some(heap.alloc(AllocList::EMPTY)),
             "source_version" | "target_version" => Some(heap.alloc("11")),
             "one_version_enforcement_level" => Some(heap.alloc("OFF")),
             "bytecode_optimizer_mnemonic" => Some(heap.alloc("Optimizer")),
             "bytecode_optimization_pass_actions" => Some(heap.alloc(0)),
-            "multi_release_deploy_jars" | "split_bytecode_optimization_pass"
+            "multi_release_deploy_jars"
+            | "split_bytecode_optimization_pass"
             | "run_android_lint" => Some(Value::new_bool(false)),
             _ => None,
         }

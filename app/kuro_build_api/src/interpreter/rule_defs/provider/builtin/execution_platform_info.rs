@@ -70,8 +70,6 @@ impl FrozenExecutionPlatformInfo {
         )],
         heap: &starlark::values::FrozenHeap,
     ) -> starlark::values::FrozenValue {
-        
-
         use starlark::values::FrozenValueOfUnchecked;
 
         use crate::interpreter::rule_defs::provider::builtin::configuration_info::FrozenConfigurationInfo;
