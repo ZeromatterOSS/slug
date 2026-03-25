@@ -307,6 +307,60 @@ pub(crate) fn set_methods(builder: &mut MethodsBuilder) {
         Ok(NoneType)
     }
 
+    /// Remove all elements of another iterable from this set (in-place).
+    /// ```
+    /// # starlark::assert::is_true(r#"
+    /// x = set([1, 2, 3, 4])
+    /// x.difference_update([2, 4])
+    /// x == set([1, 3])
+    /// # "#);
+    /// ```
+    fn difference_update<'v>(
+        this: Value<'v>,
+        #[starlark(require = pos)] other: ValueOfUnchecked<'v, StarlarkIter<Value<'v>>>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<NoneType> {
+        let other_set = SetFromValue::from_value(other, heap)?;
+        let to_remove: Vec<Hashed<Value<'v>>> =
+            other_set.get().iter_hashed().map(|h| h.copied()).collect();
+        let mut set = SetMut::from_value(this)?;
+        for elem in &to_remove {
+            set.aref
+                .remove_hashed(Hashed::new_unchecked(elem.hash(), elem.key()));
+        }
+        Ok(NoneType)
+    }
+
+    /// Update the set, keeping only elements found in it and the specified iterable.
+    /// ```
+    /// # starlark::assert::is_true(r#"
+    /// x = set([1, 2, 3, 4])
+    /// x.intersection_update([2, 4, 6])
+    /// x == set([2, 4])
+    /// # "#);
+    /// ```
+    fn intersection_update<'v>(
+        this: Value<'v>,
+        #[starlark(require = pos)] other: ValueOfUnchecked<'v, StarlarkIter<Value<'v>>>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<NoneType> {
+        let other_set = SetFromValue::from_value(other, heap)?;
+        // Collect elements to remove (those NOT in other_set)
+        let mut set = SetMut::from_value(this)?;
+        let to_remove: Vec<Hashed<Value<'v>>> = set
+            .aref
+            .content
+            .iter_hashed()
+            .filter(|h| !other_set.contains_hashed(h.copied()))
+            .map(|h| h.copied())
+            .collect();
+        for elem in &to_remove {
+            set.aref
+                .remove_hashed(Hashed::new_unchecked(elem.hash(), elem.key()));
+        }
+        Ok(NoneType)
+    }
+
     /// Removes and returns the **last** element of a set.
     ///
     /// `S.pop()` removes and returns the last element of the set S.
