@@ -468,21 +468,60 @@ fix should be minimal and targeted.
     `bazel-external/` directory, and scans for versioned repo names. Needed for `run_toml2json`
     which calls `ctx.execute([Label("@toml2json_linux_amd64//file:downloaded"), toml_file])`.
 
-#### Current blocker (2026-03-25, continued):
-  - Spoke repos (1234) have source but no BUILD.bazel. `ExtensionRepoExecutionKey::compute()` is
-    called via the eager loop but the Starlark repo rule executor may be failing silently. The
-    `crate_repository` impl calls `run_toml2json` which needs `rctx.execute([Label(...)])` — the
-    Label resolution in repo_ctx now works but the underlying execution may still fail due to
-    toml2json binary not being found or permission issues.
+#### Bugs fixed (2026-03-25, session 2):
+29. **Incomplete materialization check**: `get_file_ops_delegate()` checked `!source_path.exists()`
+    (directory existence) instead of `.kuro_repo_complete`. Partially materialized repos (source
+    downloaded but no BUILD.bazel) were skipped on re-execution. Fixed: check `.kuro_repo_complete`.
+30. **`repository_ctx.read()` only accepted strings**: `ctx.read(repo_path)` failed when passed a
+    `RepositoryPath` (from `ctx.path()`). Fixed: accept `RepositoryPath` (via `absolute_path()`)
+    and `Label` (via `resolve_label_to_path()`).
+31. **`repository_ctx.path()` didn't resolve label-like strings**: When `rctx.attr.build_file`
+    returns `"@@rules_rust//path:file"` (a string, not a Label object), `path()` stored it
+    literally. Fixed: detect `@@`/`@` + `//` patterns and resolve via `resolve_label_to_path()`.
+32. **`resolve_label_to_path()` used workspace_root (repo dir) instead of project root**: For repos
+    inside `bazel-external/`, workspace_root is the repo dir, not the project root. The scan for
+    versioned directories failed. Fixed: prioritize `DYNAMIC_PROJECT_ROOT` for all scans.
+33. **Native http_archive `build_file` label not resolved**: The native executor used naive string
+    manipulation for label-like `build_file` values. Fixed: added `resolve_build_file_label()` that
+    scans `bazel-external/` for matching repos.
+34. **`package_metadata` not accepted as rule parameter**: rules_rust's `_symbolic_rule_wrapper`
+    passes `package_metadata` to rules. Fixed: added as internal attribute (ID 15).
+35. **Bare filename in `attr.label()` default rejected in `.bzl` files**: `attr.label(default="LICENSE")`
+    in rules_license failed in strict mode. Fixed: allow bare names to fall through to relative
+    label resolution even in strict mode.
+36. **`stripPrefix` camelCase not accepted**: `download_and_extract(stripPrefix=...)` from rules_perl
+    failed. Fixed: added `stripPrefix` parameter as alias for `strip_prefix`.
+37. **Empty `integrity` string caused "Invalid integrity format"**: `get_optional_string("integrity")`
+    returned `Some("")` instead of `None`. Fixed: filter empty strings.
 
 #### Verified:
 - `kuro build //app:calculator` in `examples/multi_package` — **BUILD SUCCEEDED**
 - **`@crates` hub repo generated with real content** — `defs.bzl` contains `all_crate_deps`,
   `aliases`, `data.bzl` contains `DEP_DATA` with real crate dependency data from Cargo.lock.
+- **1230/1235 spoke repos materialized with BUILD.bazel** (5 failures: local/patched crates)
+- **`rules_rust_tinyjson` and `rrra` extension repos now generate BUILD.bazel** via
+  `crates_vendor_remote_repository` Starlark repo rule
 - Extension repos materialized with real content:
   - `bazel_features+version_extension+bazel_features_version/version.bzl`: `version = '9.0.0'`
   - `bazel_features+version_extension+bazel_features_globals/globals.bzl`: real `globals = struct(...)`
   - `rules_cc+compatibility_proxy+cc_compatibility_proxy` created via real DICE execution
+
+38. **BCR overlay files not applied**: BCR modules use `overlay` field in `source.json` to add
+    BUILD.bazel and other files on top of extracted source archives. Added `overlay` field to
+    `SourceInfo` and `apply_overlays()` to `SourceFetcher`. Files are fetched from
+    `{registry}/modules/{name}/{version}/overlay/{path}`.
+
+39. **Bare source paths with slashes in label coercion**: Paths like `"crypto/aes/file.pl"` used as
+    `attrs.dict(attrs.dep(), ...)` keys need label construction via `TargetNameRef::unchecked_new()`
+    since the pattern parser rejects slashed target names.
+
+#### Current blocker (2026-03-25, session 2):
+- `rules_rust_tinyjson//:src/parser.rs` — dep coercion succeeds for slashed source file paths,
+  but analysis fails with "Unknown target" because Buck2 doesn't create implicit source file
+  targets like Bazel does. Source files in `srcs = glob(["src/*.rs"])` get coerced as dep labels
+  instead of source files. Fix requires either:
+  1. Implicit source file targets during package evaluation (Bazel parity)
+  2. Making `one_of(dep, source)` prefer source for slashed bare names
 
 ### Success Criteria
 

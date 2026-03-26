@@ -358,9 +358,9 @@ impl BuildAttrCoercionContext {
                     // (e.g., attr.label(default = "LICENSE") resolves to ":LICENSE").
                     // Fall through to the bare name handling below.
                 }
-                if is_bare_name && !is_source_file {
-                    // Bazel-compatible: check if this bare name is a known output file
-                    // from another target in this package (declared with attr.output()).
+                if is_bare_name && !is_source_file && !value.contains('/') {
+                    // Bazel-compatible: bare target names without slashes (e.g., "foo_bar")
+                    // resolve as ":foo_bar" in the current package. Check output registry first.
                     let output_target = self.output_file_registry.borrow().get(value).cloned();
                     let target_name_to_use = output_target.as_deref().unwrap_or(value);
                     let adjusted = format!(":{}", target_name_to_use);
@@ -368,31 +368,16 @@ impl BuildAttrCoercionContext {
                         Ok(ParsedPattern::Target(package, target_name, providers)) => {
                             Ok(providers.into_providers_label(package, target_name.as_ref()))
                         }
-                        _ => {
-                            // If the `:name` parse fails (e.g., slashes in name), try
-                            // constructing the label directly. In Bazel, bare source
-                            // file paths like "crypto/aes/file.pl" are valid labels.
-                            if let Some((pkg_label, _listing)) = &self.enclosing_package {
-                                let target = TargetNameRef::unchecked_new(value);
-                                Ok(ProvidersLabel::default_for(TargetLabel::new(
-                                    pkg_label.dupe(),
-                                    target,
-                                )))
-                            } else {
-                                Err(
-                                    BuildAttrCoercionContextError::RequiredLabel(value.to_owned())
-                                        .into(),
-                                )
-                            }
-                        }
+                        _ => Err(
+                            BuildAttrCoercionContextError::RequiredLabel(value.to_owned()).into(),
+                        ),
                     }
-                } else if is_bare_name && is_source_file && value.contains('/') {
-                    // Source file with path separators (e.g., "crypto/aes/file.pl")
-                    // used as a dep label key (e.g., in attrs.dict(attrs.dep(), ...)).
-                    // The pattern parser can't handle slashed target names, so construct
-                    // the label directly. This case is NOT reached for one_of(dep, source)
-                    // with simple names (no slashes), which correctly fall through to source
-                    // coercion to avoid self-referential targets.
+                } else if is_bare_name && value.contains('/') {
+                    // Bare name with path separators (e.g., "crypto/aes/file.pl",
+                    // "src/parser.rs"). In Bazel, source files are implicit targets so
+                    // this is valid in both attrs.dep() and one_of(dep, source) contexts.
+                    // Construct the label directly since the pattern parser can't handle
+                    // slashed target names.
                     if let Some((pkg_label, _listing)) = &self.enclosing_package {
                         let target = TargetNameRef::unchecked_new(value);
                         Ok(ProvidersLabel::default_for(TargetLabel::new(
