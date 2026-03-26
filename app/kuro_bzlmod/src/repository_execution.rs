@@ -305,20 +305,14 @@ impl Key for ExtensionRepoExecutionKey {
         _cancellations: &CancellationContext,
     ) -> Self::Value {
         tracing::info!(
-            "Lazily executing repository '{}' from extension '{}'",
+            "Executing repository '{}' from extension '{}' (rule: '{}')",
             self.canonical_name,
-            self.extension_id
+            self.extension_id,
+            self.repo_spec.repo_rule_id
         );
 
         // Convert RepoSpec to RepositoryInvocation
         let invocation = repo_spec_to_invocation(&self.canonical_name, &self.repo_spec)?;
-
-        tracing::debug!(
-            "Materializing extension repo '{}' using rule '{}' at project root {:?}",
-            self.canonical_name,
-            invocation.rule_name,
-            self.project_root
-        );
 
         let working_dir = self
             .project_root
@@ -340,7 +334,7 @@ impl Key for ExtensionRepoExecutionKey {
                         crate::starlark_repo_rule_executor::STARLARK_REPO_RULE_EXECUTOR_IMPL.get()
                     {
                         tracing::info!(
-                            "Executing Starlark repository rule '{}' from '{}' for '{}'",
+                            "Executing Starlark repo rule '{}' from '{}' for '{}'",
                             rule_fn_name,
                             rule_bzl_path,
                             self.canonical_name
@@ -581,7 +575,7 @@ impl<'a> InvocationAttrs<'a> {
 
     /// Get an optional string attribute.
     pub fn get_optional_string(&self, name: &str) -> Option<&str> {
-        self.get_string(name)
+        self.get_string(name).filter(|s| !s.is_empty())
     }
 }
 

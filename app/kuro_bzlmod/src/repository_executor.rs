@@ -172,11 +172,8 @@ fn execute_http_archive(
                         }
                     })?;
                 } else if let Some(build_file) = attrs.get_optional_string("build_file") {
-                    // build_file is a label like "@//path:BUILD.foo" or a file path
-                    let build_file_path = build_file
-                        .trim_start_matches("@//")
-                        .trim_start_matches("//");
-                    let build_file_path = build_file_path.replace(':', "/");
+                    // build_file is a label like "@@repo//path:BUILD.foo" or a file path
+                    let build_file_path = resolve_build_file_label(build_file, working_dir);
                     if let Ok(content) = std::fs::read_to_string(&build_file_path) {
                         std::fs::write(working_dir.join("BUILD.bazel"), content).map_err(|e| {
                             RepositoryExecutionError::ExecutionFailed {
@@ -500,6 +497,50 @@ fn get_urls(attrs: &InvocationAttrs) -> kuro_error::Result<Vec<String>> {
     }
 
     Ok(urls)
+}
+
+/// Resolve a build_file label like "@@rules_rust//path:file" to a filesystem path.
+fn resolve_build_file_label(label: &str, working_dir: &Path) -> String {
+    if !label.contains("//") {
+        return label.to_owned();
+    }
+    let stripped = label.trim_start_matches('@');
+    let (repo, rest) = if let Some(idx) = stripped.find("//") {
+        (&stripped[..idx], &stripped[idx + 2..])
+    } else {
+        return label.to_owned();
+    };
+    let (pkg, target) = if let Some(colon) = rest.find(':') {
+        (&rest[..colon], &rest[colon + 1..])
+    } else {
+        (rest, rest.rsplit('/').next().unwrap_or(rest))
+    };
+    // Scan from project root (working_dir is {project_root}/bazel-external/{repo})
+    if let Some(bazel_ext_dir) = working_dir.parent() {
+        let bazel_ext = bazel_ext_dir.to_path_buf();
+        if let Ok(entries) = std::fs::read_dir(&bazel_ext) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                if name_str.as_ref() == repo || name_str.starts_with(&format!("{}+", repo)) {
+                    let path = if pkg.is_empty() {
+                        entry.path().join(target)
+                    } else {
+                        entry.path().join(pkg).join(target)
+                    };
+                    if path.exists() {
+                        return path.to_string_lossy().to_string();
+                    }
+                }
+            }
+        }
+    }
+    // Fallback: try relative to working dir
+    let fallback = label
+        .trim_start_matches('@')
+        .replace("//", "/")
+        .replace(':', "/");
+    fallback
 }
 
 /// Download and extract an archive.

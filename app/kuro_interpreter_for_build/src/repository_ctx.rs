@@ -630,11 +630,12 @@ pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> S
         }
     } else {
         // External repo: try multiple locations
+        // Use project root for all scans (workspace_root is often a repo dir, not project root)
+        let project_root = kuro_core::cells::get_dynamic_project_root();
+
         // 1. Check dynamic cell registry for absolute path
         if let Some(cell_path) = kuro_core::cells::get_dynamic_extension_cell(repo) {
-            // cell_path is project-relative like "bazel-external/repo_name"
-            let project_root = kuro_core::cells::get_dynamic_project_root();
-            if let Some(root) = project_root {
+            if let Some(ref root) = project_root {
                 let abs_path = if pkg.is_empty() {
                     root.join(&cell_path).join(target)
                 } else {
@@ -645,43 +646,39 @@ pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> S
                 }
             }
         }
-        // 2. Check bazel-external/ with exact name
-        let bazel_ext = workspace_root.join("bazel-external").join(repo);
-        if bazel_ext.exists() {
-            let path = if pkg.is_empty() {
-                bazel_ext.join(target)
-            } else {
-                bazel_ext.join(pkg).join(target)
-            };
-            return path.to_string_lossy().to_string();
-        }
-        // 3. Scan bazel-external/ for matching repo (handles versioned names)
-        if let Ok(entries) = std::fs::read_dir(workspace_root.join("bazel-external")) {
-            for entry in entries.flatten() {
-                let name = entry.file_name();
-                let name_str = name.to_string_lossy();
-                // Match exact name or name+version
-                if name_str == repo || name_str.starts_with(&format!("{}+", repo)) {
-                    let path = if pkg.is_empty() {
-                        entry.path().join(target)
-                    } else {
-                        entry.path().join(pkg).join(target)
-                    };
-                    if path.exists() {
-                        return path.to_string_lossy().to_string();
-                    }
+
+        // 2. Scan bazel-external/ from project root (primary) and workspace_root (fallback)
+        let scan_dirs: Vec<std::path::PathBuf> = {
+            let mut dirs = Vec::new();
+            if let Some(ref root) = project_root {
+                dirs.push(root.join("bazel-external"));
+            }
+            let ws_ext = workspace_root.join("bazel-external");
+            if ws_ext.exists() && !dirs.iter().any(|d| d == &ws_ext) {
+                dirs.push(ws_ext);
+            }
+            dirs
+        };
+
+        for scan_dir in &scan_dirs {
+            // Try exact match first
+            let exact = scan_dir.join(repo);
+            if exact.exists() {
+                let path = if pkg.is_empty() {
+                    exact.join(target)
+                } else {
+                    exact.join(pkg).join(target)
+                };
+                if path.exists() {
+                    return path.to_string_lossy().to_string();
                 }
             }
-        }
-        // 4. Check project root for source repos (non-external)
-        let project_root = kuro_core::cells::get_dynamic_project_root();
-        if let Some(root) = project_root {
-            // Also scan bazel-external from project root (workspace_root may be repo dir)
-            if let Ok(entries) = std::fs::read_dir(root.join("bazel-external")) {
+            // Scan for versioned names (repo+version)
+            if let Ok(entries) = std::fs::read_dir(scan_dir) {
                 for entry in entries.flatten() {
                     let name = entry.file_name();
                     let name_str = name.to_string_lossy();
-                    if name_str == repo || name_str.starts_with(&format!("{}+", repo)) {
+                    if name_str.starts_with(&format!("{}+", repo)) {
                         let path = if pkg.is_empty() {
                             entry.path().join(target)
                         } else {
@@ -694,12 +691,14 @@ pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> S
                 }
             }
         }
-        // 5. Fallback
-        if pkg.is_empty() {
+
+        // 3. Fallback: return unresolved path
+        let fallback = if pkg.is_empty() {
             format!("{}/{}", repo, target)
         } else {
             format!("{}/{}/{}", repo, pkg, target)
-        }
+        };
+        fallback
     }
 }
 
@@ -1104,12 +1103,16 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let path_str = if let Some(s) = path_arg.unpack_str() {
-            s.to_owned()
+            // Check if the string looks like a label (starts with @ and contains //)
+            if (s.starts_with("@@") || s.starts_with('@')) && s.contains("//") {
+                resolve_label_to_path(s, &this.working_dir)
+            } else {
+                s.to_owned()
+            }
         } else if let Some(repo_path) = path_arg.downcast_ref::<RepositoryPath>() {
             repo_path.path_str().to_owned()
         } else if path_arg.get_type() == "Label" {
             // Handle Label objects: resolve to workspace-relative path.
-            // Label("@repo//pkg:file") → "external/repo/pkg/file" or "pkg/file" for root
             let label_str = format!("{}", path_arg);
             resolve_label_to_path(&label_str, &this.working_dir)
         } else {
@@ -1269,6 +1272,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         #[allow(unused_variables)]
         #[starlark(require = named)]
         headers: Option<Value<'v>>,
+        #[starlark(require = named, default = "")]
+        #[allow(non_snake_case)]
+        stripPrefix: &str,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let urls = get_urls_from_value(url);
@@ -1328,11 +1334,16 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                         starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
                     })?;
 
-                    // Extract the archive
-                    let strip = if strip_prefix.is_empty() {
+                    // Extract the archive (support both strip_prefix and stripPrefix)
+                    let effective_strip = if !strip_prefix.is_empty() {
+                        strip_prefix
+                    } else {
+                        stripPrefix
+                    };
+                    let strip = if effective_strip.is_empty() {
                         None
                     } else {
-                        Some(strip_prefix)
+                        Some(effective_strip)
                     };
                     extract_archive(&data, &output_dir, strip)
                         .map_err(|e| starlark::Error::new_other(anyhow!("{}", e)))?;
@@ -1614,14 +1625,29 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
 
     /// Read a file and return its contents.
     #[allow(unused_variables)]
-    fn read(
+    fn read<'v>(
         this: &RepositoryContext,
-        #[starlark(require = pos)] path: &str,
+        #[starlark(require = pos)] path: Value<'v>,
         #[starlark(require = named, default = "auto")] watch: &str,
     ) -> starlark::Result<String> {
-        let file_path = this.resolve_path(path);
-        std::fs::read_to_string(&file_path)
-            .map_err(|e| starlark::Error::new_other(anyhow!("Failed to read file: {}", e)))
+        let _ = watch;
+        let file_path = if let Some(s) = path.unpack_str() {
+            this.resolve_path(s)
+        } else if let Some(repo_path) = path.downcast_ref::<RepositoryPath>() {
+            repo_path.absolute_path()
+        } else if path.get_type() == "Label" {
+            let label_str = path.to_str();
+            PathBuf::from(resolve_label_to_path(&label_str, &this.working_dir))
+        } else {
+            this.resolve_path(&path.to_str())
+        };
+        std::fs::read_to_string(&file_path).map_err(|e| {
+            starlark::Error::new_other(anyhow!(
+                "Failed to read file '{}': {}",
+                file_path.display(),
+                e
+            ))
+        })
     }
 
     /// Delete a file or directory.

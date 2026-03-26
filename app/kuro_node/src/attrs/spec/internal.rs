@@ -252,7 +252,22 @@ pub const APPLICABLE_LICENSES_ATTRIBUTE: InternalAttribute = InternalAttribute {
     is_configurable: AttrIsConfigurable::No,
 };
 
-const INTERNAL_ATTRS: [InternalAttribute; 15] = [
+/// Bazel-compatible `package_metadata` attribute.
+/// A list of package_metadata targets that apply to this target.
+pub const PACKAGE_METADATA_ATTRIBUTE: InternalAttribute = InternalAttribute {
+    id: AttributeId(15),
+    name: "package_metadata",
+    attr: || {
+        Attribute::new(
+            Some(Arc::new(AnyAttrType::empty_list())),
+            "a list of package_metadata targets that apply to this target",
+            AttrType::list(AttrType::any()),
+        )
+    },
+    is_configurable: AttrIsConfigurable::No,
+};
+
+const INTERNAL_ATTRS: [InternalAttribute; 16] = [
     NAME_ATTRIBUTE,
     DEFAULT_TARGET_PLATFORM_ATTRIBUTE,
     TARGET_COMPATIBLE_WITH_ATTRIBUTE,
@@ -268,6 +283,7 @@ const INTERNAL_ATTRS: [InternalAttribute; 15] = [
     DEPRECATION_ATTRIBUTE,
     FEATURES_ATTRIBUTE,
     APPLICABLE_LICENSES_ATTRIBUTE,
+    PACKAGE_METADATA_ATTRIBUTE,
 ];
 
 pub struct OptionalInternalAttribute {
@@ -299,7 +315,7 @@ const fn to_optional(attr: InternalAttribute) -> OptionalInternalAttribute {
 }
 
 /// Includes optional internal attrs
-const ALL_INTERNAL_ATTRS: [OptionalInternalAttribute; 16] = [
+const ALL_INTERNAL_ATTRS: [OptionalInternalAttribute; 17] = [
     to_optional(NAME_ATTRIBUTE),
     to_optional(DEFAULT_TARGET_PLATFORM_ATTRIBUTE),
     to_optional(TARGET_COMPATIBLE_WITH_ATTRIBUTE),
@@ -315,6 +331,7 @@ const ALL_INTERNAL_ATTRS: [OptionalInternalAttribute; 16] = [
     to_optional(DEPRECATION_ATTRIBUTE),
     to_optional(FEATURES_ATTRIBUTE),
     to_optional(APPLICABLE_LICENSES_ATTRIBUTE),
+    to_optional(PACKAGE_METADATA_ATTRIBUTE),
     INCOMING_TRANSITION_ATTRIBUTE,
 ];
 

@@ -414,8 +414,11 @@ pub(crate) async fn get_file_ops_delegate(
         .join("bazel-external")
         .join(setup.canonical_name.as_ref());
 
-    // Check if the repository is already materialized (exists on disk)
-    if !source_path.exists() {
+    // Check if the repository is fully materialized (marked complete).
+    // We check for .kuro_repo_complete rather than just directory existence because
+    // partial materialization (e.g., source downloaded but BUILD.bazel not generated)
+    // can leave directories without the completion marker.
+    if !source_path.join(".kuro_repo_complete").exists() {
         tracing::info!(
             "Extension repo '{}' not materialized, triggering lazy execution",
             setup.canonical_name

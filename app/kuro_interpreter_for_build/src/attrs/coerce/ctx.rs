@@ -353,9 +353,10 @@ impl BuildAttrCoercionContext {
                     false
                 };
                 if is_bare_name && self.strict_label_parsing {
-                    // In strict mode (bzl file attr defaults), bare names are not valid.
-                    // Propagate the original parse error to get the standard error message.
-                    return Err(first_err);
+                    // In strict mode (bzl file attr defaults), bare names like "LICENSE"
+                    // should still be allowed — Bazel treats them as relative labels
+                    // (e.g., attr.label(default = "LICENSE") resolves to ":LICENSE").
+                    // Fall through to the bare name handling below.
                 }
                 if is_bare_name && !is_source_file {
                     // Bazel-compatible: check if this bare name is a known output file
