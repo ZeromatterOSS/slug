@@ -119,7 +119,13 @@ pub struct SourceInfo {
     /// Directory prefix to strip from archive.
     pub strip_prefix: Option<String>,
 
-    /// Patches to apply after extraction.
+    /// Overlay files to copy on top of the extracted archive.
+    /// Keys are relative file paths, values are integrity checksums.
+    /// Files are fetched from {registry}/modules/{name}/{version}/overlay/{path}
+    #[serde(default)]
+    pub overlay: HashMap<String, String>,
+
+    /// Patches to apply after extraction (and after overlays).
     #[serde(default)]
     pub patches: HashMap<String, String>,
 
@@ -403,6 +409,7 @@ mod tests {
             urls: Some(vec!["https://mirror.com/a.tar.gz".to_string()]),
             integrity: None,
             strip_prefix: None,
+            overlay: HashMap::new(),
             patches: HashMap::new(),
             patch_strip: 0,
             remote: None,
@@ -424,6 +431,7 @@ mod tests {
             urls: None,
             integrity: Some("sha256-abc".to_string()),
             strip_prefix: None,
+            overlay: HashMap::new(),
             patches: HashMap::new(),
             patch_strip: 0,
             remote: None,
@@ -439,6 +447,7 @@ mod tests {
             urls: None,
             integrity: None,
             strip_prefix: None,
+            overlay: HashMap::new(),
             patches: HashMap::new(),
             patch_strip: 0,
             remote: Some("https://github.com/example/repo.git".to_string()),

@@ -167,6 +167,12 @@ impl SourceFetcher {
                 .await?;
         }
 
+        // Apply overlay files (before patches, per Bazel convention)
+        if !source_info.overlay.is_empty() {
+            self.apply_overlays(&dest_dir, source_info, registry_url, name, version)
+                .await?;
+        }
+
         // Apply patches if any
         if !source_info.patches.is_empty() {
             self.apply_patches(&dest_dir, source_info, registry_url, name, version)
@@ -591,6 +597,71 @@ impl SourceFetcher {
             }
 
             tracing::debug!("Applied patch: {}", patch_file);
+        }
+
+        Ok(())
+    }
+
+    /// Apply overlay files on top of the extracted source directory.
+    ///
+    /// Overlay files are fetched from the BCR at
+    /// `{registry_url}/modules/{name}/{version}/overlay/{filename}`
+    /// and written into the destination directory, overwriting any existing files.
+    /// This happens BEFORE patches are applied, matching Bazel's behavior.
+    async fn apply_overlays(
+        &self,
+        dest_dir: &Path,
+        source_info: &SourceInfo,
+        registry_url: &str,
+        name: &str,
+        version: &str,
+    ) -> kuro_error::Result<()> {
+        if source_info.overlay.is_empty() {
+            return Ok(());
+        }
+
+        tracing::info!(
+            "Applying {} overlay file(s) to {}@{}",
+            source_info.overlay.len(),
+            name,
+            version
+        );
+
+        for (overlay_path, _integrity) in &source_info.overlay {
+            let overlay_url = format!(
+                "{}/modules/{}/{}/overlay/{}",
+                registry_url, name, version, overlay_path
+            );
+            tracing::debug!("Fetching overlay from {}", overlay_url);
+
+            let response = self
+                .http_client
+                .get(&overlay_url)
+                .await
+                .with_buck_error_context(|| {
+                    format!("Failed to fetch overlay file: {}", overlay_path)
+                })?;
+
+            let body = to_bytes(response.into_body()).await?;
+            let overlay_content = body.to_vec();
+
+            // Write overlay file to destination, creating parent dirs as needed
+            let dest_file = dest_dir.join(overlay_path);
+            if let Some(parent) = dest_file.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| FetchError::ExtractionFailed {
+                    reason: format!(
+                        "Failed to create overlay directory for '{}': {}",
+                        overlay_path, e
+                    ),
+                })?;
+            }
+            std::fs::write(&dest_file, &overlay_content).map_err(|e| {
+                FetchError::ExtractionFailed {
+                    reason: format!("Failed to write overlay file '{}': {}", overlay_path, e),
+                }
+            })?;
+
+            tracing::debug!("Applied overlay: {}", overlay_path);
         }
 
         Ok(())

@@ -579,6 +579,7 @@ impl MvsResolver {
                         urls: None,
                         integrity: None,
                         strip_prefix: None,
+                        overlay: std::collections::HashMap::new(),
                         patches: std::collections::HashMap::new(),
                         patch_strip: g.patch_strip,
                         remote: Some(g.remote.clone()),
