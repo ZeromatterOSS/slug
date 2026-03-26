@@ -368,9 +368,39 @@ impl BuildAttrCoercionContext {
                         Ok(ParsedPattern::Target(package, target_name, providers)) => {
                             Ok(providers.into_providers_label(package, target_name.as_ref()))
                         }
-                        _ => Err(
-                            BuildAttrCoercionContextError::RequiredLabel(value.to_owned()).into(),
-                        ),
+                        _ => {
+                            // If the `:name` parse fails (e.g., slashes in name), try
+                            // constructing the label directly. In Bazel, bare source
+                            // file paths like "crypto/aes/file.pl" are valid labels.
+                            if let Some((pkg_label, _listing)) = &self.enclosing_package {
+                                let target = TargetNameRef::unchecked_new(value);
+                                Ok(ProvidersLabel::default_for(TargetLabel::new(
+                                    pkg_label.dupe(),
+                                    target,
+                                )))
+                            } else {
+                                Err(
+                                    BuildAttrCoercionContextError::RequiredLabel(value.to_owned())
+                                        .into(),
+                                )
+                            }
+                        }
+                    }
+                } else if is_bare_name && is_source_file && value.contains('/') {
+                    // Source file with path separators (e.g., "crypto/aes/file.pl")
+                    // used as a dep label key (e.g., in attrs.dict(attrs.dep(), ...)).
+                    // The pattern parser can't handle slashed target names, so construct
+                    // the label directly. This case is NOT reached for one_of(dep, source)
+                    // with simple names (no slashes), which correctly fall through to source
+                    // coercion to avoid self-referential targets.
+                    if let Some((pkg_label, _listing)) = &self.enclosing_package {
+                        let target = TargetNameRef::unchecked_new(value);
+                        Ok(ProvidersLabel::default_for(TargetLabel::new(
+                            pkg_label.dupe(),
+                            target,
+                        )))
+                    } else {
+                        Err(BuildAttrCoercionContextError::RequiredLabel(value.to_owned()).into())
                     }
                 } else {
                     Err(BuildAttrCoercionContextError::RequiredLabel(value.to_owned()).into())
