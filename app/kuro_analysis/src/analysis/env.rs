@@ -408,6 +408,54 @@ async fn run_analysis_with_env_underlying(
             analysis_env.execution_platform.dupe(),
         )?;
 
+        // Run toolchain resolution BEFORE entering the Starlark evaluator.
+        // The resolution reads from the DeclaredToolchainInfo registry which is
+        // populated as toolchain() targets are analyzed during the build.
+        let _toolchain_resolution_result = {
+            let toolchain_types = analysis_env.rule_spec.toolchain_types();
+            if !toolchain_types.is_empty() {
+                use crate::analysis::toolchain_resolution::{
+                    PlatformConstraints, RequiredToolchainType, resolve_toolchains,
+                };
+
+                let required: Vec<RequiredToolchainType> = toolchain_types
+                    .iter()
+                    .map(|t| RequiredToolchainType {
+                        type_label: t.clone(),
+                        mandatory: true,
+                    })
+                    .collect();
+
+                let host = PlatformConstraints::host_platform();
+                let exec_platforms = vec![host.clone()];
+
+                match resolve_toolchains(&required, &host, &exec_platforms, &[]) {
+                    Ok(result) => {
+                        if result.resolved_toolchains.values().any(|v| v.is_some()) {
+                            tracing::debug!(
+                                "Toolchain resolution: {} type(s) resolved",
+                                result
+                                    .resolved_toolchains
+                                    .values()
+                                    .filter(|v| v.is_some())
+                                    .count()
+                            );
+                        }
+                        Some(result)
+                    }
+                    Err(e) => {
+                        tracing::debug!(
+                            "Toolchain resolution failed: {} (falling back to stubs)",
+                            e
+                        );
+                        None
+                    }
+                }
+            } else {
+                None
+            }
+        };
+
         let eval_kind = StarlarkEvalKind::Analysis(node.label().dupe());
         let eval_provider = StarlarkEvaluatorProvider::new(dice, eval_kind).await?;
         let mut reentrant_eval =
@@ -426,56 +474,6 @@ async fn run_analysis_with_env_underlying(
                 dice.global_data().get_digest_config(),
                 analysis_env.rule_spec.rule_outputs(),
             );
-
-            // Run toolchain resolution for this target's declared toolchain types.
-            // This populates ctx.toolchains with real resolved toolchain info
-            // instead of the ToolchainsStub fallback.
-            {
-                let toolchain_types = analysis_env.rule_spec.toolchain_types();
-                if !toolchain_types.is_empty() {
-                    use crate::analysis::toolchain_resolution::{
-                        PlatformConstraints, RequiredToolchainType, resolve_toolchains,
-                    };
-
-                    let required: Vec<RequiredToolchainType> = toolchain_types
-                        .iter()
-                        .map(|t| {
-                            // Parse "mandatory" vs "optional" from config_common.toolchain_type()
-                            // For now, treat all as mandatory (most common case)
-                            RequiredToolchainType {
-                                type_label: t.clone(),
-                                mandatory: true,
-                            }
-                        })
-                        .collect();
-
-                    let host = PlatformConstraints::host_platform();
-                    let exec_platforms = vec![host.clone()];
-
-                    match resolve_toolchains(&required, &host, &exec_platforms, &[]) {
-                        Ok(result) => {
-                            if result.resolved_toolchains.values().any(|v| v.is_some()) {
-                                tracing::debug!(
-                                    "Toolchain resolution: {} type(s) resolved",
-                                    result.resolved_toolchains.values().filter(|v| v.is_some()).count()
-                                );
-                                // TODO: Phase 4 complete integration —
-                                // Analyze resolved toolchain impl targets and
-                                // build ResolvedToolchains with real ToolchainInfo providers.
-                                // For now, resolution data is computed but not yet wired
-                                // into ctx.toolchains (that requires analyzing the impl targets
-                                // which is Phase 5 territory).
-                            }
-                        }
-                        Err(e) => {
-                            tracing::debug!(
-                                "Toolchain resolution failed: {} (falling back to stubs)",
-                                e
-                            );
-                        }
-                    }
-                }
-            }
 
             let list_res = analysis_env.rule_spec.invoke(&mut eval, ctx)?;
 

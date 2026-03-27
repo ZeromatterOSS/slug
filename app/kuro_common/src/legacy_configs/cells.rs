@@ -1127,8 +1127,50 @@ impl BuckConfigBasedCells {
                 all_toolchains.len(),
                 all_exec_platforms.len()
             );
-            kuro_bzlmod::set_registered_toolchains(all_toolchains);
+            kuro_bzlmod::set_registered_toolchains(all_toolchains.clone());
             kuro_bzlmod::set_registered_execution_platforms(all_exec_platforms);
+
+            // Ensure toolchain repos referenced in register_toolchains() exist.
+            // Extract repo names from label patterns and check if the repo directories
+            // are present. Extension repos that haven't materialized will be triggered
+            // when their ExtensionRepoCellSetup is first accessed during analysis.
+            // Here we just log which repos are pending to aid debugging.
+            let project_root_path = project_root.root().to_path_buf();
+            let bazel_ext_dir = project_root_path.join("bazel-external");
+            let mut repos_needing_materialization = Vec::new();
+            for tc_label in &all_toolchains {
+                // Extract repo name from labels like "@repo//:all" or "@repo//pkg:target"
+                if let Some(repo_name) = extract_repo_name_from_label(tc_label) {
+                    // Check if any matching directory exists in bazel-external/
+                    let has_dir = if bazel_ext_dir.is_dir() {
+                        std::fs::read_dir(&bazel_ext_dir)
+                            .ok()
+                            .map(|entries| {
+                                entries.flatten().any(|e| {
+                                    let name = e.file_name();
+                                    let s = name.to_string_lossy();
+                                    // Match: exact name, "name+version", or "ext+name+name"
+                                    s.as_ref() == repo_name
+                                        || s.starts_with(&format!("{}+", repo_name))
+                                        || s.ends_with(&format!("+{}", repo_name))
+                                })
+                            })
+                            .unwrap_or(false)
+                    } else {
+                        false
+                    };
+                    if !has_dir {
+                        repos_needing_materialization.push(repo_name.to_owned());
+                    }
+                }
+            }
+            if !repos_needing_materialization.is_empty() {
+                tracing::info!(
+                    "{} toolchain repo(s) pending materialization: {:?}",
+                    repos_needing_materialization.len(),
+                    repos_needing_materialization
+                );
+            }
         }
 
         // Set project root for dynamic cell filesystem scanning
@@ -2450,6 +2492,18 @@ mod tests {
 }
 
 /// Convert a TagValue to a repository invocation AttrValue.
+/// Extract the repo name from a toolchain/platform label.
+/// E.g., "@local_config_cc_toolchains//:all" → "local_config_cc_toolchains"
+///       "//cc/private/toolchain/test:default_test_runner_toolchain" → None (relative)
+fn extract_repo_name_from_label(label: &str) -> Option<&str> {
+    let stripped = label
+        .strip_prefix("@@")
+        .or_else(|| label.strip_prefix('@'))?;
+    let end = stripped.find("//").unwrap_or(stripped.len());
+    let name = &stripped[..end];
+    if name.is_empty() { None } else { Some(name) }
+}
+
 fn tag_value_to_repo_attr(tv: &TagValue) -> kuro_bzlmod::RepoAttrValue {
     match tv {
         TagValue::String(s) => {

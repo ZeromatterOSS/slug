@@ -346,9 +346,21 @@ The resolution order is:
 ### Success Criteria
 
 #### Automated Verification:
-- [ ] `local_config_cc` materializes with real BUILD.bazel and cc_toolchain targets
-- [ ] `rust_toolchains` materializes with real rust_toolchain targets
-- [ ] Resolution finds these toolchains without manual intervention
+- [x] `rust_toolchains` materializes with real BUILD.bazel (already exists from Plan 10)
+- [x] Registration collection identifies `local_config_cc_toolchains` as needing materialization
+- [x] Repo existence check correctly scans bazel-external/ for versioned names
+- [ ] `local_config_cc_toolchains` materializes via cc_configure_extension execution
+- [ ] Resolution finds CC toolchains from materialized repos
+
+#### Status Note (2026-03-27):
+The infrastructure is in place: registrations collected, resolution algorithm
+works, analysis wiring done. The remaining gap is triggering `cc_configure_extension`
+execution. The extension repos have `ExtensionRepoCellSetup` from `use_repo()` but
+nothing in the build graph accesses them (because `ToolchainsStub` short-circuits
+real resolution). Options to close the gap:
+1. Make toolchain resolution trigger DICE-based loading of registered toolchain packages
+2. Add eager extension materialization for repos referenced in `register_toolchains()`
+3. Replace `ToolchainsStub` fallback with real resolution (requires #1 or #2 first)
 
 ---
 

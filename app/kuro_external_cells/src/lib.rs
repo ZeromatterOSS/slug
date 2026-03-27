@@ -48,20 +48,6 @@ impl kuro_common::external_cells::ExternalCellsImpl for ConcreteExternalCellsImp
         cell_name: CellName,
         origin: ExternalCellOrigin,
     ) -> kuro_error::Result<Arc<dyn FileOpsDelegate>> {
-        {
-            use std::io::Write;
-            let _ = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("/tmp/kuro_debug.log")
-                .map(|mut f| {
-                    let _ = writeln!(
-                        f,
-                        "[CELL-DISPATCH] cell='{}' origin='{}'",
-                        cell_name, origin
-                    );
-                });
-        }
         match origin {
             ExternalCellOrigin::Bundled(cell_name) => {
                 Ok(bundled::get_file_ops_delegate(ctx, cell_name).await? as _)
