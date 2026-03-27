@@ -2738,6 +2738,9 @@ impl<'v> StarlarkValue<'v> for CompilationContextStub {
                 | "_module_files"
                 | "_pic_module_files"
                 | "_direct_module_maps"
+                | "_exporting_module_map_files"
+                | "loose_hdrs_dirs"
+                | "purpose"
         )
     }
 
@@ -2798,6 +2801,10 @@ impl<'v> StarlarkValue<'v> for CompilationContextStub {
             "direct_private_headers" => Some(heap.alloc(Vec::<Value>::new())),
             "direct_textual_headers" => Some(heap.alloc(Vec::<Value>::new())),
             "_header_info" => Some(heap.alloc(HeaderInfoStubSimple)),
+            "_exporting_module_map_files" | "loose_hdrs_dirs" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "purpose" => Some(Value::new_none()),
             _ => None,
         }
     }

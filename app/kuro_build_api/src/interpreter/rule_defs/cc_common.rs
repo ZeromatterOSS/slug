@@ -548,6 +548,11 @@ where
                 | "direct_textual_headers"
                 | "validation_artifacts"
                 | "_header_info"
+                | "_exporting_module_map_files"
+                | "module_map"
+                | "purpose"
+                | "loose_hdrs_dirs"
+                | "virtual_to_original_headers"
         )
     }
 
@@ -610,6 +615,13 @@ where
                 Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
             }
             "_header_info" => Some(heap.alloc(HeaderInfoStub)),
+            "_exporting_module_map_files"
+            | "module_map"
+            | "loose_hdrs_dirs"
+            | "virtual_to_original_headers" => {
+                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+            }
+            "purpose" => Some(Value::new_none()),
             _ => None,
         }
     }
