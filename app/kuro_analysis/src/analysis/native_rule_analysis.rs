@@ -80,6 +80,51 @@ use starlark_map::small_map::SmallMap;
 use crate::analysis::genrule_action::GenruleAction;
 use crate::analysis::genrule_action::GenruleShell;
 
+// ============================================================================
+// Declared Toolchain Registry (for toolchain resolution)
+// ============================================================================
+
+/// Metadata about a `toolchain()` target, extracted during analysis.
+/// Used by the toolchain resolution algorithm to match toolchains to platforms.
+#[derive(Debug, Clone)]
+pub struct DeclaredToolchainInfo {
+    /// The toolchain_type this satisfies (e.g., "@bazel_tools//tools/cpp:toolchain_type")
+    pub toolchain_type: String,
+    /// The toolchain implementation target label
+    pub toolchain_impl: String,
+    /// Constraint values the execution platform must satisfy
+    pub exec_compatible_with: Vec<String>,
+    /// Constraint values the target platform must satisfy
+    pub target_compatible_with: Vec<String>,
+}
+
+/// Global registry of declared toolchains, populated during analysis of `toolchain()` targets.
+static DECLARED_TOOLCHAINS: std::sync::RwLock<Vec<(String, DeclaredToolchainInfo)>> =
+    std::sync::RwLock::new(Vec::new());
+
+/// Register a declared toolchain (called during toolchain() analysis).
+pub fn register_declared_toolchain(toolchain_label: String, info: DeclaredToolchainInfo) {
+    if let Ok(mut guard) = DECLARED_TOOLCHAINS.write() {
+        guard.push((toolchain_label, info));
+    }
+}
+
+/// Get all declared toolchains.
+pub fn get_declared_toolchains() -> Vec<(String, DeclaredToolchainInfo)> {
+    DECLARED_TOOLCHAINS
+        .read()
+        .ok()
+        .map(|v| v.clone())
+        .unwrap_or_default()
+}
+
+/// Clear declared toolchains (for fresh builds).
+pub fn clear_declared_toolchains() {
+    if let Ok(mut guard) = DECLARED_TOOLCHAINS.write() {
+        guard.clear();
+    }
+}
+
 /// Analyze a native rule target and return the analysis result.
 pub fn analyze_native_rule(
     target: &ConfiguredTargetLabel,
@@ -108,7 +153,7 @@ pub fn analyze_native_rule(
         NativeRuleKind::CcBinary => create_cc_analysis_result(target),
         NativeRuleKind::CcTest => create_cc_analysis_result(target),
         NativeRuleKind::TestSuite => analyze_test_suite(target, dep_analysis),
-        NativeRuleKind::Toolchain => create_minimal_analysis_result(target),
+        NativeRuleKind::Toolchain => analyze_toolchain(target, configured_node, dep_analysis),
         NativeRuleKind::ShLibrary => analyze_sh_library(target, configured_node, dep_analysis),
         NativeRuleKind::ShBinary => analyze_sh_binary(target, configured_node),
         NativeRuleKind::ShTest => analyze_sh_test(target, configured_node),
@@ -1632,6 +1677,105 @@ fn analyze_execution_platforms(
         0,
         None,
     ))
+}
+
+/// Analyze a toolchain() target.
+///
+/// Extracts the toolchain_type, toolchain implementation, and platform
+/// constraints, then registers the metadata in the global declared
+/// toolchains registry for use by the toolchain resolution algorithm.
+fn analyze_toolchain(
+    target: &ConfiguredTargetLabel,
+    configured_node: ConfiguredTargetNodeRef,
+    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
+) -> kuro_error::Result<AnalysisResult> {
+    let label_str = target.unconfigured().to_string();
+
+    // Extract toolchain_type and toolchain impl labels from deps.
+    // The toolchain() rule has exactly two user attrs: "toolchain_type" and "toolchain".
+    // These are deps, so their labels appear in dep_analysis.
+    let mut toolchain_type_label = String::new();
+    let mut toolchain_impl_label = String::new();
+
+    // Read the attrs to get the declared dep labels
+    for attr_full in configured_node.attrs(AttrInspectOptions::DefinedOnly) {
+        if attr_full.name == "toolchain_type" {
+            if let ConfiguredAttr::Dep(dep) = &attr_full.value {
+                toolchain_type_label = dep.label.target().unconfigured().to_string();
+            }
+        } else if attr_full.name == "toolchain" {
+            if let ConfiguredAttr::Dep(dep) = &attr_full.value {
+                toolchain_impl_label = dep.label.target().unconfigured().to_string();
+            }
+        }
+    }
+
+    // Extract exec_compatible_with and target_compatible_with from internal attrs.
+    // These are list-of-label attrs. We extract the label strings.
+    let mut exec_compat = Vec::new();
+    let mut target_compat = Vec::new();
+
+    for attr_full in configured_node.attrs(AttrInspectOptions::All) {
+        if attr_full.name == "exec_compatible_with" || attr_full.name == "target_compatible_with" {
+            let labels = extract_label_strings_from_attr(&attr_full.value);
+            if attr_full.name == "exec_compatible_with" {
+                exec_compat = labels;
+            } else {
+                target_compat = labels;
+            }
+        }
+    }
+
+    // Register in the global declared toolchains registry
+    if !toolchain_type_label.is_empty() {
+        let info = DeclaredToolchainInfo {
+            toolchain_type: toolchain_type_label.clone(),
+            toolchain_impl: toolchain_impl_label.clone(),
+            exec_compatible_with: exec_compat,
+            target_compatible_with: target_compat,
+        };
+        tracing::debug!(
+            "Registered toolchain '{}': type='{}', impl='{}'",
+            label_str,
+            info.toolchain_type,
+            info.toolchain_impl
+        );
+        register_declared_toolchain(label_str, info);
+    }
+
+    // Return minimal analysis result (toolchain() targets don't produce
+    // actions or providers that other rules consume directly)
+    create_minimal_analysis_result(target)
+}
+
+/// Extract label strings from a configured attribute that's a list of deps.
+fn extract_label_strings_from_attr(attr: &ConfiguredAttr) -> Vec<String> {
+    let mut labels = Vec::new();
+    match attr {
+        ConfiguredAttr::List(list) => {
+            for item in list.iter() {
+                match item {
+                    ConfiguredAttr::Dep(dep) => {
+                        labels.push(dep.label.target().unconfigured().to_string());
+                    }
+                    ConfiguredAttr::Label(label) => {
+                        labels.push(label.target().unconfigured().to_string());
+                    }
+                    ConfiguredAttr::OneOf(inner, _) => {
+                        // Unwrap OneOf to get the inner dep/label
+                        if let ConfiguredAttr::Dep(dep) = inner.as_ref() {
+                            labels.push(dep.label.target().unconfigured().to_string());
+                        } else if let ConfiguredAttr::Label(label) = inner.as_ref() {
+                            labels.push(label.target().unconfigured().to_string());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        _ => {}
+    }
+    labels
 }
 
 /// Create a minimal analysis result with just DefaultInfo.

@@ -191,8 +191,8 @@ The `platform()` rule's analysis already stores constraint_values. Ensure the
 ### Success Criteria
 
 #### Automated Verification:
-- [ ] `toolchain()` targets analyzed with real constraint info
-- [ ] `toolchain_type()` targets return proper type identifiers
+- [x] `toolchain()` targets analyzed with real constraint info
+- [x] `toolchain_type()` targets return proper type identifiers
 
 ---
 
