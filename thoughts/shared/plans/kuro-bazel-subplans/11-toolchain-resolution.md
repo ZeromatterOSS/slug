@@ -364,6 +364,116 @@ real resolution). Options to close the gap:
 
 ---
 
+## Phase 6: Eager Loading of Registered Toolchain Packages
+
+### Overview
+Close the materialization gap: make the analysis pipeline eagerly load
+registered toolchain packages via DICE so that extension repos materialize and
+their `toolchain()` targets populate the `DeclaredToolchainInfo` registry.
+
+This is the equivalent of Bazel's `RegisteredToolchainsFunction` SkyFunction,
+which loads and analyzes all registered toolchain targets before any rule
+analysis can request toolchain resolution.
+
+### The Problem
+`cc_configure_extension` repos (`local_config_cc`, `local_config_cc_toolchains`)
+have `ExtensionRepoCellSetup` from `use_repo()`, but their lazy materialization
+never triggers because `ToolchainsStub` short-circuits real toolchain lookup.
+Nothing in the build graph accesses these repos, so nothing forces extension
+execution → repo creation → package loading → toolchain() analysis.
+
+### Changes Required
+
+#### 1. Create `ensure_registered_toolchains_loaded()` async function
+**File**: `app/kuro_analysis/src/analysis/env.rs` (or new `toolchain_loading.rs`)
+
+This function runs ONCE per build session (guarded by a static `OnceLock`).
+It takes a `&mut DiceComputations` and:
+1. Reads the global `REGISTERED_TOOLCHAINS` list
+2. For each label pattern (e.g., `@local_config_cc_toolchains//:all`):
+   a. Parse the label to extract the cell name
+   b. Resolve the cell via `CellResolver` (triggers `ExtensionRepoCellSetup`
+      → lazy materialization → extension execution)
+   c. Load the package via `InterpreterResultsKey` (triggers BUILD.bazel parsing)
+   d. Each `toolchain()` target in the package gets analyzed via normal DICE flow,
+      which populates `DeclaredToolchainInfo` registry (Phase 2)
+3. After all packages are loaded, the registry contains all declared toolchains
+
+The key is using DICE's `ctx.compute()` for each step, which naturally handles:
+- Extension repo materialization (triggered by cell access)
+- Package loading (triggered by interpreter results key)
+- Target analysis (triggered by analysis key for toolchain() targets)
+
+#### 2. Call from first resolution attempt
+**File**: `app/kuro_analysis/src/analysis/env.rs`
+
+In `run_analysis_with_env_underlying()`, before the resolution code:
+```rust
+// One-time: ensure all registered toolchain packages are loaded
+ensure_registered_toolchains_loaded(dice).await;
+```
+
+Use `tokio::sync::OnceCell` or `std::sync::OnceLock` with an atomic flag
+to ensure this only runs once per daemon session.
+
+#### 3. Handle `:all` and `//...` patterns
+Registered labels like `@repo//:all` mean "all targets in the root package."
+`@repo//...` means "all targets recursively." For the initial implementation,
+handle `:all` by loading the package and finding all `toolchain()` targets.
+Pattern expansion for `//...` can be deferred.
+
+### Success Criteria
+
+#### Automated Verification:
+- [ ] `local_config_cc_toolchains` materializes automatically during build
+- [ ] `DeclaredToolchainInfo` registry contains CC toolchain entries
+- [ ] `resolve_toolchains()` returns real CC toolchain match
+- [ ] `ctx.toolchains` returns real `ToolchainInfo` (not `ToolchainsStub`)
+
+#### Manual Verification:
+- [ ] `//lib/hash:hash` in zeromatter builds using real CC toolchain
+- [ ] No hardcoded compiler paths in build actions
+- [ ] `ToolchainsStub` and all per-language stubs can be deleted
+
+---
+
+## Phase 7: Delete All Stubs
+
+### Overview
+Once Phase 6 validates that real toolchain resolution works end-to-end,
+delete all stub types from `context.rs` (~3000 lines).
+
+### Changes Required
+
+#### 1. Remove ToolchainsStub and all per-language stubs
+Delete from `context.rs`:
+- `ToolchainsStub` (line ~2030) and its `at()` dispatch
+- `CcToolchainInfoStub` and all its helper types
+- `RustToolchainInfoStub`, `RustToolStub`, `RustTripleStub`, etc.
+- `PyToolchainInfoStub`, `PyRuntimeInfoStub`
+- `JavaToolchainInfoStub`, `JavaRuntimeInfoStub`
+- `OciCraneToolchainStub`, `JqToolchainStub`
+- `GenericToolchainStub`
+- `ExecGroupsDict`, `ExecGroupToolchains`
+
+#### 2. Remove hardcoded tool detection
+Delete from `context.rs`:
+- `host_tool_path()`, `host_cc_path()`, `host_target_cpu()`, `host_rust_triple()`
+- `detect_rust_tool_path()`, `detect_crane_path()`, `detect_jq_path()`
+- `get_or_create_oci_launcher()`
+
+#### 3. Remove ToolchainsStub fallback from ctx.toolchains
+Make `ctx.toolchains` REQUIRE resolved toolchains — error if resolution
+didn't produce results instead of falling back to stubs.
+
+### Success Criteria
+- [ ] `context.rs` reduced by ~3000 lines
+- [ ] No `*Stub` types remain for toolchain-related functionality
+- [ ] No hardcoded tool paths in any Rust code
+- [ ] All builds use real toolchain resolution
+
+---
+
 ## Anti-Patterns to Avoid
 
 ### DO NOT keep any per-language stub types
