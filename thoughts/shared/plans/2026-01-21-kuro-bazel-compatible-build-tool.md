@@ -282,6 +282,45 @@ The detailed implementation is split into focused sub-plans:
 | Sub-Plan                                                                                             | Description                                                      | Status          |
 | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------- |
 | [10-module-extension-execution.md](./kuro-bazel-subplans/10-module-extension-execution.md)           | Let real module extensions execute via DICE instead of synthetic stubs | **In Progress** |
+| [11-toolchain-resolution.md](./kuro-bazel-subplans/11-toolchain-resolution.md)                       | Replace ToolchainsStub with real Bazel toolchain resolution algorithm | **Not Started** |
+
+### Remaining Stub Behavior (No Plans Yet)
+
+These are hardcoded stubs that bypass real Bazel behavior. Each needs a plan or
+explicit decision that the stub is adequate. Organized by priority.
+
+**High Priority (blocks real builds):**
+
+| Stub | Location | What It Bypasses | Blocked By |
+|------|----------|------------------|------------|
+| `ToolchainsStub` + 30 per-language stubs | `context.rs:2019` | Real toolchain resolution | Plan 11 |
+| `create_cc_compile_action` hardcoded compiler | `cc_common.rs:1400` | Real CC toolchain compiler path | Plan 11 |
+| `CtxCheat*` family (7 stubs) | `cc_common.rs:702` | Real `actions2ctx_cheat()` for rules_cc | Plan 11 (partially) |
+| `create_cc_analysis_result()` empty stubs | `native_rule_analysis.rs:1015` | Real CC rule analysis | Needs plan |
+| `analyze_genquery()` touch stub | `native_rule_analysis.rs:1360` | Real genquery execution | Needs plan |
+| `StampFile` stubs | `context.rs:4873` | Real build status stamping | Needs plan |
+
+**Medium Priority (functional but not Bazel-accurate):**
+
+| Stub | Location | What It Bypasses |
+|------|----------|------------------|
+| `BuildConfigurationStub` | `context.rs:3599` | Real `ctx.configuration` object |
+| `FeatureConfigurationStub` | `context.rs:3883` | Real CC feature configuration |
+| `proto_common.compile()` no-op | `proto_common.rs:212` | Real proto compilation actions |
+| `proto_common.get_tool_path()` hardcoded | `proto_common.rs:272` | Protoc path from toolchain |
+| `CppFragment.sysroot()` returns None | `fragments.rs:482` | Real sysroot from CC toolchain |
+| `CppFragment.fdo_instrument()` returns None | `fragments.rs:151` | FDO instrumentation support |
+| `target_platform_has_constraint()` uses host OS | `context.rs:1013` | Real platform constraint query |
+
+**Low Priority (rarely hit, adequate for most builds):**
+
+| Stub | Location | What It Bypasses |
+|------|----------|------------------|
+| `repository_ctx.watch()` no-op | `repository_ctx.rs:1797` | Incremental repo invalidation |
+| `module_ctx.extension_metadata()` no-op | `module_ctx.rs:1469` | Extension metadata for lockfile |
+| `config_common.feature_flag_info()` | `config_common.rs:291` | Feature flag provider |
+| `ProtoFragment` stub | `fragments.rs:683` | Proto configuration fragment |
+| `AppleFragment` stub | `fragments.rs:864` | Apple configuration fragment |
 
 ### Related Research Documents
 
