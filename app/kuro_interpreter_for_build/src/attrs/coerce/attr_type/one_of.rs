@@ -28,13 +28,35 @@ impl AttrTypeCoerce for OneOfAttrType {
         value: Value,
     ) -> kuro_error::Result<CoercedAttr> {
         let mut errs = Vec::new();
-        // Bias towards the start of the list - try and use success/failure from first in preference
-        for (i, x) in self.xs.iter().enumerate() {
-            match x.coerce_item(configurable, ctx, value) {
-                Ok(v) => return Ok(CoercedAttr::OneOf(Box::new(v), i as u32)),
-                Err(e) => {
-                    // TODO(nga): anyhow error creation is expensive.
-                    errs.push(e)
+
+        // Bazel compatibility: when the value looks like a source file path
+        // (bare string with / and no label markers), try source coercion before
+        // dep coercion. In Bazel, source files are implicit targets, but in Buck2
+        // they're separate — so source coercion must take precedence for file paths
+        // in one_of(dep, source) contexts like attr.label_list(allow_files=True).
+        let prefer_source_first = if let Some(s) = value.unpack_str() {
+            s.contains('/') && !s.starts_with("//") && !s.starts_with('@') && !s.starts_with(':')
+        } else {
+            false
+        };
+
+        if prefer_source_first && self.xs.len() >= 2 {
+            // Try alternatives in reverse order (source types tend to be last)
+            for (i, x) in self.xs.iter().enumerate().rev() {
+                match x.coerce_item(configurable, ctx, value) {
+                    Ok(v) => return Ok(CoercedAttr::OneOf(Box::new(v), i as u32)),
+                    Err(e) => errs.push(e),
+                }
+            }
+        } else {
+            // Normal order: bias towards the start of the list
+            for (i, x) in self.xs.iter().enumerate() {
+                match x.coerce_item(configurable, ctx, value) {
+                    Ok(v) => return Ok(CoercedAttr::OneOf(Box::new(v), i as u32)),
+                    Err(e) => {
+                        // TODO(nga): anyhow error creation is expensive.
+                        errs.push(e)
+                    }
                 }
             }
         }
