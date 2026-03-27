@@ -244,9 +244,9 @@ DICE handles caching automatically.
 ### Success Criteria
 
 #### Automated Verification:
-- [ ] Resolution selects correct toolchain for simple single-type case
-- [ ] Resolution correctly eliminates incompatible exec platforms
-- [ ] Optional toolchains return None when unmatched
+- [x] Resolution selects correct toolchain for simple single-type case
+- [x] Resolution correctly eliminates incompatible exec platforms
+- [x] Optional toolchains return None when unmatched
 
 ---
 

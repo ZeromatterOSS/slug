@@ -16,3 +16,4 @@ pub mod env;
 pub mod genrule_action;
 pub mod native_rule_analysis;
 mod plugins;
+pub mod toolchain_resolution;
