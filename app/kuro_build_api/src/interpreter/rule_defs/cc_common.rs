@@ -1480,7 +1480,8 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                 }
             }
         } else {
-            // GCC/Clang flags: -c source -o output -fPIC
+            // GCC/Clang: compiler -c source -o output -fPIC
+            args_vec.push(heap.alloc_str(&compiler_path).to_value());
             args_vec.push(heap.alloc_str("-c").to_value());
             args_vec.push(source);
             args_vec.push(heap.alloc_str("-o").to_value());
