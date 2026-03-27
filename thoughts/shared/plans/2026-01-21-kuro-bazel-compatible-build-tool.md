@@ -421,6 +421,13 @@ Quick reference to all phases and their locations:
 | 17    | Platform Support                   | [x] Functional (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; MSVC auto-detection; CcToolchainInfoStub per-platform; --copt/--cxxopt/--linkopt/--strip/--features flags; execution_requirements; PlatformFragment/JavaFragment/AppleFragment/CoverageFragment; 60+ common Bazel CLI flags accepted; package_group visibility resolution; 2026-03-12) |
 | 18    | Query Commands + Test Runner       | [x] Functional (deps, rdeps, allpaths, somepath, kind, attr, filter, buildfiles, tests; --output=label/json/build/graph; kuro test //... runs 4 tests; kuro version/shutdown/fetch Bazel-compat commands; ctx.workspace_name/build_file_path attrs; 2026-03-12) |
 
+### Real-World Compatibility (Phases 19-20) — NEXT
+
+| Phase | Title                                  | Sub-Plan | Status          |
+| ----- | -------------------------------------- | -------- | --------------- |
+| 19    | Module Extension Execution             | [10-module-extension-execution.md](./kuro-bazel-subplans/10-module-extension-execution.md) | [~] In Progress (extensions execute, 1230+ crate repos materialized, BCR overlays applied; remaining: cargo build script runner, some edge cases) |
+| 20    | **Toolchain Resolution (NEXT)**        | [11-toolchain-resolution.md](./kuro-bazel-subplans/11-toolchain-resolution.md) | [ ] Not Started — replaces ToolchainsStub with real Bazel resolution algorithm; prerequisite: Phase 19 (extension repos must materialize) |
+
 ---
 
 ## Test Migration Strategy
