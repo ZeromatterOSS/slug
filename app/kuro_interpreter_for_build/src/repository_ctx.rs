@@ -1535,9 +1535,13 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             })?;
         }
 
-        // Create symlink
+        // Create symlink (remove existing file/symlink first, matching Bazel behavior)
         #[cfg(unix)]
         {
+            if link_path.exists() || link_path.symlink_metadata().is_ok() {
+                let _ = std::fs::remove_file(&link_path);
+                let _ = std::fs::remove_dir_all(&link_path);
+            }
             std::os::unix::fs::symlink(&target_str, &link_path).map_err(|e| {
                 starlark::Error::new_other(anyhow!("Failed to create symlink: {}", e))
             })?;
@@ -1558,7 +1562,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         this: &RepositoryContext,
         #[starlark(require = pos)] path: Value<'v>,
         #[starlark(require = pos)] template: Value<'v>,
-        #[starlark(require = named)] substitutions: Option<Value<'v>>,
+        #[starlark(require = pos)] substitutions: Option<Value<'v>>,
         #[starlark(require = named, default = false)] executable: bool,
     ) -> starlark::Result<Value<'v>> {
         let path_str = if let Some(s) = path.unpack_str() {
