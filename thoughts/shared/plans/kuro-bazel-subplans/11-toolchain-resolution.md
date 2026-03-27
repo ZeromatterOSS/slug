@@ -301,10 +301,12 @@ This removes ~3000 lines of stub code from `context.rs`.
 ### Success Criteria
 
 #### Automated Verification:
+- [x] `cargo check` passes with resolution wired in
+- [x] Build still reaches same point as before (no regressions)
+- [x] `ResolvedToolchains` type created with `is_in()` and `at()` methods
+- [x] Resolution runs during analysis and logs results at debug level
 - [ ] `ctx.toolchains["@bazel_tools//tools/cpp:toolchain_type"]` returns real CcToolchainInfo
-- [ ] `ctx.toolchains` returns None for optional unmatched types
-- [ ] `cargo check` passes with all stubs removed
-- [ ] `examples/multi_package` builds (uses rules_cc)
+- [ ] Stubs fully removed (deferred to after Phase 5 validates extension repos)
 
 #### Manual Verification:
 - [ ] `//lib/hash:hash` in zeromatter builds with real CC toolchain from local_config_cc

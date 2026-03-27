@@ -289,6 +289,11 @@ pub trait RuleSpec: Sync {
     fn rule_outputs(&self) -> Vec<(String, String)> {
         Vec::new()
     }
+
+    /// Returns the toolchain types declared by this rule via `rule(toolchains=[...])`.
+    fn toolchain_types(&self) -> Vec<String> {
+        Vec::new()
+    }
 }
 
 /// Container for the environment that analysis implementation functions should run in
@@ -421,6 +426,56 @@ async fn run_analysis_with_env_underlying(
                 dice.global_data().get_digest_config(),
                 analysis_env.rule_spec.rule_outputs(),
             );
+
+            // Run toolchain resolution for this target's declared toolchain types.
+            // This populates ctx.toolchains with real resolved toolchain info
+            // instead of the ToolchainsStub fallback.
+            {
+                let toolchain_types = analysis_env.rule_spec.toolchain_types();
+                if !toolchain_types.is_empty() {
+                    use crate::analysis::toolchain_resolution::{
+                        PlatformConstraints, RequiredToolchainType, resolve_toolchains,
+                    };
+
+                    let required: Vec<RequiredToolchainType> = toolchain_types
+                        .iter()
+                        .map(|t| {
+                            // Parse "mandatory" vs "optional" from config_common.toolchain_type()
+                            // For now, treat all as mandatory (most common case)
+                            RequiredToolchainType {
+                                type_label: t.clone(),
+                                mandatory: true,
+                            }
+                        })
+                        .collect();
+
+                    let host = PlatformConstraints::host_platform();
+                    let exec_platforms = vec![host.clone()];
+
+                    match resolve_toolchains(&required, &host, &exec_platforms, &[]) {
+                        Ok(result) => {
+                            if result.resolved_toolchains.values().any(|v| v.is_some()) {
+                                tracing::debug!(
+                                    "Toolchain resolution: {} type(s) resolved",
+                                    result.resolved_toolchains.values().filter(|v| v.is_some()).count()
+                                );
+                                // TODO: Phase 4 complete integration —
+                                // Analyze resolved toolchain impl targets and
+                                // build ResolvedToolchains with real ToolchainInfo providers.
+                                // For now, resolution data is computed but not yet wired
+                                // into ctx.toolchains (that requires analyzing the impl targets
+                                // which is Phase 5 territory).
+                            }
+                        }
+                        Err(e) => {
+                            tracing::debug!(
+                                "Toolchain resolution failed: {} (falling back to stubs)",
+                                e
+                            );
+                        }
+                    }
+                }
+            }
 
             let list_res = analysis_env.rule_spec.invoke(&mut eval, ctx)?;
 
@@ -595,6 +650,7 @@ pub fn get_user_defined_rule_spec(
         module: FrozenModule,
         name: String,
         implicit_rule_outputs: Vec<(String, String)>,
+        toolchain_types: Vec<String>,
     }
 
     impl RuleSpec for Impl {
@@ -617,22 +673,31 @@ pub fn get_user_defined_rule_spec(
         fn rule_outputs(&self) -> Vec<(String, String)> {
             self.implicit_rule_outputs.clone()
         }
+
+        fn toolchain_types(&self) -> Vec<String> {
+            self.toolchain_types.clone()
+        }
     }
 
-    // Extract rule(outputs={...}) patterns from the frozen callable.
-    let implicit_rule_outputs = if let Ok((val, _)) = module.get_any_visibility(&rule_type.name) {
-        if let Ok(typed) = val.downcast::<FrozenStarlarkRuleCallable>() {
-            typed.as_ref().rule_outputs().to_vec()
+    // Extract rule(outputs={...}) patterns and toolchain_types from the frozen callable.
+    let (implicit_rule_outputs, toolchain_types) =
+        if let Ok((val, _)) = module.get_any_visibility(&rule_type.name) {
+            if let Ok(typed) = val.downcast::<FrozenStarlarkRuleCallable>() {
+                (
+                    typed.as_ref().rule_outputs().to_vec(),
+                    typed.as_ref().toolchain_types().to_vec(),
+                )
+            } else {
+                (Vec::new(), Vec::new())
+            }
         } else {
-            Vec::new()
-        }
-    } else {
-        Vec::new()
-    };
+            (Vec::new(), Vec::new())
+        };
 
     Impl {
         module,
         name: rule_type.name.clone(),
         implicit_rule_outputs,
+        toolchain_types,
     }
 }

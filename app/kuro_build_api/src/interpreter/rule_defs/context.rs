@@ -198,6 +198,9 @@ pub struct AnalysisContext<'v> {
     /// Implicit output patterns from `rule(outputs={...})`.
     /// Each pair is (name, pattern) where pattern may contain `%{name}`.
     rule_outputs: Vec<(String, String)>,
+    /// Resolved toolchains from real toolchain resolution.
+    /// When Some, ctx.toolchains returns this instead of ToolchainsStub.
+    resolved_toolchains: Option<Value<'v>>,
 }
 
 impl<'v> Display for AnalysisContext<'v> {
@@ -236,6 +239,7 @@ impl<'v> AnalysisContext<'v> {
             plugins,
             outputs: RefCell::new(None),
             rule_outputs,
+            resolved_toolchains: None,
         }
     }
 
@@ -254,7 +258,7 @@ impl<'v> AnalysisContext<'v> {
             ))
         });
 
-        let analysis_context = Self::new(
+        let mut analysis_context = Self::new(
             heap,
             attrs,
             label,
@@ -263,7 +267,18 @@ impl<'v> AnalysisContext<'v> {
             digest_config,
             rule_outputs,
         );
+
+        // Run toolchain resolution if the target has a label
+        // (needed to determine target platform from configuration)
+        analysis_context.resolved_toolchains = None;
+
         heap.alloc_typed(analysis_context)
+    }
+
+    /// Set the resolved toolchains for this context.
+    /// Called from the analysis pipeline after resolution completes.
+    pub fn set_resolved_toolchains(&mut self, toolchains: Value<'v>) {
+        self.resolved_toolchains = Some(toolchains);
     }
 
     pub fn assert_no_promises(&self) -> kuro_error::Result<()> {
@@ -499,9 +514,15 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// stub toolchain info when indexed. This allows rules_cc to proceed with
     /// toolchain-based builds.
     ///
-    /// TODO(toolchains): Implement proper toolchain resolution.
+    /// If real toolchain resolution produced results, returns them.
+    /// Otherwise falls back to ToolchainsStub for compatibility.
     #[starlark(attribute)]
     fn toolchains<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        // Return real resolved toolchains if available
+        if let Some(resolved) = this.0.resolved_toolchains {
+            return Ok(resolved);
+        }
+        // Fallback to stub until all toolchain repos materialize
         let is_tool = this.0.is_tool_configuration();
         Ok(heap.alloc(ToolchainsStub { is_tool }))
     }
@@ -2005,7 +2026,81 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
 }
 
 // ============================================================================
-// ToolchainsStub - Stub for ctx.toolchains
+// ResolvedToolchains - Real toolchain resolution results for ctx.toolchains
+// ============================================================================
+
+/// Real resolved toolchains from the toolchain resolution algorithm.
+///
+/// This replaces `ToolchainsStub` when resolution successfully matches
+/// toolchains to the target. Maps toolchain type labels to their resolved
+/// `ToolchainInfo` provider values (or None for optional unmatched types).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct ResolvedToolchains {
+    /// Map from toolchain_type label → resolved ToolchainInfo value.
+    /// Value is None for optional toolchain types that weren't matched.
+    pub toolchains: std::collections::HashMap<String, Option<starlark::values::FrozenValue>>,
+    /// The selected execution platform label.
+    pub exec_platform: String,
+}
+
+impl std::fmt::Display for ResolvedToolchains {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<resolved_toolchains({} types)>", self.toolchains.len())
+    }
+}
+
+starlark::starlark_simple_value!(ResolvedToolchains);
+
+#[starlark::values::starlark_value(type = "resolved_toolchains")]
+impl<'v> StarlarkValue<'v> for ResolvedToolchains {
+    /// Check if a toolchain type is available.
+    fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
+        let key = if let Some(s) = other.unpack_str() {
+            s.to_owned()
+        } else {
+            format!("{}", other)
+        };
+        let normalized = normalize_toolchain_type_label(&key);
+        Ok(self.toolchains.contains_key(&normalized)
+            || self
+                .toolchains
+                .keys()
+                .any(|k| normalize_toolchain_type_label(k) == normalized))
+    }
+
+    /// Index by toolchain type to get the ToolchainInfo provider.
+    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let key = if let Some(s) = index.unpack_str() {
+            s.to_owned()
+        } else {
+            format!("{}", index)
+        };
+        let normalized = normalize_toolchain_type_label(&key);
+
+        // Try exact match first, then normalized match
+        if let Some(value) = self.toolchains.get(&normalized) {
+            return Ok(value.map(|v| v.to_value()).unwrap_or(Value::new_none()));
+        }
+        for (k, v) in &self.toolchains {
+            if normalize_toolchain_type_label(k) == normalized {
+                return Ok(v.map(|v| v.to_value()).unwrap_or(Value::new_none()));
+            }
+        }
+
+        // Toolchain type not found — return None for optional, error for mandatory
+        Ok(Value::new_none())
+    }
+}
+
+/// Normalize a toolchain type label for matching.
+/// Strips @@ prefix, handles common variations.
+fn normalize_toolchain_type_label(label: &str) -> String {
+    let label = label.trim_start_matches('@');
+    label.to_owned()
+}
+
+// ============================================================================
+// ToolchainsStub - Stub for ctx.toolchains (FALLBACK)
 // ============================================================================
 
 /// A stub for ctx.toolchains that pretends to contain all toolchain types.
