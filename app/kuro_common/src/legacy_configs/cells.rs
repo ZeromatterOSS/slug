@@ -1111,6 +1111,26 @@ impl BuckConfigBasedCells {
             project_root.root().to_path_buf(),
         );
 
+        // Collect toolchain and execution platform registrations from all modules.
+        // Priority order: root module first, then BFS order of dep graph.
+        // parsed_modules is already in BFS order (root first from resolution).
+        {
+            let mut all_toolchains = Vec::new();
+            let mut all_exec_platforms = Vec::new();
+            for (_module_name, parsed_mod) in &parsed_modules {
+                all_toolchains.extend(parsed_mod.registered_toolchains.iter().cloned());
+                all_exec_platforms
+                    .extend(parsed_mod.registered_execution_platforms.iter().cloned());
+            }
+            tracing::info!(
+                "Collected {} toolchain registration(s) and {} execution platform registration(s)",
+                all_toolchains.len(),
+                all_exec_platforms.len()
+            );
+            kuro_bzlmod::set_registered_toolchains(all_toolchains);
+            kuro_bzlmod::set_registered_execution_platforms(all_exec_platforms);
+        }
+
         // Set project root for dynamic cell filesystem scanning
         kuro_core::cells::set_dynamic_project_root(project_root.root().to_path_buf());
 

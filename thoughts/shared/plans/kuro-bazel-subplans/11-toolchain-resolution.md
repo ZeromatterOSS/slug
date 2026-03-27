@@ -154,9 +154,9 @@ toolchain/platform registration lists.
 ### Success Criteria
 
 #### Automated Verification:
-- [ ] `cargo check` passes
-- [ ] `register_toolchains("@foo//:all")` in MODULE.bazel is stored (not discarded)
-- [ ] Registration order matches Bazel: root module first, then BFS order of deps
+- [x] `cargo check` passes
+- [x] `register_toolchains("@foo//:all")` in MODULE.bazel is stored (not discarded)
+- [x] Registration order matches Bazel: root module first, then BFS order of deps
 
 ---
 

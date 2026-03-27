@@ -149,3 +149,48 @@ pub fn get_module_version(cell_name: &str) -> Option<String> {
         .ok()
         .and_then(|map| map.as_ref().and_then(|m| m.get(cell_name).cloned()))
 }
+
+// ============================================================================
+// Toolchain and Execution Platform Registrations
+// ============================================================================
+
+/// Global priority-ordered list of registered toolchains.
+/// Populated during cell resolution from register_toolchains() calls in MODULE.bazel.
+/// Order: root module first, then BFS order of dep graph (Bazel priority).
+static REGISTERED_TOOLCHAINS: RwLock<Vec<String>> = RwLock::new(Vec::new());
+
+/// Global priority-ordered list of registered execution platforms.
+static REGISTERED_EXECUTION_PLATFORMS: RwLock<Vec<String>> = RwLock::new(Vec::new());
+
+/// Set the global ordered list of registered toolchains.
+/// Called after bzlmod resolution collects registrations from all modules.
+pub fn set_registered_toolchains(toolchains: Vec<String>) {
+    if let Ok(mut guard) = REGISTERED_TOOLCHAINS.write() {
+        *guard = toolchains;
+    }
+}
+
+/// Set the global ordered list of registered execution platforms.
+pub fn set_registered_execution_platforms(platforms: Vec<String>) {
+    if let Ok(mut guard) = REGISTERED_EXECUTION_PLATFORMS.write() {
+        *guard = platforms;
+    }
+}
+
+/// Get the priority-ordered list of registered toolchain labels.
+pub fn get_registered_toolchains() -> Vec<String> {
+    REGISTERED_TOOLCHAINS
+        .read()
+        .ok()
+        .map(|v| v.clone())
+        .unwrap_or_default()
+}
+
+/// Get the priority-ordered list of registered execution platform labels.
+pub fn get_registered_execution_platforms() -> Vec<String> {
+    REGISTERED_EXECUTION_PLATFORMS
+        .read()
+        .ok()
+        .map(|v| v.clone())
+        .unwrap_or_default()
+}

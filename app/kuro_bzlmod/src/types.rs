@@ -298,6 +298,15 @@ pub struct ParsedModuleFile {
     /// Repository rule invocations from `use_repo_rule()` calls.
     /// e.g., http_file(name = "toml2json_linux_amd64", ...)
     pub repo_rule_invocations: Vec<crate::globals::RepoRuleInvocation>,
+
+    /// Toolchain labels from `register_toolchains()` calls.
+    /// Each entry is a label string (e.g., "@rules_cc//cc:all").
+    /// Ordered: first call = highest priority within this module.
+    pub registered_toolchains: Vec<String>,
+
+    /// Execution platform labels from `register_execution_platforms()` calls.
+    /// Each entry is a label string (e.g., "@local_config_platform//:host").
+    pub registered_execution_platforms: Vec<String>,
 }
 
 // ============================================================================
