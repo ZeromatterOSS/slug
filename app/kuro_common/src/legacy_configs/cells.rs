@@ -1176,10 +1176,21 @@ impl BuckConfigBasedCells {
         // Set project root for dynamic cell filesystem scanning
         kuro_core::cells::set_dynamic_project_root(project_root.root().to_path_buf());
 
-        // Convert pre-computed cells to the format expected by BzlmodResolutionResult
+        // Convert pre-computed cells to the format expected by BzlmodResolutionResult.
+        // Use the internal (short) name as the cell name, and canonical as an alias.
+        // This prevents cell name duality where the same repo gets separate DICE computations
+        // under different names (canonical vs short), causing output path mismatches.
         let mut ext_cells = Vec::new();
         for cell in pre_computed_cells {
-            let cell_name = CellName::unchecked_new(&cell.canonical_name)?;
+            // Use internal_name (short name) as the cell name if different from canonical.
+            // This matches what dynamic cell resolution uses when spoke repos are discovered.
+            let use_short = cell.internal_name != cell.canonical_name;
+            let cell_name_str = if use_short {
+                &cell.internal_name
+            } else {
+                &cell.canonical_name
+            };
+            let cell_name = CellName::unchecked_new(cell_name_str)?;
             let cell_path = CellRootPathBuf::new(ProjectRelativePath::new(&cell.path)?.to_owned());
             let setup = ExtensionRepoCellSetup {
                 canonical_name: Arc::from(cell.canonical_name.as_str()),
@@ -1197,9 +1208,14 @@ impl BuckConfigBasedCells {
         let existing_cell_names: std::collections::HashSet<&str> =
             cells.iter().map(|(name, _, _)| name.as_str()).collect();
 
-        // Convert pre-computed aliases, skipping those that conflict with existing cells.
-        // This happens when synthetic repos create cells with bare names (e.g., "cui__camino-1.1.6")
-        // that would conflict with an alias of the same name from use_repo() declarations.
+        // Build a set of ext_cell names too for conflict detection.
+        let ext_cell_names: std::collections::HashSet<&str> =
+            ext_cells.iter().map(|(name, _, _)| name.as_str()).collect();
+
+        // Convert pre-computed aliases.
+        // Since cells are now registered under short (internal) names, we need to:
+        // 1. Create canonical → short aliases (so @rules_rs+crate+crates__foo still works)
+        // 2. Skip short → canonical aliases (the cell already IS the short name)
         let mut ext_aliases = Vec::new();
         for alias in pre_computed_aliases {
             if existing_cell_names.contains(alias.apparent_name.as_str()) {
@@ -1210,8 +1226,28 @@ impl BuckConfigBasedCells {
                 );
                 continue;
             }
+            // If the apparent name IS a cell (short name), skip the alias
+            if ext_cell_names.contains(alias.apparent_name.as_str()) {
+                // Instead, create a reverse alias: canonical → short
+                if alias.canonical_name != alias.apparent_name {
+                    if let (Ok(canon_alias), Ok(short_cell)) = (
+                        NonEmptyCellAlias::new(alias.canonical_name.clone()),
+                        CellName::unchecked_new(&alias.apparent_name),
+                    ) {
+                        ext_aliases.push((canon_alias, short_cell));
+                    }
+                }
+                continue;
+            }
+            // Normal alias: apparent → canonical (but canonical might now be a short name)
+            // Find the actual cell name (might be short name)
+            let target_cell = ext_cells
+                .iter()
+                .find(|(_, _, setup)| setup.canonical_name.as_ref() == alias.canonical_name)
+                .map(|(name, _, _)| name.as_str())
+                .unwrap_or(&alias.canonical_name);
             let apparent_name = NonEmptyCellAlias::new(alias.apparent_name)?;
-            let canonical_name = CellName::unchecked_new(&alias.canonical_name)?;
+            let canonical_name = CellName::unchecked_new(target_cell)?;
             ext_aliases.push((apparent_name, canonical_name));
         }
 
@@ -1289,6 +1325,37 @@ impl BuckConfigBasedCells {
         } else {
             parsed.module.name.clone()
         };
+
+        // Create external/ symlinks for all non-root cells so that action commands
+        // using artifact paths like `external/<cell>/...` can find source files.
+        {
+            let cell_pairs: Vec<(String, String)> =
+                cells
+                    .iter()
+                    .map(|(name, path, _)| (name.as_str().to_owned(), path.as_str().to_owned()))
+                    .chain(ext_cells.iter().map(|(name, path, _)| {
+                        (name.as_str().to_owned(), path.as_str().to_owned())
+                    }))
+                    .collect();
+            kuro_core::cells::ensure_external_symlinks_for_cells(&cell_pairs);
+            // Also create symlinks for apparent names (aliases)
+            // These map short names to the same paths as their canonical cells.
+            for (alias, canonical) in &aliases {
+                let alias_str = alias.as_str();
+                // Find the cell path for this canonical name
+                if let Some((_, path, _)) = cells
+                    .iter()
+                    .find(|(name, _, _)| name.as_str() == canonical.as_str())
+                {
+                    kuro_core::cells::ensure_external_symlink(alias_str, path.as_str());
+                } else if let Some((_, path, _)) = ext_cells
+                    .iter()
+                    .find(|(name, _, _)| name.as_str() == canonical.as_str())
+                {
+                    kuro_core::cells::ensure_external_symlink(alias_str, path.as_str());
+                }
+            }
+        }
 
         Ok(Some(BzlmodResolutionResult {
             root_module_name,

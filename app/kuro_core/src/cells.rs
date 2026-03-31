@@ -137,7 +137,18 @@ static DYNAMIC_PROJECT_ROOT: std::sync::OnceLock<std::path::PathBuf> = std::sync
 /// Called after extension execution materializes repos.
 pub fn register_dynamic_extension_cell(canonical_name: String, path: String) {
     if let Ok(mut cells) = DYNAMIC_EXTENSION_CELLS.lock() {
-        cells.insert(canonical_name, path);
+        cells.insert(canonical_name.clone(), path.clone());
+    }
+    // Also create the external/ symlink for action execution.
+    // Extract the short name (last component after '+') for spoke repos.
+    let short_name = canonical_name
+        .rfind('+')
+        .map(|i| &canonical_name[i + 1..])
+        .unwrap_or(&canonical_name);
+    ensure_external_symlink(short_name, &path);
+    // Also create a symlink for the full canonical name if different
+    if short_name != canonical_name {
+        ensure_external_symlink(&canonical_name, &path);
     }
 }
 
@@ -149,6 +160,42 @@ pub fn set_dynamic_project_root(root: std::path::PathBuf) {
 /// Get the project root (if set).
 pub fn get_dynamic_project_root() -> Option<std::path::PathBuf> {
     DYNAMIC_PROJECT_ROOT.get().cloned()
+}
+
+/// Create an `external/<cell_name>` symlink pointing to the cell's actual directory.
+/// This is needed because `artifact.path` returns `external/<cell>/...` for external
+/// repo source files (matching Bazel convention), but kuro stores repos under
+/// `bazel-external/`. The symlink bridges this gap for unsandboxed local execution.
+pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
+    let project_root = match DYNAMIC_PROJECT_ROOT.get() {
+        Some(root) => root.clone(),
+        None => return,
+    };
+    let external_dir = project_root.join("external");
+    let link_path = external_dir.join(cell_name);
+    if link_path.exists() || link_path.symlink_metadata().is_ok() {
+        return;
+    }
+    // Create external/ directory if needed
+    let _ = std::fs::create_dir_all(&external_dir);
+    // Create relative symlink: external/<cell> -> ../<cell_path>
+    let target = std::path::PathBuf::from("..").join(cell_path);
+    let _ = std::os::unix::fs::symlink(&target, &link_path);
+}
+
+/// Create `external/` symlinks for all non-root cells.
+/// Called once after cell resolver is set up.
+pub fn ensure_external_symlinks_for_cells(cells: &[(impl AsRef<str>, impl AsRef<str>)]) {
+    if DYNAMIC_PROJECT_ROOT.get().is_none() {
+        return;
+    }
+    for (cell_name, cell_path) in cells {
+        let name = cell_name.as_ref();
+        let path = cell_path.as_ref();
+        if !is_root_cell_name(name) && !path.is_empty() {
+            ensure_external_symlink(name, path);
+        }
+    }
 }
 
 /// Look up a dynamically-registered extension repo cell path.
@@ -390,6 +437,19 @@ impl CellResolver {
             return Ok(instance);
         }
 
+        // Check if this name is an alias for an existing cell.
+        // This prevents creating duplicate dynamic cells when a pre-computed
+        // extension repo cell exists under a canonical name (e.g.,
+        // "rules_rs+crate+crates__typenum-1.19.0") but is referenced by its
+        // apparent name ("crates__typenum-1.19.0").
+        if let Ok(aliased) = self.0.root_cell_alias_resolver.resolve(cell.as_str()) {
+            if aliased != cell {
+                if let Some(instance) = self.0.cells.get(&aliased) {
+                    return Ok(instance);
+                }
+            }
+        }
+
         // Check dynamic cells from extension execution.
         // If found, promote to "static" by leaking the reference (safe: cells live for
         // the duration of the build). This avoids holding the RwLock across returns.
@@ -422,6 +482,8 @@ impl CellResolver {
                 let cell_path = CellRootPathBuf::new(rel_path.to_owned());
                 let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
                 if let Ok(instance) = CellInstance::new(cell, cell_path, None, nested) {
+                    // Create external/ symlink for action execution
+                    ensure_external_symlink(cell.as_str(), &path);
                     if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
                         dynamic.insert(cell, instance);
                     }
