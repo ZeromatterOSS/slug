@@ -102,6 +102,36 @@ impl<'v> Dependency<'v> {
         provider_collection: FrozenValueTyped<'v, FrozenProviderCollection>,
         execution_platform: Option<&ExecutionPlatformResolution>,
     ) -> Self {
+        // Bazel compatibility: for alias (Forward) targets, use the actual target's
+        // label instead of the alias label. In Bazel, alias targets are transparent
+        // in label_keyed_string_dict — Target.label returns the actual target.
+        // Detect by checking if DefaultInfo outputs have a different owner.
+        let label = {
+            let mut effective = label.clone();
+            if let Ok(di) = provider_collection.default_info() {
+                let raw = di.default_outputs_raw();
+                if let Some(list) = starlark::values::list::ListRef::from_frozen_value(raw) {
+                    if let Some(first) = list.content().first() {
+                        // Try to get the artifact's owner label
+                        use crate::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkArtifactLike;
+                        if let Some(artifact) = first
+                            .to_value()
+                            .downcast_ref::<crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact>()
+                        {
+                            if let Some(kuro_core::deferred::base_deferred_key::BaseDeferredKey::TargetLabel(owner_label)) = artifact.artifact().owner() {
+                                if owner_label != label.target() {
+                                    effective = ConfiguredProvidersLabel::new(
+                                        owner_label.clone(),
+                                        label.name().clone(),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            effective
+        };
         let execution_platform: ValueOfUnchecked<NoneOr<StarlarkExecutionPlatformResolution>> =
             match execution_platform {
                 Some(e) => ValueOfUnchecked::new(
