@@ -515,13 +515,68 @@ fix should be minimal and targeted.
     `attrs.dict(attrs.dep(), ...)` keys need label construction via `TargetNameRef::unchecked_new()`
     since the pattern parser rejects slashed target names.
 
-#### Current blocker (2026-03-25, session 2):
-- `rules_rust_tinyjson//:src/parser.rs` — dep coercion succeeds for slashed source file paths,
-  but analysis fails with "Unknown target" because Buck2 doesn't create implicit source file
-  targets like Bazel does. Source files in `srcs = glob(["src/*.rs"])` get coerced as dep labels
-  instead of source files. Fix requires either:
-  1. Implicit source file targets during package evaluation (Bazel parity)
-  2. Making `one_of(dep, source)` prefer source for slashed bare names
+40. **one_of(dep, source) tried dep first for file-like paths**: `glob(["src/*.rs"])` expanded to
+    `src/parser.rs` which dep-coerced as a label but failed at analysis (no implicit source file
+    target). Fixed: `one_of` now tries alternatives in reverse order when value contains `/`.
+41. **Missing CompilationContext attributes**: rules_cc 0.2.17 accesses `_exporting_module_map_files`,
+    `loose_hdrs_dirs`, `purpose` on `CompilationContextStub`. Added to both stubs.
+42. **repository_ctx.symlink() didn't overwrite**: `cc_autoconf` creates symlinks to template files.
+    Second runs fail with "File exists". Fixed: remove existing before creating.
+43. **repository_ctx.template() required named substitutions**: rules_cc passes it positionally.
+    Fixed: changed to `require = pos`.
+
+#### Current blocker (2026-03-26):
+44. **Missing compiler path in create_cc_compile_action**: The GCC/Clang arg list started with `-c`
+    instead of `compiler_path -c`. The compiler was omitted because `args_vec` didn't include
+    it before the flags. Fixed: prepend `compiler_path` to args for non-MSVC builds.
+    Note: `cc_configure_extension` repos still don't materialize because `ToolchainsStub`
+    shortcircuits real toolchain resolution (returns `CcToolchainInfoStub` directly). The
+    `CcToolchainInfoStub` provides correct compiler paths via `host_tool_path()`, so builds
+    work without real `local_config_cc`. Full toolchain resolution remains future work.
+
+#### Bugs fixed (2026-03-27):
+45. **`external/` directory missing for action execution**: `artifact.path` returns `external/<cell>/...`
+    for external repo source files (Bazel convention), but no `external/` directory existed on disk.
+    Local action execution (unsandboxed) couldn't find these paths. Fixed: added
+    `ensure_external_symlink()` and `ensure_external_symlinks_for_cells()` to `kuro_core/src/cells.rs`.
+    Creates `external/<cell_name>` → `../<cell_path>` symlinks during cell setup (for static cells)
+    and during dynamic cell registration (for spoke repos). This fixed the "Dependency environment
+    file unreadable" error from the cargo build script runner.
+
+46. **Cell name duality for extension repos**: Pre-computed extension repo cells used canonical names
+    (`rules_rs+crate+crates__typenum-1.19.0`) while dynamic resolution used short names
+    (`crates__typenum-1.19.0`). This caused duplicate DICE computations with different output
+    paths. Fixed: register cells under short names with canonical→short aliases. Also added alias
+    lookup in `CellResolver::get()` to prevent duplicate cell creation.
+47. **CopyAction symlink not materialized to disk**: Buck2's deferred materializer doesn't eagerly
+    write CopyAction/Symlink outputs. Fixed: in `CopyAction::execute()`, directly create symlink
+    at the plain output path for Symlink mode. This bridges the gap between DICE's virtual artifact
+    system and local unsandboxed execution.
+48. **`use_param_file` on nested Args not creating param file**: Bazel's `args.use_param_file()` on
+    a per-Args basis puts those specific args into a file. But when Bazel `arguments=[args1, args2]`
+    is flattened into a single Buck2 cmd_args, the param_file config on the nested args2 is lost.
+    Fixed: in local executor, detect inline positional args that should have been in a param file
+    (first positional arg after all `--key=value` args, with `=` in subsequent entries) and write
+    them to a temp file with `--cargo_manifest_args=@<path>` substitution.
+
+49. **`bootstrap_process_wrapper` execvp "No such file or directory"**: Root cause was bug #48's
+    param file detection using too-broad heuristic (`!starts_with("--")`) that matched source file
+    paths. Tightened to `ends_with(".cargo_runfiles")` which only matches the cargo runner pattern.
+50. **Param file deleted before use**: The param file was written to the action's scratch path
+    (inside the output directory). `create_output_dirs` in `exec_once` cleaned the output dir
+    before the command ran, deleting the param file. Fixed: write to `/tmp/kuro-param-files/`
+    with unique atomic counter filenames.
+
+#### Current state (2026-03-27):
+- **42 actions execute successfully** (from 0 at start of session)
+- All extension repos materialize with real content (1230+ crate spokes, tinyjson, rrra, etc.)
+- External repo source files accessible via `external/<cell>/` symlinks
+- All cargo build scripts (_bs_ compilation, _bs- symlink, _bs execution) work end-to-end
+- Build progresses through all build scripts to Rust crate compilation including
+  `rules_rust_tinyjson`, `process_wrapper`, and most spoke crates
+- 2 remaining failures: `postgres-types` has `unresolved import chrono_04` (missing crate
+  alias in build rules, not a kuro infrastructure issue). `zmij` and `serde_core` fail
+  downstream from this.
 
 ### Success Criteria
 
