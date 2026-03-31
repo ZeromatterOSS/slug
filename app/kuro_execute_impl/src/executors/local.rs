@@ -539,7 +539,6 @@ impl LocalExecutor {
         if args.is_empty() {
             return manager.error("no_args", LocalExecutionError::NoArgs);
         }
-
         manager.start_waiting_category(WaitingCategory::MaterializingInputs);
         let executor_stage_result = executor_stage_async(
             kuro_data::LocalStage {
@@ -834,6 +833,54 @@ impl LocalExecutor {
         } else {
             None
         };
+        // Bazel compatibility: handle inline param file args for use_param_file.
+        // When a Bazel Args object has use_param_file() but kuro expands them inline
+        // (because the param file config is on a nested Args, not the top-level),
+        // the args appear as positional params. Detect this pattern and write them
+        // to a temp file with the correct --cargo_manifest_args=@<file> argument.
+        let param_args_replaced = param_args_replaced.or_else(|| {
+            // Look for inline cargo_runfiles args: after all --key=value named args,
+            // there may be positional args: runfiles_dir, retain_list, mapping1=dest1, ...
+            // These should go into a param file for --cargo_manifest_args=@<file>.
+            let exe_len = request.exe().len();
+            let remaining = &args[exe_len..];
+            // Find the cargo_runfiles directory arg specifically.
+            // It's a positional arg (no --) that ends with .cargo_runfiles.
+            // This ONLY matches the cargo_build_script runner pattern.
+            let cargo_runfiles_pos = remaining
+                .iter()
+                .position(|a| !a.starts_with("--") && a.ends_with(".cargo_runfiles"));
+            if let Some(pos_idx) = cargo_runfiles_pos {
+                let positional = &remaining[pos_idx..];
+                // Heuristic: positional args for cargo_runfiles have at least 3 entries
+                // (dir, retain_list, mapping1=dest1) and the 3rd+ contain "="
+                if positional.len() >= 3 && positional.iter().skip(2).any(|a| a.contains('=')) {
+                    // Use a temp file outside the build output tree. The scratch_path
+                    // is inside the action's output dir which gets cleaned by
+                    // create_output_dirs before the command runs.
+                    let param_dir = std::env::temp_dir().join("kuro-param-files");
+                    let _ = std::fs::create_dir_all(&param_dir);
+                    // Use a unique temp file per invocation
+                    let param_path = {
+                        use std::sync::atomic::AtomicU64;
+                        use std::sync::atomic::Ordering;
+                        static COUNTER: AtomicU64 = AtomicU64::new(0);
+                        let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+                        param_dir.join(format!("cargo-manifest-{}", id))
+                    };
+                    let content = positional.join("\n");
+                    if let Ok(()) = std::fs::write(&param_path, &content) {
+                        let param_file_arg =
+                            format!("--cargo_manifest_args=@{}", param_path.to_string_lossy());
+                        let mut new_args: Vec<String> = args[..exe_len].to_vec();
+                        new_args.extend_from_slice(&remaining[..pos_idx]);
+                        new_args.push(param_file_arg);
+                        return Some(new_args);
+                    }
+                }
+            }
+            None
+        });
         let effective_args: &[String] = param_args_replaced.as_deref().unwrap_or(args);
 
         let (time_span, start_time, res, manager) = match self

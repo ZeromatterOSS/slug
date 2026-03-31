@@ -592,6 +592,24 @@ impl FrozenStarlarkCmdArgs {
     pub fn param_file(&self) -> Option<&FrozenParamFileData> {
         self.param_file.as_deref()
     }
+
+    /// Search for param_file config in this object or nested cmd_args items.
+    /// In Bazel, use_param_file can be on an individual Args object within a list.
+    /// Buck2 only checks the top-level. This method searches nested items too.
+    pub fn param_file_or_nested(&self) -> Option<&FrozenParamFileData> {
+        if let Some(pf) = self.param_file.as_deref() {
+            return Some(pf);
+        }
+        // Check nested items (frozen values that might be cmd_args with param_file)
+        for item in self.items.iter() {
+            if let Some(nested) = item.downcast_ref::<FrozenStarlarkCmdArgs>() {
+                if let Some(pf) = nested.param_file.as_deref() {
+                    return Some(pf);
+                }
+            }
+        }
+        None
+    }
 }
 
 impl<'v> StarlarkCmdArgs<'v> {

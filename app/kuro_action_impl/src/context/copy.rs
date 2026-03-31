@@ -156,6 +156,7 @@ pub(crate) fn analysis_actions_methods_copy(methods: &mut MethodsBuilder) {
     /// (the output should be declared via `ctx.actions.declare_symlink()`).
     ///
     /// See: https://bazel.build/rules/lib/actions#symlink
+    #[allow(clippy::too_many_arguments)]
     fn symlink<'v>(
         this: &AnalysisActions<'v>,
         #[starlark(require = named)] output: OutputArtifactArg<'v>,
