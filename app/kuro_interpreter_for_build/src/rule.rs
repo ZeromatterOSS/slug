@@ -1030,14 +1030,22 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
 
         // Extract toolchain type labels from the toolchains parameter.
         // Each item is either a string label, a Label object, or a ToolchainTypeRequirement.
+        // For ToolchainTypeRequirement, extract the .toolchain_type attribute (the label).
         let toolchain_types: Vec<String> = toolchains
             .items
             .iter()
-            .map(|v| {
+            .filter_map(|v| {
                 if let Some(s) = v.unpack_str() {
-                    s.to_owned()
+                    Some(s.to_owned())
                 } else {
-                    format!("{}", v)
+                    // Try to get .toolchain_type attribute (for ToolchainTypeRequirement)
+                    if let Ok(Some(attr)) = v.get_attr("toolchain_type", eval.heap()) {
+                        if let Some(s) = attr.unpack_str() {
+                            return Some(s.to_owned());
+                        }
+                    }
+                    // Fallback: use Display representation (for Label objects, etc.)
+                    Some(format!("{}", v))
                 }
             })
             .collect();

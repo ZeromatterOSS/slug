@@ -67,6 +67,7 @@ use crate::interpreter::rule_defs::fragments::ConfigurationFragments;
 use crate::interpreter::rule_defs::fragments::CppFragment;
 use crate::interpreter::rule_defs::plugins::AnalysisPlugins;
 use crate::interpreter::rule_defs::provider::ProviderLike;
+use crate::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 
 /// Functions to allow users to interact with the Actions registry.
 ///
@@ -200,7 +201,7 @@ pub struct AnalysisContext<'v> {
     rule_outputs: Vec<(String, String)>,
     /// Resolved toolchains from real toolchain resolution.
     /// When Some, ctx.toolchains returns this instead of ToolchainsStub.
-    resolved_toolchains: Option<Value<'v>>,
+    resolved_toolchains: RefCell<Option<Value<'v>>>,
 }
 
 impl<'v> Display for AnalysisContext<'v> {
@@ -239,7 +240,7 @@ impl<'v> AnalysisContext<'v> {
             plugins,
             outputs: RefCell::new(None),
             rule_outputs,
-            resolved_toolchains: None,
+            resolved_toolchains: RefCell::new(None),
         }
     }
 
@@ -268,17 +269,13 @@ impl<'v> AnalysisContext<'v> {
             rule_outputs,
         );
 
-        // Run toolchain resolution if the target has a label
-        // (needed to determine target platform from configuration)
-        analysis_context.resolved_toolchains = None;
-
         heap.alloc_typed(analysis_context)
     }
 
     /// Set the resolved toolchains for this context.
     /// Called from the analysis pipeline after resolution completes.
-    pub fn set_resolved_toolchains(&mut self, toolchains: Value<'v>) {
-        self.resolved_toolchains = Some(toolchains);
+    pub fn set_resolved_toolchains(&self, toolchains: Value<'v>) {
+        *self.resolved_toolchains.borrow_mut() = Some(toolchains);
     }
 
     pub fn assert_no_promises(&self) -> kuro_error::Result<()> {
@@ -519,7 +516,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     #[starlark(attribute)]
     fn toolchains<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         // Return real resolved toolchains if available
-        if let Some(resolved) = this.0.resolved_toolchains {
+        if let Some(resolved) = *this.0.resolved_toolchains.borrow() {
             return Ok(resolved);
         }
         // Fallback to stub until all toolchain repos materialize
@@ -2036,9 +2033,10 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
 /// `ToolchainInfo` provider values (or None for optional unmatched types).
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct ResolvedToolchains {
-    /// Map from toolchain_type label → resolved ToolchainInfo value.
-    /// Value is None for optional toolchain types that weren't matched.
-    pub toolchains: std::collections::HashMap<String, Option<starlark::values::FrozenValue>>,
+    /// Map from toolchain_type label → resolved provider collection.
+    /// Value is None for toolchain types that resolved but whose impl target
+    /// could not be analyzed (falls back to ToolchainsStub behavior).
+    pub toolchains: std::collections::HashMap<String, Option<FrozenProviderCollectionValue>>,
     /// The selected execution platform label.
     pub exec_platform: String,
 }
@@ -2054,21 +2052,17 @@ starlark::starlark_simple_value!(ResolvedToolchains);
 #[starlark::values::starlark_value(type = "resolved_toolchains")]
 impl<'v> StarlarkValue<'v> for ResolvedToolchains {
     /// Check if a toolchain type is available.
-    fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
-        let key = if let Some(s) = other.unpack_str() {
-            s.to_owned()
-        } else {
-            format!("{}", other)
-        };
-        let normalized = normalize_toolchain_type_label(&key);
-        Ok(self.toolchains.contains_key(&normalized)
-            || self
-                .toolchains
-                .keys()
-                .any(|k| normalize_toolchain_type_label(k) == normalized))
+    /// Returns true for any type — like ToolchainsStub, this prevents rule code
+    /// from erroring on `TYPE in ctx.toolchains` checks. Real Bazel would only
+    /// return true for types that resolved, but many rules rely on the check
+    /// always succeeding.
+    fn is_in(&self, _other: Value<'v>) -> starlark::Result<bool> {
+        Ok(true)
     }
 
     /// Index by toolchain type to get the ToolchainInfo provider.
+    /// If a real provider collection was resolved via DICE analysis, returns it.
+    /// Otherwise, falls back to ToolchainsStub behavior (per-language stubs).
     fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let key = if let Some(s) = index.unpack_str() {
             s.to_owned()
@@ -2077,18 +2071,35 @@ impl<'v> StarlarkValue<'v> for ResolvedToolchains {
         };
         let normalized = normalize_toolchain_type_label(&key);
 
-        // Try exact match first, then normalized match
-        if let Some(value) = self.toolchains.get(&normalized) {
-            return Ok(value.map(|v| v.to_value()).unwrap_or(Value::new_none()));
-        }
-        for (k, v) in &self.toolchains {
-            if normalize_toolchain_type_label(k) == normalized {
-                return Ok(v.map(|v| v.to_value()).unwrap_or(Value::new_none()));
-            }
+        // Look for a resolved provider collection (exact match first, then normalized)
+        let provider_collection = self
+            .toolchains
+            .get(&normalized)
+            .or_else(|| {
+                self.toolchains
+                    .iter()
+                    .find(|(k, _)| normalize_toolchain_type_label(k) == normalized)
+                    .map(|(_, v)| v)
+            })
+            .and_then(|opt| opt.as_ref());
+
+        if let Some(providers) = provider_collection {
+            // Return the provider collection as a value. In Bazel,
+            // ctx.toolchains[TYPE] returns the ToolchainInfo which wraps the
+            // impl target's providers. Here we return the full collection,
+            // which allows rules to index into it (e.g., toolchain.cc).
+            //
+            // SAFETY: The FrozenValue is kept alive by the OwnedFrozenValueTyped
+            // inside FrozenProviderCollectionValue, which holds an Arc to the
+            // owning FrozenModule. The ResolvedToolchains struct lives on the
+            // Starlark heap and keeps the FrozenProviderCollectionValue alive.
+            let fv = unsafe { providers.value().to_frozen_value() };
+            return Ok(fv.to_value());
         }
 
-        // Toolchain type not found — return None for optional, error for mandatory
-        Ok(Value::new_none())
+        // No real provider — fall back to ToolchainsStub behavior.
+        let stub = ToolchainsStub { is_tool: false };
+        stub.at(index, heap)
     }
 }
 

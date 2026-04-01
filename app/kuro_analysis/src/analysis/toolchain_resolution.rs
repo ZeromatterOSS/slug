@@ -127,19 +127,16 @@ impl PlatformConstraints {
     }
 }
 
-/// Normalize a constraint_value label for comparison.
+/// Normalize a label for comparison.
 ///
 /// Handles:
-/// - `@@platforms//os:linux` → `@platforms//os:linux`
-/// - `@platforms//os:linux` → `@platforms//os:linux` (unchanged)
+/// - `@@platforms//os:linux` → `platforms//os:linux`
+/// - `@platforms//os:linux` → `platforms//os:linux`
+/// - `platforms//os:linux` → `platforms//os:linux` (already normalized)
 /// - `//os:linux` → `//os:linux` (relative, kept as-is)
 fn normalize_constraint_label(label: &str) -> String {
-    // Strip double-@ prefix
-    let label = if label.starts_with("@@") {
-        &label[1..]
-    } else {
-        label
-    };
+    // Strip all leading @ characters
+    let label = label.trim_start_matches('@');
     label.to_owned()
 }
 
@@ -176,6 +173,22 @@ pub fn resolve_toolchains(
 
     // Get all declared toolchains from the global registry
     let declared = get_declared_toolchains();
+    tracing::debug!(
+        "Declared toolchains registry has {} entries. Required: {:?}",
+        declared.len(),
+        required_types
+            .iter()
+            .map(|r| &r.type_label)
+            .collect::<Vec<_>>()
+    );
+    if !declared.is_empty() {
+        for (label, info) in declared.iter().take(5) {
+            tracing::debug!("  Declared: {} (type='{}')", label, info.toolchain_type);
+        }
+        if declared.len() > 5 {
+            tracing::debug!("  ... and {} more", declared.len() - 5);
+        }
+    }
 
     // Step 1: Filter exec platforms by target's exec_compatible_with
     let eligible_exec_platforms: Vec<&PlatformConstraints> = exec_platforms
@@ -318,11 +331,15 @@ mod tests {
     fn test_normalize_constraint_label() {
         assert_eq!(
             normalize_constraint_label("@@platforms//os:linux"),
-            "@platforms//os:linux"
+            "platforms//os:linux"
         );
         assert_eq!(
             normalize_constraint_label("@platforms//os:linux"),
-            "@platforms//os:linux"
+            "platforms//os:linux"
+        );
+        assert_eq!(
+            normalize_constraint_label("platforms//os:linux"),
+            "platforms//os:linux"
         );
     }
 }

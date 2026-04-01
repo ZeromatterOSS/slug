@@ -19,9 +19,11 @@ use dupe::Dupe;
 use futures::Future;
 use kuro_build_api::analysis::AnalysisResult;
 use kuro_build_api::analysis::anon_promises_dyn::RunAnonPromisesAccessorPair;
+use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
 use kuro_build_api::analysis::registry::AnalysisRegistry;
 use kuro_build_api::interpreter::rule_defs::cmd_args::value::FrozenCommandLineArg;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisContext;
+use kuro_build_api::interpreter::rule_defs::context::ResolvedToolchains;
 use kuro_build_api::interpreter::rule_defs::provider::FrozenBuiltinProviderLike;
 use kuro_build_api::interpreter::rule_defs::provider::ValueAsProviderLike;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
@@ -44,6 +46,8 @@ use kuro_core::execution_types::execution::ExecutionPlatformResolution;
 use kuro_core::package::PackageLabel;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
+use kuro_core::target::label::label::TargetLabel;
+use kuro_core::target::name::TargetNameRef;
 use kuro_core::unsafe_send_future::UnsafeSendFuture;
 use kuro_error::BuckErrorContext;
 use kuro_error::conversion::from_any_with_tag;
@@ -569,6 +573,41 @@ fn extract_label_list_from_coerced_attr(attr: &CoercedAttr) -> Vec<String> {
     }
 }
 
+/// Parse a toolchain impl label string into a `TargetLabel`.
+///
+/// Accepts formats: `@repo//pkg:target`, `@@repo//pkg:target`, `repo//pkg:target`
+/// Returns `None` if the label cannot be parsed (missing components, etc.).
+fn parse_impl_label_to_target_label(label: &str) -> Option<TargetLabel> {
+    // Strip any leading @ characters
+    let stripped = label.trim_start_matches('@');
+    let slash_pos = stripped.find("//")?;
+    let repo_name = &stripped[..slash_pos];
+    if repo_name.is_empty() {
+        return None;
+    }
+    let after_slashes = &stripped[slash_pos + 2..];
+
+    // Split into package path and target name
+    let (pkg_path, target_name) = if let Some(colon_pos) = after_slashes.find(':') {
+        (&after_slashes[..colon_pos], &after_slashes[colon_pos + 1..])
+    } else {
+        // No colon means target name = last path component (Bazel shorthand)
+        let last_slash = after_slashes.rfind('/').map(|p| p + 1).unwrap_or(0);
+        (after_slashes, &after_slashes[last_slash..])
+    };
+
+    if target_name.is_empty() {
+        return None;
+    }
+
+    let cell_name = CellName::unchecked_new(repo_name).ok()?;
+    let cell_rel_path = CellRelativePath::unchecked_new(pkg_path);
+    let package_label =
+        PackageLabel::from_cell_path(CellPathRef::new(cell_name, cell_rel_path)).ok()?;
+    let target_name_ref = TargetNameRef::new(target_name).ok()?;
+    Some(TargetLabel::new(package_label, target_name_ref))
+}
+
 // Used to express that the impl Future below captures multiple named lifetimes.
 // See https://github.com/rust-lang/rust/issues/34511#issuecomment-373423999 for more details.
 trait Captures<'x> {}
@@ -643,6 +682,12 @@ async fn run_analysis_with_env_underlying(
         // populated by eager loading above and by toolchain() target analysis.
         let toolchain_resolution_result = {
             let toolchain_types = analysis_env.rule_spec.toolchain_types();
+            tracing::debug!(
+                "Toolchain types for '{}': {:?} (count={})",
+                node.label(),
+                toolchain_types,
+                toolchain_types.len()
+            );
             if !toolchain_types.is_empty() {
                 use crate::analysis::toolchain_resolution::{
                     PlatformConstraints, RequiredToolchainType, resolve_toolchains,
@@ -666,12 +711,17 @@ async fn run_analysis_with_env_underlying(
                             .values()
                             .filter(|v| v.is_some())
                             .count();
-                        if resolved_count > 0 {
+                        tracing::debug!(
+                            "Toolchain resolution for '{}': {}/{} type(s) resolved",
+                            node.label(),
+                            resolved_count,
+                            result.resolved_toolchains.len()
+                        );
+                        for (type_label, resolved) in &result.resolved_toolchains {
                             tracing::debug!(
-                                "Toolchain resolution for '{}': {}/{} type(s) resolved",
-                                node.label(),
-                                resolved_count,
-                                result.resolved_toolchains.len()
+                                "  {} → {:?}",
+                                type_label,
+                                resolved.as_ref().map(|r| &r.toolchain_impl)
                             );
                         }
                         Some(result)
@@ -690,32 +740,102 @@ async fn run_analysis_with_env_underlying(
             }
         };
 
-        // Build ResolvedToolchains from the resolution result if we got matches.
-        // For now, we store the resolved toolchain impl labels but not the actual
-        // ToolchainInfo providers (those require analyzing the impl targets, which
-        // will be wired in Phase 4 completion). The ToolchainsStub fallback handles
-        // provider access until that's done.
-        let _resolved_toolchains_for_ctx = toolchain_resolution_result.as_ref().and_then(|result| {
+        // Build ResolvedToolchains from the resolution result.
+        // For each resolved toolchain type, analyze the impl target via DICE
+        // to get its real providers. Types that fail analysis get None (the
+        // ResolvedToolchains.at() method falls back to ToolchainsStub behavior).
+        let resolved_toolchains_for_ctx = if let Some(result) = &toolchain_resolution_result {
             let any_resolved = result.resolved_toolchains.values().any(|v| v.is_some());
             if any_resolved {
-                // Log what was resolved for debugging
+                let target_cfg = node.label().cfg().dupe();
+                let mut toolchain_providers = std::collections::HashMap::<
+                    String,
+                    Option<FrozenProviderCollectionValue>,
+                >::new();
+
                 for (type_label, resolved) in &result.resolved_toolchains {
                     if let Some(tc) = resolved {
                         tracing::debug!(
-                            "  {} → impl='{}'",
+                            "  {} → impl='{}', analyzing...",
                             type_label,
                             tc.toolchain_impl
                         );
+
+                        // Try to analyze the toolchain impl target
+                        let provider_value =
+                            match parse_impl_label_to_target_label(&tc.toolchain_impl) {
+                                Some(target_label) => {
+                                    let configured =
+                                        target_label.configure(target_cfg.dupe());
+                                    match dice.get_analysis_result(&configured).await {
+                                        Ok(maybe_compat) => match maybe_compat {
+                                            kuro_core::configuration::compatibility::MaybeCompatible::Compatible(analysis) => {
+                                                match analysis.providers() {
+                                                    Ok(providers) => {
+                                                        let owned = providers.to_owned();
+                                                        tracing::debug!(
+                                                            "  {} → analyzed impl '{}' successfully",
+                                                            type_label,
+                                                            tc.toolchain_impl
+                                                        );
+                                                        Some(owned)
+                                                    }
+                                                    Err(e) => {
+                                                        tracing::debug!(
+                                                            "  {} → providers extraction failed: {}",
+                                                            type_label,
+                                                            e
+                                                        );
+                                                        None
+                                                    }
+                                                }
+                                            }
+                                            _ => {
+                                                tracing::debug!(
+                                                    "  {} → impl '{}' is incompatible",
+                                                    type_label,
+                                                    tc.toolchain_impl
+                                                );
+                                                None
+                                            }
+                                        },
+                                        Err(e) => {
+                                            tracing::debug!(
+                                                "  {} → analysis of impl '{}' failed: {:#}",
+                                                type_label,
+                                                tc.toolchain_impl,
+                                                e
+                                            );
+                                            None
+                                        }
+                                    }
+                                }
+                                None => {
+                                    tracing::debug!(
+                                        "  {} → could not parse impl label '{}'",
+                                        type_label,
+                                        tc.toolchain_impl
+                                    );
+                                    None
+                                }
+                            };
+
+                        toolchain_providers.insert(type_label.clone(), provider_value);
+                    } else {
+                        toolchain_providers.insert(type_label.clone(), None);
                     }
                 }
-                // TODO(Phase 4): Analyze toolchain impl targets and create
-                // ResolvedToolchains with real ToolchainInfo providers.
-                // For now, fall back to ToolchainsStub.
-                None::<()>
+
+                Some(ResolvedToolchains {
+                    toolchains: toolchain_providers,
+                    exec_platform: result.exec_platform.clone(),
+                })
             } else {
                 None
             }
-        });
+        } else {
+            None
+        };
 
         let eval_kind = StarlarkEvalKind::Analysis(node.label().dupe());
         let eval_provider = StarlarkEvaluatorProvider::new(dice, eval_kind).await?;
@@ -735,6 +855,22 @@ async fn run_analysis_with_env_underlying(
                 dice.global_data().get_digest_config(),
                 analysis_env.rule_spec.rule_outputs(),
             );
+
+            // Set resolved toolchains on the context so ctx.toolchains returns
+            // real resolution results instead of ToolchainsStub.
+            if let Some(resolved) = resolved_toolchains_for_ctx {
+                let real_count = resolved.toolchains.values().filter(|v| v.is_some()).count();
+                let total = resolved.toolchains.len();
+                tracing::debug!(
+                    "Setting ResolvedToolchains on ctx for '{}': {}/{} with real providers (exec='{}')",
+                    node.label(),
+                    real_count,
+                    total,
+                    resolved.exec_platform
+                );
+                let resolved_value = eval.heap().alloc(resolved);
+                ctx.set_resolved_toolchains(resolved_value);
+            }
 
             let list_res = analysis_env.rule_spec.invoke(&mut eval, ctx)?;
 
@@ -1005,5 +1141,42 @@ mod tests {
 
         // Invalid: no //
         assert_eq!(parse_registered_toolchain_label("@repo"), None);
+    }
+
+    #[test]
+    fn test_parse_impl_label_to_target_label() {
+        // Standard @repo//pkg:target
+        let label = parse_impl_label_to_target_label("@rules_foreign_cc//toolchains:cmake_impl");
+        assert!(label.is_some());
+        let label = label.unwrap();
+        assert_eq!(label.name().as_str(), "cmake_impl");
+
+        // Root package @repo//:target
+        let label = parse_impl_label_to_target_label("@local_config_cc//:cc-compiler-k8");
+        assert!(label.is_some());
+        let label = label.unwrap();
+        assert_eq!(label.name().as_str(), "cc-compiler-k8");
+
+        // Double @@ prefix
+        let label = parse_impl_label_to_target_label("@@rules_rust//rust:toolchain_impl");
+        assert!(label.is_some());
+
+        // No target (implicit - last component of path)
+        let label = parse_impl_label_to_target_label("@repo//pkg/subpkg");
+        assert!(label.is_some());
+        let label = label.unwrap();
+        assert_eq!(label.name().as_str(), "subpkg");
+
+        // No @ prefix (Kuro internal format)
+        let label = parse_impl_label_to_target_label("local_config_cc//:cc-compiler-k8");
+        assert!(label.is_some());
+        let label = label.unwrap();
+        assert_eq!(label.name().as_str(), "cc-compiler-k8");
+
+        // Relative label (no repo) - should fail
+        assert!(parse_impl_label_to_target_label("//foo:bar").is_none());
+
+        // Invalid: empty target
+        assert!(parse_impl_label_to_target_label("@repo//:").is_none());
     }
 }
