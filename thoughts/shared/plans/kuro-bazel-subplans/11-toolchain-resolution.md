@@ -305,7 +305,11 @@ This removes ~3000 lines of stub code from `context.rs`.
 - [x] Build still reaches same point as before (no regressions)
 - [x] `ResolvedToolchains` type created with `is_in()` and `at()` methods
 - [x] Resolution runs during analysis and logs results at debug level
-- [ ] `ctx.toolchains["@bazel_tools//tools/cpp:toolchain_type"]` returns real CcToolchainInfo
+- [x] `ResolvedToolchains` created with DICE-analyzed impl target providers (falls back to stubs when analysis fails)
+- [x] `ctx.toolchains` returns `ResolvedToolchains` object (with ToolchainsStub fallback for unresolved types)
+- [x] `toolchain_types` correctly extracted from `rule(toolchains=[config_common.toolchain_type(...)])` (ToolchainTypeRequirement parsing fixed)
+- [x] Label normalization strips all `@` prefixes for consistent matching
+- [ ] `ctx.toolchains["@bazel_tools//tools/cpp:toolchain_type"]` returns real CcToolchainInfo (blocked: cc_configure_extension stub)
 - [ ] Stubs fully removed (deferred to after Phase 5 validates extension repos)
 
 #### Manual Verification:
@@ -349,18 +353,23 @@ The resolution order is:
 - [x] `rust_toolchains` materializes with real BUILD.bazel (already exists from Plan 10)
 - [x] Registration collection identifies `local_config_cc_toolchains` as needing materialization
 - [x] Repo existence check correctly scans bazel-external/ for versioned names
-- [ ] `local_config_cc_toolchains` materializes via cc_configure_extension execution
-- [ ] Resolution finds CC toolchains from materialized repos
+- [x] `local_config_cc_toolchains` materializes via cc_configure_extension execution (real BUILD with toolchain() targets)
+- [x] `local_config_cc` materializes with full cc_toolchain definitions and support files
+- [x] Resolution finds CC toolchains from materialized repos (`cc-toolchain-k8` resolves to `local_config_cc//:cc-compiler-k8`)
+- [x] `@bazel_tools//tools/cpp` BUILD updated with aliases to rules_cc and module stubs
+- [ ] `local_config_cc//:cc-compiler-k8` analysis succeeds (blocked: source file target resolution for `builtin_include_directory_paths`)
 
-#### Status Note (2026-03-27):
-The infrastructure is in place: registrations collected, resolution algorithm
-works, analysis wiring done. The remaining gap is triggering `cc_configure_extension`
-execution. The extension repos have `ExtensionRepoCellSetup` from `use_repo()` but
-nothing in the build graph accesses them (because `ToolchainsStub` short-circuits
-real resolution). Options to close the gap:
-1. Make toolchain resolution trigger DICE-based loading of registered toolchain packages
-2. Add eager extension materialization for repos referenced in `register_toolchains()`
-3. Replace `ToolchainsStub` fallback with real resolution (requires #1 or #2 first)
+#### Status Note (2026-04-01):
+Extension repos materialize successfully with real BUILD files containing toolchain()
+targets. cc_configure_extension executes and creates `local_config_cc` (cc_toolchain
+definitions) and `local_config_cc_toolchains` (toolchain() wrappers). Resolution
+correctly matches `@@bazel_tools//tools/cpp:toolchain_type` → `local_config_cc//:cc-compiler-k8`.
+
+Remaining blocker: DICE analysis of `local_config_cc//:cc-compiler-k8` fails because
+the generated BUILD references `:builtin_include_directory_paths` as a source file
+target, which Kuro doesn't create as an implicit target from files on disk. The
+Starlark `cc_toolchain` rule from rules_cc also has deep dependency chains through
+`compiler_deps` filegroup that reference many source files.
 
 ---
 
@@ -462,17 +471,24 @@ extension execution itself must produce valid BUILD.bazel files.
 - [x] 67 registered toolchain packages loaded from manual_test project
 - [x] `@rules_foreign_cc//toolchains` loads 11 real toolchain() targets (55 total across packages)
 - [x] `DeclaredToolchainInfo` registry populated with real toolchain entries
-- [ ] `local_config_cc_toolchains` has real toolchain() targets (blocked: cc_configure_extension stub)
-- [ ] `resolve_toolchains()` returns real CC toolchain match (blocked: same)
-- [ ] `ctx.toolchains` returns real `ToolchainInfo` (not `ToolchainsStub`)
+- [x] `local_config_cc_toolchains` has real toolchain() targets (cc_configure_extension now produces real BUILD files)
+- [x] `resolve_toolchains()` returns real CC toolchain match (cc-toolchain-k8 → local_config_cc//:cc-compiler-k8)
+- [ ] `ctx.toolchains` returns real `ToolchainInfo` (blocked: cc-compiler-k8 analysis fails on source file targets)
 
-#### Status Note (2026-03-31):
-Extension repos like `local_config_cc_toolchains` materialize as stub repos (empty BUILD.bazel)
-because their generating extensions (`cc_configure_extension`) don't execute to produce real
-toolchain definitions. The eager loading infrastructure works end-to-end for non-extension repos
-(e.g., `@rules_foreign_cc//toolchains` produces 55 DeclaredToolchainInfo entries). Closing the
-CC toolchain gap requires fixing `cc_configure_extension` execution to produce real BUILD files
-with `toolchain()` targets.
+#### Status Note (2026-04-01):
+Extension repos `local_config_cc` and `local_config_cc_toolchains` now materialize with real
+BUILD files containing toolchain() targets and cc_toolchain definitions respectively.
+cc_configure_extension executes successfully and creates proper content.
+
+The full resolution pipeline works: register_toolchains → eager package loading →
+DeclaredToolchainInfo registry → resolve_toolchains → DICE analysis of impl targets →
+ResolvedToolchains on ctx. The remaining gap is the DICE analysis of cc-compiler-k8
+failing because the generated BUILD in local_config_cc references source files
+(`:builtin_include_directory_paths`) that aren't exposed as build targets. The
+ToolchainsStub fallback keeps builds working until this is resolved.
+
+The `@bazel_tools//tools/cpp` BUILD was updated to include aliases to rules_cc
+targets (link_dynamic_library, interface_library_builder, etc.) and module tool stubs.
 
 #### Manual Verification:
 - [ ] `//lib/hash:hash` in zeromatter builds using real CC toolchain
