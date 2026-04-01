@@ -10,6 +10,8 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 
 use dice::CancellationContext;
 use dice::DiceComputations;
@@ -33,8 +35,13 @@ use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProvider
 use kuro_build_api::interpreter::rule_defs::provider::collection::ProviderCollection;
 use kuro_build_api::validation::transitive_validations::TransitiveValidations;
 use kuro_build_api::validation::transitive_validations::TransitiveValidationsData;
+use kuro_common::dice::cells::HasCellResolver;
+use kuro_core::cells::cell_path::CellPathRef;
+use kuro_core::cells::name::CellName;
+use kuro_core::cells::paths::CellRelativePath;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::execution_types::execution::ExecutionPlatformResolution;
+use kuro_core::package::PackageLabel;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use kuro_core::unsafe_send_future::UnsafeSendFuture;
@@ -50,7 +57,12 @@ use kuro_interpreter::soft_error::KuroStarlarkSoftErrorHandler;
 use kuro_interpreter::types::rule::FROZEN_PROMISE_ARTIFACT_MAPPINGS_GET_IMPL;
 use kuro_interpreter::types::rule::FROZEN_RULE_GET_IMPL;
 use kuro_interpreter_for_build::rule::FrozenStarlarkRuleCallable;
+use kuro_node::attrs::coerced_attr::CoercedAttr;
+use kuro_node::attrs::inspect_options::AttrInspectOptions;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
+use kuro_node::nodes::frontend::TargetGraphCalculation;
+use kuro_node::rule_type::NativeRuleKind;
+use kuro_node::rule_type::RuleType;
 use kuro_node::rule_type::StarlarkRuleType;
 use starlark::environment::FrozenModule;
 use starlark::environment::Module;
@@ -64,6 +76,8 @@ use starlark::values::ValueTypedComplex;
 use starlark::values::list::ListRef;
 use starlark_map::small_map::SmallMap;
 
+use crate::analysis::native_rule_analysis::DeclaredToolchainInfo;
+use crate::analysis::native_rule_analysis::register_declared_toolchain;
 use crate::analysis::plugins::plugins_to_starlark_value;
 use crate::attrs::resolve::ctx::AnalysisQueryResult;
 use crate::attrs::resolve::ctx::AttrResolutionContext;
@@ -341,6 +355,220 @@ pub fn get_deps_from_analysis_results(
         .collect::<kuro_error::Result<HashMap<ConfiguredTargetLabel, FrozenProviderCollectionValue>>>()
 }
 
+// ============================================================================
+// Eager Toolchain Loading (Phase 6)
+// ============================================================================
+
+/// Flag to ensure registered toolchain packages are loaded only once per session.
+static TOOLCHAINS_LOADING_DONE: AtomicBool = AtomicBool::new(false);
+
+/// Reset the eager loading flag (for fresh builds / daemon restart).
+pub fn reset_toolchain_loading() {
+    TOOLCHAINS_LOADING_DONE.store(false, Ordering::SeqCst);
+}
+
+/// Eagerly load all registered toolchain packages via DICE.
+///
+/// This triggers materialization of extension repos (e.g., `local_config_cc_toolchains`)
+/// and populates the `DeclaredToolchainInfo` registry by extracting toolchain metadata
+/// from each `toolchain()` target in the loaded packages.
+///
+/// Runs once per daemon session, guarded by `TOOLCHAINS_LOADING_DONE`.
+pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>) {
+    if TOOLCHAINS_LOADING_DONE.load(Ordering::SeqCst) {
+        return;
+    }
+
+    let registered = kuro_bzlmod::get_registered_toolchains();
+    if registered.is_empty() {
+        TOOLCHAINS_LOADING_DONE.store(true, Ordering::SeqCst);
+        return;
+    }
+
+    tracing::debug!(
+        "Eagerly loading {} registered toolchain package(s)",
+        registered.len()
+    );
+
+    let cell_resolver = match dice.get_cell_resolver().await {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::debug!("Failed to get cell resolver for toolchain loading: {}", e);
+            TOOLCHAINS_LOADING_DONE.store(true, Ordering::SeqCst);
+            return;
+        }
+    };
+
+    for tc_label_str in &registered {
+        // Parse @repo//pkg:target pattern to extract cell name and package path
+        let (repo_name, pkg_path) = match parse_registered_toolchain_label(tc_label_str) {
+            Some(v) => v,
+            None => {
+                tracing::debug!("Could not parse toolchain label: {}", tc_label_str);
+                continue;
+            }
+        };
+
+        // Resolve cell name (triggers ExtensionRepoCellSetup → lazy materialization)
+        let cell_name = match CellName::unchecked_new(&repo_name) {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::debug!("Invalid cell name '{}': {}", repo_name, e);
+                continue;
+            }
+        };
+
+        // Check that the cell exists in the resolver
+        if cell_resolver.get(cell_name).is_err() {
+            tracing::debug!("Cell '{}' not found in resolver, skipping", repo_name);
+            continue;
+        }
+
+        // Create PackageLabel for the package
+        let cell_rel_path = CellRelativePath::unchecked_new(&pkg_path);
+        let package_label =
+            match PackageLabel::from_cell_path(CellPathRef::new(cell_name, cell_rel_path)) {
+                Ok(p) => p,
+                Err(e) => {
+                    tracing::debug!(
+                        "Failed to create package label for '{}': {}",
+                        tc_label_str,
+                        e
+                    );
+                    continue;
+                }
+            };
+
+        // Load the package via DICE (triggers repo materialization + BUILD.bazel parsing)
+        let eval_result = match dice.get_interpreter_results(package_label.dupe()).await {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::debug!("Failed to load toolchain package '{}': {}", tc_label_str, e);
+                continue;
+            }
+        };
+
+        // Find toolchain() targets and register them in DeclaredToolchainInfo registry
+        let mut registered_count = 0;
+        for (_target_name, target_node) in eval_result.targets().iter() {
+            if matches!(
+                target_node.rule_type(),
+                RuleType::Native(NativeRuleKind::Toolchain)
+            ) {
+                if let Some(info) = extract_toolchain_info_from_node(target_node) {
+                    let label = target_node.label().to_string();
+                    tracing::debug!(
+                        "Eagerly registered toolchain '{}': type='{}', impl='{}'",
+                        label,
+                        info.toolchain_type,
+                        info.toolchain_impl
+                    );
+                    register_declared_toolchain(label, info);
+                    registered_count += 1;
+                }
+            }
+        }
+
+        if registered_count > 0 {
+            tracing::debug!(
+                "Loaded {} toolchain(s) from '{}'",
+                registered_count,
+                tc_label_str
+            );
+        }
+    }
+
+    TOOLCHAINS_LOADING_DONE.store(true, Ordering::SeqCst);
+}
+
+/// Parse a registered toolchain label like `@repo//pkg:target` or `@repo//:all`.
+/// Returns `(repo_name, pkg_path)`.
+fn parse_registered_toolchain_label(label: &str) -> Option<(String, String)> {
+    let stripped = label
+        .strip_prefix("@@")
+        .or_else(|| label.strip_prefix('@'))?;
+    let slash_pos = stripped.find("//")?;
+    let repo_name = &stripped[..slash_pos];
+    if repo_name.is_empty() {
+        return None;
+    }
+    let after_slashes = &stripped[slash_pos + 2..];
+    // Extract package path (before the colon, if any)
+    let pkg_path = if let Some(colon_pos) = after_slashes.find(':') {
+        &after_slashes[..colon_pos]
+    } else {
+        after_slashes
+    };
+    Some((repo_name.to_owned(), pkg_path.to_owned()))
+}
+
+/// Extract DeclaredToolchainInfo from an unconfigured toolchain() target node.
+///
+/// Reads the `toolchain_type`, `toolchain`, `exec_compatible_with`, and
+/// `target_compatible_with` attributes from the CoercedAttr values.
+fn extract_toolchain_info_from_node(
+    target_node: kuro_node::nodes::unconfigured::TargetNodeRef<'_>,
+) -> Option<DeclaredToolchainInfo> {
+    let mut toolchain_type = String::new();
+    let mut toolchain_impl = String::new();
+    let mut exec_compat = Vec::new();
+    let mut target_compat = Vec::new();
+
+    // Read all attributes (including internal ones for constraint lists)
+    for attr in target_node.attrs(AttrInspectOptions::All) {
+        match attr.name {
+            "toolchain_type" => {
+                toolchain_type = extract_label_from_coerced_attr(&attr.value);
+            }
+            "toolchain" => {
+                toolchain_impl = extract_label_from_coerced_attr(&attr.value);
+            }
+            "exec_compatible_with" => {
+                exec_compat = extract_label_list_from_coerced_attr(&attr.value);
+            }
+            "target_compatible_with" => {
+                target_compat = extract_label_list_from_coerced_attr(&attr.value);
+            }
+            _ => {}
+        }
+    }
+
+    if toolchain_type.is_empty() {
+        return None;
+    }
+
+    Some(DeclaredToolchainInfo {
+        toolchain_type,
+        toolchain_impl,
+        exec_compatible_with: exec_compat,
+        target_compatible_with: target_compat,
+    })
+}
+
+/// Extract a label string from a CoercedAttr (dep or label).
+fn extract_label_from_coerced_attr(attr: &CoercedAttr) -> String {
+    match attr {
+        CoercedAttr::Dep(providers_label) => providers_label.target().to_string(),
+        CoercedAttr::Label(providers_label) => providers_label.target().to_string(),
+        CoercedAttr::String(s) => s.0.as_str().to_owned(),
+        _ => String::new(),
+    }
+}
+
+/// Extract a list of label strings from a CoercedAttr (list of deps/labels).
+fn extract_label_list_from_coerced_attr(attr: &CoercedAttr) -> Vec<String> {
+    match attr {
+        CoercedAttr::List(list) => list
+            .iter()
+            .filter_map(|item| {
+                let s = extract_label_from_coerced_attr(item);
+                if s.is_empty() { None } else { Some(s) }
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
 // Used to express that the impl Future below captures multiple named lifetimes.
 // See https://github.com/rust-lang/rust/issues/34511#issuecomment-373423999 for more details.
 trait Captures<'x> {}
@@ -409,9 +637,11 @@ async fn run_analysis_with_env_underlying(
         )?;
 
         // Run toolchain resolution BEFORE entering the Starlark evaluator.
+        // Note: ensure_registered_toolchains_loaded() is called from
+        // calculation.rs::get_analysis_result_inner() which covers all rule types.
         // The resolution reads from the DeclaredToolchainInfo registry which is
-        // populated as toolchain() targets are analyzed during the build.
-        let _toolchain_resolution_result = {
+        // populated by eager loading above and by toolchain() target analysis.
+        let toolchain_resolution_result = {
             let toolchain_types = analysis_env.rule_spec.toolchain_types();
             if !toolchain_types.is_empty() {
                 use crate::analysis::toolchain_resolution::{
@@ -431,21 +661,25 @@ async fn run_analysis_with_env_underlying(
 
                 match resolve_toolchains(&required, &host, &exec_platforms, &[]) {
                     Ok(result) => {
-                        if result.resolved_toolchains.values().any(|v| v.is_some()) {
+                        let resolved_count = result
+                            .resolved_toolchains
+                            .values()
+                            .filter(|v| v.is_some())
+                            .count();
+                        if resolved_count > 0 {
                             tracing::debug!(
-                                "Toolchain resolution: {} type(s) resolved",
-                                result
-                                    .resolved_toolchains
-                                    .values()
-                                    .filter(|v| v.is_some())
-                                    .count()
+                                "Toolchain resolution for '{}': {}/{} type(s) resolved",
+                                node.label(),
+                                resolved_count,
+                                result.resolved_toolchains.len()
                             );
                         }
                         Some(result)
                     }
                     Err(e) => {
                         tracing::debug!(
-                            "Toolchain resolution failed: {} (falling back to stubs)",
+                            "Toolchain resolution failed for '{}': {} (falling back to stubs)",
+                            node.label(),
                             e
                         );
                         None
@@ -455,6 +689,33 @@ async fn run_analysis_with_env_underlying(
                 None
             }
         };
+
+        // Build ResolvedToolchains from the resolution result if we got matches.
+        // For now, we store the resolved toolchain impl labels but not the actual
+        // ToolchainInfo providers (those require analyzing the impl targets, which
+        // will be wired in Phase 4 completion). The ToolchainsStub fallback handles
+        // provider access until that's done.
+        let _resolved_toolchains_for_ctx = toolchain_resolution_result.as_ref().and_then(|result| {
+            let any_resolved = result.resolved_toolchains.values().any(|v| v.is_some());
+            if any_resolved {
+                // Log what was resolved for debugging
+                for (type_label, resolved) in &result.resolved_toolchains {
+                    if let Some(tc) = resolved {
+                        tracing::debug!(
+                            "  {} → impl='{}'",
+                            type_label,
+                            tc.toolchain_impl
+                        );
+                    }
+                }
+                // TODO(Phase 4): Analyze toolchain impl targets and create
+                // ResolvedToolchains with real ToolchainInfo providers.
+                // For now, fall back to ToolchainsStub.
+                None::<()>
+            } else {
+                None
+            }
+        });
 
         let eval_kind = StarlarkEvalKind::Analysis(node.label().dupe());
         let eval_provider = StarlarkEvaluatorProvider::new(dice, eval_kind).await?;
@@ -697,5 +958,52 @@ pub fn get_user_defined_rule_spec(
         name: rule_type.name.clone(),
         implicit_rule_outputs,
         toolchain_types,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_registered_toolchain_label() {
+        // Standard @repo//:all pattern
+        assert_eq!(
+            parse_registered_toolchain_label("@local_config_cc_toolchains//:all"),
+            Some(("local_config_cc_toolchains".to_owned(), "".to_owned()))
+        );
+
+        // Double @@ prefix
+        assert_eq!(
+            parse_registered_toolchain_label("@@rules_rust//rust/toolchain:all"),
+            Some(("rules_rust".to_owned(), "rust/toolchain".to_owned()))
+        );
+
+        // Package path with target
+        assert_eq!(
+            parse_registered_toolchain_label("@rules_cc//cc:toolchain_type"),
+            Some(("rules_cc".to_owned(), "cc".to_owned()))
+        );
+
+        // No target (implicit)
+        assert_eq!(
+            parse_registered_toolchain_label("@repo//pkg"),
+            Some(("repo".to_owned(), "pkg".to_owned()))
+        );
+
+        // Root package
+        assert_eq!(
+            parse_registered_toolchain_label("@repo//:target"),
+            Some(("repo".to_owned(), "".to_owned()))
+        );
+
+        // Invalid: no @ prefix
+        assert_eq!(parse_registered_toolchain_label("//foo:bar"), None);
+
+        // Invalid: empty repo name
+        assert_eq!(parse_registered_toolchain_label("@//:all"), None);
+
+        // Invalid: no //
+        assert_eq!(parse_registered_toolchain_label("@repo"), None);
     }
 }

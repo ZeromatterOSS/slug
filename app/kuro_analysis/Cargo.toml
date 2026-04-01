@@ -25,6 +25,7 @@ starlark = { workspace = true }
 starlark_map = { workspace = true }
 
 kuro_artifact = { workspace = true }
+kuro_bzlmod = { workspace = true }
 kuro_common = { workspace = true }
 kuro_fs = { workspace = true }
 kuro_build_api = { workspace = true }

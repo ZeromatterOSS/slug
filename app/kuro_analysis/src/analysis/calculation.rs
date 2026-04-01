@@ -659,6 +659,11 @@ async fn get_analysis_result_inner(
         MaybeCompatible::Compatible(configured_node) => configured_node,
     };
 
+    // Phase 6: Eagerly load registered toolchain packages so the
+    // DeclaredToolchainInfo registry is populated before resolution runs.
+    // This runs once per session (guarded by AtomicBool in ensure_registered_toolchains_loaded).
+    crate::analysis::env::ensure_registered_toolchains_loaded(ctx).await;
+
     // For precision, grab the *actual* rule type and not the *underlying* rule type.
     let target_rule_type_name = configured_node.rule_type().name().to_owned();
 
