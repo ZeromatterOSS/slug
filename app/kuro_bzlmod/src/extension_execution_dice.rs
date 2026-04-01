@@ -84,8 +84,27 @@ pub fn set_extension_aggregations(
 /// Returns `None` if the extension is not found or aggregation data hasn't been set.
 pub fn create_extension_execution_key(extension_id: &str) -> Option<ModuleExtensionExecutionKey> {
     let guard = EXTENSION_AGGREGATIONS.lock().unwrap();
-    let data = guard.as_ref()?;
-    let aggregated = data.aggregations.get(extension_id)?;
+    let data = match guard.as_ref() {
+        Some(d) => d,
+        None => {
+            tracing::warn!(
+                "create_extension_execution_key: EXTENSION_AGGREGATIONS not set (extension_id='{}')",
+                extension_id
+            );
+            return None;
+        }
+    };
+    let aggregated = match data.aggregations.get(extension_id) {
+        Some(a) => a,
+        None => {
+            tracing::warn!(
+                "create_extension_execution_key: extension '{}' not found in aggregations. Available: {:?}",
+                extension_id,
+                data.aggregations.keys().collect::<Vec<_>>()
+            );
+            return None;
+        }
+    };
     Some(ModuleExtensionExecutionKey::new_with_lockfile(
         aggregated.clone(),
         data.root_module_name.clone(),

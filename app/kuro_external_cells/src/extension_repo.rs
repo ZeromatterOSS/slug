@@ -419,9 +419,11 @@ pub(crate) async fn get_file_ops_delegate(
     // partial materialization (e.g., source downloaded but BUILD.bazel not generated)
     // can leave directories without the completion marker.
     if !source_path.join(".kuro_repo_complete").exists() {
-        tracing::info!(
-            "Extension repo '{}' not materialized, triggering lazy execution",
-            setup.canonical_name
+        tracing::warn!(
+            "Extension repo '{}' not materialized, triggering lazy execution (ext_id='{}', repo_spec_json_empty={})",
+            setup.canonical_name,
+            setup.extension_id,
+            setup.repo_spec_json.is_empty()
         );
 
         // Get the RepoSpec: either from cached JSON or by executing the extension via DICE

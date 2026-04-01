@@ -461,6 +461,20 @@ impl Lockfile {
 
         // Convert lockfile specs back to RepoSpecs
         let repo_specs = ext_data.get_repo_specs()?;
+
+        // Don't treat empty generatedRepoSpecs as a valid cache hit.
+        // Empty specs usually indicate a previous failed/stub execution that
+        // was incorrectly cached (e.g., from a Bazel lockfile or a kuro run
+        // before extension execution was implemented). Re-executing the
+        // extension may produce real repos now.
+        if repo_specs.is_empty() {
+            tracing::debug!(
+                "Extension cache miss for '{}': empty generatedRepoSpecs (forcing re-execution)",
+                extension_id
+            );
+            return None;
+        }
+
         let result = repo_specs
             .iter()
             .map(|(name, spec)| (name.clone(), spec.to_repo_spec()))
