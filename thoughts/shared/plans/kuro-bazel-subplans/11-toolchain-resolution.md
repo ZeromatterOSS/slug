@@ -309,8 +309,29 @@ This removes ~3000 lines of stub code from `context.rs`.
 - [x] `ctx.toolchains` returns `ResolvedToolchains` object (with ToolchainsStub fallback for unresolved types)
 - [x] `toolchain_types` correctly extracted from `rule(toolchains=[config_common.toolchain_type(...)])` (ToolchainTypeRequirement parsing fixed)
 - [x] Label normalization strips all `@` prefixes for consistent matching
-- [ ] `ctx.toolchains["@bazel_tools//tools/cpp:toolchain_type"]` returns real CcToolchainInfo (blocked: cc_configure_extension stub)
-- [ ] Stubs fully removed (deferred to after Phase 5 validates extension repos)
+- [x] `ctx.toolchains["@bazel_tools//tools/cpp:toolchain_type"]` returns real CcToolchainInfo via ToolchainInfo provider extraction
+- [ ] Stubs fully removed (deferred to after cc_toolchain impl analysis works)
+
+#### Status Note (2026-04-01 update):
+Resolved blockers for cc_toolchain_config analysis on Linux:
+- [x] Implicit source file targets (`:builtin_include_directory_paths` resolves)
+- [x] `actions.transform_version_file` / `transform_info_file` stubs
+- [x] `ApplePlatformStub` with `platform_type` for `ctx.fragments.apple.single_arch_platform`
+- [x] `XcodeVersionConfig` provider with `minimum_os_for_platform_type()` method
+- [x] `xcode_config` native rule in `bazel_tools//tools/osx:current_xcode_config`
+- [x] `configuration_field("apple", "xcode_config_label")` resolves to xcode_config target
+- [x] `cc_common_internal.exec_os()` and `target_os()` methods
+- [x] `PackageSpecificationInfo` provider on `package_group` native rule analysis
+- [x] `cc_common_internal.cc_toolchain_features()` (returns CcToolchainFeatures with configure_features/default_features_and_action_configs)
+- [x] `cc_common_internal.cc_toolchain_variables()` (returns build variables) — already implemented
+- [x] Other `_cc_internal` methods: `check_private_api`, `freeze`, `get_artifact_name_for_category` — already implemented
+- [x] `cc_common_internal.solib_symlink_action()` stub (returns artifact unchanged)
+- [x] `FeatureConfiguration.is_enabled()` and `is_requested()` methods
+- [x] Subrule ctx injection for `create_fdo_context` (thread-local ctx + implicit attr injection)
+- [x] `CppFragment.minimum_os_version()`, `interface_shared_objects()`, and other missing methods
+- [x] `ResolvedToolchains.at()` extracts `ToolchainInfo` provider (not raw ProviderCollection)
+- [x] Compiler executable path fixed: `RepositoryPath` Display now renders raw path instead of `<repository_path>` wrapper
+- [x] `hello_bin` and `hello_test_static` build successfully in cc_test_example using real CC toolchain
 
 #### Manual Verification:
 - [ ] `//lib/hash:hash` in zeromatter builds with real CC toolchain from local_config_cc
@@ -357,19 +378,22 @@ The resolution order is:
 - [x] `local_config_cc` materializes with full cc_toolchain definitions and support files
 - [x] Resolution finds CC toolchains from materialized repos (`cc-toolchain-k8` resolves to `local_config_cc//:cc-compiler-k8`)
 - [x] `@bazel_tools//tools/cpp` BUILD updated with aliases to rules_cc and module stubs
-- [ ] `local_config_cc//:cc-compiler-k8` analysis succeeds (blocked: source file target resolution for `builtin_include_directory_paths`)
+- [x] `local_config_cc//:cc-compiler-k8` source file deps resolve (implicit source file targets implemented)
+- [x] `actions.transform_version_file` and `transform_info_file` stubbed for cc_build_info
+- [x] `ctx.fragments.apple.single_arch_platform` returns stub with `platform_type`
+- [x] `local_config_cc//:cc-compiler-k8` full analysis succeeds (cc_toolchain_features, subrule ctx injection, ToolchainInfo extraction all working)
 
-#### Status Note (2026-04-01):
-Extension repos materialize successfully with real BUILD files containing toolchain()
-targets. cc_configure_extension executes and creates `local_config_cc` (cc_toolchain
-definitions) and `local_config_cc_toolchains` (toolchain() wrappers). Resolution
-correctly matches `@@bazel_tools//tools/cpp:toolchain_type` → `local_config_cc//:cc-compiler-k8`.
+#### Status Note (2026-04-01 evening update):
+All blockers for cc_toolchain analysis on Linux resolved:
+- `cc_common_internal.cc_toolchain_features()` implemented (CcToolchainFeatures type)
+- Subrule `create_fdo_context` works via thread-local ctx injection
+- `FeatureConfiguration.is_enabled()` and `is_requested()` methods added
+- `ResolvedToolchains.at()` now extracts ToolchainInfo (not raw ProviderCollection)
+- `CppFragment` extended with `minimum_os_version()`, `interface_shared_objects()`, etc.
+- Removed `static_link_cpp_runtimes` from default features (needs explicit toolchain setup)
 
-Remaining blocker: DICE analysis of `local_config_cc//:cc-compiler-k8` fails because
-the generated BUILD references `:builtin_include_directory_paths` as a source file
-target, which Kuro doesn't create as an implicit target from files on disk. The
-Starlark `cc_toolchain` rule from rules_cc also has deep dependency chains through
-`compiler_deps` filegroup that reference many source files.
+cc_library analysis completes and reaches action execution. The remaining gap is at
+execution time: compiler path uses `<repository_path>` placeholder instead of real path.
 
 ---
 
@@ -473,22 +497,23 @@ extension execution itself must produce valid BUILD.bazel files.
 - [x] `DeclaredToolchainInfo` registry populated with real toolchain entries
 - [x] `local_config_cc_toolchains` has real toolchain() targets (cc_configure_extension now produces real BUILD files)
 - [x] `resolve_toolchains()` returns real CC toolchain match (cc-toolchain-k8 → local_config_cc//:cc-compiler-k8)
-- [ ] `ctx.toolchains` returns real `ToolchainInfo` (blocked: cc-compiler-k8 analysis fails on source file targets)
+- [x] `ctx.toolchains` returns real `ToolchainInfo` (cc_toolchain analysis succeeds, ToolchainInfo extracted from provider collection)
 
 #### Status Note (2026-04-01):
 Extension repos `local_config_cc` and `local_config_cc_toolchains` now materialize with real
 BUILD files containing toolchain() targets and cc_toolchain definitions respectively.
 cc_configure_extension executes successfully and creates proper content.
 
-The full resolution pipeline works: register_toolchains → eager package loading →
+The full resolution pipeline works end-to-end: register_toolchains → eager package loading →
 DeclaredToolchainInfo registry → resolve_toolchains → DICE analysis of impl targets →
-ResolvedToolchains on ctx. The remaining gap is the DICE analysis of cc-compiler-k8
-failing because the generated BUILD in local_config_cc references source files
-(`:builtin_include_directory_paths`) that aren't exposed as build targets. The
-ToolchainsStub fallback keeps builds working until this is resolved.
+ResolvedToolchains on ctx → ToolchainInfo provider extraction → real CcToolchainInfo.
 
-The `@bazel_tools//tools/cpp` BUILD was updated to include aliases to rules_cc
-targets (link_dynamic_library, interface_library_builder, etc.) and module tool stubs.
+**2026-04-01 evening**: All analysis blockers resolved. The pipeline:
+1. `cc_common_internal.cc_toolchain_features()` creates CcToolchainFeatures from CcToolchainConfigInfo
+2. Subrule `create_fdo_context` receives ctx via thread-local injection
+3. `ResolvedToolchains.at()` extracts ToolchainInfo from provider collection
+4. cc_library rules get real CcToolchainInfo with real tool paths and features
+5. Compilation reaches action execution (compiler path still needs fixing)
 
 #### Manual Verification:
 - [ ] `//lib/hash:hash` in zeromatter builds using real CC toolchain
