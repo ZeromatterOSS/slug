@@ -111,6 +111,44 @@ use crate::attrs::starlark_attribute::StarlarkAttribute;
 use crate::interpreter::build_context::BuildContext;
 use crate::interpreter::build_context::PerFileTypeContext;
 
+// Thread-local storage for the current rule's `ctx` value.
+// Set by the analysis pipeline before calling a rule's implementation function,
+// read by subrule invocations to inject `ctx` as the first argument.
+//
+// SAFETY: We store the raw bits of a Value<'v> as a usize. This is safe because:
+// 1. Value is a pointer-sized wrapper (verified by static_assert below)
+// 2. The value is on the evaluator's heap which outlives the subrule call
+// 3. The thread-local is cleared after rule evaluation completes
+thread_local! {
+    static CURRENT_RULE_CTX: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+}
+
+const _: () = assert!(std::mem::size_of::<Value<'_>>() == std::mem::size_of::<usize>());
+
+/// Set the current rule context for subrule invocations.
+/// SAFETY: The caller must ensure the Value outlives any subrule calls.
+pub fn set_current_rule_ctx_raw(ctx_bits: usize) {
+    CURRENT_RULE_CTX.with(|cell| cell.set(Some(ctx_bits)));
+}
+
+/// Clear the current rule context after rule implementation completes.
+pub fn clear_current_rule_ctx() {
+    CURRENT_RULE_CTX.with(|cell| cell.set(None));
+}
+
+/// Get the current rule context Value for subrule use.
+/// SAFETY: The stored bits must have been set by set_current_rule_ctx_raw
+/// from a valid Value that is still alive on the heap.
+fn get_current_rule_ctx<'v>() -> Option<Value<'v>> {
+    CURRENT_RULE_CTX.with(|cell| {
+        cell.get().map(|bits| {
+            // SAFETY: bits were stored from a valid Value<'v> via transmute,
+            // and the Value is alive on the evaluator's heap which outlives this call.
+            unsafe { std::mem::transmute::<usize, Value<'v>>(bits) }
+        })
+    })
+}
+
 /// Errors around subrule declaration and invocation.
 #[derive(Debug, kuro_error::Error)]
 #[kuro(tag = Input)]
@@ -325,13 +363,60 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkSubruleCallable {
         args: &Arguments<'v, '_>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // When a frozen subrule is invoked from a rule's implementation,
-        // we call the implementation function with the provided arguments.
-        // The first argument should be the subrule context (similar to ctx).
-        //
-        // For now, we pass through all arguments to the implementation function.
-        // In a full implementation, we would construct a proper subrule_ctx object.
-        self.implementation.invoke(args, eval)
+        // Bazel subrules auto-inject ctx as first positional argument and resolve
+        // implicit attrs (names starting with _) from the subrule's attr definitions.
+        let heap = eval.heap();
+
+        // Get the rule's ctx from thread-local storage
+        if let Some(ctx) = get_current_rule_ctx() {
+            // Build kwargs dict: implicit attrs (set to None) + caller's named args
+            let mut kwargs_entries: Vec<(Value<'v>, Value<'v>)> = Vec::new();
+
+            // Add implicit attrs (names starting with _) as None
+            for (attr_name, _attr) in &self.attrs {
+                if attr_name.starts_with('_') {
+                    let key = heap.alloc_str(attr_name).to_value();
+                    kwargs_entries.push((key, Value::new_none()));
+                }
+            }
+
+            // Merge caller's named args from the names_map
+            if let Ok(names_map) = args.names_map() {
+                for (k, v) in names_map.iter() {
+                    kwargs_entries.push((k.to_value(), *v));
+                }
+            }
+
+            // Build the kwargs dict using heap.alloc_dict_entries
+            // which takes an iterator of (key, value) pairs.
+            let kwargs_dict_val = {
+                let hashed_entries: Vec<(starlark_map::Hashed<Value<'v>>, Value<'v>)> =
+                    kwargs_entries
+                        .into_iter()
+                        .map(|(k, v)| Ok((k.get_hashed()?, v)))
+                        .collect::<starlark::Result<Vec<(starlark_map::Hashed<Value<'v>>, Value<'v>)>>>()?;
+                let mut sm = starlark::collections::SmallMap::with_capacity(hashed_entries.len());
+                for (k, v) in hashed_entries {
+                    sm.insert_hashed(k, v);
+                }
+                heap.alloc(starlark::values::dict::AllocDict(sm.into_iter()))
+            };
+            // Call implementation with [ctx] as positional args and kwargs dict
+            let impl_val: Value<'v> = self.implementation.to_value();
+            impl_val.invoke_pos_kwargs(&[ctx], Some(kwargs_dict_val), eval)
+        } else {
+            // No ctx available - fall back to pass-through behavior
+            self.implementation.to_value().invoke_pos_kwargs(
+                &[],
+                None,
+                eval,
+            ).or_else(|_| {
+                // If that also fails, try the original arguments
+                let impl_val: Value<'v> = self.implementation.to_value();
+                let pos: Vec<Value<'v>> = args.positions(heap)?.collect();
+                impl_val.invoke_pos_kwargs(&pos, None, eval)
+            })
+        }
     }
 
     fn documentation(&self) -> DocItem {

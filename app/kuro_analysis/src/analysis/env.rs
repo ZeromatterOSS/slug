@@ -1055,7 +1055,18 @@ pub fn get_user_defined_rule_spec(
             ctx: ValueTyped<'v, AnalysisContext<'v>>,
         ) -> kuro_error::Result<Value<'v>> {
             let rule_impl = get_rule_impl(eval, &self.module, &self.name)?;
-            Ok(eval.eval_function(rule_impl.to_value(), &[ctx.to_value()], &[])?)
+
+            // Store the ctx in thread-local for subrule invocations to use.
+            // SAFETY: ctx.to_value() is on the evaluator's heap which outlives eval_function.
+            let ctx_val = ctx.to_value();
+            let ctx_bits: usize = unsafe { std::mem::transmute(ctx_val) };
+            kuro_interpreter_for_build::subrule::set_current_rule_ctx_raw(ctx_bits);
+
+            let result = eval.eval_function(rule_impl.to_value(), &[ctx_val], &[]);
+
+            kuro_interpreter_for_build::subrule::clear_current_rule_ctx();
+
+            Ok(result?)
         }
 
         fn promise_artifact_mappings<'v>(

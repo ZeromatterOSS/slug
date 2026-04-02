@@ -842,4 +842,70 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
 
         Ok(starlark::values::none::NoneType)
     }
+
+    /// Bazel build stamping: transform version file contents.
+    ///
+    /// In Bazel, this reads the volatile workspace status file, applies `transform_func`,
+    /// and writes the result using the template. Kuro stubs this to create an empty
+    /// output file since build stamping is not yet implemented.
+    #[allow(unused_variables)]
+    fn transform_version_file<'v>(
+        this: &AnalysisActions<'v>,
+        #[starlark(require = named)] transform_func: starlark::values::Value<'v>,
+        #[starlark(require = named)] template: starlark::values::Value<'v>,
+        #[starlark(require = named)] output_file_name: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<ValueTyped<'v, StarlarkDeclaredArtifact<'v>>> {
+        let name = eval.heap().alloc_str(output_file_name);
+        stub_transform_file(this, name.as_str(), eval)
+    }
+
+    /// Bazel build stamping: transform info file contents.
+    ///
+    /// In Bazel, this reads the stable workspace status file, applies `transform_func`,
+    /// and writes the result using the template. Kuro stubs this to create an empty
+    /// output file since build stamping is not yet implemented.
+    #[allow(unused_variables)]
+    fn transform_info_file<'v>(
+        this: &AnalysisActions<'v>,
+        #[starlark(require = named)] transform_func: starlark::values::Value<'v>,
+        #[starlark(require = named)] template: starlark::values::Value<'v>,
+        #[starlark(require = named)] output_file_name: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<ValueTyped<'v, StarlarkDeclaredArtifact<'v>>> {
+        let name = eval.heap().alloc_str(output_file_name);
+        stub_transform_file(this, name.as_str(), eval)
+    }
+}
+
+/// Shared implementation for `transform_version_file` and `transform_info_file` stubs.
+/// Creates an output file with placeholder content.
+fn stub_transform_file<'v>(
+    this: &AnalysisActions<'v>,
+    output_file_name: &'v str,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> starlark::Result<ValueTyped<'v, StarlarkDeclaredArtifact<'v>>> {
+    let mut state = this.state()?;
+    let (declaration, output_artifact) = state.get_or_declare_output(
+        eval,
+        OutputArtifactArg::Str(output_file_name),
+        OutputType::File,
+        None,
+    )?;
+    let content_str = eval.heap().alloc_str("// Build stamping not implemented\n");
+    let cmd_args = StarlarkCmdArgs::try_from_value(content_str.to_value())?;
+    let content_cli = CommandLineArg::from_cmd_args(eval.heap().alloc_typed(cmd_args));
+    let action = UnregisteredWriteAction {
+        is_executable: false,
+        macro_files: None,
+        absolute: false,
+        use_dep_files_placeholder_for_content_based_paths: false,
+    };
+    state.register_action(
+        indexset![output_artifact],
+        action,
+        Some(content_cli.to_value()),
+        None,
+    )?;
+    Ok(declaration.into_declared_artifact(AssociatedArtifacts::new()))
 }

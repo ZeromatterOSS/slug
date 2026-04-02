@@ -107,6 +107,7 @@ pub fn resolve_configuration_field_to_label(fragment: &str, name: &str) -> Optio
             // still uses protoc_minimal. Only toolchains without that override (python, etc.) use this.
             Some("@bazel_tools//tools/proto:system_protoc")
         }
+        ("apple", "xcode_config_label") => Some("@bazel_tools//tools/osx:current_xcode_config"),
         _ => None,
     }
 }

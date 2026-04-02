@@ -164,14 +164,24 @@ impl<'v> StarlarkValue<'v> for RepositoryAttr {
 // ============================================================================
 
 /// Represents a path within a repository being created.
-#[derive(Debug, Display, ProvidesStaticType, NoSerialize, Allocative, Clone)]
-#[display("<repository_path {}>", path)]
+///
+/// In Bazel, `repository_ctx.path()` returns a path object whose string
+/// representation is just the raw path (e.g., "/usr/bin/gcc"). This is critical
+/// because repository rules use string interpolation to embed paths into
+/// generated BUILD files.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Clone)]
 pub struct RepositoryPath {
     /// The path string (absolute path).
     path: String,
     /// The base directory for the repository.
     #[allocative(skip)]
     base_dir: Option<Arc<PathBuf>>,
+}
+
+impl std::fmt::Display for RepositoryPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.path)
+    }
 }
 
 starlark_simple_value!(RepositoryPath);

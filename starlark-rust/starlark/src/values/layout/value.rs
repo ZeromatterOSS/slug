@@ -709,6 +709,24 @@ impl<'v> Value<'v> {
         self.invoke(&params, eval)
     }
 
+    /// Invoke a callable value with positional arguments and optional kwargs dict.
+    ///
+    /// This is a public API for calling Starlark functions from native code
+    /// when you need to pass both positional and keyword arguments.
+    pub fn invoke_pos_kwargs(
+        self,
+        pos: &[Value<'v>],
+        kwargs: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> crate::Result<Value<'v>> {
+        let params = Arguments(ArgumentsFull {
+            pos,
+            kwargs,
+            ..ArgumentsFull::default()
+        });
+        self.invoke(&params, eval)
+    }
+
     fn check_callable(self) -> crate::Result<()> {
         if !self.vtable().starlark_value.HAS_invoke {
             return Err(value_error!(

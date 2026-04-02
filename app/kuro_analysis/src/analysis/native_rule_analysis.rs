@@ -146,7 +146,7 @@ pub fn analyze_native_rule(
             analyze_config_setting(target, dep_analysis, flag_values_match, values_match)
         }
         NativeRuleKind::ToolchainType => create_minimal_analysis_result(target),
-        NativeRuleKind::PackageGroup => create_minimal_analysis_result(target),
+        NativeRuleKind::PackageGroup => analyze_package_group(target),
         NativeRuleKind::Genrule => analyze_genrule(target, configured_node, dep_analysis),
         NativeRuleKind::Platform => analyze_platform(target, dep_analysis),
         NativeRuleKind::CcLibrary => create_cc_analysis_result(target),
@@ -168,6 +168,7 @@ pub fn analyze_native_rule(
         NativeRuleKind::CcImport => create_cc_analysis_result(target),
         NativeRuleKind::CcSharedLibrary => create_cc_analysis_result(target),
         NativeRuleKind::EnvironmentGroup => create_minimal_analysis_result(target),
+        NativeRuleKind::XcodeConfig => analyze_xcode_config(target),
     }
 }
 
@@ -1780,6 +1781,132 @@ fn extract_label_strings_from_attr(attr: &ConfiguredAttr) -> Vec<String> {
 
 /// Create a minimal analysis result with just DefaultInfo.
 /// This is used for native rules that don't need complex provider creation.
+/// Analyze package_group native rule.
+///
+/// Provides PackageSpecificationInfo (required by cc_toolchain's allow_list attributes)
+/// alongside DefaultInfo.
+fn analyze_package_group(target: &ConfiguredTargetLabel) -> kuro_error::Result<AnalysisResult> {
+    use kuro_build_api::interpreter::rule_defs::cc_common::PackageSpecificationInfoInstanceGen;
+    use kuro_build_api::interpreter::rule_defs::cc_common::PackageSpecificationInfoProvider;
+    use starlark::values::FrozenValue;
+
+    let heap = FrozenHeap::new();
+
+    let default_info = FrozenDefaultInfo::testing_empty(&heap);
+    let pkg_spec = heap.alloc_simple(PackageSpecificationInfoInstanceGen {
+        packages: FrozenValue::new_empty_list(),
+    });
+
+    let providers = SmallMap::from_iter([
+        (
+            DefaultInfoCallable::provider_id().dupe(),
+            default_info.to_frozen_value(),
+        ),
+        (
+            PackageSpecificationInfoProvider::provider_id().dupe(),
+            pkg_spec,
+        ),
+    ]);
+
+    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+        heap.alloc(FrozenProviderCollection::new(providers)),
+    )?;
+
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+
+    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+        value: FrozenAnalysisValueStorage::new_native(
+            self_key.dupe(),
+            DYNAMIC_LAMBDA_PARAMS_STORAGES
+                .get()
+                .unwrap()
+                .new_frozen_dynamic_lambda_params_storage(),
+            Some(provider_collection),
+        ),
+    });
+
+    let heap_ref = heap.into_ref();
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
+
+    let recorded_values = RecordedAnalysisValues::new_native(
+        self_key,
+        Some(analysis_storage),
+        RecordedActions::new(0),
+    );
+
+    Ok(AnalysisResult::new(
+        recorded_values,
+        None,
+        HashMap::new(),
+        0,
+        0,
+        None,
+    ))
+}
+
+/// Analyze xcode_config native rule.
+///
+/// Provides XcodeVersionConfig with stub values for non-Apple platforms.
+/// The generated cc_toolchain_config.bzl accesses this unconditionally via
+/// `ctx.attr._xcode_config[apple_common.XcodeVersionConfig]`.
+fn analyze_xcode_config(target: &ConfiguredTargetLabel) -> kuro_error::Result<AnalysisResult> {
+    use kuro_build_api::interpreter::rule_defs::apple_common::XcodeVersionConfigInstance;
+    use kuro_build_api::interpreter::rule_defs::apple_common::XcodeVersionConfigProvider;
+
+    let heap = FrozenHeap::new();
+
+    let default_info = FrozenDefaultInfo::testing_empty(&heap);
+    let xcode_config = heap.alloc_simple(XcodeVersionConfigInstance);
+
+    let providers = SmallMap::from_iter([
+        (
+            DefaultInfoCallable::provider_id().dupe(),
+            default_info.to_frozen_value(),
+        ),
+        (
+            XcodeVersionConfigProvider::provider_id().dupe(),
+            xcode_config,
+        ),
+    ]);
+
+    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
+        heap.alloc(FrozenProviderCollection::new(providers)),
+    )?;
+
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
+
+    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
+        value: FrozenAnalysisValueStorage::new_native(
+            self_key.dupe(),
+            DYNAMIC_LAMBDA_PARAMS_STORAGES
+                .get()
+                .unwrap()
+                .new_frozen_dynamic_lambda_params_storage(),
+            Some(provider_collection),
+        ),
+    });
+
+    let heap_ref = heap.into_ref();
+    let analysis_storage =
+        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
+
+    let recorded_values = RecordedAnalysisValues::new_native(
+        self_key,
+        Some(analysis_storage),
+        RecordedActions::new(0),
+    );
+
+    Ok(AnalysisResult::new(
+        recorded_values,
+        None,
+        HashMap::new(),
+        0,
+        0,
+        None,
+    ))
+}
+
 fn create_minimal_analysis_result(
     target: &ConfiguredTargetLabel,
 ) -> kuro_error::Result<AnalysisResult> {

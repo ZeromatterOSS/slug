@@ -389,7 +389,6 @@ fn default_cc_features() -> Vec<&'static str> {
         "supports_dynamic_linker",
         "supports_interface_shared_libraries",
         "supports_start_end_lib",
-        "static_link_cpp_runtimes",
         "compiler_param_file",
         "linker_param_file",
         // Compilation modes
@@ -484,7 +483,145 @@ impl Display for FeatureConfiguration {
 starlark_simple_value!(FeatureConfiguration);
 
 #[starlark_value(type = "FeatureConfiguration")]
-impl<'v> StarlarkValue<'v> for FeatureConfiguration {}
+impl<'v> StarlarkValue<'v> for FeatureConfiguration {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(feature_configuration_methods)
+    }
+}
+
+#[starlark_module]
+fn feature_configuration_methods(builder: &mut MethodsBuilder) {
+    /// Returns whether a given feature is enabled.
+    fn is_enabled(
+        #[starlark(this)] this: &FeatureConfiguration,
+        feature: &str,
+    ) -> starlark::Result<bool> {
+        Ok(this.is_feature_enabled(feature))
+    }
+
+    /// Returns whether a given feature was requested (i.e., is enabled).
+    /// In Bazel, is_requested checks if the feature was explicitly requested,
+    /// but for our purposes it's equivalent to is_enabled.
+    fn is_requested(
+        #[starlark(this)] this: &FeatureConfiguration,
+        feature: &str,
+    ) -> starlark::Result<bool> {
+        Ok(this.is_feature_enabled(feature))
+    }
+}
+
+// ============================================================================
+// CcToolchainFeatures - Toolchain feature configuration object
+// ============================================================================
+
+/// Object returned by `cc_common_internal.cc_toolchain_features()`.
+///
+/// Stores the feature names and action config names from the CcToolchainConfigInfo.
+/// Provides `configure_features()` which creates a FeatureConfiguration and
+/// `default_features_and_action_configs()` which returns the list of default
+/// feature/action_config names.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Clone)]
+pub struct CcToolchainFeatures {
+    /// Names of features declared in the toolchain config
+    feature_names: Vec<String>,
+    /// Names of features that are enabled by default
+    default_enabled_features: Vec<String>,
+    /// Names of action configs declared in the toolchain config
+    action_config_names: Vec<String>,
+    /// The tools directory path (reserved for future use in tool path resolution)
+    #[allow(dead_code)]
+    tools_directory: String,
+}
+
+impl Display for CcToolchainFeatures {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "CcToolchainFeatures(features={}, action_configs={})",
+            self.feature_names.len(),
+            self.action_config_names.len()
+        )
+    }
+}
+
+starlark_simple_value!(CcToolchainFeatures);
+
+#[starlark_value(type = "CcToolchainFeatures")]
+impl<'v> StarlarkValue<'v> for CcToolchainFeatures {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(cc_toolchain_features_methods)
+    }
+}
+
+#[starlark_module]
+fn cc_toolchain_features_methods(builder: &mut MethodsBuilder) {
+    /// Creates a FeatureConfiguration from the requested features.
+    ///
+    /// Called by rules_cc's configure_features.bzl to produce the final
+    /// feature configuration for a cc_toolchain.
+    fn configure_features<'v>(
+        #[starlark(this)] this: &CcToolchainFeatures,
+        #[starlark(require = named)] requested_features: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<FeatureConfiguration> {
+        let heap = eval.heap();
+        let mut requested: Vec<String> = Vec::new();
+        if let Ok(iter) = requested_features.iterate(heap) {
+            for item in iter {
+                if let Some(s) = item.unpack_str() {
+                    requested.push(s.to_owned());
+                }
+            }
+        }
+
+        // Start with the default platform features
+        let mut enabled: Vec<String> = default_cc_features()
+            .into_iter()
+            .map(|s| s.to_owned())
+            .collect();
+
+        // Add features that are enabled by default in the toolchain config
+        for f in &this.default_enabled_features {
+            if !enabled.iter().any(|e| e == f) {
+                enabled.push(f.clone());
+            }
+        }
+
+        // Add all requested features
+        for f in &requested {
+            if !enabled.iter().any(|e| e == f) {
+                enabled.push(f.clone());
+            }
+        }
+
+        Ok(FeatureConfiguration {
+            enabled_features: enabled,
+        })
+    }
+
+    /// Returns the list of default feature and action_config names.
+    ///
+    /// Called by rules_cc's configure_features.bzl (line 146) to collect
+    /// default features from the toolchain config.
+    fn default_features_and_action_configs(
+        #[starlark(this)] this: &CcToolchainFeatures,
+    ) -> starlark::Result<Vec<String>> {
+        let mut result: Vec<String> = Vec::new();
+        // Add features that are enabled by default
+        for f in &this.default_enabled_features {
+            result.push(f.clone());
+        }
+        // Add all action config names (they act as implicit features)
+        for a in &this.action_config_names {
+            if !result.contains(a) {
+                result.push(a.clone());
+            }
+        }
+        Ok(result)
+    }
+}
 
 // ============================================================================
 // CcCompilationContext - Compilation context for C++ builds
@@ -2646,6 +2783,120 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         // TODO(cc_common): Implement proper HeaderInfo with deps
         Ok(eval.heap().alloc(HeaderInfoStub))
+    }
+
+    /// Creates a toolchain features object from CcToolchainConfigInfo.
+    ///
+    /// Called by rules_cc's cc_common.bzl which delegates to this native method.
+    /// The returned object has `configure_features()` and
+    /// `default_features_and_action_configs()` methods used by configure_features.bzl.
+    #[allow(unused_variables)]
+    fn cc_toolchain_features<'v>(
+        #[starlark(this)] this: &CcCommonInternal,
+        #[starlark(require = named)] toolchain_config_info: Value<'v>,
+        #[starlark(require = named)] tools_directory: &str,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<CcToolchainFeatures> {
+        let heap = eval.heap();
+        let mut feature_names = Vec::new();
+        let mut default_enabled_features = Vec::new();
+        let mut action_config_names = Vec::new();
+
+        // Extract feature names from toolchain_config_info.features
+        if let Ok(Some(features_val)) = toolchain_config_info.get_attr("features", heap) {
+            if !features_val.is_none() {
+                if let Ok(iter) = features_val.iterate(heap) {
+                    for feature in iter {
+                        // Each feature is a struct with .name and .enabled fields
+                        if let Ok(Some(name_val)) = feature.get_attr("name", heap) {
+                            if let Some(name) = name_val.unpack_str() {
+                                feature_names.push(name.to_owned());
+                                // Check if enabled by default
+                                if let Ok(Some(enabled_val)) = feature.get_attr("enabled", heap) {
+                                    if enabled_val.unpack_bool() == Some(true) {
+                                        default_enabled_features.push(name.to_owned());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Extract action_config names from toolchain_config_info.action_configs
+        if let Ok(Some(configs_val)) = toolchain_config_info.get_attr("action_configs", heap) {
+            if !configs_val.is_none() {
+                if let Ok(iter) = configs_val.iterate(heap) {
+                    for config in iter {
+                        if let Ok(Some(name_val)) = config.get_attr("action_name", heap) {
+                            if let Some(name) = name_val.unpack_str() {
+                                action_config_names.push(name.to_owned());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(CcToolchainFeatures {
+            feature_names,
+            default_enabled_features,
+            action_config_names,
+            tools_directory: tools_directory.to_owned(),
+        })
+    }
+
+    /// Creates a solib symlink for a shared library artifact.
+    ///
+    /// In Bazel, this creates a symlink in the solib directory for dynamic linking.
+    /// For now, returns the artifact unchanged since we don't need the symlink
+    /// for local execution.
+    #[allow(unused_variables)]
+    fn solib_symlink_action<'v>(
+        #[starlark(this)] this: &CcCommonInternal,
+        #[starlark(require = named)] ctx: Value<'v>,
+        #[starlark(require = named)] artifact: Value<'v>,
+        #[starlark(require = named)] solib_directory: &str,
+        #[starlark(require = named)] runtime_solib_dir_base: &str,
+    ) -> starlark::Result<Value<'v>> {
+        // Return the artifact unchanged - symlinks aren't needed for local execution
+        Ok(artifact)
+    }
+
+    /// Returns the exec platform OS name.
+    /// Used by cc_toolchain_config_info.bzl to tag the toolchain config.
+    #[allow(unused_variables)]
+    fn exec_os<'v>(
+        #[starlark(this)] this: &CcCommonInternal,
+        #[starlark(require = pos)] ctx: Value<'v>,
+    ) -> starlark::Result<String> {
+        if cfg!(target_os = "linux") {
+            Ok("linux".to_owned())
+        } else if cfg!(target_os = "macos") {
+            Ok("darwin".to_owned())
+        } else if cfg!(target_os = "windows") {
+            Ok("windows".to_owned())
+        } else {
+            Ok("unknown".to_owned())
+        }
+    }
+
+    /// Returns the target platform OS name.
+    #[allow(unused_variables)]
+    fn target_os<'v>(
+        #[starlark(this)] this: &CcCommonInternal,
+        #[starlark(require = pos)] ctx: Value<'v>,
+    ) -> starlark::Result<String> {
+        if cfg!(target_os = "linux") {
+            Ok("linux".to_owned())
+        } else if cfg!(target_os = "macos") {
+            Ok("darwin".to_owned())
+        } else if cfg!(target_os = "windows") {
+            Ok("windows".to_owned())
+        } else {
+            Ok("unknown".to_owned())
+        }
     }
 }
 
@@ -7106,7 +7357,7 @@ impl ProviderCallableLike for PackageSpecificationInfoProvider {
 #[repr(C)]
 pub struct PackageSpecificationInfoInstanceGen<V: ValueLifetimeless> {
     /// List of package specifications (strings like "//pkg", "//pkg/...").
-    packages: V,
+    pub packages: V,
 }
 
 starlark_complex_value!(pub PackageSpecificationInfoInstance);

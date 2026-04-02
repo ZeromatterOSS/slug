@@ -23,6 +23,9 @@ use kuro_core::package::package_relative_path::PackageRelativePath;
 use kuro_core::target::name::TargetNameRef;
 use kuro_events::dispatch::console_message;
 use kuro_interpreter::package_imports::ImplicitImport;
+use kuro_node::attrs::attr_type::list::ListLiteral;
+use kuro_node::attrs::coerced_attr::CoercedAttr;
+use kuro_node::attrs::coerced_path::CoercedPath;
 use kuro_node::nodes::eval_result::EvaluationResult;
 use kuro_node::nodes::targets_map::TargetsMap;
 use kuro_node::nodes::targets_map::TargetsMapRecordError;
@@ -31,11 +34,14 @@ use kuro_node::oncall::Oncall;
 use kuro_node::package::Package;
 use kuro_node::super_package::SuperPackage;
 use kuro_node::visibility::VisibilitySpecification;
+use kuro_util::arc_str::ArcSlice;
 use starlark::environment::FrozenModule;
 use starlark::values::OwnedFrozenValue;
 
 use crate::attrs::coerce::ctx::BuildAttrCoercionContext;
 use crate::interpreter::globspec::GlobSpec;
+use crate::interpreter::native_rules::create_native_target_node;
+use crate::interpreter::native_rules::rule_defs;
 
 impl From<ModuleInternals> for EvaluationResult {
     // TODO(cjhopman): Let's make this an `into_evaluation_result()` on ModuleInternals instead.
@@ -45,11 +51,32 @@ impl From<ModuleInternals> for EvaluationResult {
             imports,
             buildfile_path,
             super_package,
+            package_listing,
+            attr_coercion_context,
+            build_file_default_visibility,
             ..
         } = internals;
         let recorder = match state.into_inner() {
             State::BeforeTargets(_) => TargetsRecorder::new(),
-            State::RecordingTargets(RecordingTargets { recorder, .. }) => recorder,
+            State::RecordingTargets(RecordingTargets {
+                mut recorder,
+                package,
+            }) => {
+                // Bazel compatibility: source files in a package are implicitly available
+                // as targets. Register any file in the package that doesn't already have
+                // a corresponding rule target.
+                let default_vis = build_file_default_visibility
+                    .into_inner()
+                    .unwrap_or_else(|| super_package.visibility().dupe());
+                register_implicit_source_file_targets(
+                    &package_listing,
+                    &package,
+                    &attr_coercion_context,
+                    &default_vis,
+                    &mut recorder,
+                );
+                recorder
+            }
         };
         EvaluationResult::new(buildfile_path, imports, super_package, recorder.take())
     }
@@ -409,5 +436,86 @@ impl TargetsRecorder {
 
     fn take(self) -> TargetsMap {
         self.targets
+    }
+}
+
+/// Bazel compatibility: register implicit source file targets for files in the package.
+///
+/// In Bazel, every source file in a package directory is implicitly available as a
+/// build target. For example, if a package contains `foo.txt`, it can be referenced
+/// as `:foo.txt` in BUILD files without needing `exports_files(["foo.txt"])`.
+///
+/// This creates a filegroup target for each file that doesn't already have a rule
+/// target with the same name.
+fn register_implicit_source_file_targets(
+    package_listing: &PackageListing,
+    package: &Arc<Package>,
+    coercion_ctx: &BuildAttrCoercionContext,
+    default_visibility: &VisibilitySpecification,
+    recorder: &mut TargetsRecorder,
+) {
+    let buildfile_name = package_listing.buildfile().as_str();
+    let mut count = 0usize;
+
+    for file_path in package_listing.files().files() {
+        let file_str = file_path.as_str();
+
+        // Skip the build file itself
+        if file_str == buildfile_name {
+            continue;
+        }
+
+        // Use the file path as the target name
+        let target_name = file_str;
+
+        // Skip if target name is not valid for Kuro
+        if TargetNameRef::new(target_name).is_err() {
+            continue;
+        }
+
+        // Skip if a rule target with this name already exists
+        if recorder
+            .targets
+            .contains_key(TargetNameRef::unchecked_new(target_name))
+        {
+            continue;
+        }
+
+        // Construct the source file attribute directly (without Starlark coercion).
+        // filegroup srcs is AttrType::list(one_of(dep=0, source=1)), so the
+        // source variant index is 1.
+        let source_file = CoercedAttr::SourceFile(CoercedPath::File(file_path.to_arc()));
+        let one_of = CoercedAttr::OneOf(Box::new(source_file), 1);
+        let srcs_list = CoercedAttr::List(ListLiteral(ArcSlice::new([one_of])));
+        let data_list = CoercedAttr::List(ListLiteral(ArcSlice::default()));
+
+        let target_node = match create_native_target_node(
+            rule_defs::FILEGROUP_RULE.clone(),
+            package.clone(),
+            target_name,
+            vec![
+                ("srcs".to_owned(), srcs_list),
+                ("data".to_owned(), data_list),
+            ],
+            &[],
+            coercion_ctx,
+            default_visibility,
+        ) {
+            Ok(node) => node,
+            Err(_) => continue,
+        };
+
+        // Silently skip if registration fails (e.g., duplicate target)
+        if recorder.record(target_node).is_ok() {
+            count += 1;
+        }
+    }
+
+    if count > 0 {
+        tracing::debug!(
+            "Registered {} implicit source file targets for package '{}'",
+            count,
+            package.buildfile_path.package()
+        );
     }
 }

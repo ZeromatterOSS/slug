@@ -17,20 +17,27 @@
 
 use std::fmt;
 use std::fmt::Display;
+use std::sync::Arc;
+use std::sync::OnceLock;
 
 use allocative::Allocative;
+use kuro_core::provider::id::ProviderId;
+use kuro_interpreter::types::provider::callable::ProviderCallableLike;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
+use starlark::values::Demand;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
 use starlark::values::starlark_value;
+
+use crate::interpreter::rule_defs::provider::ProviderLike;
 
 // ============================================================================
 // AppleCommonModule - The main apple_common namespace
@@ -207,9 +214,23 @@ fn platform_type_attrs(builder: &mut MethodsBuilder) {
 // XcodeVersionConfigProvider
 // ============================================================================
 
-/// XcodeVersionConfig provider type.
+/// XcodeVersionConfig provider callable (key).
+///
+/// Used as the provider key in `dep[apple_common.XcodeVersionConfig]`.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct XcodeVersionConfigProvider;
+
+impl XcodeVersionConfigProvider {
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "XcodeVersionConfig".to_owned(),
+            })
+        })
+    }
+}
 
 impl Display for XcodeVersionConfigProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -219,8 +240,75 @@ impl Display for XcodeVersionConfigProvider {
 
 starlark_simple_value!(XcodeVersionConfigProvider);
 
+impl ProviderCallableLike for XcodeVersionConfigProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
 #[starlark_value(type = "XcodeVersionConfig")]
-impl<'v> StarlarkValue<'v> for XcodeVersionConfigProvider {}
+impl<'v> StarlarkValue<'v> for XcodeVersionConfigProvider {
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+/// XcodeVersionConfig provider instance.
+///
+/// Stub instance for non-Apple platforms. Provides `minimum_os_for_platform_type()`
+/// which returns a default version string. On non-Apple platforms, the version value
+/// is meaningless (used in macOS-specific compiler flags that are never executed).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct XcodeVersionConfigInstance;
+
+impl Display for XcodeVersionConfigInstance {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "XcodeVersionConfig(stub)")
+    }
+}
+
+starlark_simple_value!(XcodeVersionConfigInstance);
+
+impl<'v> ProviderLike<'v> for XcodeVersionConfigInstance {
+    fn id(&self) -> &Arc<ProviderId> {
+        XcodeVersionConfigProvider::provider_id()
+    }
+
+    fn items(&self) -> Vec<(&str, Value<'v>)> {
+        vec![]
+    }
+}
+
+#[starlark_value(type = "XcodeVersionConfigInstance")]
+impl<'v> StarlarkValue<'v> for XcodeVersionConfigInstance {
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderLike>(self);
+    }
+
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(xcode_version_config_instance_methods)
+    }
+}
+
+#[starlark_module]
+fn xcode_version_config_instance_methods(builder: &mut MethodsBuilder) {
+    /// Returns the minimum OS version for the given platform type.
+    /// On non-Apple platforms, returns a default version string.
+    fn minimum_os_for_platform_type(
+        #[allow(unused_variables)] this: &XcodeVersionConfigInstance,
+        #[starlark(require = pos)] platform_type: &str,
+    ) -> starlark::Result<String> {
+        Ok("10.0".to_owned())
+    }
+
+    /// Returns the Xcode version string. Stub returns "0.0".
+    fn xcode_version(
+        #[allow(unused_variables)] this: &XcodeVersionConfigInstance,
+    ) -> starlark::Result<String> {
+        Ok("0.0".to_owned())
+    }
+}
 
 // ============================================================================
 // AppleDynamicFrameworkProvider

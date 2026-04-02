@@ -491,6 +491,66 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         Ok(heap.alloc(AllocList::EMPTY))
     }
+
+    /// Returns the minimum OS version string, or None if not set.
+    fn minimum_os_version(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// Returns the FDO path, or None if not set.
+    fn fdo_path(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// Returns the CS-FDO path, or None if not set.
+    fn cs_fdo_path(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// Returns the Propeller optimize CC profile path, or None.
+    fn propeller_optimize_absolute_cc_profile(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// Returns the Propeller optimize LD profile path, or None.
+    fn propeller_optimize_absolute_ld_profile(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// Whether proto profile is enabled.
+    fn proto_profile(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Returns the libc_top label, or None.
+    fn libc_top(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// Returns the zipper tool label, or None.
+    fn zipper(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<NoneType> {
+        Ok(NoneType)
+    }
+
+    /// Whether stamp binaries is enabled.
+    fn stamp_binaries(#[allow(unused_variables)] this: &CppFragment) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    /// Whether interface shared objects are enabled.
+    /// In Bazel, this controls whether .ifso (interface shared object) files
+    /// are generated for shared libraries.
+    fn interface_shared_objects(
+        #[allow(unused_variables)] this: &CppFragment,
+    ) -> starlark::Result<bool> {
+        Ok(false)
+    }
 }
 
 /// Detect the compiler identifier for the current platform.
@@ -858,6 +918,35 @@ fn java_fragment_methods(builder: &mut MethodsBuilder) {
 // AppleFragment - Apple configuration fragment
 // ============================================================================
 
+/// Stub for Apple platform objects returned by `ctx.fragments.apple.single_arch_platform`.
+/// Provides `platform_type` and other attributes that cc_toolchain_config.bzl accesses.
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct ApplePlatformStub;
+
+impl Display for ApplePlatformStub {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<apple_platform>")
+    }
+}
+
+starlark_simple_value!(ApplePlatformStub);
+
+#[starlark_value(type = "apple_platform")]
+impl<'v> StarlarkValue<'v> for ApplePlatformStub {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "platform_type" | "name_in_plist" | "is_device")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "platform_type" => Some(heap.alloc("macos")),
+            "name_in_plist" => Some(heap.alloc("MacOSX")),
+            "is_device" => Some(heap.alloc(false)),
+            _ => None,
+        }
+    }
+}
+
 /// Apple configuration fragment stub.
 ///
 /// Accessed via `ctx.fragments.apple`. Returns safe defaults for Apple platform settings.
@@ -886,7 +975,8 @@ impl<'v> StarlarkValue<'v> for AppleFragment {
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "single_arch_platform" | "bitcode_mode" => Some(heap.alloc(NoneType)),
+            "single_arch_platform" => Some(heap.alloc(ApplePlatformStub)),
+            "bitcode_mode" => Some(heap.alloc("none")),
             "single_arch_cpu" => {
                 if cfg!(target_arch = "aarch64") {
                     Some(heap.alloc("arm64"))

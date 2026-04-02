@@ -2084,15 +2084,15 @@ impl<'v> StarlarkValue<'v> for ResolvedToolchains {
             .and_then(|opt| opt.as_ref());
 
         if let Some(providers) = provider_collection {
-            // Return the provider collection as a value. In Bazel,
-            // ctx.toolchains[TYPE] returns the ToolchainInfo which wraps the
-            // impl target's providers. Here we return the full collection,
-            // which allows rules to index into it (e.g., toolchain.cc).
-            //
-            // SAFETY: The FrozenValue is kept alive by the OwnedFrozenValueTyped
-            // inside FrozenProviderCollectionValue, which holds an Arc to the
-            // owning FrozenModule. The ResolvedToolchains struct lives on the
-            // Starlark heap and keeps the FrozenProviderCollectionValue alive.
+            // In Bazel, ctx.toolchains[TYPE] returns the ToolchainInfo provider
+            // (platform_common.ToolchainInfo), NOT the entire provider collection.
+            // Look for ToolchainInfo in the resolved provider collection.
+            let toolchain_info_id = crate::interpreter::rule_defs::platform_common::ToolchainInfoProvider::provider_id();
+            if let Some(fv) = providers.provider_collection().get_provider_raw(toolchain_info_id) {
+                return Ok(fv.to_value());
+            }
+
+            // If no ToolchainInfo found, return the full collection as fallback.
             let fv = unsafe { providers.value().to_frozen_value() };
             return Ok(fv.to_value());
         }
@@ -3807,6 +3807,12 @@ fn build_configuration_stub_methods(builder: &mut MethodsBuilder) {
     fn has_separate_genfiles_directory(this: &BuildConfigurationStub) -> starlark::Result<bool> {
         let _ = this;
         Ok(false)
+    }
+
+    /// Returns whether build stamping is enabled.
+    fn stamp_binaries(this: &BuildConfigurationStub) -> starlark::Result<bool> {
+        let _ = this;
+        Ok(crate::interpreter::rule_defs::build_config::get_stamp())
     }
 }
 

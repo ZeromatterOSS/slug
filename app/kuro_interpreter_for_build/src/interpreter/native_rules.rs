@@ -1330,6 +1330,27 @@ pub(crate) mod rule_defs {
             build_setting_is_flag: false,
         })
     });
+
+    /// Stub xcode_config rule for non-Apple platforms.
+    /// Provides XcodeVersionConfig with dummy values so cc_toolchain_config.bzl
+    /// can execute without crashing on Linux.
+    pub static XCODE_CONFIG_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        Arc::new(Rule {
+            attributes: constraint_setting_attributes(), // No user-defined attrs needed
+            rule_type: RuleType::Native(NativeRuleKind::XcodeConfig),
+            rule_kind: RuleKind::Normal,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test: false,
+            is_executable: false,
+            provides: vec![],
+            toolchain_types: vec![],
+            exec_group_names: vec![],
+            fragments: vec![],
+            build_setting_type: None,
+            build_setting_is_flag: false,
+        })
+    });
 }
 
 /// Extract visibility strings from a Starlark value.
@@ -3103,6 +3124,32 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             &internals.default_visibility(),
         )?;
 
+        internals.record(target_node)?;
+        Ok(NoneType)
+    }
+
+    /// Stub xcode_config rule for non-Apple platforms.
+    ///
+    /// In Bazel, xcode_config selects an Xcode version for Apple builds.
+    /// On non-Apple platforms, this provides a stub XcodeVersionConfig with dummy values.
+    fn xcode_config<'v>(
+        #[starlark(require = named)] name: &str,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
+            'v,
+        >,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<NoneType> {
+        let internals = ModuleInternals::from_context(eval, "xcode_config")?;
+        let target_node = create_native_target_node(
+            rule_defs::XCODE_CONFIG_RULE.clone(),
+            internals.package(),
+            name,
+            vec![],
+            &extract_visibility_strings(visibility),
+            internals.attr_coercion_context(),
+            &internals.default_visibility(),
+        )?;
         internals.record(target_node)?;
         Ok(NoneType)
     }
