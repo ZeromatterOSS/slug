@@ -247,12 +247,15 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
     /// Toolchain resolution stub.
     ///
     /// Provides access to `ctx.toolchains[toolchain_type]` for aspect implementations.
-    /// Currently uses the same stub as the rule context.
+    /// Returns empty resolved toolchains (aspects don't yet support real resolution).
     #[starlark(attribute)]
     fn toolchains<'v>(this: RefAspectContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
-        use crate::interpreter::rule_defs::context::ToolchainsStub;
-        Ok(heap.alloc(ToolchainsStub { is_tool: false }))
+        use crate::interpreter::rule_defs::context::ResolvedToolchains;
+        Ok(heap.alloc(ResolvedToolchains {
+            toolchains: std::collections::HashMap::new(),
+            exec_platform: String::new(),
+        }))
     }
 
     /// Returns the list of features enabled for this target.

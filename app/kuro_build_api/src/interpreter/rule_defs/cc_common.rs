@@ -899,11 +899,12 @@ impl<'v> StarlarkValue<'v> for CtxCheatStub {
             "exec_groups" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::context::ExecGroupsDict))
             }
-            "toolchains" => Some(
-                heap.alloc(crate::interpreter::rule_defs::context::ToolchainsStub {
-                    is_tool: false,
-                }),
-            ),
+            "toolchains" => Some(heap.alloc(
+                crate::interpreter::rule_defs::context::ResolvedToolchains {
+                    toolchains: std::collections::HashMap::new(),
+                    exec_platform: String::new(),
+                },
+            )),
             _ => None,
         }
     }
@@ -992,11 +993,12 @@ impl<'v> StarlarkValue<'v> for CtxCheatWithActions<'v> {
             "exec_groups" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::context::ExecGroupsDict))
             }
-            "toolchains" => Some(
-                heap.alloc(crate::interpreter::rule_defs::context::ToolchainsStub {
-                    is_tool: false,
-                }),
-            ),
+            "toolchains" => Some(heap.alloc(
+                crate::interpreter::rule_defs::context::ResolvedToolchains {
+                    toolchains: std::collections::HashMap::new(),
+                    exec_platform: String::new(),
+                },
+            )),
             _ => None,
         }
     }

@@ -743,7 +743,7 @@ async fn run_analysis_with_env_underlying(
         // Build ResolvedToolchains from the resolution result.
         // For each resolved toolchain type, analyze the impl target via DICE
         // to get its real providers. Types that fail analysis get None (the
-        // ResolvedToolchains.at() method falls back to ToolchainsStub behavior).
+        // ResolvedToolchains.at() method returns an error for unresolved types).
         let resolved_toolchains_for_ctx = if let Some(result) = &toolchain_resolution_result {
             let any_resolved = result.resolved_toolchains.values().any(|v| v.is_some());
             if any_resolved {
@@ -857,7 +857,7 @@ async fn run_analysis_with_env_underlying(
             );
 
             // Set resolved toolchains on the context so ctx.toolchains returns
-            // real resolution results instead of ToolchainsStub.
+            // real resolution results instead of empty ResolvedToolchains.
             if let Some(resolved) = resolved_toolchains_for_ctx {
                 let real_count = resolved.toolchains.values().filter(|v| v.is_some()).count();
                 let total = resolved.toolchains.len();

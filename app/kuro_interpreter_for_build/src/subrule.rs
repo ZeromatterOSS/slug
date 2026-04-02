@@ -406,16 +406,15 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkSubruleCallable {
             impl_val.invoke_pos_kwargs(&[ctx], Some(kwargs_dict_val), eval)
         } else {
             // No ctx available - fall back to pass-through behavior
-            self.implementation.to_value().invoke_pos_kwargs(
-                &[],
-                None,
-                eval,
-            ).or_else(|_| {
-                // If that also fails, try the original arguments
-                let impl_val: Value<'v> = self.implementation.to_value();
-                let pos: Vec<Value<'v>> = args.positions(heap)?.collect();
-                impl_val.invoke_pos_kwargs(&pos, None, eval)
-            })
+            self.implementation
+                .to_value()
+                .invoke_pos_kwargs(&[], None, eval)
+                .or_else(|_| {
+                    // If that also fails, try the original arguments
+                    let impl_val: Value<'v> = self.implementation.to_value();
+                    let pos: Vec<Value<'v>> = args.positions(heap)?.collect();
+                    impl_val.invoke_pos_kwargs(&pos, None, eval)
+                })
         }
     }
 

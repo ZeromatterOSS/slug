@@ -200,7 +200,7 @@ pub struct AnalysisContext<'v> {
     /// Each pair is (name, pattern) where pattern may contain `%{name}`.
     rule_outputs: Vec<(String, String)>,
     /// Resolved toolchains from real toolchain resolution.
-    /// When Some, ctx.toolchains returns this instead of ToolchainsStub.
+    /// When Some, ctx.toolchains returns this instead of empty ResolvedToolchains.
     resolved_toolchains: RefCell<Option<Value<'v>>>,
 }
 
@@ -507,21 +507,19 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// on rule(). During analysis, resolved toolchains are provided via `ctx.toolchains`,
     /// which is a dict-like object mapping toolchain types to toolchain info providers.
     ///
-    /// Returns a stub that pretends to contain all toolchain types and returns
-    /// stub toolchain info when indexed. This allows rules_cc to proceed with
-    /// toolchain-based builds.
-    ///
-    /// If real toolchain resolution produced results, returns them.
-    /// Otherwise falls back to ToolchainsStub for compatibility.
+    /// Returns real resolved toolchains if available, or an empty ResolvedToolchains
+    /// if no resolution ran for this target.
     #[starlark(attribute)]
     fn toolchains<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         // Return real resolved toolchains if available
         if let Some(resolved) = *this.0.resolved_toolchains.borrow() {
             return Ok(resolved);
         }
-        // Fallback to stub until all toolchain repos materialize
-        let is_tool = this.0.is_tool_configuration();
-        Ok(heap.alloc(ToolchainsStub { is_tool }))
+        // Return empty resolved toolchains — no stubs
+        Ok(heap.alloc(ResolvedToolchains {
+            toolchains: std::collections::HashMap::new(),
+            exec_platform: String::new(),
+        }))
     }
 
     /// Predeclared outputs from the rule definition (Bazel-compatible).
@@ -1737,77 +1735,12 @@ pub fn host_target_cpu() -> &'static str {
     }
 }
 
-/// Returns the Rust target triple for the host platform.
-fn host_rust_triple() -> &'static str {
-    match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("windows", "x86_64") => "x86_64-pc-windows-msvc",
-        ("windows", "aarch64") => "aarch64-pc-windows-msvc",
-        ("macos", "x86_64") => "x86_64-apple-darwin",
-        ("macos", "aarch64") => "aarch64-apple-darwin",
-        ("linux", "aarch64") => "aarch64-unknown-linux-gnu",
-        _ => "x86_64-unknown-linux-gnu",
-    }
-}
-
 /// Returns the default C compiler path for the host platform.
 pub fn host_cc_path() -> &'static str {
     match std::env::consts::OS {
         "windows" => "cl.exe",
         "macos" => "/usr/bin/clang",
         _ => "/usr/bin/gcc",
-    }
-}
-
-/// Returns the tool path for a given tool name, appropriate for the host platform.
-///
-/// On Windows with MSVC, tools like strip/objcopy/gcov don't have MSVC equivalents,
-/// so we fall back to the bare tool name (works if LLVM tools are on PATH).
-/// On Unix, paths default to /usr/bin/<tool>.
-pub fn host_tool_path(tool_name: &str) -> &'static str {
-    match std::env::consts::OS {
-        "windows" => match tool_name {
-            "gcc" | "g++" | "cpp" => "cl.exe",
-            "ar" => "lib.exe",
-            "ld" => "link.exe",
-            "nm" | "objdump" => "dumpbin.exe",
-            // These tools don't have MSVC equivalents. Return the bare name
-            // so they can be found on PATH (e.g., if LLVM tools are installed).
-            "objcopy" => "llvm-objcopy",
-            "strip" => "strip",
-            "gcov" => "gcov",
-            "dwp" => "dwp",
-            "llvm-profdata" => "llvm-profdata",
-            "llvm-cov" => "llvm-cov",
-            _ => "", // Unknown tools
-        },
-        "macos" => match tool_name {
-            "gcc" | "g++" | "cpp" => "/usr/bin/clang",
-            "ar" => "/usr/bin/ar",
-            "ld" => "/usr/bin/ld",
-            "nm" => "/usr/bin/nm",
-            "objcopy" => "/usr/bin/objcopy",
-            "objdump" => "/usr/bin/objdump",
-            "strip" => "/usr/bin/strip",
-            "gcov" => "/usr/bin/gcov",
-            "dwp" => "/usr/bin/dwp",
-            "llvm-profdata" => "/usr/bin/llvm-profdata",
-            "llvm-cov" => "/usr/bin/llvm-cov",
-            _ => "", // Unknown tools
-        },
-        _ => match tool_name {
-            "gcc" | "g++" | "cpp" => "/usr/bin/gcc",
-            "ar" => "/usr/bin/ar",
-            "ld" => "/usr/bin/ld",
-            "nm" => "/usr/bin/nm",
-            "objcopy" => "/usr/bin/objcopy",
-            "objdump" => "/usr/bin/objdump",
-            "strip" => "/usr/bin/strip",
-            "gcov" => "/usr/bin/gcov",
-            "dwp" => "/usr/bin/dwp",
-            "llvm-profdata" => "/usr/bin/llvm-profdata",
-            "llvm-cov" => "/usr/bin/llvm-cov",
-            _ => "", // Unknown tools
-        },
     }
 }
 
@@ -2028,14 +1961,14 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
 
 /// Real resolved toolchains from the toolchain resolution algorithm.
 ///
-/// This replaces `ToolchainsStub` when resolution successfully matches
-/// toolchains to the target. Maps toolchain type labels to their resolved
-/// `ToolchainInfo` provider values (or None for optional unmatched types).
+/// Real resolved toolchains from the toolchain resolution algorithm.
+/// Maps toolchain type labels to their resolved `ToolchainInfo` provider
+/// values (or None for optional unmatched types).
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct ResolvedToolchains {
     /// Map from toolchain_type label → resolved provider collection.
     /// Value is None for toolchain types that resolved but whose impl target
-    /// could not be analyzed (falls back to ToolchainsStub behavior).
+    /// could not be analyzed (errors on access).
     pub toolchains: std::collections::HashMap<String, Option<FrozenProviderCollectionValue>>,
     /// The selected execution platform label.
     pub exec_platform: String,
@@ -2052,17 +1985,15 @@ starlark::starlark_simple_value!(ResolvedToolchains);
 #[starlark::values::starlark_value(type = "resolved_toolchains")]
 impl<'v> StarlarkValue<'v> for ResolvedToolchains {
     /// Check if a toolchain type is available.
-    /// Returns true for any type — like ToolchainsStub, this prevents rule code
-    /// from erroring on `TYPE in ctx.toolchains` checks. Real Bazel would only
-    /// return true for types that resolved, but many rules rely on the check
-    /// always succeeding.
+    /// Returns true for any type. Real Bazel would only return true for types
+    /// that resolved, but many rules rely on the check always succeeding.
     fn is_in(&self, _other: Value<'v>) -> starlark::Result<bool> {
         Ok(true)
     }
 
     /// Index by toolchain type to get the ToolchainInfo provider.
     /// If a real provider collection was resolved via DICE analysis, returns it.
-    /// Otherwise, falls back to ToolchainsStub behavior (per-language stubs).
+    /// Otherwise, returns an error for unresolved toolchain types.
     fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let key = if let Some(s) = index.unpack_str() {
             s.to_owned()
@@ -2087,8 +2018,13 @@ impl<'v> StarlarkValue<'v> for ResolvedToolchains {
             // In Bazel, ctx.toolchains[TYPE] returns the ToolchainInfo provider
             // (platform_common.ToolchainInfo), NOT the entire provider collection.
             // Look for ToolchainInfo in the resolved provider collection.
-            let toolchain_info_id = crate::interpreter::rule_defs::platform_common::ToolchainInfoProvider::provider_id();
-            if let Some(fv) = providers.provider_collection().get_provider_raw(toolchain_info_id) {
+            let toolchain_info_id =
+                crate::interpreter::rule_defs::platform_common::ToolchainInfoProvider::provider_id(
+                );
+            if let Some(fv) = providers
+                .provider_collection()
+                .get_provider_raw(toolchain_info_id)
+            {
                 return Ok(fv.to_value());
             }
 
@@ -2097,9 +2033,15 @@ impl<'v> StarlarkValue<'v> for ResolvedToolchains {
             return Ok(fv.to_value());
         }
 
-        // No real provider — fall back to ToolchainsStub behavior.
-        let stub = ToolchainsStub { is_tool: false };
-        stub.at(index, heap)
+        // No resolved provider for this toolchain type.
+        Err(starlark::Error::new_other(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!(
+                "Toolchain type '{}' was not resolved. Ensure the toolchain is registered \
+                 via register_toolchains() and the rule declares it in toolchains=[...]",
+                key
+            ),
+        )))
     }
 }
 
@@ -2111,696 +2053,8 @@ fn normalize_toolchain_type_label(label: &str) -> String {
 }
 
 // ============================================================================
-// ToolchainsStub - Stub for ctx.toolchains (FALLBACK)
+// CompilationContext / LinkingContext stubs for CcInfo
 // ============================================================================
-
-/// A stub for ctx.toolchains that pretends to contain all toolchain types.
-///
-/// This allows rules_cc and other Bazel rules to proceed with toolchain-based builds
-/// without implementing full toolchain resolution. The stub returns a CcToolchainInfoStub
-/// when indexed, which provides minimal toolchain info.
-///
-/// TODO(toolchains): Replace with proper toolchain resolution.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct ToolchainsStub {
-    pub is_tool: bool,
-}
-
-impl std::fmt::Display for ToolchainsStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<toolchains>")
-    }
-}
-
-starlark::starlark_simple_value!(ToolchainsStub);
-
-#[starlark::values::starlark_value(type = "toolchains")]
-impl<'v> StarlarkValue<'v> for ToolchainsStub {
-    /// Returns True for any key - pretends to contain all toolchain types.
-    fn is_in(&self, _other: Value<'v>) -> starlark::Result<bool> {
-        // Return True for any toolchain type check
-        Ok(true)
-    }
-
-    /// Returns a toolchain stub when indexed.
-    /// Checks the key to determine which kind of toolchain to return.
-    /// Returns None for unrecognized toolchain types.
-    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        // Get the key string - handle both str and Label objects.
-        // Label("//rust:toolchain_type") is a BazelLabel, not a str, so unpack_str() returns None.
-        // Using format!("{}", index) gives the Display representation:
-        //   - for str: includes quotes (e.g., `"@rules_rust//rust:toolchain_type"`) but we use unpack_str first
-        //   - for BazelLabel: returns the raw label string (e.g., `@rules_rust//rust:toolchain_type`)
-        let owned_str;
-        let key_str = if let Some(s) = index.unpack_str() {
-            s
-        } else {
-            owned_str = format!("{}", index);
-            &owned_str
-        };
-        // Extract target name (after :) and package path (before :) for matching
-        let (pkg_path, target_name) = key_str.rsplit_once(':').unwrap_or(("", key_str));
-        // Extract the last package segment (e.g., "cpp" from "//tools/cpp")
-        let pkg_segment = pkg_path
-            .rsplit_once('/')
-            .map(|(_, seg)| seg)
-            .unwrap_or(pkg_path);
-        if target_name == "rust_toolchain"
-            || target_name == "rustfmt_toolchain"
-            || (target_name == "toolchain_type" && pkg_segment == "rust")
-        {
-            Ok(heap.alloc(RustToolchainInfoStub))
-        } else if target_name == "toolchain_type" && (pkg_segment == "cc" || pkg_segment == "cpp") {
-            Ok(heap.alloc(CcToolchainInfoStub {
-                is_tool: self.is_tool,
-            }))
-        } else if target_name == "toolchain_type"
-            && (pkg_segment == "java" || key_str.contains("rules_java"))
-        {
-            // Java toolchain: ctx.toolchains["@rules_java//java:toolchain_type"].java
-            Ok(heap.alloc(JavaToolchainWrapperStub))
-        } else if target_name == "runtime_toolchain_type"
-            && (pkg_segment == "java" || key_str.contains("rules_java"))
-        {
-            // Java runtime toolchain: ctx.toolchains["@rules_java//java:runtime_toolchain_type"].java_runtime
-            Ok(heap.alloc(JavaRuntimeToolchainWrapperStub))
-        } else if target_name == "toolchain_type"
-            && key_str.contains("python")
-            && !key_str.contains("exec_tools")
-        {
-            // Python target toolchain - provide a stub with py3_runtime
-            Ok(heap.alloc(PyToolchainInfoStub))
-        } else if target_name == "crane_toolchain_type" {
-            // OCI crane toolchain
-            let crane_path = detect_crane_path();
-            Ok(heap.alloc(OciCraneToolchainStub { crane_path }))
-        } else if target_name == "registry_toolchain_type" {
-            // OCI registry toolchain (uses crane registry serve)
-            let crane_path = detect_crane_path();
-            let launcher_path = get_or_create_oci_launcher();
-            Ok(heap.alloc(OciRegistryToolchainStub {
-                launcher_path,
-                registry_path: crane_path,
-            }))
-        } else if target_name == "jq_toolchain_type" {
-            // jq toolchain
-            let jq_path = detect_jq_path();
-            Ok(heap.alloc(JqToolchainStub { jq_path }))
-        } else if target_name == "test_runner_toolchain_type"
-            || (target_name == "toolchain_type" && pkg_segment == "test_runner")
-        {
-            // Test runner toolchain - return None so rules_cc cc_test.bzl falls back
-            // to the legacy cc_test implementation path. Without a real test runner
-            // toolchain registered, returning a stub would cause attribute access
-            // errors (e.g., cc_test_info.linkopts on NoneType).
-            Ok(Value::new_none())
-        } else if key_str.contains("exec_tools") {
-            // exec_tools toolchains (e.g., rules_python exec_tools, rules_rust exec_tools)
-            // These provide tools for execution, return a generic toolchain
-            Ok(heap.alloc(GenericToolchainStub))
-        } else if target_name == "toolchain_type"
-            || target_name.ends_with("_toolchain_type")
-            || target_name.ends_with("_toolchain")
-        {
-            // Generic toolchain type - return a stub that won't crash on attribute access
-            Ok(heap.alloc(GenericToolchainStub))
-        } else {
-            // For unrecognized toolchain keys, return a generic stub rather than None.
-            // This prevents AttributeError crashes when rules access toolchain attributes.
-            tracing::warn!(
-                "ctx.toolchains[{:?}]: unrecognized toolchain type, returning stub. \
-                 Attribute accesses on this toolchain will return None.",
-                key_str
-            );
-            Ok(heap.alloc(GenericToolchainStub))
-        }
-    }
-}
-
-/// A stub for CcToolchainInfo that provides minimal toolchain info.
-///
-/// This provides the attributes that rules_cc expects from a CcToolchainInfo provider.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct CcToolchainInfoStub {
-    is_tool: bool,
-}
-
-impl std::fmt::Display for CcToolchainInfoStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<CcToolchainInfo>")
-    }
-}
-
-starlark::starlark_simple_value!(CcToolchainInfoStub);
-
-impl<'v> ProviderLike<'v> for CcToolchainInfoStub {
-    fn id(&self) -> &Arc<ProviderId> {
-        CcToolchainInfoProvider::provider_id()
-    }
-
-    fn items(&self) -> Vec<(&str, starlark::values::Value<'v>)> {
-        vec![]
-    }
-}
-
-#[starlark::values::starlark_value(type = "CcToolchainInfo")]
-impl<'v> StarlarkValue<'v> for CcToolchainInfoStub {
-    fn get_methods() -> Option<&'static Methods> {
-        static RES: MethodsStatic = MethodsStatic::new();
-        RES.methods(cc_toolchain_info_stub_methods)
-    }
-
-    fn provide(&'v self, demand: &mut starlark::values::Demand<'_, 'v>) {
-        demand.provide_value::<&dyn ProviderLike>(self);
-    }
-
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        // Report which attributes exist for hasattr() checks
-        matches!(
-            attribute,
-            "cc" | "cc_provider_in_toolchain"
-                | "toolchain_id"
-                | "compiler"
-                | "cpu"
-                | "target_gnu_system_name"
-                | "dynamic_runtime_lib"
-                | "static_runtime_lib"
-                | "sysroot"
-                | "all_files"
-                | "compiler_files"
-                | "linker_files"
-                | "ar_files"
-                | "objcopy_files"
-                | "strip_files"
-                | "gcov_files"
-                | "_supports_header_parsing"
-                | "_needs_pic_for_dynamic_libraries"
-                | "_use_pic_for_dynamic_libraries_not_for_binaries"
-                | "_supports_start_end_lib"
-                | "_feature_configuration"
-                | "_tool_paths"
-                | "libc"
-                | "_abi_glibc_version"
-                | "_abi"
-                | "_crosstool_top_path"
-                | "_legacy_cc_flags_make_variable"
-                | "_build_variables"
-                | "_coverage_files"
-                | "_strip_files"
-                | "_cpp_configuration"
-                | "_if_so_builder"
-                | "_solib_dir"
-                | "_build_variables_dict"
-                | "_ar_files"
-                | "_linker_files"
-                | "_supports_param_files"
-                | "_stamp_binaries"
-                | "_is_tool_configuration"
-                | "_is_sibling_repository_layout"
-                | "_static_runtime_lib_depset"
-                | "_dynamic_runtime_lib_depset"
-                | "_compiler_files_without_includes"
-                | "_as_files"
-                | "_dwp_files"
-                | "_builtin_include_files"
-                | "_additional_make_variables"
-                | "_all_files_including_libc"
-                | "_build_info_files"
-                | "_allowlist_for_layering_check"
-                | "_cc_info"
-                | "_objcopy_files"
-                | "_aggregate_ddi"
-                | "_toolchain_label"
-                | "_link_dynamic_library_tool"
-                | "_grep_includes"
-                | "_compiler_files"
-                | "built_in_include_directories"
-        )
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "cc_provider_in_toolchain" => Some(Value::new_bool(false)),
-            "toolchain_id" => Some(heap.alloc_str("local_cc_toolchain").to_value()),
-            "compiler" => {
-                let compiler = if cfg!(windows) {
-                    "msvc"
-                } else if cfg!(target_os = "macos") {
-                    "clang"
-                } else {
-                    "gcc"
-                };
-                Some(heap.alloc_str(compiler).to_value())
-            }
-            "cpu" => Some(heap.alloc_str(host_target_cpu()).to_value()),
-            "target_gnu_system_name" => {
-                let name = if cfg!(windows) {
-                    if cfg!(target_arch = "aarch64") {
-                        "aarch64-w64-windows-msvc"
-                    } else {
-                        "x86_64-w64-windows-msvc"
-                    }
-                } else if cfg!(target_os = "macos") {
-                    if cfg!(target_arch = "aarch64") {
-                        "aarch64-apple-darwin"
-                    } else {
-                        "x86_64-apple-darwin"
-                    }
-                } else {
-                    if cfg!(target_arch = "aarch64") {
-                        "aarch64-linux-gnu"
-                    } else {
-                        "x86_64-linux-gnu"
-                    }
-                };
-                Some(heap.alloc_str(name).to_value())
-            }
-            "sysroot" => Some(Value::new_none()),
-            "_supports_header_parsing" => Some(Value::new_bool(true)),
-            "_needs_pic_for_dynamic_libraries" => Some(Value::new_bool(!cfg!(windows))),
-            "_use_pic_for_dynamic_libraries_not_for_binaries" => Some(Value::new_bool(false)),
-            "_supports_start_end_lib" => Some(Value::new_bool(false)),
-            "_cc_info" => Some(heap.alloc(CcInfoStub)),
-            "_tool_paths" => Some(heap.alloc(ToolPathsStub)),
-            "_toolchain_features" => Some(heap.alloc(ToolchainFeaturesStub)),
-            "_is_tool_configuration" => Some(Value::new_bool(false)),
-            "_fdo_context" => Some(Value::new_none()),
-            "libc" => {
-                let libc = if cfg!(windows) {
-                    "msvcrt"
-                } else if cfg!(target_os = "macos") {
-                    "macosx"
-                } else {
-                    "glibc"
-                };
-                Some(heap.alloc_str(libc).to_value())
-            }
-            "_abi_glibc_version" => Some(heap.alloc_str("2.17").to_value()),
-            "_abi" => Some(heap.alloc_str("local").to_value()),
-            "_crosstool_top_path" => Some(heap.alloc_str("external/local_config_cc").to_value()),
-            "_legacy_cc_flags_make_variable" => Some(heap.alloc_str("").to_value()),
-            "_build_variables" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_coverage_files" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_strip_files" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_cpp_configuration" => Some(heap.alloc(CppFragment::default())),
-            "_if_so_builder" => Some(Value::new_none()),
-            "_solib_dir" => {
-                let solib = if cfg!(target_arch = "aarch64") {
-                    "_solib_aarch64"
-                } else {
-                    "_solib_k8"
-                };
-                Some(heap.alloc_str(solib).to_value())
-            }
-            "_build_variables_dict" => {
-                let map: SmallMap<Value, Value> = SmallMap::new();
-                Some(heap.alloc(Dict::new(map)))
-            }
-            "_ar_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_linker_files" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_supports_param_files" => Some(Value::new_bool(true)),
-            "_stamp_binaries" => Some(Value::new_bool(
-                crate::interpreter::rule_defs::build_config::get_stamp(),
-            )),
-            "_is_sibling_repository_layout" => Some(Value::new_bool(false)),
-            "_static_runtime_lib_depset" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_dynamic_runtime_lib_depset" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_compiler_files_without_includes" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_as_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "_dwp_files" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_builtin_include_files" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_additional_make_variables" => {
-                let map: SmallMap<Value, Value> = SmallMap::new();
-                Some(heap.alloc(Dict::new(map)))
-            }
-            "_all_files_including_libc" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_build_info_files" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_allowlist_for_layering_check" => Some(Value::new_none()),
-            "_objcopy_files" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "_aggregate_ddi" => Some(Value::new_none()),
-            "_toolchain_label" => Some(
-                heap.alloc_str("@bazel_tools//tools/cpp:toolchain")
-                    .to_value(),
-            ),
-            "_cc_test_info" | "cc_test_info" => {
-                // CcTestInfo provides default linkopts and linkstatic for cc_test targets.
-                // rules_cc cc_test.bzl accesses cc_test_info.linkopts and cc_test_info.linkstatic.
-                Some(heap.alloc(CcTestInfoStub))
-            }
-            "_link_dynamic_library_tool" => Some(Value::new_none()),
-            "_grep_includes" => Some(Value::new_none()),
-            "_compiler_files" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "gcov_files" | "_gcov_files" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "built_in_include_directories" => {
-                // Return list of built-in include directories from the system compiler.
-                // On Windows (MSVC), return MSVC and Windows SDK include paths.
-                // On Unix, return standard system include paths.
-                let dirs: Vec<Value<'v>> = if cfg!(windows) {
-                    crate::interpreter::rule_defs::cc_common::get_msvc_include_dirs()
-                        .iter()
-                        .map(|d| heap.alloc_str(d).to_value())
-                        .collect()
-                } else {
-                    ["/usr/include", "/usr/local/include"]
-                        .iter()
-                        .map(|d| heap.alloc_str(d).to_value())
-                        .collect()
-                };
-                Some(heap.alloc(dirs))
-            }
-            _ => None,
-        }
-    }
-
-    fn dir_attr(&self) -> Vec<String> {
-        vec![
-            "cc".to_owned(),
-            "cc_provider_in_toolchain".to_owned(),
-            "toolchain_id".to_owned(),
-            "compiler".to_owned(),
-            "cpu".to_owned(),
-            "target_gnu_system_name".to_owned(),
-            "dynamic_runtime_lib".to_owned(),
-            "static_runtime_lib".to_owned(),
-            "sysroot".to_owned(),
-            "all_files".to_owned(),
-            "compiler_files".to_owned(),
-            "linker_files".to_owned(),
-            "ar_files".to_owned(),
-            "objcopy_files".to_owned(),
-            "strip_files".to_owned(),
-            "gcov_files".to_owned(),
-            "libc".to_owned(),
-            "built_in_include_directories".to_owned(),
-        ]
-    }
-}
-
-#[starlark_module]
-fn cc_toolchain_info_stub_methods(builder: &mut MethodsBuilder) {
-    /// The C++ toolchain provider itself (for cc_provider_in_toolchain pattern).
-    #[starlark(attribute)]
-    fn cc<'v>(this: &CcToolchainInfoStub, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        Ok(heap.alloc(CcToolchainInfoStub {
-            is_tool: this.is_tool,
-        }))
-    }
-
-    /// Toolchain identifier.
-    #[starlark(attribute)]
-    fn toolchain_id(this: &CcToolchainInfoStub) -> starlark::Result<&'static str> {
-        let _ = this;
-        Ok("local_cc_toolchain")
-    }
-
-    /// Whether the toolchain is for tool execution.
-    #[starlark(attribute)]
-    fn is_tool_configuration(this: &CcToolchainInfoStub) -> starlark::Result<bool> {
-        Ok(this.is_tool)
-    }
-
-    /// Compiler type.
-    #[starlark(attribute)]
-    fn compiler(this: &CcToolchainInfoStub) -> starlark::Result<&'static str> {
-        let _ = this;
-        if cfg!(windows) {
-            Ok("msvc")
-        } else if cfg!(target_os = "macos") {
-            Ok("clang")
-        } else {
-            Ok("gcc")
-        }
-    }
-
-    /// Target CPU architecture.
-    #[starlark(attribute)]
-    fn cpu(this: &CcToolchainInfoStub) -> starlark::Result<&'static str> {
-        let _ = this;
-        Ok(host_target_cpu())
-    }
-
-    /// GNU system name for the target.
-    #[starlark(attribute)]
-    fn target_gnu_system_name(this: &CcToolchainInfoStub) -> starlark::Result<&'static str> {
-        let _ = this;
-        if cfg!(windows) {
-            if cfg!(target_arch = "aarch64") {
-                Ok("aarch64-w64-windows-msvc")
-            } else {
-                Ok("x86_64-w64-windows-msvc")
-            }
-        } else if cfg!(target_os = "macos") {
-            if cfg!(target_arch = "aarch64") {
-                Ok("aarch64-apple-darwin")
-            } else {
-                Ok("x86_64-apple-darwin")
-            }
-        } else {
-            if cfg!(target_arch = "aarch64") {
-                Ok("aarch64-linux-gnu")
-            } else {
-                Ok("x86_64-linux-gnu")
-            }
-        }
-    }
-
-    /// All input files for the toolchain.
-    #[starlark(attribute)]
-    fn all_files<'v>(this: &CcToolchainInfoStub, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-    }
-
-    /// Compiler input files.
-    #[starlark(attribute)]
-    fn compiler_files<'v>(
-        this: &CcToolchainInfoStub,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-    }
-
-    /// Linker input files.
-    #[starlark(attribute)]
-    fn linker_files<'v>(this: &CcToolchainInfoStub, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-    }
-
-    /// Archiver input files.
-    #[starlark(attribute)]
-    fn ar_files<'v>(this: &CcToolchainInfoStub, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-    }
-
-    /// Strip input files.
-    #[starlark(attribute)]
-    fn strip_files<'v>(this: &CcToolchainInfoStub, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-    }
-
-    /// Objcopy input files.
-    #[starlark(attribute)]
-    fn objcopy_files<'v>(
-        this: &CcToolchainInfoStub,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-    }
-
-    /// Returns the dynamic runtime libraries for the given feature configuration.
-    #[allow(unused_variables)]
-    fn dynamic_runtime_lib<'v>(
-        this: &CcToolchainInfoStub,
-        #[starlark(require = named)] feature_configuration: Value<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        // Return empty depset - no dynamic runtime libraries
-        Ok(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-    }
-
-    /// Returns the static runtime libraries for the given feature configuration.
-    #[allow(unused_variables)]
-    fn static_runtime_lib<'v>(
-        this: &CcToolchainInfoStub,
-        #[starlark(require = named)] feature_configuration: Value<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        // Return empty depset - no static runtime libraries
-        Ok(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-    }
-
-    /// Returns whether PIC is required for dynamic libraries.
-    #[allow(unused_variables)]
-    fn needs_pic_for_dynamic_libraries<'v>(
-        this: &CcToolchainInfoStub,
-        #[starlark(require = named)] feature_configuration: Value<'v>,
-    ) -> starlark::Result<bool> {
-        let _ = (this, feature_configuration);
-        // MSVC doesn't use PIC; Unix does
-        Ok(!cfg!(windows))
-    }
-
-    /// Returns whether PIC is used only for dynamic libraries.
-    #[allow(unused_variables)]
-    fn use_pic_for_dynamic_libraries_not_for_binaries<'v>(
-        this: &CcToolchainInfoStub,
-        #[starlark(require = named)] feature_configuration: Value<'v>,
-    ) -> starlark::Result<bool> {
-        // Return false - use PIC everywhere
-        Ok(false)
-    }
-
-    /// Returns the solib directory for dynamic runtime libraries.
-    ///
-    /// Used by rules_cc's finalize_link_action.bzl for finding runtime shared libraries.
-    #[starlark(attribute)]
-    fn dynamic_runtime_solib_dir(this: &CcToolchainInfoStub) -> starlark::Result<String> {
-        let _ = this;
-        if cfg!(target_arch = "aarch64") {
-            Ok("_solib_aarch64".to_owned())
-        } else {
-            Ok("_solib_k8".to_owned())
-        }
-    }
-
-    /// Returns the module map generation tool, or None.
-    ///
-    /// Used by rules_cc's compile.bzl for C++ module map generation.
-    #[starlark(attribute)]
-    fn generate_modmap<'v>(
-        this: &CcToolchainInfoStub,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        let _ = (this, heap);
-        Ok(Value::new_none())
-    }
-
-    /// Sysroot path for cross-compilation, or None for native builds.
-    #[starlark(attribute)]
-    fn sysroot(this: &CcToolchainInfoStub) -> starlark::Result<NoneType> {
-        let _ = this;
-        Ok(NoneType)
-    }
-
-    /// Returns the libc_top label, or None.
-    #[starlark(attribute)]
-    fn libc_top(this: &CcToolchainInfoStub) -> starlark::Result<NoneType> {
-        let _ = this;
-        Ok(NoneType)
-    }
-}
-
-/// A stub for CcInfo with compilation_context and linking_context.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct CcInfoStub;
-
-impl std::fmt::Display for CcInfoStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<CcInfo>")
-    }
-}
-
-starlark::starlark_simple_value!(CcInfoStub);
-
-#[starlark::values::starlark_value(type = "CcInfo")]
-impl<'v> StarlarkValue<'v> for CcInfoStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(
-            attribute,
-            "compilation_context"
-                | "linking_context"
-                | "_debug_context"
-                | "_legacy_transitive_native_libraries"
-        )
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "compilation_context" => Some(heap.alloc(CompilationContextStub)),
-            "linking_context" => Some(heap.alloc(LinkingContextStub)),
-            // rules_cc expects _debug_context (CcDebugContext) on CcInfo objects
-            "_debug_context" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::cc_common::CcDebugContext))
-            }
-            // rules_cc expects _legacy_transitive_native_libraries (depset) on CcInfo objects
-            "_legacy_transitive_native_libraries" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            _ => None,
-        }
-    }
-}
-
-/// A stub for CcTestInfo providing default linkopts and linkstatic for cc_test.
-/// In Bazel, CcTestInfo is part of the CcToolchainProvider and controls how
-/// cc_test targets are linked. rules_cc cc_test.bzl accesses:
-/// - cc_test_info.linkopts: additional linker flags for test binaries
-/// - cc_test_info.linkstatic: whether to link test binaries statically (default True)
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct CcTestInfoStub;
-
-impl std::fmt::Display for CcTestInfoStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<CcTestInfo>")
-    }
-}
-
-starlark::starlark_simple_value!(CcTestInfoStub);
-
-#[starlark::values::starlark_value(type = "CcTestInfo")]
-impl<'v> StarlarkValue<'v> for CcTestInfoStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "linkopts" | "linkstatic")
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "linkopts" => {
-                // Default: no extra linker flags for test binaries
-                let empty: Vec<Value<'v>> = Vec::new();
-                Some(heap.alloc(empty))
-            }
-            "linkstatic" => {
-                // Default: link test binaries statically (matches Bazel default)
-                Some(Value::new_bool(true))
-            }
-            _ => None,
-        }
-    }
-}
 
 /// A stub for CompilationContext.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
@@ -2949,12 +2203,8 @@ impl<'v> StarlarkValue<'v> for HeaderInfoStubSimple {
             "modular_public_headers"
             | "modular_private_headers"
             | "textual_headers"
-            | "separate_module_headers" => {
-                // Return empty list
-                Some(heap.alloc(Vec::<Value>::new()))
-            }
+            | "separate_module_headers" => Some(heap.alloc(Vec::<Value>::new())),
             "header_module" | "pic_header_module" | "separate_module" | "separate_pic_module" => {
-                // Return None
                 Some(Value::new_none())
             }
             _ => None,
@@ -2991,13 +2241,13 @@ impl<'v> StarlarkValue<'v> for LinkingContextStub {
     }
 }
 
+// ============================================================================
+// CtxFiles / CtxFile / CtxExecutable — ctx.files, ctx.file, ctx.executable
+// ============================================================================
+
 /// Provides access to files from label/label_list attributes as ctx.files.<attr>.
-///
-/// In Bazel, `ctx.files.foo` returns a list of Files from attribute `foo`.
-/// This implementation extracts files from the resolved attribute values.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
 pub struct CtxFiles<'v> {
-    /// The resolved attributes struct as a Value
     attrs: Value<'v>,
 }
 
@@ -3018,7 +2268,6 @@ impl<'v> std::fmt::Display for CtxFiles<'v> {
 #[starlark::values::starlark_value(type = "ctx_files")]
 impl<'v> StarlarkValue<'v> for CtxFiles<'v> {
     fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
-        // Check if the attribute exists in attrs using StarlarkValue method
         self.attrs.has_attr(attribute, heap)
     }
 
@@ -3033,14 +2282,12 @@ impl<'v> StarlarkValue<'v> for CtxFiles<'v> {
         use crate::interpreter::rule_defs::provider::dependency::Dependency;
         use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
 
-        // Get the attribute value from attrs
         let attr_value = self.attrs.get_attr(attribute, heap).ok().flatten()?;
 
         if attr_value.is_none() {
             return Some(heap.alloc(AllocList::EMPTY));
         }
 
-        // Helper: extract default output files from a dependency value
         let extract_files = |v: Value<'v>, files: &mut Vec<Value<'v>>| {
             let pc = if let Some(dep) = v.downcast_ref::<Dependency>() {
                 Some(dep.provider_collection())
@@ -3059,7 +2306,6 @@ impl<'v> StarlarkValue<'v> for CtxFiles<'v> {
                     }
                 }
             } else {
-                // Not a dependency - include as-is (already an artifact)
                 files.push(v);
             }
         };
@@ -3071,7 +2317,6 @@ impl<'v> StarlarkValue<'v> for CtxFiles<'v> {
             }
             Some(heap.alloc(files))
         } else {
-            // Single value (e.g. single label attribute)
             let mut files = Vec::new();
             extract_files(attr_value, &mut files);
             Some(heap.alloc(files))
@@ -3087,13 +2332,8 @@ impl<'v> AllocValue<'v> for CtxFiles<'v> {
 }
 
 /// Provides access to single files from label attributes as ctx.file.<attr>.
-///
-/// In Bazel, `ctx.file.foo` returns a single File from attribute `foo`.
-/// If the attribute contains multiple files, this is an error in Bazel,
-/// but for compatibility we return the first file.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
 pub struct CtxFile<'v> {
-    /// The resolved attributes struct as a Value
     attrs: Value<'v>,
 }
 
@@ -3133,7 +2373,6 @@ impl<'v> StarlarkValue<'v> for CtxFile<'v> {
             return Some(Value::new_none());
         }
 
-        // Extract the first file from a dependency or artifact value
         let extract_first_file = |v: Value<'v>| -> Value<'v> {
             let pc = if let Some(dep) = v.downcast_ref::<Dependency>() {
                 Some(dep.provider_collection())
@@ -3157,7 +2396,6 @@ impl<'v> StarlarkValue<'v> for CtxFile<'v> {
             }
         };
 
-        // If it's a list, get first element and extract file from it
         if let Some(list) = ListRef::from_value(attr_value) {
             if list.is_empty() {
                 return Some(Value::new_none());
@@ -3165,7 +2403,6 @@ impl<'v> StarlarkValue<'v> for CtxFile<'v> {
             return Some(extract_first_file(list.content()[0]));
         }
 
-        // Single value - extract file from it
         Some(extract_first_file(attr_value))
     }
 }
@@ -3177,12 +2414,8 @@ impl<'v> AllocValue<'v> for CtxFile<'v> {
 }
 
 /// Provides access to executable files from label attributes as ctx.executable.<attr>.
-///
-/// In Bazel, `ctx.executable.foo` returns the executable File from attribute `foo`
-/// (which must be declared with `executable=True`).
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
 pub struct CtxExecutable<'v> {
-    /// The resolved attributes struct as a Value
     attrs: Value<'v>,
 }
 
@@ -3216,16 +2449,12 @@ impl<'v> StarlarkValue<'v> for CtxExecutable<'v> {
         use crate::interpreter::rule_defs::provider::dependency::Dependency;
         use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
 
-        // Get the attribute value from attrs
-        // Value::get_attr returns Result<Option<Value>, Error>, we ignore errors
         let attr_value = self.attrs.get_attr(attribute, heap).ok().flatten()?;
 
-        // If it's None, return None
         if attr_value.is_none() {
             return Some(Value::new_none());
         }
 
-        // Helper: extract first executable file from a dependency's DefaultInfo
         let extract_executable = |v: Value<'v>| -> Option<Value<'v>> {
             let pc = if let Some(dep) = v.downcast_ref::<Dependency>() {
                 Some(dep.provider_collection())
@@ -3235,13 +2464,10 @@ impl<'v> StarlarkValue<'v> for CtxExecutable<'v> {
                 None
             };
             if let Some(pc) = pc {
-                // Try to get the executable from DefaultInfo
                 if let Ok(di) = pc.default_info() {
-                    // Check DefaultInfo.executable first
                     if let Some(exe) = di.executable() {
                         return Some(heap.alloc(exe));
                     }
-                    // Fall back to first default output
                     let raw = di.default_outputs_raw();
                     if let Some(list) = ListRef::from_frozen_value(raw) {
                         if !list.is_empty() {
@@ -3251,11 +2477,9 @@ impl<'v> StarlarkValue<'v> for CtxExecutable<'v> {
                 }
                 return Some(Value::new_none());
             }
-            // Not a dependency - return as-is (already an artifact)
             Some(v)
         };
 
-        // Handle list attributes (list of deps)
         if let Some(list) = ListRef::from_value(attr_value) {
             if list.is_empty() {
                 return Some(Value::new_none());
@@ -3263,7 +2487,6 @@ impl<'v> StarlarkValue<'v> for CtxExecutable<'v> {
             return extract_executable(list.content()[0]);
         }
 
-        // Handle single dependency
         extract_executable(attr_value)
     }
 }
@@ -3909,12 +3132,10 @@ starlark::starlark_simple_value!(ExecGroupToolchains);
 
 #[starlark::values::starlark_value(type = "exec_group_toolchains")]
 impl<'v> StarlarkValue<'v> for ExecGroupToolchains {
-    /// Returns toolchain stub for known types, None for unknown.
-    /// Uses the same logic as ToolchainsStub to resolve known toolchain types.
-    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        // Delegate to ToolchainsStub's resolution logic
-        let stub = ToolchainsStub { is_tool: false };
-        stub.at(index, heap)
+    /// Returns None for exec group toolchain lookups.
+    /// TODO(bazel): Implement proper exec group toolchain resolution.
+    fn at(&self, _index: Value<'v>, _heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        Ok(Value::new_none())
     }
 
     /// Returns True for known toolchain types, False for unknown.
@@ -3922,1055 +3143,6 @@ impl<'v> StarlarkValue<'v> for ExecGroupToolchains {
         // Return true so rules can access toolchains via exec groups
         Ok(true)
     }
-}
-
-// ============================================================================
-
-/// A stub for _toolchain_features that provides feature configuration.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct ToolchainFeaturesStub;
-
-impl std::fmt::Display for ToolchainFeaturesStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<toolchain_features>")
-    }
-}
-
-starlark::starlark_simple_value!(ToolchainFeaturesStub);
-
-#[starlark::values::starlark_value(type = "CcToolchainFeatures")]
-impl<'v> StarlarkValue<'v> for ToolchainFeaturesStub {
-    fn get_methods() -> Option<&'static Methods> {
-        static RES: MethodsStatic = MethodsStatic::new();
-        RES.methods(toolchain_features_stub_methods)
-    }
-}
-
-#[starlark_module]
-fn toolchain_features_stub_methods(builder: &mut MethodsBuilder) {
-    /// Returns default features and action configs.
-    fn default_features_and_action_configs<'v>(
-        this: &ToolchainFeaturesStub,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        use starlark::values::list::AllocList;
-        // Return empty list of features
-        Ok(heap.alloc(AllocList::EMPTY))
-    }
-
-    /// Returns the set of all feature names.
-    fn feature_names<'v>(
-        this: &ToolchainFeaturesStub,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        use starlark::values::list::AllocList;
-        Ok(heap.alloc(AllocList::EMPTY))
-    }
-
-    /// Returns the set of all action config names.
-    fn action_config_names<'v>(
-        this: &ToolchainFeaturesStub,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        use starlark::values::list::AllocList;
-        Ok(heap.alloc(AllocList::EMPTY))
-    }
-
-    /// Configures features based on requested features list.
-    fn configure_features<'v>(
-        this: &ToolchainFeaturesStub,
-        #[starlark(require = named)] requested_features: Value<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        let _ = (this, requested_features);
-        Ok(heap.alloc(FeatureConfigurationStub))
-    }
-}
-
-/// A stub for FeatureConfiguration returned by configure_features.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct FeatureConfigurationStub;
-
-impl std::fmt::Display for FeatureConfigurationStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<FeatureConfiguration>")
-    }
-}
-
-starlark::starlark_simple_value!(FeatureConfigurationStub);
-
-#[starlark::values::starlark_value(type = "FeatureConfiguration")]
-impl<'v> StarlarkValue<'v> for FeatureConfigurationStub {
-    fn get_methods() -> Option<&'static Methods> {
-        static RES: MethodsStatic = MethodsStatic::new();
-        RES.methods(feature_configuration_stub_methods)
-    }
-}
-
-#[starlark_module]
-fn feature_configuration_stub_methods(builder: &mut MethodsBuilder) {
-    /// Check if a feature is enabled.
-    fn is_enabled<'v>(
-        this: &FeatureConfigurationStub,
-        #[starlark(require = pos)] feature_name: &str,
-    ) -> starlark::Result<bool> {
-        let _ = this;
-        // Return false for most features
-        Ok(matches!(
-            feature_name,
-            "supports_dynamic_linker" | "static_linking_mode"
-        ))
-    }
-
-    /// Check if a feature was requested by the user.
-    fn is_requested<'v>(
-        this: &FeatureConfigurationStub,
-        #[starlark(require = pos)] _feature_name: &str,
-    ) -> starlark::Result<bool> {
-        let _ = this;
-        // Return false - no features explicitly requested
-        Ok(false)
-    }
-}
-
-/// A stub for _tool_paths dict that returns tool paths.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct ToolPathsStub;
-
-impl std::fmt::Display for ToolPathsStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<tool_paths>")
-    }
-}
-
-starlark::starlark_simple_value!(ToolPathsStub);
-
-#[starlark::values::starlark_value(type = "dict")]
-impl<'v> StarlarkValue<'v> for ToolPathsStub {
-    fn get_methods() -> Option<&'static Methods> {
-        static RES: MethodsStatic = MethodsStatic::new();
-        RES.methods(tool_paths_stub_methods)
-    }
-
-    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let key = index.unpack_str().unwrap_or("unknown");
-        let path = host_tool_path(key);
-        Ok(heap.alloc_str(path).to_value())
-    }
-
-    fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
-        // Return true if the key is a known tool
-        if let Some(key) = other.unpack_str() {
-            Ok(matches!(
-                key,
-                "gcc"
-                    | "g++"
-                    | "cpp"
-                    | "ar"
-                    | "ld"
-                    | "nm"
-                    | "objcopy"
-                    | "objdump"
-                    | "strip"
-                    | "gcov"
-                    | "dwp"
-                    | "llvm-profdata"
-            ))
-        } else {
-            Ok(false)
-        }
-    }
-}
-
-#[starlark_module]
-fn tool_paths_stub_methods(builder: &mut MethodsBuilder) {
-    /// Get a tool path by name, or return the default if not found.
-    fn get<'v>(
-        this: &ToolPathsStub,
-        #[starlark(require = pos)] key: &str,
-        #[starlark(default = NoneType)] default: Value<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        let path = host_tool_path(key);
-        if path.is_empty() {
-            return Ok(default);
-        }
-        Ok(heap.alloc_str(path).to_value())
-    }
-}
-
-// ============================================================================
-// RustToolchainInfoStub - Stub for Rust toolchain info
-// ============================================================================
-
-/// A stub for the Rust toolchain info returned by ctx.toolchains for Rust rules.
-///
-/// Provides the attributes that rules_rust expects from a Rust toolchain provider.
-/// Returns sensible defaults for the local system's Rust installation.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct RustToolchainInfoStub;
-
-impl std::fmt::Display for RustToolchainInfoStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<RustToolchainInfo>")
-    }
-}
-
-starlark::starlark_simple_value!(RustToolchainInfoStub);
-
-/// A stub for a Rust triple (exec_triple, target_triple).
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct RustTripleStub {
-    triple_str: &'static str,
-}
-
-impl std::fmt::Display for RustTripleStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.triple_str)
-    }
-}
-
-starlark::starlark_simple_value!(RustTripleStub);
-
-#[starlark::values::starlark_value(type = "rust_triple")]
-impl<'v> StarlarkValue<'v> for RustTripleStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "str" | "arch" | "system" | "abi" | "vendor")
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "str" => Some(heap.alloc_str(self.triple_str).to_value()),
-            "arch" => Some(heap.alloc_str("x86_64").to_value()),
-            "system" => Some(heap.alloc_str("linux").to_value()),
-            "abi" => Some(heap.alloc_str("gnu").to_value()),
-            "vendor" => Some(heap.alloc_str("unknown").to_value()),
-            _ => None,
-        }
-    }
-}
-
-/// A stub for a Rust compilation mode options struct.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct RustCompilationModeOptsStub;
-
-impl std::fmt::Display for RustCompilationModeOptsStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<RustCompilationModeOpts>")
-    }
-}
-
-starlark::starlark_simple_value!(RustCompilationModeOptsStub);
-
-#[starlark::values::starlark_value(type = "rust_compilation_mode_opts")]
-impl<'v> StarlarkValue<'v> for RustCompilationModeOptsStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "debug_info" | "opt_level" | "strip_level")
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "debug_info" => Some(heap.alloc_str("2").to_value()),
-            "opt_level" => Some(heap.alloc_str("0").to_value()),
-            "strip_level" => Some(heap.alloc_str("none").to_value()),
-            _ => None,
-        }
-    }
-}
-
-#[starlark::values::starlark_value(type = "RustToolchainInfo")]
-impl<'v> StarlarkValue<'v> for RustToolchainInfoStub {
-    fn has_attr(&self, _attribute: &str, _heap: Heap<'v>) -> bool {
-        // Accept any attribute - the Rust toolchain has many fields and methods
-        // that vary across rules_rust versions. Return true for all to avoid
-        // breaking on unrecognized attributes.
-        true
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        use starlark::values::list::AllocList;
-        match attribute {
-            // Tool paths - return file-like stubs with .path and cmd_args compatibility
-            "rustc" => Some(heap.alloc(RustToolStub("rustc"))),
-            "rust_doc" => Some(heap.alloc(RustToolStub("rustdoc"))),
-            "rustfmt" => Some(Value::new_none()),
-            "cargo" => Some(Value::new_none()),
-            "clippy_driver" => Some(Value::new_none()),
-            "llvm_cov" => Some(Value::new_none()),
-            "llvm_profdata" => Some(Value::new_none()),
-            "rustc_lib" => Some(Value::new_none()),
-
-            // Depsets
-            "rust_std" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-            "rust_std_paths" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
-            }
-            "all_files" => Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())),
-
-            // File extensions (platform-specific)
-            "binary_ext" => {
-                let ext = if cfg!(windows) { ".exe" } else { "" };
-                Some(heap.alloc_str(ext).to_value())
-            }
-            "staticlib_ext" => {
-                let ext = if cfg!(windows) { ".lib" } else { ".a" };
-                Some(heap.alloc_str(ext).to_value())
-            }
-            "dylib_ext" => {
-                let ext = if cfg!(windows) {
-                    ".dll"
-                } else if cfg!(target_os = "macos") {
-                    ".dylib"
-                } else {
-                    ".so"
-                };
-                Some(heap.alloc_str(ext).to_value())
-            }
-
-            // Edition and triples (platform-specific)
-            "default_edition" => Some(heap.alloc_str("2021").to_value()),
-            "exec_triple" => Some(heap.alloc(RustTripleStub {
-                triple_str: host_rust_triple(),
-            })),
-            "target_triple" => Some(heap.alloc(RustTripleStub {
-                triple_str: host_rust_triple(),
-            })),
-            "target_arch" => {
-                let arch = if cfg!(target_arch = "aarch64") {
-                    "aarch64"
-                } else {
-                    "x86_64"
-                };
-                Some(heap.alloc_str(arch).to_value())
-            }
-            "target_os" => {
-                let os = if cfg!(windows) {
-                    "windows"
-                } else if cfg!(target_os = "macos") {
-                    "macos"
-                } else {
-                    "linux"
-                };
-                Some(heap.alloc_str(os).to_value())
-            }
-            "target_flag_value" => Some(heap.alloc_str(host_rust_triple()).to_value()),
-            "target_json" => Some(Value::new_none()),
-
-            // Sysroot
-            "sysroot" => Some(heap.alloc_str("").to_value()),
-            "sysroot_short_path" => Some(heap.alloc_str("").to_value()),
-
-            // Env and flags
-            "env" => {
-                let map: SmallMap<Value, Value> = SmallMap::new();
-                Some(heap.alloc(Dict::new(map)))
-            }
-            "extra_rustc_flags" => Some(heap.alloc(AllocList::EMPTY)),
-            "extra_exec_rustc_flags" => Some(heap.alloc(AllocList::EMPTY)),
-            "per_crate_rustc_flags" => Some(heap.alloc(AllocList::EMPTY)),
-
-            // Compilation mode opts - dict mapping mode names to option structs
-            "compilation_mode_opts" => {
-                let mut map: SmallMap<Value, Value> = SmallMap::new();
-                let dbg = heap.alloc(RustCompilationModeOptsStub);
-                let opt = heap.alloc(RustCompilationModeOptsStub);
-                let fastbuild = heap.alloc(RustCompilationModeOptsStub);
-                map.insert_hashed(heap.alloc_str("dbg").to_value().get_hashed().unwrap(), dbg);
-                map.insert_hashed(heap.alloc_str("opt").to_value().get_hashed().unwrap(), opt);
-                map.insert_hashed(
-                    heap.alloc_str("fastbuild").to_value().get_hashed().unwrap(),
-                    fastbuild,
-                );
-                Some(heap.alloc(Dict::new(map)))
-            }
-
-            // CcInfo stubs for linking
-            "stdlib_linkflags" => Some(heap.alloc(CcInfoStub)),
-            "libstd_and_allocator_ccinfo" => Some(Value::new_none()),
-            "libstd_and_global_allocator_ccinfo" => Some(Value::new_none()),
-            "nostd_and_global_allocator_cc_info" => Some(Value::new_none()),
-            // make_libstd_and_allocator_ccinfo is a closure in real toolchains
-            // that takes (label, actions, allocator_library, std) and returns CcInfo or None.
-            // Return a stub function that always returns None.
-            "make_libstd_and_allocator_ccinfo" => Some(heap.alloc(MakeAllocatorCcInfoStub)),
-
-            // Additional flags and attributes from rules_rust toolchain
-            "extra_rustc_flags_for_crate_types" => {
-                let map: SmallMap<Value, Value> = SmallMap::new();
-                Some(heap.alloc(Dict::new(map)))
-            }
-            "linker" => Some(Value::new_none()),
-            "linker_files" => Some(Value::new_none()),
-            "_linker_files" => Some(Value::new_none()),
-            "linker_preference" => Some(heap.alloc_str("cc").to_value()),
-            "linker_type" => Some(Value::new_none()),
-            "llvm_lib" => Some(Value::new_none()),
-            "dynamic_runtime_lib" => Some(Value::new_none()),
-            "static_runtime_lib" => Some(Value::new_none()),
-            "needs_pic_for_dynamic_libraries" => Some(Value::new_bool(true)),
-            "require_explicit_unstable_features" => Some(Value::new_bool(false)),
-            "make_variables" => {
-                let map: SmallMap<Value, Value> = SmallMap::new();
-                Some(heap.alloc(Dict::new(map)))
-            }
-            "lto" => {
-                // lto is a struct with a mode field, not a dict
-                use starlark::values::structs::AllocStruct;
-                Some(heap.alloc(AllocStruct([("mode", heap.alloc_str("off").to_value())])))
-            }
-            "proc_macro_srv" => Some(Value::new_none()),
-            "rust_analyzer" => Some(Value::new_none()),
-            "rustc_srcs" => Some(Value::new_none()),
-            "rustc_srcs_path" => Some(Value::new_none()),
-            "cargo_clippy" => Some(Value::new_none()),
-            "sysroot_anchor" => Some(Value::new_none()),
-
-            // Internal/experimental flags - all default to false or safe values
-            "_rename_first_party_crates" => Some(Value::new_bool(false)),
-            "_third_party_dir" => Some(heap.alloc_str("").to_value()),
-            "_pipelined_compilation" => Some(Value::new_bool(false)),
-            "_no_std" => Some(heap.alloc_str("off").to_value()),
-            "_codegen_units" => Some(heap.alloc(0)),
-
-            // Integer-valued experimental flags
-            "_experimental_use_allocator_libraries_with_mangled_symbols" => Some(heap.alloc(0)),
-            "_experimental_use_allocator_libraries_with_mangled_symbols_setting" => {
-                Some(Value::new_bool(false))
-            }
-
-            // Catch-all: attributes starting with _ are likely boolean flags
-            // Other unknown attributes get None
-            _ if attribute.starts_with("_experimental_")
-                || attribute.starts_with("_incompatible_") =>
-            {
-                Some(Value::new_bool(false))
-            }
-            _ if attribute.starts_with("_") => Some(Value::new_bool(false)),
-            _ => Some(Value::new_none()),
-        }
-    }
-}
-
-/// Stub callable for `make_libstd_and_allocator_ccinfo` on the Rust toolchain.
-/// Returns None when called (no actual CcInfo available in stub toolchain).
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct MakeAllocatorCcInfoStub;
-
-impl std::fmt::Display for MakeAllocatorCcInfoStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<make_libstd_and_allocator_ccinfo>")
-    }
-}
-
-starlark::starlark_simple_value!(MakeAllocatorCcInfoStub);
-
-#[starlark::values::starlark_value(type = "make_libstd_and_allocator_ccinfo")]
-impl<'v> StarlarkValue<'v> for MakeAllocatorCcInfoStub {
-    fn invoke(
-        &self,
-        _me: Value<'v>,
-        _args: &Arguments<'v, '_>,
-        _eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<Value<'v>> {
-        Ok(Value::new_none())
-    }
-}
-
-/// A stub for a Rust tool (rustc, rustdoc, etc.) that provides a .path attribute.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct RustToolStub(&'static str);
-
-/// Detect the path to a Rust tool by checking common locations.
-fn detect_rust_tool_path(tool_name: &str) -> String {
-    // On Windows, use where.exe to find the tool (returns native Windows path)
-    #[cfg(windows)]
-    {
-        let exe_name = if tool_name.ends_with(".exe") {
-            tool_name.to_string()
-        } else {
-            format!("{}.exe", tool_name)
-        };
-        if let Ok(output) = std::process::Command::new("where.exe")
-            .arg(&exe_name)
-            .output()
-        {
-            if output.status.success() {
-                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                // `where` may return multiple lines; take the first
-                if let Some(first) = path.lines().next() {
-                    if !first.is_empty() {
-                        return first.to_string();
-                    }
-                }
-            }
-        }
-        // Fallback to USERPROFILE/.cargo/bin
-        let home = std::env::var("USERPROFILE").unwrap_or_default();
-        let cargo_path = format!("{}\\.cargo\\bin\\{}", home, exe_name);
-        if std::path::Path::new(&cargo_path).exists() {
-            return cargo_path;
-        }
-        return exe_name;
-    }
-
-    #[cfg(not(windows))]
-    {
-        // Try `which` first via PATH lookup
-        if let Ok(output) = std::process::Command::new("which").arg(tool_name).output() {
-            if output.status.success() {
-                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                if !path.is_empty() {
-                    return path;
-                }
-            }
-        }
-        // Fallback to common locations
-        let home = std::env::var("HOME").unwrap_or_default();
-        let cargo_path = format!("{}/.cargo/bin/{}", home, tool_name);
-        if std::path::Path::new(&cargo_path).exists() {
-            return cargo_path;
-        }
-        let usr_local = format!("/usr/local/bin/{}", tool_name);
-        if std::path::Path::new(&usr_local).exists() {
-            return usr_local;
-        }
-        format!("/usr/bin/{}", tool_name)
-    }
-}
-
-impl std::fmt::Display for RustToolStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<{}>", self.0)
-    }
-}
-
-starlark::starlark_simple_value!(RustToolStub);
-
-#[starlark::values::starlark_value(type = "rust_tool")]
-impl<'v> StarlarkValue<'v> for RustToolStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(
-            attribute,
-            "path"
-                | "short_path"
-                | "basename"
-                | "dirname"
-                | "extension"
-                | "is_source"
-                | "root"
-                | "owner"
-        )
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "path" | "short_path" => {
-                let path = detect_rust_tool_path(self.0);
-                Some(heap.alloc_str(&path).to_value())
-            }
-            "basename" => Some(heap.alloc_str(self.0).to_value()),
-            "dirname" => {
-                let path = detect_rust_tool_path(self.0);
-                let dir = std::path::Path::new(&path)
-                    .parent()
-                    .map(|p| p.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                Some(heap.alloc_str(&dir).to_value())
-            }
-            "extension" => Some(heap.alloc_str("").to_value()),
-            "is_source" => Some(Value::new_bool(false)),
-            "root" => Some(Value::new_none()),
-            "owner" => Some(Value::new_none()),
-            _ => None,
-        }
-    }
-
-    fn provide(&'v self, demand: &mut starlark::values::Demand<'_, 'v>) {
-        demand.provide_value::<&dyn crate::interpreter::rule_defs::cmd_args::CommandLineArgLike>(
-            self,
-        );
-    }
-}
-
-impl<'v> crate::interpreter::rule_defs::cmd_args::CommandLineArgLike<'v> for RustToolStub {
-    fn register_me(&self) {
-        use crate::interpreter::rule_defs::cmd_args::command_line_arg_like_type::command_line_arg_like_impl;
-        command_line_arg_like_impl!(starlark::typing::Ty::string());
-    }
-
-    fn add_to_command_line(
-        &self,
-        cli: &mut dyn crate::interpreter::rule_defs::cmd_args::CommandLineBuilder,
-        _context: &mut dyn crate::interpreter::rule_defs::cmd_args::CommandLineContext,
-        _artifact_path_mapping: &dyn crate::interpreter::rule_defs::cmd_args::ArtifactPathMapper,
-    ) -> kuro_error::Result<()> {
-        cli.push_arg(detect_rust_tool_path(self.0));
-        Ok(())
-    }
-
-    fn contains_arg_attr(&self) -> bool {
-        false
-    }
-
-    fn visit_write_to_file_macros(
-        &self,
-        _visitor: &mut dyn crate::interpreter::rule_defs::cmd_args::WriteToFileMacroVisitor,
-        _artifact_path_mapping: &dyn crate::interpreter::rule_defs::cmd_args::ArtifactPathMapper,
-    ) -> kuro_error::Result<()> {
-        Ok(())
-    }
-}
-
-// ============================================================================
-// PyToolchainInfoStub - Stub for Python toolchain info
-// ============================================================================
-
-/// A stub for the Python toolchain info returned by ctx.toolchains for Python rules.
-///
-/// Provides py3_runtime attribute that rules_python expects.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct PyToolchainInfoStub;
-
-impl std::fmt::Display for PyToolchainInfoStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<PyToolchainInfo>")
-    }
-}
-
-starlark::starlark_simple_value!(PyToolchainInfoStub);
-
-#[starlark::values::starlark_value(type = "PyToolchainInfo")]
-impl<'v> StarlarkValue<'v> for PyToolchainInfoStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(
-            attribute,
-            "py3_runtime" | "py2_runtime" | "exec_compatible_with"
-        )
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "py3_runtime" => Some(heap.alloc(PyRuntimeInfoStub)),
-            "py2_runtime" => Some(Value::new_none()),
-            "exec_compatible_with" => Some(heap.alloc(starlark::values::list::AllocList::EMPTY)),
-            _ => None,
-        }
-    }
-}
-
-/// A stub for PyRuntimeInfo that provides the Python interpreter path.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct PyRuntimeInfoStub;
-
-impl std::fmt::Display for PyRuntimeInfoStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<PyRuntimeInfo>")
-    }
-}
-
-starlark::starlark_simple_value!(PyRuntimeInfoStub);
-
-#[starlark::values::starlark_value(type = "PyRuntimeInfo")]
-impl<'v> StarlarkValue<'v> for PyRuntimeInfoStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(
-            attribute,
-            "interpreter_path"
-                | "interpreter"
-                | "files"
-                | "coverage_tool"
-                | "coverage_files"
-                | "python_version"
-                | "stub_shebang"
-                | "bootstrap_template"
-                | "implementation_name"
-                | "flag_values"
-                | "site_init_template"
-        )
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "interpreter_path" => {
-                // Use the magic sentinel to force the legacy bootstrap-template path.
-                // This makes rules_python fall back to ctx.file._bootstrap_template
-                // (which is @bazel_tools//tools/python:python_bootstrap_template.txt),
-                // since our PyRuntimeInfoStub doesn't provide a real bootstrap_template.
-                Some(
-                    heap.alloc_str("/_magic_pyruntime_sentinel_do_not_use")
-                        .to_value(),
-                )
-            }
-            "interpreter" => Some(Value::new_none()),
-            "files" => Some(Value::new_none()),
-            "coverage_tool" => Some(Value::new_none()),
-            "coverage_files" => Some(Value::new_none()),
-            "python_version" => Some(heap.alloc_str("PY3").to_value()),
-            "stub_shebang" => Some(heap.alloc_str("#!/usr/bin/env python3").to_value()),
-            "bootstrap_template" => Some(Value::new_none()),
-            "implementation_name" => Some(heap.alloc_str("cpython").to_value()),
-            "flag_values" => Some(heap.alloc(starlark::values::dict::Dict::default())),
-            "site_init_template" => Some(Value::new_none()),
-            _ => None,
-        }
-    }
-}
-
-// ============================================================================
-// Java toolchain stubs
-// ============================================================================
-
-/// Stub for the Java toolchain wrapper object.
-/// In Bazel, `ctx.toolchains["@rules_java//java:toolchain_type"]` returns
-/// an object with a `.java` attribute containing the `JavaToolchainInfo`.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct JavaToolchainWrapperStub;
-
-impl std::fmt::Display for JavaToolchainWrapperStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<JavaToolchainWrapper>")
-    }
-}
-
-starlark::starlark_simple_value!(JavaToolchainWrapperStub);
-
-#[starlark::values::starlark_value(type = "JavaToolchainWrapper")]
-impl<'v> StarlarkValue<'v> for JavaToolchainWrapperStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "java" | "java_runtime")
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "java" => Some(heap.alloc(JavaToolchainInfoStub)),
-            "java_runtime" => Some(heap.alloc(JavaRuntimeInfoStub)),
-            _ => None,
-        }
-    }
-
-    fn dir_attr(&self) -> Vec<String> {
-        vec!["java".to_owned(), "java_runtime".to_owned()]
-    }
-}
-
-/// Stub for JavaToolchainInfo providing minimal attributes for rules_java.
-///
-/// Provides the key fields that rules_java Starlark code accesses:
-/// bootclasspath, ijar, java_runtime, jvm_opt, source_version, target_version, etc.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct JavaToolchainInfoStub;
-
-impl std::fmt::Display for JavaToolchainInfoStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<JavaToolchainInfo>")
-    }
-}
-
-starlark::starlark_simple_value!(JavaToolchainInfoStub);
-
-#[starlark::values::starlark_value(type = "JavaToolchainInfo")]
-impl<'v> StarlarkValue<'v> for JavaToolchainInfoStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(
-            attribute,
-            "bootclasspath"
-                | "ijar"
-                | "jacocorunner"
-                | "java_runtime"
-                | "jvm_opt"
-                | "label"
-                | "proguard_allowlister"
-                | "single_jar"
-                | "source_version"
-                | "target_version"
-                | "tools"
-                | "_javabuilder"
-                | "_header_compiler"
-                | "_header_compiler_direct"
-                | "_header_compiler_builtin_processors"
-                | "_javacopts"
-                | "_javacopts_list"
-                | "_compatible_javacopts"
-                | "_javac_supports_workers"
-                | "_javac_supports_multiplex_workers"
-                | "_javac_supports_worker_cancellation"
-                | "_javac_supports_worker_multiplex_sandboxing"
-                | "_gen_class"
-                | "_deps_checker"
-                | "_forcibly_disable_header_compilation"
-                | "_one_version_tool"
-                | "_one_version_allowlist"
-                | "_one_version_allowlist_for_tests"
-                | "_android_linter"
-                | "_bytecode_optimizer"
-                | "_local_java_optimization_config"
-                | "_timezone_data"
-                | "_reduced_classpath_incompatible_processors"
-                | "_package_configuration"
-                | "_jspecify_info"
-                | "_bootclasspath_info"
-        )
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        use starlark::values::list::AllocList;
-        let empty_depset = || heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty());
-        match attribute {
-            "bootclasspath" => Some(empty_depset()),
-            "ijar" => Some(Value::new_none()),
-            "jacocorunner" => Some(Value::new_none()),
-            "java_runtime" => Some(heap.alloc(JavaRuntimeInfoStub)),
-            "jvm_opt" => Some(empty_depset()),
-            "label" => Some(Value::new_none()),
-            "proguard_allowlister" => Some(Value::new_none()),
-            "single_jar" => Some(Value::new_none()),
-            "source_version" => Some(heap.alloc_str("11").to_value()),
-            "target_version" => Some(heap.alloc_str("11").to_value()),
-            "tools" => Some(empty_depset()),
-            // Internal fields used by rules_java Starlark
-            "_javabuilder" => Some(Value::new_none()),
-            "_header_compiler" => Some(Value::new_none()),
-            "_header_compiler_direct" => Some(Value::new_none()),
-            "_header_compiler_builtin_processors" => Some(heap.alloc(AllocList::EMPTY)),
-            "_javacopts" => Some(empty_depset()),
-            "_javacopts_list" => Some(heap.alloc(AllocList::EMPTY)),
-            "_compatible_javacopts" => Some(heap.alloc(starlark::values::dict::Dict::default())),
-            "_javac_supports_workers" => Some(Value::new_bool(true)),
-            "_javac_supports_multiplex_workers" => Some(Value::new_bool(true)),
-            "_javac_supports_worker_cancellation" => Some(Value::new_bool(false)),
-            "_javac_supports_worker_multiplex_sandboxing" => Some(Value::new_bool(false)),
-            "_gen_class" => Some(Value::new_none()),
-            "_deps_checker" => Some(Value::new_none()),
-            "_forcibly_disable_header_compilation" => Some(Value::new_bool(false)),
-            "_one_version_tool" => Some(Value::new_none()),
-            "_one_version_allowlist" => Some(Value::new_none()),
-            "_one_version_allowlist_for_tests" => Some(Value::new_none()),
-            "_android_linter" => Some(Value::new_none()),
-            "_bytecode_optimizer" => Some(Value::new_none()),
-            "_local_java_optimization_config" => Some(Value::new_none()),
-            "_timezone_data" => Some(Value::new_none()),
-            "_reduced_classpath_incompatible_processors" => Some(heap.alloc(AllocList::EMPTY)),
-            "_package_configuration" => Some(heap.alloc(AllocList::EMPTY)),
-            "_jspecify_info" => Some(Value::new_none()),
-            "_bootclasspath_info" => Some(Value::new_none()),
-            _ => None,
-        }
-    }
-}
-
-/// Stub for JavaRuntimeInfo providing minimal attributes for rules_java.
-///
-/// Provides java_home, java_executable paths, files, and version info.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct JavaRuntimeInfoStub;
-
-impl std::fmt::Display for JavaRuntimeInfoStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<JavaRuntimeInfo>")
-    }
-}
-
-starlark::starlark_simple_value!(JavaRuntimeInfoStub);
-
-#[starlark::values::starlark_value(type = "JavaRuntimeInfo")]
-impl<'v> StarlarkValue<'v> for JavaRuntimeInfoStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(
-            attribute,
-            "java_home"
-                | "java_home_runfiles_path"
-                | "java_executable_exec_path"
-                | "java_executable_runfiles_path"
-                | "files"
-                | "hermetic_files"
-                | "hermetic_static_libs"
-                | "lib_modules"
-                | "lib_ct_sym"
-                | "default_cds"
-                | "version"
-        )
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        let empty_depset = || heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty());
-        // Try to detect JAVA_HOME from environment
-        let java_home = std::env::var("JAVA_HOME").unwrap_or_else(|_| {
-            if cfg!(windows) {
-                "C:/Program Files/Java/jdk-11".to_owned()
-            } else {
-                "/usr/lib/jvm/java-11".to_owned()
-            }
-        });
-        let java_exe = if cfg!(windows) {
-            format!("{}/bin/java.exe", java_home)
-        } else {
-            format!("{}/bin/java", java_home)
-        };
-        match attribute {
-            "java_home" => Some(heap.alloc_str(&java_home).to_value()),
-            "java_home_runfiles_path" => Some(heap.alloc_str(&java_home).to_value()),
-            "java_executable_exec_path" => Some(heap.alloc_str(&java_exe).to_value()),
-            "java_executable_runfiles_path" => Some(heap.alloc_str(&java_exe).to_value()),
-            "files" => Some(empty_depset()),
-            "hermetic_files" => Some(empty_depset()),
-            "hermetic_static_libs" => Some(heap.alloc(starlark::values::list::AllocList::EMPTY)),
-            "lib_modules" => Some(Value::new_none()),
-            "lib_ct_sym" => Some(Value::new_none()),
-            "default_cds" => Some(Value::new_none()),
-            "version" => Some(heap.alloc(11)),
-            _ => None,
-        }
-    }
-}
-
-/// Stub for the Java runtime toolchain wrapper.
-/// `ctx.toolchains["@rules_java//java:runtime_toolchain_type"]` returns
-/// an object with `.java_runtime` containing the `JavaRuntimeInfo`.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct JavaRuntimeToolchainWrapperStub;
-
-impl std::fmt::Display for JavaRuntimeToolchainWrapperStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<JavaRuntimeToolchainWrapper>")
-    }
-}
-
-starlark::starlark_simple_value!(JavaRuntimeToolchainWrapperStub);
-
-#[starlark::values::starlark_value(type = "JavaRuntimeToolchainWrapper")]
-impl<'v> StarlarkValue<'v> for JavaRuntimeToolchainWrapperStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "java_runtime")
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "java_runtime" => Some(heap.alloc(JavaRuntimeInfoStub)),
-            _ => None,
-        }
-    }
-
-    fn dir_attr(&self) -> Vec<String> {
-        vec!["java_runtime".to_owned()]
-    }
-}
-
-// ============================================================================
-// OCI toolchain stubs (crane, registry, jq)
-// ============================================================================
-
-/// Detect a binary path using platform-appropriate lookup.
-fn detect_binary_path(name: &str, extra_candidates: &[&str]) -> String {
-    // Check extra candidates first
-    for path in extra_candidates {
-        if std::path::Path::new(path).exists() {
-            return path.to_string();
-        }
-    }
-    // Use platform-appropriate PATH lookup
-    let finder = if cfg!(windows) { "where" } else { "which" };
-    if let Ok(output) = std::process::Command::new(finder).arg(name).output() {
-        if output.status.success() {
-            if let Ok(s) = std::str::from_utf8(&output.stdout) {
-                let first_line = s.lines().next().unwrap_or("").trim();
-                if !first_line.is_empty() {
-                    return first_line.to_string();
-                }
-            }
-        }
-    }
-    name.to_string()
-}
-
-/// Detect the crane binary path from common locations.
-fn detect_crane_path() -> String {
-    let extra = if cfg!(windows) {
-        vec![]
-    } else {
-        vec!["/usr/local/bin/crane", "/usr/bin/crane"]
-    };
-    detect_binary_path("crane", &extra)
-}
-
-/// Detect the jq binary path.
-fn detect_jq_path() -> String {
-    let extra = if cfg!(windows) {
-        vec![]
-    } else {
-        vec!["/usr/bin/jq", "/usr/local/bin/jq"]
-    };
-    detect_binary_path("jq", &extra)
-}
-
-/// Get or create the OCI registry launcher script.
-/// The launcher script implements start_registry/stop_registry using crane registry serve.
-fn get_or_create_oci_launcher() -> String {
-    let launcher_path = &format!(
-        "{}/kuro_oci_registry_launcher.sh",
-        std::env::temp_dir().to_string_lossy()
-    );
-    if !std::path::Path::new(launcher_path).exists() {
-        let crane_path = detect_crane_path();
-        let content = format!(
-            r#"#!/usr/bin/env bash
-# Kuro OCI registry launcher - auto-generated
-CRANE_BIN="{crane_path}"
-
-function start_registry() {{
-    local storage_dir="$1"
-    local output="$2"
-    local deadline="${{3:-10}}"
-    local registry_pid="${{storage_dir}}/proc.pid"
-
-    mkdir -p "${{storage_dir}}"
-    "${{CRANE_BIN}}" registry serve --disk="${{storage_dir}}" --address=localhost:0 >>"${{output}}" 2>&1 &
-    echo "$!" > "${{registry_pid}}"
-
-    local timeout=$((SECONDS + ${{deadline}}))
-    local port=""
-    while [ "${{SECONDS}}" -lt "${{timeout}}" ]; do
-        port=$(grep -o "serving on port [0-9]*" "${{output}}" 2>/dev/null | tail -1 | grep -o "[0-9]*$")
-        if [ -n "${{port}}" ]; then
-            break
-        fi
-        sleep 0.1
-    done
-
-    if [ -z "${{port}}" ]; then
-        echo "registry didn't become ready within ${{deadline}}s." >&2
-        return 1
-    fi
-    echo "127.0.0.1:${{port}}"
-    return 0
-}}
-
-function stop_registry() {{
-    local storage_dir="$1"
-    local registry_pid="${{storage_dir}}/proc.pid"
-    if [ -f "${{registry_pid}}" ]; then
-        kill "$(cat "${{registry_pid}}")" 2>/dev/null || true
-        rm -f "${{registry_pid}}"
-    fi
-}}
-"#,
-        );
-        let _ = std::fs::write(launcher_path, &content);
-        // Make it executable
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            if let Ok(meta) = std::fs::metadata(launcher_path) {
-                let mut perms = meta.permissions();
-                perms.set_mode(0o755);
-                let _ = std::fs::set_permissions(launcher_path, perms);
-            }
-        }
-    }
-    launcher_path.to_string()
 }
 
 /// A Bazel-compatible stamp file (stable-status.txt or volatile-status.txt).
@@ -5048,287 +3220,6 @@ impl<'v> StarlarkValue<'v> for StampFile {
                 Some(heap.alloc(ArtifactRootStub { path: root_path }))
             }
             _ => None,
-        }
-    }
-}
-
-/// A stub that wraps a string path and provides a `.path` attribute.
-/// Used for crane_info.binary, registry_info.launcher, jqinfo.bin, etc.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct FileLikePathStub {
-    path: String,
-}
-
-impl std::fmt::Display for FileLikePathStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<file:{}>", self.path)
-    }
-}
-
-starlark::starlark_simple_value!(FileLikePathStub);
-
-#[starlark::values::starlark_value(type = "FileLikePath")]
-impl<'v> StarlarkValue<'v> for FileLikePathStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(
-            attribute,
-            "path"
-                | "short_path"
-                | "basename"
-                | "is_source"
-                | "is_directory"
-                | "extension"
-                | "owner"
-                | "root"
-        )
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "path" => Some(heap.alloc_str(&self.path).to_value()),
-            "short_path" => Some(heap.alloc_str(&self.path).to_value()),
-            "basename" => {
-                let basename = std::path::Path::new(&self.path)
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or(&self.path);
-                Some(heap.alloc_str(basename).to_value())
-            }
-            "is_source" => Some(Value::new_bool(true)),
-            "is_directory" => Some(Value::new_bool(false)),
-            _ => None,
-        }
-    }
-}
-
-/// Stub for crane_info provider (CraneInfo from rules_oci).
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct OciCraneInfoStub {
-    crane_path: String,
-}
-
-impl std::fmt::Display for OciCraneInfoStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<CraneInfo>")
-    }
-}
-
-starlark::starlark_simple_value!(OciCraneInfoStub);
-
-#[starlark::values::starlark_value(type = "CraneInfo")]
-impl<'v> StarlarkValue<'v> for OciCraneInfoStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "binary" | "version")
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "binary" => Some(heap.alloc(FileLikePathStub {
-                path: self.crane_path.clone(),
-            })),
-            "version" => Some(heap.alloc_str("0.19.1").to_value()),
-            _ => None,
-        }
-    }
-}
-
-/// Stub for OCI crane toolchain.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct OciCraneToolchainStub {
-    crane_path: String,
-}
-
-impl std::fmt::Display for OciCraneToolchainStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<CraneToolchain>")
-    }
-}
-
-starlark::starlark_simple_value!(OciCraneToolchainStub);
-
-#[starlark::values::starlark_value(type = "CraneToolchain")]
-impl<'v> StarlarkValue<'v> for OciCraneToolchainStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "crane_info")
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "crane_info" => Some(heap.alloc(OciCraneInfoStub {
-                crane_path: self.crane_path.clone(),
-            })),
-            _ => None,
-        }
-    }
-}
-
-/// Stub for registry_info provider (RegistryInfo from rules_oci).
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct OciRegistryInfoStub {
-    launcher_path: String,
-    registry_path: String,
-}
-
-impl std::fmt::Display for OciRegistryInfoStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<RegistryInfo>")
-    }
-}
-
-starlark::starlark_simple_value!(OciRegistryInfoStub);
-
-#[starlark::values::starlark_value(type = "RegistryInfo")]
-impl<'v> StarlarkValue<'v> for OciRegistryInfoStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "launcher" | "registry")
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "launcher" => Some(heap.alloc(FileLikePathStub {
-                path: self.launcher_path.clone(),
-            })),
-            "registry" => Some(heap.alloc(FileLikePathStub {
-                path: self.registry_path.clone(),
-            })),
-            _ => None,
-        }
-    }
-}
-
-/// Stub for OCI registry toolchain.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct OciRegistryToolchainStub {
-    launcher_path: String,
-    registry_path: String,
-}
-
-impl std::fmt::Display for OciRegistryToolchainStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<RegistryToolchain>")
-    }
-}
-
-starlark::starlark_simple_value!(OciRegistryToolchainStub);
-
-#[starlark::values::starlark_value(type = "RegistryToolchain")]
-impl<'v> StarlarkValue<'v> for OciRegistryToolchainStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "registry_info")
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "registry_info" => Some(heap.alloc(OciRegistryInfoStub {
-                launcher_path: self.launcher_path.clone(),
-                registry_path: self.registry_path.clone(),
-            })),
-            _ => None,
-        }
-    }
-}
-
-/// Stub for jqinfo provider (from aspect_bazel_lib jq toolchain).
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct JqInfoStub {
-    jq_path: String,
-}
-
-impl std::fmt::Display for JqInfoStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<JqInfo>")
-    }
-}
-
-starlark::starlark_simple_value!(JqInfoStub);
-
-#[starlark::values::starlark_value(type = "JqInfo")]
-impl<'v> StarlarkValue<'v> for JqInfoStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "bin")
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "bin" => Some(heap.alloc(FileLikePathStub {
-                path: self.jq_path.clone(),
-            })),
-            _ => None,
-        }
-    }
-}
-
-/// Stub for jq toolchain (from aspect_bazel_lib).
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct JqToolchainStub {
-    jq_path: String,
-}
-
-impl std::fmt::Display for JqToolchainStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<JqToolchain>")
-    }
-}
-
-starlark::starlark_simple_value!(JqToolchainStub);
-
-#[starlark::values::starlark_value(type = "JqToolchain")]
-impl<'v> StarlarkValue<'v> for JqToolchainStub {
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "jqinfo")
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "jqinfo" => Some(heap.alloc(JqInfoStub {
-                jq_path: self.jq_path.clone(),
-            })),
-            _ => None,
-        }
-    }
-}
-
-/// A generic toolchain stub for unrecognized toolchain types.
-///
-/// Instead of returning None (which crashes on attribute access), this returns
-/// a stub that accepts any attribute access and returns None. This allows rules
-/// to check for toolchain presence without crashing.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct GenericToolchainStub;
-
-impl std::fmt::Display for GenericToolchainStub {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<GenericToolchain>")
-    }
-}
-
-starlark::starlark_simple_value!(GenericToolchainStub);
-
-#[starlark::values::starlark_value(type = "GenericToolchain")]
-impl<'v> StarlarkValue<'v> for GenericToolchainStub {
-    fn has_attr(&self, _attribute: &str, _heap: Heap<'v>) -> bool {
-        // Accept any attribute to avoid crashes
-        true
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        // For known toolchain info fields, return another stub so
-        // chained attribute access (e.g., toolchain.coreutils_info.bin) works.
-        match attribute {
-            // Info-suffix fields return another stub for chaining
-            a if a.ends_with("_info") => Some(heap.alloc(GenericToolchainStub)),
-            // Tool paths return a string so they work with ctx.actions.run(executable=...)
-            "bin" | "path" | "short_path" => {
-                // Return a placeholder path - the action won't actually execute during analysis
-                let path = if cfg!(windows) {
-                    "C:\\Windows\\System32\\cmd.exe"
-                } else {
-                    "/bin/sh"
-                };
-                Some(heap.alloc_str(path).to_value())
-            }
-            "basename" => Some(heap.alloc_str("tool").to_value()),
-            _ => Some(Value::new_none()),
         }
     }
 }

@@ -310,7 +310,7 @@ This removes ~3000 lines of stub code from `context.rs`.
 - [x] `toolchain_types` correctly extracted from `rule(toolchains=[config_common.toolchain_type(...)])` (ToolchainTypeRequirement parsing fixed)
 - [x] Label normalization strips all `@` prefixes for consistent matching
 - [x] `ctx.toolchains["@bazel_tools//tools/cpp:toolchain_type"]` returns real CcToolchainInfo via ToolchainInfo provider extraction
-- [ ] Stubs fully removed (deferred to after cc_toolchain impl analysis works)
+- [x] Stubs fully removed (Phase 7 complete — all per-language toolchain stubs deleted)
 
 #### Status Note (2026-04-01 update):
 Resolved blockers for cc_toolchain_config analysis on Linux:
@@ -552,10 +552,21 @@ Make `ctx.toolchains` REQUIRE resolved toolchains — error if resolution
 didn't produce results instead of falling back to stubs.
 
 ### Success Criteria
-- [ ] `context.rs` reduced by ~3000 lines
-- [ ] No `*Stub` types remain for toolchain-related functionality
-- [ ] No hardcoded tool paths in any Rust code
-- [ ] All builds use real toolchain resolution
+- [x] `context.rs` reduced by ~2100 lines (5417→3308; remaining are non-toolchain ctx types)
+- [x] No `*ToolchainInfoStub`, `*ToolStub`, `ToolchainsStub`, or `GenericToolchainStub` types remain
+- [x] `host_tool_path()`, `host_rust_triple()`, `detect_*_path()`, `get_or_create_oci_launcher()` deleted
+- [x] `ctx.toolchains` returns empty `ResolvedToolchains` (not stubs) when no resolution ran
+- [x] `ResolvedToolchains.at()` errors on unresolved types (no stub fallback)
+- [x] CC builds succeed with real toolchain resolution (cc_test_example hello_bin, hello_test_static)
+- [ ] All builds use real toolchain resolution (Rust/Python/Java not yet verified)
+
+#### Notes:
+- `host_target_cpu()` and `host_cc_path()` retained for Make variables (ctx.var) — these are
+  not toolchain stubs but default values for BINDIR/CC Make variables
+- `CompilationContextStub` / `LinkingContextStub` retained — used by cc_common.rs for creating
+  empty CcInfo providers, not toolchain dispatch
+- `ExecGroupsDict` / `ExecGroupToolchains` retained as structural types but updated to not
+  depend on ToolchainsStub (ExecGroupToolchains.at() returns None instead of stub dispatch)
 
 ---
 
