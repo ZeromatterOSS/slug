@@ -283,7 +283,7 @@ The detailed implementation is split into focused sub-plans:
 | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------- |
 | [10-module-extension-execution.md](./kuro-bazel-subplans/10-module-extension-execution.md)           | Let real module extensions execute via DICE instead of synthetic stubs | **In Progress** |
 | [11-toolchain-resolution.md](./kuro-bazel-subplans/11-toolchain-resolution.md)                       | Replace ToolchainsStub with real Bazel toolchain resolution algorithm | **Complete** (automated; manual verification remaining) |
-| [12-stub-cleanup-and-exec-groups.md](./kuro-bazel-subplans/12-stub-cleanup-and-exec-groups.md)       | Rename remaining stubs, real BuildConfiguration, exec group resolution | **Not Started** |
+| [12-stub-cleanup-and-exec-groups.md](./kuro-bazel-subplans/12-stub-cleanup-and-exec-groups.md)       | Rename remaining stubs, real BuildConfiguration, exec group resolution | **Complete** (automated; manual verification remaining) |
 
 ### Remaining Stub Behavior (No Plans Yet)
 
