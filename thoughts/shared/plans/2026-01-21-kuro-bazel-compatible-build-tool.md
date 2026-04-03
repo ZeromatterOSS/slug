@@ -282,7 +282,8 @@ The detailed implementation is split into focused sub-plans:
 | Sub-Plan                                                                                             | Description                                                      | Status          |
 | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------- |
 | [10-module-extension-execution.md](./kuro-bazel-subplans/10-module-extension-execution.md)           | Let real module extensions execute via DICE instead of synthetic stubs | **In Progress** |
-| [11-toolchain-resolution.md](./kuro-bazel-subplans/11-toolchain-resolution.md)                       | Replace ToolchainsStub with real Bazel toolchain resolution algorithm | **Not Started** |
+| [11-toolchain-resolution.md](./kuro-bazel-subplans/11-toolchain-resolution.md)                       | Replace ToolchainsStub with real Bazel toolchain resolution algorithm | **Complete** (automated; manual verification remaining) |
+| [12-stub-cleanup-and-exec-groups.md](./kuro-bazel-subplans/12-stub-cleanup-and-exec-groups.md)       | Rename remaining stubs, real BuildConfiguration, exec group resolution | **Not Started** |
 
 ### Remaining Stub Behavior (No Plans Yet)
 
@@ -302,15 +303,16 @@ explicit decision that the stub is adequate. Organized by priority.
 
 **Medium Priority (functional but not Bazel-accurate):**
 
-| Stub | Location | What It Bypasses |
-|------|----------|------------------|
-| `BuildConfigurationStub` | `context.rs:3599` | Real `ctx.configuration` object |
-| `FeatureConfigurationStub` | `context.rs:3883` | Real CC feature configuration |
-| `proto_common.compile()` no-op | `proto_common.rs:212` | Real proto compilation actions |
-| `proto_common.get_tool_path()` hardcoded | `proto_common.rs:272` | Protoc path from toolchain |
-| `CppFragment.sysroot()` returns None | `fragments.rs:482` | Real sysroot from CC toolchain |
-| `CppFragment.fdo_instrument()` returns None | `fragments.rs:151` | FDO instrumentation support |
-| `target_platform_has_constraint()` uses host OS | `context.rs:1013` | Real platform constraint query |
+| Stub | Location | What It Bypasses | Blocked By |
+|------|----------|------------------|------------|
+| `BuildConfigurationStub` | `context.rs:2928` | Real `ctx.configuration` object | Plan 12 |
+| `ExecGroupsDict` / `ExecGroupToolchains` stubs | `context.rs:3043` | Real per-group toolchain resolution | Plan 12 |
+| `FeatureConfigurationStub` | `context.rs:3883` | Real CC feature configuration | Needs plan |
+| `proto_common.compile()` no-op | `proto_common.rs:212` | Real proto compilation actions | Needs plan |
+| `proto_common.get_tool_path()` hardcoded | `proto_common.rs:272` | Protoc path from toolchain | Needs plan |
+| `CppFragment.sysroot()` returns None | `fragments.rs:482` | Real sysroot from CC toolchain | Needs plan |
+| `CppFragment.fdo_instrument()` returns None | `fragments.rs:151` | FDO instrumentation support | Needs plan |
+| `target_platform_has_constraint()` uses host OS | `context.rs:1013` | Real platform constraint query | Needs plan |
 
 **Low Priority (rarely hit, adequate for most builds):**
 
