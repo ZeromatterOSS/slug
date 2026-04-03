@@ -281,6 +281,47 @@ pub fn resolve_toolchains(
     ))
 }
 
+/// A request to resolve toolchains for one exec group.
+#[derive(Debug, Clone)]
+pub struct ExecGroupResolutionRequest {
+    /// Group name ("default" for the rule-level toolchains).
+    pub group_name: String,
+    /// Toolchain types this group requires.
+    pub required_types: Vec<RequiredToolchainType>,
+    /// Additional exec constraints for this group.
+    pub exec_constraints: Vec<String>,
+}
+
+/// Result of resolving all exec groups for a target.
+#[derive(Debug, Clone)]
+pub struct MultiGroupResolutionResult {
+    /// Per-group results keyed by group name.
+    pub groups: HashMap<String, ToolchainResolutionResult>,
+}
+
+/// Resolve toolchains for multiple exec groups independently.
+///
+/// Each exec group gets its own call to `resolve_toolchains()` with its own
+/// required types and exec constraints. Different groups may select different
+/// execution platforms.
+pub fn resolve_toolchains_multi_group(
+    requests: &[ExecGroupResolutionRequest],
+    target_platform: &PlatformConstraints,
+    exec_platforms: &[PlatformConstraints],
+) -> Result<MultiGroupResolutionResult, String> {
+    let mut groups = HashMap::new();
+    for req in requests {
+        let result = resolve_toolchains(
+            &req.required_types,
+            target_platform,
+            exec_platforms,
+            &req.exec_constraints,
+        )?;
+        groups.insert(req.group_name.clone(), result);
+    }
+    Ok(MultiGroupResolutionResult { groups })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -341,5 +382,30 @@ mod tests {
             normalize_constraint_label("platforms//os:linux"),
             "platforms//os:linux"
         );
+    }
+
+    #[test]
+    fn test_multi_group_resolution_empty() {
+        let target_platform = PlatformConstraints::host_platform();
+        let exec_platforms = vec![PlatformConstraints::host_platform()];
+
+        let requests = vec![
+            ExecGroupResolutionRequest {
+                group_name: "default".to_owned(),
+                required_types: vec![],
+                exec_constraints: vec![],
+            },
+            ExecGroupResolutionRequest {
+                group_name: "link".to_owned(),
+                required_types: vec![],
+                exec_constraints: vec![],
+            },
+        ];
+
+        let result =
+            resolve_toolchains_multi_group(&requests, &target_platform, &exec_platforms).unwrap();
+        assert_eq!(result.groups.len(), 2);
+        assert!(result.groups.contains_key("default"));
+        assert!(result.groups.contains_key("link"));
     }
 }

@@ -312,6 +312,11 @@ pub trait RuleSpec: Sync {
     fn toolchain_types(&self) -> Vec<String> {
         Vec::new()
     }
+
+    /// Returns the exec group definitions declared by this rule via `rule(exec_groups={...})`.
+    fn exec_group_defs(&self) -> Vec<(String, kuro_node::rule::ExecGroupDef)> {
+        Vec::new()
+    }
 }
 
 /// Container for the environment that analysis implementation functions should run in
@@ -680,63 +685,99 @@ async fn run_analysis_with_env_underlying(
         // calculation.rs::get_analysis_result_inner() which covers all rule types.
         // The resolution reads from the DeclaredToolchainInfo registry which is
         // populated by eager loading above and by toolchain() target analysis.
-        let toolchain_resolution_result = {
+        let (toolchain_resolution_result, exec_group_resolution_results) = {
             let toolchain_types = analysis_env.rule_spec.toolchain_types();
+            let exec_group_defs = analysis_env.rule_spec.exec_group_defs();
             tracing::debug!(
-                "Toolchain types for '{}': {:?} (count={})",
+                "Toolchain types for '{}': {:?} (count={}), exec_groups: {}",
                 node.label(),
                 toolchain_types,
-                toolchain_types.len()
+                toolchain_types.len(),
+                exec_group_defs.len()
             );
-            if !toolchain_types.is_empty() {
+            if !toolchain_types.is_empty() || !exec_group_defs.is_empty() {
                 use crate::analysis::toolchain_resolution::{
-                    PlatformConstraints, RequiredToolchainType, resolve_toolchains,
+                    ExecGroupResolutionRequest, PlatformConstraints, RequiredToolchainType,
+                    resolve_toolchains_multi_group,
                 };
 
-                let required: Vec<RequiredToolchainType> = toolchain_types
-                    .iter()
-                    .map(|t| RequiredToolchainType {
-                        type_label: t.clone(),
-                        mandatory: true,
-                    })
-                    .collect();
+                // Build resolution requests: default group + named exec groups
+                let mut requests = vec![ExecGroupResolutionRequest {
+                    group_name: "default".to_owned(),
+                    required_types: toolchain_types
+                        .iter()
+                        .map(|t| RequiredToolchainType {
+                            type_label: t.clone(),
+                            mandatory: true,
+                        })
+                        .collect(),
+                    exec_constraints: vec![],
+                }];
+                for (name, def) in &exec_group_defs {
+                    requests.push(ExecGroupResolutionRequest {
+                        group_name: name.clone(),
+                        required_types: def
+                            .toolchain_types
+                            .iter()
+                            .map(|t| RequiredToolchainType {
+                                type_label: t.clone(),
+                                // Exec group toolchains default to optional — many rules
+                                // declare them with mandatory=False (e.g., cc_test's
+                                // test_runner_toolchain_type). The mandatory flag should
+                                // be extracted from the rule definition, but for now we
+                                // default to false to avoid breaking builds.
+                                mandatory: false,
+                            })
+                            .collect(),
+                        exec_constraints: def.exec_compatible_with.clone(),
+                    });
+                }
 
                 let host = PlatformConstraints::host_platform();
                 let exec_platforms = vec![host.clone()];
 
-                match resolve_toolchains(&required, &host, &exec_platforms, &[]) {
-                    Ok(result) => {
-                        let resolved_count = result
-                            .resolved_toolchains
-                            .values()
-                            .filter(|v| v.is_some())
-                            .count();
-                        tracing::debug!(
-                            "Toolchain resolution for '{}': {}/{} type(s) resolved",
-                            node.label(),
-                            resolved_count,
-                            result.resolved_toolchains.len()
-                        );
-                        for (type_label, resolved) in &result.resolved_toolchains {
+                match resolve_toolchains_multi_group(&requests, &host, &exec_platforms) {
+                    Ok(multi_result) => {
+                        let default_result = multi_result.groups.get("default").cloned();
+                        if let Some(ref result) = default_result {
+                            let resolved_count = result
+                                .resolved_toolchains
+                                .values()
+                                .filter(|v| v.is_some())
+                                .count();
                             tracing::debug!(
-                                "  {} → {:?}",
-                                type_label,
-                                resolved.as_ref().map(|r| &r.toolchain_impl)
+                                "Toolchain resolution for '{}': {}/{} type(s) resolved",
+                                node.label(),
+                                resolved_count,
+                                result.resolved_toolchains.len()
                             );
+                            for (type_label, resolved) in &result.resolved_toolchains {
+                                tracing::debug!(
+                                    "  {} → {:?}",
+                                    type_label,
+                                    resolved.as_ref().map(|r| &r.toolchain_impl)
+                                );
+                            }
                         }
-                        Some(result)
+                        // Collect named exec group results (everything except "default")
+                        let exec_groups: std::collections::HashMap<String, _> = multi_result
+                            .groups
+                            .into_iter()
+                            .filter(|(name, _)| name != "default")
+                            .collect();
+                        (default_result, exec_groups)
                     }
                     Err(e) => {
                         tracing::debug!(
-                            "Toolchain resolution failed for '{}': {} (falling back to stubs)",
+                            "Toolchain resolution failed for '{}': {}",
                             node.label(),
                             e
                         );
-                        None
+                        (None, std::collections::HashMap::new())
                     }
                 }
             } else {
-                None
+                (None, std::collections::HashMap::new())
             }
         };
 
@@ -870,6 +911,31 @@ async fn run_analysis_with_env_underlying(
                 );
                 let resolved_value = eval.heap().alloc(resolved);
                 ctx.set_resolved_toolchains(resolved_value);
+            }
+
+            // Set resolved exec groups on the context so ctx.exec_groups returns
+            // real per-group toolchain resolution results.
+            if !exec_group_resolution_results.is_empty() {
+                use kuro_build_api::interpreter::rule_defs::context::ResolvedExecGroups;
+
+                let valid_names: Vec<String> = exec_group_resolution_results.keys().cloned().collect();
+                // For now, we store the exec group names. Full per-group DICE analysis
+                // of toolchain impl targets would mirror the default group flow above.
+                // For the initial implementation, store empty provider maps (the resolution
+                // result exists but providers are not yet analyzed).
+                let groups = exec_group_resolution_results
+                    .into_iter()
+                    .map(|(name, _result)| {
+                        // TODO: analyze per-group toolchain impl targets via DICE
+                        (name, std::collections::HashMap::new())
+                    })
+                    .collect();
+
+                let exec_groups_value = eval.heap().alloc(ResolvedExecGroups {
+                    groups,
+                    valid_names,
+                });
+                ctx.set_resolved_exec_groups(exec_groups_value);
             }
 
             let list_res = analysis_env.rule_spec.invoke(&mut eval, ctx)?;
@@ -1046,6 +1112,7 @@ pub fn get_user_defined_rule_spec(
         name: String,
         implicit_rule_outputs: Vec<(String, String)>,
         toolchain_types: Vec<String>,
+        exec_group_defs: Vec<(String, kuro_node::rule::ExecGroupDef)>,
     }
 
     impl RuleSpec for Impl {
@@ -1083,21 +1150,26 @@ pub fn get_user_defined_rule_spec(
         fn toolchain_types(&self) -> Vec<String> {
             self.toolchain_types.clone()
         }
+
+        fn exec_group_defs(&self) -> Vec<(String, kuro_node::rule::ExecGroupDef)> {
+            self.exec_group_defs.clone()
+        }
     }
 
-    // Extract rule(outputs={...}) patterns and toolchain_types from the frozen callable.
-    let (implicit_rule_outputs, toolchain_types) =
+    // Extract rule(outputs={...}) patterns, toolchain_types, and exec_group_defs from the frozen callable.
+    let (implicit_rule_outputs, toolchain_types, exec_group_defs) =
         if let Ok((val, _)) = module.get_any_visibility(&rule_type.name) {
             if let Ok(typed) = val.downcast::<FrozenStarlarkRuleCallable>() {
                 (
                     typed.as_ref().rule_outputs().to_vec(),
                     typed.as_ref().toolchain_types().to_vec(),
+                    typed.as_ref().exec_group_defs().to_vec(),
                 )
             } else {
-                (Vec::new(), Vec::new())
+                (Vec::new(), Vec::new(), Vec::new())
             }
         } else {
-            (Vec::new(), Vec::new())
+            (Vec::new(), Vec::new(), Vec::new())
         };
 
     Impl {
@@ -1105,6 +1177,7 @@ pub fn get_user_defined_rule_spec(
         name: rule_type.name.clone(),
         implicit_rule_outputs,
         toolchain_types,
+        exec_group_defs,
     }
 }
 

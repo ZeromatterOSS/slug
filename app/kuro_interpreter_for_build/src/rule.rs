@@ -40,6 +40,7 @@ use kuro_node::attrs::spec::AttributeSpec;
 use kuro_node::bzl_or_bxl_path::BzlOrBxlPath;
 use kuro_node::nodes::unconfigured::RuleKind;
 use kuro_node::nodes::unconfigured::TargetNode;
+use kuro_node::rule::ExecGroupDef;
 use kuro_node::rule::Rule;
 use kuro_node::rule::RuleIncomingTransition;
 use kuro_node::rule_type::RuleType;
@@ -77,6 +78,7 @@ use starlark::values::Value;
 use starlark::values::ValueOfUnchecked;
 use starlark::values::dict::DictRef;
 use starlark::values::dict::UnpackDictEntries;
+use starlark::values::list::ListRef;
 use starlark::values::list::ListType;
 use starlark::values::list::UnpackList;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
@@ -151,8 +153,8 @@ pub struct StarlarkRuleCallable<'v> {
     /// Toolchain type labels declared via `rule(toolchains=[...])`.
     /// These are stored as Display strings from ToolchainTypeRequirement, Label, or plain strings.
     toolchain_types: Vec<String>,
-    /// Execution group names declared via `rule(exec_groups={...})`.
-    exec_group_names: Vec<String>,
+    /// Execution group definitions declared via `rule(exec_groups={...})`.
+    exec_group_defs: Vec<(String, ExecGroupDef)>,
     /// Configuration fragment names declared via `rule(fragments=["cpp", "java", ...])`.
     fragments: Vec<String>,
     /// Optional initializer function from `rule(initializer=...)`.
@@ -237,7 +239,7 @@ impl<'v> StarlarkRuleCallable<'v> {
         provides: Vec<String>,
         rule_outputs: Vec<(String, String)>,
         toolchain_types: Vec<String>,
-        exec_group_names: Vec<String>,
+        exec_group_defs: Vec<(String, ExecGroupDef)>,
         fragments: Vec<String>,
         initializer: Option<Value<'v>>,
         build_setting_type: Option<String>,
@@ -403,7 +405,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             output_attr_names,
             rule_outputs,
             toolchain_types,
-            exec_group_names,
+            exec_group_defs,
             fragments,
             initializer,
             build_setting_type,
@@ -619,7 +621,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
                 is_executable: self.is_executable,
                 provides: self.provides.clone(),
                 toolchain_types: self.toolchain_types.clone(),
-                exec_group_names: self.exec_group_names.clone(),
+                exec_group_defs: self.exec_group_defs.clone(),
                 fragments: self.fragments.clone(),
                 build_setting_type: self.build_setting_type.clone(),
                 build_setting_is_flag: self.build_setting_is_flag,
@@ -634,7 +636,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
             output_attr_names: self.output_attr_names,
             rule_outputs: self.rule_outputs,
             toolchain_types: self.toolchain_types,
-            exec_group_names: self.exec_group_names,
+            exec_group_defs: self.exec_group_defs,
             fragments: self.fragments,
             initializer: match self.initializer {
                 Some(v) => Some(v.freeze(freezer)?),
@@ -665,8 +667,8 @@ pub struct FrozenStarlarkRuleCallable {
     rule_outputs: Vec<(String, String)>,
     /// Toolchain type labels declared via `rule(toolchains=[...])`.
     toolchain_types: Vec<String>,
-    /// Execution group names declared via `rule(exec_groups={...})`.
-    exec_group_names: Vec<String>,
+    /// Execution group definitions declared via `rule(exec_groups={...})`.
+    exec_group_defs: Vec<(String, ExecGroupDef)>,
     /// Configuration fragment names declared via `rule(fragments=["cpp", "java", ...])`.
     fragments: Vec<String>,
     /// Optional initializer function from `rule(initializer=...)`.
@@ -726,6 +728,11 @@ impl FrozenStarlarkRuleCallable {
     /// Returns the toolchain type labels declared on this rule.
     pub fn toolchain_types(&self) -> &[String] {
         &self.toolchain_types
+    }
+
+    /// Returns the exec group definitions declared on this rule.
+    pub fn exec_group_defs(&self) -> &[(String, ExecGroupDef)] {
+        &self.exec_group_defs
     }
 }
 
@@ -995,14 +1002,65 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         let fragment_names: Vec<String> =
             fragments.items.into_iter().map(|s| s.to_owned()).collect();
 
-        // Extract execution group names from the exec_groups parameter.
+        // Extract execution group definitions from the exec_groups parameter.
         // In Bazel, exec_groups is a dict mapping group name → exec_group() value.
-        // We store just the names for metadata; the ExecGroupValue details are
-        // not yet used for real toolchain resolution.
-        let exec_group_names: Vec<String> = if let Some(eg_val) = exec_groups {
+        // We extract both the toolchain type labels and exec_compatible_with constraints.
+        let exec_group_defs: Vec<(String, ExecGroupDef)> = if let Some(eg_val) = exec_groups {
             if let Some(dict) = DictRef::from_value(eg_val) {
-                dict.keys()
-                    .filter_map(|k| k.unpack_str().map(|s| s.to_owned()))
+                dict.iter()
+                    .filter_map(|(k, v)| {
+                        let name = k.unpack_str()?.to_owned();
+                        // Extract toolchain types from exec_group value
+                        let tc_types = if let Some(tc_val) =
+                            v.get_attr("toolchains", eval.heap()).ok().flatten()
+                        {
+                            if let Some(list) = ListRef::from_value(tc_val) {
+                                list.iter()
+                                    .filter_map(|item| {
+                                        if let Some(s) = item.unpack_str() {
+                                            Some(s.to_owned())
+                                        } else if let Ok(Some(attr)) =
+                                            item.get_attr("toolchain_type", eval.heap())
+                                        {
+                                            if let Some(s) = attr.unpack_str() {
+                                                return Some(s.to_owned());
+                                            }
+                                            Some(format!("{}", attr))
+                                        } else {
+                                            Some(format!("{}", item))
+                                        }
+                                    })
+                                    .collect()
+                            } else {
+                                Vec::new()
+                            }
+                        } else {
+                            Vec::new()
+                        };
+                        // Extract exec_compatible_with constraint labels
+                        let exec_compat = if let Some(ec_val) = v
+                            .get_attr("exec_compatible_with", eval.heap())
+                            .ok()
+                            .flatten()
+                        {
+                            if let Some(list) = ListRef::from_value(ec_val) {
+                                list.iter()
+                                    .filter_map(|item| item.unpack_str().map(|s| s.to_owned()))
+                                    .collect()
+                            } else {
+                                Vec::new()
+                            }
+                        } else {
+                            Vec::new()
+                        };
+                        Some((
+                            name,
+                            ExecGroupDef {
+                                toolchain_types: tc_types,
+                                exec_compatible_with: exec_compat,
+                            },
+                        ))
+                    })
                     .collect()
             } else {
                 Vec::new()
@@ -1206,7 +1264,7 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             provides_names,
             rule_outputs,
             toolchain_types,
-            exec_group_names,
+            exec_group_defs,
             fragment_names,
             initializer,
             build_setting_type,
@@ -1267,8 +1325,12 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] copy_from_rule: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // TODO(bazel): Implement proper execution group support with real toolchain resolution
-        let _ = copy_from_rule;
+        if copy_from_rule {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "copy_from_rule is no longer supported (removed in Bazel 7). \
+                 Specify toolchains and exec_compatible_with explicitly."
+            )));
+        }
         let heap = eval.heap();
         Ok(heap.alloc(ExecGroupValue {
             toolchains: heap.alloc(toolchains.items),

@@ -832,10 +832,17 @@ impl<'a> ConfiguredTargetNodeRef<'a> {
         }
     }
 
-    pub fn exec_group_names(self) -> &'a [String] {
+    pub fn exec_group_defs(self) -> &'a [(String, crate::rule::ExecGroupDef)] {
+        match &self.0.get().target_node {
+            TargetNodeOrForward::TargetNode(target_node) => target_node.exec_group_defs(),
+            TargetNodeOrForward::Forward(_, _) => &[],
+        }
+    }
+
+    pub fn exec_group_names(self) -> Vec<String> {
         match &self.0.get().target_node {
             TargetNodeOrForward::TargetNode(target_node) => target_node.exec_group_names(),
-            TargetNodeOrForward::Forward(_, _) => &[],
+            TargetNodeOrForward::Forward(_, _) => Vec::new(),
         }
     }
 

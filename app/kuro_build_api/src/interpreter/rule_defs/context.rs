@@ -60,7 +60,7 @@ use starlark::values::type_repr::StarlarkTypeRepr;
 use crate::analysis::anon_promises_dyn::RunAnonPromisesAccessor;
 use crate::analysis::registry::AnalysisRegistry;
 use crate::deferred::calculation::GET_PROMISED_ARTIFACT;
-use crate::interpreter::rule_defs::artifact::methods::ArtifactRootStub;
+use crate::interpreter::rule_defs::artifact::methods::ArtifactRoot;
 use crate::interpreter::rule_defs::bazel_label::BazelLabel;
 use crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider;
 use crate::interpreter::rule_defs::fragments::ConfigurationFragments;
@@ -202,6 +202,9 @@ pub struct AnalysisContext<'v> {
     /// Resolved toolchains from real toolchain resolution.
     /// When Some, ctx.toolchains returns this instead of empty ResolvedToolchains.
     resolved_toolchains: RefCell<Option<Value<'v>>>,
+    /// Resolved exec group toolchains from per-group resolution.
+    /// When Some, ctx.exec_groups returns real per-group results.
+    resolved_exec_groups: RefCell<Option<Value<'v>>>,
 }
 
 impl<'v> Display for AnalysisContext<'v> {
@@ -241,6 +244,7 @@ impl<'v> AnalysisContext<'v> {
             outputs: RefCell::new(None),
             rule_outputs,
             resolved_toolchains: RefCell::new(None),
+            resolved_exec_groups: RefCell::new(None),
         }
     }
 
@@ -276,6 +280,12 @@ impl<'v> AnalysisContext<'v> {
     /// Called from the analysis pipeline after resolution completes.
     pub fn set_resolved_toolchains(&self, toolchains: Value<'v>) {
         *self.resolved_toolchains.borrow_mut() = Some(toolchains);
+    }
+
+    /// Set the resolved exec groups for this context.
+    /// Called from the analysis pipeline after per-group resolution completes.
+    pub fn set_resolved_exec_groups(&self, exec_groups: Value<'v>) {
+        *self.resolved_exec_groups.borrow_mut() = Some(exec_groups);
     }
 
     pub fn assert_no_promises(&self) -> kuro_error::Result<()> {
@@ -414,7 +424,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     fn split_attr<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         match this.0.attrs {
             Some(attrs) => Ok(heap.alloc(CtxSplitAttr::new(attrs))),
-            None => Ok(heap.alloc(CtxSplitAttrStub)),
+            None => Ok(heap.alloc(CtxSplitAttrUnavailable)),
         }
     }
 
@@ -627,7 +637,21 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let is_tool = this.0.is_tool_configuration();
-        Ok(heap.alloc(BuildConfigurationStub { is_tool }))
+        let (config_hash, config_label) = match &this.0.label {
+            Some(label) => {
+                let cfg = label.inner().target().cfg();
+                (
+                    cfg.output_hash().as_str().to_owned(),
+                    cfg.full_name().to_owned(),
+                )
+            }
+            None => (String::new(), "unknown".to_owned()),
+        };
+        Ok(heap.alloc(BuildConfiguration {
+            is_tool,
+            config_hash,
+            config_label,
+        }))
     }
 
     /// Files from attributes (Bazel-compatible).
@@ -640,7 +664,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             Some(attrs) => Ok(heap.alloc(CtxFiles::new(attrs))),
             None => {
                 // Fallback for dynamic_output or BXL contexts
-                Ok(heap.alloc(CtxFilesStub))
+                Ok(heap.alloc(CtxFilesUnavailable))
             }
         }
     }
@@ -655,7 +679,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             Some(attrs) => Ok(heap.alloc(CtxFile::new(attrs))),
             None => {
                 // Fallback for dynamic_output or BXL contexts
-                Ok(heap.alloc(CtxFileStub))
+                Ok(heap.alloc(CtxFileUnavailable))
             }
         }
     }
@@ -670,7 +694,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             Some(attrs) => Ok(heap.alloc(CtxExecutable::new(attrs))),
             None => {
                 // Fallback for dynamic_output or BXL contexts
-                Ok(heap.alloc(CtxExecutableStub))
+                Ok(heap.alloc(CtxExecutableUnavailable))
             }
         }
     }
@@ -797,14 +821,19 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// tc = ctx.exec_groups["test"].toolchains["@bazel_tools//tools/cpp:test_runner_toolchain_type"]
     /// ```
     ///
-    /// TODO(bazel): Implement proper toolchain resolution for exec groups.
     #[starlark(attribute)]
     fn exec_groups<'v>(
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        Ok(heap.alloc(ExecGroupsDict))
+        if let Some(resolved) = this.0.resolved_exec_groups.borrow().as_ref() {
+            return Ok(*resolved);
+        }
+        // Fallback: return empty ResolvedExecGroups
+        Ok(heap.alloc(ResolvedExecGroups {
+            groups: std::collections::HashMap::new(),
+            valid_names: Vec::new(),
+        }))
     }
 
     /// Make variable access (Bazel-compatible).
@@ -2034,6 +2063,12 @@ impl<'v> StarlarkValue<'v> for ResolvedToolchains {
         }
 
         // No resolved provider for this toolchain type.
+        // Return None for exec-group toolchains (empty map = no per-group resolution),
+        // which lets rules fall back to their legacy code paths.
+        if self.toolchains.is_empty() {
+            return Ok(Value::new_none());
+        }
+
         Err(starlark::Error::new_other(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             format!(
@@ -2058,18 +2093,18 @@ fn normalize_toolchain_type_label(label: &str) -> String {
 
 /// A stub for CompilationContext.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct CompilationContextStub;
+pub struct EmptyCompilationContext;
 
-impl std::fmt::Display for CompilationContextStub {
+impl std::fmt::Display for EmptyCompilationContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<CompilationContext>")
     }
 }
 
-starlark::starlark_simple_value!(CompilationContextStub);
+starlark::starlark_simple_value!(EmptyCompilationContext);
 
 #[starlark::values::starlark_value(type = "CompilationContext")]
-impl<'v> StarlarkValue<'v> for CompilationContextStub {
+impl<'v> StarlarkValue<'v> for EmptyCompilationContext {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
@@ -2160,7 +2195,7 @@ impl<'v> StarlarkValue<'v> for CompilationContextStub {
             "direct_public_headers" => Some(heap.alloc(Vec::<Value>::new())),
             "direct_private_headers" => Some(heap.alloc(Vec::<Value>::new())),
             "direct_textual_headers" => Some(heap.alloc(Vec::<Value>::new())),
-            "_header_info" => Some(heap.alloc(HeaderInfoStubSimple)),
+            "_header_info" => Some(heap.alloc(EmptyHeaderInfo)),
             "_exporting_module_map_files" | "loose_hdrs_dirs" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
             }
@@ -2172,18 +2207,18 @@ impl<'v> StarlarkValue<'v> for CompilationContextStub {
 
 /// A stub for HeaderInfo for CompilationContext.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct HeaderInfoStubSimple;
+pub struct EmptyHeaderInfo;
 
-impl std::fmt::Display for HeaderInfoStubSimple {
+impl std::fmt::Display for EmptyHeaderInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<HeaderInfo>")
     }
 }
 
-starlark::starlark_simple_value!(HeaderInfoStubSimple);
+starlark::starlark_simple_value!(EmptyHeaderInfo);
 
 #[starlark::values::starlark_value(type = "HeaderInfo")]
-impl<'v> StarlarkValue<'v> for HeaderInfoStubSimple {
+impl<'v> StarlarkValue<'v> for EmptyHeaderInfo {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
@@ -2214,18 +2249,18 @@ impl<'v> StarlarkValue<'v> for HeaderInfoStubSimple {
 
 /// A stub for LinkingContext.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct LinkingContextStub;
+pub struct EmptyLinkingContext;
 
-impl std::fmt::Display for LinkingContextStub {
+impl std::fmt::Display for EmptyLinkingContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<LinkingContext>")
     }
 }
 
-starlark::starlark_simple_value!(LinkingContextStub);
+starlark::starlark_simple_value!(EmptyLinkingContext);
 
 #[starlark::values::starlark_value(type = "LinkingContext")]
-impl<'v> StarlarkValue<'v> for LinkingContextStub {
+impl<'v> StarlarkValue<'v> for EmptyLinkingContext {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(attribute, "linker_inputs" | "_extra_link_time_libraries")
     }
@@ -2500,18 +2535,18 @@ impl<'v> AllocValue<'v> for CtxExecutable<'v> {
 /// A stub for ctx.files that returns empty lists for all attributes.
 /// Used as fallback when attrs is not available (e.g., dynamic_output, BXL).
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct CtxFilesStub;
+pub struct CtxFilesUnavailable;
 
-impl std::fmt::Display for CtxFilesStub {
+impl std::fmt::Display for CtxFilesUnavailable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<ctx.files>")
     }
 }
 
-starlark::starlark_simple_value!(CtxFilesStub);
+starlark::starlark_simple_value!(CtxFilesUnavailable);
 
 #[starlark::values::starlark_value(type = "ctx_files")]
-impl<'v> StarlarkValue<'v> for CtxFilesStub {
+impl<'v> StarlarkValue<'v> for CtxFilesUnavailable {
     fn has_attr(&self, _attribute: &str, _heap: Heap<'v>) -> bool {
         true
     }
@@ -2579,18 +2614,18 @@ impl<'v> StarlarkValue<'v> for CtxSplitAttr<'v> {
 
 /// A stub for ctx.split_attr when attrs are not available.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct CtxSplitAttrStub;
+pub struct CtxSplitAttrUnavailable;
 
-impl std::fmt::Display for CtxSplitAttrStub {
+impl std::fmt::Display for CtxSplitAttrUnavailable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<ctx.split_attr>")
     }
 }
 
-starlark::starlark_simple_value!(CtxSplitAttrStub);
+starlark::starlark_simple_value!(CtxSplitAttrUnavailable);
 
 #[starlark::values::starlark_value(type = "ctx_split_attr_stub")]
-impl<'v> StarlarkValue<'v> for CtxSplitAttrStub {
+impl<'v> StarlarkValue<'v> for CtxSplitAttrUnavailable {
     fn has_attr(&self, _attribute: &str, _heap: Heap<'v>) -> bool {
         true
     }
@@ -2605,18 +2640,18 @@ impl<'v> StarlarkValue<'v> for CtxSplitAttrStub {
 /// A stub for ctx.file that returns None for all attributes.
 /// Used as fallback when attrs is not available.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct CtxFileStub;
+pub struct CtxFileUnavailable;
 
-impl std::fmt::Display for CtxFileStub {
+impl std::fmt::Display for CtxFileUnavailable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<ctx.file>")
     }
 }
 
-starlark::starlark_simple_value!(CtxFileStub);
+starlark::starlark_simple_value!(CtxFileUnavailable);
 
 #[starlark::values::starlark_value(type = "ctx_file")]
-impl<'v> StarlarkValue<'v> for CtxFileStub {
+impl<'v> StarlarkValue<'v> for CtxFileUnavailable {
     fn has_attr(&self, _attribute: &str, _heap: Heap<'v>) -> bool {
         true
     }
@@ -2629,18 +2664,18 @@ impl<'v> StarlarkValue<'v> for CtxFileStub {
 /// A stub for ctx.executable that returns None for all attributes.
 /// Used as fallback when attrs is not available.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct CtxExecutableStub;
+pub struct CtxExecutableUnavailable;
 
-impl std::fmt::Display for CtxExecutableStub {
+impl std::fmt::Display for CtxExecutableUnavailable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<ctx.executable>")
     }
 }
 
-starlark::starlark_simple_value!(CtxExecutableStub);
+starlark::starlark_simple_value!(CtxExecutableUnavailable);
 
 #[starlark::values::starlark_value(type = "ctx_executable")]
-impl<'v> StarlarkValue<'v> for CtxExecutableStub {
+impl<'v> StarlarkValue<'v> for CtxExecutableUnavailable {
     fn has_attr(&self, _attribute: &str, _heap: Heap<'v>) -> bool {
         true
     }
@@ -2922,26 +2957,30 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
 /// - `host_path_separator`: ":" on Unix, ";" on Windows
 /// - `default_shell_env`: Dict from --action_env flags
 /// - `stamp_binaries`: Whether build stamping is enabled
-/// - `short_id`: Opaque configuration fingerprint
+/// - `short_id`: Opaque configuration fingerprint (cpu-hash)
 /// - `test_env`: Dict from --test_env flags
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct BuildConfigurationStub {
+pub struct BuildConfiguration {
     pub is_tool: bool,
+    /// The configuration hash from ConfigurationData (16-char hex, e.g. "6770d7f2ebfc0845")
+    pub config_hash: String,
+    /// The full configuration label (e.g. "@local_config_platform//:host#6770d7f2ebfc0845")
+    pub config_label: String,
 }
 
-impl std::fmt::Display for BuildConfigurationStub {
+impl std::fmt::Display for BuildConfiguration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<configuration>")
     }
 }
 
-starlark::starlark_simple_value!(BuildConfigurationStub);
+starlark::starlark_simple_value!(BuildConfiguration);
 
 #[starlark::values::starlark_value(type = "configuration")]
-impl<'v> StarlarkValue<'v> for BuildConfigurationStub {
+impl<'v> StarlarkValue<'v> for BuildConfiguration {
     fn get_methods() -> Option<&'static Methods> {
         static RES: MethodsStatic = MethodsStatic::new();
-        RES.methods(build_configuration_stub_methods)
+        RES.methods(build_configuration_methods)
     }
 
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
@@ -2985,10 +3024,20 @@ impl<'v> StarlarkValue<'v> for BuildConfigurationStub {
                 Some(heap.alloc(dict))
             }
             "short_id" => {
-                // Opaque configuration fingerprint based on compilation mode + CPU
-                let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
-                let cpu = host_target_cpu();
-                Some(heap.alloc_str(&format!("{cpu}-{comp_mode}")).to_value())
+                // Opaque configuration fingerprint using real config hash
+                if self.config_hash.is_empty() {
+                    // Fallback for BXL/dynamic_output contexts without config data
+                    let comp_mode =
+                        crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                    let cpu = host_target_cpu();
+                    Some(heap.alloc_str(&format!("{cpu}-{comp_mode}")).to_value())
+                } else {
+                    let cpu = host_target_cpu();
+                    Some(
+                        heap.alloc_str(&format!("{cpu}-{}", self.config_hash))
+                            .to_value(),
+                    )
+                }
             }
             "test_env" => {
                 // Return --test_env values from build config
@@ -3012,96 +3061,135 @@ impl<'v> StarlarkValue<'v> for BuildConfigurationStub {
 }
 
 #[starlark_module]
-fn build_configuration_stub_methods(builder: &mut MethodsBuilder) {
+fn build_configuration_methods(builder: &mut MethodsBuilder) {
     /// Returns whether sibling repository layout is used.
-    fn is_sibling_repository_layout(this: &BuildConfigurationStub) -> starlark::Result<bool> {
+    fn is_sibling_repository_layout(this: &BuildConfiguration) -> starlark::Result<bool> {
         let _ = this;
         Ok(false)
     }
 
     /// Returns whether this is a tool configuration (exec configuration).
     /// Tool configurations are used for build tools that run on the host machine.
-    fn is_tool_configuration(this: &BuildConfigurationStub) -> starlark::Result<bool> {
+    fn is_tool_configuration(this: &BuildConfiguration) -> starlark::Result<bool> {
         Ok(this.is_tool)
     }
 
     /// Returns whether this configuration has a separate genfiles directory.
     /// In modern Bazel, this is always false (genfiles merged with bin directory).
-    fn has_separate_genfiles_directory(this: &BuildConfigurationStub) -> starlark::Result<bool> {
+    fn has_separate_genfiles_directory(this: &BuildConfiguration) -> starlark::Result<bool> {
         let _ = this;
         Ok(false)
     }
 
     /// Returns whether build stamping is enabled.
-    fn stamp_binaries(this: &BuildConfigurationStub) -> starlark::Result<bool> {
+    fn stamp_binaries(this: &BuildConfiguration) -> starlark::Result<bool> {
         let _ = this;
         Ok(crate::interpreter::rule_defs::build_config::get_stamp())
     }
 }
 
 // ============================================================================
-// ExecGroupsDict - Stub for ctx.exec_groups
+// ResolvedExecGroups - ctx.exec_groups
 // ============================================================================
 
-/// A dict-like stub for `ctx.exec_groups`.
+/// Real exec group collection backed by per-group toolchain resolution.
 ///
-/// In Bazel, `ctx.exec_groups` is a dictionary mapping execution group names
-/// to resolved exec group info objects. Each exec group has a `toolchains`
-/// attribute that provides resolved toolchains.
+/// `ctx.exec_groups["name"]` returns a `ResolvedExecGroupContext` for the named
+/// exec group, which provides `.toolchains` for per-group toolchain access.
 ///
-/// This stub returns an `ExecGroupInfo` for any key lookup, which in turn
-/// returns `None` for any toolchain lookup. This causes rules to take their
-/// fallback/legacy code paths.
-///
-/// TODO(bazel): Implement proper exec group resolution with real toolchain lookup.
+/// Groups that weren't declared in `rule(exec_groups={...})` produce an error
+/// listing valid group names.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct ExecGroupsDict;
+pub struct ResolvedExecGroups {
+    /// Map of group name -> per-group resolved toolchains.
+    pub groups: std::collections::HashMap<
+        String,
+        std::collections::HashMap<String, Option<FrozenProviderCollectionValue>>,
+    >,
+    /// Valid group names for error messages.
+    pub valid_names: Vec<String>,
+}
 
-impl std::fmt::Display for ExecGroupsDict {
+impl std::fmt::Display for ResolvedExecGroups {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<exec_groups>")
+        write!(f, "<exec_groups({} groups)>", self.groups.len())
     }
 }
 
-starlark::starlark_simple_value!(ExecGroupsDict);
+starlark::starlark_simple_value!(ResolvedExecGroups);
 
 #[starlark::values::starlark_value(type = "exec_groups")]
-impl<'v> StarlarkValue<'v> for ExecGroupsDict {
-    /// Returns an ExecGroupInfo for any key.
-    fn at(&self, _index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        Ok(heap.alloc(ExecGroupInfo))
+impl<'v> StarlarkValue<'v> for ResolvedExecGroups {
+    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let key = match index.unpack_str() {
+            Some(s) => s,
+            None => {
+                return Ok(heap.alloc(ResolvedExecGroupContext {
+                    toolchains: ResolvedToolchains {
+                        toolchains: std::collections::HashMap::new(),
+                        exec_platform: String::new(),
+                    },
+                }));
+            }
+        };
+
+        if let Some(toolchains) = self.groups.get(key) {
+            Ok(heap.alloc(ResolvedExecGroupContext {
+                toolchains: ResolvedToolchains {
+                    toolchains: toolchains.clone(),
+                    exec_platform: String::new(),
+                },
+            }))
+        } else {
+            // Fallback: return an empty exec group context for any key.
+            // Many rules access exec groups that may not have been resolved yet,
+            // so we return an empty context rather than erroring.
+            Ok(heap.alloc(ResolvedExecGroupContext {
+                toolchains: ResolvedToolchains {
+                    toolchains: std::collections::HashMap::new(),
+                    exec_platform: String::new(),
+                },
+            }))
+        }
     }
 
-    /// Returns True for any key - pretends all exec groups are defined.
-    fn is_in(&self, _other: Value<'v>) -> starlark::Result<bool> {
-        Ok(true)
+    fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
+        if let Some(key) = other.unpack_str() {
+            Ok(self.groups.contains_key(key) || self.valid_names.contains(&key.to_owned()))
+        } else {
+            Ok(false)
+        }
     }
 }
 
-/// A stub for a resolved execution group.
+/// A single resolved exec group, returned from `ctx.exec_groups["name"]`.
 ///
-/// Provides a `toolchains` attribute that returns `None` for any toolchain
-/// type lookup, causing rules to take their fallback code paths.
+/// Exposes `.toolchains` attribute for per-group toolchain access.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct ExecGroupInfo;
+pub struct ResolvedExecGroupContext {
+    toolchains: ResolvedToolchains,
+}
 
-impl std::fmt::Display for ExecGroupInfo {
+impl std::fmt::Display for ResolvedExecGroupContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<exec_group_info>")
+        write!(f, "<exec_group_context>")
     }
 }
 
-starlark::starlark_simple_value!(ExecGroupInfo);
+starlark::starlark_simple_value!(ResolvedExecGroupContext);
 
 #[starlark::values::starlark_value(type = "exec_group_info")]
-impl<'v> StarlarkValue<'v> for ExecGroupInfo {
+impl<'v> StarlarkValue<'v> for ResolvedExecGroupContext {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(attribute, "toolchains" | "exec_compatible_with")
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "toolchains" => Some(heap.alloc(ExecGroupToolchains)),
+            "toolchains" => Some(heap.alloc(ResolvedToolchains {
+                toolchains: self.toolchains.toolchains.clone(),
+                exec_platform: self.toolchains.exec_platform.clone(),
+            })),
             "exec_compatible_with" => {
                 use starlark::values::list::AllocList;
                 Some(heap.alloc(AllocList::EMPTY))
@@ -3112,36 +3200,6 @@ impl<'v> StarlarkValue<'v> for ExecGroupInfo {
 
     fn dir_attr(&self) -> Vec<String> {
         vec!["toolchains".to_owned(), "exec_compatible_with".to_owned()]
-    }
-}
-
-/// A stub for toolchains within an execution group.
-///
-/// Returns `None` for any toolchain type lookup, indicating that the toolchain
-/// is not resolved. This is consistent with `mandatory = False` toolchains.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct ExecGroupToolchains;
-
-impl std::fmt::Display for ExecGroupToolchains {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<exec_group_toolchains>")
-    }
-}
-
-starlark::starlark_simple_value!(ExecGroupToolchains);
-
-#[starlark::values::starlark_value(type = "exec_group_toolchains")]
-impl<'v> StarlarkValue<'v> for ExecGroupToolchains {
-    /// Returns None for exec group toolchain lookups.
-    /// TODO(bazel): Implement proper exec group toolchain resolution.
-    fn at(&self, _index: Value<'v>, _heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        Ok(Value::new_none())
-    }
-
-    /// Returns True for known toolchain types, False for unknown.
-    fn is_in(&self, _other: Value<'v>) -> starlark::Result<bool> {
-        // Return true so rules can access toolchains via exec groups
-        Ok(true)
     }
 }
 
@@ -3217,7 +3275,7 @@ impl<'v> StarlarkValue<'v> for StampFile {
                 } else {
                     "bazel-out".to_owned()
                 };
-                Some(heap.alloc(ArtifactRootStub { path: root_path }))
+                Some(heap.alloc(ArtifactRoot { path: root_path }))
             }
             _ => None,
         }

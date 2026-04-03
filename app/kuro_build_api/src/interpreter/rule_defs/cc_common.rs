@@ -896,9 +896,12 @@ impl<'v> StarlarkValue<'v> for CtxCheatStub {
                 Some(heap.alloc(ConfigurationFragments::new(cpp)))
             }
             "workspace_name" => Some(heap.alloc_str("").to_value()),
-            "exec_groups" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::context::ExecGroupsDict))
-            }
+            "exec_groups" => Some(heap.alloc(
+                crate::interpreter::rule_defs::context::ResolvedExecGroups {
+                    groups: std::collections::HashMap::new(),
+                    valid_names: Vec::new(),
+                },
+            )),
             "toolchains" => Some(heap.alloc(
                 crate::interpreter::rule_defs::context::ResolvedToolchains {
                     toolchains: std::collections::HashMap::new(),
@@ -990,9 +993,12 @@ impl<'v> StarlarkValue<'v> for CtxCheatWithActions<'v> {
                 Some(heap.alloc(ConfigurationFragments::new(cpp)))
             }
             "workspace_name" => Some(heap.alloc_str("").to_value()),
-            "exec_groups" => {
-                Some(heap.alloc(crate::interpreter::rule_defs::context::ExecGroupsDict))
-            }
+            "exec_groups" => Some(heap.alloc(
+                crate::interpreter::rule_defs::context::ResolvedExecGroups {
+                    groups: std::collections::HashMap::new(),
+                    valid_names: Vec::new(),
+                },
+            )),
             "toolchains" => Some(heap.alloc(
                 crate::interpreter::rule_defs::context::ResolvedToolchains {
                     toolchains: std::collections::HashMap::new(),
@@ -6006,16 +6012,16 @@ where
         match attribute {
             "compilation_context" => {
                 if self.compilation_context.to_value().is_none() {
-                    use crate::interpreter::rule_defs::context::CompilationContextStub;
-                    Some(heap.alloc(CompilationContextStub))
+                    use crate::interpreter::rule_defs::context::EmptyCompilationContext;
+                    Some(heap.alloc(EmptyCompilationContext))
                 } else {
                     Some(self.compilation_context.to_value())
                 }
             }
             "linking_context" => {
                 if self.linking_context.to_value().is_none() {
-                    use crate::interpreter::rule_defs::context::LinkingContextStub;
-                    Some(heap.alloc(LinkingContextStub))
+                    use crate::interpreter::rule_defs::context::EmptyLinkingContext;
+                    Some(heap.alloc(EmptyLinkingContext))
                 } else {
                     Some(self.linking_context.to_value())
                 }
@@ -6073,11 +6079,11 @@ impl<'v> StarlarkValue<'v> for CcInfoInstanceStub {
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        use crate::interpreter::rule_defs::context::CompilationContextStub;
-        use crate::interpreter::rule_defs::context::LinkingContextStub;
+        use crate::interpreter::rule_defs::context::EmptyCompilationContext;
+        use crate::interpreter::rule_defs::context::EmptyLinkingContext;
         match attribute {
-            "compilation_context" => Some(heap.alloc(CompilationContextStub)),
-            "linking_context" => Some(heap.alloc(LinkingContextStub)),
+            "compilation_context" => Some(heap.alloc(EmptyCompilationContext)),
+            "linking_context" => Some(heap.alloc(EmptyLinkingContext)),
             "_legacy_transitive_native_libraries" => {
                 Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
             }

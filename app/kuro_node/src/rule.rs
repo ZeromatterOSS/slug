@@ -30,6 +30,15 @@ pub enum RuleIncomingTransition {
     FromAttribute,
 }
 
+/// Stored definition of an exec group from `rule(exec_groups={...})`.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Pagable, Allocative)]
+pub struct ExecGroupDef {
+    /// Toolchain type labels this group requires.
+    pub toolchain_types: Vec<String>,
+    /// Exec-compatible-with constraint labels.
+    pub exec_compatible_with: Vec<String>,
+}
+
 /// Common rule data needed in `TargetNode`.
 #[derive(Debug, Eq, PartialEq, Hash, Pagable, Allocative)]
 pub struct Rule {
@@ -59,10 +68,9 @@ pub struct Rule {
     /// Toolchain type labels declared via `rule(toolchains=[...])`.
     /// Used during analysis to populate `ctx.toolchains`.
     pub toolchain_types: Vec<String>,
-    /// Execution group names declared via `rule(exec_groups={...})`.
-    /// Each entry is a group name (e.g., "compile", "link").
-    /// Used to validate `ctx.exec_groups` key lookups at analysis time.
-    pub exec_group_names: Vec<String>,
+    /// Execution group definitions declared via `rule(exec_groups={...})`.
+    /// Each entry is `(group_name, definition)` with toolchain types and exec constraints.
+    pub exec_group_defs: Vec<(String, ExecGroupDef)>,
     /// Configuration fragment names declared via `rule(fragments=["cpp", "java", ...])`.
     /// In Bazel, this declares which configuration fragments a rule requires.
     /// Currently stored as metadata; fragment access is handled via `ctx.fragments`.
@@ -80,6 +88,14 @@ impl Rule {
     /// Returns true if this rule is a build setting (user-configurable build flag).
     pub fn is_build_setting(&self) -> bool {
         self.build_setting_type.is_some()
+    }
+
+    /// Convenience: returns just the exec group names (derived from exec_group_defs).
+    pub fn exec_group_names(&self) -> Vec<String> {
+        self.exec_group_defs
+            .iter()
+            .map(|(name, _)| name.clone())
+            .collect()
     }
 }
 

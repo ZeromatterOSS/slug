@@ -315,8 +315,12 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
-        use crate::interpreter::rule_defs::context::BuildConfigurationStub;
-        Ok(heap.alloc(BuildConfigurationStub { is_tool: false }))
+        use crate::interpreter::rule_defs::context::BuildConfiguration;
+        Ok(heap.alloc(BuildConfiguration {
+            is_tool: false,
+            config_hash: String::new(),
+            config_label: "unknown".to_owned(),
+        }))
     }
 
     /// Returns whether coverage instrumentation is enabled for this target.

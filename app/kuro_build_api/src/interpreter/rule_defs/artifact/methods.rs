@@ -39,23 +39,23 @@ use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::Starlar
 use crate::interpreter::rule_defs::artifact::starlark_output_artifact::StarlarkOutputArtifact;
 use crate::interpreter::rule_defs::artifact::starlark_promise_artifact::StarlarkPromiseArtifact;
 
-/// A stub for artifact root (Bazel compatibility).
+/// Artifact root (Bazel compatibility).
 /// Provides `path` attribute for output root path.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub struct ArtifactRootStub {
+pub struct ArtifactRoot {
     pub path: String,
 }
 
-impl std::fmt::Display for ArtifactRootStub {
+impl std::fmt::Display for ArtifactRoot {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<root {}>", self.path)
     }
 }
 
-starlark::starlark_simple_value!(ArtifactRootStub);
+starlark::starlark_simple_value!(ArtifactRoot);
 
 #[starlark::values::starlark_value(type = "root")]
-impl<'v> StarlarkValue<'v> for ArtifactRootStub {
+impl<'v> StarlarkValue<'v> for ArtifactRoot {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         attribute == "path"
     }
@@ -255,7 +255,7 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         if this.is_source()? {
-            return Ok(heap.alloc(ArtifactRootStub {
+            return Ok(heap.alloc(ArtifactRoot {
                 path: String::new(),
             }));
         }
@@ -272,7 +272,7 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
                 None => String::new(),
             }
         };
-        Ok(heap.alloc(ArtifactRootStub { path: root_path }))
+        Ok(heap.alloc(ArtifactRoot { path: root_path }))
     }
 
     /// The executable file (Bazel FilesToRunProvider compatibility).

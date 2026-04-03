@@ -217,9 +217,14 @@ impl TargetNode {
         &self.0.rule.toolchain_types
     }
 
-    /// Execution group names declared via `rule(exec_groups={...})`.
-    pub fn exec_group_names(&self) -> &[String] {
-        &self.0.rule.exec_group_names
+    /// Execution group definitions declared via `rule(exec_groups={...})`.
+    pub fn exec_group_defs(&self) -> &[(String, crate::rule::ExecGroupDef)] {
+        &self.0.rule.exec_group_defs
+    }
+
+    /// Convenience: execution group names.
+    pub fn exec_group_names(&self) -> Vec<String> {
+        self.0.rule.exec_group_names()
     }
 
     /// Configuration fragment names declared via `rule(fragments=["cpp", ...])`.
@@ -762,7 +767,7 @@ pub mod testing {
                     is_executable: false,
                     provides: Vec::new(),
                     toolchain_types: Vec::new(),
-                    exec_group_names: Vec::new(),
+                    exec_group_defs: Vec::new(),
                     fragments: Vec::new(),
                     build_setting_type: None,
                     build_setting_is_flag: false,
