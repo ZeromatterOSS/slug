@@ -146,7 +146,7 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
             .map(|(k, v)| (k.clone(), convert_attr_value(v)))
             .collect();
 
-        let repo_attr = RepositoryAttr::new(ctx_attrs);
+        let repo_attr = RepositoryAttr::new_with_name(invocation.name.clone(), ctx_attrs);
 
         // 7. Create the RepositoryContext
         let repo_ctx = RepositoryContext::new(

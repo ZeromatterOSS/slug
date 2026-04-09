@@ -567,13 +567,30 @@ fix should be minimal and targeted.
     before the command ran, deleting the param file. Fixed: write to `/tmp/kuro-param-files/`
     with unique atomic counter filenames.
 
-#### Current state (2026-03-27):
+#### Bugs fixed (2026-04-08, zeromatter manual verification):
+51. **`depset.to_list()` didn't deduplicate elements**: Bazel's `depset(["a", "a"]).to_list()`
+    returns `["a"]`; kuro returned `["a", "a"]`. This caused `rules_rust`'s
+    `_get_toolchain_repositories()` to generate duplicate toolchain names when `exec_triple` was
+    also in `DEFAULT_EXTRA_TARGET_TRIPLES` (e.g., `x86_64-unknown-linux-gnu`), making the `rust`
+    extension `fail()` silently. Fixed: added `HashSet`-based deduplication in both `to_list()`
+    implementations (`depset.rs`).
+52. **`repository_ctx.attr.name` missing**: Protobuf's `system_python.bzl` accesses `ctx.attr.name`.
+    Fixed: added `name` field to `RepositoryAttr`, set during construction from repo name.
+53. **`download_and_extract(url=...)` rejected named parameter**: Protobuf's `protoc_toolchain.bzl`
+    passes `url=` as keyword. Fixed: removed `require = pos` from `url` param.
+54. **`download_and_extract(output=path_obj)` rejected RepositoryPath**: `apple_support`'s
+    `http_dmg.bzl` passes a `RepositoryPath` as `output`. Fixed: changed `output` from `&str` to
+    `NoneOr<Value>`, extracting string from both `RepositoryPath` and `str` types.
+
+#### Current state (2026-04-08):
 - **42 actions execute successfully** (from 0 at start of session)
 - All extension repos materialize with real content (1230+ crate spokes, tinyjson, rrra, etc.)
 - External repo source files accessible via `external/<cell>/` symlinks
 - All cargo build scripts (_bs_ compilation, _bs- symlink, _bs execution) work end-to-end
-- Build progresses through all build scripts to Rust crate compilation including
-  `rules_rust_tinyjson`, `process_wrapper`, and most spoke crates
+- **`rust` extension from `@rules_rust//rust:extensions.bzl` now executes successfully** and
+  generates real `rust_toolchains` repo (33KB BUILD.bazel with `toolchain()` targets)
+- Rust toolchain resolution still returns None due to toolchain_type label mismatch:
+  generated BUILD uses `@rules_rust//rust:toolchain`, rule requests `@rules_rust//rust:toolchain_type`
 - 2 remaining failures: `postgres-types` has `unresolved import chrono_04` (missing crate
   alias in build rules, not a kuro infrastructure issue). `zmij` and `serde_core` fail
   downstream from this.

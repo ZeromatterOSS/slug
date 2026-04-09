@@ -298,11 +298,14 @@ impl<'v> StarlarkValue<'v> for Depset {
 fn frozen_depset_methods(builder: &mut MethodsBuilder) {
     /// Return a list of all elements in the depset.
     fn to_list<'v>(#[starlark(this)] this: &Depset, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let elements: Vec<Value<'v>> = this
+        let mut elements: Vec<Value<'v>> = this
             .collect_all_frozen()
             .into_iter()
             .map(|v| v.to_value())
             .collect();
+        // Bazel depsets deduplicate elements
+        let mut seen = HashSet::new();
+        elements.retain(|v| seen.insert(v.to_str()));
         Ok(heap.alloc(AllocList(elements)))
     }
 }
@@ -683,6 +686,10 @@ fn generic_live_depset_methods(builder: &mut MethodsBuilder) {
         let order = depset_order_from_value(this).unwrap_or("default");
         let mut elements: Vec<Value<'v>> = Vec::new();
         collect_depset_elements_ordered(this, &mut elements, heap, order);
+        // Bazel depsets deduplicate elements: depset(["a", "a"]).to_list() == ["a"]
+        // Use string representation for dedup since Value doesn't implement Hash/Eq
+        let mut seen = HashSet::new();
+        elements.retain(|v| seen.insert(v.to_str()));
         Ok(heap.alloc(AllocList(elements)))
     }
 }

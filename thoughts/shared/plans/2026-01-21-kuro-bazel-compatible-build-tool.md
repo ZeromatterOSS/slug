@@ -281,7 +281,7 @@ The detailed implementation is split into focused sub-plans:
 
 | Sub-Plan                                                                                             | Description                                                      | Status          |
 | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------- |
-| [10-module-extension-execution.md](./kuro-bazel-subplans/10-module-extension-execution.md)           | Let real module extensions execute via DICE instead of synthetic stubs | **In Progress** |
+| [10-module-extension-execution.md](./kuro-bazel-subplans/10-module-extension-execution.md)           | Let real module extensions execute via DICE instead of synthetic stubs | **In Progress** (extensions execute, rust extension now produces real rust_toolchains; depset dedup fix, rctx.attr.name, download_and_extract fixes) |
 | [11-toolchain-resolution.md](./kuro-bazel-subplans/11-toolchain-resolution.md)                       | Replace ToolchainsStub with real Bazel toolchain resolution algorithm | **Complete** (automated; manual verification remaining) |
 | [12-stub-cleanup-and-exec-groups.md](./kuro-bazel-subplans/12-stub-cleanup-and-exec-groups.md)       | Rename remaining stubs, real BuildConfiguration, exec group resolution | **Complete** (automated; manual verification remaining) |
 
@@ -427,8 +427,8 @@ Quick reference to all phases and their locations:
 
 | Phase | Title                                  | Sub-Plan | Status          |
 | ----- | -------------------------------------- | -------- | --------------- |
-| 19    | Module Extension Execution             | [10-module-extension-execution.md](./kuro-bazel-subplans/10-module-extension-execution.md) | [~] In Progress (extensions execute, 1230+ crate repos materialized, BCR overlays applied; remaining: cargo build script runner, some edge cases) |
-| 20    | **Toolchain Resolution (NEXT)**        | [11-toolchain-resolution.md](./kuro-bazel-subplans/11-toolchain-resolution.md) | [ ] Not Started — replaces ToolchainsStub with real Bazel resolution algorithm; prerequisite: Phase 19 (extension repos must materialize) |
+| 19    | Module Extension Execution             | [10-module-extension-execution.md](./kuro-bazel-subplans/10-module-extension-execution.md) | [~] In Progress (extensions execute, 1230+ crate repos materialized, BCR overlays applied, rust extension produces real rust_toolchains; remaining: toolchain_type label mismatch blocks resolution) |
+| 20    | **Toolchain Resolution (NEXT)**        | [11-toolchain-resolution.md](./kuro-bazel-subplans/11-toolchain-resolution.md) | [x] Complete (automated; Rust toolchain_type label mismatch remaining) |
 
 ---
 

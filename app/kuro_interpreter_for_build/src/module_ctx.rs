@@ -995,8 +995,8 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
     /// Download a file from a URL.
     fn download<'v>(
         this: &ModuleContext,
-        #[starlark(require = pos)] url: Value<'v>,
-        #[starlark(require = pos, default = "")] output: &str,
+        url: Value<'v>,
+        #[starlark(default = "")] output: &str,
         #[starlark(require = named, default = "")] sha256: &str,
         #[starlark(require = named, default = "")] integrity: &str,
         #[starlark(require = named, default = false)] executable: bool,
@@ -1128,7 +1128,7 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
     /// Download and extract an archive from a URL.
     fn download_and_extract<'v>(
         this: &ModuleContext,
-        #[starlark(require = pos)] url: Value<'v>,
+        url: Value<'v>,
         #[starlark(require = named, default = "")] output: &str,
         #[starlark(require = named, default = "")] sha256: &str,
         #[starlark(require = named, default = "")] integrity: &str,

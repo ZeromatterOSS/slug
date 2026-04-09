@@ -67,6 +67,7 @@ use starlark::values::StarlarkValue;
 use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::dict::AllocDict;
+use starlark::values::none::NoneOr;
 use starlark::values::starlark_value;
 use starlark::values::starlark_value_as_type::StarlarkValueAsType;
 use tar::Archive;
@@ -83,6 +84,9 @@ use crate::module_ctx::RepositoryOs;
 #[derive(Debug, Display, ProvidesStaticType, NoSerialize, Allocative, Clone)]
 #[display("<repository_rule_attr>")]
 pub struct RepositoryAttr {
+    /// The name of the repository being created.
+    /// In Bazel, `ctx.attr.name` returns this value.
+    name: String,
     /// Attribute values stored as a simple map.
     /// In a full implementation, these would be typed based on the attr definitions.
     attrs: HashMap<String, AttrValue>,
@@ -127,31 +131,50 @@ impl AttrValue {
 starlark_simple_value!(RepositoryAttr);
 
 impl RepositoryAttr {
-    /// Create a new repository attr with the given values.
+    /// Create a new repository attr with the given values and repository name.
+    pub fn new_with_name(name: String, attrs: HashMap<String, AttrValue>) -> Self {
+        Self { name, attrs }
+    }
+
+    /// Create a new repository attr with the given values (name defaults to empty).
     pub fn new(attrs: HashMap<String, AttrValue>) -> Self {
-        Self { attrs }
+        Self {
+            name: String::new(),
+            attrs,
+        }
     }
 
     /// Create an empty attr (for testing).
     pub fn empty() -> Self {
         Self {
+            name: String::new(),
             attrs: HashMap::new(),
         }
+    }
+
+    /// Set the repository name on this attr.
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
     }
 }
 
 #[starlark_value(type = "repository_rule_attr")]
 impl<'v> StarlarkValue<'v> for RepositoryAttr {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        self.attrs.contains_key(attribute)
+        attribute == "name" || self.attrs.contains_key(attribute)
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        if attribute == "name" {
+            return Some(heap.alloc(self.name.as_str()));
+        }
         self.attrs.get(attribute).map(|v| v.to_starlark(heap))
     }
 
     fn dir_attr(&self) -> Vec<String> {
-        self.attrs.keys().cloned().collect()
+        let mut keys: Vec<String> = self.attrs.keys().cloned().collect();
+        keys.push("name".to_owned());
+        keys
     }
 
     fn get_type_starlark_repr() -> Ty {
@@ -557,7 +580,8 @@ starlark_simple_value!(RepositoryContext);
 
 impl RepositoryContext {
     /// Create a new repository context.
-    pub fn new(name: String, attr: RepositoryAttr, working_dir: PathBuf) -> Self {
+    pub fn new(name: String, mut attr: RepositoryAttr, working_dir: PathBuf) -> Self {
+        attr.set_name(name.clone());
         Self {
             original_name: name.clone(),
             name,
@@ -570,9 +594,10 @@ impl RepositoryContext {
     pub fn new_with_original_name(
         name: String,
         original_name: String,
-        attr: RepositoryAttr,
+        mut attr: RepositoryAttr,
         working_dir: PathBuf,
     ) -> Self {
+        attr.set_name(name.clone());
         Self {
             name,
             original_name,
@@ -1136,9 +1161,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     /// Download a file from a URL.
     fn download<'v>(
         this: &RepositoryContext,
-        #[starlark(require = pos)] url: Value<'v>,
-        #[starlark(require = pos, default = "")] output: &str,
-        #[starlark(require = pos, default = "")] sha256: &str,
+        url: Value<'v>,
+        #[starlark(default = "")] output: &str,
+        #[starlark(default = "")] sha256: &str,
         #[starlark(require = named, default = false)] executable: bool,
         #[starlark(require = named, default = false)] allow_fail: bool,
         #[allow(unused_variables)]
@@ -1261,8 +1286,8 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     /// Download and extract an archive.
     fn download_and_extract<'v>(
         this: &RepositoryContext,
-        #[starlark(require = pos)] url: Value<'v>,
-        #[starlark(default = "")] output: &str,
+        url: Value<'v>,
+        #[starlark(default = NoneOr::None)] output: NoneOr<Value<'v>>,
         #[starlark(default = "")] sha256: &str,
         #[allow(unused_variables)]
         #[starlark(default = "")]
@@ -1301,11 +1326,21 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             )));
         }
 
-        // Determine output directory
-        let output_dir = if output.is_empty() {
+        // Determine output directory - accept string or RepositoryPath
+        let output_str = match output.into_option() {
+            Some(v) => {
+                if let Some(rp) = v.downcast_ref::<RepositoryPath>() {
+                    rp.path_str().to_owned()
+                } else {
+                    v.unpack_str().unwrap_or("").to_owned()
+                }
+            }
+            None => String::new(),
+        };
+        let output_dir = if output_str.is_empty() {
             this.working_dir.as_ref().clone()
         } else {
-            this.resolve_path(output)
+            this.resolve_path(&output_str)
         };
 
         // Try each URL until one succeeds
