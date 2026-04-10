@@ -630,7 +630,7 @@ fn verify_sha256(data: &[u8], expected: &str) -> kuro_error::Result<()> {
     let hash = Sha256::digest(data);
     let computed = hex::encode(hash);
 
-    if computed == expected {
+    if computed.eq_ignore_ascii_case(expected) {
         Ok(())
     } else {
         Err(RepositoryExecutionError::ExecutionFailed {

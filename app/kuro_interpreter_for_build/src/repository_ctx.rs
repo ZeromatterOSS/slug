@@ -798,7 +798,7 @@ pub(crate) fn verify_sha256(data: &[u8], expected: &str) -> Result<(), String> {
     let hash = Sha256::digest(data);
     let computed = hex::encode(&hash);
 
-    if computed == expected {
+    if computed.eq_ignore_ascii_case(expected) {
         Ok(())
     } else {
         Err(format!(
@@ -815,23 +815,53 @@ pub(crate) fn verify_integrity(data: &[u8], expected: &str) -> Result<(), String
         .split_once('-')
         .ok_or_else(|| format!("Invalid integrity format: {}", expected))?;
 
-    if algo != "sha256" {
-        return Err(format!("Unsupported hash algorithm: {}", algo));
-    }
-
     let expected_bytes = base64::engine::general_purpose::STANDARD
         .decode(hash)
         .map_err(|e| format!("Invalid base64: {}", e))?;
 
-    let computed = Sha256::digest(data);
-    if computed.as_slice() == expected_bytes.as_slice() {
-        Ok(())
-    } else {
-        let computed_base64 = base64::engine::general_purpose::STANDARD.encode(&computed);
-        Err(format!(
-            "Integrity mismatch: expected {}, got sha256-{}",
-            expected, computed_base64
-        ))
+    match algo {
+        "sha256" => {
+            let computed = Sha256::digest(data);
+            if computed.as_slice() == expected_bytes.as_slice() {
+                Ok(())
+            } else {
+                let computed_base64 =
+                    base64::engine::general_purpose::STANDARD.encode(&computed);
+                Err(format!(
+                    "Integrity mismatch: expected {}, got sha256-{}",
+                    expected, computed_base64
+                ))
+            }
+        }
+        "sha384" => {
+            use sha2::Sha384;
+            let computed = Sha384::digest(data);
+            if computed.as_slice() == expected_bytes.as_slice() {
+                Ok(())
+            } else {
+                let computed_base64 =
+                    base64::engine::general_purpose::STANDARD.encode(&computed);
+                Err(format!(
+                    "Integrity mismatch: expected {}, got sha384-{}",
+                    expected, computed_base64
+                ))
+            }
+        }
+        "sha512" => {
+            use sha2::Sha512;
+            let computed = Sha512::digest(data);
+            if computed.as_slice() == expected_bytes.as_slice() {
+                Ok(())
+            } else {
+                let computed_base64 =
+                    base64::engine::general_purpose::STANDARD.encode(&computed);
+                Err(format!(
+                    "Integrity mismatch: expected {}, got sha512-{}",
+                    expected, computed_base64
+                ))
+            }
+        }
+        _ => Err(format!("Unsupported hash algorithm: {}", algo)),
     }
 }
 
