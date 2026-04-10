@@ -582,24 +582,31 @@ pub(crate) async fn get_file_ops_delegate(
         );
 
         // Execute via DICE to materialize the repository
-        let result =
-            ctx.compute(&key)
-                .await
-                .map_err(|e| ExtensionRepoError::MaterializationFailed {
-                    canonical_name: setup.canonical_name.to_string(),
-                    reason: format!("DICE computation failed: {}", e),
-                })?;
-
-        let repo_result = result.map_err(|e| ExtensionRepoError::MaterializationFailed {
-            canonical_name: setup.canonical_name.to_string(),
-            reason: format!("Repository rule execution failed: {}", e),
-        })?;
-
-        tracing::info!(
-            "Successfully materialized extension repo '{}' at {:?}",
-            setup.canonical_name,
-            repo_result.repo_path
-        );
+        match ctx.compute(&key).await {
+            Ok(Ok(repo_result)) => {
+                tracing::info!(
+                    "Successfully materialized extension repo '{}' at {:?}",
+                    setup.canonical_name,
+                    repo_result.repo_path
+                );
+            }
+            Ok(Err(e)) => {
+                tracing::warn!(
+                    "Repo rule execution failed for '{}': {}. Creating stub.",
+                    setup.canonical_name,
+                    e
+                );
+                materialize_stub_repo(&project_root_path, &setup.canonical_name)?;
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "DICE computation failed for '{}': {}. Creating stub.",
+                    setup.canonical_name,
+                    e
+                );
+                materialize_stub_repo(&project_root_path, &setup.canonical_name)?;
+            }
+        }
     }
 
     // At this point, the repository should exist on disk

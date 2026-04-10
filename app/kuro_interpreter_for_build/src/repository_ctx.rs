@@ -163,24 +163,14 @@ impl RepositoryAttr {
 #[starlark_value(type = "repository_rule_attr")]
 impl<'v> StarlarkValue<'v> for RepositoryAttr {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        // Return true for all attribute access - missing attrs return None.
-        // This is needed for private attrs (starting with _) which may
-        // use default values not stored in our attrs map.
-        let _ = attribute;
-        true
+        attribute == "name" || self.attrs.contains_key(attribute)
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
         if attribute == "name" {
             return Some(heap.alloc(self.name.as_str()));
         }
-        match self.attrs.get(attribute) {
-            Some(v) => Some(v.to_starlark(heap)),
-            None => {
-                // Return None for missing attrs (e.g., private attrs with defaults)
-                Some(Value::new_none())
-            }
-        }
+        self.attrs.get(attribute).map(|v| v.to_starlark(heap))
     }
 
     fn dir_attr(&self) -> Vec<String> {
