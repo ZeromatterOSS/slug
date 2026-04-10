@@ -572,8 +572,9 @@ fn download_and_extract(
 
 /// Download a URL using curl or wget.
 fn download_url(url: &str) -> kuro_error::Result<Vec<u8>> {
-    // Try curl first
-    let output = Command::new("curl")
+    // Try curl first. On Windows, use curl.exe to avoid PowerShell alias
+    let curl_cmd = if cfg!(windows) { "curl.exe" } else { "curl" };
+    let output = Command::new(curl_cmd)
         .args(["-fsSL", "--max-time", "300", url])
         .output();
 
@@ -581,14 +582,29 @@ fn download_url(url: &str) -> kuro_error::Result<Vec<u8>> {
         Ok(output) if output.status.success() => return Ok(output.stdout),
         Ok(output) => {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            tracing::debug!("curl failed: {}", stderr);
+            tracing::debug!("curl failed for {}: {}", url, stderr);
+            // curl was found but the URL failed - try wget, but keep curl error
+            let curl_err = stderr.to_string();
+            match Command::new("wget")
+                .args(["-q", "-O", "-", "--timeout=300", url])
+                .output()
+            {
+                Ok(wget_out) if wget_out.status.success() => return Ok(wget_out.stdout),
+                _ => {
+                    return Err(RepositoryExecutionError::ExecutionFailed {
+                        name: url.to_owned(),
+                        reason: format!("Download failed: {}", curl_err),
+                    }
+                    .into());
+                }
+            }
         }
         Err(e) => {
             tracing::debug!("curl not available: {}", e);
         }
     }
 
-    // Try wget as fallback
+    // curl not found - try wget
     let output = Command::new("wget")
         .args(["-q", "-O", "-", "--timeout=300", url])
         .output()

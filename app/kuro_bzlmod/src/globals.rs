@@ -39,6 +39,7 @@ use starlark::values::ValueLike;
 use starlark::values::dict::DictRef;
 use starlark::values::list::ListRef;
 use starlark::values::list::UnpackList;
+use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark::values::tuple::UnpackTuple;
@@ -354,7 +355,7 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(require = named)] name: &str,
         #[starlark(require = named, default = "")] version: &str,
         #[starlark(require = named, default = -1)] max_compatibility_level: i32,
-        #[starlark(require = named, default = "")] repo_name: &str,
+        #[starlark(require = named, default = NoneOr::None)] repo_name: NoneOr<&str>,
         #[starlark(require = named, default = false)] dev_dependency: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
@@ -368,14 +369,16 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
                 .map_err(|e| starlark::Error::new_other(anyhow::anyhow!("{}", e)))?
         };
 
+        let repo_name_str = match repo_name {
+            NoneOr::None => None,
+            NoneOr::Other(s) if s.is_empty() => None,
+            NoneOr::Other(s) => Some(s.to_owned()),
+        };
+
         let dep = BazelDep {
             name: name.to_owned(),
             version: parsed_version,
-            repo_name: if repo_name.is_empty() {
-                None
-            } else {
-                Some(repo_name.to_owned())
-            },
+            repo_name: repo_name_str,
             dev_dependency,
         };
 

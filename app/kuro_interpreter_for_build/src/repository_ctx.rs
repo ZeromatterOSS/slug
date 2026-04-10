@@ -73,6 +73,8 @@ use starlark::values::starlark_value_as_type::StarlarkValueAsType;
 use tar::Archive;
 use zip::ZipArchive;
 
+use kuro_build_api::interpreter::rule_defs::bazel_label::BazelLabel;
+
 use crate::module_ctx::RepositoryOs;
 
 // ============================================================================
@@ -116,7 +118,7 @@ impl AttrValue {
                 let values: Vec<Value<'v>> = items.iter().map(|s| heap.alloc(s.as_str())).collect();
                 heap.alloc(values)
             }
-            AttrValue::Label(s) => heap.alloc(s.as_str()),
+            AttrValue::Label(s) => heap.alloc(BazelLabel::parse(s)),
             AttrValue::Dict(entries) => {
                 let pairs: Vec<(&str, Value<'v>)> = entries
                     .iter()
@@ -268,11 +270,15 @@ fn repository_path_methods(builder: &mut MethodsBuilder) {
 
     /// Get the dirname of this path.
     #[starlark(attribute)]
-    fn dirname(this: &RepositoryPath) -> starlark::Result<String> {
-        Ok(std::path::Path::new(&this.path)
+    fn dirname(this: &RepositoryPath) -> starlark::Result<RepositoryPath> {
+        let parent = std::path::Path::new(&this.path)
             .parent()
             .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default())
+            .unwrap_or_default();
+        Ok(RepositoryPath {
+            path: parent,
+            base_dir: this.base_dir.clone(),
+        })
     }
 
     /// Check if a file/directory exists at this path.
@@ -746,7 +752,9 @@ pub(crate) fn download_url(url: &str) -> Result<Vec<u8>, String> {
     tracing::info!("Downloading from: {}", url);
 
     // Try using curl first (more commonly available)
-    let output = Command::new("curl")
+    // On Windows, prefer curl.exe to avoid PowerShell Invoke-WebRequest alias
+    let curl_cmd = if cfg!(windows) { "curl.exe" } else { "curl" };
+    let output = Command::new(curl_cmd)
         .args(["-fsSL", "--max-time", "300", url])
         .output();
 
@@ -1344,8 +1352,15 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         };
 
         // Try each URL until one succeeds
+        tracing::warn!(
+            "download_and_extract: {} URLs, strip='{}', out='{}'",
+            urls.len(),
+            strip_prefix,
+            output_dir.display()
+        );
         let mut last_error = None;
         for url_str in &urls {
+            tracing::warn!("download_and_extract: trying '{}'", url_str);
             match download_url(url_str) {
                 Ok(data) => {
                     // Verify integrity if specified
@@ -1396,7 +1411,8 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                     return Ok(heap.alloc(DownloadInfo::new(true, &data)));
                 }
                 Err(e) => {
-                    last_error = Some(e);
+                    tracing::warn!("download_and_extract: URL '{}' failed: {}", url_str, e);
+                    last_error = Some(format!("{}: {}", url_str, e));
                 }
             }
         }
@@ -1595,8 +1611,62 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         #[cfg(not(unix))]
         {
             // On Windows, try to create a symlink or fall back to copying
-            std::fs::copy(&target_str, &link_path)
-                .map_err(|e| starlark::Error::new_other(anyhow!("Failed to copy file: {}", e)))?;
+            let target_path = std::path::Path::new(&target_str);
+            tracing::debug!(
+                "symlink: target='{}' (exists={}, is_dir={}), link='{}'",
+                target_str,
+                target_path.exists(),
+                target_path.is_dir(),
+                link_path.display()
+            );
+            if link_path.exists() || link_path.symlink_metadata().is_ok() {
+                let _ = std::fs::remove_file(&link_path);
+                let _ = std::fs::remove_dir_all(&link_path);
+            }
+            if target_path.is_dir() {
+                // Try directory symlink first, fall back to junction, then recursive copy
+                match std::os::windows::fs::symlink_dir(target_path, &link_path) {
+                    Ok(()) => {}
+                    Err(_) => {
+                        // Fall back to recursive copy for directories
+                        fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+                            std::fs::create_dir_all(dst)?;
+                            for entry in std::fs::read_dir(src)? {
+                                let entry = entry?;
+                                let ty = entry.file_type()?;
+                                let dst_path = dst.join(entry.file_name());
+                                if ty.is_dir() {
+                                    copy_dir_all(&entry.path(), &dst_path)?;
+                                } else {
+                                    std::fs::copy(entry.path(), &dst_path)?;
+                                }
+                            }
+                            Ok(())
+                        }
+                        copy_dir_all(target_path, &link_path).map_err(|e| {
+                            starlark::Error::new_other(anyhow!(
+                                "Failed to copy directory '{}' to '{}': {}",
+                                target_str,
+                                link_path.display(),
+                                e
+                            ))
+                        })?;
+                    }
+                }
+            } else if target_path.exists() {
+                std::fs::copy(target_path, &link_path).map_err(|e| {
+                    starlark::Error::new_other(anyhow!(
+                        "Failed to copy file '{}' to '{}': {}",
+                        target_str,
+                        link_path.display(),
+                        e
+                    ))
+                })?;
+            } else {
+                // Target doesn't exist - try to create symlink anyway (it might be created later)
+                let _ = std::os::windows::fs::symlink_dir(target_path, &link_path)
+                    .or_else(|_| std::os::windows::fs::symlink_file(target_path, &link_path));
+            }
         }
 
         Ok(Value::new_none())
@@ -1925,10 +1995,11 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Return repository metadata for lockfile.
+    #[allow(unused_variables)]
     fn repo_metadata<'v>(
         this: &RepositoryContext,
         #[starlark(require = named, default = false)] reproducible: bool,
-        #[starlark(require = named)] _attrs_for_reproducibility: Option<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] attrs_for_reproducibility: NoneOr<Value<'v>>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         Ok(heap.alloc(RepoMetadata { reproducible }))

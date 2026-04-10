@@ -180,7 +180,14 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
     let _ = std::fs::create_dir_all(&external_dir);
     // Create relative symlink: external/<cell> -> ../<cell_path>
     let target = std::path::PathBuf::from("..").join(cell_path);
-    let _ = std::os::unix::fs::symlink(&target, &link_path);
+    #[cfg(unix)]
+    {
+        let _ = std::os::unix::fs::symlink(&target, &link_path);
+    }
+    #[cfg(windows)]
+    {
+        let _ = std::os::windows::fs::symlink_dir(&target, &link_path);
+    }
 }
 
 /// Create `external/` symlinks for all non-root cells.

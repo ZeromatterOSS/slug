@@ -956,6 +956,14 @@ pub struct CommonBuildConfigurationOptions {
         value_name = "CMD"
     )]
     pub workspace_status_command: Option<String>,
+
+    /// Enable runfiles (Bazel compatibility, accepted but ignored).
+    #[clap(long = "enable-runfiles", alias = "enable_runfiles", hide = true)]
+    pub enable_runfiles: bool,
+
+    /// No enable runfiles (Bazel compatibility, accepted but ignored).
+    #[clap(long = "noenable-runfiles", alias = "noenable_runfiles", hide = true)]
+    pub noenable_runfiles: bool,
 }
 
 impl CommonBuildConfigurationOptions {
@@ -1163,6 +1171,8 @@ impl CommonBuildConfigurationOptions {
             cache_test_results: false,
             nocache_test_results: false,
             workspace_status_command: None,
+            enable_runfiles: false,
+            noenable_runfiles: false,
         };
         &DEFAULT
     }
@@ -1264,6 +1274,8 @@ impl CommonBuildConfigurationOptions {
             cache_test_results: false,
             nocache_test_results: false,
             workspace_status_command: None,
+            enable_runfiles: false,
+            noenable_runfiles: false,
         };
         &OPTS
     }

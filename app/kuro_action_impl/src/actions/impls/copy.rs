@@ -227,7 +227,19 @@ impl Action for CopyAction {
                 let _ = std::fs::create_dir_all(parent);
             }
             let _ = std::fs::remove_file(&plain_dest_path);
-            let _ = std::os::unix::fs::symlink(&src_abs, &plain_dest_path);
+            #[cfg(unix)]
+            {
+                let _ = std::os::unix::fs::symlink(&src_abs, &plain_dest_path);
+            }
+            #[cfg(windows)]
+            {
+                // On Windows, try dir symlink first, fall back to file copy
+                if src_abs.is_dir() {
+                    let _ = std::os::windows::fs::symlink_dir(&src_abs, &plain_dest_path);
+                } else {
+                    let _ = std::os::windows::fs::symlink_file(&src_abs, &plain_dest_path);
+                }
+            }
         }
 
         ctx.materializer()
