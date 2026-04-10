@@ -508,6 +508,17 @@ pub(crate) async fn get_file_ops_delegate(
                     format!("bazel-external/{}", canonical),
                 );
 
+                // Also register the internal (apparent) name as a cell alias.
+                // This is needed for repo mapping: the hub repo's BUILD.bazel
+                // references spoke repos by their internal name (e.g., "crates__tempfile-3.26.0")
+                // which must resolve to the canonical path.
+                if internal_name != &canonical {
+                    kuro_core::cells::register_dynamic_extension_cell(
+                        internal_name.clone(),
+                        format!("bazel-external/{}", canonical),
+                    );
+                }
+
                 // Skip if already materialized
                 if repo_dir.join(".kuro_repo_complete").exists() {
                     continue;
