@@ -454,17 +454,42 @@ pub(crate) async fn get_file_ops_delegate(
                     ),
                 })?;
 
-            let ext_result = ctx.compute(&ext_key).await.map_err(|e| {
-                ExtensionRepoError::MaterializationFailed {
-                    canonical_name: setup.canonical_name.to_string(),
-                    reason: format!("Extension execution DICE error: {}", e),
+            let ext_result = match ctx.compute(&ext_key).await {
+                Ok(Ok(result)) => result,
+                Ok(Err(e)) => {
+                    tracing::warn!(
+                        "Extension '{}' execution failed for repo '{}': {}. Creating stub.",
+                        setup.extension_id,
+                        setup.canonical_name,
+                        e
+                    );
+                    // Create stub repo so loading can continue
+                    materialize_stub_repo(&project_root_path, &setup.canonical_name)?;
+                    declare_all_source_artifacts_ext(ctx, &setup, &source_path).await?;
+                    return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
+                        cell_name,
+                        setup.canonical_name.to_string(),
+                        source_path.clone(),
+                        digest_config,
+                    )));
                 }
-            })?;
-
-            let ext_result = ext_result.map_err(|e| ExtensionRepoError::MaterializationFailed {
-                canonical_name: setup.canonical_name.to_string(),
-                reason: format!("Extension '{}' execution failed: {}", setup.extension_id, e),
-            })?;
+                Err(e) => {
+                    tracing::warn!(
+                        "Extension '{}' DICE error for repo '{}': {}. Creating stub.",
+                        setup.extension_id,
+                        setup.canonical_name,
+                        e
+                    );
+                    materialize_stub_repo(&project_root_path, &setup.canonical_name)?;
+                    declare_all_source_artifacts_ext(ctx, &setup, &source_path).await?;
+                    return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
+                        cell_name,
+                        setup.canonical_name.to_string(),
+                        source_path.clone(),
+                        digest_config,
+                    )));
+                }
+            };
 
             // Eagerly materialize ALL repos from this extension, not just the one
             // being requested. In Bazel, accessing any repo from an extension triggers
