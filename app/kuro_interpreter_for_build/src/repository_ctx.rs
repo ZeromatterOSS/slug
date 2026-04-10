@@ -1170,7 +1170,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     fn download<'v>(
         this: &RepositoryContext,
         url: Value<'v>,
-        #[starlark(default = "")] output: &str,
+        #[starlark(default = NoneOr::None)] output: NoneOr<Value<'v>>,
         #[starlark(default = "")] sha256: &str,
         #[starlark(require = named, default = false)] executable: bool,
         #[starlark(require = named, default = false)] allow_fail: bool,
@@ -1203,13 +1203,25 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             )));
         }
 
-        // Determine output path
-        let output_path = if output.is_empty() {
+        // Determine output path - accept string, RepositoryPath, or None
+        let output_str = match output.into_option() {
+            Some(v) => {
+                if let Some(rp) = v.downcast_ref::<RepositoryPath>() {
+                    rp.path_str().to_owned()
+                } else if let Some(s) = v.unpack_str() {
+                    s.to_owned()
+                } else {
+                    v.to_str()
+                }
+            }
+            None => String::new(),
+        };
+        let output_path = if output_str.is_empty() {
             // Default to filename from URL
             let url_path = urls[0].split('/').last().unwrap_or("downloaded");
             this.resolve_path(url_path)
         } else {
-            this.resolve_path(output)
+            this.resolve_path(&output_str)
         };
 
         // Try each URL until one succeeds
@@ -1435,7 +1447,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     fn file<'v>(
         this: &RepositoryContext,
         #[starlark(require = pos)] path: Value<'v>,
-        #[starlark(require = pos, default = "")] content: &str,
+        #[starlark(default = "")] content: &str,
         #[starlark(require = named, default = false)] executable: bool,
         #[starlark(require = named, default = false)] _legacy_utf8: bool,
     ) -> starlark::Result<Value<'v>> {
@@ -1677,7 +1689,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         this: &RepositoryContext,
         #[starlark(require = pos)] path: Value<'v>,
         #[starlark(require = pos)] template: Value<'v>,
-        #[starlark(require = pos)] substitutions: Option<Value<'v>>,
+        substitutions: Option<Value<'v>>,
         #[starlark(require = named, default = false)] executable: bool,
     ) -> starlark::Result<Value<'v>> {
         let path_str = if let Some(s) = path.unpack_str() {
