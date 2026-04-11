@@ -1478,8 +1478,8 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         this: &RepositoryContext,
         #[starlark(require = pos)] path: Value<'v>,
         #[starlark(default = "")] content: &str,
-        #[starlark(require = named, default = false)] executable: bool,
-        #[starlark(require = named, default = false)] _legacy_utf8: bool,
+        #[starlark(default = false)] executable: bool,
+        #[starlark(default = false)] _legacy_utf8: bool,
     ) -> starlark::Result<Value<'v>> {
         let path_str = if let Some(s) = path.unpack_str() {
             s.to_owned()
