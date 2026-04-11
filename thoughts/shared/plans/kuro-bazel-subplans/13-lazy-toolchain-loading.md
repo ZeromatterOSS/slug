@@ -105,11 +105,11 @@ After implementing this plan:
 
 ### Verification Criteria
 
-- [ ] `kuro build //sdk:all_sdk_sources` → BUILD SUCCEEDED
-- [ ] `kuro build //sdk:sdk` reaches "Error running analysis" (not loading errors)
-- [ ] No "Error loading ... bazel_ci_rules" messages
-- [ ] No `rules_java java_common.bzl` loading errors
-- [ ] Existing test suite passes: `pytest tests/core/analysis/ -q`
+- [x] `kuro build //sdk:all_sdk_sources` → BUILD SUCCEEDED (2026-04-11)
+- [x] `kuro build //sdk:sdk` reaches "Error running analysis" (not loading errors) (2026-04-11)
+- [x] No "Error loading ... bazel_ci_rules" messages (2026-04-11)
+- [x] No `rules_java java_common.bzl` loading errors (2026-04-11)
+- [x] Existing test suite passes: `pytest tests/core/analysis/ -q` (293 passed, 5 pre-existing failures, 2026-04-11)
 
 ## What We're NOT Doing
 
@@ -236,14 +236,13 @@ of non-root modules.
 ### Success Criteria (Phase 1)
 
 #### Automated Verification:
-- [ ] `cargo build -p kuro` compiles without errors
-- [ ] `pytest tests/core/analysis/ -q` — existing tests pass
-- [ ] `pytest tests/core/bzlmod/ -q` — existing tests pass
+- [x] `cargo build -p kuro` compiles without errors (2026-04-11)
+- [x] `pytest tests/core/analysis/ -q` — 293 passed, 5 pre-existing failures (2026-04-11)
+- [x] `pytest tests/core/bzlmod/ -q` — 13 passed (2026-04-11)
 
 #### Manual Verification:
-- [ ] zeromatter: count of registered toolchains is significantly reduced
-      (check log output: "Collected N toolchain registration(s)")
-- [ ] No `@bazel_ci_rules` cell-not-found errors (this was a dev-only dep)
+- [x] zeromatter: count of registered toolchains is significantly reduced (2026-04-11)
+- [x] No `@bazel_ci_rules` cell-not-found errors (2026-04-11)
 
 ---
 
@@ -314,12 +313,12 @@ or use the existing error-recovery mechanism.
 ### Success Criteria (Phase 2)
 
 #### Automated Verification:
-- [ ] `cargo build -p kuro` compiles
-- [ ] Existing test suite passes
+- [x] `cargo build -p kuro` compiles (2026-04-11)
+- [x] Existing test suite passes (no regressions, 2026-04-11)
 
 #### Manual Verification:
-- [ ] zeromatter: `kuro build //sdk:all_sdk_sources` → BUILD SUCCEEDED
-- [ ] Failed toolchain loads produce WARN logs, not BUILD FAILED
+- [x] zeromatter: `kuro build //sdk:all_sdk_sources` → BUILD SUCCEEDED (2026-04-11)
+- [x] Failed toolchain loads produce WARN logs, not BUILD FAILED (2026-04-11)
 
 ---
 

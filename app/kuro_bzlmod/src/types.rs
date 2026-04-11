@@ -282,6 +282,13 @@ pub struct GitOverride {
     pub patch_strip: u32,
 }
 
+/// A registered toolchain or execution platform, with dev_dependency tracking.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RegisteredItem {
+    pub label: String,
+    pub dev_dependency: bool,
+}
+
 /// The result of parsing a MODULE.bazel file.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct ParsedModuleFile {
@@ -300,13 +307,13 @@ pub struct ParsedModuleFile {
     pub repo_rule_invocations: Vec<crate::globals::RepoRuleInvocation>,
 
     /// Toolchain labels from `register_toolchains()` calls.
-    /// Each entry is a label string (e.g., "@rules_cc//cc:all").
+    /// Each entry is a label string (e.g., "@rules_cc//cc:all") with dev_dependency flag.
     /// Ordered: first call = highest priority within this module.
-    pub registered_toolchains: Vec<String>,
+    pub registered_toolchains: Vec<RegisteredItem>,
 
     /// Execution platform labels from `register_execution_platforms()` calls.
-    /// Each entry is a label string (e.g., "@local_config_platform//:host").
-    pub registered_execution_platforms: Vec<String>,
+    /// Each entry is a label string (e.g., "@local_config_platform//:host") with dev_dependency flag.
+    pub registered_execution_platforms: Vec<RegisteredItem>,
 }
 
 // ============================================================================

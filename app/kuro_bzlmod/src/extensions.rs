@@ -124,14 +124,38 @@ impl AggregatedExtension {
 /// Aggregate extension usages from all modules.
 ///
 /// This collects all extension usages from the dependency graph and
-/// groups them by extension.
+/// groups them by extension. Dev-dependency usages from non-root modules
+/// are skipped (Bazel 9.0 behavior).
 pub fn aggregate_extensions(
     module_extensions: &HashMap<String, Vec<ExtensionUsage>>,
+) -> HashMap<String, AggregatedExtension> {
+    aggregate_extensions_with_root(module_extensions, None)
+}
+
+/// Aggregate extension usages, filtering dev_dependency from non-root modules.
+pub fn aggregate_extensions_with_root(
+    module_extensions: &HashMap<String, Vec<ExtensionUsage>>,
+    root_module_name: Option<&str>,
 ) -> HashMap<String, AggregatedExtension> {
     let mut aggregated: HashMap<String, AggregatedExtension> = HashMap::new();
 
     for (module_name, usages) in module_extensions {
         for usage in usages {
+            // Skip dev_dependency usages from non-root modules
+            if usage.dev_dependency {
+                let is_root = root_module_name.map_or(true, |root| {
+                    module_name == root || module_name == "_main"
+                });
+                if !is_root {
+                    tracing::debug!(
+                        "Skipping dev_dependency extension '{}' from non-root module '{}'",
+                        usage.extension_id(),
+                        module_name
+                    );
+                    continue;
+                }
+            }
+
             let ext_id = usage.extension_id();
 
             let agg = aggregated.entry(ext_id.clone()).or_insert_with(|| {

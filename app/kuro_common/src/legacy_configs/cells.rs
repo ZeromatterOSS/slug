@@ -1104,7 +1104,10 @@ impl BuckConfigBasedCells {
                 module_extensions.insert(module_name.clone(), parsed_mod.extension_usages.clone());
             }
         }
-        let aggregated = kuro_bzlmod::aggregate_extensions(&module_extensions);
+        let aggregated = kuro_bzlmod::aggregate_extensions_with_root(
+            &module_extensions,
+            Some(root_module_name),
+        );
         kuro_bzlmod::set_extension_aggregations(
             aggregated,
             root_module_name.to_owned(),
@@ -1114,13 +1117,36 @@ impl BuckConfigBasedCells {
         // Collect toolchain and execution platform registrations from all modules.
         // Priority order: root module first, then BFS order of dep graph.
         // parsed_modules is already in BFS order (root first from resolution).
+        // dev_dependency items from non-root modules are skipped (Bazel 9.0 behavior).
         {
             let mut all_toolchains = Vec::new();
             let mut all_exec_platforms = Vec::new();
-            for (_module_name, parsed_mod) in &parsed_modules {
-                all_toolchains.extend(parsed_mod.registered_toolchains.iter().cloned());
-                all_exec_platforms
-                    .extend(parsed_mod.registered_execution_platforms.iter().cloned());
+            for (module_name, parsed_mod) in &parsed_modules {
+                let is_root = module_name == root_module_name
+                    || module_name == "_main"
+                    || parsed_mod.module.name == root_module_name;
+                for item in &parsed_mod.registered_toolchains {
+                    if item.dev_dependency && !is_root {
+                        tracing::debug!(
+                            "Skipping dev_dependency toolchain '{}' from non-root module '{}'",
+                            item.label,
+                            module_name
+                        );
+                        continue;
+                    }
+                    all_toolchains.push(item.label.clone());
+                }
+                for item in &parsed_mod.registered_execution_platforms {
+                    if item.dev_dependency && !is_root {
+                        tracing::debug!(
+                            "Skipping dev_dependency execution platform '{}' from non-root module '{}'",
+                            item.label,
+                            module_name
+                        );
+                        continue;
+                    }
+                    all_exec_platforms.push(item.label.clone());
+                }
             }
             tracing::info!(
                 "Collected {} toolchain registration(s) and {} execution platform registration(s)",

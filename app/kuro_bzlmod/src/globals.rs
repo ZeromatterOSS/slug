@@ -53,6 +53,7 @@ use crate::types::LocalPathOverride;
 use crate::types::MultipleVersionOverride;
 use crate::types::Override;
 use crate::types::SingleVersionOverride;
+use crate::types::RegisteredItem;
 use crate::types::TagValue;
 use crate::types::UseRepo;
 use crate::version::Version;
@@ -82,11 +83,11 @@ pub struct ModuleFileContext {
     /// e.g., http_file(name = "toml2json_linux_amd64", ...)
     pub repo_rule_invocations: Vec<RepoRuleInvocation>,
 
-    /// Toolchain labels from register_toolchains() calls.
-    pub registered_toolchains: Vec<String>,
+    /// Toolchain labels from register_toolchains() calls, with dev_dependency tracking.
+    pub registered_toolchains: Vec<RegisteredItem>,
 
-    /// Execution platform labels from register_execution_platforms() calls.
-    pub registered_execution_platforms: Vec<String>,
+    /// Execution platform labels from register_execution_platforms() calls, with dev_dependency tracking.
+    pub registered_execution_platforms: Vec<RegisteredItem>,
 }
 
 /// A repository rule invocation from MODULE.bazel (via use_repo_rule).
@@ -730,11 +731,13 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] dev_dependency: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _ = dev_dependency;
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
         for tc in toolchains.items {
-            ctx.registered_toolchains.push(tc.to_owned());
+            ctx.registered_toolchains.push(RegisteredItem {
+                label: tc.to_owned(),
+                dev_dependency,
+            });
         }
         Ok(NoneType)
     }
@@ -780,11 +783,13 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] dev_dependency: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _ = dev_dependency;
         let ctx = get_module_context(eval)?;
         let mut ctx = ctx.borrow_mut();
         for p in platforms.items {
-            ctx.registered_execution_platforms.push(p.to_owned());
+            ctx.registered_execution_platforms.push(RegisteredItem {
+                label: p.to_owned(),
+                dev_dependency,
+            });
         }
         Ok(NoneType)
     }

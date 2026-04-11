@@ -408,6 +408,8 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         }
     };
 
+    let mut skipped_count = 0;
+
     for tc_label_str in &registered {
         // Parse @repo//pkg:target pattern to extract cell name and package path
         let (repo_name, pkg_path) = match parse_registered_toolchain_label(tc_label_str) {
@@ -418,6 +420,19 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
             }
         };
 
+        // Skip extension-generated repos (canonical names like "module+ext+repo").
+        // These may not be materialized yet and loading them eagerly triggers
+        // expensive extension execution (downloading SDKs, running repo rules, etc.).
+        // They will be loaded on-demand when actually needed during analysis.
+        if repo_name.contains('+') || repo_name.contains('~') {
+            tracing::debug!(
+                "Skipping extension-generated toolchain repo '{}' (loaded on-demand)",
+                tc_label_str
+            );
+            skipped_count += 1;
+            continue;
+        }
+
         // Resolve cell name (triggers ExtensionRepoCellSetup → lazy materialization)
         let cell_name = match CellName::unchecked_new(&repo_name) {
             Ok(c) => c,
@@ -427,10 +442,41 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
             }
         };
 
-        // Check that the cell exists in the resolver
-        if cell_resolver.get(cell_name).is_err() {
-            tracing::debug!("Cell '{}' not found in resolver, skipping", repo_name);
-            continue;
+        // Check that the cell exists in the resolver and inspect its path.
+        let cell_instance = match cell_resolver.get(cell_name) {
+            Ok(c) => c,
+            Err(_) => {
+                tracing::debug!("Cell '{}' not found in resolver, skipping", repo_name);
+                skipped_count += 1;
+                continue;
+            }
+        };
+
+        // Check if this cell is an extension-generated repo by examining its path.
+        // Extension repos live at "bazel-external/<canonical>" where canonical contains '+'.
+        // Also check if the resolved cell name is an alias to an extension repo.
+        {
+            let cell_path_str = cell_instance.path().as_project_relative_path().as_str();
+            if cell_path_str.contains('+') || cell_path_str.contains('~') {
+                tracing::debug!(
+                    "Skipping toolchain repo '{}' (extension repo at '{}', loaded on-demand)",
+                    tc_label_str,
+                    cell_path_str
+                );
+                skipped_count += 1;
+                continue;
+            }
+            // Also check the cell's actual name (may differ from alias)
+            let actual_name = cell_instance.name().as_str();
+            if actual_name.contains('+') || actual_name.contains('~') {
+                tracing::debug!(
+                    "Skipping toolchain repo '{}' (alias for extension repo '{}', loaded on-demand)",
+                    tc_label_str,
+                    actual_name
+                );
+                skipped_count += 1;
+                continue;
+            }
         }
 
         // Create PackageLabel for the package
@@ -444,6 +490,7 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
                         tc_label_str,
                         e
                     );
+                    skipped_count += 1;
                     continue;
                 }
             };
@@ -452,7 +499,8 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         let eval_result = match dice.get_interpreter_results(package_label.dupe()).await {
             Ok(r) => r,
             Err(e) => {
-                tracing::debug!("Failed to load toolchain package '{}': {}", tc_label_str, e);
+                tracing::warn!("Toolchain package '{}' load failed (non-fatal): {}", tc_label_str, e);
+                skipped_count += 1;
                 continue;
             }
         };
@@ -485,6 +533,13 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
                 tc_label_str
             );
         }
+    }
+
+    if skipped_count > 0 {
+        tracing::debug!(
+            "Skipped {} toolchain registration(s) (extension repos or unavailable)",
+            skipped_count
+        );
     }
 
     TOOLCHAINS_LOADING_DONE.store(true, Ordering::SeqCst);

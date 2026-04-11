@@ -65,6 +65,7 @@ pub use extension_execution_dice::extract_owning_module;
 pub use extension_execution_dice::set_extension_aggregations;
 pub use extensions::AggregatedExtension;
 pub use extensions::aggregate_extensions;
+pub use extensions::aggregate_extensions_with_root;
 pub use extensions::compute_extension_input_hash;
 pub use fetch::SourceFetcher;
 pub use integrity::verify_integrity;

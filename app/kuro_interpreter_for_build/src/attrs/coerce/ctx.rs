@@ -358,9 +358,12 @@ impl BuildAttrCoercionContext {
                     // (e.g., attr.label(default = "LICENSE") resolves to ":LICENSE").
                     // Fall through to the bare name handling below.
                 }
-                if is_bare_name && !is_source_file && !value.contains('/') {
-                    // Bazel-compatible: bare target names without slashes (e.g., "foo_bar")
-                    // resolve as ":foo_bar" in the current package. Check output registry first.
+                if is_bare_name && !value.contains('/') {
+                    // Bazel-compatible: bare target names without slashes (e.g., "foo_bar",
+                    // "declare_config_settings.bzl") resolve as ":foo_bar" in the current
+                    // package. This applies even when the name matches a source file —
+                    // in a dep/label attr context, bare names are always labels.
+                    // Check output registry first for declared outputs.
                     let output_target = self.output_file_registry.borrow().get(value).cloned();
                     let target_name_to_use = output_target.as_deref().unwrap_or(value);
                     let adjusted = format!(":{}", target_name_to_use);

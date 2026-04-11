@@ -134,7 +134,7 @@ pub fn pre_compute_extension_repo_cells(
     // (same repo may appear in use_repo() from multiple modules).
     let mut seen_canonical: std::collections::HashSet<String> = std::collections::HashSet::new();
 
-    for (_module_name, parsed) in parsed_modules {
+    for (cell_name, parsed) in parsed_modules {
         // Use the module's own name from its MODULE.bazel for canonical naming.
         // For the root module, this matches root_module_name.
         // For transitive deps (e.g., bazel_features), this uses their declared name,
@@ -145,7 +145,20 @@ pub fn pre_compute_extension_repo_cells(
             &parsed.module.name
         };
 
+        let is_root = cell_name == root_module_name
+            || cell_name == "_main"
+            || parsed.module.name == root_module_name;
+
         for usage in &parsed.extension_usages {
+            // Skip dev_dependency usages from non-root modules (Bazel 9.0 behavior)
+            if usage.dev_dependency && !is_root {
+                tracing::debug!(
+                    "Skipping dev_dependency extension repo cells for '{}' from non-root module '{}'",
+                    usage.extension_id(),
+                    cell_name
+                );
+                continue;
+            }
             let ext_id = usage.extension_id();
             let ext_name = extract_extension_name(&ext_id);
 
