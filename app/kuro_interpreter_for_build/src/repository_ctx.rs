@@ -2025,14 +2025,18 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     }
 
     /// Get an environment variable.
-    fn getenv(
+    fn getenv<'v>(
         this: &RepositoryContext,
         #[starlark(require = pos)] name: &str,
-        default: Option<&str>,
-    ) -> starlark::Result<String> {
+        #[starlark(default = NoneOr::None)] default: NoneOr<&str>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
         match std::env::var(name) {
-            Ok(v) => Ok(v),
-            Err(_) => Ok(default.unwrap_or("").to_owned()),
+            Ok(v) => Ok(heap.alloc(v)),
+            Err(_) => match default.into_option() {
+                Some(d) => Ok(heap.alloc(d)),
+                None => Ok(Value::new_none()),
+            },
         }
     }
 
