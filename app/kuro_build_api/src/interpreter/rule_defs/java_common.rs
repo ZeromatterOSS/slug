@@ -92,6 +92,7 @@ impl<'v> StarlarkValue<'v> for JavaCommonModule {
                 | "JavaToolchainInfo"
                 | "provider"
                 | "INCOMPATIBLE_ENABLE_JAVA_TOOLCHAIN_RESOLUTION"
+                | "internal_DO_NOT_USE"
         )
     }
 
@@ -284,6 +285,63 @@ fn java_common_module_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         Ok(eval.heap().alloc(AllocList::EMPTY))
+    }
+
+    /// Internal API used by rules_java.
+    /// Returns an object with google_legacy_api_enabled() and
+    /// check_java_toolchain_is_declared_on_rule() methods.
+    fn internal_DO_NOT_USE<'v>(
+        #[starlark(this)] _this: &JavaCommonModule,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(eval.heap().alloc(JavaCommonInternal))
+    }
+}
+
+/// Internal Java common API (returned by java_common.internal_DO_NOT_USE()).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Clone)]
+struct JavaCommonInternal;
+
+impl Display for JavaCommonInternal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<java_common_internal>")
+    }
+}
+
+starlark_simple_value!(JavaCommonInternal);
+
+#[starlark_value(type = "java_common_internal")]
+impl<'v> StarlarkValue<'v> for JavaCommonInternal {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(java_common_internal_methods)
+    }
+}
+
+#[starlark_module]
+fn java_common_internal_methods(builder: &mut MethodsBuilder) {
+    fn google_legacy_api_enabled<'v>(
+        #[starlark(this)] _this: &JavaCommonInternal,
+    ) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    #[allow(unused_variables)]
+    fn check_java_toolchain_is_declared_on_rule<'v>(
+        #[starlark(this)] _this: &JavaCommonInternal,
+        actions: Value<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(Value::new_none())
+    }
+
+    #[allow(unused_variables)]
+    fn check_provider_instances<'v>(
+        #[starlark(this)] _this: &JavaCommonInternal,
+        providers: Value<'v>,
+        what: &str,
+        provider_type: Value<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(Value::new_none())
     }
 }
 
