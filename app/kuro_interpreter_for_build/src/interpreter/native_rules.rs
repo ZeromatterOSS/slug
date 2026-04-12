@@ -17,6 +17,7 @@
 use std::sync::Arc;
 
 use dupe::Dupe;
+use kuro_core::package::package_relative_path::PackageRelativePathBuf;
 use kuro_core::plugins::PluginKindSet;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::label::label::TargetLabel;
@@ -27,6 +28,7 @@ use kuro_node::attrs::attr_type::bool::BoolLiteral;
 use kuro_node::attrs::attr_type::list::ListLiteral;
 use kuro_node::attrs::attr_type::string::StringLiteral;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
+use kuro_node::attrs::coerced_path::CoercedPath;
 use kuro_node::attrs::coerced_deps_collector::CoercedDeps;
 use kuro_node::attrs::coerced_deps_collector::CoercedDepsCollector;
 use kuro_node::attrs::coercion_context::AttrCoercionContext;
@@ -2527,31 +2529,29 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let vis_strings = extract_visibility_strings(visibility);
         let default_vis = internals.default_visibility();
 
-        let src_list_type = AttrType::list(AttrType::one_of(vec![
-            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
-            AttrType::source(false),
-        ]));
-
         for src in srcs.items {
             let file_str = match src.unpack_str() {
                 Some(s) => s,
                 None => continue, // Skip non-string values (e.g., from glob())
             };
 
-            // Create srcs list with just this single source file
-            let src_list_value = eval.heap().alloc(vec![src]);
-            let coerced_srcs =
-                match src_list_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, src_list_value) {
-                    Ok(v) => v,
-                    Err(_) => continue, // Skip files that can't be coerced
-                };
+            // Construct the srcs list manually to avoid self-referential cycles.
+            // exports_files creates a filegroup named "X" with srcs=["X"]; if coerced
+            // via one_of(dep, source), "X" resolves as dep to the same target, creating
+            // a cycle. Instead, construct the CoercedAttr directly as a source file,
+            // using OneOf index 1 (source) to match filegroup's srcs type definition.
+            let file_path = PackageRelativePathBuf::unchecked_new(file_str.to_owned());
+            let source_file =
+                CoercedAttr::SourceFile(CoercedPath::File(file_path.as_path().to_arc()));
+            let one_of = CoercedAttr::OneOf(Box::new(source_file), 1);
+            let srcs_list = CoercedAttr::List(ListLiteral(ArcSlice::new([one_of])));
 
             let target_node = create_native_target_node(
                 rule_defs::FILEGROUP_RULE.clone(),
                 internals.package(),
                 file_str,
                 vec![
-                    ("srcs".to_owned(), coerced_srcs),
+                    ("srcs".to_owned(), srcs_list),
                     (
                         "data".to_owned(),
                         CoercedAttr::List(ListLiteral(ArcSlice::default())),

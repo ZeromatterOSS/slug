@@ -188,7 +188,9 @@ impl StreamingCommand for InstallCommand {
                 InstallRequest {
                     context: Some(context),
                     target_patterns: self.patterns.clone(),
-                    target_cfg: Some(self.target_cfg.target_cfg()),
+                    target_cfg: Some(self.target_cfg.target_cfg_with_host_fallback(
+                        self.common_opts.config_opts.host_platform.as_deref(),
+                    )),
                     build_opts: Some(self.build_opts.to_proto()),
                     installer_run_args: extra_run_args,
                     installer_debug: self.installer_debug,

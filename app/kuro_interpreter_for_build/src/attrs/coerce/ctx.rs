@@ -96,9 +96,17 @@ fn try_make_placeholder_label(value: &str) -> Option<ProvidersLabel> {
         let pkg = &rest[..colon_idx];
         let tgt = &rest[colon_idx + 1..];
         if tgt.is_empty() {
-            return None;
+            // "@repo//:" or "@repo//pkg:" → default target name is last path component
+            // or repo name if package is root. Bazel: "@repo//:repo"
+            if pkg.is_empty() {
+                ("", cell_alias)
+            } else {
+                let last = pkg.rsplit('/').next()?;
+                (pkg, last)
+            }
+        } else {
+            (pkg, tgt)
         }
-        (pkg, tgt)
     } else if rest.is_empty() {
         // "@repo//" → "@repo//:repo"
         ("", cell_alias)
@@ -312,6 +320,23 @@ impl BuildAttrCoercionContext {
             Ok(result) => match result {
                 ParsedPattern::Target(package, target_name, providers) => {
                     return Ok(providers.into_providers_label(package, target_name.as_ref()));
+                }
+                ParsedPattern::Package(package) => {
+                    // Bazel: `@repo//:` means `@repo//:repo` — default target is the
+                    // last component of the package path, or the cell name for root packages.
+                    let target_name = if package.cell_relative_path().is_empty() {
+                        package.cell_name().as_str()
+                    } else {
+                        package
+                            .cell_relative_path()
+                            .as_str()
+                            .rsplit('/')
+                            .next()
+                            .unwrap_or(package.cell_name().as_str())
+                    };
+                    let target =
+                        TargetLabel::new(package, TargetNameRef::unchecked_new(target_name));
+                    return Ok(ProvidersLabel::default_for(target));
                 }
                 _ => {
                     return Err(

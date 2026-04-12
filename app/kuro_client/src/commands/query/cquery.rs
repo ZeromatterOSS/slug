@@ -122,7 +122,9 @@ impl StreamingCommand for CqueryCommand {
                     context: Some(context),
                     output_attributes,
                     target_universe: self.target_cfg.target_universe,
-                    target_cfg: Some(self.target_cfg.target_cfg.target_cfg()),
+                    target_cfg: Some(self.target_cfg.target_cfg.target_cfg_with_host_fallback(
+                        self.common_opts.config_opts.host_platform.as_deref(),
+                    )),
                     show_providers: self.show_providers,
                     unstable_output_format,
                     profile_mode: self.profile_options.profile_mode_proto().map(|m| m as i32),

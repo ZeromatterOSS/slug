@@ -610,7 +610,8 @@ pub struct CommonBuildConfigurationOptions {
     #[clap(long = "sandbox-debug", alias = "sandbox_debug", hide = true)]
     pub sandbox_debug: bool,
 
-    /// Host platform (Bazel compatibility, accepted but ignored).
+    /// Host platform label (Bazel compatibility).
+    /// Used as the default target platform when --target-platforms is not set.
     #[clap(
         long = "host-platform",
         alias = "host_platform",

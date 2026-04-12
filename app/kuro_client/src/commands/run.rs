@@ -113,7 +113,9 @@ impl StreamingCommand for RunCommand {
                     context: Some(context),
                     // TODO(wendyy): glob patterns should be prohibited, and command should fail before the build event happens.
                     target_patterns: vec![self.target.clone()],
-                    target_cfg: Some(self.target_cfg.target_cfg.target_cfg()),
+                    target_cfg: Some(self.target_cfg.target_cfg.target_cfg_with_host_fallback(
+                        self.common_opts.config_opts.host_platform.as_deref(),
+                    )),
                     build_providers: Some(BuildProviders {
                         default_info: build_providers::Action::Skip as i32,
                         run_info: build_providers::Action::Build as i32,

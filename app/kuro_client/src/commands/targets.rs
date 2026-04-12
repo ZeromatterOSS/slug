@@ -352,7 +352,9 @@ impl StreamingCommand for TargetsCommand {
                     package_values,
                 })
             }),
-            target_cfg: Some(self.target_cfg.target_cfg()),
+            target_cfg: Some(self.target_cfg.target_cfg_with_host_fallback(
+                self.common_opts.config_opts.host_platform.as_deref(),
+            )),
             output: self
                 .output
                 .try_map(|x| x.resolve(&ctx.working_dir).into_string())?,

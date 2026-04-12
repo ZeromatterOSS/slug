@@ -53,8 +53,20 @@ pub struct TargetCfgUnusedOptions {
 
 impl TargetCfgOptions {
     pub fn target_cfg(&self) -> TargetCfg {
+        self.target_cfg_with_host_fallback(None)
+    }
+
+    /// Create a TargetCfg, using `host_platform` as a fallback for `target_platforms`.
+    /// In Bazel, `--host_platform` is used as the default target platform when
+    /// `--platforms` is not explicitly set.
+    pub fn target_cfg_with_host_fallback(&self, host_platform: Option<&str>) -> TargetCfg {
+        let target_platform = self
+            .target_platforms
+            .clone()
+            .or_else(|| host_platform.map(|s| s.to_owned()))
+            .unwrap_or_default();
         TargetCfg {
-            target_platform: self.target_platforms.clone().unwrap_or_default(),
+            target_platform,
             cli_modifiers: self.cli_modifiers(),
         }
     }

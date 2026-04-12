@@ -174,7 +174,12 @@ impl BuildCommand {
     }
 
     pub(crate) fn target_cfg(&self) -> TargetCfg {
-        self.target_cfg.target_cfg.target_cfg().clone()
+        self.target_cfg
+            .target_cfg
+            .target_cfg_with_host_fallback(
+                self.common_opts.config_opts.host_platform.as_deref(),
+            )
+            .clone()
     }
 }
 
@@ -249,7 +254,9 @@ impl StreamingCommand for BuildCommand {
                 BuildRequest {
                     context: Some(context),
                     target_patterns: self.patterns.clone(),
-                    target_cfg: Some(self.target_cfg.target_cfg.target_cfg()),
+                    target_cfg: Some(self.target_cfg.target_cfg.target_cfg_with_host_fallback(
+                        self.common_opts.config_opts.host_platform.as_deref(),
+                    )),
                     build_providers: Some(BuildProviders {
                         default_info: self.default_info() as i32,
                         run_info: self.run_info() as i32,

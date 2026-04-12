@@ -96,7 +96,9 @@ impl StreamingCommand for ConfiguredTargetsCommand {
                 ConfiguredTargetsRequest {
                     context,
                     target_patterns: self.patterns,
-                    target_cfg: Some(self.target_cfg.target_cfg()),
+                    target_cfg: Some(self.target_cfg.target_cfg_with_host_fallback(
+                        self.common_opts.config_opts.host_platform.as_deref(),
+                    )),
                     skip_missing_targets: self.skip_missing_targets,
                     output_format: output_format as i32,
                     output_attributes: self.attributes.get()?,

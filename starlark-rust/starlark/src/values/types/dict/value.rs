@@ -492,19 +492,26 @@ where
     }
 
     fn bit_or(&self, rhs: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
-        let rhs = DictRef::from_value(rhs)
-            .map_or_else(|| ValueError::unsupported_with(self, "|", rhs), Ok)?;
-        if self.0.content().is_empty() {
-            return Ok(heap.alloc((*rhs).clone()));
+        if let Some(rhs_dict) = DictRef::from_value(rhs) {
+            if self.0.content().is_empty() {
+                return Ok(heap.alloc((*rhs_dict).clone()));
+            }
+            // Might be faster if we preallocate the capacity, but then copying in the LHS
+            // is more expensive and might oversize given the behaviour on duplicates.
+            // If this becomes a bottleneck, benchmark.
+            let mut items = self.0.content().clone();
+            for (k, v) in rhs_dict.iter_hashed() {
+                items.insert_hashed(k, v);
+            }
+            return Ok(heap.alloc(Dict::new(items)));
         }
-        // Might be faster if we preallocate the capacity, but then copying in the LHS
-        // is more expensive and might oversize given the behaviour on duplicates.
-        // If this becomes a bottleneck, benchmark.
-        let mut items = self.0.content().clone();
-        for (k, v) in rhs.iter_hashed() {
-            items.insert_hashed(k, v);
+        // Bazel supports `dict | select(...)` — delegate to rhs.radd(lhs) which
+        // StarlarkSelector implements to create a concatenated select.
+        let lhs = heap.alloc((*self.0.content()).clone());
+        if let Some(result) = rhs.get_ref().radd(lhs, heap) {
+            return result;
         }
-        Ok(heap.alloc(Dict::new(items)))
+        ValueError::unsupported_with(self, "|", rhs)
     }
 
     fn typechecker_ty(&self) -> Option<Ty> {

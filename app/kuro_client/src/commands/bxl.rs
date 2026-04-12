@@ -112,7 +112,9 @@ impl StreamingCommand for BxlCommand {
                     bxl_label: self.bxl_opts.bxl_label,
                     bxl_args: self.bxl_opts.bxl_args,
                     build_opts: Some(self.bxl_opts.build_opts.to_proto()),
-                    target_cfg: Some(self.target_cfg.target_cfg()),
+                    target_cfg: Some(self.target_cfg.target_cfg_with_host_fallback(
+                        self.common_ops.config_opts.host_platform.as_deref(),
+                    )),
                     final_artifact_materializations: self.bxl_opts.materializations.to_proto()
                         as i32,
                     final_artifact_uploads: self.bxl_opts.upload_final_artifacts.to_proto() as i32,
