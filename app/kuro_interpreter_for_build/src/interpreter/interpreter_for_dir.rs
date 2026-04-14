@@ -482,12 +482,13 @@ impl InterpreterForDir {
         import: StarlarkPath,
         content: String,
     ) -> kuro_error::Result<ParseResult> {
-        // Indentation with tabs is prohibited by starlark spec and configured starlark dialect.
-        // This check also prohibits tabs even where spaces are not significant,
-        // for example inside parentheses in function call arguments,
-        // which restricts what the spec allows.
+        // Buck2 prohibits tabs in .bzl files, but Bazel allows them.
+        // Log a warning instead of erroring for Bazel compatibility.
         if content.contains('\t') {
-            return Err(StarlarkTabsError(OwnedStarlarkPath::new(import)).into());
+            tracing::warn!(
+                "Tabs found in Starlark file: `{}` (allowed for Bazel compat)",
+                OwnedStarlarkPath::new(import)
+            );
         }
 
         let project_relative_path = self

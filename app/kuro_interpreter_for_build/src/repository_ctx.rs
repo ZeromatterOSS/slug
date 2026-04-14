@@ -51,6 +51,7 @@ use anyhow::anyhow;
 use base64::Engine;
 use derive_more::Display;
 use flate2::read::GzDecoder;
+use kuro_build_api::interpreter::rule_defs::bazel_label::BazelLabel;
 use sha2::Digest;
 use sha2::Sha256;
 use starlark::any::ProvidesStaticType;
@@ -72,8 +73,6 @@ use starlark::values::starlark_value;
 use starlark::values::starlark_value_as_type::StarlarkValueAsType;
 use tar::Archive;
 use zip::ZipArchive;
-
-use kuro_build_api::interpreter::rule_defs::bazel_label::BazelLabel;
 
 use crate::module_ctx::RepositoryOs;
 
@@ -825,8 +824,7 @@ pub(crate) fn verify_integrity(data: &[u8], expected: &str) -> Result<(), String
             if computed.as_slice() == expected_bytes.as_slice() {
                 Ok(())
             } else {
-                let computed_base64 =
-                    base64::engine::general_purpose::STANDARD.encode(&computed);
+                let computed_base64 = base64::engine::general_purpose::STANDARD.encode(&computed);
                 Err(format!(
                     "Integrity mismatch: expected {}, got sha256-{}",
                     expected, computed_base64
@@ -839,8 +837,7 @@ pub(crate) fn verify_integrity(data: &[u8], expected: &str) -> Result<(), String
             if computed.as_slice() == expected_bytes.as_slice() {
                 Ok(())
             } else {
-                let computed_base64 =
-                    base64::engine::general_purpose::STANDARD.encode(&computed);
+                let computed_base64 = base64::engine::general_purpose::STANDARD.encode(&computed);
                 Err(format!(
                     "Integrity mismatch: expected {}, got sha384-{}",
                     expected, computed_base64
@@ -853,8 +850,7 @@ pub(crate) fn verify_integrity(data: &[u8], expected: &str) -> Result<(), String
             if computed.as_slice() == expected_bytes.as_slice() {
                 Ok(())
             } else {
-                let computed_base64 =
-                    base64::engine::general_purpose::STANDARD.encode(&computed);
+                let computed_base64 = base64::engine::general_purpose::STANDARD.encode(&computed);
                 Err(format!(
                     "Integrity mismatch: expected {}, got sha512-{}",
                     expected, computed_base64
@@ -1671,7 +1667,10 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                     Ok(()) => {}
                     Err(_) => {
                         // Fall back to recursive copy for directories
-                        fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+                        fn copy_dir_all(
+                            src: &std::path::Path,
+                            dst: &std::path::Path,
+                        ) -> std::io::Result<()> {
                             std::fs::create_dir_all(dst)?;
                             for entry in std::fs::read_dir(src)? {
                                 let entry = entry?;
@@ -2045,7 +2044,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     fn repo_metadata<'v>(
         this: &RepositoryContext,
         #[starlark(require = named, default = false)] reproducible: bool,
-        #[starlark(require = named, default = NoneOr::None)] attrs_for_reproducibility: NoneOr<Value<'v>>,
+        #[starlark(require = named, default = NoneOr::None)] attrs_for_reproducibility: NoneOr<
+            Value<'v>,
+        >,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         Ok(heap.alloc(RepoMetadata { reproducible }))

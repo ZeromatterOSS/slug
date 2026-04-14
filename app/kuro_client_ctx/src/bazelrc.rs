@@ -461,6 +461,7 @@ pub fn normalize_args(args: Vec<String>) -> Vec<String> {
 /// - `--incompatible_*` / `--noincompatible_*`: Bazel migration flags
 /// - `--legacy_*` / `--nolegacy_*`: Legacy behavior toggles
 /// - `--experimental_*` / `--noexperimental_*`: Experimental features
+/// - Various Bazel-specific build flags (sandboxing, PIC, runfiles, etc.)
 fn is_bazel_transitional_flag(arg: &str) -> bool {
     // Must start with -- (long flag)
     let flag_name = if let Some(stripped) = arg.strip_prefix("--") {
@@ -473,12 +474,84 @@ fn is_bazel_transitional_flag(arg: &str) -> bool {
     // Strip leading "no" prefix for boolean flags
     let base = flag_name.strip_prefix("no").unwrap_or(flag_name);
     // Check against transitional prefixes
-    base.starts_with("incompatible_")
+    if base.starts_with("incompatible_")
         || base.starts_with("incompatible-")
         || base.starts_with("legacy_")
         || base.starts_with("legacy-")
         || base.starts_with("experimental_")
         || base.starts_with("experimental-")
+    {
+        return true;
+    }
+    // Normalize for comparison
+    let normalized = flag_name.replace('-', "_");
+    // Bazel-specific flags that have no kuro equivalent and should be silently dropped.
+    // These are internal Bazel build/execution flags that control sandboxing, caching,
+    // compilation modes, and other Bazel-specific behavior.
+    is_bazel_specific_flag(&normalized)
+}
+
+/// Bazel-specific flags that kuro should silently ignore from .bazelrc files.
+///
+/// These are flags that control Bazel-internal behavior (sandboxing, caching,
+/// remote execution details, compilation modes) that have no direct kuro
+/// equivalent. Silently dropping them allows kuro to work with existing
+/// `.bazelrc` files without modification.
+fn is_bazel_specific_flag(normalized_flag: &str) -> bool {
+    // Strip leading "no" for boolean flags
+    let base = normalized_flag
+        .strip_prefix("no")
+        .unwrap_or(normalized_flag);
+    matches!(
+        base,
+        // Workspace/bzlmod toggles (kuro always uses bzlmod)
+        "enable_workspace"
+            | "enable_bzlmod"
+            // Build behavior flags
+            | "guard_against_concurrent_changes"
+            | "force_pic"
+            | "dynamic_mode"
+            | "strip"
+            | "features"
+            | "build_runfile_links"
+            | "build_runfile_manifests"
+            | "process_headers_in_dependencies"
+            // Sandbox flags
+            | "sandbox_base"
+            | "sandbox_default_allow_network"
+            | "sandbox_fake_hostname"
+            | "sandbox_fake_username"
+            // Remote execution / caching flags
+            | "remote_upload_local_results"
+            | "remote_accept_cached"
+            | "remote_cache"
+            | "remote_executor"
+            | "remote_default_exec_properties"
+            | "remote_local_fallback"
+            | "remote_timeout"
+            // Compilation / output flags
+            | "compilation_mode"
+            | "copt"
+            | "cxxopt"
+            | "host_copt"
+            | "host_cxxopt"
+            | "linkopt"
+            | "host_linkopt"
+            | "repo_env"
+            | "compiler"
+            // Runfiles / symlinks
+            | "build_runfile_links"
+            // Test flags
+            | "test_output"
+            | "test_summary"
+            | "test_tag_filters"
+            | "build_tag_filters"
+            | "test_sharding_strategy"
+            // Misc Bazel flags
+            | "keep_going"
+            | "stamp"
+            | "check_visibility"
+    )
 }
 
 /// Convert Bazel `--noflag_name` boolean negation to a form clap can handle.
@@ -514,6 +587,10 @@ fn normalize_bazel_negation(arg: &str) -> Option<String> {
         "stamp",
         "check_visibility",
         "check-visibility",
+        "enable_workspace",
+        "enable-workspace",
+        "enable_bzlmod",
+        "enable-bzlmod",
     ];
     // Normalize underscores to hyphens for comparison
     let normalized_name = flag_name.replace('_', "-");

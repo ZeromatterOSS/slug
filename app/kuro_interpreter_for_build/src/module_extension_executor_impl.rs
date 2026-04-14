@@ -107,13 +107,18 @@ pub(crate) fn parse_bzlmod_bzl_path(
         .or_else(|| bzl_path.strip_prefix("@"))
         .unwrap_or(bzl_path);
 
+    // Handle root module shorthand: ":extensions.bzl" means "//:extensions.bzl"
+    let path_without_prefix = if path_without_prefix.starts_with(':') {
+        &path_without_prefix[1..] // Strip leading ':', treat as root module path
+    } else {
+        path_without_prefix
+    };
+
     // Split into cell/repo part and path part at //
-    let (cell_part, path_part) = path_without_prefix.split_once("//").ok_or_else(|| {
-        ExtensionExecutionError::InvalidBzlPath {
-            path: bzl_path.to_owned(),
-            reason: "missing '//' separator".to_owned(),
-        }
-    })?;
+    let (cell_part, path_part) = path_without_prefix.split_once("//").unwrap_or_else(|| {
+        // No '//' separator - treat as root module path
+        ("", path_without_prefix)
+    });
 
     // Determine the cell name
     let cell_name = if cell_part.is_empty() {

@@ -1349,7 +1349,7 @@ fn module_ctx_methods(builder: &mut MethodsBuilder) {
     fn getenv(
         this: &ModuleContext,
         #[starlark(require = pos)] name: &str,
-        #[starlark(require = named)] default: Option<&str>,
+        default: Option<&str>,
     ) -> starlark::Result<String> {
         match std::env::var(name) {
             Ok(v) => Ok(v),

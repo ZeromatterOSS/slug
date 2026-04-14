@@ -220,8 +220,28 @@ pub fn pre_compute_extension_repo_cells(
         }
     }
 
+    // Also register use_repo_rule() invocations as extension cells.
+    // In Bazel, use_repo_rule() creates implicit single-repo extensions.
+    // The canonical name for use_repo_rule is just the repo name (not prefixed).
+    for (_module_name, parsed) in parsed_modules {
+        for invocation in &parsed.repo_rule_invocations {
+            let canonical = invocation.name.clone();
+            if seen_canonical.insert(canonical.clone()) {
+                let path = format!("bazel-external/{}", canonical);
+                cells.push(PendingRepoCell {
+                    canonical_name: canonical.clone(),
+                    extension_id: invocation.rule_source.clone(),
+                    internal_name: invocation.name.clone(),
+                    spec_hash: String::new(),
+                    repo_spec_json: String::new(), // Will be filled from rule_source attrs
+                    path,
+                });
+            }
+        }
+    }
+
     tracing::info!(
-        "Pre-computed {} extension repo cell(s) and {} alias(es) from use_repo() declarations",
+        "Pre-computed {} extension repo cell(s) and {} alias(es) from use_repo()/use_repo_rule() declarations",
         cells.len(),
         aliases.len()
     );

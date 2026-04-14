@@ -1291,6 +1291,11 @@ impl BuckConfigBasedCells {
                 } else {
                     &parsed_mod.module.name
                 };
+                tracing::info!(
+                    "Module '{}' has {} repo_rule_invocations",
+                    module_name,
+                    parsed_mod.repo_rule_invocations.len()
+                );
                 for invocation in &parsed_mod.repo_rule_invocations {
                     let cell_name_str = invocation.name.clone();
                     let cell_path_str = format!("bazel-external/{}", cell_name_str);
@@ -1300,15 +1305,54 @@ impl BuckConfigBasedCells {
                         continue;
                     }
 
+                    let rule_name = invocation
+                        .rule_source
+                        .split('%')
+                        .last()
+                        .unwrap_or("unknown");
+
+                    // Check if this is a custom Starlark rule (has .bzl source)
+                    let is_custom_rule = !kuro_bzlmod::is_builtin_repo_rule(rule_name);
+
+                    if is_custom_rule {
+                        // Register as extension cell for lazy DICE-based Starlark execution.
+                        // In Bazel, use_repo_rule() is syntactic sugar for an implicit extension.
+                        let extension_id = invocation.rule_source.clone();
+                        let mut repo_spec =
+                            kuro_bzlmod::RepoSpec::new(invocation.rule_source.clone());
+                        for (k, v) in &invocation.attrs {
+                            repo_spec
+                                .attributes
+                                .insert(k.clone(), tag_value_to_attr_value(v));
+                        }
+                        let repo_spec_json = serde_json::to_string(&repo_spec).unwrap_or_default();
+
+                        if let Ok(cell_name) = CellName::unchecked_new(&cell_name_str) {
+                            if let Ok(cell_path) = ProjectRelativePath::new(&cell_path_str)
+                                .map(|p| CellRootPathBuf::new(p.to_owned()))
+                            {
+                                let setup = ExtensionRepoCellSetup {
+                                    canonical_name: Arc::from(cell_name_str.as_str()),
+                                    extension_id: Arc::from(extension_id.as_str()),
+                                    internal_name: Arc::from(cell_name_str.as_str()),
+                                    spec_hash: Arc::from(""),
+                                    repo_spec_json: Arc::from(repo_spec_json.as_str()),
+                                    materialized: false,
+                                };
+                                ext_cells.push((cell_name, cell_path, setup));
+                                tracing::info!(
+                                    "Registered custom repo rule '{}' as extension cell for lazy execution",
+                                    cell_name_str
+                                );
+                            }
+                        }
+                        continue;
+                    }
+
                     // Convert TagValue attrs to RepositoryInvocation attrs for the executor
                     let mut inv = kuro_bzlmod::RepositoryInvocation::new(
                         invocation.name.clone(),
-                        invocation
-                            .rule_source
-                            .split('%')
-                            .last()
-                            .unwrap_or("unknown")
-                            .to_owned(),
+                        rule_name.to_owned(),
                     );
                     inv.rule_source = Some(invocation.rule_source.clone());
                     for (k, v) in &invocation.attrs {
@@ -2595,6 +2639,41 @@ fn extract_repo_name_from_label(label: &str) -> Option<&str> {
     let end = stripped.find("//").unwrap_or(stripped.len());
     let name = &stripped[..end];
     if name.is_empty() { None } else { Some(name) }
+}
+
+/// Convert a TagValue to a RepoSpec AttrValue (for extension cell repo specs).
+fn tag_value_to_attr_value(tv: &TagValue) -> kuro_bzlmod::repository_invocations::AttrValue {
+    use kuro_bzlmod::repository_invocations::AttrValue;
+    match tv {
+        TagValue::String(s) => {
+            if s.starts_with("//") || s.starts_with("@") || s.starts_with(":") {
+                AttrValue::Label(s.clone())
+            } else {
+                AttrValue::String(s.clone())
+            }
+        }
+        TagValue::Int(i) => AttrValue::Int(*i),
+        TagValue::Bool(b) => AttrValue::Bool(*b),
+        TagValue::None => AttrValue::None,
+        TagValue::Label(s) => AttrValue::Label(s.clone()),
+        TagValue::List(items) => {
+            let strings: Vec<String> = items
+                .iter()
+                .filter_map(|v| match v {
+                    TagValue::String(s) | TagValue::Label(s) => Some(s.clone()),
+                    _ => None,
+                })
+                .collect();
+            AttrValue::StringList(strings)
+        }
+        TagValue::Dict(entries) => {
+            let map: std::collections::HashMap<String, AttrValue> = entries
+                .iter()
+                .map(|(k, v)| (k.clone(), tag_value_to_attr_value(v)))
+                .collect();
+            AttrValue::Dict(map)
+        }
+    }
 }
 
 fn tag_value_to_repo_attr(tv: &TagValue) -> kuro_bzlmod::RepoAttrValue {
