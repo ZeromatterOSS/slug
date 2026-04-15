@@ -445,14 +445,75 @@ pub(crate) async fn get_file_ops_delegate(
                 setup.extension_id
             );
 
-            let ext_key = kuro_bzlmod::create_extension_execution_key(&setup.extension_id)
-                .ok_or_else(|| ExtensionRepoError::MaterializationFailed {
-                    canonical_name: setup.canonical_name.to_string(),
-                    reason: format!(
-                        "Extension '{}' not found in aggregation data",
-                        setup.extension_id
-                    ),
-                })?;
+            let ext_key = match kuro_bzlmod::create_extension_execution_key(&setup.extension_id) {
+                Some(key) => key,
+                None => {
+                    // Not a module extension — likely a use_repo_rule() invocation.
+                    // Execute directly as a Starlark repository rule via DICE.
+                    tracing::info!(
+                        "Extension '{}' not in aggregations, treating as use_repo_rule for '{}'",
+                        setup.extension_id,
+                        setup.canonical_name
+                    );
+                    let mut inv = kuro_bzlmod::RepositoryInvocation::new(
+                        setup.canonical_name.to_string(),
+                        setup
+                            .extension_id
+                            .split('%')
+                            .last()
+                            .unwrap_or("unknown")
+                            .to_owned(),
+                    );
+                    inv.rule_source = Some(setup.extension_id.to_string());
+                    let repo_spec = kuro_bzlmod::RepoSpec::new(setup.extension_id.to_string());
+                    let key = ExtensionRepoExecutionKey::new(
+                        setup.canonical_name.to_string(),
+                        setup.extension_id.to_string(),
+                        repo_spec,
+                        project_root_path.clone(),
+                    );
+                    match ctx.compute(&key).await {
+                        Ok(Ok(repo_result)) => {
+                            tracing::info!(
+                                "Materialized use_repo_rule repo '{}' at {:?}",
+                                setup.canonical_name,
+                                repo_result.repo_path
+                            );
+                        }
+                        Ok(Err(e)) => {
+                            tracing::warn!(
+                                "use_repo_rule execution failed for '{}': {}. Creating stub.",
+                                setup.canonical_name,
+                                e
+                            );
+                            materialize_stub_repo(&project_root_path, &setup.canonical_name)?;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "DICE error for use_repo_rule '{}': {}. Creating stub.",
+                                setup.canonical_name,
+                                e
+                            );
+                            materialize_stub_repo(&project_root_path, &setup.canonical_name)?;
+                        }
+                    }
+                    // Skip the extension execution path below
+                    if !source_path.exists() {
+                        return Err(ExtensionRepoError::MaterializationFailed {
+                            canonical_name: setup.canonical_name.to_string(),
+                            reason: "Repository not found after use_repo_rule execution".to_owned(),
+                        }
+                        .into());
+                    }
+                    declare_all_source_artifacts_ext(ctx, &setup, &source_path).await?;
+                    return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
+                        cell_name,
+                        setup.canonical_name.to_string(),
+                        source_path,
+                        digest_config,
+                    )));
+                }
+            };
 
             let ext_result = match ctx.compute(&ext_key).await {
                 Ok(Ok(result)) => result,

@@ -378,8 +378,17 @@ impl ExtensionUsage {
     }
 
     /// Get a unique identifier for this extension.
+    ///
+    /// Normalizes the bzl file path so that `:file.bzl` becomes `//:file.bzl`,
+    /// matching the canonical format used in Bazel lockfiles.
     pub fn extension_id(&self) -> String {
-        format!("{}%{}", self.extension_bzl_file, self.extension_name)
+        let bzl = &self.extension_bzl_file;
+        let normalized = if bzl.starts_with(':') {
+            format!("//{}", bzl)
+        } else {
+            bzl.clone()
+        };
+        format!("{}%{}", normalized, self.extension_name)
     }
 }
 

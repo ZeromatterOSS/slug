@@ -24,6 +24,7 @@
 
 use std::io::Cursor;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 
 use flate2::read::GzDecoder;
@@ -995,29 +996,80 @@ fn execute_local_repository(
 ) -> kuro_error::Result<()> {
     let path = attrs.require_string("path")?;
 
-    // Create symlink to local path
-    #[cfg(unix)]
-    {
-        // Remove the working dir we created, we'll replace with symlink
-        std::fs::remove_dir(working_dir).ok();
-        std::os::unix::fs::symlink(path, working_dir).map_err(|e| {
-            RepositoryExecutionError::ExecutionFailed {
-                name: invocation.name.clone(),
-                reason: format!("Failed to create symlink: {}", e),
+    // Resolve relative paths against the project root (parent of bazel-external/).
+    // In Bazel, relative paths in new_local_repository are resolved relative to
+    // the workspace root (where MODULE.bazel lives).
+    let resolved_path = if Path::new(path).is_relative() {
+        if let Some(bazel_external) = working_dir.parent() {
+            if let Some(project_root) = bazel_external.parent() {
+                project_root.join(path)
+            } else {
+                PathBuf::from(path)
             }
-        })?;
-    }
+        } else {
+            PathBuf::from(path)
+        }
+    } else {
+        PathBuf::from(path)
+    };
 
-    #[cfg(not(unix))]
-    {
-        // On non-Unix, copy the directory
-        copy_dir_recursive(Path::new(path), working_dir)?;
-    }
+    let resolved_path = resolved_path
+        .canonicalize()
+        .unwrap_or_else(|_| resolved_path.clone());
 
-    // For new_local_repository, write BUILD file if specified
     if invocation.rule_name == "new_local_repository" {
+        // For new_local_repository: create working dir with symlinks to individual
+        // entries from the target, plus a custom BUILD.bazel. Don't symlink the
+        // directory itself (that would write BUILD.bazel into the source tree).
+        std::fs::create_dir_all(working_dir).ok();
+
+        // Symlink all entries from the target directory
+        if let Ok(entries) = std::fs::read_dir(&resolved_path) {
+            for entry in entries.flatten() {
+                let name = entry.file_name();
+                let target = working_dir.join(&name);
+                if !target.exists() {
+                    #[cfg(unix)]
+                    std::os::unix::fs::symlink(entry.path(), &target).ok();
+                    #[cfg(not(unix))]
+                    {
+                        if entry.path().is_dir() {
+                            copy_dir_recursive(&entry.path(), &target).ok();
+                        } else {
+                            std::fs::copy(entry.path(), &target).ok();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Write custom BUILD file
         if let Some(content) = attrs.get_optional_string("build_file_content") {
+            // Remove any symlinked BUILD files first
+            std::fs::remove_file(working_dir.join("BUILD.bazel")).ok();
+            std::fs::remove_file(working_dir.join("BUILD")).ok();
             std::fs::write(working_dir.join("BUILD.bazel"), content).ok();
+        }
+    } else {
+        // For local_repository: symlink the entire directory (it has its own BUILD)
+        #[cfg(unix)]
+        {
+            std::fs::remove_dir(working_dir).ok();
+            std::os::unix::fs::symlink(&resolved_path, working_dir).map_err(|e| {
+                RepositoryExecutionError::ExecutionFailed {
+                    name: invocation.name.clone(),
+                    reason: format!(
+                        "Failed to create symlink {} -> {}: {}",
+                        working_dir.display(),
+                        resolved_path.display(),
+                        e
+                    ),
+                }
+            })?;
+        }
+        #[cfg(not(unix))]
+        {
+            copy_dir_recursive(&resolved_path, working_dir)?;
         }
     }
 

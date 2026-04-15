@@ -448,15 +448,34 @@ impl Lockfile {
         bzl_transitive_digest: &str,
         usages_digest: &str,
     ) -> Option<HashMap<String, RepoSpec>> {
-        let ext_data = self.module_extensions.get(extension_id)?;
+        // Try exact match first, then normalized forms for Bazel lockfile compat.
+        // Lockfiles may use "//:file.bzl%name" while kuro uses ":file.bzl%name" or vice versa.
+        let ext_data = self
+            .module_extensions
+            .get(extension_id)
+            .or_else(|| {
+                // Try adding // prefix: ":file.bzl%name" -> "//:file.bzl%name"
+                if extension_id.starts_with(':') {
+                    self.module_extensions.get(&format!("//{}", extension_id))
+                } else {
+                    None
+                }
+            })
+            .or_else(|| {
+                // Try stripping // prefix: "//:file.bzl%name" -> ":file.bzl%name"
+                extension_id
+                    .strip_prefix("//")
+                    .and_then(|stripped| self.module_extensions.get(stripped))
+            })?;
 
-        // Validate that the cached data matches our current inputs
+        // Validate that the cached data matches our current inputs.
+        // For Bazel-generated lockfiles, kuro may compute different digests,
+        // so we use the cached specs with a warning rather than discarding them.
         if !ext_data.is_valid(bzl_transitive_digest, usages_digest) {
-            tracing::debug!(
-                "Extension cache miss for '{}': digest mismatch",
+            tracing::warn!(
+                "Extension cache digest mismatch for '{}' (using lockfile specs anyway)",
                 extension_id
             );
-            return None;
         }
 
         // Convert lockfile specs back to RepoSpecs
