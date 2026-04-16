@@ -166,7 +166,17 @@ pub fn pre_compute_extension_repo_cells(
             // the module that uses the extension. For `@bazel_features//private:ext.bzl`,
             // the owning module is `bazel_features`. For `//local:ext.bzl`, it's the
             // current module.
-            let owner_module = extract_owning_module(&usage.extension_bzl_file, module_name);
+            //
+            // Bazel convention: the root module uses `_main` as its canonical prefix
+            // (regardless of its declared name, which is only used by OTHER modules
+            // to reference it). Extensions defined in the root module's own .bzl files
+            // therefore produce repos like `_main+ext_name+repo_name`.
+            let extracted_owner = extract_owning_module(&usage.extension_bzl_file, module_name);
+            let owner_module = if is_root && extracted_owner == module_name {
+                "_main"
+            } else {
+                extracted_owner
+            };
 
             for import in &usage.imports {
                 // Positional repos: use_repo(ext, "numpy", "requests")

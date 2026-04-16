@@ -304,6 +304,18 @@ fn repository_path_methods(builder: &mut MethodsBuilder) {
         Ok(heap.alloc(path))
     }
 
+    /// Whether this path is a directory.
+    #[starlark(attribute)]
+    fn is_dir(this: &RepositoryPath) -> starlark::Result<bool> {
+        Ok(this.absolute_path().is_dir())
+    }
+
+    /// Whether this path exists.
+    #[starlark(attribute)]
+    fn exists(this: &RepositoryPath) -> starlark::Result<bool> {
+        Ok(this.absolute_path().exists())
+    }
+
     /// Read directory contents.
     fn readdir(this: &RepositoryPath) -> starlark::Result<Vec<RepositoryPath>> {
         let abs_path = this.absolute_path();

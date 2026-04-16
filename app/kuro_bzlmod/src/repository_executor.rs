@@ -506,10 +506,19 @@ fn resolve_build_file_label(label: &str, working_dir: &Path) -> String {
         return label.to_owned();
     }
     let stripped = label.trim_start_matches('@');
-    let (repo, rest) = if let Some(idx) = stripped.find("//") {
+    let (repo_raw, rest) = if let Some(idx) = stripped.find("//") {
         (&stripped[..idx], &stripped[idx + 2..])
     } else {
         return label.to_owned();
+    };
+    // Bazel uses `+ext+name` for root-module extension repos (empty module prefix).
+    // Kuro stores these as `_main+ext+name`. Rewrite to match.
+    let repo_owned;
+    let repo: &str = if repo_raw.starts_with('+') {
+        repo_owned = format!("_main{}", repo_raw);
+        &repo_owned
+    } else {
+        repo_raw
     };
     let (pkg, target) = if let Some(colon) = rest.find(':') {
         (&rest[..colon], &rest[colon + 1..])
@@ -1023,10 +1032,27 @@ fn execute_local_repository(
         // directory itself (that would write BUILD.bazel into the source tree).
         std::fs::create_dir_all(working_dir).ok();
 
-        // Symlink all entries from the target directory
+        // Symlink all entries from the target directory.
+        // When path points to an ancestor of the working dir (e.g. "../.."),
+        // symlinking everything would recurse into ourselves. We don't have
+        // a generic solution, but excluding known kuro output dirs covers the
+        // common case (Bazel's llvm-raw pattern).
         if let Ok(entries) = std::fs::read_dir(&resolved_path) {
             for entry in entries.flatten() {
                 let name = entry.file_name();
+                let name_str = name.to_string_lossy();
+                // Skip kuro/bazel output dirs to avoid recursive self-reference
+                if matches!(
+                    name_str.as_ref(),
+                    "bazel-external"
+                        | "bazel-out"
+                        | "bazel-bin"
+                        | "bazel-testlogs"
+                        | "buck-out"
+                        | ".kuro_repo_complete"
+                ) {
+                    continue;
+                }
                 let target = working_dir.join(&name);
                 if !target.exists() {
                     #[cfg(unix)]

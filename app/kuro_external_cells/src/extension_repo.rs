@@ -559,7 +559,15 @@ pub(crate) async fn get_file_ops_delegate(
             // thus have no ExtensionRepoCellSetup, so they'd never be lazily triggered.
             let ext_name = kuro_bzlmod::extract_extension_name(&setup.extension_id);
             let owner_module = kuro_bzlmod::extract_owning_module(&setup.extension_id);
-            for (internal_name, spec) in ext_result.generated_repo_specs.iter() {
+            // Sort specs so local_repository types materialize first — other repos
+            // may reference them via build_file attributes.
+            let mut sorted_specs: Vec<_> = ext_result.generated_repo_specs.iter().collect();
+            sorted_specs.sort_by_key(|(_, spec)| {
+                let is_local = spec.repo_rule_id.ends_with("%new_local_repository")
+                    || spec.repo_rule_id.ends_with("%local_repository");
+                (!is_local, spec.repo_rule_id.clone())
+            });
+            for (internal_name, spec) in sorted_specs {
                 let canonical = format!("{}+{}+{}", owner_module, ext_name, internal_name);
                 let repo_dir = project_root_path.join("bazel-external").join(&canonical);
 
