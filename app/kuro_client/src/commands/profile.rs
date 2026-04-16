@@ -185,7 +185,12 @@ impl StreamingCommand for ProfileSubcommand {
                         .target_cfg
                         .target_cfg
                         .target_cfg_with_host_fallback(
-                            loading.profile_common_opts.common_opts.config_opts.host_platform.as_deref(),
+                            loading
+                                .profile_common_opts
+                                .common_opts
+                                .config_opts
+                                .host_platform
+                                .as_deref(),
                         ),
                 ),
                 target_universe: loading
@@ -204,7 +209,12 @@ impl StreamingCommand for ProfileSubcommand {
                         .target_cfg
                         .target_cfg
                         .target_cfg_with_host_fallback(
-                            analysis.profile_common_opts.common_opts.config_opts.host_platform.as_deref(),
+                            analysis
+                                .profile_common_opts
+                                .common_opts
+                                .config_opts
+                                .host_platform
+                                .as_deref(),
                         ),
                 ),
                 target_universe: analysis
@@ -230,9 +240,18 @@ impl StreamingCommand for ProfileSubcommand {
                 ProfileOpts::BxlProfile(BxlProfile {
                     bxl_label: bxl.bxl_opts.bxl_label.clone(),
                     bxl_args: bxl.bxl_opts.bxl_args.clone(),
-                    target_cfg: Some(bxl.profile_common_opts.target_cfg.target_cfg.target_cfg_with_host_fallback(
-                        bxl.profile_common_opts.common_opts.config_opts.host_platform.as_deref(),
-                    )),
+                    target_cfg: Some(
+                        bxl.profile_common_opts
+                            .target_cfg
+                            .target_cfg
+                            .target_cfg_with_host_fallback(
+                                bxl.profile_common_opts
+                                    .common_opts
+                                    .config_opts
+                                    .host_platform
+                                    .as_deref(),
+                            ),
+                    ),
                 })
             }
         };

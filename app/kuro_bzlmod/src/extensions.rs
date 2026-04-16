@@ -143,9 +143,8 @@ pub fn aggregate_extensions_with_root(
         for usage in usages {
             // Skip dev_dependency usages from non-root modules
             if usage.dev_dependency {
-                let is_root = root_module_name.map_or(true, |root| {
-                    module_name == root || module_name == "_main"
-                });
+                let is_root = root_module_name
+                    .map_or(true, |root| module_name == root || module_name == "_main");
                 if !is_root {
                     tracing::debug!(
                         "Skipping dev_dependency extension '{}' from non-root module '{}'",

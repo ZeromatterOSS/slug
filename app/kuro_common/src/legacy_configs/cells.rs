@@ -1104,10 +1104,8 @@ impl BuckConfigBasedCells {
                 module_extensions.insert(module_name.clone(), parsed_mod.extension_usages.clone());
             }
         }
-        let aggregated = kuro_bzlmod::aggregate_extensions_with_root(
-            &module_extensions,
-            Some(root_module_name),
-        );
+        let aggregated =
+            kuro_bzlmod::aggregate_extensions_with_root(&module_extensions, Some(root_module_name));
         kuro_bzlmod::set_extension_aggregations(
             aggregated,
             root_module_name.to_owned(),

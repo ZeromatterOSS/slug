@@ -176,9 +176,7 @@ impl BuildCommand {
     pub(crate) fn target_cfg(&self) -> TargetCfg {
         self.target_cfg
             .target_cfg
-            .target_cfg_with_host_fallback(
-                self.common_opts.config_opts.host_platform.as_deref(),
-            )
+            .target_cfg_with_host_fallback(self.common_opts.config_opts.host_platform.as_deref())
             .clone()
     }
 }

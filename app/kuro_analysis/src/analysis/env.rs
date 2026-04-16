@@ -499,7 +499,11 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         let eval_result = match dice.get_interpreter_results(package_label.dupe()).await {
             Ok(r) => r,
             Err(e) => {
-                tracing::warn!("Toolchain package '{}' load failed (non-fatal): {}", tc_label_str, e);
+                tracing::warn!(
+                    "Toolchain package '{}' load failed (non-fatal): {}",
+                    tc_label_str,
+                    e
+                );
                 skipped_count += 1;
                 continue;
             }
