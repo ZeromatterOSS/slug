@@ -7067,6 +7067,15 @@ impl<'v> StarlarkValue<'v> for ExecutionInfoProvider {
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
         demand.provide_value::<&dyn ProviderCallableLike>(self);
     }
+
+    // Any two ExecutionInfoProvider values represent the same provider
+    // callable. Without this, rules_python's
+    // `IS_BAZEL_6_OR_HIGHER = testing.ExecutionInfo == testing.ExecutionInfo`
+    // returns False (each access allocates a fresh unit struct) and the code
+    // falls through to `native.py_runtime` which we don't provide.
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(other.downcast_ref::<ExecutionInfoProvider>().is_some())
+    }
 }
 
 /// An instance of ExecutionInfo created by `testing.ExecutionInfo(requirements = {...})`.
