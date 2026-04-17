@@ -941,6 +941,115 @@ The `execute_extension` fallback to empty specs in
 be the DICE execution failing gracefully, not a synthetic repo being
 pre-materialized.
 
+## Phase 6: Lazy Extension Repo File Tracking (2026-04-17)
+
+Once extensions execute and materialize real content, the next bottleneck is
+how that content gets tracked. The inherited Buck2 pipeline walks every file,
+reads contents, and registers writes with the materializer. For Bazel repos
+that can point at gigabytes of source (e.g. `new_local_repository(path="../../")`
+for llvm-raw on a real llvm-project checkout), this is catastrophic.
+
+### Problem
+
+`declare_all_source_artifacts_ext` in `app/kuro_external_cells/src/extension_repo.rs`
+(~line 304) walks every file in each extension repo and reads content into
+memory via `tokio::fs::read`. Combined with the eager spoke-materialization
+loop (~line 555), building `@llvm-project//llvm:config` appears to hang — it is
+actually doing tree walks over millions of files.
+
+### Structural root cause
+
+Kuro inherited Buck2's "external cell" materializer pipeline:
+
+- `ExternalCellOrigin::ExtensionRepo` triggers hard-coded path remapping from
+  `bazel-external/{canonical}/file` to
+  `buck-out/v2/external_cells/extension_repo/{canonical}/file` in
+  `artifact_path_resolver.rs:78-85`.
+- `materializer.declare_write` requires pre-registration of every file before
+  actions can find inputs.
+
+Buck2 uses this for small bundled prelude content. It does not fit Bazel extension
+repos which land real source files on disk. Bazel treats those files as ordinary
+source: digested lazily per access, never copied, never path-remapped. Kuro's
+root cell already does this via `IoFileOpsDelegate`. Extension repos take an
+unnecessary alternate path.
+
+### Incremental plan
+
+**Phase 6.1: Skip eager walk (IMPLEMENTED 2026-04-17)**
+
+Remove `declare_all_source_artifacts_ext` calls in `extension_repo.rs` and drop
+the eager spoke-compute loop. Keep `ExtensionRepoFileOpsDelegate` with its lazy
+per-access `read_*` methods. Keep spoke registration in the dynamic registry.
+
+Status: landed. Build progresses past the hang, `llvm-raw` + `llvm-project`
+materialize correctly, `llvm_configure` rule executes and writes `vars.bzl` +
+`targets.bzl`, overlay symlinks are created.
+
+**Phase 6.2: Merge repo-rule attr defaults in DICE executor (IMPLEMENTED 2026-04-17)**
+
+`starlark_repo_rule_executor_impl.rs` around line 143 converts user-passed
+attrs to `RepositoryAttr` but did not merge declared defaults from
+`frozen_rule.attrs()`. Copied the pattern from `repository_rule.rs:478-486`
+(extension-context path that applies defaults correctly).
+
+Status: landed. `llvm_configure(name="llvm-project")` now receives
+`ctx.attr.targets` with its default value (DEFAULT_TARGETS list).
+
+**Phase 6.3: Full Plan C — register extension repos as ordinary cells (PENDING)**
+
+After 6.1 and 6.2 prove the lazy model works end-to-end, remove
+`ExternalCellOrigin::ExtensionRepo` entirely and replace with normal cell
+registration:
+
+- Register extension repos as plain cells pointing at
+  `bazel-external/{canonical}`, no external origin.
+- Store `ExtensionRepoCellSetup` in a side registry (not as part of cell
+  origin).
+- Hook `FileOpsKey::compute` (or the dispatcher in
+  `app/kuro_common/src/file_ops/delegate.rs`): if cell has pending
+  extension-repo metadata, drive materialization to completion via DICE first,
+  then return `IoFileOpsDelegate`.
+- Delete `ExtensionRepoFileOpsDelegate` and `declare_all_source_artifacts_ext`.
+- Path resolution unchanged — no external origin means
+  `artifact_path_resolver.rs` naturally produces `bazel-external/X/file`
+  project-relative paths, same as root cell source files.
+
+User confirmed no existing code depends on the `buck-out/v2/external_cells/...`
+path format; buck-out structure will eventually match bazel-out directly.
+
+### Touchpoints for Phase 6.3
+
+- `app/kuro_core/src/cells/external.rs` — remove
+  `ExternalCellOrigin::ExtensionRepo` variant (keep `Bundled`, `Git`, etc.).
+- `app/kuro_common/src/legacy_configs/cells.rs` — register extension repos as
+  normal cells; store `ExtensionRepoCellSetup` in a new side registry.
+- `app/kuro_common/src/file_ops/delegate.rs` — add materialization hook before
+  returning `IoFileOpsDelegate`.
+- `app/kuro_external_cells/src/extension_repo.rs` — simplify: materialize
+  directory, return `IoFileOpsDelegate`, delete file-ops complexity.
+- `app/kuro_bzlmod/src/pending_repo_cells.rs` — stop setting
+  `ExternalCellOrigin`.
+
+### Reference (Bazel behaviour)
+
+From investigating `/var/mnt/dev/bazel`:
+
+- `FileStateValue.create()` computes digests lazily (on first access) per file.
+- `RepositoryDirectoryValue.Success` returns a `Root` pointing at the repo
+  directory; actions reference files through this Root without copying.
+- `local_repository` uses symlinks, not copies.
+- `GlobFunction` operates lazily — traverses only matching files.
+- No materializer-style `declare_write` for source files.
+
+### Adversarial review
+
+Two sub-agent reviews of smaller plans (skip `declare_write` only; lazy
+per-file `declare_write`) both concluded the Buck2 materializer pipeline is
+fundamentally incompatible with lazy access to large external source dirs.
+Phase 6.3 bypasses it entirely for extension repos, which is the structurally
+correct fix.
+
 ## References
 
 - Extension execution DICE: `app/kuro_bzlmod/src/extension_execution_dice.rs`
@@ -950,3 +1059,7 @@ pre-materialized.
 - Repository rule hook: `app/kuro_interpreter_for_build/src/repository_rule.rs:403-424`
 - Synthetic repos: `app/kuro_bzlmod/src/synthetic_repos.rs`
 - Cell registration: `app/kuro_common/src/legacy_configs/cells.rs`
+- External cell file ops: `app/kuro_external_cells/src/extension_repo.rs`
+- Cell external origin: `app/kuro_core/src/cells/external.rs`
+- Artifact path resolver: `app/kuro_core/src/fs/artifact_path_resolver.rs`
+- IO file ops delegate (target model): `app/kuro_common/src/file_ops/io.rs`

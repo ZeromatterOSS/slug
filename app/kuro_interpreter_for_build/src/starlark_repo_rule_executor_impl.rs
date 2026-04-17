@@ -85,6 +85,39 @@ fn convert_attr_value(value: &kuro_bzlmod::RepoAttrValue) -> CtxAttrValue {
     }
 }
 
+/// Convert a `CoercedAttr` default value to a `repository_ctx` AttrValue.
+/// Mirrors `repository_rule::coerced_attr_to_repo_attr_value` but produces
+/// the ctx flavour used directly in `RepositoryContext`.
+fn coerced_attr_to_ctx_attr_value(
+    attr: &kuro_node::attrs::coerced_attr::CoercedAttr,
+) -> Option<CtxAttrValue> {
+    use kuro_node::attrs::coerced_attr::CoercedAttr;
+    match attr {
+        CoercedAttr::String(s) => {
+            let s = s.as_str().to_owned();
+            if s.starts_with("//") || s.starts_with('@') || s.starts_with(':') {
+                Some(CtxAttrValue::Label(s))
+            } else {
+                Some(CtxAttrValue::String(s))
+            }
+        }
+        CoercedAttr::Int(i) => Some(CtxAttrValue::Int(*i)),
+        CoercedAttr::Bool(b) => Some(CtxAttrValue::Bool(b.0)),
+        CoercedAttr::None => Some(CtxAttrValue::None),
+        CoercedAttr::List(list) => {
+            let items: Vec<String> = list
+                .iter()
+                .filter_map(|v| match v {
+                    CoercedAttr::String(s) => Some(s.as_str().to_owned()),
+                    _ => None,
+                })
+                .collect();
+            Some(CtxAttrValue::StringList(items))
+        }
+        _ => None,
+    }
+}
+
 /// Concrete implementation of Starlark repository rule executor.
 pub struct ConcreteStarlarkRepoRuleExecutor;
 
@@ -140,11 +173,25 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
         tracing::debug!("Found repository rule '{}' in module", frozen_rule.name());
 
         // 6. Convert attrs from bzlmod AttrValue to repository_ctx AttrValue
-        let ctx_attrs: HashMap<String, CtxAttrValue> = invocation
+        let mut ctx_attrs: HashMap<String, CtxAttrValue> = invocation
             .attrs
             .iter()
             .map(|(k, v)| (k.clone(), convert_attr_value(v)))
             .collect();
+
+        // 6b. Merge in defaults from the rule's declared attrs for any user-
+        // unspecified attribute. Matches the extension-context path in
+        // repository_rule.rs:478-486.
+        for (attr_name, attr_def) in frozen_rule.attrs() {
+            if ctx_attrs.contains_key(attr_name) {
+                continue;
+            }
+            if let Some(default) = attr_def.default() {
+                if let Some(v) = coerced_attr_to_ctx_attr_value(default) {
+                    ctx_attrs.insert(attr_name.clone(), v);
+                }
+            }
+        }
 
         let repo_attr = RepositoryAttr::new_with_name(invocation.name.clone(), ctx_attrs);
 

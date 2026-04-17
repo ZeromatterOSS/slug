@@ -37,8 +37,11 @@ use std::collections::HashMap;
 
 use crate::extension_execution_dice::ModuleExtensionResult;
 use crate::extension_execution_dice::extract_extension_name;
+use crate::repo_spec::RepoSpec;
+use crate::repository_invocations::AttrValue;
 use crate::types::ExtensionUsage;
 use crate::types::ParsedModuleFile;
+use crate::types::TagValue;
 use crate::types::UseRepo;
 
 /// A pending repository cell definition.
@@ -238,12 +241,21 @@ pub fn pre_compute_extension_repo_cells(
             let canonical = invocation.name.clone();
             if seen_canonical.insert(canonical.clone()) {
                 let path = format!("bazel-external/{}", canonical);
+                // Serialize the invocation attrs into a RepoSpec so the normal
+                // cached-spec materialization path handles them (preserves defaults
+                // via repo rule definition lookup downstream).
+                let mut spec = RepoSpec::new(invocation.rule_source.clone());
+                for (k, v) in &invocation.attrs {
+                    spec.attributes
+                        .insert(k.clone(), tag_value_to_attr_value(v));
+                }
+                let repo_spec_json = serde_json::to_string(&spec).unwrap_or_default();
                 cells.push(PendingRepoCell {
                     canonical_name: canonical.clone(),
                     extension_id: invocation.rule_source.clone(),
                     internal_name: invocation.name.clone(),
                     spec_hash: String::new(),
-                    repo_spec_json: String::new(), // Will be filled from rule_source attrs
+                    repo_spec_json,
                     path,
                 });
             }
@@ -257,6 +269,41 @@ pub fn pre_compute_extension_repo_cells(
     );
 
     Ok((cells, aliases))
+}
+
+/// Convert a MODULE.bazel `TagValue` (parser representation) to an `AttrValue`
+/// (serialized RepoSpec representation).
+fn tag_value_to_attr_value(tv: &TagValue) -> AttrValue {
+    match tv {
+        TagValue::String(s) => {
+            if s.starts_with("//") || s.starts_with('@') || s.starts_with(':') {
+                AttrValue::Label(s.clone())
+            } else {
+                AttrValue::String(s.clone())
+            }
+        }
+        TagValue::Int(i) => AttrValue::Int(*i),
+        TagValue::Bool(b) => AttrValue::Bool(*b),
+        TagValue::None => AttrValue::None,
+        TagValue::Label(s) => AttrValue::Label(s.clone()),
+        TagValue::List(items) => {
+            let strings: Vec<String> = items
+                .iter()
+                .filter_map(|v| match v {
+                    TagValue::String(s) | TagValue::Label(s) => Some(s.clone()),
+                    _ => None,
+                })
+                .collect();
+            AttrValue::StringList(strings)
+        }
+        TagValue::Dict(entries) => {
+            let map: std::collections::HashMap<String, AttrValue> = entries
+                .iter()
+                .map(|(k, v)| (k.clone(), tag_value_to_attr_value(v)))
+                .collect();
+            AttrValue::Dict(map)
+        }
+    }
 }
 
 /// Extract the owning module name from an extension bzl file path.

@@ -301,6 +301,11 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
 /// 1. Check if the repository is already materialized (exists on disk)
 /// 2. If not materialized, deserialize the `RepoSpec` from `repo_spec_json`
 /// Declare all source files from an extension repo with the materializer.
+///
+/// Currently unused — source files are tracked lazily via `ExtensionRepoFileOpsDelegate`'s
+/// per-access `read_*` methods. Kept for reference; may be needed if action execution
+/// requires pre-declared materializer state for some input-resolution path.
+#[allow(dead_code)]
 async fn declare_all_source_artifacts_ext(
     ctx: &mut DiceComputations<'_>,
     setup: &ExtensionRepoCellSetup,
@@ -505,7 +510,7 @@ pub(crate) async fn get_file_ops_delegate(
                         }
                         .into());
                     }
-                    declare_all_source_artifacts_ext(ctx, &setup, &source_path).await?;
+                    // declare_all_source_artifacts_ext skipped: lazy file tracking via ExtensionRepoFileOpsDelegate
                     return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
                         cell_name,
                         setup.canonical_name.to_string(),
@@ -526,7 +531,7 @@ pub(crate) async fn get_file_ops_delegate(
                     );
                     // Create stub repo so loading can continue
                     materialize_stub_repo(&project_root_path, &setup.canonical_name)?;
-                    declare_all_source_artifacts_ext(ctx, &setup, &source_path).await?;
+                    // declare_all_source_artifacts_ext skipped: lazy file tracking via ExtensionRepoFileOpsDelegate
                     return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
                         cell_name,
                         setup.canonical_name.to_string(),
@@ -542,7 +547,7 @@ pub(crate) async fn get_file_ops_delegate(
                         e
                     );
                     materialize_stub_repo(&project_root_path, &setup.canonical_name)?;
-                    declare_all_source_artifacts_ext(ctx, &setup, &source_path).await?;
+                    // declare_all_source_artifacts_ext skipped: lazy file tracking via ExtensionRepoFileOpsDelegate
                     return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
                         cell_name,
                         setup.canonical_name.to_string(),
@@ -552,67 +557,23 @@ pub(crate) async fn get_file_ops_delegate(
                 }
             };
 
-            // Eagerly materialize ALL repos from this extension, not just the one
-            // being requested. In Bazel, accessing any repo from an extension triggers
-            // evaluation of the entire extension and materialization of all repos.
-            // Spoke repos (e.g., crates__tempfile-3.26.0) are not in use_repo() and
-            // thus have no ExtensionRepoCellSetup, so they'd never be lazily triggered.
+            // Register spoke repos in the dynamic cell registry so cell resolution
+            // can find them when hub BUILD files reference them (e.g. @crates__tempfile).
+            // Actual materialization happens lazily when the cell is first accessed —
+            // Bazel-style on-demand fetch via DICE dedup, not upfront serial walk.
             let ext_name = kuro_bzlmod::extract_extension_name(&setup.extension_id);
             let owner_module = kuro_bzlmod::extract_owning_module(&setup.extension_id);
-            // Sort specs so local_repository types materialize first — other repos
-            // may reference them via build_file attributes.
-            let mut sorted_specs: Vec<_> = ext_result.generated_repo_specs.iter().collect();
-            sorted_specs.sort_by_key(|(_, spec)| {
-                let is_local = spec.repo_rule_id.ends_with("%new_local_repository")
-                    || spec.repo_rule_id.ends_with("%local_repository");
-                (!is_local, spec.repo_rule_id.clone())
-            });
-            for (internal_name, spec) in sorted_specs {
+            for (internal_name, _spec) in ext_result.generated_repo_specs.iter() {
                 let canonical = format!("{}+{}+{}", owner_module, ext_name, internal_name);
-                let repo_dir = project_root_path.join("bazel-external").join(&canonical);
-
-                // Register in dynamic cell registry for cell resolution
                 kuro_core::cells::register_dynamic_extension_cell(
                     canonical.clone(),
                     format!("bazel-external/{}", canonical),
                 );
-
-                // Also register the internal (apparent) name as a cell alias.
-                // This is needed for repo mapping: the hub repo's BUILD.bazel
-                // references spoke repos by their internal name (e.g., "crates__tempfile-3.26.0")
-                // which must resolve to the canonical path.
                 if internal_name != &canonical {
                     kuro_core::cells::register_dynamic_extension_cell(
                         internal_name.clone(),
                         format!("bazel-external/{}", canonical),
                     );
-                }
-
-                // Skip if already materialized
-                if repo_dir.join(".kuro_repo_complete").exists() {
-                    continue;
-                }
-
-                let key = ExtensionRepoExecutionKey::new(
-                    canonical.clone(),
-                    setup.extension_id.to_string(),
-                    spec.clone(),
-                    project_root_path.clone(),
-                );
-                match ctx.compute(&key).await {
-                    Ok(Ok(_)) => {
-                        tracing::debug!("Materialized extension spoke repo '{}'", canonical);
-                    }
-                    Ok(Err(e)) => {
-                        tracing::debug!("Could not materialize spoke repo '{}': {}", canonical, e);
-                    }
-                    Err(e) => {
-                        tracing::debug!(
-                            "DICE error materializing spoke repo '{}': {}",
-                            canonical,
-                            e
-                        );
-                    }
                 }
             }
 
@@ -631,7 +592,7 @@ pub(crate) async fn get_file_ops_delegate(
                     );
                     materialize_stub_repo(&project_root_path, &setup.canonical_name)?;
                     // The stub repo is now on disk; create file ops delegate from it
-                    declare_all_source_artifacts_ext(ctx, &setup, &source_path).await?;
+                    // declare_all_source_artifacts_ext skipped: lazy file tracking via ExtensionRepoFileOpsDelegate
                     return Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
                         cell_name,
                         setup.canonical_name.to_string(),
@@ -689,7 +650,7 @@ pub(crate) async fn get_file_ops_delegate(
 
     // Declare all source files with the materializer so they exist
     // at buck-out/v2/external_cells/extension_repo/... paths during action execution.
-    declare_all_source_artifacts_ext(ctx, &setup, &source_path).await?;
+    // declare_all_source_artifacts_ext skipped: lazy file tracking via ExtensionRepoFileOpsDelegate
 
     Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
         cell_name,
