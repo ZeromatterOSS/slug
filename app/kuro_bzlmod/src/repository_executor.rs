@@ -582,41 +582,66 @@ fn download_and_extract(
 
 /// Download a URL using curl or wget.
 fn download_url(url: &str) -> kuro_error::Result<Vec<u8>> {
-    // Try curl first. On Windows, use curl.exe to avoid PowerShell alias
+    // Timeouts: split connect and total. Stuck TCP connects get ~30s before
+    // skipping to the next URL in the caller's fallback list. Stalled
+    // in-flight transfers get up to 60s wall-time total. Previously this
+    // function allowed `--max-time 300` per URL with no `--connect-timeout`
+    // and then tried wget as a fallback on the same URL — a single
+    // unreachable mirror (e.g. gmplib.org intermittent outage) blocked the
+    // daemon thread for 5+5 minutes before the next URL in the caller's
+    // urls[] list was tried. On slow-but-live mirrors, the caller's next
+    // URL is typically faster; favour falling through quickly.
+    // See Plan 10 Phase 7 diagnostic findings.
+    const CONNECT_TIMEOUT_SECS: &str = "30";
+    const TOTAL_TIMEOUT_SECS: &str = "60";
+
+    // Try curl first. On Windows, use curl.exe to avoid PowerShell alias.
     let curl_cmd = if cfg!(windows) { "curl.exe" } else { "curl" };
     let output = Command::new(curl_cmd)
-        .args(["-fsSL", "--max-time", "300", url])
+        .args([
+            "-fsSL",
+            "--connect-timeout",
+            CONNECT_TIMEOUT_SECS,
+            "--max-time",
+            TOTAL_TIMEOUT_SECS,
+            url,
+        ])
         .output();
 
     match output {
         Ok(output) if output.status.success() => return Ok(output.stdout),
         Ok(output) => {
+            // curl ran but the URL failed. Common causes at this point are
+            // HTTP errors (4xx/5xx) or timeouts. wget is unlikely to
+            // recover from HTTP errors, and if the failure was a timeout,
+            // wget will time out on the same URL for the same duration.
+            // Skip wget; surface the error and let the caller try the next
+            // URL in its fallback list.
             let stderr = String::from_utf8_lossy(&output.stderr);
             tracing::debug!("curl failed for {}: {}", url, stderr);
-            // curl was found but the URL failed - try wget, but keep curl error
-            let curl_err = stderr.to_string();
-            match Command::new("wget")
-                .args(["-q", "-O", "-", "--timeout=300", url])
-                .output()
-            {
-                Ok(wget_out) if wget_out.status.success() => return Ok(wget_out.stdout),
-                _ => {
-                    return Err(RepositoryExecutionError::ExecutionFailed {
-                        name: url.to_owned(),
-                        reason: format!("Download failed: {}", curl_err),
-                    }
-                    .into());
-                }
+            return Err(RepositoryExecutionError::ExecutionFailed {
+                name: url.to_owned(),
+                reason: format!("Download failed: {}", stderr),
             }
+            .into());
         }
         Err(e) => {
             tracing::debug!("curl not available: {}", e);
         }
     }
 
-    // curl not found - try wget
+    // curl not found - try wget as the primary tool.
     let output = Command::new("wget")
-        .args(["-q", "-O", "-", "--timeout=300", url])
+        .args([
+            "-q",
+            "-O",
+            "-",
+            "--connect-timeout",
+            CONNECT_TIMEOUT_SECS,
+            "--timeout",
+            TOTAL_TIMEOUT_SECS,
+            url,
+        ])
         .output()
         .map_err(|e| RepositoryExecutionError::ExecutionFailed {
             name: url.to_owned(),
