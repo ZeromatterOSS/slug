@@ -1050,6 +1050,62 @@ fundamentally incompatible with lazy access to large external source dirs.
 Phase 6.3 bypasses it entirely for extension repos, which is the structurally
 correct fix.
 
+## Phase 7: LLVM `cquery` analysis hang — follow-up (2026-04-17)
+
+After Phase 6.1 + 6.2 + downstream Starlark-compat fixes
+(ExecGroup freeze, ExecutionInfoProvider equality, cc_common.launcher_provider
+stub), a `kuro uquery @llvm-project//llvm:config` now completes: BUILD
+evaluation succeeds and returns the target label. `kuro cquery` for the same
+target, however, hangs during analysis.
+
+### Observed symptoms
+
+- `bazel-external/` grows to ~214 repos (many unrelated to our target:
+  rules_fuzzing jazzer, Kotlin capabilities, JVM maven, Java JDKs, Swift NIO,
+  etc. — all triggered transitively via extension eval during analysis).
+- Daemon enters `S (sleeping)` with no CPU progress after a burst of
+  materialisation activity. Client remains connected but never returns.
+- Stderr shows no new log output once the hang begins. No error, no
+  `BUILD FAILED` — just silence.
+
+### Suspected causes (untriaged)
+
+1. DICE future deadlock deeper in analysis (not the same as the Phase 6
+   `declare_write` tree walk). Likely two analysis keys transitively awaiting
+   each other via load / toolchain-resolution / configuration probing.
+2. Every `@rules_xxx//...` label that shows up in any loaded .bzl file causes
+   the corresponding extension cell to materialise. Many irrelevant
+   extensions get pulled in for a cc_library target. Bazel is more selective
+   — some kind of laziness gap at the cell-resolution level, or a lockfile
+   parse that eagerly registers too many dynamic cells.
+3. A specific extension or repo rule retries forever on failure (less likely
+   now — we log failures clearly and most show up as "Creating stub" once).
+
+### Next investigation steps
+
+- Reproduce deterministically. Record which key is in flight at the moment of
+  hang (DICE could expose "active keys" via a debug endpoint or by dumping
+  pending futures on SIGUSR1).
+- Compare Bazel's analysis graph for the same target: how many extensions
+  does Bazel actually evaluate for `@llvm-project//llvm:config`?
+- Check whether `pre_compute_extension_repo_cells` registers
+  `ExtensionRepoCellSetup` for repos that are never referenced, and if
+  something in analysis accesses them anyway.
+- Bisect: does `kuro cquery` hang on a simpler target in a simpler repo?
+  If not, the hang is specific to llvm-project's graph shape.
+
+### Session commits (2026-04-17)
+
+- `62fe237` — Plan 10 Phase 6.1 + 6.2 (lazy file tracking, attr defaults).
+- `5d128f6` — `repository_ctx.path(Label)` unconditional resolution.
+- `9bbea57` — ExecGroupValue freezable.
+- `6acb8a3` — ExecutionInfoProvider equality.
+- `99d4502` — Stub `cc_common.launcher_provider`.
+
+Verified through this chain: llvm_configure Starlark rule runs end-to-end,
+full llvm-project overlay created, BUILD.bazel evaluation succeeds, uquery
+returns the target. Blocker is now in the analysis phase (Phase 7).
+
 ## References
 
 - Extension execution DICE: `app/kuro_bzlmod/src/extension_execution_dice.rs`
