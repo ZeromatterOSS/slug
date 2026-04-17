@@ -408,10 +408,12 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         }
     };
 
+    // Pre-filter packages whose paths can be resolved without touching DICE.
+    // These filters were previously inside the serial loop; hoisting them out
+    // lets the parallel dispatch below only do the expensive work.
+    let mut to_load: Vec<(String, PackageLabel)> = Vec::new();
     let mut skipped_count = 0;
-
     for tc_label_str in &registered {
-        // Parse @repo//pkg:target pattern to extract cell name and package path
         let (repo_name, pkg_path) = match parse_registered_toolchain_label(tc_label_str) {
             Some(v) => v,
             None => {
@@ -442,7 +444,6 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
             }
         };
 
-        // Check that the cell exists in the resolver and inspect its path.
         let cell_instance = match cell_resolver.get(cell_name) {
             Ok(c) => c,
             Err(_) => {
@@ -453,33 +454,27 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         };
 
         // Check if this cell is an extension-generated repo by examining its path.
-        // Extension repos live at "bazel-external/<canonical>" where canonical contains '+'.
-        // Also check if the resolved cell name is an alias to an extension repo.
-        {
-            let cell_path_str = cell_instance.path().as_project_relative_path().as_str();
-            if cell_path_str.contains('+') || cell_path_str.contains('~') {
-                tracing::debug!(
-                    "Skipping toolchain repo '{}' (extension repo at '{}', loaded on-demand)",
-                    tc_label_str,
-                    cell_path_str
-                );
-                skipped_count += 1;
-                continue;
-            }
-            // Also check the cell's actual name (may differ from alias)
-            let actual_name = cell_instance.name().as_str();
-            if actual_name.contains('+') || actual_name.contains('~') {
-                tracing::debug!(
-                    "Skipping toolchain repo '{}' (alias for extension repo '{}', loaded on-demand)",
-                    tc_label_str,
-                    actual_name
-                );
-                skipped_count += 1;
-                continue;
-            }
+        let cell_path_str = cell_instance.path().as_project_relative_path().as_str();
+        if cell_path_str.contains('+') || cell_path_str.contains('~') {
+            tracing::debug!(
+                "Skipping toolchain repo '{}' (extension repo at '{}', loaded on-demand)",
+                tc_label_str,
+                cell_path_str
+            );
+            skipped_count += 1;
+            continue;
+        }
+        let actual_name = cell_instance.name().as_str();
+        if actual_name.contains('+') || actual_name.contains('~') {
+            tracing::debug!(
+                "Skipping toolchain repo '{}' (alias for extension repo '{}', loaded on-demand)",
+                tc_label_str,
+                actual_name
+            );
+            skipped_count += 1;
+            continue;
         }
 
-        // Create PackageLabel for the package
         let cell_rel_path = CellRelativePath::unchecked_new(&pkg_path);
         let package_label =
             match PackageLabel::from_cell_path(CellPathRef::new(cell_name, cell_rel_path)) {
@@ -495,49 +490,71 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
                 }
             };
 
-        // Load the package via DICE (triggers repo materialization + BUILD.bazel parsing)
-        let eval_result = match dice.get_interpreter_results(package_label.dupe()).await {
-            Ok(r) => r,
-            Err(e) => {
-                tracing::warn!(
-                    "Toolchain package '{}' load failed (non-fatal): {}",
-                    tc_label_str,
-                    e
-                );
-                skipped_count += 1;
-                continue;
-            }
-        };
-
-        // Find toolchain() targets and register them in DeclaredToolchainInfo registry
-        let mut registered_count = 0;
-        for (_target_name, target_node) in eval_result.targets().iter() {
-            if matches!(
-                target_node.rule_type(),
-                RuleType::Native(NativeRuleKind::Toolchain)
-            ) {
-                if let Some(info) = extract_toolchain_info_from_node(target_node) {
-                    let label = target_node.label().to_string();
-                    tracing::debug!(
-                        "Eagerly registered toolchain '{}': type='{}', impl='{}'",
-                        label,
-                        info.toolchain_type,
-                        info.toolchain_impl
-                    );
-                    register_declared_toolchain(label, info);
-                    registered_count += 1;
-                }
-            }
-        }
-
-        if registered_count > 0 {
-            tracing::debug!(
-                "Loaded {} toolchain(s) from '{}'",
-                registered_count,
-                tc_label_str
-            );
-        }
+        to_load.push((tc_label_str.clone(), package_label));
     }
+
+    // Load packages in parallel. Each load triggers its own transitive
+    // `.bzl` chain; the Phase-7 spoke-materialization parallelization inside
+    // each cascade gets to run concurrently across extensions too. DICE
+    // dedups overlapping `get_interpreter_results` requests.
+    //
+    // Non-fatal errors (load failures, missing target nodes) are swallowed
+    // to match the previous `continue` behaviour.
+    use futures::FutureExt;
+    let _: Vec<()> = match dice
+        .try_compute_join(to_load, |ctx, (tc_label_str, package_label)| {
+            async move {
+                let eval_result = match ctx.get_interpreter_results(package_label.dupe()).await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        tracing::warn!(
+                            "Toolchain package '{}' load failed (non-fatal): {}",
+                            tc_label_str,
+                            e
+                        );
+                        return Ok::<(), kuro_error::Error>(());
+                    }
+                };
+
+                let mut registered_count = 0;
+                for (_target_name, target_node) in eval_result.targets().iter() {
+                    if matches!(
+                        target_node.rule_type(),
+                        RuleType::Native(NativeRuleKind::Toolchain)
+                    ) {
+                        if let Some(info) = extract_toolchain_info_from_node(target_node) {
+                            let label = target_node.label().to_string();
+                            tracing::debug!(
+                                "Eagerly registered toolchain '{}': type='{}', impl='{}'",
+                                label,
+                                info.toolchain_type,
+                                info.toolchain_impl
+                            );
+                            register_declared_toolchain(label, info);
+                            registered_count += 1;
+                        }
+                    }
+                }
+
+                if registered_count > 0 {
+                    tracing::debug!(
+                        "Loaded {} toolchain(s) from '{}'",
+                        registered_count,
+                        tc_label_str
+                    );
+                }
+                Ok(())
+            }
+            .boxed()
+        })
+        .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!("Toolchain loading join failed (non-fatal): {}", e);
+            Vec::new()
+        }
+    };
 
     if skipped_count > 0 {
         tracing::debug!(

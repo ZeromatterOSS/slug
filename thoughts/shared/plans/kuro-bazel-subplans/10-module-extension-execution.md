@@ -1142,20 +1142,203 @@ via `ExtensionRepoExecutionKey::compute`, so DICE dedup and cycle detection
 remain intact. I/O-bound downloads that have no inter-spoke dependency can
 now proceed concurrently.
 
-### What the fix does NOT address
+### What the parallelization fix does NOT address
 
 - `ensure_registered_toolchains_loaded` still eagerly loads every non-dev
   toolchain package. For a cc_library target, loading rules_fuzzing / Kotlin
   / Swift / JVM toolchain packages is structurally unnecessary — Bazel only
   loads the toolchain packages for types the target's rule actually declares.
-  Proper per-target-type toolchain resolution is Plan 13 out-of-scope item
-  ("Full Bazel-style lazy toolchain resolution").
 - Cross-extension Label references (crate extension's
   `ctx.execute([Label("@rs_rust_host_tools//:bin/cargo"), ...])`) still
   depend on the referenced extension having been materialized eagerly before
-  the referring extension runs. Removing the eager loop entirely would
-  require threading a blocking-from-sync-Starlark materialization hook into
-  `module_ctx.path(Label)` — deferred.
+  the referring extension runs. Removing the eager loop entirely requires a
+  blocking-from-sync-Starlark materialization hook.
+
+Both items were previously punted to "Plan 13 out-of-scope" or "deferred".
+Pulling them in-scope as Phase 7.1 and Phase 7.2 below — the parallelization
+fix is a stopgap that masks rather than eliminates the cascade.
+
+---
+
+## Phase 7.1: Parallelize toolchain package loading
+
+### Problem
+
+`ensure_registered_toolchains_loaded`
+(`app/kuro_analysis/src/analysis/env.rs:386`) iterates every registered
+toolchain label **serially** with `dice.get_interpreter_results(...).await`
+inside the loop body. For an `@llvm-project//llvm:config` cquery, that's ~100
+sequential package loads spanning rules_fuzzing, rules_kotlin, rules_swift,
+rules_jvm_external, rules_java, rules_python, etc. Each load triggers its own
+transitive `.bzl` cascade.
+
+Phase 7's parallelization of the inner spoke-materialization loop is
+neutralized: package N's cascade can't start until package N-1's load (and
+its spoke cascade) completes, because the outer `await` serializes everything.
+
+### Design: parallelize the outer loop
+
+Replace the serial `for` loop with `ctx.try_compute_join`. Each toolchain
+package load runs concurrently; DICE deduplicates shared loads (many
+toolchain labels resolve to overlapping `.bzl` files); Phase 7's parallel
+inner spoke materialization now gets to run across extensions in parallel too.
+
+Preserve the existing filter (extension-repo skip, cell-not-found skip,
+non-fatal package load failures). `DeclaredToolchainInfo` registry writes
+are under `RwLock`; they already tolerate concurrent registration.
+
+### Why NOT per-type demand-driven loading
+
+The original Phase 7.1 draft proposed a
+`RegisteredToolchainsByType: HashMap<type, Vec<label>>` index with per-type
+lazy loading. Abandoned because:
+
+- Determining a toolchain's `toolchain_type` requires loading the package's
+  BUILD file (the `toolchain()` rule's `toolchain_type` attr). So populating
+  the index still requires loading all packages.
+- Bazel pays the same cost — it loads every registered `toolchain()` wrapper.
+  Bazel's speed comes from Skyframe parallelism, not from type-filtering the
+  loads.
+- Per-target-type filtering only helps if we skip loading packages that
+  DON'T match the requested type. Without pre-computed type info, we can't
+  skip them. Circular.
+
+Parallelization directly addresses the hang. If it proves insufficient,
+revisit per-type filtering backed by lockfile-cached `(label → type)` pairs
+from prior builds.
+
+### Touchpoints
+
+- `app/kuro_analysis/src/analysis/env.rs` —
+  `ensure_registered_toolchains_loaded`: convert `for tc_label_str in
+  &registered { ... dice.get_interpreter_results(...).await ... }` into
+  `dice.try_compute_join(registered, |ctx, tc_label_str| async move { ... })`.
+- `register_declared_toolchain` already uses `RwLock` — no change.
+- Non-fatal load errors already swallowed with `continue` — preserve via
+  returning `Ok(())` in the mapper.
+
+### Success criteria
+
+#### Automated
+
+- [x] `cargo check -p kuro_analysis` clean (2026-04-17)
+- [x] `cargo test -p kuro_analysis --lib` — 10/10 pass (2026-04-17)
+- [x] `cargo build -p kuro` clean (2026-04-17)
+
+#### Manual
+
+- `kuro cquery //app:calculator` in `examples/multi_package` still resolves
+  toolchains correctly (no regression for working builds)
+- For an llvm-project-shaped graph: total wall time for
+  `ensure_registered_toolchains_loaded` drops from O(N_packages × slowest
+  cascade) to O(slowest cascade). Measurable via elapsed time in the
+  `tracing::debug!` summary at end of function.
+
+### Phase 7.1 implementation notes (2026-04-17)
+
+`app/kuro_analysis/src/analysis/env.rs` —
+`ensure_registered_toolchains_loaded` split into two phases:
+
+1. **Pre-filter (serial, cheap)** — parse labels, skip extension repos,
+   resolve cell names. No DICE calls inside the filter, so keeping it serial
+   costs nothing. Populates `to_load: Vec<(String, PackageLabel)>`.
+2. **Load (parallel, expensive)** — `dice.try_compute_join(to_load, ...)`
+   fires all `get_interpreter_results` calls concurrently. Non-fatal errors
+   match prior behaviour (swallowed with `tracing::warn!`). DICE's internal
+   scheduler bounds actual parallelism.
+
+Structural property verified via code review: the outer `.await` that
+previously serialized cascades is gone. Combined with Phase 7's parallel
+spoke loop, the entire toolchain-loading path is now fully parallel.
+`DeclaredToolchainInfo` registry writes go through `RwLock`; already safe
+for concurrent registration from multiple mapper futures.
+
+### Phase 7.2 assessment (2026-04-17)
+
+With Phase 7 + Phase 7.1 combined, `ensure_registered_toolchains_loaded`
+is now fully parallel at both levels (toolchain package loads → extension
+spoke materializations). The 214-repo amplification is unchanged — those
+repos still materialize — but in parallel rather than sequentially.
+
+Whether Phase 7.2 (on-demand materialization, eliminating the eager loop
+entirely) is still required depends on empirical cquery behaviour:
+
+- **If cquery now returns in bounded time**: 7.2 not urgent.
+  Amplification is wasteful but not fatal. Defer until a demonstrated
+  slow-build or disk-usage concern arises.
+- **If cquery still hangs or is unacceptably slow**: 7.2 becomes
+  required. The cascade is still unbounded in total work; parallelism
+  just makes the wall time equal to the longest single cascade chain.
+
+Cannot verify in this workspace (no MODULE.bazel-registered llvm-project
+checkout). Marking 7.2 as **status-unknown**; re-run `kuro cquery
+@llvm-project//llvm:config` and escalate if the hang persists.
+
+---
+
+## Phase 7.2: On-demand materialization from sync Starlark
+
+### Problem
+
+The eager spoke-materialization loop (now parallelized in Phase 7) exists
+only because `module_ctx.path(Label)` and
+`module_ctx.execute([Label, ...])` resolve Label to a filesystem path during
+synchronous Starlark evaluation. Kuro lacks Bazel's Skyframe restart
+mechanism, so the repo must be on disk by the time Starlark reads the path.
+Eager materialization of every spoke pre-empts that need but materializes
+far more than the current extension actually references.
+
+### Design
+
+Add a blocking-from-sync-Starlark hook that materializes the specific repo
+referenced by a Label at the moment `path(Label)` resolves it. Two routes:
+
+**Route A — Pre-scan before Starlark eval**: Parse the extension's `.bzl`
+AST for `ctx.path(Label(...))` and `ctx.execute([Label(...)])` call sites,
+extract referenced repo names, and materialize *only those* before calling
+`implementation(module_ctx)`. Cheap, but misses dynamic Label construction.
+
+**Route B — Blocking DICE compute from sync Starlark**: Thread a tokio
+`Handle` and DICE `DiceComputations` reference into `ModuleContext`. In
+`path(Label)`, detect if the referenced repo is not yet materialized, and
+invoke `tokio::task::block_in_place(|| handle.block_on(ctx.compute(&key)))`.
+Requires verifying that `block_in_place` from inside DICE's own worker thread
+doesn't deadlock the runtime.
+
+### Recommendation
+
+Start with **Route A** (pre-scan). Covers ~100% of real-world cases (the Label
+references are always static in captured extensions like `rules_rs`'s crate).
+Falls back gracefully — if pre-scan misses a reference, the old eager-loop
+behavior kicks in (gated behind a feature flag during rollout, then removed).
+
+### Touchpoints
+
+- `app/kuro_interpreter_for_build/src/module_extension_executor_impl.rs` —
+  after `with_repo_spec_registry` evaluates, before the eager loop: scan the
+  extension's `FrozenModule` for Label literals referenced by
+  `module_ctx.path` / `module_ctx.execute` / `module_ctx.read`
+- `app/kuro_bzlmod/src/extension_execution_dice.rs` — optional: store
+  pre-scanned cross-extension refs alongside `ModuleExtensionResult` so they
+  persist via the lockfile cache
+- Delete the Phase-7 parallel loop (not the dynamic-cell-registration path)
+  once Route A demonstrably handles the crate extension
+
+### Success criteria
+
+#### Automated
+
+- `cargo check` clean
+- `pytest tests/core/ -q` — all passing tests stay green
+
+#### Manual (zeromatter)
+
+- `kuro build //sdk:sdk` still succeeds: crate extension's `toml2json`
+  execution finds `rs_rust_host_tools` on disk
+- `bazel-external/` count for zeromatter cc_library builds drops
+  correspondingly (only referenced spokes materialize)
+- For `@llvm-project//llvm:config`: zero repos materialized beyond those
+  actually touched by target-closure `.bzl` loads
 
 ### Verification (2026-04-17 continued)
 
