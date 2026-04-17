@@ -2992,6 +2992,17 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         Ok(CcCommonInternal)
     }
 
+    /// Provider callable used by rules_cc's cc_binary for the launcher marker info.
+    ///
+    /// rules_cc reads `_CcLauncherInfo = cc_common.launcher_provider` at module
+    /// load time. We return `ExecutionInfoProvider` as a placeholder — kuro
+    /// does not consume the returned provider value for any behaviour yet.
+    #[starlark(attribute)]
+    fn launcher_provider(this: &CcCommonModule) -> starlark::Result<ExecutionInfoProvider> {
+        let _ = this;
+        Ok(ExecutionInfoProvider)
+    }
+
     /// Returns whether C++ toolchain resolution is enabled.
     ///
     /// In Bazel 9.0+, this always returns True (toolchain resolution is the default).
