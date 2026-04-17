@@ -875,6 +875,11 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             ("JAVABASE", ""),
             ("ABI_GLIBC_VERSION", "2.17"),
             ("ABI", "local"),
+            // Seeded by rules_cc's cc_toolchain via TemplateVariableInfo +
+            // cc_toolchain_provider_helper.bzl `_additional_make_variables`.
+            // Kuro's cc_toolchain is a native stub that does not publish
+            // TemplateVariableInfo, so we provide the default here.
+            ("STACK_FRAME_UNLIMITED", ""),
         ];
         let mut map: SmallMap<Value, Value> = SmallMap::new();
         for (k, v) in entries {
@@ -1178,6 +1183,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             ("JAVABASE", ""),
             ("ABI_GLIBC_VERSION", "2.17"),
             ("ABI", "local"),
+            ("STACK_FRAME_UNLIMITED", ""),
         ];
         for (k, v) in builtins {
             substitutions
