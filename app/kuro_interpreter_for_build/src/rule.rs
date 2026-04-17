@@ -865,38 +865,54 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRuleCallable {
 ///
 /// Created by the `exec_group()` function and stored in rule definitions.
 /// At analysis time, these are replaced by resolved exec group info in `ctx.exec_groups`.
+/// rules_python stores these in module-level globals so they must be freezable.
 ///
 /// TODO(bazel): Implement proper execution group support with real toolchain resolution.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
-pub struct ExecGroupValue<'v> {
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    starlark::values::Freeze
+)]
+#[repr(C)]
+pub struct ExecGroupValueGen<V: starlark::values::ValueLifetimeless> {
     /// Toolchain requirements for this execution group
-    toolchains: Value<'v>,
+    toolchains: V,
     /// Execution compatibility constraints
-    exec_compatible_with: Value<'v>,
+    exec_compatible_with: V,
 }
 
-impl<'v> std::fmt::Display for ExecGroupValue<'v> {
+impl<V: starlark::values::ValueLifetimeless> std::fmt::Display for ExecGroupValueGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "exec_group()")
     }
 }
 
-impl<'v> AllocValue<'v> for ExecGroupValue<'v> {
-    fn alloc_value(self, heap: Heap<'v>) -> Value<'v> {
-        heap.alloc_complex_no_freeze(self)
-    }
+unsafe impl<
+    From: starlark::coerce::Coerce<To> + starlark::values::ValueLifetimeless,
+    To: starlark::values::ValueLifetimeless,
+> starlark::coerce::Coerce<ExecGroupValueGen<To>> for ExecGroupValueGen<From>
+{
 }
 
+use starlark::starlark_complex_value;
+starlark_complex_value!(pub ExecGroupValue);
+
 #[starlark_value(type = "exec_group")]
-impl<'v> StarlarkValue<'v> for ExecGroupValue<'v> {
+impl<'v, V: starlark::values::ValueLike<'v>> StarlarkValue<'v> for ExecGroupValueGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(attribute, "toolchains" | "exec_compatible_with")
     }
 
     fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
         match attribute {
-            "toolchains" => Some(self.toolchains),
-            "exec_compatible_with" => Some(self.exec_compatible_with),
+            "toolchains" => Some(self.toolchains.to_value()),
+            "exec_compatible_with" => Some(self.exec_compatible_with.to_value()),
             _ => None,
         }
     }
