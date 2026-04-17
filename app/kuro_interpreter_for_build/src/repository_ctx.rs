@@ -685,7 +685,10 @@ pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> S
         // Use project root for all scans (workspace_root is often a repo dir, not project root)
         let project_root = kuro_core::cells::get_dynamic_project_root();
 
-        // 1. Check dynamic cell registry for absolute path
+        // 1. Check dynamic cell registry for absolute path.
+        // Bazel's repository_ctx.path(Label(...)) does NOT require the target file
+        // to exist — it returns a path that callers can use for .dirname,
+        // .get_child, etc. Existence checks belong in readdir/exists, not here.
         if let Some(cell_path) = kuro_core::cells::get_dynamic_extension_cell(repo) {
             if let Some(ref root) = project_root {
                 let abs_path = if pkg.is_empty() {
@@ -693,13 +696,13 @@ pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> S
                 } else {
                     root.join(&cell_path).join(pkg).join(target)
                 };
-                if abs_path.exists() {
-                    return abs_path.to_string_lossy().to_string();
-                }
+                return abs_path.to_string_lossy().to_string();
             }
         }
 
-        // 2. Scan bazel-external/ from project root (primary) and workspace_root (fallback)
+        // 2. Scan bazel-external/ from project root (primary) and workspace_root (fallback).
+        // Return the first plausible parent directory match, even if the target file
+        // does not exist yet.
         let scan_dirs: Vec<std::path::PathBuf> = {
             let mut dirs = Vec::new();
             if let Some(ref root) = project_root {
@@ -713,7 +716,7 @@ pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> S
         };
 
         for scan_dir in &scan_dirs {
-            // Try exact match first
+            // Try exact match first — does the repo DIRECTORY exist?
             let exact = scan_dir.join(repo);
             if exact.exists() {
                 let path = if pkg.is_empty() {
@@ -721,9 +724,7 @@ pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> S
                 } else {
                     exact.join(pkg).join(target)
                 };
-                if path.exists() {
-                    return path.to_string_lossy().to_string();
-                }
+                return path.to_string_lossy().to_string();
             }
             // Scan for versioned names (repo+version)
             if let Ok(entries) = std::fs::read_dir(scan_dir) {
@@ -736,9 +737,7 @@ pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> S
                         } else {
                             entry.path().join(pkg).join(target)
                         };
-                        if path.exists() {
-                            return path.to_string_lossy().to_string();
-                        }
+                        return path.to_string_lossy().to_string();
                     }
                 }
             }
