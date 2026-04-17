@@ -1260,19 +1260,70 @@ is now fully parallel at both levels (toolchain package loads → extension
 spoke materializations). The 214-repo amplification is unchanged — those
 repos still materialize — but in parallel rather than sequentially.
 
-Whether Phase 7.2 (on-demand materialization, eliminating the eager loop
-entirely) is still required depends on empirical cquery behaviour:
+### Phase 7 empirical diagnosis (2026-04-17, third session)
 
-- **If cquery now returns in bounded time**: 7.2 not urgent.
-  Amplification is wasteful but not fatal. Defer until a demonstrated
-  slow-build or disk-usage concern arises.
-- **If cquery still hangs or is unacceptably slow**: 7.2 becomes
-  required. The cascade is still unbounded in total work; parallelism
-  just makes the wall time equal to the longest single cascade chain.
+Reproduced the hang against `/var/mnt/dev/llvm-project/utils/bazel/` with
+diagnostic counters on `ModuleExtensionExecutionKey::compute` and
+`ExtensionRepoExecutionKey::compute`. Findings invalidated **all three**
+of the 14-series candidate plans:
 
-Cannot verify in this workspace (no MODULE.bazel-registered llvm-project
-checkout). Marking 7.2 as **status-unknown**; re-run `kuro cquery
-@llvm-project//llvm:config` and escalate if the hang persists.
+- **14a premise (DICE re-executes errored keys)**: false. Per-key compute
+  counter showed `count=1` for both the single extension that ran
+  (`llvm_repos_extension`) and the single spoke it materialized (`gmp`).
+  DICE dedups correctly within a transaction.
+- **14b premise (lockfile misses force re-execution)**: irrelevant. The
+  lockfile cache hit for llvm_repos_extension and specs were used. No
+  re-run from cache miss.
+- **14c premise (spoke amplification cascades)**: irrelevant. Only one
+  extension and one spoke were in flight during the entire hang window.
+
+Actual blocker: `download_url` in
+`app/kuro_bzlmod/src/repository_executor.rs:584` used `curl --max-time
+300` with no `--connect-timeout`, followed by a same-URL wget fallback
+with another 300s timeout. gmplib.org was unreachable at TCP level from
+this host; curl blocked 30+ seconds to fail the connect, continued to
+wait toward its 300s ceiling, then wget tried the same URL with another
+300s budget. The outer fallback loop (which would have tried
+`https://ftp.gnu.org/gnu/gmp/...` — reachable and fast) only got a turn
+after >5 minutes of per-URL time. Single tokio worker blocked in
+synchronous `Command::output()` during the whole stall.
+
+### Fix (commit 04176ec)
+
+`repository_executor.rs:584` tightened:
+- Added `--connect-timeout 30` so unreachable mirrors fall through in
+  ~30s.
+- Reduced `--max-time` from 300 to 60s to cap stalled transfers.
+- Dropped the same-URL wget fallback on curl HTTP failure. The caller's
+  `urls[]` already provides the real fallback; wget would re-issue the
+  same failing request with the same timeout. wget remains the primary
+  tool if curl is not installed.
+
+Verified:
+- `kuro cquery @llvm-project//llvm:config` now completes in ~54s
+  (previously 5+ minute hang).
+- Log shows `curl: (28) Failed to connect to gmplib.org port 443 after
+  30002 ms` → immediate fall-through to `ftp.gnu.org` → download
+  succeeds in ~2s → gmp materialised.
+- Cquery then surfaces a real, actionable error:
+  `bazel_tools//src/conditions package does not exist`. Separate
+  Bazel-compat issue, not a hang.
+- 154/157 kuro_bzlmod tests passing (3 pre-existing lockfile test
+  failures unrelated to this change).
+
+### Status
+
+- Phase 7 (parallel spoke materialization): complete (commit 094b0ab)
+- Phase 7.1 (parallel toolchain package loading): complete (commit
+  2b0f50a)
+- Phase 7 real-world verification: complete (commit 04176ec)
+- Phase 7.2 (on-demand spoke materialization): **not required**.
+  Amplification (214 repos) is wasteful in disk/time but not a hang
+  source. Defer indefinitely; reassess if disk-usage or first-build
+  wall-time becomes a user complaint.
+- Plans 14a / 14b / 14c: drafted during investigation, retained as
+  reference, not implemented — reviewer findings + empirical evidence
+  showed none addressed the actual bottleneck.
 
 ---
 
