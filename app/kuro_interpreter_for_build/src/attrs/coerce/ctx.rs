@@ -402,10 +402,29 @@ impl BuildAttrCoercionContext {
                     }
                 } else if is_bare_name && value.contains('/') {
                     // Bare name with path separators (e.g., "crypto/aes/file.pl",
-                    // "src/parser.rs"). In Bazel, source files are implicit targets so
-                    // this is valid in both attrs.dep() and one_of(dep, source) contexts.
-                    // Construct the label directly since the pattern parser can't handle
-                    // slashed target names.
+                    // "src/parser.rs"). Two cases:
+                    //   1. Source file: "src/foo.h" on disk — implicit source target.
+                    //   2. Declared output: a rule with `attr.output(out =
+                    //      "include/llvm/Config/TargetMCAs.def")` registers the
+                    //      full slashed path in `output_file_registry`. Redirect
+                    //      to the producer target so analysis can find it.
+                    // Check the output registry first so generated files with
+                    // slashed names resolve to their producing target.
+                    if let Some(producer) = self.output_file_registry.borrow().get(value).cloned() {
+                        let adjusted = format!(":{}", producer);
+                        return match self
+                            .parse_pattern_bazel_compat::<ProvidersPatternExtra>(&adjusted)
+                        {
+                            Ok(ParsedPattern::Target(package, target_name, providers)) => {
+                                Ok(providers.into_providers_label(package, target_name.as_ref()))
+                            }
+                            _ => Err(BuildAttrCoercionContextError::RequiredLabel(
+                                value.to_owned(),
+                            )
+                            .into()),
+                        };
+                    }
+                    // Fall through to source-file handling.
                     if let Some((pkg_label, _listing)) = &self.enclosing_package {
                         let target = TargetNameRef::unchecked_new(value);
                         Ok(ProvidersLabel::default_for(TargetLabel::new(
