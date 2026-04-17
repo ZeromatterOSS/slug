@@ -447,33 +447,28 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         let cell_instance = match cell_resolver.get(cell_name) {
             Ok(c) => c,
             Err(_) => {
-                tracing::debug!("Cell '{}' not found in resolver, skipping", repo_name);
+                tracing::debug!(
+                    "Cell '{}' not found in resolver for toolchain '{}', skipping",
+                    repo_name,
+                    tc_label_str
+                );
                 skipped_count += 1;
                 continue;
             }
         };
 
-        // Check if this cell is an extension-generated repo by examining its path.
-        let cell_path_str = cell_instance.path().as_project_relative_path().as_str();
-        if cell_path_str.contains('+') || cell_path_str.contains('~') {
-            tracing::debug!(
-                "Skipping toolchain repo '{}' (extension repo at '{}', loaded on-demand)",
-                tc_label_str,
-                cell_path_str
-            );
-            skipped_count += 1;
-            continue;
-        }
-        let actual_name = cell_instance.name().as_str();
-        if actual_name.contains('+') || actual_name.contains('~') {
-            tracing::debug!(
-                "Skipping toolchain repo '{}' (alias for extension repo '{}', loaded on-demand)",
-                tc_label_str,
-                actual_name
-            );
-            skipped_count += 1;
-            continue;
-        }
+        // Extension repos (paths containing '+' or '~') are loaded the same way
+        // as other cells: via `dice.get_interpreter_results`. If the repo's
+        // content is not yet on disk, the file-ops layer triggers
+        // `ExtensionRepoExecutionKey::compute` and materialises it on demand.
+        // Previously this path short-circuited with a skip, which meant
+        // toolchain registrations coming from extension-generated repos such
+        // as `rules_cc+cc_configure_extension+local_config_cc_toolchains`
+        // were never fed into the DeclaredToolchainInfo registry — so CC
+        // toolchain resolution failed with "No execution platform found that
+        // provides all mandatory toolchain types". Fall through to the normal
+        // `to_load.push(...)` path below for both in-tree and extension cells.
+        let _ = cell_instance;
 
         let cell_rel_path = CellRelativePath::unchecked_new(&pkg_path);
         let package_label =

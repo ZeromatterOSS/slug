@@ -726,12 +726,25 @@ pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> S
                 };
                 return path.to_string_lossy().to_string();
             }
-            // Scan for versioned names (repo+version)
+            // Scan for versioned names matching `<repo>+<version>` while
+            // rejecting extension-generated repos of the form
+            // `<repo>+<extension>+<innername>`. Without this filter, a request
+            // for `@rules_cc` finds `rules_cc+compatibility_proxy+cc_compatibility_proxy`
+            // before `rules_cc+0.2.17` because the scan order is
+            // filesystem-dependent. Extension repos have three or more `+`
+            // segments; bzlmod-module cells have exactly two (name+version).
             if let Ok(entries) = std::fs::read_dir(scan_dir) {
                 for entry in entries.flatten() {
                     let name = entry.file_name();
                     let name_str = name.to_string_lossy();
-                    if name_str.starts_with(&format!("{}+", repo)) {
+                    if !name_str.starts_with(&format!("{}+", repo)) {
+                        continue;
+                    }
+                    // Reject extension-generated repos (3+ segments).
+                    if name_str.matches('+').count() > 1 {
+                        continue;
+                    }
+                    {
                         let path = if pkg.is_empty() {
                             entry.path().join(target)
                         } else {
@@ -1743,10 +1756,13 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         let template_str = if let Some(s) = template.unpack_str() {
             s.to_owned()
         } else if let Some(repo_path) = template.downcast_ref::<RepositoryPath>() {
-            // Read template file content
             let template_path = repo_path.absolute_path();
             std::fs::read_to_string(&template_path).map_err(|e| {
-                starlark::Error::new_other(anyhow!("Failed to read template: {}", e))
+                starlark::Error::new_other(anyhow!(
+                    "Failed to read template '{}': {}",
+                    template_path.display(),
+                    e
+                ))
             })?
         } else {
             template.to_repr()
