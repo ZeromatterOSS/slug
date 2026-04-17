@@ -414,46 +414,72 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         // happens lazily via Skyframe's RepositoryDirectoryValue. In kuro, we
         // materialize eagerly since we can't do Skyframe-style restarts from
         // synchronous Starlark eval.
+        //
+        // Materialization runs in parallel via try_compute_join. Serial execution
+        // (one spec at a time) previously caused apparent hangs during cquery
+        // analysis when a cascade of transitive extensions each generated hundreds
+        // of spokes (e.g. the crate extension has 1230+ spokes). DICE's scheduler
+        // bounds actual concurrency; this unblocks I/O-bound downloads that have
+        // no inter-spoke dependencies.
         if !specs.is_empty() {
             let ext_name = kuro_bzlmod::extract_extension_name(&aggregated.extension_id);
             let owning_module = kuro_bzlmod::extract_owning_module(&aggregated.extension_id);
+
+            // Register all spoke cells in the dynamic registry up front so cell
+            // resolution works even before any individual spoke is materialized.
+            // Spokes not referenced by the current build are never materialized.
+            let mut pending: Vec<(kuro_bzlmod::ExtensionRepoExecutionKey, String)> = Vec::new();
             for (internal_name, spec) in &specs {
                 let canonical = format!("{}+{}+{}", owning_module, ext_name, internal_name);
-                let repo_dir = project_root.join("bazel-external").join(&canonical);
-
-                // Register in dynamic cell registry so cell resolution can find
-                // extension spoke repos (e.g., crates__tempfile-3.26.0) that
-                // aren't explicitly in use_repo().
                 kuro_core::cells::register_dynamic_extension_cell(
                     canonical.clone(),
                     format!("bazel-external/{}", canonical),
                 );
-
-                // Skip if already materialized
+                let repo_dir = project_root.join("bazel-external").join(&canonical);
                 if repo_dir.join(".kuro_repo_complete").exists() {
                     continue;
                 }
-
-                // Use DICE-based ExtensionRepoExecutionKey for full Starlark repo
-                // rule support. This handles both builtin (http_archive, etc.)
-                // and custom Starlark repo rules (cargo_repository, etc.).
                 let key = kuro_bzlmod::ExtensionRepoExecutionKey::new(
                     canonical.clone(),
                     aggregated.extension_id.to_string(),
                     spec.clone(),
                     project_root.clone(),
                 );
-                match ctx.compute(&key).await {
-                    Ok(Ok(_result)) => {
-                        tracing::debug!("Eagerly materialized extension repo '{}'", canonical);
-                    }
-                    Ok(Err(e)) => {
-                        tracing::debug!("Could not eagerly materialize '{}': {}", canonical, e);
-                    }
-                    Err(e) => {
-                        tracing::debug!("DICE error materializing '{}': {}", canonical, e);
-                    }
-                }
+                pending.push((key, canonical));
+            }
+
+            if !pending.is_empty() {
+                use futures::FutureExt;
+                let _: Vec<()> = ctx
+                    .try_compute_join(pending, |ctx, (key, canonical)| {
+                        async move {
+                            match ctx.compute(&key).await {
+                                Ok(Ok(_)) => {
+                                    tracing::debug!(
+                                        "Eagerly materialized extension repo '{}'",
+                                        canonical
+                                    );
+                                }
+                                Ok(Err(e)) => {
+                                    tracing::debug!(
+                                        "Could not eagerly materialize '{}': {}",
+                                        canonical,
+                                        e
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::debug!(
+                                        "DICE error materializing '{}': {}",
+                                        canonical,
+                                        e
+                                    );
+                                }
+                            }
+                            Ok::<(), kuro_error::Error>(())
+                        }
+                        .boxed()
+                    })
+                    .await?;
             }
         }
 

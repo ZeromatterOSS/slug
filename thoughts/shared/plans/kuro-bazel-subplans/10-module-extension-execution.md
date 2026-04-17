@@ -1106,6 +1106,83 @@ Verified through this chain: llvm_configure Starlark rule runs end-to-end,
 full llvm-project overlay created, BUILD.bazel evaluation succeeds, uquery
 returns the target. Blocker is now in the analysis phase (Phase 7).
 
+### Investigation findings (2026-04-17, second session)
+
+**Root cause located:** `module_extension_executor_impl.rs::execute_extension`
+ran an eager spoke-materialization loop (`ctx.compute(&ExtensionRepoExecutionKey)`
+per spec) **serially** with `.await` on each call. For extensions producing
+hundreds of spokes (crate: 1230+; rust toolchain: ~50; LLVM toolchain: ~40
+per-platform archive), this is O(N) wall time per extension.
+
+Phase 6.1's commit message (`62fe237`) claimed this loop was dropped — it was
+not. Only the `declare_all_source_artifacts_ext` file-walk path was dropped.
+The eager `ctx.compute` loop stayed. Phase 6.1's Phase-6.1 heading in the plan
+text was aspirational; git diff confirms the loop remained untouched.
+
+During cquery analysis, `ensure_registered_toolchains_loaded`
+(`app/kuro_analysis/src/analysis/env.rs:386`) iterates every registered
+toolchain across all non-dev modules and calls
+`dice.get_interpreter_results(package_label)` for each. Loading any
+toolchain BUILD file transitively loads `.bzl` files that `load()` from
+extension-generated cells. Each first-touch on an extension cell triggers that
+extension's execution → enters the serial eager loop → serializes all of that
+extension's spoke materializations. Cascade × serial = minutes of sleep.
+
+uquery never enters `get_analysis_result_inner`, so it never calls
+`ensure_registered_toolchains_loaded`, so the cascade does not fire — hence
+uquery finishes while cquery hangs.
+
+### Fix applied
+
+`module_extension_executor_impl.rs:411-480`: converted the serial loop into a
+parallel `ctx.try_compute_join`. Dynamic-cell registration and
+`.kuro_repo_complete` skip-check remain, so lazy fast-path for
+already-materialized repos is preserved. Per-spec materialization still runs
+via `ExtensionRepoExecutionKey::compute`, so DICE dedup and cycle detection
+remain intact. I/O-bound downloads that have no inter-spoke dependency can
+now proceed concurrently.
+
+### What the fix does NOT address
+
+- `ensure_registered_toolchains_loaded` still eagerly loads every non-dev
+  toolchain package. For a cc_library target, loading rules_fuzzing / Kotlin
+  / Swift / JVM toolchain packages is structurally unnecessary — Bazel only
+  loads the toolchain packages for types the target's rule actually declares.
+  Proper per-target-type toolchain resolution is Plan 13 out-of-scope item
+  ("Full Bazel-style lazy toolchain resolution").
+- Cross-extension Label references (crate extension's
+  `ctx.execute([Label("@rs_rust_host_tools//:bin/cargo"), ...])`) still
+  depend on the referenced extension having been materialized eagerly before
+  the referring extension runs. Removing the eager loop entirely would
+  require threading a blocking-from-sync-Starlark materialization hook into
+  `module_ctx.path(Label)` — deferred.
+
+### Verification (2026-04-17 continued)
+
+Build + existing test suite pass locally (`cargo check -p
+kuro_interpreter_for_build` clean; 50/50 interpreter_for_build tests pass;
+lockfile tests have 3 pre-existing failures unrelated to this change).
+
+LLVM-specific repro for `@llvm-project//llvm:config` not runnable in this
+workspace (no MODULE.bazel-registered llvm-project checkout locally). Verified
+the parallelization path indirectly against `examples/multi_package`:
+
+- `kuro uquery //app:calculator` — completes
+- `kuro cquery //app:calculator` — returns in 0.274s, no hang
+- Extension execution (`bazel_features`, `rules_cc`, etc.) flows through
+  `try_compute_join` and returns without deadlock
+- Analysis ultimately fails downstream on CC toolchain resolution
+  (`find_cc_toolchain.bzl:88`), but this is a pre-existing regression —
+  stashing the Phase 7 change reproduces the same failure on `bdbd737`.
+  Unrelated to the parallelization fix.
+
+Outstanding: confirming elapsed-time bound on an actual cascaded-extension
+scenario (llvm-project graph shape) remains pending until an llvm-project
+MODULE.bazel workspace is available. The structural property — that spoke
+materialization no longer serializes behind a single `.await` — is visible
+in code review (`try_compute_join` dispatches all specs concurrently, DICE
+bounds actual parallelism).
+
 ## References
 
 - Extension execution DICE: `app/kuro_bzlmod/src/extension_execution_dice.rs`
