@@ -3311,6 +3311,56 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             }
         }
 
+        // Collect transitive header artifacts so compile actions declare them
+        // as inputs. Without this, generated headers referenced via `-I` flags
+        // (e.g. `:abi_breaking_h_gen` in @llvm-project//llvm) are not scheduled
+        // before the consuming compile action runs — the compile fails with
+        // `fatal error: llvm/Config/abi-breaking.h: No such file or directory`.
+        //
+        // Sources:
+        //   - `public_hdrs` / `private_hdrs` / `textual_hdrs` from this call
+        //     (may include declared-output artifacts from `attr.output` like
+        //     `:abi_breaking_h_gen`)
+        //   - `headers` depset from each dep's `CcCompilationContext`
+        let mut compile_inputs: Vec<Value<'v>> = Vec::new();
+        for hdr_val in &[public_hdrs, private_hdrs, textual_hdrs] {
+            if !hdr_val.is_none() {
+                let mut elements = Vec::new();
+                crate::interpreter::rule_defs::depset::collect_depset_elements(
+                    *hdr_val,
+                    &mut elements,
+                    heap,
+                );
+                for h in elements {
+                    compile_inputs.push(h);
+                }
+            }
+        }
+        if !compilation_contexts.is_none() {
+            if let Ok(iter) = compilation_contexts.iterate(heap) {
+                for ctx in iter {
+                    if let Ok(Some(headers)) = ctx.get_attr("headers", heap) {
+                        if !headers.is_none() {
+                            let mut elements = Vec::new();
+                            crate::interpreter::rule_defs::depset::collect_depset_elements(
+                                headers,
+                                &mut elements,
+                                heap,
+                            );
+                            for h in elements {
+                                compile_inputs.push(h);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let compile_inputs_value: Value<'v> = if compile_inputs.is_empty() {
+            Value::new_none()
+        } else {
+            heap.alloc(compile_inputs.clone())
+        };
+
         // Process source files if provided
         // srcs is a list of (Artifact, Label) tuples from cc_helper.get_srcs()
         if !srcs.is_none() {
@@ -3456,16 +3506,16 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                             // Call actions.run() for regular compile
                             // Use unique identifier to avoid "multiple actions with same category" error
                             let identifier = heap.alloc_str(&format!("{}.o", basename)).to_value();
-                            let run_result = eval.eval_function(
-                                run,
-                                &[args],
-                                &[
-                                    ("outputs", outputs_list),
-                                    ("category", heap.alloc_str("cpp_compile").to_value()),
-                                    ("identifier", identifier),
-                                    ("progress_message", progress),
-                                ],
-                            );
+                            let mut run_kwargs: Vec<(&str, Value<'v>)> = vec![
+                                ("outputs", outputs_list),
+                                ("category", heap.alloc_str("cpp_compile").to_value()),
+                                ("identifier", identifier),
+                                ("progress_message", progress),
+                            ];
+                            if !compile_inputs_value.is_none() {
+                                run_kwargs.push(("inputs", compile_inputs_value));
+                            }
+                            let run_result = eval.eval_function(run, &[args], &run_kwargs);
                             // Register PIC compile action with unique identifier
                             let mut pic_args_vec: Vec<Value<'v>> = Vec::new();
                             pic_args_vec.push(heap.alloc_str(host_compiler).to_value());
@@ -3512,16 +3562,16 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                             let pic_identifier =
                                 heap.alloc_str(&format!("{}.pic.o", basename)).to_value();
 
-                            let _ = eval.eval_function(
-                                run,
-                                &[pic_args],
-                                &[
-                                    ("outputs", pic_outputs_list),
-                                    ("category", heap.alloc_str("cpp_compile").to_value()),
-                                    ("identifier", pic_identifier),
-                                    ("progress_message", pic_progress),
-                                ],
-                            );
+                            let mut pic_run_kwargs: Vec<(&str, Value<'v>)> = vec![
+                                ("outputs", pic_outputs_list),
+                                ("category", heap.alloc_str("cpp_compile").to_value()),
+                                ("identifier", pic_identifier),
+                                ("progress_message", pic_progress),
+                            ];
+                            if !compile_inputs_value.is_none() {
+                                pic_run_kwargs.push(("inputs", compile_inputs_value));
+                            }
+                            let _ = eval.eval_function(run, &[pic_args], &pic_run_kwargs);
 
                             object_files.push(out);
                             pic_object_files.push(pic_out);
