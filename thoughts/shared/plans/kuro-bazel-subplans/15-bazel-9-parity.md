@@ -419,52 +419,106 @@ recurse. No real workspace hits it yet (normal repos don't symlink
 whole subdirs), but Bazel's glob follows symlinks by default, so
 kuro diverges. File as its own sub-plan if a workspace surfaces it.
 
-### 15.5.3 Generated headers not materialized at expected include path (BLOCKING `@llvm-project//llvm:llvm` compile)
+### 15.5.3 Implicit DefaultInfo from `attr.output` declarations (LANDED)
 
-**Status:** Open. Next blocker after 15.5.1 and 15.5.2 landed.
+**Status:** Landed in commit `54b3be8` (2026-04-18).
 
-After 15.5.2, `@llvm-project//llvm:Support` compiles ~183 source files
-before failing with:
+Bazel convention: a rule with `attr.output` / `attr.output_list`
+attributes that does not return DefaultInfo gets an implicit
+DefaultInfo whose `default_outputs` are the declared artifacts. e.g.
+bazel_skylib's `expand_template.bzl`:
+
+```python
+def _expand_template_impl(ctx):
+    ctx.actions.expand_template(
+        template = ctx.file.template,
+        output = ctx.outputs.out,
+        substitutions = ctx.attr.substitutions,
+    )
+```
+
+No return statement. Under kuro's previous behaviour,
+`ProviderCollection::try_from_value_subtarget` auto-injected an
+**empty** DefaultInfo, so `kuro build :abi_breaking_h_gen` reported
+"does not have any outputs", and cc_library targets that consumed the
+output via `hdrs = [":abi_breaking_h_gen"]` saw nothing to depend on.
+
+**Fix:**
+- Thread `output_attr_names()` through the `RuleSpec` trait (extracted
+  from `FrozenStarlarkRuleCallable`'s existing `output_attr_names`
+  field).
+- New `AnalysisContext::collect_implicit_default_outputs` method
+  materialises the `CtxOutputs` wrapper if the impl never accessed
+  `ctx.outputs`, then calls `get_attr(name)` for each declared output
+  attr. Must run before `take_state` because declaration goes through
+  the live `AnalysisRegistry`.
+- New `DefaultInfo::with_default_outputs` constructor.
+- `maybe_inject_implicit_default_info` in `run_analysis` appends the
+  implicit DefaultInfo to the rule's return value unless the user
+  already returned one (user-supplied DefaultInfo wins even if its
+  `default_outputs` is empty — explicit > implicit).
+
+**Parity source:** `@bazel_skylib//rules:expand_template.bzl` and
+Bazel's `RuleClass.computeImplicitOutputs` (implicit from attr.output).
+
+### 15.5.4 `attr.output` generated-file path layout divergence (OPEN, BLOCKING `@llvm-project//llvm:llvm` compile)
+
+**Status:** Open. Next blocker after 15.5.3.
+
+After the DefaultInfo auto-inject lands, `kuro build @llvm-project//llvm:abi_breaking_h_gen`
+succeeds and produces the header at:
 
 ```
-fatal error: llvm/Config/abi-breaking.h: No such file or directory
+buck-out/v2/gen/llvm-project/9b5202f249973417/llvm/__abi_breaking_h_gen__/include/llvm/Config/abi-breaking.h
 ```
 
-The header is produced by `expand_template(name="abi_breaking_h_gen",
-out = "include/llvm/Config/abi-breaking.h", template = "...cmake", ...)`
-at `llvm-project-overlay/llvm/BUILD.bazel:151-160`. The compile command
-adds `-Ibuck-out/v2/gen/llvm-project/9b5202f249973417/external/llvm-project/llvm/include`,
-expecting the generated header to appear there. Needs investigation:
-is `expand_template` registering the action, is the output path
-rewritten correctly for extension-repo packages, and does the
-`cc_library(hdrs=[...])` declaration propagate the generated header
-into the `CcCompilationContext` consumed by dependents?
+but `@llvm-project//llvm:Support` compile commands include
+`-Ibuck-out/v2/gen/llvm-project/9b5202f249973417/external/llvm-project/llvm/include`
+and fail with `fatal error: llvm/Config/abi-breaking.h: No such file or directory`.
+
+Two path deltas between kuro output and the cc_library include path:
+
+1. **Extra `__<target>__/` segment.** kuro's `BaseDeferredKey::make_hashed_path`
+   in `app/kuro_core/src/deferred/base_deferred_key.rs:148` always appends
+   `__<escaped_target_name>__/` between `<pkg>/` and the output path.
+   Bazel's `attr.output`-declared files go at `bazel-bin/<pkg>/<out_path>`
+   with no target wrapper.
+2. **`external/<canonical>/` prefix missing.** For external-cell
+   targets, Bazel's bin-dir layout is
+   `bazel-bin/external/<canonical_name>/<pkg>/<out_path>`. kuro's buck-out
+   layout is `buck-out/v2/gen/<cell_name>/<cfg>/<pkg>/...`, without an
+   `external/` prefix.
+
+Fixing either half in isolation is insufficient — cc_library's include
+search path is Bazel-shaped (`<bin_dir>/external/<canonical>/<pkg>/<include_dir>`)
+so both transformations need to apply for declared-output `hdrs`.
+
+**Options to evaluate:**
+- (A) Make `attr.output`/`attr.output_list` declarations use a
+  Bazel-style path resolver that omits `__<target>__/` and prefixes
+  `external/<canonical>/` for external-cell targets. Would require
+  distinguishing "Bazel-style attr.output" from Buck2-style
+  `declare_output` without collision risk when two targets in the same
+  package declare outputs with the same name.
+- (B) After action execution, symlink from the Bazel-layout path to
+  the actual kuro buck-out path. Cheap, but introduces two truth
+  sources and a clean/rebuild coherence concern.
+- (C) Change cc_library's include-dir computation to point at the
+  kuro-layout path (`<bin_dir>/<cell>/<pkg>/__<target>__/<include_dir>`).
+  Breaks if the same cc_library consumes multiple generated hdrs
+  from different targets sharing an include dir.
+
+Option (A) is closest to Bazel semantics but the most invasive. (B) is
+a pragmatic unblock; a follow-up can migrate to (A) once the rest of
+Plan 15 shakes out.
 
 **Parity sources:**
-- `@bazel_skylib//rules/expand_template.bzl` (Starlark implementation
-  used by LLVM BUILD; actions should produce files under the package's
-  genfiles dir)
-- Bazel's `CcCompilationContext.getIncludes()` aggregates generated
-  header directories from transitive deps.
+- `src/main/java/com/google/devtools/build/lib/actions/ArtifactFactory.java`
+  — declared-file path computation (bazel-bin + package path)
+- `src/main/java/com/google/devtools/build/lib/rules/cpp/CcCompilationContext.java`
+  — include-dir aggregation for cc_library deps
 
-**Est. effort:** unknown until root cause known — 1 day to 1 week.
-
-### 15.5.4 `expand_template` / genrule output resolution for symlinked extension repos
-
-**Status:** Open, possibly a component of 15.5.3.
-
-Action outputs for targets inside an extension-repo package end up at
-`buck-out/v2/gen/{cell}/{cfg_hash}/{package}/...`. For
-`@llvm-project//llvm:abi_breaking_h_gen` that would be
-`buck-out/v2/gen/llvm-project/{hash}/llvm/include/llvm/Config/abi-breaking.h`.
-The compile command references
-`buck-out/v2/gen/llvm-project/{hash}/external/llvm-project/llvm/include/...`
-— note the `external/llvm-project/` segment. That suggests the
-compile's include search path is built from the source-rooted layout
-(`external/<canonical>/...`) rather than the generated-file layout.
-Investigate whether `CcCompilationContext` is correctly translating
-the generated-include-dir into its buck-out-relative form for
-extension-repo cells.
+**Est. effort:** 3-5 days for (B) symlink approach; 1-2 weeks for (A).
 
 ## Dependencies and ordering
 
