@@ -3231,43 +3231,81 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             }
         }
 
-        // Handle strip_include_prefix - register the resolved directory as an include path
+        // Handle strip_include_prefix.
+        //
+        // Bazel: `strip_include_prefix = X` on a cc_library means headers can
+        // be `#include`d with the `X/` component stripped. If X is relative
+        // (no leading `/`), it's interpreted relative to the package.
+        //
+        // Concrete example: `@llvm-project//third-party/siphash:siphash` has
+        //   hdrs = ["include/siphash/SipHash.h"]
+        //   strip_include_prefix = "include"
+        // A dependent with `#include "siphash/SipHash.h"` needs an include
+        // path that points at `.../third-party/siphash/include/` so the
+        // `include/` prefix is stripped.
+        //
+        // Register the resulting include dir globally (for compiles in the
+        // same analysis session) and also expose it via the returned
+        // `CcCompilationContext.includes` so dependents picking up this
+        // target through `compilation_contexts` see it too. Package
+        // directory is derived from a hdr's source artifact (iterates
+        // public_hdrs / private_hdrs / textual_hdrs); falls back to srcs.
+        let mut strip_include_dir: Option<String> = None;
         if let Some(strip_prefix) = strip_include_prefix.unpack_str() {
             if !strip_prefix.is_empty() {
-                // strip_include_prefix is relative to the repo root, e.g. "/third_party/utf8_range"
-                // We need to determine the repo name from the source paths
-                if !srcs.is_none() {
-                    if let Ok(iter) = srcs.iterate(heap) {
-                        for src_tuple in iter {
-                            let src = src_tuple
+                let trimmed_prefix = strip_prefix.trim_start_matches('/');
+
+                let mut sample_hdr_path: Option<String> = None;
+                for candidate in &[public_hdrs, private_hdrs, textual_hdrs, srcs] {
+                    if candidate.is_none() {
+                        continue;
+                    }
+                    if let Ok(iter) = candidate.iterate(heap) {
+                        for hdr_tuple in iter {
+                            let hdr = hdr_tuple
                                 .at(heap.alloc(0i32).to_value(), heap)
-                                .unwrap_or(src_tuple);
-                            if let Some(src_path_raw) = src
+                                .unwrap_or(hdr_tuple);
+                            if let Some(hdr_path_raw) = hdr
                                 .get_attr("path", heap)
                                 .ok()
                                 .flatten()
                                 .and_then(|v| v.unpack_str())
                             {
-                                // Normalize buck-out/v2/external_cells/... to external/...
                                 let normalized;
-                                let src_path: &str =
-                                    if let Some(n) = normalize_external_cells_path(src_path_raw) {
+                                let hdr_path: &str =
+                                    if let Some(n) = normalize_external_cells_path(hdr_path_raw) {
                                         normalized = n;
                                         &normalized
                                     } else {
-                                        src_path_raw
+                                        hdr_path_raw
                                     };
-                                if src_path.starts_with("external/") {
-                                    if let Some(second_slash) = src_path[9..].find('/') {
-                                        let repo = &src_path[..9 + second_slash];
-                                        let prefix = strip_prefix.trim_start_matches('/');
-                                        let include_dir = format!("{}/{}", repo, prefix);
-                                        register_external_include_dir(&include_dir);
-                                    }
-                                }
-                                break; // Only need one source to determine repo
+                                sample_hdr_path = Some(hdr_path.to_owned());
+                                break;
                             }
                         }
+                    }
+                    if sample_hdr_path.is_some() {
+                        break;
+                    }
+                }
+
+                if let Some(hdr_path) = sample_hdr_path {
+                    // Find the trailing `<strip_prefix>/` segment in the hdr
+                    // path and take everything up to and including it as the
+                    // include root. Works for both external (`external/<repo>/<pkg>/<prefix>/...`)
+                    // and root-cell (`<pkg>/<prefix>/...`) layouts.
+                    let needle = format!("/{}/", trimmed_prefix);
+                    let include_dir_owned: Option<String> =
+                        if let Some(idx) = hdr_path.rfind(&needle) {
+                            Some(hdr_path[..idx + needle.len() - 1].to_owned())
+                        } else if hdr_path.starts_with(&format!("{}/", trimmed_prefix)) {
+                            Some(trimmed_prefix.to_owned())
+                        } else {
+                            None
+                        };
+                    if let Some(dir) = include_dir_owned {
+                        register_external_include_dir(&dir);
+                        strip_include_dir = Some(dir);
                     }
                 }
             }
@@ -3521,6 +3559,35 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     .unwrap_or(Value::new_none())
                 }
             };
+
+        // If strip_include_prefix produced an include root, append it to the
+        // includes depset so that dependents consuming this target's CcInfo
+        // get the include path via compilation_contexts propagation (not
+        // just via the in-session global register_external_include_dir
+        // channel, which is unreliable when analyses interleave).
+        let includes = if let Some(ref dir) = strip_include_dir {
+            let mut direct: Vec<Value<'v>> = vec![heap.alloc_str(dir).to_value()];
+            let transitive: Vec<Value<'v>> = if includes.is_none() {
+                Vec::new()
+            } else {
+                let mut existing = Vec::new();
+                crate::interpreter::rule_defs::depset::collect_depset_elements(
+                    includes,
+                    &mut existing,
+                    heap,
+                );
+                for v in existing {
+                    direct.push(v);
+                }
+                Vec::new()
+            };
+            crate::interpreter::rule_defs::depset::make_depset_from_lists(
+                heap, direct, transitive, "default",
+            )
+            .unwrap_or(includes)
+        } else {
+            includes
+        };
 
         let compilation_context = heap.alloc(CcCompilationContextGen {
             headers: merged_headers,

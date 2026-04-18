@@ -149,9 +149,9 @@ pub fn analyze_native_rule(
         NativeRuleKind::PackageGroup => analyze_package_group(target),
         NativeRuleKind::Genrule => analyze_genrule(target, configured_node, dep_analysis),
         NativeRuleKind::Platform => analyze_platform(target, dep_analysis),
-        NativeRuleKind::CcLibrary => create_cc_analysis_result(target),
-        NativeRuleKind::CcBinary => create_cc_analysis_result(target),
-        NativeRuleKind::CcTest => create_cc_analysis_result(target),
+        NativeRuleKind::CcLibrary => create_cc_analysis_result(target, Some(configured_node)),
+        NativeRuleKind::CcBinary => create_cc_analysis_result(target, Some(configured_node)),
+        NativeRuleKind::CcTest => create_cc_analysis_result(target, Some(configured_node)),
         NativeRuleKind::TestSuite => analyze_test_suite(target, dep_analysis),
         NativeRuleKind::Toolchain => analyze_toolchain(target, configured_node, dep_analysis),
         NativeRuleKind::ShLibrary => analyze_sh_library(target, configured_node, dep_analysis),
@@ -165,8 +165,8 @@ pub fn analyze_native_rule(
         NativeRuleKind::StarlarkDocExtract => analyze_genquery(target), // stub: empty output file
         NativeRuleKind::CcToolchain => create_minimal_analysis_result(target),
         NativeRuleKind::CcToolchainSuite => create_minimal_analysis_result(target),
-        NativeRuleKind::CcImport => create_cc_analysis_result(target),
-        NativeRuleKind::CcSharedLibrary => create_cc_analysis_result(target),
+        NativeRuleKind::CcImport => create_cc_analysis_result(target, Some(configured_node)),
+        NativeRuleKind::CcSharedLibrary => create_cc_analysis_result(target, Some(configured_node)),
         NativeRuleKind::EnvironmentGroup => create_minimal_analysis_result(target),
         NativeRuleKind::XcodeConfig => analyze_xcode_config(target),
     }
@@ -1058,7 +1058,10 @@ fn analyze_filegroup(
 }
 
 /// Create an analysis result with DefaultInfo + CcInfo for native cc rules.
-fn create_cc_analysis_result(target: &ConfiguredTargetLabel) -> kuro_error::Result<AnalysisResult> {
+fn create_cc_analysis_result(
+    target: &ConfiguredTargetLabel,
+    configured_node: Option<ConfiguredTargetNodeRef<'_>>,
+) -> kuro_error::Result<AnalysisResult> {
     // Register the repo root as an include directory for native cc_library stubs.
     // This ensures that when other targets compile against this stub dep,
     // headers from this repo can be found (e.g., "absl/base/macros.h" from abseil-cpp).
@@ -1068,6 +1071,43 @@ fn create_cc_analysis_result(target: &ConfiguredTargetLabel) -> kuro_error::Resu
         kuro_build_api::interpreter::rule_defs::cc_common::register_external_include_dir(
             &include_dir,
         );
+    }
+
+    // Honour `strip_include_prefix`. Bazel convention: headers exposed by this
+    // cc_library can be `#include`d with `<strip_prefix>/` stripped. Compute
+    // the absolute include dir as `[external/<cell>/]<pkg>/<strip_prefix>` so
+    // dependents find `#include "<remainder>"` correctly. Without this,
+    // e.g. `@llvm-project//third-party/siphash:siphash` with
+    // `strip_include_prefix="include"` fails to expose
+    // `third-party/siphash/include` and Support's `#include "siphash/SipHash.h"`
+    // doesn't resolve. Only needed while `create_cc_analysis_result` stubs
+    // out the full cc_library analysis; once rules_cc's Starlark impl runs
+    // for these targets, `cc_common.compile` handles strip_include_prefix.
+    if let Some(node) = configured_node {
+        use kuro_node::attrs::configured_attr::ConfiguredAttr;
+        use kuro_node::attrs::inspect_options::AttrInspectOptions;
+        if let Some(attr) = node.get("strip_include_prefix", AttrInspectOptions::All) {
+            if let ConfiguredAttr::String(s) = &attr.value {
+                let trimmed = s.0.as_str().trim_start_matches('/');
+                if !trimmed.is_empty() {
+                    let pkg_path = target.pkg().cell_relative_path().as_str();
+                    let include_dir = if kuro_core::cells::is_root_cell_name(cell_name) {
+                        if pkg_path.is_empty() {
+                            trimmed.to_owned()
+                        } else {
+                            format!("{}/{}", pkg_path, trimmed)
+                        }
+                    } else if pkg_path.is_empty() {
+                        format!("external/{}/{}", cell_name, trimmed)
+                    } else {
+                        format!("external/{}/{}/{}", cell_name, pkg_path, trimmed)
+                    };
+                    kuro_build_api::interpreter::rule_defs::cc_common::register_external_include_dir(
+                        &include_dir,
+                    );
+                }
+            }
+        }
     }
 
     let heap = FrozenHeap::new();
