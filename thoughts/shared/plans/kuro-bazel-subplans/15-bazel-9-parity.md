@@ -540,9 +540,91 @@ Other output-declaring callers (`ctx.actions.declare_output`,
 `ctx.actions.write`, etc.) keep the default Configuration layout —
 intermediate outputs that don't need to match Bazel's bin-dir shape.
 
-### 15.5.5 Shell-quoting for string-define values (OPEN, BLOCKING Support compile)
+### 15.5.5 Shell-quoting for string-define values (LANDED)
 
-**Status:** Open. Next blocker after 15.5.4 landed.
+**Status:** Landed in commit `53e04f4` (2026-04-18). Root cause was
+not shell-escaping but Starlark raw-string lexer divergence from
+Python/Bazel spec.
+
+Python's r-string spec: inside `r"..."`, a backslash followed by a
+matching quote does not end the string, but the backslash **remains**
+in the result. `r"\""` is the two-char string `\"`.
+
+Kuro's lexer (`starlark-rust/starlark_syntax/src/lexer.rs:393-403`)
+dropped the backslash for that case. So
+`r'LLVM_VERSION_STRING=\"23.0.0git\"'` produced
+`LLVM_VERSION_STRING="23.0.0git"` in Starlark memory (with literal
+quotes) instead of `LLVM_VERSION_STRING=\"23.0.0git\"` (with literal
+backslashes). rules_cc's `_tokenize` in cc_helper.bzl then stripped
+the literal quotes during shell-style tokenisation, yielding
+`LLVM_VERSION_STRING=23.0.0git` (no quotes at all) — a malformed
+numeric token during `#define PACKAGE_VERSION LLVM_VERSION_STRING`
+expansion.
+
+Fix: preserve the backslash in the raw-string escape path. Tests
+updated in `lexer_tests::test_string_lit` and the f_string golden.
+
+**Parity source:** Python Language Reference §2.4.1.1 "String and
+Bytes literals". Bazel's Starlark follows Python raw-string
+semantics.
+
+### 15.5.6 `strip_include_prefix` for cc_library (LANDED)
+
+**Status:** Landed in commit `0defacf` (2026-04-18).
+
+cc_library's `strip_include_prefix = "include"` was ignored in both
+paths:
+
+- Native stub (`app/kuro_analysis/src/analysis/native_rule_analysis.rs`)
+  didn't look at the attribute.
+- `cc_common.compile` handler derived the include dir from `srcs`
+  (broken for hdrs-only libraries) and used the wrong path formula
+  (`external/<cell>/<strip_prefix>` instead of
+  `external/<cell>/<pkg>/<strip_prefix>`).
+
+Both fixed. The `cc_common.compile` path also appends the derived
+include dir to the returned `CcCompilationContext.includes` so
+dependents pick it up through normal provider propagation, not only
+via the in-session `register_external_include_dir` global.
+
+**Parity source:** `src/main/java/com/google/devtools/build/lib/rules/cpp/CcCompilationHelper.java`
+— `stripIncludePrefix` + `CcCompilationContext.headerInfo.headers`.
+
+### 15.5.7 `Label("//:...")` in repo rule inserts spurious `_main/` (OPEN)
+
+**Status:** Open. Pre-existing blocker surfaced by `kuro clean` +
+full re-materialization.
+
+`Label("//:llvm/CMakeLists.txt")` evaluated inside
+`llvm_configure._llvm_configure_impl` (running in the
+`@llvm-project` extension repo) resolves to:
+
+```
+bazel-external/llvm-project/_main/llvm/CMakeLists.txt
+```
+
+The extra `_main/` segment is the bzlmod canonical name of the root
+workspace; it shouldn't appear in the resolved path. `_main` is the
+root-module canonical name in bzlmod — so the Label is being stamped
+with the wrong "current repo" when evaluated inside a repo rule.
+Fixing this likely requires the repo_ctx machinery to supply its own
+repo as the Label's implicit repo instead of falling back to `_main`.
+
+**Location to investigate:**
+`app/kuro_interpreter_for_build/src/repository_ctx.rs::resolve_label_to_path`
+(handles string-label path arguments) and its Label-object sibling.
+The Label's repo attribute at construction time is what matters —
+check how `Label(...)` inside a repo rule's Starlark sets the repo
+context.
+
+**Impact:** Blocks any `kuro clean` + rebuild scenario for
+llvm-project. Does NOT block the already-materialized scenario
+(session state observed earlier had a working repo on disk from a
+prior successful materialisation).
+
+**Parity source:** Bazel 9's
+`src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkRepositoryModule.java`
+— how Label() resolves inside `repository_ctx` callbacks.
 
 `@llvm-project//llvm:Support` compiles 25 files, then fails on
 `config.h`'s `PACKAGE_VERSION` expansion:
@@ -561,13 +643,8 @@ double quotes. kuro emits `-DLLVM_VERSION_STRING=23.0.0git` (quotes
 stripped), so preprocessor expansion turns `23.0.0git` into a malformed
 numeric token.
 
-Needs investigation in kuro's defines argument emission —
-`cc_common.compile`'s `defines` handling or lower-level shell-escape
-code that drops the escape-double-quote sequence.
-
-**Parity source:** Bazel's `CcCommon.computeCcFlags` +
-`ShellUtils.shellEscape` chain — defines propagate to the shell
-with correct escaping for literal quotes in the value.
+Root cause: raw-string lexer in starlark-rust drops the backslash in
+`\"` / `\'` escapes (see 15.5.5 notes).
 
 ## Dependencies and ordering
 
