@@ -590,10 +590,23 @@ via the in-session `register_external_include_dir` global.
 **Parity source:** `src/main/java/com/google/devtools/build/lib/rules/cpp/CcCompilationHelper.java`
 — `stripIncludePrefix` + `CcCompilationContext.headerInfo.headers`.
 
-### 15.5.7 `Label("//:...")` in repo rule inserts spurious `_main/` (OPEN)
+### 15.5.7 `Label("//:...")` in repo rule inserts spurious `_main/` (LANDED)
 
-**Status:** Open. Pre-existing blocker surfaced by `kuro clean` +
-full re-materialization.
+**Status:** Landed in commit `ac28913` (2026-04-18). Fixed cell-name
+extraction from bazel-external directory names. Module-extension
+canonical layouts of the form `{owner}+{extension}+{repo_name}` (e.g.
+`_main+llvm_repos_extension+llvm-raw`) were being stripped at the
+first `+`, yielding `_main` instead of the apparent `llvm-raw`.
+
+Three cases now handled in
+`app/kuro_interpreter_for_build/src/interpreter/natives.rs::extract_cell_and_package_from_filename`:
+- 0 `+` segments: plain name (e.g. `llvm-project`)
+- 1 segment: bzlmod module cell `{name}+{version}` → first segment
+- 2+ segments: canonical extension repo → last segment
+
+Verified via `rm -rf bazel-external && kuro build @llvm-project//llvm:Support`:
+llvm_configure re-materializes correctly; its `Label("//:...")` now
+resolves to the correct cell.
 
 `Label("//:llvm/CMakeLists.txt")` evaluated inside
 `llvm_configure._llvm_configure_impl` (running in the
@@ -625,6 +638,62 @@ prior successful materialisation).
 **Parity source:** Bazel 9's
 `src/main/java/com/google/devtools/build/lib/bazel/repository/starlark/StarlarkRepositoryModule.java`
 — how Label() resolves inside `repository_ctx` callbacks.
+
+### 15.5.8 Transitive hdrs not threaded into cc compile action inputs (LANDED)
+
+**Status:** Landed in commit `5f64d82` (2026-04-18).
+
+`cc_common.compile` invoked `actions.run()` with only (args, outputs,
+category, identifier, progress) — no `inputs=` kwarg. Generated hdrs
+referenced via `-I` flags (e.g., `abi-breaking.h` from
+`expand_template`) were not declared as action inputs, so kuro's
+scheduler didn't build them before the consuming compile ran. The
+`-I` path pointed at a location that didn't exist yet.
+
+Fix: collect hdr artifacts from `public_hdrs` / `private_hdrs` /
+`textual_hdrs` and from each dep `CcCompilationContext.headers`
+depset. Pass the list as `inputs=` to both PIC and non-PIC
+`actions.run()` calls. `inputs` is handled by `actions.run`'s
+`bazel_inputs` pathway (tracks as dependency, runs dep actions first).
+
+Effect on `@llvm-project//llvm:Support`: command count jumps from 43
+(just the compile actions that used to fail) to 83 (dep actions +
+compile actions) — generated hdrs materialize before their consumers
+compile.
+
+### 15.5.9 rules_cc cc_library short-circuits for hdrs-only libraries (OPEN)
+
+**Status:** Open. Surfaced after 15.5.8 landed.
+
+Tracing `STARLARK_ANALYSIS` and `fn cc_common.compile` enter-points
+shows:
+- `@llvm-project//third-party/siphash:siphash` dispatches via
+  `STARLARK_ANALYSIS` to `rules_cc//cc/private/rules_impl/cc_library.bzl@llvm-project:cc_library`
+- `cc_common.compile` is **never called** for it
+
+`kuro build @llvm-project//third-party/siphash:siphash` completes
+successfully but prints "does not have any outputs". Starlark cc_library
+impl must be exiting early before reaching `cc_common.compile` when
+srcs is empty (hdrs-only library). As a result, the
+strip_include_prefix handling in kuro's `cc_common.compile` never
+runs for siphash — Support's compile still can't find
+`siphash/SipHash.h`.
+
+**To investigate:**
+- Does rules_cc's `cc_library.bzl` have an early-exit when no srcs?
+  (line 56 unconditionally calls `cc_common.compile`, but earlier
+  checks may return before reaching it)
+- Does kuro's Starlark rule invocation path silently swallow an
+  exception from `find_cc_toolchain` / `check_cpp_modules` /
+  `configure_features`?
+- Alternative: move strip_include_prefix handling out of
+  `cc_common.compile` and into the cc_library rule impl, or into a
+  separate provider-construction pass that runs even when there are
+  no srcs.
+
+**Parity source:** `@rules_cc//cc/private/rules_impl/cc_library.bzl:56-81`
+— `cc_common.compile` invocation; investigate any guards that could
+skip it for hdrs-only targets.
 
 `@llvm-project//llvm:Support` compiles 25 files, then fails on
 `config.h`'s `PACKAGE_VERSION` expansion:
