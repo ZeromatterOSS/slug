@@ -183,6 +183,84 @@ fn maybe_inject_test_info<'v>(
     Ok(list_res)
 }
 
+/// Bazel convention: if a rule declares outputs via `attr.output` /
+/// `attr.output_list` and the implementation does not return a DefaultInfo
+/// provider, the declared outputs become the target's `default_outputs`.
+///
+/// Kuro rule impls otherwise get an empty DefaultInfo auto-injected by
+/// `ProviderCollection::try_from_value_subtarget`, which yields a target
+/// with no outputs — cf. `bazel_skylib//rules:expand_template.bzl`, whose
+/// impl is `ctx.actions.expand_template(... output = ctx.outputs.out ...)`
+/// with no `return` statement.
+///
+/// This helper inspects `list_res`. If no DefaultInfo is present, it builds
+/// one from the artifacts declared via `ctx.outputs.<name>` for each
+/// `attr.output` attribute and appends it to the provider list. If
+/// DefaultInfo is already present, the rule author's version wins (even if
+/// it has empty `default_outputs`).
+fn maybe_inject_implicit_default_info<'v>(
+    eval: &mut Evaluator<'v, '_, '_>,
+    ctx: starlark::values::ValueTyped<
+        'v,
+        kuro_build_api::interpreter::rule_defs::context::AnalysisContext<'v>,
+    >,
+    list_res: Value<'v>,
+    output_attr_names: &[String],
+) -> kuro_error::Result<Value<'v>> {
+    if output_attr_names.is_empty() {
+        return Ok(list_res);
+    }
+
+    let default_info_id = DefaultInfoCallable::provider_id();
+
+    // Detect whether the impl already returned a DefaultInfo.
+    let existing_providers: Vec<Value<'v>> = if list_res.is_none() {
+        Vec::new()
+    } else if let Some(list) = ListRef::from_value(list_res) {
+        list.iter().collect()
+    } else if <ValueAsProviderLike as starlark::values::UnpackValue>::unpack_value(list_res)
+        .ok()
+        .flatten()
+        .is_some()
+    {
+        vec![list_res]
+    } else {
+        // struct(providers=[...]), unknown shape, etc. — let downstream error if needed.
+        return Ok(list_res);
+    };
+
+    let has_default_info = existing_providers.iter().any(|v| {
+        if v.is_none() {
+            return false;
+        }
+        match <ValueAsProviderLike as starlark::values::UnpackValue>::unpack_value(*v) {
+            Ok(Some(p)) => p.provider_id() == default_info_id,
+            _ => false,
+        }
+    });
+    if has_default_info {
+        return Ok(list_res);
+    }
+
+    let heap = eval.heap();
+    let artifacts = ctx
+        .as_ref()
+        .collect_implicit_default_outputs(output_attr_names, heap);
+    if artifacts.is_empty() {
+        return Ok(list_res);
+    }
+
+    let default_info = kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::DefaultInfo::with_default_outputs(
+        heap,
+        artifacts,
+    );
+    let default_info_value = heap.alloc(default_info);
+
+    let mut new_list = existing_providers;
+    new_list.push(default_info_value);
+    Ok(heap.alloc(new_list))
+}
+
 #[derive(kuro_error::Error, Debug)]
 #[kuro(tag = Tier0)]
 enum AnalysisError {
@@ -305,6 +383,15 @@ pub trait RuleSpec: Sync {
     /// Returns the implicit output patterns from `rule(outputs={...})`.
     /// Each pair is (name, pattern) where pattern may contain `%{name}`.
     fn rule_outputs(&self) -> Vec<(String, String)> {
+        Vec::new()
+    }
+
+    /// Names of `attr.output()` / `attr.output_list()` attributes on this rule.
+    /// Used at analysis time to auto-populate `DefaultInfo.default_outputs`
+    /// from declared outputs when a rule impl does not return DefaultInfo
+    /// (Bazel convention — see e.g. bazel_skylib's `expand_template` which
+    /// returns `None` and relies on implicit default-output inference).
+    fn output_attr_names(&self) -> Vec<String> {
         Vec::new()
     }
 
@@ -1011,6 +1098,22 @@ async fn run_analysis_with_env_underlying(
 
             let list_res = analysis_env.rule_spec.invoke(&mut eval, ctx)?;
 
+            // Bazel convention: when a rule declares outputs via `attr.output`
+            // / `attr.output_list` and the impl does not return DefaultInfo
+            // explicitly, those declared files become the `default_outputs`.
+            // Example: bazel_skylib's `expand_template` returns `None` and
+            // relies on this to make its generated file the default output.
+            //
+            // Compute implicit outputs now (while the actions registry is
+            // still live) and, if the impl did not supply DefaultInfo,
+            // inject one carrying them.
+            let list_res = maybe_inject_implicit_default_info(
+                &mut eval,
+                ctx,
+                list_res,
+                &analysis_env.rule_spec.output_attr_names(),
+            )?;
+
             Ok((ctx, list_res))
         })?;
 
@@ -1182,6 +1285,7 @@ pub fn get_user_defined_rule_spec(
         module: FrozenModule,
         name: String,
         implicit_rule_outputs: Vec<(String, String)>,
+        output_attr_names: Vec<String>,
         toolchain_types: Vec<String>,
         exec_group_defs: Vec<(String, kuro_node::rule::ExecGroupDef)>,
     }
@@ -1218,6 +1322,10 @@ pub fn get_user_defined_rule_spec(
             self.implicit_rule_outputs.clone()
         }
 
+        fn output_attr_names(&self) -> Vec<String> {
+            self.output_attr_names.clone()
+        }
+
         fn toolchain_types(&self) -> Vec<String> {
             self.toolchain_types.clone()
         }
@@ -1227,26 +1335,29 @@ pub fn get_user_defined_rule_spec(
         }
     }
 
-    // Extract rule(outputs={...}) patterns, toolchain_types, and exec_group_defs from the frozen callable.
-    let (implicit_rule_outputs, toolchain_types, exec_group_defs) =
+    // Extract rule(outputs={...}) patterns, attr.output names, toolchain_types,
+    // and exec_group_defs from the frozen callable.
+    let (implicit_rule_outputs, output_attr_names, toolchain_types, exec_group_defs) =
         if let Ok((val, _)) = module.get_any_visibility(&rule_type.name) {
             if let Ok(typed) = val.downcast::<FrozenStarlarkRuleCallable>() {
                 (
                     typed.as_ref().rule_outputs().to_vec(),
+                    typed.as_ref().output_attr_names().to_vec(),
                     typed.as_ref().toolchain_types().to_vec(),
                     typed.as_ref().exec_group_defs().to_vec(),
                 )
             } else {
-                (Vec::new(), Vec::new(), Vec::new())
+                (Vec::new(), Vec::new(), Vec::new(), Vec::new())
             }
         } else {
-            (Vec::new(), Vec::new(), Vec::new())
+            (Vec::new(), Vec::new(), Vec::new(), Vec::new())
         };
 
     Impl {
         module,
         name: rule_type.name.clone(),
         implicit_rule_outputs,
+        output_attr_names,
         toolchain_types,
         exec_group_defs,
     }

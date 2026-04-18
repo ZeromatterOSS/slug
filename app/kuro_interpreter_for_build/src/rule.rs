@@ -725,6 +725,14 @@ impl FrozenStarlarkRuleCallable {
         &self.rule_outputs
     }
 
+    /// Names of `attr.output()` / `attr.output_list()` attributes on this rule.
+    /// Used during analysis to infer implicit `DefaultInfo.default_outputs` when
+    /// the rule impl declares outputs but does not return DefaultInfo (Bazel
+    /// convention; e.g. bazel_skylib's `expand_template`).
+    pub fn output_attr_names(&self) -> &[String] {
+        &self.output_attr_names
+    }
+
     /// Returns the toolchain type labels declared on this rule.
     pub fn toolchain_types(&self) -> &[String] {
         &self.toolchain_types

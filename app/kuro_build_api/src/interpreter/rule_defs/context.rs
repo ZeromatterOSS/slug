@@ -301,6 +301,68 @@ impl<'v> AnalysisContext<'v> {
             .expect("nothing to have stolen state yet")
     }
 
+    /// Collect declared artifacts for the named `attr.output` / `attr.output_list`
+    /// attributes. Used by `run_analysis` to auto-populate
+    /// `DefaultInfo.default_outputs` when a rule impl declares outputs via
+    /// `attr.output` but does not return DefaultInfo explicitly (Bazel convention).
+    ///
+    /// Must be called while the analysis registry is still live (i.e. before
+    /// `take_state`). Attributes that are not present, are empty, or whose
+    /// `ctx.outputs.<name>` access fails are silently skipped; downstream
+    /// validation will still fire if the rule genuinely produced nothing.
+    pub fn collect_implicit_default_outputs(
+        &self,
+        names: &[String],
+        heap: Heap<'v>,
+    ) -> Vec<Value<'v>> {
+        if names.is_empty() {
+            return Vec::new();
+        }
+
+        // Ensure the CtxOutputs wrapper exists (it's built lazily on first
+        // Starlark access; we may be invoked even if the rule impl never
+        // touched `ctx.outputs`).
+        let outputs_val = {
+            let borrow = self.outputs.borrow();
+            match borrow.as_ref().copied() {
+                Some(v) => v,
+                None => {
+                    drop(borrow);
+                    let attrs_val = self.attrs.map(|v| v.get()).unwrap_or_else(Value::new_none);
+                    let target_name = self
+                        .label
+                        .as_ref()
+                        .map(|l| l.label().target().name().as_str().to_owned())
+                        .unwrap_or_else(|| "output".to_owned());
+                    let v = heap.alloc(CtxOutputs {
+                        attrs: attrs_val,
+                        actions: self.actions,
+                        declared: RefCell::new(SmallMap::new()),
+                        target_name,
+                        rule_outputs: self.rule_outputs.clone(),
+                    });
+                    *self.outputs.borrow_mut() = Some(v);
+                    v
+                }
+            }
+        };
+
+        let mut out = Vec::new();
+        for name in names {
+            let Some(v) = outputs_val.get_attr(name, heap).ok().flatten() else {
+                continue;
+            };
+            if let Some(list) = starlark::values::list::ListRef::from_value(v) {
+                for el in list.iter() {
+                    out.push(el);
+                }
+            } else {
+                out.push(v);
+            }
+        }
+        out
+    }
+
     /// Returns true if this target is being built in exec (tool) configuration.
     /// In Bazel, this means the target is a build tool that runs on the host machine.
     fn is_tool_configuration(&self) -> bool {

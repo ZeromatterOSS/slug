@@ -213,6 +213,30 @@ impl<'v> DefaultInfo<'v> {
         }
     }
 
+    /// Create a DefaultInfo with the given artifacts as `default_outputs`.
+    ///
+    /// Used to auto-populate `default_outputs` from a rule's `attr.output` declarations
+    /// when the rule implementation does not return DefaultInfo explicitly. Matches
+    /// Bazel's implicit-default-output convention (see e.g. bazel_skylib's
+    /// `expand_template`, which declares outputs via `attr.output` and returns `None`).
+    pub fn with_default_outputs(heap: Heap<'v>, artifacts: Vec<Value<'v>>) -> Self {
+        let sub_targets = ValueOfUnchecked::<DictType<_, _>>::new(heap.alloc(AllocDict::EMPTY));
+        let default_outputs =
+            ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList(artifacts)));
+        let other_outputs = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
+        let default_runfiles = ValueOfUnchecked::<FrozenValue>::new(empty_runfiles_value(heap));
+        let data_runfiles = ValueOfUnchecked::<FrozenValue>::new(empty_runfiles_value(heap));
+        let executable = ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY));
+        DefaultInfo {
+            sub_targets,
+            default_outputs,
+            other_outputs,
+            default_runfiles,
+            data_runfiles,
+            executable,
+        }
+    }
+
     /// Create a DefaultInfo containing a single artifact as the default output.
     ///
     /// This is used to provide Bazel-compatible semantics where source files (artifacts)
