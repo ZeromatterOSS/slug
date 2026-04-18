@@ -661,39 +661,65 @@ Effect on `@llvm-project//llvm:Support`: command count jumps from 43
 compile actions) — generated hdrs materialize before their consumers
 compile.
 
-### 15.5.9 rules_cc cc_library short-circuits for hdrs-only libraries (OPEN)
+### 15.5.9 rules_cc `cc_common.compile` is Starlark, not kuro's native (OPEN)
 
-**Status:** Open. Surfaced after 15.5.8 landed.
+**Status:** Open. Deep investigation this session; not yet resolved.
 
-Tracing `STARLARK_ANALYSIS` and `fn cc_common.compile` enter-points
-shows:
-- `@llvm-project//third-party/siphash:siphash` dispatches via
-  `STARLARK_ANALYSIS` to `rules_cc//cc/private/rules_impl/cc_library.bzl@llvm-project:cc_library`
-- `cc_common.compile` is **never called** for it
+Key finding: `cc_common.compile` in the `@llvm-project` build is **not**
+kuro's native implementation in
+`app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs::fn compile`.
+It's rules_cc's Starlark impl at
+`@rules_cc//cc/private/compile:compile.bzl` (2295 lines), imported via
+`@rules_cc//cc/common:cc_common.bzl` →
+`@cc_compatibility_proxy//:symbols.bzl` →
+`@rules_cc//cc/private:cc_common.bzl`.
 
-`kuro build @llvm-project//third-party/siphash:siphash` completes
-successfully but prints "does not have any outputs". Starlark cc_library
-impl must be exiting early before reaching `cc_common.compile` when
-srcs is empty (hdrs-only library). As a result, the
-strip_include_prefix handling in kuro's `cc_common.compile` never
-runs for siphash — Support's compile still can't find
-`siphash/SipHash.h`.
+Implication: every fix landed in kuro's native
+`cc_common.compile` (e.g., 15.5.6 strip_include_prefix handling) is
+unreachable for targets loaded via `@rules_cc//cc:defs.bzl` (which is
+all of llvm-project's cc_library usage). Those fixes apply only to
+targets that hit kuro's native stub — not the Starlark-intercepted path.
 
-**To investigate:**
-- Does rules_cc's `cc_library.bzl` have an early-exit when no srcs?
-  (line 56 unconditionally calls `cc_common.compile`, but earlier
-  checks may return before reaching it)
-- Does kuro's Starlark rule invocation path silently swallow an
-  exception from `find_cc_toolchain` / `check_cpp_modules` /
-  `configure_features`?
-- Alternative: move strip_include_prefix handling out of
-  `cc_common.compile` and into the cc_library rule impl, or into a
-  separate provider-construction pass that runs even when there are
-  no srcs.
+Concrete failure: `@llvm-project//third-party/siphash:siphash` runs
+`STARLARK_ANALYSIS` with `fn=rules_cc//cc/private/rules_impl/cc_library.bzl@llvm-project:cc_library`,
+produces empty outputs, and never reaches either kuro's native
+`cc_common.compile` OR `actions.declare_shareable_artifact` (verified
+via tracing — call count 0). That means rules_cc's Starlark
+`_compute_public_headers` (in `cc/private/compile/cc_compilation_helper.bzl`)
+is not running, even though the target has non-empty `hdrs` and
+`strip_include_prefix="include"`. Something in the rules_cc analysis
+flow exits before header processing.
 
-**Parity source:** `@rules_cc//cc/private/rules_impl/cc_library.bzl:56-81`
-— `cc_common.compile` invocation; investigate any guards that could
-skip it for hdrs-only targets.
+Also experimented: switching `declare_shareable_artifact` to use
+`BuckOutPathKind::BazelOutput` dropped command count from 83 to 15,
+suggesting the path change breaks downstream analysis in ways not
+yet understood. Reverted — keeping `Configuration` layout for now.
+
+**Likely investigation paths:**
+- rules_cc's `cc_library.bzl` early-exit conditions (prior to line 56
+  `cc_common.compile` call): `semantics.validate`,
+  `cc_helper.check_srcs_extensions`, `find_cc_toolchain`,
+  `cc_common.configure_features`, `cc_helper.check_cpp_modules`.
+  Any of these returning or raising could silently bail.
+- kuro's Starlark rule-invocation path may be swallowing analysis
+  errors in ways that hide the actual failure. Check
+  `kuro_analysis::analysis::env::run_analysis` error handling.
+- rules_cc's `cc_compilation_helper.bzl::_compute_public_headers`
+  early-return at line 106-122 (when `strip_prefix == None AND not
+  include_prefix`): siphash has `strip_include_prefix="include"`, so
+  strip_prefix should not be None — but `paths.relativize` /
+  `get_relative_path` may compute an unexpected value.
+
+**Quick-win alternative:** add handling for `strip_include_prefix` at
+the cc_library rule impl's caller level (not inside
+`cc_common.compile`), e.g., via kuro's native cc_library stub, so
+strip_include_prefix works regardless of whether Starlark compile
+runs.
+
+**Parity source:** `@rules_cc//cc/private/compile:compile.bzl` +
+`@rules_cc//cc/private/compile:cc_compilation_helper.bzl::_compute_public_headers`
+— how Bazel's Starlark implementation generates virtual-includes
+symlinks and propagates the virtual_include_dir through CcInfo.
 
 `@llvm-project//llvm:Support` compiles 25 files, then fails on
 `config.h`'s `PACKAGE_VERSION` expansion:
