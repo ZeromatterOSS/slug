@@ -52,6 +52,25 @@ pub enum BuckOutPathKind {
 
     /// A path that contains the content hash of the artifact stored at the path.
     ContentHash,
+
+    /// A Bazel-shaped output path: the `__<target>__/` segment is omitted, and
+    /// non-root cells get an `external/<cell_name>/` prefix. Used for
+    /// `attr.output` / `attr.output_list` declarations so that downstream
+    /// `cc_library(hdrs=[...])` and similar consumers find generated files at
+    /// the include-path locations produced by `bin_dir + <pkg>/<include>`.
+    ///
+    /// The full resolved layout is:
+    ///
+    /// ```text
+    /// buck-out/v2/gen/<cell>/<cfg_hash>/[external/<cell>/]<pkg>/<out_path>
+    /// ```
+    ///
+    /// vs. the default `Configuration` layout:
+    ///
+    /// ```text
+    /// buck-out/v2/gen/<cell>/<cfg_hash>/<pkg>/__<target>__/<out_path>
+    /// ```
+    BazelOutput,
 }
 
 #[derive(

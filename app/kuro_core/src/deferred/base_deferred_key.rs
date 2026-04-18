@@ -163,6 +163,59 @@ impl BaseDeferredKey {
                 // It is performance critical that we use slices and allocate via `join` instead of
                 // repeated calls to `join` on the path object because `join` allocates on each call,
                 // which has a significant impact.
+                // Bazel-shaped output path: no `__<target>__/` segment, with
+                // an `external/<cell>/` prefix before the package for non-root
+                // cells. Used by `attr.output` / `attr.output_list` declarations
+                // so generated headers land at the include-path locations
+                // produced by `bin_dir + <pkg>/<include_dir>` (matches
+                // `bazel-bin/external/<repo>/<pkg>/...`).
+                if matches!(path_resolution_method, BuckOutPathKind::BazelOutput) {
+                    let cell_name_str = target.pkg().cell_name().as_str();
+                    let is_root = crate::cells::is_root_cell_name(cell_name_str);
+                    let bazel_path = if is_root {
+                        [
+                            base.as_str(),
+                            "/",
+                            prefix.as_str(),
+                            "/",
+                            cell_name_str,
+                            "/",
+                            target.cfg().output_hash().as_str(),
+                            "/",
+                            cell_relative_path,
+                            if cell_relative_path.is_empty() {
+                                ""
+                            } else {
+                                "/"
+                            },
+                            path.as_str(),
+                        ]
+                        .concat()
+                    } else {
+                        [
+                            base.as_str(),
+                            "/",
+                            prefix.as_str(),
+                            "/",
+                            cell_name_str,
+                            "/",
+                            target.cfg().output_hash().as_str(),
+                            "/external/",
+                            cell_name_str,
+                            "/",
+                            cell_relative_path,
+                            if cell_relative_path.is_empty() {
+                                ""
+                            } else {
+                                "/"
+                            },
+                            path.as_str(),
+                        ]
+                        .concat()
+                    };
+                    return Ok(ProjectRelativePathBuf::unchecked_new(bazel_path));
+                }
+
                 let path_identifier = match path_resolution_method {
                     BuckOutPathKind::Configuration => [
                         target.cfg().output_hash().as_str(),
@@ -221,6 +274,10 @@ impl BaseDeferredKey {
                                 path.to_buf(),
                             ))?;
                         }
+                    }
+                    BuckOutPathKind::BazelOutput => {
+                        // Handled above; unreachable but explicit to satisfy the match.
+                        unreachable!("BazelOutput handled above");
                     }
                 };
                 let path_or_hash = if fully_hash_path {

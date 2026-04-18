@@ -1965,6 +1965,11 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
         use crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
         use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 
+        // Outputs declared via `ctx.outputs.<name>` from `attr.output` /
+        // `attr.output_list` attributes use the Bazel-shaped path layout so
+        // that `cc_library(hdrs=[...])` consumers find generated headers at
+        // the include-path locations that follow Bazel's `bazel-bin/<pkg>/...`
+        // convention (with `external/<cell>/` prefix for external cells).
         let declare_file = |filename: &str| -> Option<Value<'v>> {
             if filename.is_empty() {
                 return None;
@@ -1978,7 +1983,7 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
                     filename,
                     OutputType::File,
                     None,
-                    BuckOutPathKind::default(),
+                    BuckOutPathKind::BazelOutput,
                     heap,
                 )
                 .ok()?;

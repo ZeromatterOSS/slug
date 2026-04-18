@@ -195,9 +195,42 @@ impl ArtifactPath<'_> {
                     // Escape target name (replace = with special sequence)
                     let escaped_target_name = target_name.replace('=', "__EQ__");
 
-                    // Build the full path
-                    // Path format: buck-out/v2/gen/<cell>/<cfg_hash>[/<pkg_path>]/__<target>__/<artifact_path>
-                    let full_path = if cell_relative_path.is_empty() {
+                    // Bazel-shaped output path: omit the `__<target>__/` segment
+                    // and prefix `external/<cell>/` for non-root cells so that
+                    // `cc_library(hdrs=[...])` consumers find generated headers
+                    // at `<bin_dir>/external/<cell>/<pkg>/<include>/<hdr>`.
+                    // Kept in sync with `BaseDeferredKey::make_hashed_path`.
+                    let full_path = if matches!(
+                        buck_out.path_resolution_method(),
+                        kuro_core::fs::buck_out_path::BuckOutPathKind::BazelOutput
+                    ) {
+                        let joined = artifact_path.join(self.projected_path);
+                        let is_root = kuro_core::cells::is_root_cell_name(cell_name);
+                        match (is_root, cell_relative_path.is_empty()) {
+                            (true, true) => {
+                                format!("buck-out/v2/gen/{}/{}/{}", cell_name, cfg_hash, joined)
+                            }
+                            (true, false) => {
+                                format!(
+                                    "buck-out/v2/gen/{}/{}/{}/{}",
+                                    cell_name, cfg_hash, cell_relative_path, joined
+                                )
+                            }
+                            (false, true) => {
+                                format!(
+                                    "buck-out/v2/gen/{}/{}/external/{}/{}",
+                                    cell_name, cfg_hash, cell_name, joined
+                                )
+                            }
+                            (false, false) => {
+                                format!(
+                                    "buck-out/v2/gen/{}/{}/external/{}/{}/{}",
+                                    cell_name, cfg_hash, cell_name, cell_relative_path, joined
+                                )
+                            }
+                        }
+                    } else if cell_relative_path.is_empty() {
+                        // Path format: buck-out/v2/gen/<cell>/<cfg_hash>/__<target>__/<artifact_path>
                         format!(
                             "buck-out/v2/gen/{}/{}/__{}__/{}",
                             cell_name,

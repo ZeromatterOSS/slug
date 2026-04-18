@@ -186,6 +186,37 @@ impl BaseDeferredKeyDyn for AspectDeferredKey {
                     ))?;
                 }
             }
+            BuckOutPathKind::BazelOutput => {
+                // Aspects don't currently participate in `attr.output` declarations;
+                // fall back to the Configuration layout so aspect outputs remain
+                // addressable. Revisit if aspects need Bazel-shaped outputs.
+                [
+                    target.cfg().output_hash().as_str(),
+                    if target.exec_cfg().is_some() { "-" } else { "" },
+                    target
+                        .exec_cfg()
+                        .as_ref()
+                        .map_or("", |x| x.output_hash().as_str()),
+                    "/",
+                    cell_relative_path,
+                    if cell_relative_path.is_empty() {
+                        ""
+                    } else {
+                        "/"
+                    },
+                    "__",
+                    escaped_target_name.as_ref(),
+                    "__",
+                    "/",
+                    if action_key.is_none() {
+                        ""
+                    } else {
+                        "__action__"
+                    },
+                    action_key.unwrap_or_default(),
+                    if action_key.is_none() { "" } else { "__/" },
+                ]
+            }
         };
 
         let path_str = path_identifier.concat();
