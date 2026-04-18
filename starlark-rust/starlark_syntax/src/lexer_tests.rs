@@ -242,10 +242,14 @@ fn test_string_lit() {
         lex("'''''' '''\\n''' '''\n''' \"\"\"\"\"\" \"\"\"\\n\"\"\" \"\"\"\n\"\"\""),
         "\"\" \"\\n\" \"\\n\" \"\" \"\\n\" \"\\n\" \n"
     );
-    // Raw string
+    // Raw string: Python/Bazel semantics — even when a backslash escapes a
+    // matching quote so that it does not end the string, the backslash itself
+    // is preserved in the result (cf. Python docs "Even in a raw literal,
+    // quotes can be escaped with a backslash, but the backslash remains in
+    // the result").
     assert_eq!(
         lex("r'' r\"\" r'\\'' r\"\\\"\" r'\"' r\"'\" r'\\n'"),
-        "\"\" \"\" \"\'\" \"\\\"\" \"\\\"\" \"\'\" \"\\\\n\" \n"
+        "\"\" \"\" \"\\\\'\" \"\\\\\\\"\" \"\\\"\" \"\'\" \"\\\\n\" \n"
     );
 }
 

@@ -22,8 +22,8 @@ comment ' Raw f-string'     # # Raw f-string
 new line                    # \n
 f-string ""                 # fr''
 f-string ""                 # fr""
-f-string "'"                # fr'\''
-f-string "\""               # fr"\""
+f-string "\\'"              # fr'\''
+f-string "\\\""             # fr"\""
 f-string "\""               # fr'"'
 f-string "'"                # fr"'"
 f-string "\\n"              # fr'\n'

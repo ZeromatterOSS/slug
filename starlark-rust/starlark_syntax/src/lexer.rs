@@ -392,11 +392,14 @@ impl<'a> Lexer<'a> {
                 }
                 '\\' => {
                     if raw {
+                        // In a raw string, a backslash followed by a matching
+                        // quote character does not end the string, but the
+                        // backslash itself is preserved in the result (matches
+                        // Python and Bazel's Starlark spec: `r"\""` has two
+                        // characters, `\` and `"`).
                         match it.next() {
                             Some(c) => {
-                                if c != '\'' && c != '"' {
-                                    res.push('\\');
-                                }
+                                res.push('\\');
                                 res.push(c);
                             }
                             _ => break, // Out of chars
