@@ -648,9 +648,12 @@ pub(crate) async fn get_file_ops_delegate(
         .into());
     }
 
-    // Declare all source files with the materializer so they exist
-    // at buck-out/v2/external_cells/extension_repo/... paths during action execution.
-    // declare_all_source_artifacts_ext skipped: lazy file tracking via ExtensionRepoFileOpsDelegate
+    // Create a buck-out/v2/external_cells/extension_repo/{canonical_name} symlink
+    // pointing to bazel-external/{canonical_name}. `resolve_external_cell_source`
+    // in buck_out_path.rs builds action command lines that reference source files
+    // at the buck-out path (mirroring how bzlmod cells get a parallel symlink in
+    // legacy_configs/cells.rs). Without this, gcc/clang can't find the actual files.
+    ensure_buck_out_extension_repo_symlink(&project_root_path, &setup.canonical_name);
 
     Ok(Arc::new(ExtensionRepoFileOpsDelegate::new(
         cell_name,
@@ -658,6 +661,63 @@ pub(crate) async fn get_file_ops_delegate(
         source_path,
         digest_config,
     )))
+}
+
+/// Create `buck-out/v2/external_cells/extension_repo/{canonical_name}` as a symlink
+/// to `bazel-external/{canonical_name}` (the materialized repo content).
+///
+/// Action command lines reference sources via the buck-out path computed in
+/// `BuckOutPathResolver::resolve_external_cell_source`. Materialization writes
+/// content under `bazel-external/`, so a symlink bridges the two locations.
+/// Failures are logged but non-fatal; downstream action execution will surface
+/// the missing-file error with the full command context.
+fn ensure_buck_out_extension_repo_symlink(project_root: &std::path::Path, canonical_name: &str) {
+    let source = project_root.join("bazel-external").join(canonical_name);
+    let link_parent = project_root.join("buck-out/v2/external_cells/extension_repo");
+    let link = link_parent.join(canonical_name);
+
+    if let Ok(existing) = std::fs::read_link(&link) {
+        if existing == source {
+            return;
+        }
+        if let Err(e) = std::fs::remove_file(&link) {
+            tracing::warn!(
+                "Failed to remove stale extension_repo symlink {:?}: {}",
+                link,
+                e
+            );
+            return;
+        }
+    } else if link.exists() {
+        tracing::warn!(
+            "buck-out/v2/external_cells/extension_repo/{} exists and is not a symlink — skipping",
+            canonical_name
+        );
+        return;
+    }
+
+    if let Err(e) = std::fs::create_dir_all(&link_parent) {
+        tracing::warn!(
+            "Failed to create extension_repo symlink parent {:?}: {}",
+            link_parent,
+            e
+        );
+        return;
+    }
+
+    #[cfg(unix)]
+    let sym_res = std::os::unix::fs::symlink(&source, &link);
+    #[cfg(windows)]
+    let sym_res = std::os::windows::fs::symlink_dir(&source, &link);
+
+    if let Err(e) = sym_res {
+        tracing::warn!(
+            "Failed to create extension_repo symlink {:?} -> {:?}: {}",
+            link,
+            source,
+            e
+        );
+    }
 }
 
 /// Copy extension repository content to destination.
