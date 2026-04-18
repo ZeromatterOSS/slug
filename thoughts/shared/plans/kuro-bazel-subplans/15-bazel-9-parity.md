@@ -336,6 +336,136 @@ Known candidate areas:
 Running list of API gaps, with per-item parity sources and estimated
 effort. Each gap becomes a sub-plan (15.5.1, 15.5.2, ...) when tackled.
 
+### 15.5.1 CC toolchain `TemplateVariableInfo` propagation (PARTIAL)
+
+**Status:** Minimal unblock landed in commit `fe3639f` (2026-04-17).
+Seeded `STACK_FRAME_UNLIMITED=""` in `ctx.var` static entries so
+`@llvm-project//llvm:llvm` analysis can evaluate rules_cc 0.2.17's
+`_expand_make_variables_for_copts` without failing on
+`$(STACK_FRAME_UNLIMITED) not defined`.
+
+**Remaining work (real plumbing):**
+
+Bazel's `ctx.var` is built by aggregating `TemplateVariableInfo`
+providers from the resolved toolchains declared via
+`rule(toolchains=[...])`. In Bazel, rules_cc's `cc_toolchain` rule
+returns a `TemplateVariableInfo` populated from
+`cc_toolchain._additional_make_variables |
+cc_helper.get_toolchain_global_make_variables(cc_toolchain) |
+cc_helper.get_cc_flags_make_variable(...)` (see
+`@rules_cc//cc/private/rules_impl/cc_toolchain.bzl:135`).
+
+Kuro's `cc_toolchain` is a native stub
+(`app/kuro_analysis/src/analysis/native_rule_analysis.rs:166` —
+`NativeRuleKind::CcToolchain => create_minimal_analysis_result(target)`)
+that returns only `DefaultInfo`. Defaults that Bazel seeds via
+`cc_toolchain_provider_helper.bzl::_additional_make_variables` are
+therefore not published, and `ctx.var` falls back to kuro's hardcoded
+builtin list in `app/kuro_build_api/src/interpreter/rule_defs/context.rs`
+(two active sites: the `ctx.var` attribute and
+`expand_make_variables`).
+
+Target:
+1. Make `ctx.var` (attribute + `expand_make_variables`) gather
+   `TemplateVariableInfo` from `resolved_toolchains_for_ctx`
+   (already computed in `env.rs:859-950`) and merge the variables
+   dict into the returned `Dict`.
+2. Either (a) implement the native `cc_toolchain` rule analysis to
+   return a real `TemplateVariableInfo`, or (b) let rules_cc's
+   Starlark `cc_toolchain` run (requires promoting the native stub
+   to `EmptyRule` per Phase 2 and providing full `cc_common` surface).
+
+**Parity sources:**
+- `@rules_cc//cc/private/rules_impl/cc_toolchain.bzl:135`
+  (`template_vars = cc_toolchain._additional_make_variables | ...`)
+- `@rules_cc//cc/private/rules_impl/cc_toolchain_provider_helper.bzl:65-75`
+  (`_additional_make_variables` — seeds `STACK_FRAME_UNLIMITED=""`)
+- `@rules_cc//cc/common/cc_helper.bzl:583` (`_lookup_var` — order:
+  `additional_vars` first, then `ctx.var`)
+- Bazel CcToolchain impl: `src/main/java/com/google/devtools/build/lib/rules/cpp/`
+
+**Est. effort:** 2-3 days for (1) + (2a); 1-2 weeks for (2b).
+
+### 15.5.2 Extension-repo action-path resolution (LANDED)
+
+**Status:** Fully landed in commits `bfe28b4` and `325e06a`
+(2026-04-17). Two gaps:
+
+1. **Path bridging**: `BuckOutPathResolver::resolve_external_cell_source`
+   in `app/kuro_core/src/fs/buck_out_path.rs:346-348` places action
+   command lines for `ExternalCellOrigin::ExtensionRepo` cells at
+   `buck-out/v2/external_cells/extension_repo/{canonical_name}/...`,
+   but materialization writes content to
+   `bazel-external/{canonical_name}/`. No symlink was being created.
+   Bzlmod cells already did this in
+   `app/kuro_common/src/legacy_configs/cells.rs:822`. Parity fix:
+   `app/kuro_external_cells/src/extension_repo.rs::ensure_buck_out_extension_repo_symlink`.
+
+2. **Symlink-aware directory listing**: `ExtensionRepoFileOpsDelegate::read_dir`
+   classified entries via `DirEntry::file_type()`, which does not
+   follow symlinks. `repository_ctx.symlink(src_dir, dst_dir)` (used
+   by `rules_cc`'s `llvm_configure` to overlay whole subtrees) left
+   entries typed `FileType::Symlink`. `gather_package_listing_impl`
+   in `app/kuro_common/src/package_listing/interpreter.rs:414` only
+   recurses into `FileType::Directory`, so `glob(["lib/Support/*.c"])`
+   returned an empty list. Fix: stat each entry (`tokio::fs::metadata`)
+   to classify by the resolved target's type, falling back to the
+   symlink's own metadata only if the target is broken.
+
+**Related latent bug (not yet fixed):** `IoFileOpsDelegate` in
+`app/kuro_common/src/io/fs.rs:149` has the same behaviour — symlinks
+in a regular cell's source tree classify as `Symlink` and don't
+recurse. No real workspace hits it yet (normal repos don't symlink
+whole subdirs), but Bazel's glob follows symlinks by default, so
+kuro diverges. File as its own sub-plan if a workspace surfaces it.
+
+### 15.5.3 Generated headers not materialized at expected include path (BLOCKING `@llvm-project//llvm:llvm` compile)
+
+**Status:** Open. Next blocker after 15.5.1 and 15.5.2 landed.
+
+After 15.5.2, `@llvm-project//llvm:Support` compiles ~183 source files
+before failing with:
+
+```
+fatal error: llvm/Config/abi-breaking.h: No such file or directory
+```
+
+The header is produced by `expand_template(name="abi_breaking_h_gen",
+out = "include/llvm/Config/abi-breaking.h", template = "...cmake", ...)`
+at `llvm-project-overlay/llvm/BUILD.bazel:151-160`. The compile command
+adds `-Ibuck-out/v2/gen/llvm-project/9b5202f249973417/external/llvm-project/llvm/include`,
+expecting the generated header to appear there. Needs investigation:
+is `expand_template` registering the action, is the output path
+rewritten correctly for extension-repo packages, and does the
+`cc_library(hdrs=[...])` declaration propagate the generated header
+into the `CcCompilationContext` consumed by dependents?
+
+**Parity sources:**
+- `@bazel_skylib//rules/expand_template.bzl` (Starlark implementation
+  used by LLVM BUILD; actions should produce files under the package's
+  genfiles dir)
+- Bazel's `CcCompilationContext.getIncludes()` aggregates generated
+  header directories from transitive deps.
+
+**Est. effort:** unknown until root cause known — 1 day to 1 week.
+
+### 15.5.4 `expand_template` / genrule output resolution for symlinked extension repos
+
+**Status:** Open, possibly a component of 15.5.3.
+
+Action outputs for targets inside an extension-repo package end up at
+`buck-out/v2/gen/{cell}/{cfg_hash}/{package}/...`. For
+`@llvm-project//llvm:abi_breaking_h_gen` that would be
+`buck-out/v2/gen/llvm-project/{hash}/llvm/include/llvm/Config/abi-breaking.h`.
+The compile command references
+`buck-out/v2/gen/llvm-project/{hash}/external/llvm-project/llvm/include/...`
+— note the `external/llvm-project/` segment. That suggests the
+compile's include search path is built from the source-rooted layout
+(`external/<canonical>/...`) rather than the generated-file layout.
+Investigate whether `CcCompilationContext` is correctly translating
+the generated-include-dir into its buck-out-relative form for
+extension-repo cells.
+
 ## Dependencies and ordering
 
 ```

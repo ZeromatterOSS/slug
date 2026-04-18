@@ -1430,3 +1430,35 @@ bounds actual parallelism).
 - Cell external origin: `app/kuro_core/src/cells/external.rs`
 - Artifact path resolver: `app/kuro_core/src/fs/artifact_path_resolver.rs`
 - IO file ops delegate (target model): `app/kuro_common/src/file_ops/io.rs`
+
+## 2026-04-17 continuation: `@llvm-project//llvm:llvm` post-analysis unblocks
+
+Three further commits landed unblocking `@llvm-project//llvm:llvm`
+beyond cquery. These are follow-ons to Plan 10 Phase 7 (specifically
+to the extension-repo materialization path documented here) and have
+been promoted to Plan 15 sub-plans 15.5.1 / 15.5.2 for API-surface
+tracking.
+
+- `fe3639f` — Seed `STACK_FRAME_UNLIMITED=""` in `ctx.var` builtins.
+  Unblocks analysis of rules_cc's `_expand_make_variables_for_copts`.
+  Tracked for real `TemplateVariableInfo` plumbing in 15.5.1.
+- `bfe28b4` — Symlink
+  `buck-out/v2/external_cells/extension_repo/{canonical}` ->
+  `bazel-external/{canonical}` after materialization. Action command
+  lines use the buck-out path (via
+  `BuckOutPathResolver::resolve_external_cell_source`), so action
+  execution needs the content reachable there. Mirrors the bzlmod
+  cell symlinking at `cells.rs:822`.
+- `325e06a` — Follow symlinks in `ExtensionRepoFileOpsDelegate::read_dir`
+  when classifying entry types. `repository_ctx.symlink(src_dir,
+  dst_dir)` materializes whole subtrees as directory symlinks;
+  `DirEntry::file_type()` does not follow, so
+  `gather_package_listing_impl`'s `if d.file_type.is_dir()` test
+  failed and `glob()` returned empty for symlinked subtrees.
+  `IoFileOpsDelegate` has the same latent bug (not yet hit in
+  practice); see 15.5.2.
+
+Current state: `@llvm-project//llvm:llvm` reaches compile stage,
+Support compiles ~183 files, blocks on generated-header resolution
+for `llvm/Config/abi-breaking.h` (an `expand_template` output). That
+remaining blocker is tracked in Plan 15 sub-plan 15.5.3.
