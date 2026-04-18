@@ -243,12 +243,18 @@ impl BaseDeferredKeyDyn for BxlDynamicKeyData {
             "-bxl/",
             label.bxl_path.cell().as_str(),
             "/",
-            if path_resolution_method == BuckOutPathKind::Configuration {
+            if matches!(
+                path_resolution_method,
+                BuckOutPathKind::Configuration | BuckOutPathKind::Shareable
+            ) {
                 exec_platform.as_str()
             } else {
                 ""
             },
-            if path_resolution_method == BuckOutPathKind::Configuration {
+            if matches!(
+                path_resolution_method,
+                BuckOutPathKind::Configuration | BuckOutPathKind::Shareable
+            ) {
                 "/"
             } else {
                 ""
@@ -263,7 +269,10 @@ impl BaseDeferredKeyDyn for BxlDynamicKeyData {
             "__/",
             action_key.unwrap_or_default(),
             if action_key.is_none() { "" } else { "/" },
-            if path_resolution_method == BuckOutPathKind::Configuration {
+            if matches!(
+                path_resolution_method,
+                BuckOutPathKind::Configuration | BuckOutPathKind::Shareable
+            ) {
                 output_hash.as_str()
             } else {
                 if let Some(content_hash) = content_hash {

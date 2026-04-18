@@ -661,60 +661,82 @@ Effect on `@llvm-project//llvm:Support`: command count jumps from 43
 compile actions) — generated hdrs materialize before their consumers
 compile.
 
-### 15.5.9 rules_cc `cc_common.compile` is Starlark, not kuro's native (OPEN)
+### 15.5.9 rules_cc `cc_common.compile` is Starlark, not kuro's native (IN PROGRESS)
 
-**Status:** Open. Deep investigation this session; not yet resolved.
+**Status:** Partially landed. rules_cc's Starlark `cc_common.compile`
+now produces virtual-include symlinks at correct paths and Support's
+compile command receives the right `-I<virtual-includes-dir>` flag,
+but the symlink action fails to run before the consuming compile.
 
-Key finding: `cc_common.compile` in the `@llvm-project` build is **not**
-kuro's native implementation in
-`app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs::fn compile`.
-It's rules_cc's Starlark impl at
-`@rules_cc//cc/private/compile:compile.bzl` (2295 lines), imported via
-`@rules_cc//cc/common:cc_common.bzl` →
+**Path chain**: `@rules_cc//cc/common:cc_common.bzl` →
 `@cc_compatibility_proxy//:symbols.bzl` →
-`@rules_cc//cc/private:cc_common.bzl`.
+`@rules_cc//cc/private:cc_common.bzl` → Starlark `_compile` →
+`compile.bzl::compile` → `cc_compilation_helper.bzl::_compute_public_headers`
+→ `actions.declare_shareable_artifact` + `actions.symlink`.
 
-Implication: every fix landed in kuro's native
-`cc_common.compile` (e.g., 15.5.6 strip_include_prefix handling) is
-unreachable for targets loaded via `@rules_cc//cc:defs.bzl` (which is
-all of llvm-project's cc_library usage). Those fixes apply only to
-targets that hit kuro's native stub — not the Starlark-intercepted path.
+Earlier session's claim "never reaches `cc_common.compile`" was wrong.
+Placing `fail("KURO_TRACE ...")` verifies _cc_library_impl enters
+compile() and returns a compilation_context with a populated
+`virtual_include_path` and two headers (the virtual symlink + the
+source). `declare_shareable_artifact` is called with
+`external/llvm-project/third-party/siphash/_virtual_includes/siphash/siphash/SipHash.h`.
 
-Concrete failure: `@llvm-project//third-party/siphash:siphash` runs
-`STARLARK_ANALYSIS` with `fn=rules_cc//cc/private/rules_impl/cc_library.bzl@llvm-project:cc_library`,
-produces empty outputs, and never reaches either kuro's native
-`cc_common.compile` OR `actions.declare_shareable_artifact` (verified
-via tracing — call count 0). That means rules_cc's Starlark
-`_compute_public_headers` (in `cc/private/compile/cc_compilation_helper.bzl`)
-is not running, even though the target has non-empty `hdrs` and
-`strip_include_prefix="include"`. Something in the rules_cc analysis
-flow exits before header processing.
+**Landed this session:**
 
-Also experimented: switching `declare_shareable_artifact` to use
-`BuckOutPathKind::BazelOutput` dropped command count from 83 to 15,
-suggesting the path change breaks downstream analysis in ways not
-yet understood. Reverted — keeping `Configuration` layout for now.
+1. **`BuckOutPathKind::Shareable` variant**
+   (`app/kuro_core/src/fs/buck_out_path.rs`) — resolves to
+   `buck-out/v2/gen/<cell>/<cfg_hash>/<filename>` with no package,
+   `__<target>__/`, or duplicated `external/<cell>/` prefix. The
+   `filename` passed to `declare_shareable_artifact` is already
+   bin-dir-relative (rules_cc joins its own `external/<cell>/<pkg>/...`).
+   Handled in `BaseDeferredKey::make_hashed_path`
+   (`app/kuro_core/src/deferred/base_deferred_key.rs`) and mirrored in
+   `ArtifactPath::with_full_path`
+   (`app/kuro_execute/src/path/artifact_path.rs`). Aspect and
+   anon-target matches fall back to Configuration semantics; BXL key
+   matching widened to treat Shareable as Configuration-like.
 
-**Likely investigation paths:**
-- rules_cc's `cc_library.bzl` early-exit conditions (prior to line 56
-  `cc_common.compile` call): `semantics.validate`,
-  `cc_helper.check_srcs_extensions`, `find_cc_toolchain`,
-  `cc_common.configure_features`, `cc_helper.check_cpp_modules`.
-  Any of these returning or raising could silently bail.
-- kuro's Starlark rule-invocation path may be swallowing analysis
-  errors in ways that hide the actual failure. Check
-  `kuro_analysis::analysis::env::run_analysis` error handling.
-- rules_cc's `cc_compilation_helper.bzl::_compute_public_headers`
-  early-return at line 106-122 (when `strip_prefix == None AND not
-  include_prefix`): siphash has `strip_include_prefix="include"`, so
-  strip_prefix should not be None — but `paths.relativize` /
-  `get_relative_path` may compute an unexpected value.
+2. **`declare_shareable_artifact` uses `Shareable`**
+   (`app/kuro_action_impl/src/context/unsorted.rs:229, 257`). Removed
+   a duplicate definition later in the same starlark_module that was
+   shadowing the Shareable-using version with Configuration semantics.
 
-**Quick-win alternative:** add handling for `strip_include_prefix` at
-the cc_library rule impl's caller level (not inside
-`cc_common.compile`), e.g., via kuro's native cc_library stub, so
-strip_include_prefix works regardless of whether Starlark compile
-runs.
+3. **`ctx.bin_dir.path` returns real per-target bin_dir**
+   (`app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs`:
+   `CtxCheatWithActions` now stores `cfg_hash`; `actions2ctx_cheat`
+   populates it from the owner's `ConfiguredTargetLabel.cfg().output_hash()`).
+   Prior stub returned `bazel-out/k8-fastbuild/bin`, so
+   `paths.join(bin_dir, virtual_include_dir)` in rules_cc produced a
+   nonexistent path.
+
+4. **Removed `_virtual_includes` filter in
+   `create_cc_compile_action`** (`cc_common.rs:1669-1671`). Was
+   actively rejecting the virtual-includes `-I` flag from the compile
+   command.
+
+5. **Threaded transitive headers into `create_cc_compile_action`
+   inputs** (`cc_common.rs` near line 1849). Previously only the
+   kuro-native `fn compile` (line ~3108, added in 5f64d82) threaded
+   `cc_compilation_context.headers` into `actions.run(inputs=...)`;
+   the Starlark rules_cc path goes through `create_cc_compile_action`
+   which still passed no inputs.
+
+**Remaining blocker (15.5.10 candidate):** The symlink action is
+registered via `copy_file_impl` (`app/kuro_action_impl/src/context/copy.rs:76`)
+and the compile receives the virtual_header in its `inputs=` kwarg
+(visible in `collected_bazel_inputs` / `StarlarkRunActionValues.bazel_inputs`),
+yet kuro runs the compile without waiting for the symlink. Empty
+virtual-includes directory is created, then the compile fails with
+`fatal error: siphash/SipHash.h: No such file or directory`.
+
+Hypothesis: `run.rs::run` adds the artifact to `artifacts.inputs`
+(line 754) AND stores it in `StarlarkRunActionValues.bazel_inputs`
+for `visit_artifacts` (line 478 of actions/impls/run.rs). The
+`visit_artifacts` path should establish a DICE edge, but something
+in the path from bazel_input → artifact_group → action-dependency is
+not producing a must-materialize edge. Worth comparing against how
+the kuro-native `fn compile`'s 5f64d82 threading actually works for
+abi-breaking.h — same mechanism, works there.
 
 **Parity source:** `@rules_cc//cc/private/compile:compile.bzl` +
 `@rules_cc//cc/private/compile:cc_compilation_helper.bzl::_compute_public_headers`
@@ -740,6 +762,70 @@ numeric token.
 
 Root cause: raw-string lexer in starlark-rust drops the backslash in
 `\"` / `\'` escapes (see 15.5.5 notes).
+
+### 15.5.10 Symlink action deps not scheduled before consuming compile (OPEN)
+
+**Status:** Open. Blocks `@llvm-project//llvm:Support` even after
+15.5.9's infrastructure landed. Artifacts flow correctly; scheduling
+does not.
+
+**Observed state after 15.5.9:**
+- `declare_shareable_artifact` produces a `BuildArtifactPath` with
+  `BuckOutPathKind::Shareable`. Its `.path` attribute resolves to
+  `buck-out/v2/gen/<cell>/<cfg_hash>/<filename>` as intended.
+- `actions.symlink(output=virtual_header, target_file=src)` registers
+  a `CopyMode::Symlink` action via
+  `copy_file_impl` (`app/kuro_action_impl/src/context/copy.rs:76`).
+- Support's `create_cc_compile_action` gets the virtual_header in the
+  merged `cc_compilation_context.headers` depset, iterates it into
+  `compile_inputs`, and passes it as `inputs=` to `actions.run`.
+- `run.rs::run` inserts the artifact into `artifacts.inputs` (line
+  754) AND stores it in `StarlarkRunActionValues.bazel_inputs` (line
+  873) so `visit_artifacts` sees it (actions/impls/run.rs:478).
+- Compile command at build time contains the correct
+  `-Ibuck-out/v2/gen/<cell>/<cfg_hash>/external/<cell>/<pkg>/_virtual_includes/<name>`
+  include flag.
+
+**Symptom:** kuro executes the compile immediately without
+materializing the symlink first. Filesystem shows the parent dir
+scaffolding (`.../_virtual_includes/siphash/siphash/`) but no
+`SipHash.h` symlink inside. Compile fails with
+`fatal error: siphash/SipHash.h: No such file or directory`.
+
+**Working comparison point:** `5f64d82` threaded identical inputs=
+logic into kuro's **native** `fn compile` (cc_common.rs:3311) and
+solved the abi-breaking.h case. The mechanism works there. So the
+gap is in kuro's `create_cc_compile_action` + Starlark `actions.run`
+plumbing, not in the inputs= machinery itself.
+
+**Investigation angles:**
+- Compare action-inputs wiring between kuro's native `fn compile`
+  (working, 5f64d82) and rules_cc's Starlark path that ends in
+  `_cc_internal.create_cc_compile_action` → kuro's native
+  `create_cc_compile_action` (broken, this section).
+- Verify `visit_artifacts` in `actions/impls/run.rs:478` actually
+  fires for `bazel_inputs` entries and that the ArtifactGroup it
+  produces participates in DICE dep-edge construction.
+- Maybe `collected_bazel_inputs` are consumed twice — once as
+  `artifacts.inputs.insert(ArtifactGroup::Artifact(…))` (run.rs:754)
+  and once as `StarlarkRunActionValues.bazel_inputs` — but the former
+  path doesn't make it into the action's ExecutionDeps, and the
+  latter is only a `visit_artifacts` hook that might be bypassed.
+- Check `register_action`'s handling of `artifacts.inputs` vs
+  `artifacts.declared_outputs` in
+  `app/kuro_build_api/src/actions/registry.rs:213`.
+
+**Diagnostic that confirmed scope:**
+- `tracing::error!` traces on `declare_shareable_artifact`,
+  `copy_file_impl`, and `create_cc_compile_action` verified the
+  symlink action IS registered and the virtual_header IS in the
+  compile's compile_inputs list with the Shareable-layout path.
+- `find buck-out/v2/gen/…/_virtual_includes/siphash/siphash/` shows
+  empty dir — scaffolding created, but the symlink action never ran.
+
+**Parity source:** Buck2's `app/buck2_build_api/src/actions/registry.rs`
+— how registered actions get scheduled when an output artifact
+appears in another action's inputs via `visit_artifacts`.
 
 ## Dependencies and ordering
 

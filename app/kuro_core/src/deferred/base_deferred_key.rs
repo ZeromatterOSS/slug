@@ -169,6 +169,22 @@ impl BaseDeferredKey {
                 // so generated headers land at the include-path locations
                 // produced by `bin_dir + <pkg>/<include_dir>` (matches
                 // `bazel-bin/external/<repo>/<pkg>/...`).
+                if matches!(path_resolution_method, BuckOutPathKind::Shareable) {
+                    let shareable_path = [
+                        base.as_str(),
+                        "/",
+                        prefix.as_str(),
+                        "/",
+                        target.pkg().cell_name().as_str(),
+                        "/",
+                        target.cfg().output_hash().as_str(),
+                        "/",
+                        path.as_str(),
+                    ]
+                    .concat();
+                    return Ok(ProjectRelativePathBuf::unchecked_new(shareable_path));
+                }
+
                 if matches!(path_resolution_method, BuckOutPathKind::BazelOutput) {
                     let cell_name_str = target.pkg().cell_name().as_str();
                     let is_root = crate::cells::is_root_cell_name(cell_name_str);
@@ -275,9 +291,9 @@ impl BaseDeferredKey {
                             ))?;
                         }
                     }
-                    BuckOutPathKind::BazelOutput => {
+                    BuckOutPathKind::BazelOutput | BuckOutPathKind::Shareable => {
                         // Handled above; unreachable but explicit to satisfy the match.
-                        unreachable!("BazelOutput handled above");
+                        unreachable!("BazelOutput/Shareable handled above");
                     }
                 };
                 let path_or_hash = if fully_hash_path {

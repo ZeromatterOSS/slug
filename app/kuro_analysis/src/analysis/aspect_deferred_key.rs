@@ -186,10 +186,10 @@ impl BaseDeferredKeyDyn for AspectDeferredKey {
                     ))?;
                 }
             }
-            BuckOutPathKind::BazelOutput => {
-                // Aspects don't currently participate in `attr.output` declarations;
-                // fall back to the Configuration layout so aspect outputs remain
-                // addressable. Revisit if aspects need Bazel-shaped outputs.
+            BuckOutPathKind::BazelOutput | BuckOutPathKind::Shareable => {
+                // Aspects don't currently participate in `attr.output` /
+                // `declare_shareable_artifact` declarations; fall back to the
+                // Configuration layout so aspect outputs remain addressable.
                 [
                     target.cfg().output_hash().as_str(),
                     if target.exec_cfg().is_some() { "-" } else { "" },

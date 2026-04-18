@@ -930,6 +930,9 @@ pub struct CtxCheatWithActions<'v> {
     /// Target name (e.g., "utf8_validity")
     #[allocative(skip)]
     target_name: String,
+    /// Configuration hash of the owning target (empty when unknown).
+    #[allocative(skip)]
+    cfg_hash: String,
 }
 
 impl<'v> Display for CtxCheatWithActions<'v> {
@@ -963,24 +966,30 @@ impl<'v> StarlarkValue<'v> for CtxCheatWithActions<'v> {
                 workspace_name: self.cell_name.clone(),
             })),
             "bin_dir" => {
-                let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
-                Some(heap.alloc(CtxCheatDirStub {
-                    path: format!(
+                let path = if !self.cell_name.is_empty() && !self.cfg_hash.is_empty() {
+                    format!("buck-out/v2/gen/{}/{}", self.cell_name, self.cfg_hash)
+                } else {
+                    let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                    format!(
                         "bazel-out/{}-{}/bin",
                         crate::interpreter::rule_defs::context::host_target_cpu(),
                         m
-                    ),
-                }))
+                    )
+                };
+                Some(heap.alloc(CtxCheatDirStub { path }))
             }
             "genfiles_dir" => {
-                let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
-                Some(heap.alloc(CtxCheatDirStub {
-                    path: format!(
+                let path = if !self.cell_name.is_empty() && !self.cfg_hash.is_empty() {
+                    format!("buck-out/v2/gen/{}/{}", self.cell_name, self.cfg_hash)
+                } else {
+                    let m = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                    format!(
                         "bazel-out/{}-{}/genfiles",
                         crate::interpreter::rule_defs::context::host_target_cpu(),
                         m
-                    ),
-                }))
+                    )
+                };
+                Some(heap.alloc(CtxCheatDirStub { path }))
             }
             "configuration" => Some(heap.alloc(CtxCheatConfigStub)),
             // Return the REAL actions object here
@@ -1657,10 +1666,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                         );
                         for elem in &elements {
                             let dir = elem.to_str();
-                            if dir.is_empty()
-                                || dir.contains("_virtual_includes")
-                                || !seen_include_dirs.insert(dir.to_string())
-                            {
+                            if dir.is_empty() || !seen_include_dirs.insert(dir.to_string()) {
                                 continue;
                             }
                             let flag = include_flag_for_dir_impl(&dir, msvc);
@@ -1835,6 +1841,33 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
 
         let outputs_list = heap.alloc(outputs_vec);
 
+        // Thread transitive headers (including rules_cc virtual-include
+        // symlinks) into the compile action as inputs so scheduling orders
+        // the symlink/template actions before this compile. Without this,
+        // `<bin_dir>/.../_virtual_includes/<name>/<hdr>` is referenced via
+        // `-I` but never materialized.
+        let mut compile_inputs: Vec<Value<'v>> = Vec::new();
+        if !cc_compilation_context.is_none() {
+            if let Ok(Some(headers)) = cc_compilation_context.get_attr("headers", heap) {
+                if !headers.is_none() {
+                    let mut elements = Vec::new();
+                    crate::interpreter::rule_defs::depset::collect_depset_elements(
+                        headers,
+                        &mut elements,
+                        heap,
+                    );
+                    for h in elements {
+                        compile_inputs.push(h);
+                    }
+                }
+            }
+        }
+        let compile_inputs_value: Value<'v> = if compile_inputs.is_empty() {
+            Value::new_none()
+        } else {
+            heap.alloc(compile_inputs)
+        };
+
         // Build the progress message
         let progress_msg = heap
             .alloc_str(&format!("Compiling {}", source_path))
@@ -1844,12 +1877,15 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         // run(arguments, outputs=outputs, mnemonic=mnemonic, progress_message=msg, identifier=id)
         // Use source path as identifier to disambiguate multiple compile actions
         let identifier = heap.alloc_str(&source_path).to_value();
-        let named_args: Vec<(&str, Value<'v>)> = vec![
+        let mut named_args: Vec<(&str, Value<'v>)> = vec![
             ("outputs", outputs_list),
             ("mnemonic", heap.alloc_str(&action_name_str).to_value()),
             ("progress_message", progress_msg),
             ("identifier", identifier),
         ];
+        if !compile_inputs_value.is_none() {
+            named_args.push(("inputs", compile_inputs_value));
+        }
 
         // Invoke actions.run() using Starlark's function evaluation
         // This properly registers the action through Kuro's infrastructure
@@ -2028,26 +2064,35 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         // Try to extract label info from the actions object
-        let (cell_name, pkg_path, target_name) = (|| -> Option<(String, String, String)> {
-            let analysis_actions = actions
-                .downcast_ref::<crate::interpreter::rule_defs::context::AnalysisActions>(
-            )?;
-            let state = analysis_actions.state.try_borrow().ok()?;
-            let registry = state.as_ref()?;
-            let owner = registry.actions.owner();
-            match owner {
-                kuro_core::deferred::key::DeferredHolderKey::Base(
-                    kuro_core::deferred::base_deferred_key::BaseDeferredKey::TargetLabel(label),
-                ) => {
-                    let cell = label.pkg().cell_name().as_str().to_owned();
-                    let pkg = label.pkg().cell_relative_path().to_string();
-                    let name = label.name().as_str().to_owned();
-                    Some((cell, pkg, name))
+        let (cell_name, pkg_path, target_name, cfg_hash) =
+            (|| -> Option<(String, String, String, String)> {
+                let analysis_actions = actions
+                    .downcast_ref::<crate::interpreter::rule_defs::context::AnalysisActions>(
+                )?;
+                let state = analysis_actions.state.try_borrow().ok()?;
+                let registry = state.as_ref()?;
+                let owner = registry.actions.owner();
+                match owner {
+                    kuro_core::deferred::key::DeferredHolderKey::Base(
+                        kuro_core::deferred::base_deferred_key::BaseDeferredKey::TargetLabel(label),
+                    ) => {
+                        let cell = label.pkg().cell_name().as_str().to_owned();
+                        let pkg = label.pkg().cell_relative_path().to_string();
+                        let name = label.name().as_str().to_owned();
+                        let cfg = label.cfg().output_hash().as_str().to_owned();
+                        Some((cell, pkg, name, cfg))
+                    }
+                    _ => None,
                 }
-                _ => None,
-            }
-        })()
-        .unwrap_or_else(|| ("".to_owned(), "stub".to_owned(), "stub".to_owned()));
+            })()
+            .unwrap_or_else(|| {
+                (
+                    "".to_owned(),
+                    "stub".to_owned(),
+                    "stub".to_owned(),
+                    "".to_owned(),
+                )
+            });
 
         // Return a wrapper that preserves the real actions object and label info
         // This allows create_cc_compile_action to register real actions
@@ -2056,6 +2101,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             cell_name,
             pkg_path,
             target_name,
+            cfg_hash,
         }))
     }
 

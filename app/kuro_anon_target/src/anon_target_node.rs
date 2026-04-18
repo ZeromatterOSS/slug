@@ -290,12 +290,18 @@ impl BaseDeferredKeyDyn for AnonTarget {
             prefix.as_str(),
             "-anon/",
             self.name().pkg().cell_name().as_str(),
-            if path_resolution_method == BuckOutPathKind::Configuration {
+            if matches!(
+                path_resolution_method,
+                BuckOutPathKind::Configuration | BuckOutPathKind::Shareable
+            ) {
                 "/"
             } else {
                 ""
             },
-            if path_resolution_method == BuckOutPathKind::Configuration {
+            if matches!(
+                path_resolution_method,
+                BuckOutPathKind::Configuration | BuckOutPathKind::Shareable
+            ) {
                 self.exec_cfg().cfg().output_hash().as_str()
             } else {
                 ""
@@ -306,7 +312,10 @@ impl BaseDeferredKeyDyn for AnonTarget {
             } else {
                 "/"
             },
-            if path_resolution_method == BuckOutPathKind::Configuration {
+            if matches!(
+                path_resolution_method,
+                BuckOutPathKind::Configuration | BuckOutPathKind::Shareable
+            ) {
                 self.path_hash()
             } else {
                 if let Some(content_hash) = content_hash {

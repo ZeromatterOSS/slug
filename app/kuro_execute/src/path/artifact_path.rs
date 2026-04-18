@@ -195,13 +195,21 @@ impl ArtifactPath<'_> {
                     // Escape target name (replace = with special sequence)
                     let escaped_target_name = target_name.replace('=', "__EQ__");
 
-                    // Bazel-shaped output path: omit the `__<target>__/` segment
-                    // and prefix `external/<cell>/` for non-root cells so that
-                    // `cc_library(hdrs=[...])` consumers find generated headers
-                    // at `<bin_dir>/external/<cell>/<pkg>/<include>/<hdr>`.
+                    // Shareable-artifact path: `<bin_dir>/<filename>` with no
+                    // package or `__<target>__/` segment. Used by
+                    // `actions.declare_shareable_artifact` (rules_cc's virtual
+                    // includes, LTO, etc.) where the filename is already
+                    // fully-qualified from bin_dir root.
                     // Kept in sync with `BaseDeferredKey::make_hashed_path`.
+                    let resolution = buck_out.path_resolution_method();
                     let full_path = if matches!(
-                        buck_out.path_resolution_method(),
+                        resolution,
+                        kuro_core::fs::buck_out_path::BuckOutPathKind::Shareable
+                    ) {
+                        let joined = artifact_path.join(self.projected_path);
+                        format!("buck-out/v2/gen/{}/{}/{}", cell_name, cfg_hash, joined)
+                    } else if matches!(
+                        resolution,
                         kuro_core::fs::buck_out_path::BuckOutPathKind::BazelOutput
                     ) {
                         let joined = artifact_path.join(self.projected_path);

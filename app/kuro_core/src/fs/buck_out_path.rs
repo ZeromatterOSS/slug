@@ -71,6 +71,21 @@ pub enum BuckOutPathKind {
     /// buck-out/v2/gen/<cell>/<cfg_hash>/<pkg>/__<target>__/<out_path>
     /// ```
     BazelOutput,
+
+    /// A shareable artifact path rooted directly at the target's `bin_dir`.
+    /// Used by `actions.declare_shareable_artifact(filename)` where `filename`
+    /// is already the full bin-dir-relative path (e.g. rules_cc's virtual
+    /// includes: `external/<cell>/<pkg>/_virtual_includes/<name>/<hdr>`).
+    ///
+    /// The resolved layout is:
+    ///
+    /// ```text
+    /// buck-out/v2/gen/<cell>/<cfg_hash>/<filename>
+    /// ```
+    ///
+    /// No package segment, no `__<target>__/`, no duplicated `external/<cell>/`
+    /// prefix — the caller has already provided a fully-qualified path.
+    Shareable,
 }
 
 #[derive(
