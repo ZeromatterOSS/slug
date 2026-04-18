@@ -142,15 +142,31 @@ pub(crate) fn json_to_starlark_value<'v>(
 /// - Other paths for root cell
 fn extract_cell_and_package_from_filename(filename: &str) -> (String, String) {
     if let Some(rest) = filename.strip_prefix("bazel-external/") {
-        // bazel-external/{cell_name}+{version}/{cell_relative_path}
-        // or bazel-external/{canonical_name}/{cell_relative_path}
+        // bazel-external/{dir_name}/{cell_relative_path}
+        //
+        // dir_name can take several shapes:
+        //   - "{cell_name}"                                 -- use_repo_rule-style
+        //     (e.g. "llvm-project")
+        //   - "{cell_name}+{version}"                       -- bzlmod module cell
+        //     (e.g. "rules_cc+0.2.17" -> cell_name = "rules_cc")
+        //   - "{owner}+{extension}+{repo_name}"             -- module-extension repo
+        //     (e.g. "_main+llvm_repos_extension+llvm-raw"
+        //      -> cell_name = "llvm-raw"; taking the first `+` segment would
+        //      yield "_main" which is the root-module canonical prefix, not
+        //      the apparent repo name used in Label() resolution)
         if let Some(dir_end) = rest.find('/') {
             let dir_name = &rest[..dir_end];
-            // Extract cell name: strip "+version" suffix if present
-            let cell_name = if let Some(plus_idx) = dir_name.find('+') {
-                dir_name[..plus_idx].to_owned()
-            } else {
-                dir_name.to_owned()
+            let plus_count = dir_name.matches('+').count();
+            let cell_name = match plus_count {
+                0 => dir_name.to_owned(),
+                1 => {
+                    // "{cell_name}+{version}"
+                    dir_name[..dir_name.find('+').unwrap()].to_owned()
+                }
+                _ => {
+                    // "{owner}+{extension}+{repo_name}[+...]"
+                    dir_name[dir_name.rfind('+').unwrap() + 1..].to_owned()
+                }
             };
             let cell_relative = &rest[dir_end + 1..];
             if let Some(last_slash) = cell_relative.rfind('/') {
