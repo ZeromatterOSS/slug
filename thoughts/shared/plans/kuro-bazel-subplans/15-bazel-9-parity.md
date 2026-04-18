@@ -461,9 +461,9 @@ output via `hdrs = [":abi_breaking_h_gen"]` saw nothing to depend on.
 **Parity source:** `@bazel_skylib//rules:expand_template.bzl` and
 Bazel's `RuleClass.computeImplicitOutputs` (implicit from attr.output).
 
-### 15.5.4 `attr.output` generated-file path layout divergence (OPEN, BLOCKING `@llvm-project//llvm:llvm` compile)
+### 15.5.4 `attr.output` generated-file path layout divergence (LANDED)
 
-**Status:** Open. Next blocker after 15.5.3.
+**Status:** Landed option A in commit `4c1923a` (2026-04-18).
 
 After the DefaultInfo auto-inject lands, `kuro build @llvm-project//llvm:abi_breaking_h_gen`
 succeeds and produces the header at:
@@ -518,7 +518,56 @@ Plan 15 shakes out.
 - `src/main/java/com/google/devtools/build/lib/rules/cpp/CcCompilationContext.java`
   — include-dir aggregation for cc_library deps
 
-**Est. effort:** 3-5 days for (B) symlink approach; 1-2 weeks for (A).
+**Landed implementation (option A):**
+
+- `BuckOutPathKind::BazelOutput` variant in `app/kuro_core/src/fs/buck_out_path.rs`.
+- `BaseDeferredKey::make_hashed_path` in
+  `app/kuro_core/src/deferred/base_deferred_key.rs` handles the new
+  variant with a dedicated assembly that omits the `__<target>__/`
+  segment and prefixes `external/<cell>/` for non-root cells.
+- `ArtifactPath::with_full_path` in
+  `app/kuro_execute/src/path/artifact_path.rs` mirrors the new layout
+  in command-line path strings so compile actions can find the
+  materialized files.
+- `AspectDeferredKey::make_hashed_path` falls through to the existing
+  Configuration layout (aspects don't declare `attr.output` outputs
+  currently; revisit if that changes).
+- `CtxOutputs::declare_file` in
+  `app/kuro_build_api/src/interpreter/rule_defs/context.rs` passes the
+  new kind for `attr.output` / `attr.output_list` declarations.
+
+Other output-declaring callers (`ctx.actions.declare_output`,
+`ctx.actions.write`, etc.) keep the default Configuration layout —
+intermediate outputs that don't need to match Bazel's bin-dir shape.
+
+### 15.5.5 Shell-quoting for string-define values (OPEN, BLOCKING Support compile)
+
+**Status:** Open. Next blocker after 15.5.4 landed.
+
+`@llvm-project//llvm:Support` compiles 25 files, then fails on
+`config.h`'s `PACKAGE_VERSION` expansion:
+
+```
+<command-line>: error: too many decimal points in number
+external/llvm-project/llvm/include/llvm/Config/config.h:280:25: note:
+    in expansion of macro 'LLVM_VERSION_STRING'
+  280 | #define PACKAGE_VERSION LLVM_VERSION_STRING
+```
+
+BUILD declares `defines = [r'LLVM_VERSION_STRING=\"{}\"'.format(PACKAGE_VERSION)]`
+— the escaped-double-quote is intended to produce a string literal
+define. Bazel emits `-DLLVM_VERSION_STRING="23.0.0git"` with literal
+double quotes. kuro emits `-DLLVM_VERSION_STRING=23.0.0git` (quotes
+stripped), so preprocessor expansion turns `23.0.0git` into a malformed
+numeric token.
+
+Needs investigation in kuro's defines argument emission —
+`cc_common.compile`'s `defines` handling or lower-level shell-escape
+code that drops the escape-double-quote sequence.
+
+**Parity source:** Bazel's `CcCommon.computeCcFlags` +
+`ShellUtils.shellEscape` chain — defines propagate to the shell
+with correct escaping for literal quotes in the value.
 
 ## Dependencies and ordering
 
