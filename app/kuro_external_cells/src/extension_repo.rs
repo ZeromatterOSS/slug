@@ -181,15 +181,15 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
                 e
             )
         })? {
-            let file_type = entry.file_type().await.map_err(|e| {
-                kuro_error::kuro_error!(
-                    kuro_error::ErrorTag::Environment,
-                    "Failed to get file type: {}",
-                    e
-                )
-            })?;
-
-            let file_name = entry.file_name().into_string().map_err(|_| {
+            // Follow symlinks when classifying the entry type. Repository rules like
+            // rules_cc's llvm_configure use `repository_ctx.symlink` to materialize
+            // entire source subtrees as directory symlinks (e.g., llvm/lib -> ...);
+            // `DirEntry::file_type` does not follow symlinks, so those entries would
+            // come back as `FileType::Symlink`. gather_package_listing only recurses
+            // into `FileType::Directory`, so classifying symlinks-to-dirs as
+            // directories is required for `glob()` to see files inside.
+            let file_name_os = entry.file_name();
+            let file_name = file_name_os.into_string().map_err(|_| {
                 kuro_error::kuro_error!(
                     kuro_error::ErrorTag::Environment,
                     "Non-UTF8 filename in {:?}",
@@ -197,15 +197,35 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
                 )
             })?;
 
+            let entry_path = entry.path();
+            let resolved = tokio::fs::metadata(&entry_path).await;
+            let file_type = match resolved {
+                Ok(md) if md.is_dir() => FileType::Directory,
+                Ok(_) => FileType::File,
+                Err(_) => {
+                    // Broken or inaccessible symlink — fall back to the symlink's
+                    // own metadata so we at least report the entry instead of
+                    // failing the entire directory read.
+                    let st = entry.file_type().await.map_err(|e| {
+                        kuro_error::kuro_error!(
+                            kuro_error::ErrorTag::Environment,
+                            "Failed to get file type: {}",
+                            e
+                        )
+                    })?;
+                    if st.is_dir() {
+                        FileType::Directory
+                    } else if st.is_symlink() {
+                        FileType::Symlink
+                    } else {
+                        FileType::File
+                    }
+                }
+            };
+
             entries.push(RawDirEntry {
                 file_name: CompactString::from(file_name),
-                file_type: if file_type.is_dir() {
-                    FileType::Directory
-                } else if file_type.is_symlink() {
-                    FileType::Symlink
-                } else {
-                    FileType::File
-                },
+                file_type,
             });
         }
 
