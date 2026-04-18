@@ -754,6 +754,21 @@ impl RunAction {
         values.args.visit_artifacts(artifact_visitor)?;
         command_line_digest_for_dep_files.push_count();
 
+        // Bazel compatibility: visit extra input artifacts from the `inputs=` kwarg.
+        // These must be added to the execution request's inputs so the local executor
+        // runs `materialize_inputs` on them — otherwise the materializer leaves the
+        // producing action's output in the Declared (but not Materialized) state and
+        // nothing re-creates the file before this action runs. The top-level
+        // `RunAction::visit_artifacts` already iterates `bazel_inputs` for DICE
+        // scheduling (`Action::inputs()`), but `expand_command_line_and_worker` is a
+        // separate pass that feeds `CommandExecutionRequest`, so we repeat it here.
+        for bazel_input in &self.starlark_values.bazel_inputs {
+            let val = bazel_input.to_value();
+            if let Some(cmd_arg) = ValueAsCommandLineLike::unpack_value_opt(val) {
+                cmd_arg.0.visit_artifacts(artifact_visitor)?;
+            }
+        }
+
         let env_len = values.env.len();
         let cli_env: kuro_error::Result<SortedVectorMap<_, _>> = values
             .env

@@ -316,12 +316,21 @@ impl BuckOutPathResolver {
         )
     }
 
-    /// Same as `resolve_gen`, except it also uses BuckOutPathKind::Configuration
-    /// as the path_resolution_method.
+    /// Like `resolve_gen`, but for content-based paths it substitutes the
+    /// configuration hash layout (used where a caller needs a stable path
+    /// before the content hash is available, e.g. `materialize_inputs` keying
+    /// or offline cache lookup). Non-content-based layouts (Configuration,
+    /// Shareable, BazelOutput) must round-trip unchanged — otherwise the
+    /// path computed here will not match the one the materializer recorded
+    /// in `declare_copy`, and materialization will silently skip the artifact.
     pub fn resolve_gen_configuration_hash_path(
         &self,
         path: &BuildArtifactPath,
     ) -> kuro_error::Result<ProjectRelativePathBuf> {
+        let kind = match path.path_resolution_method() {
+            BuckOutPathKind::ContentHash => BuckOutPathKind::Configuration,
+            other => other,
+        };
         self.prefixed_path_for_owner(
             ForwardRelativePath::unchecked_new("gen"),
             path.owner().owner(),
@@ -330,7 +339,7 @@ impl BuckOutPathResolver {
                 .map(|x| x.as_str()),
             path.path(),
             false,
-            BuckOutPathKind::Configuration,
+            kind,
             None,
         )
     }

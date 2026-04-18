@@ -763,69 +763,96 @@ numeric token.
 Root cause: raw-string lexer in starlark-rust drops the backslash in
 `\"` / `\'` escapes (see 15.5.5 notes).
 
-### 15.5.10 Symlink action deps not scheduled before consuming compile (OPEN)
+### 15.5.10 Symlink action deps not scheduled before consuming compile (LANDED 2026-04-18)
 
-**Status:** Open. Blocks `@llvm-project//llvm:Support` even after
-15.5.9's infrastructure landed. Artifacts flow correctly; scheduling
-does not.
+**Status:** Landed. Two root causes, each fixed independently.
 
-**Observed state after 15.5.9:**
-- `declare_shareable_artifact` produces a `BuildArtifactPath` with
-  `BuckOutPathKind::Shareable`. Its `.path` attribute resolves to
-  `buck-out/v2/gen/<cell>/<cfg_hash>/<filename>` as intended.
-- `actions.symlink(output=virtual_header, target_file=src)` registers
-  a `CopyMode::Symlink` action via
-  `copy_file_impl` (`app/kuro_action_impl/src/context/copy.rs:76`).
-- Support's `create_cc_compile_action` gets the virtual_header in the
-  merged `cc_compilation_context.headers` depset, iterates it into
-  `compile_inputs`, and passes it as `inputs=` to `actions.run`.
-- `run.rs::run` inserts the artifact into `artifacts.inputs` (line
-  754) AND stores it in `StarlarkRunActionValues.bazel_inputs` (line
-  873) so `visit_artifacts` sees it (actions/impls/run.rs:478).
-- Compile command at build time contains the correct
-  `-Ibuck-out/v2/gen/<cell>/<cfg_hash>/external/<cell>/<pkg>/_virtual_includes/<name>`
-  include flag.
+**Investigation summary.** Tracing in `RunAction::visit_artifacts`
+(`app/kuro_action_impl/src/actions/impls/run.rs:478`) showed that
+`bazel_inputs.len=402` on the SipHash.cpp compile, with the
+virtual_header artifact `<build artifact external/.../siphash/SipHash.h
+bound to llvm-project//third-party/siphash:siphash>` present and
+successfully cast to `CommandLineArgLike`. DICE scheduling was fine —
+the symlink `CopyAction::execute` ran before the compile (confirmed
+via tracing on copy.rs). So the failure wasn't at scheduling.
 
-**Symptom:** kuro executes the compile immediately without
-materializing the symlink first. Filesystem shows the parent dir
-scaffolding (`.../_virtual_includes/siphash/siphash/`) but no
-`SipHash.h` symlink inside. Compile fails with
-`fatal error: siphash/SipHash.h: No such file or directory`.
+**Root cause #1: bazel_inputs missing from `CommandExecutionRequest`.**
+`RunAction` has two visitor passes:
+- `RunAction::visit_artifacts` (used by `Action::inputs()` for DICE
+  scheduling) — correctly iterates `bazel_inputs`.
+- `expand_command_line_and_worker` (used by `prepare` to build the
+  `CommandExecutionRequest`'s `inputs` list, which `materialize_inputs`
+  reads) — visits only exe/args/env. `bazel_inputs` were silently
+  dropped here.
 
-**Working comparison point:** `5f64d82` threaded identical inputs=
-logic into kuro's **native** `fn compile` (cc_common.rs:3311) and
-solved the abi-breaking.h case. The mechanism works there. So the
-gap is in kuro's `create_cc_compile_action` + Starlark `actions.run`
-plumbing, not in the inputs= machinery itself.
+Consequence: the local executor's `materialize_inputs` never knew it
+had to materialize the virtual_header. The materializer had the
+artifact in `Declared` (not `Materialized`) state, so the compile ran
+against an empty `_virtual_includes/siphash/siphash/` directory.
 
-**Investigation angles:**
-- Compare action-inputs wiring between kuro's native `fn compile`
-  (working, 5f64d82) and rules_cc's Starlark path that ends in
-  `_cc_internal.create_cc_compile_action` → kuro's native
-  `create_cc_compile_action` (broken, this section).
-- Verify `visit_artifacts` in `actions/impls/run.rs:478` actually
-  fires for `bazel_inputs` entries and that the ArtifactGroup it
-  produces participates in DICE dep-edge construction.
-- Maybe `collected_bazel_inputs` are consumed twice — once as
-  `artifacts.inputs.insert(ArtifactGroup::Artifact(…))` (run.rs:754)
-  and once as `StarlarkRunActionValues.bazel_inputs` — but the former
-  path doesn't make it into the action's ExecutionDeps, and the
-  latter is only a `visit_artifacts` hook that might be bypassed.
-- Check `register_action`'s handling of `artifacts.inputs` vs
-  `artifacts.declared_outputs` in
-  `app/kuro_build_api/src/actions/registry.rs:213`.
+Worse: the materializer's `declare` handler unconditionally
+dispatches a `clean_path` future
+(`app/kuro_execute_impl/src/materializers/deferred/command_processor.rs:927`)
+that deletes whatever's already at the declared path. So even though
+`CopyAction::execute` had a sidechannel workaround that materialized
+the symlink on disk immediately, the materializer wiped it out
+seconds later, before the compile ran.
 
-**Diagnostic that confirmed scope:**
-- `tracing::error!` traces on `declare_shareable_artifact`,
-  `copy_file_impl`, and `create_cc_compile_action` verified the
-  symlink action IS registered and the virtual_header IS in the
-  compile's compile_inputs list with the Shareable-layout path.
-- `find buck-out/v2/gen/…/_virtual_includes/siphash/siphash/` shows
-  empty dir — scaffolding created, but the symlink action never ran.
+**Fix #1** (`app/kuro_action_impl/src/actions/impls/run.rs`): in
+`expand_command_line_and_worker`, after visiting `values.args`, also
+iterate `self.starlark_values.bazel_inputs` and call
+`visit_artifacts` on each via `ValueAsCommandLineLike`. Now both
+visitor passes see the same artifacts; `materialize_inputs` properly
+materializes them before the consuming action runs.
 
-**Parity source:** Buck2's `app/buck2_build_api/src/actions/registry.rs`
-— how registered actions get scheduled when an output artifact
-appears in another action's inputs via `visit_artifacts`.
+**Root cause #2: `resolve_configuration_hash_path` clobbers Shareable
+and BazelOutput path kinds.**
+`materialize_inputs`
+(`app/kuro_execute_impl/src/executors/local.rs:1579`) calls
+`artifact.resolve_configuration_hash_path(artifact_fs)` to get the
+path to materialize. That chains through
+`BuckOutPathResolver::resolve_gen_configuration_hash_path`, which
+hardcoded `BuckOutPathKind::Configuration` — regardless of the
+artifact's actual kind. For a Shareable artifact whose real on-disk
+layout is `buck-out/v2/gen/<cell>/<cfg_hash>/<path>`, this returned
+the Configuration layout
+`buck-out/v2/gen/<cell>/<cfg_hash>/<pkg>/__<target>__/<path>`.
+
+The materializer had recorded the artifact at the Shareable path (via
+`declare_copy` → `resolve_build` which honours Shareable). So
+`materialize_many` received a path the materializer didn't recognize
+and silently did nothing.
+
+**Fix #2** (`app/kuro_core/src/fs/buck_out_path.rs`):
+`resolve_gen_configuration_hash_path` now preserves the artifact's
+real `path_resolution_method` for non-content-based kinds, only
+redirecting `ContentHash` to `Configuration` (its actual purpose per
+the existing doc comment — "except for content-based artifacts"). The
+behaviour change is a strict subset of what the function should have
+been doing all along.
+
+**Verification:** After both fixes, `SipHash.h` materializes in
+`buck-out/v2/gen/llvm-project/<hash>/external/llvm-project/third-party/siphash/_virtual_includes/siphash/siphash/SipHash.h`
+as a symlink to the upstream source. All 25+ `@llvm-project//llvm:Support`
+sources compile (including `SipHash.cpp` and `SipHash.pic.o` files
+land in `buck-out`). Build now fails at the *link* step with "Failed
+to spawn a process" for `external/rules_cc/cc/private/toolchain/link_dynamic_library.sh`
+— a separate materialization-of-executables issue for 15.5.11.
+
+**Collateral cleanup:** The sidechannel on-disk-symlink workaround in
+`CopyAction::execute` (copy.rs:215-274 before this commit) was added
+in 15.5.9 to paper over this exact problem. It never worked because
+the materializer deleted the file before the consumer ran. Removed as
+part of this fix since the proper materialization path now handles
+it.
+
+**Parity source:** Bazel's Skyframe dependency tracking works on the
+assumption that every action input is materialized before the action
+runs. Buck2 implements this via `materialize_inputs` keyed off the
+action's `CommandExecutionRequest` inputs. The bug was a Bazel/kuro
+translation gap: Bazel rules pass inputs via an explicit `inputs=`
+kwarg on `ctx.actions.run`, but kuro's `RunAction` treated that kwarg
+as metadata-for-DICE only, not as "this needs to be on disk".
 
 ## Dependencies and ordering
 

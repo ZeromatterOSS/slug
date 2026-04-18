@@ -212,36 +212,6 @@ impl Action for CopyAction {
             tmp_dest
         };
 
-        // For Symlink mode, also create the symlink directly on disk at the
-        // non-content-hashed path. The materializer uses deferred materialization
-        // which may not materialize the symlink before the dependent action reads it.
-        // This is a Bazel-compat workaround for unsandboxed local execution.
-        if matches!(self.copy, CopyMode::Symlink) {
-            let plain_dest = artifact_fs.resolve_build(
-                self.output().get_path(),
-                None, // No content hash — plain output path
-            )?;
-            let plain_dest_path = artifact_fs.fs().resolve(&plain_dest);
-            let src_abs = artifact_fs.fs().resolve(&src);
-            if let Some(parent) = plain_dest_path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            let _ = std::fs::remove_file(&plain_dest_path);
-            #[cfg(unix)]
-            {
-                let _ = std::os::unix::fs::symlink(&src_abs, &plain_dest_path);
-            }
-            #[cfg(windows)]
-            {
-                // On Windows, try dir symlink first, fall back to file copy
-                if src_abs.is_dir() {
-                    let _ = std::os::windows::fs::symlink_dir(&src_abs, &plain_dest_path);
-                } else {
-                    let _ = std::os::windows::fs::symlink_file(&src_abs, &plain_dest_path);
-                }
-            }
-        }
-
         ctx.materializer()
             .declare_copy(
                 dest.clone(),
