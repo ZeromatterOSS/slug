@@ -387,7 +387,6 @@ fn default_cc_features() -> Vec<&'static str> {
     let mut features = vec![
         // Core features always enabled
         "supports_dynamic_linker",
-        "supports_interface_shared_libraries",
         "supports_start_end_lib",
         "compiler_param_file",
         "linker_param_file",
@@ -426,6 +425,12 @@ fn default_cc_features() -> Vec<&'static str> {
         features.push("copy_dynamic_libraries_to_binary");
         features.push("has_configured_linker_path");
         features.push("no_stripping");
+        // Windows-only: interface libraries (.lib) are native to MSVC. On
+        // Linux/macOS, enabling this flag makes rules_cc's finalize_link_action
+        // route through link_dynamic_library.sh when `has_configured_linker_path`
+        // isn't enabled, which our default toolchain doesn't want — we drive
+        // the linker directly via `get_tool_for_action`.
+        features.push("supports_interface_shared_libraries");
     }
     features
 }

@@ -854,79 +854,57 @@ translation gap: Bazel rules pass inputs via an explicit `inputs=`
 kwarg on `ctx.actions.run`, but kuro's `RunAction` treated that kwarg
 as metadata-for-DICE only, not as "this needs to be on disk".
 
-### 15.5.11 Executable spawn fails for tools in bzlmod external cells (OPEN)
+### 15.5.11 Executable spawn fails for tools in bzlmod external cells (LANDED 2026-04-19)
 
-**Status:** Open. Blocks `@llvm-project//llvm:Support` link step. All
-25+ source files compile; `libSupport.a` archive succeeds; only the
-dynamic `libSupport.so` link fails.
+**Status:** Landed. Two stacked bugs; both fixed.
 
-**Observed state:**
-- All `SipHash.pic.o` and peers land in `buck-out/...`.
-- Link command is emitted with argv[0] =
-  `external/rules_cc/cc/private/toolchain/link_dynamic_library.sh`.
-- Spawn fails: "Spawning executable
-  `external/rules_cc/cc/private/toolchain/link_dynamic_library.sh`
-  failed: Failed to spawn a process".
-- The script exists at
-  `buck-out/v2/external_cells/bzlmod/rules_cc/0.2.17/cc/private/toolchain/link_dynamic_library.sh`
-  but there is no `external/rules_cc -> ...` symlink at project root
-  for kuro to find it via Bazel's execution-time path convention.
+**Investigation.** Link failed with "Spawning executable
+`external/rules_cc/cc/private/toolchain/link_dynamic_library.sh`
+failed: Failed to spawn a process". Kuro already had machinery
+(`ensure_external_symlink` in
+`app/kuro_core/src/cells.rs`) to create `<project_root>/external/<cell>`
+symlinks pointing at `bazel-external/<cell>+<version>`, and did emit
+the correct symlink target for rules_cc (0.2.17). But the symlink
+visible at `<project_root>/external/rules_cc` was
+`../bazel-external/rules_cc+0.2.11` — left over from a prior Bazel
+run. Bazel had pinned a different version. Because the old symlink's
+`symlink_metadata()` returned `Ok`, kuro's creator bailed out and
+never replaced it.
 
-**Root cause (primary hypothesis).** For non-root cell source
-artifacts, `ArtifactPath::with_full_path`
-(`app/kuro_execute/src/path/artifact_path.rs:282-285`) returns
-`external/<cell>/<path>` — Bazel's execution-time path. kuro does not
-populate that path in the filesystem; it stores external-cell content
-at `buck-out/v2/external_cells/<origin>/<cell>[/<version>]/...` and
-(for extension_repo origin) creates symlinks at
-`buck-out/v2/external_cells/extension_repo/<cell>` but not at
-`<project_root>/external/<cell>`. So `File.path` returns a
-non-existent string path.
+**Bug #1:** `ensure_external_symlink` only created a symlink when one
+was absent. It didn't validate the target, so dangling or stale
+symlinks left behind by Bazel survived. **Fix
+(`app/kuro_core/src/cells.rs`):** if the entry is a symlink and
+`readlink` doesn't match the desired target, remove and recreate.
+Non-symlink entries (real files/dirs) are still left alone so we
+never clobber user content.
 
-Why compile worked and link fails: source artifacts passed *directly*
-as command-line values go through
-`CommandLineContext::resolve_artifact`, which uses
-`ArtifactFs::resolve_source` → a real buck-out path. Tool paths that
-rules_cc's Starlark formats via `.path` → a string come out as
-`external/<cell>/...`, which kuro doesn't symlink.
+Once the spawn worked, the wrapper script (which *is* the correct
+target for bundled rules_cc when interface libraries are in play)
+rejected its arguments with exit 13: "Interface library builder (-o)
+not found". The script expects a 5-arg prefix
+(`<yes|no> <iface_builder> <dyn_lib> <iface_lib> <real_linker>`)
+before the actual linker flags. kuro's `get_link_args` produces only
+the real linker flags (`-shared -o …`). rules_cc decides whether to
+wrap based on
+`is_dynamic_library(link_type) and is_enabled("supports_interface_shared_libraries") and not is_enabled("has_configured_linker_path")`.
 
-**Options for the fix.**
-1. Make `ArtifactPath::with_full_path` for non-root cell sources
-   return the buck-out external_cells path, matching
-   `ArtifactFs::resolve_source`. Removes the divergence between
-   `.path` strings and directly-passed artifacts. Risk: breaks any
-   kuro-internal code that expects Bazel's `external/<cell>/...`
-   spelling (search for that form; the only matches are in
-   `app/kuro_execute/src/path/artifact_path.rs` itself for the
-   Shareable/BazelOutput BuildArtifactPath cases, which produce
-   `buck-out/v2/gen/<cell>/<cfg_hash>/external/<cell>/...` — those
-   are physical buck-out paths, unrelated to the source-artifact
-   external path convention, so this option looks clean).
-2. Create project-root `<project_root>/external/<cell>` symlinks for
-   every non-root cell at daemon startup, pointing into
-   `buck-out/v2/external_cells/<origin>/<cell>[/<version>]/`. This is
-   what Bazel itself does via `output_base/external/<cell>`. Keeps
-   the `external/<cell>` path string working everywhere (including
-   user-facing rules). Risk: contention with any real `external/`
-   directory in the project root; race with Bazel (which writes
-   symlinks to the same location via `bazel-external`).
-3. Preprocess argv[0] at spawn time in the local executor: if it
-   matches `external/<cell>/...`, rewrite to the buck-out
-   external_cells path. Risk: doesn't fix `<tool>.path` strings
-   embedded later in argv, env vars, or in scripts the tool runs.
+**Bug #2:** kuro's default `FeatureConfiguration` enabled
+`supports_interface_shared_libraries` on *all* platforms
+(`cc_common.rs:390`). Bazel's `unix_cc_toolchain_config.bzl` never
+enables that feature on Linux/macOS — interface libraries are a
+Windows (MSVC) concept. The mis-enablement made rules_cc pick the
+wrapper script path; the wrapper then saw raw linker flags and
+rejected them. **Fix (`cc_common.rs`):** only enable
+`supports_interface_shared_libraries` on Windows.
 
-**Recommended direction:** Option 1 is the most honest fix — kuro's
-`.path` for non-root cell sources should reflect where the content
-actually lives on disk. Option 2 is the parity-with-Bazel fallback;
-if rules/scripts depend on the `external/<cell>` convention
-(sub-script invocations, `$BASH_SOURCE`-style recursion) Option 1
-alone won't suffice. Pick after grepping non-kuro Starlark for
-`external/<cell>` expectations.
+**Verification:** `@llvm-project//llvm:Support` now **builds
+successfully**. `libSupport.a` (35 MB) and `libSupport.so` (13 MB)
+both produced end-to-end.
 
-**Parity source:** Bazel's `BazelRuntime` creates the `external/`
-directory at the output_base root (i.e. project-root-ish from the
-perspective of command execution) and symlinks each external cell
-into it. This is what makes `File.path` usable as a spawnable path.
+**Parity source:** `unix_cc_toolchain_config.bzl` in Bazel's own
+`tools/cpp/` — it does not include `supports_interface_shared_libraries`
+in the Linux/macOS feature set. Match that.
 
 ## Dependencies and ordering
 
