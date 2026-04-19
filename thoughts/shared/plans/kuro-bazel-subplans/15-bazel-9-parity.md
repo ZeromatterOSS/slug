@@ -854,6 +854,80 @@ translation gap: Bazel rules pass inputs via an explicit `inputs=`
 kwarg on `ctx.actions.run`, but kuro's `RunAction` treated that kwarg
 as metadata-for-DICE only, not as "this needs to be on disk".
 
+### 15.5.11 Executable spawn fails for tools in bzlmod external cells (OPEN)
+
+**Status:** Open. Blocks `@llvm-project//llvm:Support` link step. All
+25+ source files compile; `libSupport.a` archive succeeds; only the
+dynamic `libSupport.so` link fails.
+
+**Observed state:**
+- All `SipHash.pic.o` and peers land in `buck-out/...`.
+- Link command is emitted with argv[0] =
+  `external/rules_cc/cc/private/toolchain/link_dynamic_library.sh`.
+- Spawn fails: "Spawning executable
+  `external/rules_cc/cc/private/toolchain/link_dynamic_library.sh`
+  failed: Failed to spawn a process".
+- The script exists at
+  `buck-out/v2/external_cells/bzlmod/rules_cc/0.2.17/cc/private/toolchain/link_dynamic_library.sh`
+  but there is no `external/rules_cc -> ...` symlink at project root
+  for kuro to find it via Bazel's execution-time path convention.
+
+**Root cause (primary hypothesis).** For non-root cell source
+artifacts, `ArtifactPath::with_full_path`
+(`app/kuro_execute/src/path/artifact_path.rs:282-285`) returns
+`external/<cell>/<path>` — Bazel's execution-time path. kuro does not
+populate that path in the filesystem; it stores external-cell content
+at `buck-out/v2/external_cells/<origin>/<cell>[/<version>]/...` and
+(for extension_repo origin) creates symlinks at
+`buck-out/v2/external_cells/extension_repo/<cell>` but not at
+`<project_root>/external/<cell>`. So `File.path` returns a
+non-existent string path.
+
+Why compile worked and link fails: source artifacts passed *directly*
+as command-line values go through
+`CommandLineContext::resolve_artifact`, which uses
+`ArtifactFs::resolve_source` → a real buck-out path. Tool paths that
+rules_cc's Starlark formats via `.path` → a string come out as
+`external/<cell>/...`, which kuro doesn't symlink.
+
+**Options for the fix.**
+1. Make `ArtifactPath::with_full_path` for non-root cell sources
+   return the buck-out external_cells path, matching
+   `ArtifactFs::resolve_source`. Removes the divergence between
+   `.path` strings and directly-passed artifacts. Risk: breaks any
+   kuro-internal code that expects Bazel's `external/<cell>/...`
+   spelling (search for that form; the only matches are in
+   `app/kuro_execute/src/path/artifact_path.rs` itself for the
+   Shareable/BazelOutput BuildArtifactPath cases, which produce
+   `buck-out/v2/gen/<cell>/<cfg_hash>/external/<cell>/...` — those
+   are physical buck-out paths, unrelated to the source-artifact
+   external path convention, so this option looks clean).
+2. Create project-root `<project_root>/external/<cell>` symlinks for
+   every non-root cell at daemon startup, pointing into
+   `buck-out/v2/external_cells/<origin>/<cell>[/<version>]/`. This is
+   what Bazel itself does via `output_base/external/<cell>`. Keeps
+   the `external/<cell>` path string working everywhere (including
+   user-facing rules). Risk: contention with any real `external/`
+   directory in the project root; race with Bazel (which writes
+   symlinks to the same location via `bazel-external`).
+3. Preprocess argv[0] at spawn time in the local executor: if it
+   matches `external/<cell>/...`, rewrite to the buck-out
+   external_cells path. Risk: doesn't fix `<tool>.path` strings
+   embedded later in argv, env vars, or in scripts the tool runs.
+
+**Recommended direction:** Option 1 is the most honest fix — kuro's
+`.path` for non-root cell sources should reflect where the content
+actually lives on disk. Option 2 is the parity-with-Bazel fallback;
+if rules/scripts depend on the `external/<cell>` convention
+(sub-script invocations, `$BASH_SOURCE`-style recursion) Option 1
+alone won't suffice. Pick after grepping non-kuro Starlark for
+`external/<cell>` expectations.
+
+**Parity source:** Bazel's `BazelRuntime` creates the `external/`
+directory at the output_base root (i.e. project-root-ish from the
+perspective of command execution) and symlinks each external cell
+into it. This is what makes `File.path` usable as a spawnable path.
+
 ## Dependencies and ordering
 
 ```
