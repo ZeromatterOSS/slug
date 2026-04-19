@@ -1383,8 +1383,14 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         let _unused = mandatory;
         let coercer = AttrType::list(AttrType::string());
         let base = Attribute::attr(eval, default, doc, coercer)?;
-        Ok(StarlarkAttribute::new(
-            base.clone_attribute().with_allow_empty(allow_empty),
-        ))
+        let mut sa = StarlarkAttribute::new(base.clone_attribute().with_allow_empty(allow_empty));
+        // Match `attr.output`: mark so that each filename in the list is
+        // registered for bare-filename label resolution from other targets
+        // in the package. LLVM's gentbl_rule uses this for multi-output
+        // tablegen invocations (`additional_outputs = [...]`), which
+        // downstream `filegroup(srcs = [<file>])` references resolve by
+        // filename.
+        sa.is_output = true;
+        Ok(sa)
     }
 }

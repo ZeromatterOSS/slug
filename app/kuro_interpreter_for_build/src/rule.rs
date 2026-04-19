@@ -837,11 +837,31 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRuleCallable {
                         if let Ok(Some(attr_full)) =
                             target_node.attr(attr_name, AttrInspectOptions::All)
                         {
-                            if let CoercedAttr::String(s) = attr_full.value {
-                                coerce_ctx.register_output_file(
-                                    s.0.as_str().to_owned(),
-                                    target_name.clone(),
-                                );
+                            match attr_full.value {
+                                // attr.output — single filename string.
+                                CoercedAttr::String(s) => {
+                                    coerce_ctx.register_output_file(
+                                        s.0.as_str().to_owned(),
+                                        target_name.clone(),
+                                    );
+                                }
+                                // attr.output_list — list of filename strings.
+                                // llvm's gentbl_rule declares multi-output
+                                // tablegen invocations via additional_outputs,
+                                // and downstream `filegroup(srcs=[<file>])`
+                                // references resolve by filename; without this
+                                // the filenames don't map to a target.
+                                CoercedAttr::List(items) => {
+                                    for item in items.iter() {
+                                        if let CoercedAttr::String(s) = item {
+                                            coerce_ctx.register_output_file(
+                                                s.0.as_str().to_owned(),
+                                                target_name.clone(),
+                                            );
+                                        }
+                                    }
+                                }
+                                _ => {}
                             }
                         }
                     }

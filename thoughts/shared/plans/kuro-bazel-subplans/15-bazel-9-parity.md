@@ -977,6 +977,66 @@ the list of all predeclared outputs." plus
 action's inputs never include its own declared outputs by construction;
 Bazel builds them as two disjoint sets.
 
+### 15.5.13 `attr.output_list` filenames not resolvable as labels (LANDED 2026-04-19)
+
+**Status:** Landed. Partial progress on `@llvm-project//llvm:llc` —
+label-resolution phase is past; a separate `strip_include_prefix`
+issue (15.5.14) now blocks downstream.
+
+**Investigation.** Building `:llc` triggered multi-output tablegen
+rules like
+
+```python
+gentbl_cc_library(
+    name = "XCoreCommonTableGen",
+    tbl_outs = [
+        (["-gen-register-info"], [
+            "lib/Target/XCore/XCoreGenRegisterInfo.inc",
+            "lib/Target/XCore/XCoreGenRegisterInfoEnums.inc",
+            …
+            "lib/Target/XCore/XCoreGenRegisterInfoTargetDesc.inc",
+        ]),
+        …
+    ],
+)
+```
+
+`gentbl_filegroup` expands this into a `gentbl_rule` with `out =
+outs[0]` and `additional_outputs = outs[1:]`, then a `native.filegroup`
+whose `srcs = [<all out files>]`. The filegroup's by-filename srcs
+failed label resolution with "Unknown target
+`lib/Target/XCore/XCoreGenRegisterInfoTargetDesc.inc`" — the file is a
+declared output of the gentbl_rule, but kuro never registered it in
+the package's output-file → target map, so the label couldn't resolve.
+
+**Root cause.** Two collaborating bugs in kuro:
+1. `attr.output_list` didn't set `is_output = true` on the attribute
+   (`kuro_interpreter_for_build/src/attrs/attrs_global.rs::output_list`).
+   Without that, `FrozenStarlarkRuleCallable::output_attr_names()`
+   didn't include it, so target coercion never iterated the list's
+   filenames.
+2. Even with the attribute flagged, the registration loop in
+   `kuro_interpreter_for_build/src/rule.rs::call` only handled
+   `CoercedAttr::String` (single-output). `attr.output_list` coerces
+   to `CoercedAttr::List`, so the list's filenames were still
+   ignored.
+
+**Fix.** (a) `output_list` now sets `is_output = true` on the emitted
+`StarlarkAttribute`. (b) The registration loop handles both
+`CoercedAttr::String` (single filename) and `CoercedAttr::List` (a
+list of filename strings), calling `register_output_file` for each.
+
+**Verification.** `:llc` now reaches analysis without
+"Unknown target" for tablegen-produced .inc filenames.
+`:Support` and `:llvm-tblgen` still build.
+
+**Parity source:** Bazel's
+`com.google.devtools.build.lib.packages.PackageBuilder` registers
+every predeclared output (from `attr.output` / `attr.output_list`)
+in the package's output-file table at loading time, so labels for
+those files resolve to the declaring target. Match that for both
+attribute variants.
+
 ## Dependencies and ordering
 
 ```
