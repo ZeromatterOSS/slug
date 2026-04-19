@@ -166,6 +166,11 @@ pub fn get_dynamic_project_root() -> Option<std::path::PathBuf> {
 /// This is needed because `artifact.path` returns `external/<cell>/...` for external
 /// repo source files (matching Bazel convention), but kuro stores repos under
 /// `bazel-external/`. The symlink bridges this gap for unsandboxed local execution.
+///
+/// If an existing symlink points to the wrong target (common when Bazel was run first
+/// and left a `external/<cell>` symlink pointing to a different version in
+/// `bazel-external/`), it is replaced. Non-symlink entries (directories or files) are
+/// left alone — the user put them there.
 pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
     let project_root = match DYNAMIC_PROJECT_ROOT.get() {
         Some(root) => root.clone(),
@@ -173,20 +178,34 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
     };
     let external_dir = project_root.join("external");
     let link_path = external_dir.join(cell_name);
-    if link_path.exists() || link_path.symlink_metadata().is_ok() {
-        return;
+    let desired_target = std::path::PathBuf::from("..").join(cell_path);
+    match link_path.symlink_metadata() {
+        Ok(meta) if meta.file_type().is_symlink() => {
+            // Replace symlink only if it points to a different target. Comparing
+            // the raw readlink output avoids stat'ing dangling targets.
+            match std::fs::read_link(&link_path) {
+                Ok(current) if current == desired_target => return,
+                _ => {
+                    let _ = std::fs::remove_file(&link_path);
+                }
+            }
+        }
+        Ok(_) => {
+            // Real file/dir at this path — don't clobber it.
+            return;
+        }
+        Err(_) => {
+            // No entry yet; fall through to create.
+        }
     }
-    // Create external/ directory if needed
     let _ = std::fs::create_dir_all(&external_dir);
-    // Create relative symlink: external/<cell> -> ../<cell_path>
-    let target = std::path::PathBuf::from("..").join(cell_path);
     #[cfg(unix)]
     {
-        let _ = std::os::unix::fs::symlink(&target, &link_path);
+        let _ = std::os::unix::fs::symlink(&desired_target, &link_path);
     }
     #[cfg(windows)]
     {
-        let _ = std::os::windows::fs::symlink_dir(&target, &link_path);
+        let _ = std::os::windows::fs::symlink_dir(&desired_target, &link_path);
     }
 }
 
