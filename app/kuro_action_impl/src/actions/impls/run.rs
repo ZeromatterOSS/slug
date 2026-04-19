@@ -851,8 +851,23 @@ impl RunAction {
 
         // TODO (@torozco): At this point, might as well just receive the list already. Finding
         // those things in a HashMap is just not very useful.
+        //
+        // Same self-reference filter as `Action::inputs()`: Bazel rules pass
+        // `ctx.outputs.<name>` in `args.add(...)` which the default
+        // `visit_declared_artifact` routes through `visit_input`. Drop any
+        // input whose underlying `BuildArtifact` is also one of our own
+        // outputs, otherwise `ctx.artifact_values(..)` panics — those
+        // artifacts were filtered out of `ensured_inputs` upstream.
+        let own_outputs: std::collections::HashSet<&BuildArtifact> = self.outputs.iter().collect();
         let artifact_inputs: Vec<&ArtifactGroupValues> = visitor
             .inputs()
+            .filter(|group| match group {
+                ArtifactGroup::Artifact(a) => match a.as_parts().0 {
+                    BaseArtifactKind::Build(built) => !own_outputs.contains(built),
+                    BaseArtifactKind::Source(_) => true,
+                },
+                _ => true,
+            })
             .map(|group| ctx.artifact_values(group))
             .collect();
 
@@ -1435,7 +1450,27 @@ impl Action for RunAction {
     fn inputs(&self) -> kuro_error::Result<Cow<'_, [ArtifactGroup]>> {
         let mut artifact_visitor = SimpleCommandLineArtifactVisitor::new();
         self.visit_artifacts(&mut artifact_visitor)?;
-        Ok(Cow::Owned(artifact_visitor.inputs.into_iter().collect()))
+        // Filter self-referential inputs: Bazel rule impls commonly pass
+        // `ctx.outputs.<name>` (a `StarlarkDeclaredArtifact`) as a command-line
+        // argument (e.g. `args.add("-o", ctx.outputs.out)`). The default
+        // `CommandLineArtifactVisitor::visit_declared_artifact` forwards a
+        // declared artifact to `visit_input`, so the action's own outputs end
+        // up in its own input set and DICE deadlocks waiting on them. Drop
+        // any inputs whose underlying `BuildArtifact` is also one of this
+        // action's declared outputs.
+        let own_outputs: std::collections::HashSet<&BuildArtifact> = self.outputs.iter().collect();
+        let filtered: Vec<ArtifactGroup> = artifact_visitor
+            .inputs
+            .into_iter()
+            .filter(|ag| match ag {
+                ArtifactGroup::Artifact(a) => match a.as_parts().0 {
+                    BaseArtifactKind::Build(built) => !own_outputs.contains(built),
+                    BaseArtifactKind::Source(_) => true,
+                },
+                _ => true,
+            })
+            .collect();
+        Ok(Cow::Owned(filtered))
     }
 
     fn outputs(&self) -> Cow<'_, [BuildArtifact]> {

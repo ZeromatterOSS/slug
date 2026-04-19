@@ -906,6 +906,77 @@ both produced end-to-end.
 `tools/cpp/` — it does not include `supports_interface_shared_libraries`
 in the Linux/macOS feature set. Match that.
 
+### 15.5.12 gentbl_rule (`[DefaultInfo()]` + self-referencing outputs) (LANDED 2026-04-19)
+
+**Status:** Landed. Unblocks `@llvm-project//llvm:llvm-tblgen` (and
+anything else depending on tablegen-generated `.inc` headers).
+
+**Investigation.** After `:Support` built, `:llvm-tblgen` failed with
+`fatal error: llvm/CodeGen/GenVT.inc: No such file or directory`.
+GenVT.inc is produced by a `gentbl_rule` (a user-defined rule in
+`llvm-project-overlay/mlir/tblgen.bzl`) that runs `llvm-min-tblgen` on
+`ValueTypes.td`. The rule's impl:
+
+```python
+ctx.actions.run(outputs=[ctx.outputs.out], inputs=trans_srcs,
+                executable=ctx.executable.tblgen, ...)
+return [DefaultInfo()]    # <-- empty DefaultInfo()
+```
+
+**Bug #1: empty DefaultInfo skipped auto-inject.**
+`maybe_inject_implicit_default_info` in `kuro_analysis/src/analysis/env.rs`
+short-circuited whenever the impl returned *any* DefaultInfo, even an
+empty `DefaultInfo()`. Bazel's contract is that an empty `DefaultInfo()`
+still auto-populates `files=` with the rule's predeclared outputs (cf.
+Bazel's `DefaultInfo` docs: "If files is not specified, the default output
+for the target becomes the list of all predeclared outputs."). In kuro's
+behaviour the gentbl's output never made it into the filegroup, never
+into the consuming cc_library's textual_hdrs, so GenVT.inc was simply
+absent. **Fix:** when an existing DefaultInfo has empty `default_outputs`
+and the rule has `attr.output` declarations, replace it with a populated
+one. Non-empty author-supplied outputs are left alone.
+
+**Bug #2: action's own output ended up in its own input set → DICE
+deadlock.**
+With fix #1 in place, DICE correctly scheduled the `TdGenerate` action
+— but the action's `inputs()` contained three artifacts, one of which
+was GenVT.inc itself (its own output). The gentbl_rule impl does
+`args.add("-o", ctx.outputs.out)`, and when that args object was
+rendered, `StarlarkDeclaredArtifact::visit_artifacts` routed the
+output through `visit_declared_artifact` whose *default* trait impl
+forwards to `visit_input`
+(`kuro_build_api/src/interpreter/rule_defs/cmd_args/traits.rs:58-67`).
+The output artifact was bound to *this* action, so the action's
+`inputs()` set contained its own `BuildArtifact` → DICE waited
+forever for `ensure_artifact_group_staged(GenVT.inc)` to complete,
+which required the `TdGenerate` action, which was waiting on itself.
+
+**Fix:** in `RunAction::inputs()` and in `prepare()`, filter out any
+`ArtifactGroup::Artifact(build)` whose `BuildArtifact` is one of the
+action's own outputs. Source artifacts and transitive-set projections
+are left untouched. The filter addresses the symptom cleanly — a
+broader fix (distinguishing declared-output-as-arg from
+declared-artifact-as-input in `visit_declared_artifact`) would require
+plumbing the action's output list into cmd_args visitors, which does
+not have it today. `prepare()` also needs the same filter because
+`visitor.inputs()` is computed from a second visitor traversal, and
+`ctx.artifact_values(ag)` panics if the artifact wasn't in
+`ensured_inputs`.
+
+**Verification:** `vt_gen_filegroup___gen_vt_33394888_genrule` builds
+(GenVT.inc materialized at
+`buck-out/v2/gen/llvm-project/<hash>/external/llvm-project/llvm/include/llvm/CodeGen/GenVT.inc`).
+`@llvm-project//llvm:llvm-tblgen` builds end-to-end (322 commands).
+`@llvm-project//llvm:Support` still builds.
+
+**Parity source:** Bazel's
+`com.google.devtools.build.lib.starlarkbuildapi.DefaultInfoApi` —
+"If files is not specified, the default output for the target becomes
+the list of all predeclared outputs." plus
+`com.google.devtools.build.lib.actions.Action.getInputs()` — an
+action's inputs never include its own declared outputs by construction;
+Bazel builds them as two disjoint sets.
+
 ## Dependencies and ordering
 
 ```

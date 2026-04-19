@@ -229,20 +229,44 @@ fn maybe_inject_implicit_default_info<'v>(
         return Ok(list_res);
     };
 
-    let has_default_info = existing_providers.iter().any(|v| {
-        if v.is_none() {
-            return false;
+    let heap = eval.heap();
+
+    // Find the index of any DefaultInfo the impl already returned. We don't
+    // short-circuit on its presence: Bazel lets rules write `return [DefaultInfo()]`
+    // with no `files=` argument and still has the predeclared outputs become the
+    // target's default outputs (see rules_cc's `gentbl_rule` at
+    // llvm-project-overlay/mlir/tblgen.bzl, which returns `[DefaultInfo()]` and
+    // relies on its `attr.output(name="out")` showing up as the target's files).
+    // If the impl supplied a non-empty `default_outputs`, honour it verbatim.
+    let existing_default_info_idx =
+        existing_providers
+            .iter()
+            .enumerate()
+            .find_map(|(i, v)| match (*v).is_none() {
+                true => None,
+                false => {
+                    match <ValueAsProviderLike as starlark::values::UnpackValue>::unpack_value(*v) {
+                        Ok(Some(p)) if p.provider_id() == default_info_id => Some(i),
+                        _ => None,
+                    }
+                }
+            });
+
+    if let Some(idx) = existing_default_info_idx {
+        let existing = existing_providers[idx];
+        // If the existing DefaultInfo already has non-empty default_outputs,
+        // trust the rule author.
+        let has_outputs = existing
+            .get_attr("default_outputs", heap)
+            .ok()
+            .flatten()
+            .and_then(|v| v.length().ok())
+            .is_some_and(|n| n > 0);
+        if has_outputs {
+            return Ok(list_res);
         }
-        match <ValueAsProviderLike as starlark::values::UnpackValue>::unpack_value(*v) {
-            Ok(Some(p)) => p.provider_id() == default_info_id,
-            _ => false,
-        }
-    });
-    if has_default_info {
-        return Ok(list_res);
     }
 
-    let heap = eval.heap();
     let artifacts = ctx
         .as_ref()
         .collect_implicit_default_outputs(output_attr_names, heap);
@@ -257,7 +281,13 @@ fn maybe_inject_implicit_default_info<'v>(
     let default_info_value = heap.alloc(default_info);
 
     let mut new_list = existing_providers;
-    new_list.push(default_info_value);
+    if let Some(idx) = existing_default_info_idx {
+        // Replace the empty DefaultInfo with the populated one. Preserves
+        // provider ordering so downstream consumers aren't surprised.
+        new_list[idx] = default_info_value;
+    } else {
+        new_list.push(default_info_value);
+    }
     Ok(heap.alloc(new_list))
 }
 
