@@ -320,23 +320,66 @@ impl EvaluationResult {
         &'a self,
         path: &TargetNameRef,
     ) -> kuro_error::Result<TargetNodeRef<'a>> {
-        self.get_target(path).ok_or_else(|| {
-            let similar_targets =
-                SuggestedSimilarTargets::suggest(path, self.package().dupe(), self.targets.keys());
-            MissingTargetError {
-                target: path.to_owned(),
-                package: self.package().dupe(),
-                num_targets: self.targets.len(),
-                buildfile_path: self.buildfile_path.dupe(),
-                all_targets: AllTargetsDisplay::new(
-                    path,
-                    self.package().dupe(),
-                    self.targets.values(),
-                ),
-                similar_targets,
+        if let Some(t) = self.get_target(path) {
+            return Ok(t);
+        }
+        // Bazel-compat: when a label like `//llvm:include/foo/bar.inc` names
+        // a file that is the predeclared output of some other target in this
+        // package (via `attr.output` / `attr.output_list`), redirect the
+        // lookup to the producing target. The per-module
+        // `output_file_registry` in BuildAttrCoercionContext only handles
+        // in-package references coerced during loading; cross-package
+        // references like `clang:sema`'s
+        // `srcs = ["//llvm:include/llvm/Frontend/OpenACC/ACC.inc"]`
+        // survive coercion as a full label and hit DICE target lookup
+        // here, where we need the same redirect.
+        //
+        // Linear scan is O(N) per miss, but misses are rare (normally a
+        // target with the given name exists) so we accept it over the
+        // bookkeeping cost of maintaining a reverse index on every
+        // EvaluationResult.
+        let file_name = path.as_str();
+        if file_name.contains('/')
+            && (file_name.ends_with(".inc")
+                || file_name.ends_with(".h")
+                || file_name.ends_with(".h.inc")
+                || file_name.ends_with(".cpp")
+                || file_name.ends_with(".def"))
+        {
+            use crate::attrs::coerced_attr::CoercedAttr;
+            use crate::attrs::inspect_options::AttrInspectOptions;
+            for node in self.targets.values() {
+                for attr in node.attrs(AttrInspectOptions::All) {
+                    match &attr.value {
+                        CoercedAttr::String(s) if s.0.as_str() == file_name => {
+                            return Ok(node);
+                        }
+                        CoercedAttr::List(items) => {
+                            if items.iter().any(|item| {
+                                matches!(
+                                    item,
+                                    CoercedAttr::String(s) if s.0.as_str() == file_name
+                                )
+                            }) {
+                                return Ok(node);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
             }
-            .into()
-        })
+        }
+        let similar_targets =
+            SuggestedSimilarTargets::suggest(path, self.package().dupe(), self.targets.keys());
+        Err(MissingTargetError {
+            target: path.to_owned(),
+            package: self.package().dupe(),
+            num_targets: self.targets.len(),
+            buildfile_path: self.buildfile_path.dupe(),
+            all_targets: AllTargetsDisplay::new(path, self.package().dupe(), self.targets.values()),
+            similar_targets,
+        }
+        .into())
     }
 
     pub fn apply_spec<T: PatternType>(

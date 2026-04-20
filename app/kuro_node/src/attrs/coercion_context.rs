@@ -73,6 +73,22 @@ pub trait AttrCoercionContext {
         value: Vec<(CoercedAttr, CoercedAttr)>,
     ) -> ArcSlice<(CoercedAttr, CoercedAttr)>;
 
+    /// If the given filename is a predeclared output file of some other
+    /// target in the current package (registered via `attr.output` /
+    /// `attr.output_list`), return the producing target's label. Returns
+    /// `None` if the path does not refer to a registered output — caller
+    /// should then try source-file resolution. Default impl returns `None`
+    /// for contexts that don't track a package-level output map.
+    ///
+    /// Bazel handles this by routing a source-label reference to a declared
+    /// output file to the file's declaring target automatically. Kuro
+    /// reproduces that in `SourceAttrType::coerce_item` so that patterns
+    /// like `cc_library(srcs = ["foo.inc"])` resolve to the gentbl_rule
+    /// that generates `foo.inc` when no source file of that name exists.
+    fn output_file_target(&self, _value: &str) -> Option<ProvidersLabel> {
+        None
+    }
+
     /// Attempt to convert a string into a BuckPath
     fn coerce_path(&self, value: &str, allow_directory: bool) -> kuro_error::Result<CoercedPath>;
 

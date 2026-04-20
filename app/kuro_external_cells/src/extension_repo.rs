@@ -840,6 +840,42 @@ fn materialize_stub_repo(
         })?;
     }
 
+    // rules_python's pythons_hub extension generates a versions.bzl listing
+    // the registered Python toolchains. Without kuro actually executing the
+    // extension, stub the file with a non-empty MINOR_MAPPING /
+    // PYTHON_VERSIONS so `rules_python//python/config_settings/BUILD.bazel`
+    // (called unconditionally by several rules_python targets) doesn't
+    // crash in `construct_config_settings()` when iterating the mapping
+    // to emit compat config_setting aliases. Values chosen to cover the
+    // range of Python 3 minor versions rules_python currently references.
+    let versions_path = dest.join("versions.bzl");
+    if !versions_path.exists() {
+        std::fs::write(
+            &versions_path,
+            "# Stub versions.bzl (extension did not generate this repo)\n\
+             DEFAULT_PYTHON_VERSION = \"3.11\"\n\
+             MINOR_MAPPING = {\n\
+                 \"3.8\": \"3.8.20\",\n\
+                 \"3.9\": \"3.9.21\",\n\
+                 \"3.10\": \"3.10.16\",\n\
+                 \"3.11\": \"3.11.11\",\n\
+                 \"3.12\": \"3.12.9\",\n\
+                 \"3.13\": \"3.13.2\",\n\
+             }\n\
+             PYTHON_VERSIONS = [\n\
+                 \"3.8.20\", \"3.9.21\", \"3.10.16\", \"3.11.11\", \"3.12.9\", \"3.13.2\",\n\
+             ]\n",
+        )
+        .map_err(|e| {
+            kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Environment,
+                "Failed to write stub versions.bzl for '{}': {}",
+                canonical_name,
+                e
+            )
+        })?;
+    }
+
     // Mark as complete
     let marker = dest.join(".kuro_repo_complete");
     let _ = std::fs::write(&marker, "stub");

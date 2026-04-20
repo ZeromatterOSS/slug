@@ -309,6 +309,20 @@ async fn do_apply_transition(
         return Ok(TransitionApplied::Single(conf.dupe()));
     }
 
+    // Anonymous `rule(cfg = dict(implementation=..., inputs=[...], outputs=[...]))`
+    // transitions (used by rules_python's py_binary builder) are stored with a
+    // magic id `(<defining_bzl>, "_anonymous_transition")`. The transition
+    // object itself is never bound to a module-level global, so the
+    // fetch-by-name lookup always fails. Kuro does not yet execute Starlark
+    // transitions, so treat anonymous cfg= transitions as identity (matches
+    // the behaviour we already apply to `config.target()` and bazel-style
+    // no-op transitions in `rule.rs::call`).
+    if let TransitionId::MagicObject { name, .. } = transition_id {
+        if name == "_anonymous_transition" {
+            return Ok(TransitionApplied::Single(conf.dupe()));
+        }
+    }
+
     let transition = ctx.fetch_transition(transition_id).await?;
     let mut refs = Vec::new();
     let mut refs_refs = Vec::new();
@@ -449,6 +463,18 @@ impl TransitionCalculation for TransitionCalculationImpl {
         cfg: &ConfigurationData,
         transition_id: &TransitionId,
     ) -> kuro_error::Result<Arc<TransitionApplied>> {
+        // Anonymous `rule(cfg = dict(...))` transitions: the transition
+        // object is never bound to a module-level global, so the later
+        // `ctx.fetch_transition(transition_id)` call inside this function
+        // fails. Kuro does not execute Starlark transitions, so treat the
+        // anonymous form as identity and short-circuit the whole path.
+        // See also `do_apply_transition` below for the same guard applied
+        // through the DICE key route.
+        if let TransitionId::MagicObject { name, .. } = transition_id {
+            if name == "_anonymous_transition" {
+                return Ok(Arc::new(TransitionApplied::Single(cfg.dupe())));
+            }
+        }
         #[derive(Debug, Eq, PartialEq, Hash, Clone, Display, Allocative)]
         #[display("{} ({}){}", transition_id, cfg, self.fmt_attrs())]
         struct TransitionKey {

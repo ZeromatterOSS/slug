@@ -7893,11 +7893,35 @@ impl<'v> StarlarkValue<'v> for PyInternalStub {
         )
     }
 
-    fn get_attr(&self, attribute: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
-        if self.has_attr(attribute, _heap) {
-            Some(Value::new_none())
-        } else {
-            None
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        if !self.has_attr(attribute, heap) {
+            return None;
+        }
+        // rules_python 1.9+ calls several of these attributes directly,
+        // e.g. `py_internal.get_label_repo_runfiles_path(ctx.label)`, so the
+        // stub attribute needs to be a callable (not None). Return a lambda
+        // via the starlark evaluator that always produces an empty string.
+        // The booleans (is_bzlmod_enabled, stamp_binaries, …) are sometimes
+        // used as values rather than called, but starlark allows unused
+        // callables there too, so returning a no-arg lambda is uniformly safe.
+        match attribute {
+            "get_label_repo_runfiles_path"
+            | "get_legacy_external_runfiles"
+            | "copy_without_caching"
+            | "create_repo_mapping_manifest"
+            | "cc_toolchain_build_info_files"
+            | "declare_shareable_artifact"
+            | "is_bzlmod_enabled"
+            | "is_tool_configuration"
+            | "link"
+            | "linkstamp_file"
+            | "regex_match"
+            | "runfiles_enabled"
+            | "share_native_deps"
+            | "stamp_binaries" => Some(heap.alloc(PyInternalStubCall {
+                name: attribute.to_owned(),
+            })),
+            _ => Some(Value::new_none()),
         }
     }
 
@@ -7918,6 +7942,39 @@ impl<'v> StarlarkValue<'v> for PyInternalStub {
             "share_native_deps".to_owned(),
             "stamp_binaries".to_owned(),
         ]
+    }
+
+    fn get_type_starlark_repr() -> starlark::typing::Ty {
+        starlark::typing::Ty::any()
+    }
+}
+
+/// Callable stub returned by `py_internal.<name>` access for methods that
+/// rules_python calls. Accepts any args and returns an empty string (a
+/// reasonable harmless default; all current callers ignore return value
+/// when it's non-meaningful in kuro).
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Clone)]
+pub struct PyInternalStubCall {
+    pub name: String,
+}
+
+impl std::fmt::Display for PyInternalStubCall {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "py_internal.{}(stub)", self.name)
+    }
+}
+
+starlark_simple_value!(PyInternalStubCall);
+
+#[starlark_value(type = "py_internal_stub_fn")]
+impl<'v> StarlarkValue<'v> for PyInternalStubCall {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        _args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(eval.heap().alloc_str("").to_value())
     }
 
     fn get_type_starlark_repr() -> starlark::typing::Ty {

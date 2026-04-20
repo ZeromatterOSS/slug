@@ -165,6 +165,16 @@ impl Key for TransitionAttrsKey {
         ctx: &mut DiceComputations,
         _cancellation: &dice::CancellationContext,
     ) -> Self::Value {
+        // Anonymous `rule(cfg = dict(...))` transitions — see comment in
+        // `calculation_apply_transition::do_apply_transition`. The transition
+        // isn't bound to any module-level global, so `fetch_transition`
+        // always fails. Kuro doesn't execute Starlark transitions, so the
+        // anonymous transition has no attribute-name requirements.
+        if let TransitionId::MagicObject { name, .. } = &self.0 {
+            if name == "_anonymous_transition" {
+                return Ok(None);
+            }
+        }
         Ok(ctx
             .fetch_transition(&self.0)
             .await?

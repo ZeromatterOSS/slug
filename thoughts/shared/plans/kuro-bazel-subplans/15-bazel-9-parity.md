@@ -1123,7 +1123,151 @@ with default `""`, so evaluation errored with
 content. Kuro already ignored the attribute's semantics; this is
 purely about accepting the upstream call sites.
 
-### 15.5.16 Anonymous `rule(cfg=dict(...))` transitions not findable (OPEN)
+### 15.5.16 Anonymous `rule(cfg=dict(...))` transitions not findable (LANDED 2026-04-20)
+
+**Status:** Landed. Unblocks clang analysis past the rules_python
+py_binary transition.
+
+**Fix.** Short-circuit anonymous-transition lookup in three places:
+- `TransitionCalculation::apply_transition` (top of impl) — return
+  `TransitionApplied::Single(cfg)` for `MagicObject(name =
+  "_anonymous_transition")` before the inner `fetch_transition`
+  call that would otherwise fail.
+- `do_apply_transition` (DICE key compute path) — same guard.
+- `TransitionAttrsKey::compute` — return `Ok(None)` so the
+  `resolve_transition_attrs` pass doesn't trip on missing attrs.
+
+Rationale: kuro does not yet execute Starlark config transitions;
+honouring the anonymous `rule(cfg=dict(...))` form as identity
+matches what we already do for `config.target()` and other no-op
+transitions.
+
+### 15.5.17 bazel_tools `python_bootstrap_template.txt` self-cycle (LANDED 2026-04-20)
+
+**Status:** Landed. Unblocks clang past the next configured-target
+cycle.
+
+**Fix.** `bazel_tools//tools/python:BUILD` declared a filegroup
+`name = "python_bootstrap_template.txt"` whose `srcs` list contained
+the source file of the same name. Kuro treats `:python_bootstrap_template.txt`
+as a label reference, which matches the filegroup itself, so DICE
+sees a self-dependency cycle. Replaced with `exports_files()` — the
+source file already exists in the package and referencing
+`:python_bootstrap_template.txt` resolves directly to the file when
+the source is publicly exported.
+
+### 15.5.18 rules_python `pythons_hub` stub missing `versions.bzl` (LANDED 2026-04-20)
+
+**Status:** Landed. Unblocks clang past the rules_python
+`config_settings` evaluation.
+
+**Fix.** rules_python's module extension generates `pythons_hub` with
+a `versions.bzl` exposing `DEFAULT_PYTHON_VERSION`, `MINOR_MAPPING`,
+`PYTHON_VERSIONS`. Kuro doesn't yet run the extension; its stub
+`extension_repo.rs::materialize_stub_repo` now emits a default
+`versions.bzl` covering Python 3.8–3.13 minor versions so
+`construct_config_settings()` in
+`rules_python//python/config_settings/BUILD.bazel` evaluates
+without crashing on empty `MINOR_MAPPING`.
+
+### 15.5.19 cross-package output-file label resolution (LANDED 2026-04-20)
+
+**Status:** Landed. Unblocks clang past the LLVM frontend `.inc`
+lookups.
+
+**Observed.** `clang/BUILD.bazel` has
+`cc_library(name="sema", srcs = [...] + ["//llvm:include/llvm/Frontend/OpenACC/ACC.inc"])`.
+kuro's per-module `output_file_registry` tracks predeclared outputs
+for labels resolved *within the same package*. A cross-package label
+like `//llvm:include/.../ACC.inc` survives coercion as a full label
+and hits DICE target lookup, which raised MissingTargetError because
+the package has no target named `include/.../ACC.inc` (the file is a
+predeclared output of an `acc_gen_impl__…_genrule` target).
+
+**Fix.** Two pieces:
+1. `SourceAttrType::coerce_item` — when the bare source label has no
+   `:`, try `ctx.output_file_target()` before falling through to
+   `coerce_path`. Added an `output_file_target` method to the
+   `AttrCoercionContext` trait with a default that returns `None`;
+   `BuildAttrCoercionContext` implements it using its existing
+   `output_file_registry`. This handles intra-package file-name
+   references in `srcs`.
+2. `EvaluationResult::resolve_target` — on `MissingTargetError` for
+   a slashed file-like name (`.inc`/`.h`/`.h.inc`/`.cpp`/`.def`),
+   linear-scan the package's targets checking each node's
+   `CoercedAttr::String` / `CoercedAttr::List` attribute values for a
+   match, and redirect to the declaring target. Handles the
+   cross-package case (label was already parsed and parked; DICE
+   lookup falls back to this check).
+
+The registry is per-module (per `BuildAttrCoercionContext`) so a
+cross-package DICE lookup needs the linear scan; maintaining a
+persistent reverse index on every `EvaluationResult` would cost
+memory per package for the common case that all target lookups hit
+by name.
+
+### 15.5.20 `py_internal` stub attributes return callables (LANDED 2026-04-20)
+
+**Status:** Landed. Unblocks clang past rules_python's py_library
+analysis.
+
+**Fix.** rules_python ≥ 1.9 calls `py_internal.<method>(args)` from
+inside rule implementations (e.g.
+`py_internal.get_label_repo_runfiles_path(ctx.label)`). Kuro's
+`PyInternalStub::get_attr` returned `Value::new_none()` for all known
+attribute names, so the subsequent `.call()` errored with "Operation
+`call()` not supported on type `NoneType`".
+
+Added a `PyInternalStubCall` Starlark value that accepts any call
+arguments and returns an empty string. `get_attr` now routes the
+method-like attributes through it; non-method attributes still return
+`None`. Matches our "stub that never errors" philosophy for
+Bazel-specific internal APIs.
+
+### 15.5.21 rules_python py_binary Python toolchain (OPEN)
+
+**Status:** Open. Blocks clang at the py_library analysis step.
+`clang:clang` → `clang:analysis` → `clang:analysis_htmllogger_gen`
+(`run_binary` that spawns `clang:bundle_resources` py_binary) →
+py_library analysis fails at
+`fail("Python toolchain field 'py3_runtime' is missing")` in
+`py_executable.bzl:1197`.
+
+rules_python expects a registered py3 toolchain exposing
+`py3_runtime`. Kuro hasn't set one up — the host's Python isn't
+discovered as a Bazel toolchain. Options:
+1. Register a kuro-internal Python toolchain with the host's `python3`.
+2. Stub `py_binary` as a native no-op that emits an empty output file
+   (makes `run_binary(tool=:py_binary)` produce an empty `.inc`;
+   clang's HTMLLogger resources would be empty but the build
+   completes).
+3. Upstream the driver BUILD to optionally skip bundle_resources.
+
+Option 2 is pragmatic for kuro Bazel-compat builds where users don't
+need runtime Python tools to finish linking C++ binaries. Option 1
+is the proper long-term fix but requires platform-resolution work.
+
+### 15.5.22 `@llvm-project//llvm:llvm` empty driver-tools select (OPEN)
+
+**Status:** Open. Blocks the `:llvm` binary target (separate from
+`:llc`, which builds).
+
+**Observed.** `tools/llvm-driver/llvm-driver.cpp` expects at least one
+`LLVM_DRIVER_TOOL(...)` entry in `LLVMDriverTools.def`, generated by
+a rule that collects tools via a `select()` against per-tool
+`config_setting`s. Kuro's select evaluation returns the default
+(empty list) for every tool, so the generated def file has only
+`#undef LLVM_DRIVER_TOOL` and the compile fails with
+`error: expected primary-expression before ';' token` at the line
+consuming `constexpr char subcommands[] =  \n #include "…" \n ;`.
+
+The underlying bug is that `generate_driver_selects`'s
+`_validated_string_list_flag` default (all tools) isn't matching
+kuro's config_setting evaluation. Likely a `flag_values` semantic
+gap on our string-list comparison, or a missing
+`StringListSettingInfo`-style provider. Investigate next.
+
+## Dependencies and ordering
 
 **Status:** Open. Blocks `@llvm-project//clang:clang` after the
 genrule fix.

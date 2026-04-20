@@ -497,6 +497,27 @@ impl AttrCoercionContext for BuildAttrCoercionContext {
         self.select_interner.intern(value)
     }
 
+    fn output_file_target(
+        &self,
+        value: &str,
+    ) -> Option<kuro_core::provider::label::ProvidersLabel> {
+        let producer = self.output_file_registry.borrow().get(value).cloned();
+        if value.contains("ACC.inc") {
+            tracing::error!(
+                "output_file_target: value={} producer={:?} registry.len={}",
+                value,
+                producer,
+                self.output_file_registry.borrow().len()
+            );
+        }
+        let producer = producer?;
+        let (pkg_label, _) = self.enclosing_package.as_ref()?;
+        let target_name = kuro_core::target::name::TargetNameRef::new(&producer).ok()?;
+        Some(kuro_core::provider::label::ProvidersLabel::default_for(
+            kuro_core::target::label::label::TargetLabel::new(pkg_label.dupe(), target_name),
+        ))
+    }
+
     fn coerce_path(&self, value: &str, allow_directory: bool) -> kuro_error::Result<CoercedPath> {
         let path = <&PackageRelativePath>::try_from(value)?;
         let (package, listing) = self.require_enclosing_package(value)?;
