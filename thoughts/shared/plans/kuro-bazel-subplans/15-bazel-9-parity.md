@@ -1224,28 +1224,238 @@ method-like attributes through it; non-method attributes still return
 `None`. Matches our "stub that never errors" philosophy for
 Bazel-specific internal APIs.
 
-### 15.5.21 rules_python py_binary Python toolchain (OPEN)
+### 15.5.21 rules_python py_binary Python toolchain (LANDED 2026-04-20)
 
-**Status:** Open. Blocks clang at the py_library analysis step.
-`clang:clang` → `clang:analysis` → `clang:analysis_htmllogger_gen`
-(`run_binary` that spawns `clang:bundle_resources` py_binary) →
-py_library analysis fails at
-`fail("Python toolchain field 'py3_runtime' is missing")` in
-`py_executable.bzl:1197`.
+**Status:** Landed. `clang:bundle_resources` (py_binary) now
+**builds successfully** end-to-end; py_library + py_binary analysis
+proceed past the `py3_runtime is missing` fail; resolution surfaces a
+real `ToolchainInfo` with `py3_runtime` when rules_python is in the
+module graph. `clang:clang` build advances past analysis of all
+rules_python-backed targets and now fails on a separate
+`$(WORKSPACE_ROOT)` Make-variable gap in `cc_library` (see
+`ctx_var_builtins.md` — Make-variable expansion, unrelated to
+toolchain resolution).
 
-rules_python expects a registered py3 toolchain exposing
-`py3_runtime`. Kuro hasn't set one up — the host's Python isn't
-discovered as a Bazel toolchain. Options:
-1. Register a kuro-internal Python toolchain with the host's `python3`.
-2. Stub `py_binary` as a native no-op that emits an empty output file
-   (makes `run_binary(tool=:py_binary)` produce an empty `.inc`;
-   clang's HTMLLogger resources would be empty but the build
-   completes).
-3. Upstream the driver BUILD to optionally skip bundle_resources.
+**Root causes.** Three distinct bugs stacked on top of each other:
 
-Option 2 is pragmatic for kuro Bazel-compat builds where users don't
-need runtime Python tools to finish linking C++ binaries. Option 1
-is the proper long-term fix but requires platform-resolution work.
+1. **Mandatory flag ignored.** kuro's `rule(toolchains=[...])`
+   extractor reduced every entry to `Vec<String>` and `env.rs` built
+   the default exec group's `RequiredToolchainType` list with
+   `mandatory: true` hardcoded. rules_python passes
+   `ruleb.ToolchainType(TOOLCHAIN_TYPE, mandatory = False)` for
+   optional types (`exec_tools_toolchain_type`, cc toolchain, target
+   py toolchain on py_library) — kuro promoted those to mandatory,
+   so a single missing registration poisoned the entire resolution.
+
+2. **Empty `ResolvedToolchains` swallowed optional misses.** Even
+   when resolution returned partial results, `ctx.toolchains[T]` for
+   an unregistered optional `T` hit the "map non-empty but entry
+   absent" arm in `context.rs::at()` and raised
+   `"Toolchain type '...' was not resolved"`. Bazel returns the
+   entry (None) for declared-but-unresolved optional types; kuro now
+   matches.
+
+3. **No host Python toolchain registered.** LLVM's MODULE.bazel
+   depends on rules_python (for small py_binary helpers) but never
+   calls `register_toolchains` or configures `python.toolchain`.
+   Bazel historically auto-generated `@local_config_python`; kuro
+   now does the same.
+
+**Landed changes.**
+
+- `app/kuro_node/src/rule.rs`, `app/kuro_interpreter_for_build/src/rule.rs`,
+  `app/kuro_analysis/src/analysis/env.rs`:
+  `Rule.toolchain_types: Vec<String>` → `Vec<(String, bool)>`
+  (label, mandatory). The Starlark `rule()` builder extracts
+  `.mandatory` from `ToolchainTypeRequirement` / `config_common.toolchain_type`;
+  `env.rs` threads the flag into `RequiredToolchainType.mandatory`.
+  Raw string/Label entries default to mandatory=true (Bazel default).
+
+- `app/kuro_build_api/src/interpreter/rule_defs/context.rs`
+  `ResolvedToolchains::at()` rewritten as a three-way match:
+  resolved → return `ToolchainInfo`; declared-but-unresolved → return
+  `None`; not declared → raise. Matches Bazel's
+  `ctx.toolchains[type]` semantics.
+
+- `app/kuro_external_cells_bundled/build.rs` generates a new
+  `local_config_python` bundled cell with:
+  - `py_runtime(interpreter_path = <detected host python3>, python_version = "PY3")`
+  - `py_runtime_pair(py3_runtime = :py3_runtime)`
+  - `toolchain(name = host_toolchain, toolchain_type = "@rules_python//python:toolchain_type", toolchain = :py_runtime_pair)`
+  - Stub `stub_toolchain_info` rule (returns empty `ToolchainInfo`)
+    plus `toolchain(name = host_launcher_maker_toolchain, toolchain_type = "@bazel_tools//tools/launcher:launcher_maker_toolchain_type")`
+    for `bazel_9_or_later` py_binary's mandatory launcher toolchain.
+    `host_python3` probed in build.rs (`/usr/bin/python3` →
+    `/usr/local/bin/python3` → `/opt/homebrew/bin/python3`).
+
+- `app/kuro_external_cells_bundled/src/lib.rs` adds
+  `LOCAL_CONFIG_PYTHON` to the bundled-cell set.
+
+- `app/kuro_common/src/legacy_configs/cells.rs`
+  (parse/cell-resolution path) auto-registers the
+  `local_config_python` cell alongside `local_config_platform` for
+  bzlmod workspaces. After collecting `registered_toolchains` from
+  all modules, if `rules_python` is in the module graph and no
+  existing `local_config_python` registration is present, prepends
+  `@local_config_python//:host_toolchain` and
+  `@local_config_python//:host_launcher_maker_toolchain` at lowest
+  priority. Explicit user registrations override (they appear earlier
+  in `all_toolchains` and resolve first).
+
+- `bazel_tools/tools/launcher/BUILD` adds the `launcher_toolchain_type`
+  and `launcher_maker_toolchain_type` targets (previously only in
+  `BUILD.tools`/`BUILD.bootstrap`). kuro's `toolchain()` rule requires
+  the toolchain_type to be a resolvable dep target.
+
+- `app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs`
+  `PyInternalStub` gains the rules_python 1.9 method names it was
+  missing: `declare_constant_metadata_file`,
+  `expand_location_and_make_variables`, `is_singleton_depset`,
+  `make_runfiles_respect_legacy_external_runfiles`,
+  `merge_runfiles_with_generated_inits_empty_files_supplier`.
+  `PyInternalStubCall` special-cases two paths beyond the
+  empty-string default:
+  - `merge_runfiles_with_generated_inits_empty_files_supplier` and
+    `make_runfiles_respect_legacy_external_runfiles` pass through
+    the `runfiles=` kwarg (so `RunfilesBuilder.add()` accepts the
+    return value).
+  - `declare_constant_metadata_file(ctx=, name=, root=)` dispatches
+    to `ctx.actions.declare_file(name)` (return is used as an
+    action output; callers read `.path`).
+
+**Parity source.**
+- Bazel toolchain resolution algorithm:
+  https://bazel.build/extending/toolchains#toolchain-resolution
+- rules_python toolchain declarations:
+  `bazel-external/rules_python+1.9.0/python/private/py_library.bzl:295`
+  (py_library's toolchains list with mandatory=False on both target
+  and exec_tools types); `py_executable.bzl:1848-1851` (py_binary
+  adds cc + launcher_maker toolchains, launcher_maker is mandatory
+  when `bazel_9_or_later`).
+- `platform_common.ToolchainInfo` provider shape:
+  `/var/mnt/dev/bazel/src/main/java/com/google/devtools/build/lib/analysis/platform/ToolchainInfo.java`.
+
+**Additional fixes that landed in the same changeset to unblock
+`clang:bundle_resources` end-to-end** (scope-adjacent, not strictly
+toolchain resolution):
+
+1. **`DefaultInfo.files_to_run.executable` fallback.**
+   `app/kuro_build_api/src/interpreter/rule_defs/provider/builtin/default_info.rs`
+   `files_to_run` attribute getter now falls back to the single
+   `default_output` when `DefaultInfo.executable` is empty.
+   Matches Bazel's "source file with exec bit is implicitly its own
+   executable" semantics. Unblocks rules_python's
+   `_build_data_writer` (alias → `build_data_writer.sh` source file)
+   when used as `ctx.actions.run(executable=...)`.
+
+2. **py_internal method name/positional handling.**
+   `app/kuro_build_api/src/interpreter/rule_defs/cc_common.rs`:
+   `PyInternalStub.has_attr` / `get_attr` / `dir_attr` gain the
+   rules_python 1.9 methods `declare_constant_metadata_file`,
+   `expand_location_and_make_variables`, `is_singleton_depset`,
+   `make_runfiles_respect_legacy_external_runfiles`,
+   `merge_runfiles_with_generated_inits_empty_files_supplier`.
+   `PyInternalStubCall.invoke` handles both keyword and positional
+   call shapes for the runfiles-passthrough methods (rules_python
+   calls `make_runfiles_respect_legacy_external_runfiles(ctx, rf)`
+   positionally but `merge_runfiles_with_generated_inits_empty_files_supplier(ctx=, runfiles=)`
+   by keyword). `declare_constant_metadata_file` dispatches to
+   `ctx.actions.declare_file(name)` so callers that read `.path`
+   on the result get a real File instead of an empty string.
+
+**Remaining analysis gaps (separate tickets).**
+
+1. **Exec-tools toolchain.** rules_python declares
+   `exec_tools_toolchain_type` as mandatory=False. We resolve it to
+   None today (no registration), which matches Bazel behaviour for
+   workspaces that don't configure pystar. If a workspace ever needs
+   it (precompilation features), point to a user-registered
+   py_exec_tools_toolchain.
+
+**Remaining execution-phase gaps (separate tickets).**
+
+1. **py_binary runfiles tree missing at action time.** Once analysis
+   clears, `clang:analysis_htmllogger_gen` fires a `run_binary` that
+   invokes the `bundle_resources` py_binary; the generated stub
+   script calls `FindModuleSpace()` which asserts on the presence of
+   a `.runfiles/` directory next to the executable. Kuro does not
+   create the Bazel-style runfiles symlink tree for py_binary
+   outputs yet. This is the gate that lets the *execution* of
+   `clang:clang` proceed; analysis is complete.
+
+**Scope boundary held.** The implementation is general — no
+`if toolchain_type == "python"` branches. The only Python-specific
+code is (a) `local_config_python`'s bundled BUILD content, which
+mirrors what Bazel itself auto-generates, and (b) the one-line
+"if rules_python in module graph" conditional that decides whether
+to prepend the auto-registration. Toolchain resolution, mandatory
+handling, and `ctx.toolchains[T]` semantics are generic and will
+serve future rules_java/rules_go/cc_test gaps without further
+changes to the resolver.
+
+### 15.5.21.1 `$(WORKSPACE_ROOT)` / `TemplateVariableInfo` from `ctx.attr.toolchains` (LANDED 2026-04-20)
+
+**Status:** Landed. With 15.5.21 unblocking py_library/py_binary
+analysis, `clang:clang`'s next failure moved to `cc_library` copts
+expansion:
+
+```
+error: fail: llvm-project//clang:basic (local_config_platform//:host#...):
+       $(WORKSPACE_ROOT) not defined
+    --> bazel-external/rules_cc+0.2.17/cc/common/cc_helper.bzl:590:5
+```
+
+**Root cause.** Bazel's `RuleContext.getMakeVariables()` merges
+`TemplateVariableInfo.variables` from every dep listed in a target's
+implicit `toolchains = [...]` attribute into `ctx.var`. LLVM's
+`@llvm-project//:workspace_root` rule publishes
+`TemplateVariableInfo({"WORKSPACE_ROOT": ctx.label.workspace_root})`
+and `cc_library` targets list it via `toolchains = [":workspace_root"]`.
+rules_cc's `cc_helper._lookup_var` falls back to `ctx.var.get(var)`
+when the caller-supplied `additional_vars` dict misses; if the var
+is absent from both, it `fail()`s.
+
+kuro declared the implicit `toolchains` attribute as
+`AttrType::list(AttrType::any())`, so labels were stored as opaque
+values and never resolved as deps. `ctx.var` therefore couldn't see
+any `TemplateVariableInfo`.
+
+**Changes.**
+
+- `app/kuro_interpreter_for_build/src/rule.rs`: implicit
+  `toolchains` attribute changed to
+  `AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY))`.
+  Kuro now resolves the deps and exposes them as
+  `Dependency`/`FrozenDependency` values on `ctx.attr.toolchains`.
+
+- `app/kuro_build_api/src/interpreter/rule_defs/platform_common.rs`:
+  `TemplateVariableInfoInstance::variables()` public accessor
+  returning `&SmallMap<String, String>`.
+
+- `app/kuro_build_api/src/interpreter/rule_defs/context.rs`:
+  new `collect_toolchains_template_vars()` helper iterates
+  `ctx.attr.toolchains`, downcasts each item to
+  `Dependency`/`FrozenDependency`, reads
+  `TemplateVariableInfo` from the provider collection, and yields
+  `(name, value)` pairs. Both `ctx.var` and `expand_make_variables`
+  merge these pairs with user-provided substitutions winning.
+
+**Scope boundary.** Generic — no rules_cc or LLVM-specific branches.
+Any rule that publishes `TemplateVariableInfo` and is referenced in
+a target's `toolchains = [...]` attribute now feeds its variables
+into `ctx.var` / `$(VAR)` expansion. The existing hardcoded defaults
+(`STACK_FRAME_UNLIMITED`, `CC`, etc.) still seed `ctx.var` for rules
+that rely on the cc_toolchain's vars, until Phase 5's proper
+`TemplateVariableInfo` gathering from resolved rule-level toolchains
+lands (see `ctx_var_builtins.md`).
+
+**End-to-end verification.** After this change,
+`kuro cquery "deps(@llvm-project//clang:clang)"` resolves **916
+targets** without analysis failures. `kuro build @llvm-project//clang:clang`
+advances past analysis into action execution, where the
+`bundle_resources` py_binary is invoked as a `run_binary` tool and
+fails on a missing runfiles symlink tree — an orthogonal
+execution-phase gap (see §15.5.21 "Remaining execution-phase gaps").
 
 ### 15.5.22 `@llvm-project//llvm:llvm` empty driver-tools select (OPEN)
 

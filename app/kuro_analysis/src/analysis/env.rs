@@ -426,7 +426,8 @@ pub trait RuleSpec: Sync {
     }
 
     /// Returns the toolchain types declared by this rule via `rule(toolchains=[...])`.
-    fn toolchain_types(&self) -> Vec<String> {
+    /// Each entry is `(label, mandatory)`.
+    fn toolchain_types(&self) -> Vec<(String, bool)> {
         Vec::new()
     }
 
@@ -889,14 +890,19 @@ async fn run_analysis_with_env_underlying(
                     resolve_toolchains_multi_group,
                 };
 
-                // Build resolution requests: default group + named exec groups
+                // Build resolution requests: default group + named exec groups.
+                // The mandatory flag comes from the rule's per-toolchain declaration
+                // (`config_common.toolchain_type(..., mandatory=False)`). Optional
+                // toolchains with no matching registration resolve to None; the ctx
+                // still exposes the entry so `ctx.toolchains[type]` returns the
+                // collection (None-typed), not a lookup error.
                 let mut requests = vec![ExecGroupResolutionRequest {
                     group_name: "default".to_owned(),
                     required_types: toolchain_types
                         .iter()
-                        .map(|t| RequiredToolchainType {
-                            type_label: t.clone(),
-                            mandatory: true,
+                        .map(|(label, mandatory)| RequiredToolchainType {
+                            type_label: label.clone(),
+                            mandatory: *mandatory,
                         })
                         .collect(),
                     exec_constraints: vec![],
@@ -1316,7 +1322,7 @@ pub fn get_user_defined_rule_spec(
         name: String,
         implicit_rule_outputs: Vec<(String, String)>,
         output_attr_names: Vec<String>,
-        toolchain_types: Vec<String>,
+        toolchain_types: Vec<(String, bool)>,
         exec_group_defs: Vec<(String, kuro_node::rule::ExecGroupDef)>,
     }
 
@@ -1356,7 +1362,7 @@ pub fn get_user_defined_rule_spec(
             self.output_attr_names.clone()
         }
 
-        fn toolchain_types(&self) -> Vec<String> {
+        fn toolchain_types(&self) -> Vec<(String, bool)> {
             self.toolchain_types.clone()
         }
 

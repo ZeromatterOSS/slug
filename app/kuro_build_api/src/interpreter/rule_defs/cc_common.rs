@@ -7879,13 +7879,18 @@ impl<'v> StarlarkValue<'v> for PyInternalStub {
             "cc_toolchain_build_info_files"
                 | "copy_without_caching"
                 | "create_repo_mapping_manifest"
+                | "declare_constant_metadata_file"
                 | "declare_shareable_artifact"
+                | "expand_location_and_make_variables"
                 | "get_label_repo_runfiles_path"
                 | "get_legacy_external_runfiles"
                 | "is_bzlmod_enabled"
+                | "is_singleton_depset"
                 | "is_tool_configuration"
                 | "link"
                 | "linkstamp_file"
+                | "make_runfiles_respect_legacy_external_runfiles"
+                | "merge_runfiles_with_generated_inits_empty_files_supplier"
                 | "regex_match"
                 | "runfiles_enabled"
                 | "share_native_deps"
@@ -7910,11 +7915,16 @@ impl<'v> StarlarkValue<'v> for PyInternalStub {
             | "copy_without_caching"
             | "create_repo_mapping_manifest"
             | "cc_toolchain_build_info_files"
+            | "declare_constant_metadata_file"
             | "declare_shareable_artifact"
+            | "expand_location_and_make_variables"
             | "is_bzlmod_enabled"
+            | "is_singleton_depset"
             | "is_tool_configuration"
             | "link"
             | "linkstamp_file"
+            | "make_runfiles_respect_legacy_external_runfiles"
+            | "merge_runfiles_with_generated_inits_empty_files_supplier"
             | "regex_match"
             | "runfiles_enabled"
             | "share_native_deps"
@@ -7930,13 +7940,18 @@ impl<'v> StarlarkValue<'v> for PyInternalStub {
             "cc_toolchain_build_info_files".to_owned(),
             "copy_without_caching".to_owned(),
             "create_repo_mapping_manifest".to_owned(),
+            "declare_constant_metadata_file".to_owned(),
             "declare_shareable_artifact".to_owned(),
+            "expand_location_and_make_variables".to_owned(),
             "get_label_repo_runfiles_path".to_owned(),
             "get_legacy_external_runfiles".to_owned(),
             "is_bzlmod_enabled".to_owned(),
+            "is_singleton_depset".to_owned(),
             "is_tool_configuration".to_owned(),
             "link".to_owned(),
             "linkstamp_file".to_owned(),
+            "make_runfiles_respect_legacy_external_runfiles".to_owned(),
+            "merge_runfiles_with_generated_inits_empty_files_supplier".to_owned(),
             "regex_match".to_owned(),
             "runfiles_enabled".to_owned(),
             "share_native_deps".to_owned(),
@@ -7971,9 +7986,53 @@ impl<'v> StarlarkValue<'v> for PyInternalStubCall {
     fn invoke(
         &self,
         _me: Value<'v>,
-        _args: &Arguments<'v, '_>,
+        args: &Arguments<'v, '_>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
+        // Most py_internal methods have unused return values in kuro; returning
+        // an empty string is a safe default. A few methods feed their return
+        // value back into downstream APIs that type-check it — for those,
+        // pass through the runfiles arg that rules_python expects to round-trip.
+        let kwargs = args.names_map()?;
+        let kwarg = |name: &str| {
+            kwargs
+                .iter()
+                .find_map(|(k, v)| if k.as_str() == name { Some(*v) } else { None })
+        };
+        let positional: Vec<Value<'v>> = args.positions(eval.heap())?.collect();
+        match self.name.as_str() {
+            // Both methods pass a runfiles object through. Called either as
+            //   make_runfiles_respect_legacy_external_runfiles(ctx, runfiles)   # positional
+            //   merge_runfiles_with_generated_inits_empty_files_supplier(ctx=, runfiles=)  # kwarg
+            // With no real merge, passing the input runfiles back is a
+            // correct no-op (downstream appends it to a RunfilesBuilder or
+            // feeds it to DefaultInfo.default_runfiles).
+            "merge_runfiles_with_generated_inits_empty_files_supplier"
+            | "make_runfiles_respect_legacy_external_runfiles" => {
+                if let Some(rf) = kwarg("runfiles").or_else(|| positional.get(1).copied()) {
+                    return Ok(rf);
+                }
+            }
+            // declare_constant_metadata_file(ctx=, name=, root=) is called by
+            // rules_python's _write_build_data to create the build-data output
+            // File. The downstream code reads `.path` on the return value, so
+            // we must return a real File, not a string. Delegate to
+            // ctx.actions.declare_file(name).
+            "declare_constant_metadata_file" => {
+                if let (Some(ctx), Some(name)) = (kwarg("ctx"), kwarg("name")) {
+                    if let (Ok(Some(actions)), Some(_name_str)) =
+                        (ctx.get_attr("actions", eval.heap()), name.unpack_str())
+                    {
+                        if let Ok(Some(declare_file)) =
+                            actions.get_attr("declare_file", eval.heap())
+                        {
+                            return eval.eval_function(declare_file, &[name], &[]);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
         Ok(eval.heap().alloc_str("").to_value())
     }
 

@@ -955,6 +955,18 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             let val = heap.alloc_str(&v).to_value();
             map.insert_hashed(key.get_hashed().unwrap(), val);
         }
+        // Merge TemplateVariableInfo from each `ctx.attr.toolchains` dep.
+        // Mirrors Bazel's RuleContext.getMakeVariables() where
+        // `toolchains = [...]` on a target lists deps whose TemplateVariableInfo
+        // variables are exposed as `$(VAR)` in copts/cmd/genrule etc.
+        // Example: llvm-project's `workspace_root` rule publishes
+        // `TemplateVariableInfo({"WORKSPACE_ROOT": ctx.label.workspace_root})`,
+        // and cc_library targets list it in `toolchains=[":workspace_root"]`.
+        for (k, v) in collect_toolchains_template_vars(this.0.attrs, heap) {
+            let key = heap.alloc_str(&k).to_value();
+            let val = heap.alloc_str(&v).to_value();
+            map.insert_hashed(key.get_hashed().unwrap(), val);
+        }
         Ok(heap.alloc(Dict::new(map)))
     }
 
@@ -1251,6 +1263,13 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             substitutions
                 .entry(k.to_string())
                 .or_insert_with(|| v.to_string());
+        }
+
+        // Merge TemplateVariableInfo from `ctx.attr.toolchains` deps. Same
+        // priority rule as builtins: user-provided substitutions win. See
+        // `ctx.var` above for the motivation.
+        for (k, v) in collect_toolchains_template_vars(this.0.attrs, heap) {
+            substitutions.entry(k).or_insert(v);
         }
 
         // Merge --define KEY=VALUE entries (lowest priority, after user subs and builtins)
@@ -1841,6 +1860,69 @@ pub fn host_cc_path() -> &'static str {
     }
 }
 
+/// Gather `TemplateVariableInfo` variables from each dep in the current
+/// target's `toolchains` attribute. Returns `(name, value)` pairs ready to
+/// merge into `ctx.var` / the `$(VAR)` expansion map.
+///
+/// Mirrors Bazel's `RuleContext.getMakeVariables()`. `ctx.attr.toolchains`
+/// is the target-level attribute (as opposed to `rule(toolchains = [...])`
+/// which declares rule-level toolchain *types*): a list of deps whose
+/// providers are exposed to the target. `TemplateVariableInfo` is the
+/// provider that carries Make-variable definitions, most commonly from
+/// LLVM-style `workspace_root` rules or from a project's `make_variables.bzl`.
+fn collect_toolchains_template_vars<'v>(
+    attrs: Option<
+        starlark::values::ValueOfUnchecked<'v, starlark::values::structs::StructRef<'static>>,
+    >,
+    heap: Heap<'v>,
+) -> Vec<(String, String)> {
+    use starlark::values::list::ListRef;
+
+    use crate::interpreter::rule_defs::platform_common::TemplateVariableInfoCallable;
+    use crate::interpreter::rule_defs::platform_common::TemplateVariableInfoInstance;
+    use crate::interpreter::rule_defs::provider::dependency::Dependency;
+    use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
+
+    let Some(attrs) = attrs else {
+        return Vec::new();
+    };
+    let attrs_val = attrs.get().to_value();
+    let toolchains_val = match attrs_val.get_attr("toolchains", heap) {
+        Ok(Some(v)) => v,
+        _ => return Vec::new(),
+    };
+    let Some(list) = ListRef::from_value(toolchains_val) else {
+        return Vec::new();
+    };
+
+    let tvi_id = TemplateVariableInfoCallable::provider_id();
+    let mut out: Vec<(String, String)> = Vec::new();
+    for item in list.iter() {
+        // `ctx.attr.toolchains` items are `Dependency` (unfrozen, rare at
+        // analysis time) or `FrozenDependency` (the common case).
+        let providers = if let Some(dep) = item.downcast_ref::<Dependency<'v>>() {
+            dep.provider_collection()
+        } else if let Some(frozen) = item.downcast_ref::<FrozenDependency>() {
+            frozen.provider_collection()
+        } else {
+            continue;
+        };
+        let Some(provider_fv) = providers.get_provider_raw(tvi_id) else {
+            continue;
+        };
+        let Some(instance) = provider_fv
+            .to_value()
+            .downcast_ref::<TemplateVariableInfoInstance>()
+        else {
+            continue;
+        };
+        for (k, v) in instance.variables() {
+            out.push((k.clone(), v.clone()));
+        }
+    }
+    out
+}
+
 fn collect_runfiles_from_value<'v>(
     value: Value<'v>,
     want_data: bool,
@@ -2104,52 +2186,53 @@ impl<'v> StarlarkValue<'v> for ResolvedToolchains {
         };
         let normalized = normalize_toolchain_type_label(&key);
 
-        // Look for a resolved provider collection (exact match first, then normalized)
-        let provider_collection = self
-            .toolchains
-            .get(&normalized)
-            .or_else(|| {
-                self.toolchains
-                    .iter()
-                    .find(|(k, _)| normalize_toolchain_type_label(k) == normalized)
-                    .map(|(_, v)| v)
-            })
-            .and_then(|opt| opt.as_ref());
+        // Locate the entry by normalized label. Two outcomes matter:
+        //   * Entry present, Some(providers): return the ToolchainInfo.
+        //   * Entry present, None: the rule declared this toolchain type (likely
+        //     mandatory=False) but nothing registered — return None so Bazel
+        //     idioms like `hasattr(toolchain, "field")` or `if toolchain:`
+        //     work without raising.
+        //   * Entry absent: rule never declared this type; raise to surface
+        //     the bug early.
+        let entry = self.toolchains.get(&normalized).or_else(|| {
+            self.toolchains
+                .iter()
+                .find(|(k, _)| normalize_toolchain_type_label(k) == normalized)
+                .map(|(_, v)| v)
+        });
 
-        if let Some(providers) = provider_collection {
-            // In Bazel, ctx.toolchains[TYPE] returns the ToolchainInfo provider
-            // (platform_common.ToolchainInfo), NOT the entire provider collection.
-            // Look for ToolchainInfo in the resolved provider collection.
-            let toolchain_info_id =
-                crate::interpreter::rule_defs::platform_common::ToolchainInfoProvider::provider_id(
-                );
-            if let Some(fv) = providers
-                .provider_collection()
-                .get_provider_raw(toolchain_info_id)
-            {
-                return Ok(fv.to_value());
+        match entry {
+            Some(Some(providers)) => {
+                let toolchain_info_id =
+                    crate::interpreter::rule_defs::platform_common::ToolchainInfoProvider::provider_id();
+                if let Some(fv) = providers
+                    .provider_collection()
+                    .get_provider_raw(toolchain_info_id)
+                {
+                    return Ok(fv.to_value());
+                }
+                let fv = unsafe { providers.value().to_frozen_value() };
+                Ok(fv.to_value())
             }
-
-            // If no ToolchainInfo found, return the full collection as fallback.
-            let fv = unsafe { providers.value().to_frozen_value() };
-            return Ok(fv.to_value());
+            Some(None) => Ok(Value::new_none()),
+            None => {
+                // Empty map: no toolchain machinery ran for this rule (e.g., a
+                // rule with no `toolchains=` declaration accessing ctx.toolchains).
+                // Return None to match Bazel's pre-resolution behaviour rather
+                // than hard-failing.
+                if self.toolchains.is_empty() {
+                    return Ok(Value::new_none());
+                }
+                Err(starlark::Error::new_other(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!(
+                        "Toolchain type '{}' was not resolved. Ensure the toolchain is registered \
+                         via register_toolchains() and the rule declares it in toolchains=[...]",
+                        key
+                    ),
+                )))
+            }
         }
-
-        // No resolved provider for this toolchain type.
-        // Return None for exec-group toolchains (empty map = no per-group resolution),
-        // which lets rules fall back to their legacy code paths.
-        if self.toolchains.is_empty() {
-            return Ok(Value::new_none());
-        }
-
-        Err(starlark::Error::new_other(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!(
-                "Toolchain type '{}' was not resolved. Ensure the toolchain is registered \
-                 via register_toolchains() and the rule declares it in toolchains=[...]",
-                key
-            ),
-        )))
     }
 }
 

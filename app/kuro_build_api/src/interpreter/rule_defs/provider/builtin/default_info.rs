@@ -675,17 +675,32 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
     /// In Bazel, `DefaultInfo.files_to_run` returns an object with:
     /// - `executable`: the executable File (or None)
     /// - `runfiles_manifest`: the runfiles manifest File (always None in Kuro)
+    ///
+    /// Bazel treats any source file with the executable bit as runnable: its
+    /// `files_to_run.executable` is the file itself. To approximate this when
+    /// a target's analysis did not set `DefaultInfo.executable` (e.g., the
+    /// implicit filegroup kuro creates for a `.sh` source file reached via
+    /// an `alias()`), fall back to the single `default_output` when there's
+    /// exactly one. This lets rules_python's `_build_data_writer` (an alias
+    /// to `build_data_writer.sh`) resolve to a usable executable at action
+    /// registration time.
     #[starlark(attribute)]
     fn files_to_run<'v>(this: &DefaultInfo<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let executable = {
-            let list_val = this.executable.get();
-            if let Some(list) = ListRef::from_value(list_val.to_value()) {
-                list.iter().next().unwrap_or(Value::new_none())
-            } else {
-                Value::new_none()
-            }
+            let explicit = ListRef::from_value(this.executable.get().to_value())
+                .and_then(|list| list.iter().next())
+                .filter(|v| !v.is_none());
+            let fallback = || {
+                ListRef::from_value(this.default_outputs.get().to_value()).and_then(|list| {
+                    if list.len() == 1 {
+                        list.iter().next()
+                    } else {
+                        None
+                    }
+                })
+            };
+            explicit.or_else(fallback).unwrap_or(Value::new_none())
         };
-        // Return a struct with executable and runfiles_manifest fields
         Ok(heap.alloc(starlark::values::structs::AllocStruct([
             ("executable", executable),
             ("runfiles_manifest", Value::new_none()),

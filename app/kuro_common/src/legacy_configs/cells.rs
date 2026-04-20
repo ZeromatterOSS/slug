@@ -578,6 +578,23 @@ impl BuckConfigBasedCells {
                     bzlmod_bundled_cells.push(lcp_name);
                     tracing::info!("Auto-registered bundled cell: local_config_platform");
                 }
+
+                // Auto-register @local_config_python for bzlmod projects that
+                // depend on rules_python. The bundled cell provides a host
+                // py_runtime + py_runtime_pair + toolchain() target so
+                // rules_python's py_library/py_binary analysis finds a
+                // py3_runtime when the user's MODULE.bazel hasn't registered
+                // its own Python toolchain (common for projects that use
+                // small py_binary helpers, e.g. @llvm-project//clang:clang).
+                let lcpy_name = CellName::unchecked_new("local_config_python")?;
+                if !cell_definitions.iter().any(|(n, _)| *n == lcpy_name) {
+                    let lcpy_path = CellRootPathBuf::new(
+                        ProjectRelativePath::new("local_config_python")?.to_owned(),
+                    );
+                    cell_definitions.push((lcpy_name, lcpy_path));
+                    bzlmod_bundled_cells.push(lcpy_name);
+                    tracing::info!("Auto-registered bundled cell: local_config_python");
+                }
             }
         }
 
@@ -1146,6 +1163,32 @@ impl BuckConfigBasedCells {
                     all_exec_platforms.push(item.label.clone());
                 }
             }
+            // If the module graph depends on rules_python but never registers
+            // a py3 toolchain, auto-inject @local_config_python//:host_toolchain
+            // at lowest priority so ctx.toolchains[@rules_python//python:toolchain_type]
+            // resolves to a host py_runtime. Users can override by registering
+            // their own toolchain earlier in MODULE.bazel.
+            let has_rules_python = parsed_modules
+                .iter()
+                .any(|(name, _)| name == "rules_python");
+            let already_has_py_toolchain = all_toolchains
+                .iter()
+                .any(|lbl| lbl.contains("local_config_python"));
+            if has_rules_python && !already_has_py_toolchain {
+                all_toolchains.push("@local_config_python//:host_toolchain".to_owned());
+                // rules_python 1.9+ on bazel_9_or_later declares
+                // launcher_maker_toolchain_type as a mandatory rule-level
+                // toolchain on py_binary. The launcher is only invoked on
+                // Windows, but resolution must succeed on Linux/macOS too —
+                // register a stub impl that returns an empty ToolchainInfo.
+                all_toolchains
+                    .push("@local_config_python//:host_launcher_maker_toolchain".to_owned());
+                tracing::info!(
+                    "Auto-registered @local_config_python//:host_toolchain + \
+                     host_launcher_maker_toolchain (rules_python in deps)"
+                );
+            }
+
             tracing::info!(
                 "Collected {} toolchain registration(s) and {} execution platform registration(s)",
                 all_toolchains.len(),

@@ -212,8 +212,9 @@ impl TargetNode {
         &self.0.rule.provides
     }
 
-    /// Toolchain type labels declared via `rule(toolchains=[...])`.
-    pub fn toolchain_types(&self) -> &[String] {
+    /// Toolchain type requirements declared via `rule(toolchains=[...])`.
+    /// Each entry is `(label, mandatory)`.
+    pub fn toolchain_types(&self) -> &[(String, bool)] {
         &self.0.rule.toolchain_types
     }
 

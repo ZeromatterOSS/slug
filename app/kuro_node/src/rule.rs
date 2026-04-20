@@ -65,9 +65,12 @@ pub struct Rule {
     /// After analysis, the returned provider collection is validated to contain
     /// all declared providers. Empty means no validation.
     pub provides: Vec<String>,
-    /// Toolchain type labels declared via `rule(toolchains=[...])`.
-    /// Used during analysis to populate `ctx.toolchains`.
-    pub toolchain_types: Vec<String>,
+    /// Toolchain type requirements declared via `rule(toolchains=[...])`.
+    /// Each entry is `(label, mandatory)`; mandatory=false matches Bazel's
+    /// `config_common.toolchain_type(mandatory=False)` — resolution must
+    /// succeed even when no matching toolchain is registered. Used during
+    /// analysis to populate `ctx.toolchains`.
+    pub toolchain_types: Vec<(String, bool)>,
     /// Execution group definitions declared via `rule(exec_groups={...})`.
     /// Each entry is `(group_name, definition)` with toolchain types and exec constraints.
     pub exec_group_defs: Vec<(String, ExecGroupDef)>,

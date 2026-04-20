@@ -736,6 +736,14 @@ pub struct TemplateVariableInfoInstance {
     variables: SmallMap<String, String>,
 }
 
+impl TemplateVariableInfoInstance {
+    /// The variables dict. Used by `ctx.var` to merge TemplateVariableInfo
+    /// from `ctx.attr.toolchains` deps into the Make-variable lookup map.
+    pub fn variables(&self) -> &SmallMap<String, String> {
+        &self.variables
+    }
+}
+
 impl Display for TemplateVariableInfoInstance {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "TemplateVariableInfo({:?})", self.variables)

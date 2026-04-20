@@ -19,6 +19,7 @@ use dupe::Dupe;
 use either::Either;
 use itertools::Itertools;
 use kuro_core::plugins::PluginKind;
+use kuro_core::plugins::PluginKindSet;
 use kuro_error::BuckErrorContext;
 use kuro_interpreter::late_binding_ty::AnalysisContextReprLate;
 use kuro_interpreter::late_binding_ty::ProviderReprLate;
@@ -40,6 +41,7 @@ use kuro_node::attrs::spec::AttributeSpec;
 use kuro_node::bzl_or_bxl_path::BzlOrBxlPath;
 use kuro_node::nodes::unconfigured::RuleKind;
 use kuro_node::nodes::unconfigured::TargetNode;
+use kuro_node::provider_id_set::ProviderIdSet;
 use kuro_node::rule::ExecGroupDef;
 use kuro_node::rule::Rule;
 use kuro_node::rule::RuleIncomingTransition;
@@ -150,9 +152,10 @@ pub struct StarlarkRuleCallable<'v> {
     /// Maps output attribute name → file name pattern (e.g., "output" → "%{name}.binpb").
     /// `%{name}` in patterns is substituted with the target name at analysis time.
     rule_outputs: Vec<(String, String)>,
-    /// Toolchain type labels declared via `rule(toolchains=[...])`.
-    /// These are stored as Display strings from ToolchainTypeRequirement, Label, or plain strings.
-    toolchain_types: Vec<String>,
+    /// Toolchain type requirements declared via `rule(toolchains=[...])`.
+    /// Each entry is `(label, mandatory)`; mandatory=false matches Bazel's
+    /// `config_common.toolchain_type(mandatory=False)`.
+    toolchain_types: Vec<(String, bool)>,
     /// Execution group definitions declared via `rule(exec_groups={...})`.
     exec_group_defs: Vec<(String, ExecGroupDef)>,
     /// Configuration fragment names declared via `rule(fragments=["cpp", "java", ...])`.
@@ -238,7 +241,7 @@ impl<'v> StarlarkRuleCallable<'v> {
         is_executable: bool,
         provides: Vec<String>,
         rule_outputs: Vec<(String, String)>,
-        toolchain_types: Vec<String>,
+        toolchain_types: Vec<(String, bool)>,
         exec_group_defs: Vec<(String, ExecGroupDef)>,
         fragments: Vec<String>,
         initializer: Option<Value<'v>>,
@@ -319,8 +322,12 @@ impl<'v> StarlarkRuleCallable<'v> {
             sorted_validated_attrs
         };
 
-        // Bazel implicitly adds a `toolchains` attribute to all rules that lists
-        // the toolchain types the rule depends on. Inject it if not already defined.
+        // Bazel implicitly adds a `toolchains` attribute to all rules.
+        // Per-target `toolchains = [...]` takes a list of targets whose
+        // `TemplateVariableInfo` providers are merged into `ctx.var` for
+        // $(VAR) expansion in genrule/cc_* copts. Declaring as a dep list
+        // (rather than opaque `any`) lets kuro resolve the labels so their
+        // providers flow through to `ctx.attr.toolchains`.
         let sorted_validated_attrs = {
             let mut attrs = sorted_validated_attrs;
             let has_toolchains = attrs.iter().any(|(n, _)| n == "toolchains");
@@ -330,7 +337,7 @@ impl<'v> StarlarkRuleCallable<'v> {
                     Attribute::new(
                         Some(Arc::new(AnyAttrType::empty_list())),
                         "implicit toolchains attribute",
-                        AttrType::list(AttrType::any()),
+                        AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
                     ),
                 ));
                 attrs.sort_by(|(k1, _), (k2, _)| Ord::cmp(k1, k2));
@@ -665,8 +672,9 @@ pub struct FrozenStarlarkRuleCallable {
     output_attr_names: Vec<String>,
     /// Rule-level output declarations from `rule(outputs={...})`.
     rule_outputs: Vec<(String, String)>,
-    /// Toolchain type labels declared via `rule(toolchains=[...])`.
-    toolchain_types: Vec<String>,
+    /// Toolchain type requirements declared via `rule(toolchains=[...])`.
+    /// Each entry is `(label, mandatory)`.
+    toolchain_types: Vec<(String, bool)>,
     /// Execution group definitions declared via `rule(exec_groups={...})`.
     exec_group_defs: Vec<(String, ExecGroupDef)>,
     /// Configuration fragment names declared via `rule(fragments=["cpp", "java", ...])`.
@@ -733,8 +741,9 @@ impl FrozenStarlarkRuleCallable {
         &self.output_attr_names
     }
 
-    /// Returns the toolchain type labels declared on this rule.
-    pub fn toolchain_types(&self) -> &[String] {
+    /// Returns the toolchain type requirements declared on this rule.
+    /// Each entry is `(label, mandatory)`.
+    pub fn toolchain_types(&self) -> &[(String, bool)] {
         &self.toolchain_types
     }
 
@@ -1130,25 +1139,34 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
             })
             .collect();
 
-        // Extract toolchain type labels from the toolchains parameter.
-        // Each item is either a string label, a Label object, or a ToolchainTypeRequirement.
-        // For ToolchainTypeRequirement, extract the .toolchain_type attribute (the label).
-        let toolchain_types: Vec<String> = toolchains
+        // Extract toolchain type labels + mandatory flag from the toolchains parameter.
+        // Each item is a string label, a Label object, or a ToolchainTypeRequirement
+        // (produced by config_common.toolchain_type()).
+        //   - String / Label: treated as mandatory (Bazel default).
+        //   - ToolchainTypeRequirement: extract .toolchain_type and .mandatory.
+        let toolchain_types: Vec<(String, bool)> = toolchains
             .items
             .iter()
             .filter_map(|v| {
                 if let Some(s) = v.unpack_str() {
-                    Some(s.to_owned())
-                } else {
-                    // Try to get .toolchain_type attribute (for ToolchainTypeRequirement)
-                    if let Ok(Some(attr)) = v.get_attr("toolchain_type", eval.heap()) {
-                        if let Some(s) = attr.unpack_str() {
-                            return Some(s.to_owned());
-                        }
-                    }
-                    // Fallback: use Display representation (for Label objects, etc.)
-                    Some(format!("{}", v))
+                    return Some((s.to_owned(), true));
                 }
+                let label_opt = v
+                    .get_attr("toolchain_type", eval.heap())
+                    .ok()
+                    .flatten()
+                    .and_then(|attr| attr.unpack_str().map(|s| s.to_owned()));
+                let mandatory = v
+                    .get_attr("mandatory", eval.heap())
+                    .ok()
+                    .flatten()
+                    .and_then(|attr| attr.unpack_bool())
+                    .unwrap_or(true);
+                if let Some(label) = label_opt {
+                    return Some((label, mandatory));
+                }
+                // Fallback: Display (covers Label objects)
+                Some((format!("{}", v), true))
             })
             .collect();
 

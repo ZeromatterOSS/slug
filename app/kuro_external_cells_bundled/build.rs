@@ -87,7 +87,101 @@ fn imp() -> io::Result<()> {
         std::fs::File::create(out_dir.join("local_config_platform_include.rs"))?,
     )?;
 
+    // Generate local_config_python bundled cell.
+    //
+    // Mirrors Bazel's historical @local_config_python autoconfig: provides a host
+    // py_runtime+py_runtime_pair wired into a toolchain() target. Kuro auto-
+    // registers @local_config_python//:host_toolchain at cell-resolution time
+    // when rules_python is in the module graph, so rules_python's py_library
+    // and py_binary analysis (which looks up py3_runtime via
+    // ctx.toolchains[@rules_python//python:toolchain_type]) finds a match.
+    //
+    // The interpreter_path is detected at kuro build time; if none is found,
+    // "/usr/bin/python3" is used as the default (common on Linux). Users can
+    // override at daemon startup by installing python3 at a standard path.
+    let local_config_python_out = out_dir.join("local_config_python_src");
+    std::fs::create_dir_all(&local_config_python_out)?;
+
+    let interpreter_path = detect_host_python3();
+    let python_build_content = format!(
+        "load(\"@rules_python//python:py_runtime.bzl\", \"py_runtime\")\n\
+         load(\"@rules_python//python:py_runtime_pair.bzl\", \"py_runtime_pair\")\n\
+         load(\":stub_toolchain.bzl\", \"stub_toolchain_info\")\n\
+         \n\
+         py_runtime(\n\
+         \x20   name = \"py3_runtime\",\n\
+         \x20   interpreter_path = \"{interpreter_path}\",\n\
+         \x20   python_version = \"PY3\",\n\
+         \x20   visibility = [\"PUBLIC\"],\n\
+         )\n\
+         \n\
+         py_runtime_pair(\n\
+         \x20   name = \"py_runtime_pair\",\n\
+         \x20   py3_runtime = \":py3_runtime\",\n\
+         \x20   visibility = [\"PUBLIC\"],\n\
+         )\n\
+         \n\
+         toolchain(\n\
+         \x20   name = \"host_toolchain\",\n\
+         \x20   toolchain = \":py_runtime_pair\",\n\
+         \x20   toolchain_type = \"@rules_python//python:toolchain_type\",\n\
+         \x20   visibility = [\"PUBLIC\"],\n\
+         )\n\
+         \n\
+         # Stub impl for launcher_maker_toolchain_type: required to satisfy\n\
+         # py_binary's rule-level toolchain list on bazel_9_or_later. Returns\n\
+         # an empty ToolchainInfo. Never dereferenced on Linux/macOS because\n\
+         # create_windows_exe_launcher is not called there.\n\
+         stub_toolchain_info(name = \"launcher_maker_stub\", visibility = [\"PUBLIC\"])\n\
+         \n\
+         toolchain(\n\
+         \x20   name = \"host_launcher_maker_toolchain\",\n\
+         \x20   toolchain = \":launcher_maker_stub\",\n\
+         \x20   toolchain_type = \"@bazel_tools//tools/launcher:launcher_maker_toolchain_type\",\n\
+         \x20   visibility = [\"PUBLIC\"],\n\
+         )\n"
+    );
+    let stub_toolchain_bzl = concat!(
+        "# stub_toolchain_info: returns an empty ToolchainInfo. Used as the impl for\n",
+        "# toolchain types that kuro must register to satisfy rule-level mandatory\n",
+        "# declarations but that are never dereferenced on the host platform\n",
+        "# (e.g., launcher_maker on Linux).\n",
+        "def _stub_toolchain_info_impl(ctx):\n",
+        "    return [platform_common.ToolchainInfo()]\n",
+        "\n",
+        "stub_toolchain_info = rule(\n",
+        "    implementation = _stub_toolchain_info_impl,\n",
+        "    attrs = {},\n",
+        ")\n",
+    );
+    std::fs::write(
+        local_config_python_out.join("stub_toolchain.bzl"),
+        stub_toolchain_bzl,
+    )?;
+    std::fs::write(
+        local_config_python_out.join("BUILD.bazel"),
+        &python_build_content,
+    )?;
+
+    write_include_file(
+        &local_config_python_out,
+        std::fs::File::create(out_dir.join("local_config_python_include.rs"))?,
+    )?;
+
     Ok(())
+}
+
+fn detect_host_python3() -> String {
+    for candidate in [
+        "/usr/bin/python3",
+        "/usr/local/bin/python3",
+        "/opt/homebrew/bin/python3",
+    ] {
+        if Path::new(candidate).exists() {
+            return candidate.to_owned();
+        }
+    }
+    "/usr/bin/python3".to_owned()
 }
 
 fn as_unix_like(path: &Path) -> String {

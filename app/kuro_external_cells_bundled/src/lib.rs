@@ -69,6 +69,17 @@ const LOCAL_CONFIG_PLATFORM: BundledCell = BundledCell {
     is_testing: false,
 };
 
+#[cfg(not(buck_build))]
+mod local_config_python {
+    include!(concat!(env!("OUT_DIR"), "/local_config_python_include.rs"));
+}
+
+const LOCAL_CONFIG_PYTHON: BundledCell = BundledCell {
+    name: "local_config_python",
+    files: local_config_python::DATA,
+    is_testing: false,
+};
+
 const TEST_CELL: BundledCell = BundledCell {
     name: "test_bundled_cell",
     files: &[
@@ -116,7 +127,13 @@ pub const fn get_bundled_data() -> &'static [BundledCell] {
     // local_config_platform provides HOST_CONSTRAINTS for the current platform
     // prelude is included for legacy (non-bzlmod) projects that reference it via
     // [external_cells] prelude = bundled in .buckconfig
-    &[PRELUDE, BAZEL_TOOLS, LOCAL_CONFIG_PLATFORM, TEST_CELL]
+    &[
+        PRELUDE,
+        BAZEL_TOOLS,
+        LOCAL_CONFIG_PLATFORM,
+        LOCAL_CONFIG_PYTHON,
+        TEST_CELL,
+    ]
 }
 
 #[cfg(test)]
