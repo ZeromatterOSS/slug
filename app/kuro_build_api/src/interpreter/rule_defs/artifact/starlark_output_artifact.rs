@@ -213,6 +213,13 @@ impl<'v, V: ValueLike<'v>> StarlarkArtifactLike<'v> for StarlarkOutputArtifactGe
         Ok(self.get_path().with_full_path(f))
     }
 
+    fn with_root_path(
+        &self,
+        f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
+    ) -> kuro_error::Result<StringValue<'v>> {
+        Ok(self.get_path().with_root_path(f))
+    }
+
     fn source_path_info(&self) -> Option<(kuro_core::package::PackageLabel, String)> {
         None
     }

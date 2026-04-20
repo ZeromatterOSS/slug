@@ -216,6 +216,47 @@ impl<'v> ActionsRegistry<'v> {
         outputs: IndexSet<OutputArtifact>,
         action: A,
     ) -> kuro_error::Result<ActionKey> {
+        // Bazel-compat idempotency: rules_cc's `_compute_public_headers` runs
+        // twice for targets with `strip_include_prefix` set (once for
+        // `hdrs`, once for `textual_hdrs`). Both runs call
+        // `actions.declare_shareable_artifact(<same path>)` — the first
+        // materializes an artifact, the second gets a dup returned from
+        // `path_to_artifact` — and each subsequently calls
+        // `actions.symlink(output=<that artifact>, ...)`. Under Bazel the
+        // second `symlink` is a no-op. Without this guard, kuro's
+        // `OutputArtifact::bind` rejects the second call with
+        // "Attempted to bind an artifact which was already bound".
+        //
+        // If every output in the set is already bound to an existing action
+        // in this registry, reuse that action's key and skip re-registering.
+        // If outputs are bound to *different* actions (pathological — the
+        // caller is trying to overwrite a different action's result), fall
+        // through to `bind()` and let it raise the usual error.
+        if !outputs.is_empty() {
+            let mut common_key: Option<ActionKey> = None;
+            let mut all_bound_same = true;
+            for output in &outputs {
+                match output.existing_action_key() {
+                    Some(k) => match &common_key {
+                        None => common_key = Some(k),
+                        Some(prev) if *prev == k => {}
+                        _ => {
+                            all_bound_same = false;
+                            break;
+                        }
+                    },
+                    None => {
+                        all_bound_same = false;
+                        break;
+                    }
+                }
+            }
+            if all_bound_same {
+                if let Some(key) = common_key {
+                    return Ok(key);
+                }
+            }
+        }
         let key = ActionKey::new(
             self_key.dupe(),
             // If there are declared_dynamic_outputs, then the analysis that created this one has

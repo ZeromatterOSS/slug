@@ -201,6 +201,16 @@ impl<'v> StarlarkArtifactLike<'v> for StarlarkPromiseArtifact {
         }
     }
 
+    fn with_root_path(
+        &self,
+        f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
+    ) -> kuro_error::Result<StringValue<'v>> {
+        match self.artifact.get() {
+            Some(v) => Ok(v.get_path().with_root_path(f)),
+            None => Ok(f(ForwardRelativePath::empty())),
+        }
+    }
+
     fn source_path_info(&self) -> Option<(kuro_core::package::PackageLabel, String)> {
         None
     }

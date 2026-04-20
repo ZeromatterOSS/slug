@@ -1037,6 +1037,77 @@ in the package's output-file table at loading time, so labels for
 those files resolve to the declaring target. Match that for both
 attribute variants.
 
+### 15.5.14 `artifact.root.path` + duplicate `actions.symlink` registration (LANDED 2026-04-19)
+
+**Status:** Landed. `@llvm-project//llvm:llc` now builds end-to-end
+(2684 commands, 408 MB binary).
+
+Two bugs, each independently blocking `:llc` after 15.5.13:
+
+**(a) `artifact.root.path` returned wrong prefix for Bazel parity.**
+rules_cc's `cc_compilation_helper.bzl::_repo_relative_path`
+(called from `_compute_public_headers`) does
+
+```python
+relative_path = paths.relativize(artifact.path, artifact.root.path)
+```
+
+and expects `relative_path` to begin with the target's package dir
+(e.g. `llvm/lib/Target/XCore/XCoreGenAsmWriter.inc` for a file
+declared in `llvm-project//llvm`), which downstream checks against
+`strip_include_prefix = "llvm/lib/Target/XCore"`.
+
+kuro computed `root.path` as `full_path - short_path` (suffix-strip).
+`short_path` for BuildArtifacts omits the package component, so the
+stripped root *included* the package (`buck-out/…/external/llvm-project/llvm`)
+and `relativize` gave back just the filename. `strip_include_prefix`
+never matched. XCoreCommonTableGen's cc_library failed with
+"header '…' is not under the specified strip prefix".
+
+**Fix.** Added `with_root_path` on `ArtifactPath` and the
+`StarlarkArtifactLike` trait (implemented for StarlarkArtifact /
+StarlarkDeclaredArtifact / StarlarkOutputArtifact /
+StarlarkPromiseArtifact). For BuildArtifacts it returns
+`buck-out/v2/gen/<cell>/<cfg>` (root cell) or
+`buck-out/v2/gen/<cell>/<cfg>/external/<cell>` (non-root cell),
+matching Bazel's bin_dir layout. Source artifacts return empty
+string (Bazel's convention). `artifact.root.path` now uses this
+instead of the suffix-strip heuristic.
+
+**(b) Duplicate `actions.symlink` registration with `hdrs=textual_hdrs`.**
+`gentbl_cc_library` with `strip_include_prefix` sets
+`hdrs = [":filegroup"]` *and* `textual_hdrs = [":filegroup"]` — same
+filegroup in both. rules_cc's `_compute_public_headers` then runs
+twice (once for hdrs, once for textual_hdrs) and each run calls
+
+```python
+virtual_header = actions.declare_shareable_artifact(<same path>)
+actions.symlink(output=virtual_header, target_file=original_header)
+```
+
+kuro's `declare_shareable_artifact` already dedupes via
+`path_to_artifact`, so both runs get the same artifact. But each
+`actions.symlink` then called `register_action` which called
+`OutputArtifact::bind(key)` — the second call panicked with
+"Attempted to bind an artifact which was already bound".
+
+**Fix.** `ActionsRegistry::register` is now idempotent: if every
+output in the set is already bound to a single existing action key,
+return that key and skip re-registering. If outputs are bound to
+different actions (genuine conflict), fall through so `bind()` errors
+normally. Added `OutputArtifact::existing_action_key()` helper.
+
+**Verification:** `@llvm-project//llvm:llc` builds — 2684 commands,
+408 MB binary. `:Support`, `:llvm-tblgen`, `:BinaryFormat` still
+build.
+
+**Parity source:** Bazel's `StarlarkAction` / `SpawnAction`
+registration is idempotent in the same way — registering a spawn
+for an artifact already owned by an equivalent action is a no-op,
+not an error. Kuro matches the no-op semantics for the common case
+without trying to verify "equivalent" (which would need a structural
+comparison of the action).
+
 ## Dependencies and ordering
 
 ```

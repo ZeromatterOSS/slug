@@ -76,6 +76,15 @@ pub trait StarlarkArtifactLike<'v>: Display {
         f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
     ) -> kuro_error::Result<StringValue<'v>>;
 
+    /// Returns the artifact's Bazel-style root — the bin_dir prefix of
+    /// `full_path` *excluding* the package and filename. rules_cc relies
+    /// on `paths.relativize(full_path, root_path)` yielding
+    /// `<package>/<filename>`. Source artifacts return empty string.
+    fn with_root_path(
+        &self,
+        f: &dyn for<'b> Fn(&'b ForwardRelativePath) -> StringValue<'v>,
+    ) -> kuro_error::Result<StringValue<'v>>;
+
     /// For source artifacts, returns the source path information needed to construct a label.
     /// Returns (package, relative_path_str) where relative_path_str can be used as a target name.
     fn source_path_info(&self) -> Option<(PackageLabel, String)>;

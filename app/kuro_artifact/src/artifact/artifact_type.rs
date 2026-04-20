@@ -541,6 +541,17 @@ impl<'v> From<DeclaredArtifact<'v>> for OutputArtifact<'v> {
 }
 
 impl<'v> OutputArtifact<'v> {
+    /// Returns the ActionKey this artifact was bound to, if any. Used by
+    /// `ActionsRegistry::register` to make duplicate registrations (e.g.
+    /// rules_cc's virtual-include `actions.symlink` called twice for the
+    /// same filegroup) idempotent instead of erroring with DuplicateBind.
+    pub fn existing_action_key(&self) -> Option<ActionKey> {
+        match &*self.0.artifact().borrow() {
+            DeclaredArtifactKind::Bound(b) => Some(b.key().clone()),
+            DeclaredArtifactKind::Unbound(_) => None,
+        }
+    }
+
     pub fn bind(&self, key: ActionKey) -> kuro_error::Result<BoundBuildArtifact> {
         match &mut *self.0.artifact().borrow_mut() {
             DeclaredArtifactKind::Bound(a) => {

@@ -290,6 +290,51 @@ impl ArtifactPath<'_> {
         }
     }
 
+    /// Bazel-style root: the bin_dir prefix of `full_path` *excluding*
+    /// the package and filename. Empty string for source artifacts.
+    ///
+    /// Used by `artifact.root.path` to satisfy rules_cc's
+    /// `cc_compilation_helper.bzl::_repo_relative_path`, which relies on
+    /// `paths.relativize(full_path, root_path)` returning a path that
+    /// starts with the target's package directory.
+    pub fn with_root_path<F, T>(&self, f: F) -> T
+    where
+        for<'b> F: FnOnce(&'b ForwardRelativePath) -> T,
+    {
+        match self.base_path.as_ref() {
+            Either::Left(buck_out) => {
+                let owner = buck_out.owner().owner();
+                let target_opt = match owner {
+                    BaseDeferredKey::TargetLabel(target) => Some(target.clone()),
+                    BaseDeferredKey::Aspect(aspect_key) => aspect_key.configured_label(),
+                    _ => None,
+                };
+                if let Some(target) = target_opt {
+                    let cfg_hash = target.cfg().output_hash().as_str();
+                    let cell_name = target.pkg().cell_name().as_str();
+                    let is_root = kuro_core::cells::is_root_cell_name(cell_name);
+                    let root_path = if is_root {
+                        format!("buck-out/v2/gen/{}/{}", cell_name, cfg_hash)
+                    } else {
+                        format!(
+                            "buck-out/v2/gen/{}/{}/external/{}",
+                            cell_name, cfg_hash, cell_name
+                        )
+                    };
+                    let root_path_buf = ForwardRelativePathBuf::unchecked_new(root_path);
+                    f(&root_path_buf)
+                } else {
+                    // Fallback: empty root for non-target owners.
+                    f(ForwardRelativePath::empty())
+                }
+            }
+            Either::Right(_) => {
+                // Source artifacts: Bazel convention is empty string.
+                f(ForwardRelativePath::empty())
+            }
+        }
+    }
+
     /// Returns the project relative path of the artifact.
     /// A build artifact that is declared to be content-based must have a content hash
     /// provided, otherwise an error is returned.

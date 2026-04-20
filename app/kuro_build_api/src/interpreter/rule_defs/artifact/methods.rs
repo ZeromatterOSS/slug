@@ -247,8 +247,22 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
     }
 
     /// The root directory of this artifact (Bazel-compatible).
-    /// Returns a struct with a `path` attribute containing the output root.
-    /// For generated files, root.path is the buck-out prefix before the short_path.
+    ///
+    /// For generated files, `root.path` is the Bazel-style bin_dir that the
+    /// consumer can prepend to the repo-relative path. rules_cc's
+    /// `cc_compilation_helper.bzl::_repo_relative_path` relies on
+    /// `paths.relativize(artifact.path, artifact.root.path)` producing a
+    /// path that starts with the target's package dir (e.g.
+    /// `llvm/lib/Target/XCore/...` for a file declared in package
+    /// `llvm-project//llvm`).
+    ///
+    /// To satisfy that, root must be the bin_dir prefix only — *without*
+    /// the package component — so relativize gives back
+    /// `<package>/<filename>`. Previous implementation computed
+    /// `full_path - short_path`, which (since kuro's short_path omits the
+    /// package prefix) left the package dir in the root, so
+    /// `relativize` returned only `<filename>` and
+    /// `strip_include_prefix = "<package>"` always failed.
     #[starlark(attribute)]
     fn root<'v>(
         this: &'v dyn StarlarkArtifactLike<'v>,
@@ -259,20 +273,10 @@ pub(crate) fn any_artifact_methods(builder: &mut MethodsBuilder) {
                 path: String::new(),
             }));
         }
-        // Compute root = full_path with short_path stripped from the end
-        let full = this.with_full_path(&|p| heap.alloc_str(p.as_str()))?;
-        let short = this.with_short_path(&|p| heap.alloc_str(p.as_str()))?;
-        let full_str = full.as_str();
-        let short_str = short.as_str();
-        let root_path = if let Some(prefix) = full_str.strip_suffix(short_str) {
-            prefix.trim_end_matches('/').to_owned()
-        } else {
-            match full_str.rfind('/') {
-                Some(pos) => full_str[..pos].to_owned(),
-                None => String::new(),
-            }
-        };
-        Ok(heap.alloc(ArtifactRoot { path: root_path }))
+        let root_path = this.with_root_path(&|p| heap.alloc_str(p.as_str()))?;
+        Ok(heap.alloc(ArtifactRoot {
+            path: root_path.as_str().to_owned(),
+        }))
     }
 
     /// The executable file (Bazel FilesToRunProvider compatibility).
