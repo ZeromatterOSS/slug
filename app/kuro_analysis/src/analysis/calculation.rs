@@ -262,8 +262,9 @@ async fn check_config_setting_flag_values(
     let config_setting_cell = target_ref.label().pkg().cell_name();
     let cell_alias_resolver = ctx.get_cell_alias_resolver(config_setting_cell).await?;
 
+    let config_setting_pkg = target_ref.label().pkg();
     for (key, expected_value) in pairs.iter() {
-        let label_str = match key {
+        let raw_label_str = match key {
             CoercedAttr::String(s) => s.0.as_str().to_owned(),
             _ => return Ok(false), // Unexpected key type → conservative: no match
         };
@@ -271,6 +272,28 @@ async fn check_config_setting_flag_values(
         let expected_str = match expected_value {
             CoercedAttr::String(s) => s.0.as_str().to_owned(),
             _ => return Ok(false), // Unexpected value type → conservative: no match
+        };
+
+        // Bazel-compatible label resolution in `flag_values`: the dict keys are
+        // flag target labels and may appear as:
+        //   * `@repo//pkg:name` — fully qualified; parse as absolute.
+        //   * `//pkg:name` — main-cell absolute.
+        //   * `:name` — relative to the config_setting's own package.
+        //   * `name` — bare target name, relative to the config_setting's own
+        //     package (common with `native.config_setting(flag_values = {name: ...})`
+        //     where `name` is a sibling flag rule).
+        // TargetLabel::parse rejects the last form ("Invalid absolute target
+        // pattern"); normalize bare names to `//<pkg>:<name>` first.
+        let label_str = if raw_label_str.starts_with('@') || raw_label_str.starts_with("//") {
+            raw_label_str.clone()
+        } else {
+            let bare = raw_label_str.trim_start_matches(':');
+            let pkg_path = config_setting_pkg.cell_relative_path().as_str();
+            if pkg_path.is_empty() {
+                format!("//:{bare}")
+            } else {
+                format!("//{pkg_path}:{bare}")
+            }
         };
 
         // Parse the label string into a TargetLabel.
@@ -281,15 +304,13 @@ async fn check_config_setting_flag_values(
             &cell_alias_resolver,
         ) {
             Ok(label) => label,
-            Err(_) => return Ok(false), // Can't parse label → conservative: no match
+            Err(_) => return Ok(false),
         };
 
         // Look up the flag target's TargetNode to read its build_setting_default.
-        // If the target doesn't exist (e.g., bazel_tools//tools/cpp:compiler), treat
-        // as no match (conservative behavior, same as before flag_values support).
         let flag_node = match ctx.get_target_node(&flag_target_label).await {
             Ok(node) => node,
-            Err(_) => return Ok(false), // Target not found → conservative: no match
+            Err(_) => return Ok(false),
         };
 
         // Check for CLI override via --//pkg:target=value first
@@ -301,30 +322,67 @@ async fn check_config_setting_flag_values(
             format!("//{}:{}", flag_pkg, flag_name)
         };
 
-        let actual_val = if let Some(cli_val) =
-            kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(&flag_label_str)
-        {
-            cli_val
-        } else {
-            // Fall back to build_setting_default
-            match flag_node.attr_or_none("build_setting_default", AttrInspectOptions::All) {
-                Some(attr) => match &attr.value {
-                    CoercedAttr::String(s) => s.0.as_str().to_owned(),
-                    CoercedAttr::Bool(b) => {
-                        if b.0 {
-                            "True".to_owned()
-                        } else {
-                            "False".to_owned()
+        // Handle the flag's current value in two shapes:
+        //   * Scalar (string/bool/int): compared against expected_str for equality.
+        //   * List (config.string_list / config.int_list): `flag_values` on a
+        //     list-typed setting matches when the expected string appears in
+        //     the list. Bazel semantics — the canonical example is
+        //     `@llvm-project//llvm:driver-tools`, a string_list_flag whose
+        //     default is the full tool name list. Every
+        //     `driver-tools-include-<tool>` config_setting should match
+        //     against the default because each tool is in the list.
+        let (scalar_actual, list_actual): (Option<String>, Option<Vec<String>>) =
+            if let Some(cli_val) =
+                kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(
+                    &flag_label_str,
+                )
+            {
+                // CLI overrides arrive as a single string; string_list flags are
+                // passed comma-separated, so split if there's a comma.
+                if cli_val.contains(',') {
+                    (
+                        None,
+                        Some(cli_val.split(',').map(|s| s.to_owned()).collect()),
+                    )
+                } else {
+                    (Some(cli_val), None)
+                }
+            } else {
+                match flag_node.attr_or_none("build_setting_default", AttrInspectOptions::All) {
+                    Some(attr) => match &attr.value {
+                        CoercedAttr::String(s) => (Some(s.0.as_str().to_owned()), None),
+                        CoercedAttr::Bool(b) => {
+                            (Some(if b.0 { "True" } else { "False" }.to_owned()), None)
                         }
-                    }
-                    _ => return Ok(false),
-                },
-                None => return Ok(false),
-            }
-        };
+                        CoercedAttr::Int(i) => (Some(i.to_string()), None),
+                        CoercedAttr::List(list) => {
+                            let items: Vec<String> = list
+                                .0
+                                .iter()
+                                .filter_map(|item| match item {
+                                    CoercedAttr::String(s) => Some(s.0.as_str().to_owned()),
+                                    CoercedAttr::Int(i) => Some(i.to_string()),
+                                    CoercedAttr::Bool(b) => {
+                                        Some(if b.0 { "True" } else { "False" }.to_owned())
+                                    }
+                                    _ => None,
+                                })
+                                .collect();
+                            (None, Some(items))
+                        }
+                        _ => return Ok(false),
+                    },
+                    None => return Ok(false),
+                }
+            };
 
-        if actual_val != expected_str {
-            return Ok(false); // Mismatch
+        let matched = match (&scalar_actual, &list_actual) {
+            (Some(actual), _) => actual == &expected_str,
+            (_, Some(list)) => list.iter().any(|v| v == &expected_str),
+            _ => false,
+        };
+        if !matched {
+            return Ok(false);
         }
     }
 
