@@ -1108,6 +1108,71 @@ not an error. Kuro matches the no-op semantics for the common case
 without trying to verify "equivalent" (which would need a structural
 comparison of the action).
 
+### 15.5.15 `genrule(output_to_bindir=1)` type error (LANDED 2026-04-20)
+
+**Status:** Landed. Trivial — unblocks loading of
+`@llvm-project//clang/BUILD.bazel`.
+
+**Bug.** `@llvm-project//clang/BUILD.bazel:1777` declares
+`genrule(..., output_to_bindir = 1, ...)`. Bazel accepts int (0/1)
+or bool there. Kuro's native `genrule` typed the parameter as `&str`
+with default `""`, so evaluation errored with
+`Type of parameter 'output_to_bindir' doesn't match, expected 'str', actual 'int (repr: 1)'`.
+
+**Fix.** Relax the parameter type to `Value<'v>` and ignore its
+content. Kuro already ignored the attribute's semantics; this is
+purely about accepting the upstream call sites.
+
+### 15.5.16 Anonymous `rule(cfg=dict(...))` transitions not findable (OPEN)
+
+**Status:** Open. Blocks `@llvm-project//clang:clang` after the
+genrule fix.
+
+**Observed.** rules_python ≥ 1.9.0 defines py_binary via a rule
+builder in `py_executable.bzl` that passes
+`cfg = dict(implementation=..., inputs=..., outputs=...)` inline
+to `rule()`. Kuro creates a `Transition` object for the inline
+`dict`, assigns it `TransitionId::MagicObject { path, name =
+"_anonymous_transition" }`, and stores the path as "whatever bzl
+was evaluating when `rule()` was called" — i.e.
+`py_binary_rule.bzl` (the file where `.build()` ultimately runs).
+
+When DICE later fetches the transition, it loads the module at
+`path` and looks up the global `_anonymous_transition`. That global
+does not exist: the transition is an inline argument to `rule()`,
+never bound to a module-level name.
+
+Result: `Transition object not found by id MagicObject { path:
+…/py_binary_rule.bzl, name: "_anonymous_transition" }`. The dep
+chain failing is `clang:clang → clang-driver → … → analysis →
+analysis_htmllogger_gen → bundle_resources (py_binary)`.
+
+**Investigation angles.**
+1. Store the frozen `Transition` value directly in the
+   `FrozenStarlarkRuleCallable` that owns it, so `fetch_transition`
+   can bypass the module-lookup step for anonymous transitions. Keep
+   the `MagicObject` id for named transitions (backwards compat).
+2. Inject the frozen `Transition` as a module-level global at freeze
+   time with the `_anonymous_transition` name, so the existing
+   `get_any_visibility` lookup succeeds. Downside: mutating module
+   globals post-evaluation is awkward in starlark-rust.
+3. Treat anonymous rule-cfg transitions as no-ops (identity transition)
+   and skip the whole fetch path. Correct for kuro today because we
+   don't implement Starlark-driven config transitions anyway — the
+   dict's `implementation` is never invoked. Simpler; possibly the
+   right long-term answer until transitions are actually implemented.
+
+**Recommended direction.** Option 3. Kuro doesn't execute
+Starlark transitions, so honouring the anonymous dict as a no-op
+matches what happens for every other transition (they're all no-ops
+right now). Revisit when real transition support lands.
+
+**Parity source.** Bazel's `StarlarkRuleClassFunctions.rule()`
+stores the `StarlarkDefinedConfigTransition` inline on the `Rule`
+class; lookup is by direct reference, not by module path + global
+name. Kuro's detour through `(path, name)` is a kuro-specific
+approximation that doesn't handle inline definitions.
+
 ## Dependencies and ordering
 
 ```

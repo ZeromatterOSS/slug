@@ -2136,7 +2136,11 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] executable: bool,
         #[starlark(require = named, default = false)] local: bool,
         #[starlark(require = named, default = "")] message: &str,
-        #[starlark(require = named, default = "")] output_to_bindir: &str,
+        // Bazel accepts int (0/1) or bool here; upstream .bazel files use both
+        // forms. Take `Value` and let it be coerced downstream — we currently
+        // ignore the actual value.
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        output_to_bindir: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
