@@ -77,6 +77,12 @@ use std::fmt;
 
 use allocative::Allocative;
 use derive_more::Display;
+// Thread-local storage for the current rule's `ctx` value lives in
+// `kuro_build_api::interpreter::rule_ctx_storage` so that provider constructors
+// (e.g. DefaultInfo) can also reach it without a dependency on this crate.
+pub use kuro_build_api::interpreter::rule_ctx_storage::clear_current_rule_ctx;
+pub use kuro_build_api::interpreter::rule_ctx_storage::get_current_rule_ctx;
+pub use kuro_build_api::interpreter::rule_ctx_storage::set_current_rule_ctx_raw;
 use starlark::any::ProvidesStaticType;
 use starlark::docs::DocFunction;
 use starlark::docs::DocItem;
@@ -110,44 +116,6 @@ use starlark::values::starlark_value_as_type::StarlarkValueAsType;
 use crate::attrs::starlark_attribute::StarlarkAttribute;
 use crate::interpreter::build_context::BuildContext;
 use crate::interpreter::build_context::PerFileTypeContext;
-
-// Thread-local storage for the current rule's `ctx` value.
-// Set by the analysis pipeline before calling a rule's implementation function,
-// read by subrule invocations to inject `ctx` as the first argument.
-//
-// SAFETY: We store the raw bits of a Value<'v> as a usize. This is safe because:
-// 1. Value is a pointer-sized wrapper (verified by static_assert below)
-// 2. The value is on the evaluator's heap which outlives the subrule call
-// 3. The thread-local is cleared after rule evaluation completes
-thread_local! {
-    static CURRENT_RULE_CTX: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
-}
-
-const _: () = assert!(std::mem::size_of::<Value<'_>>() == std::mem::size_of::<usize>());
-
-/// Set the current rule context for subrule invocations.
-/// SAFETY: The caller must ensure the Value outlives any subrule calls.
-pub fn set_current_rule_ctx_raw(ctx_bits: usize) {
-    CURRENT_RULE_CTX.with(|cell| cell.set(Some(ctx_bits)));
-}
-
-/// Clear the current rule context after rule implementation completes.
-pub fn clear_current_rule_ctx() {
-    CURRENT_RULE_CTX.with(|cell| cell.set(None));
-}
-
-/// Get the current rule context Value for subrule use.
-/// SAFETY: The stored bits must have been set by set_current_rule_ctx_raw
-/// from a valid Value that is still alive on the heap.
-fn get_current_rule_ctx<'v>() -> Option<Value<'v>> {
-    CURRENT_RULE_CTX.with(|cell| {
-        cell.get().map(|bits| {
-            // SAFETY: bits were stored from a valid Value<'v> via transmute,
-            // and the Value is alive on the evaluator's heap which outlives this call.
-            unsafe { std::mem::transmute::<usize, Value<'v>>(bits) }
-        })
-    })
-}
 
 /// Errors around subrule declaration and invocation.
 #[derive(Debug, kuro_error::Error)]

@@ -248,6 +248,33 @@ impl<'v> AnalysisContext<'v> {
         }
     }
 
+    /// The workspace name (repository) that owns the current rule target.
+    ///
+    /// Matches the Bazel-visible `ctx.workspace_name` attribute: the cell name of the
+    /// target's package, or an empty string for the root cell. Used by
+    /// `DefaultInfo(executable=..., default_runfiles=...)` to key the runfiles
+    /// symlink tree under `<exe>.runfiles/<workspace_name>/...`.
+    pub fn workspace_name_str(&self) -> &str {
+        match self.label {
+            Some(label) => {
+                let cell = label.label().target().pkg().cell_name().as_str();
+                if kuro_core::cells::is_root_cell_name(cell) {
+                    ""
+                } else {
+                    cell
+                }
+            }
+            None => "",
+        }
+    }
+
+    /// Returns the `ctx.actions` `ValueTyped<AnalysisActions>` for callers that need
+    /// to register additional analysis-time actions without going through Starlark
+    /// method dispatch.
+    pub fn actions_typed(&self) -> ValueTyped<'v, AnalysisActions<'v>> {
+        self.actions
+    }
+
     pub fn prepare(
         heap: Heap<'v>,
         attrs: Option<ValueOfUnchecked<'v, StructRef<'static>>>,

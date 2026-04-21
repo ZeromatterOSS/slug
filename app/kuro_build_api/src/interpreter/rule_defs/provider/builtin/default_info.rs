@@ -18,6 +18,7 @@ use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_artifact::artifact::artifact_type::OutputArtifact;
 use kuro_build_api_derive::internal_provider;
 use kuro_error::BuckErrorContext;
+use kuro_util::late_binding::LateBinding;
 use starlark::any::ProvidesStaticType;
 use starlark::coerce::Coerce;
 use starlark::collections::SmallMap;
@@ -56,16 +57,47 @@ use starlark::values::none::NoneOr;
 
 use crate as kuro_build_api;
 use crate::artifact_groups::ArtifactGroup;
+use crate::interpreter::rule_ctx_storage::get_current_rule_ctx;
 use crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
 use crate::interpreter::rule_defs::artifact::starlark_artifact_like::ValueAsInputArtifactLike;
 use crate::interpreter::rule_defs::artifact::starlark_artifact_like::ValueIsInputArtifactAnnotation;
 use crate::interpreter::rule_defs::artifact_tagging::ArtifactTag;
 use crate::interpreter::rule_defs::cmd_args::CommandLineArtifactVisitor;
 use crate::interpreter::rule_defs::cmd_args::value_as::ValueAsCommandLineLike;
+use crate::interpreter::rule_defs::context::AnalysisActions;
+use crate::interpreter::rule_defs::context::AnalysisContext;
 use crate::interpreter::rule_defs::depset::Depset;
 use crate::interpreter::rule_defs::depset::LiveDepsetGen;
 use crate::interpreter::rule_defs::provider::ProviderCollection;
 use crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
+
+/// Late binding for synthesizing a runfiles symlink tree action.
+///
+/// Initialized in `kuro_action_impl::context::runfiles_tree`. See §15.5.23 of
+/// `thoughts/shared/plans/kuro-bazel-subplans/15-bazel-9-parity.md` for why this
+/// lives here and not in `kuro_action_impl`: `DefaultInfo(executable=..., default_runfiles=...)`
+/// needs to emit a `symlinked_dir` action at analysis time to match Bazel's
+/// `SymlinkTreeAction` behaviour so that `<exe>.runfiles/<workspace>/<short_path>`
+/// is materialized for any consumer running the executable (py_binary → bundle_resources
+/// stub looks the tree up at action time and fails without it).
+///
+/// Returns `(wrapped_executable_value, tree_artifact_value)`:
+/// - `wrapped_executable_value` is the original executable Value wrapped via
+///   `with_associated_artifacts([tree])` so that `visit_artifacts` on tool consumers
+///   (e.g. `ctx.actions.run(executable = dep, tools = [dep])`) pulls the tree in as
+///   an action input without requiring changes to `run`.
+/// - `tree_artifact_value` is the declared symlink-tree artifact so the caller can
+///   append it to `other_outputs` as a safety net (ensures `kuro build :target`
+///   materialises the tree even if the exe isn't in `default_outputs`).
+pub static SYNTHESIZE_RUNFILES_TREE: LateBinding<
+    for<'v> fn(
+        &mut Evaluator<'v, '_, '_>,
+        &AnalysisActions<'v>,
+        Value<'v>,
+        Value<'v>,
+        &str,
+    ) -> kuro_error::Result<(Value<'v>, Value<'v>)>,
+> = LateBinding::new("SYNTHESIZE_RUNFILES_TREE");
 
 /// A provider that all rules' implementations must return
 ///
@@ -908,19 +940,71 @@ fn default_info_creator(builder: &mut GlobalsBuilder) {
             None => empty_runfiles_value(heap),
         };
 
+        // Step A of §15.5.23: when a rule returns DefaultInfo with both an executable
+        // and non-empty default_runfiles, synthesize a symlink tree at
+        // `<exe>.runfiles/<workspace>/...` and attach it as an associated artifact
+        // of the executable. Consumers using the exe via `tools=[X]` pick up the tree
+        // automatically because `StarlarkArtifact::visit_artifacts` walks
+        // `associated_artifacts`. As a safety net we also append the tree artifact
+        // to `other_outputs` so `kuro build :target` materialises it even if the exe
+        // is not in `default_outputs`.
+        let exe_opt = executable.into_option();
+        let (final_exe_opt, tree_artifact_opt): (Option<Value<'v>>, Option<Value<'v>>) =
+            match exe_opt {
+                Some(exe_val) if runfiles_has_content(default_runfiles_value) => {
+                    match (SYNTHESIZE_RUNFILES_TREE.get(), get_current_rule_ctx()) {
+                        (Ok(synth), Some(ctx_val)) => {
+                            // The ctx_val is the AnalysisContext Value set by
+                            // env::get_user_defined_rule_spec::invoke before calling the
+                            // rule impl. Downcast to get AnalysisActions.
+                            match ctx_val.downcast_ref::<AnalysisContext<'v>>() {
+                                Some(analysis_ctx) => {
+                                    let actions = analysis_ctx.actions_typed();
+                                    let workspace_name = analysis_ctx.workspace_name_str();
+                                    let (wrapped, tree) = synth(
+                                        eval,
+                                        actions.as_ref(),
+                                        exe_val,
+                                        default_runfiles_value,
+                                        workspace_name,
+                                    )?;
+                                    (Some(wrapped), Some(tree))
+                                }
+                                None => (Some(exe_val), None),
+                            }
+                        }
+                        _ => (Some(exe_val), None),
+                    }
+                }
+                other => (other, None),
+            };
+
         // Store executable as a list (empty if None, single element if Some)
         // This enables RunInfo synthesis for Bazel compatibility
         let valid_executable: ValueOfUnchecked<ListType<ValueIsInputArtifactAnnotation>> =
-            match executable.into_option() {
+            match final_exe_opt {
                 Some(exe_val) => {
                     ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList([exe_val])))
                 }
                 None => ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList::EMPTY)),
             };
 
+        // Append the tree to other_outputs so top-level builds materialise it.
+        let other_outputs_value: Value<'v> = match tree_artifact_opt {
+            Some(tree) => {
+                let mut items: Vec<Value<'v>> = match ListRef::from_value(other_outputs.value) {
+                    Some(list) => list.iter().collect(),
+                    None => Vec::new(),
+                };
+                items.push(tree);
+                heap.alloc(AllocList(items))
+            }
+            None => other_outputs.value,
+        };
+
         Ok(DefaultInfo {
             default_outputs: valid_default_outputs,
-            other_outputs: other_outputs.as_unchecked().cast(),
+            other_outputs: ValueOfUnchecked::new(other_outputs_value),
             sub_targets: heap
                 .alloc_typed_unchecked(AllocDict(valid_sub_targets))
                 .cast(),
@@ -929,6 +1013,35 @@ fn default_info_creator(builder: &mut GlobalsBuilder) {
             executable: valid_executable,
         })
     }
+}
+
+/// Returns true if the given `Runfiles` Value has any non-empty direct content
+/// across `files`, `symlinks`, `root_symlinks`, or `empty_filenames`. Cheap check
+/// before dispatching to the tree-synthesis late binding.
+fn runfiles_has_content<'v>(runfiles_val: Value<'v>) -> bool {
+    if runfiles_val.is_none() {
+        return false;
+    }
+    let Some(runfiles) = runfiles_val.downcast_ref::<Runfiles<'v>>() else {
+        return false;
+    };
+    let files = runfiles.files.to_value();
+    let symlinks = runfiles.symlinks.to_value();
+    let root_symlinks = runfiles.root_symlinks.to_value();
+    let empty_filenames = runfiles.empty_filenames.to_value();
+    let dict_nonempty = |v: Value<'v>| DictRef::from_value(v).is_some_and(|d| !d.is_empty());
+    let depset_nonempty = |v: Value<'v>| {
+        // Heuristic: a non-source Value that's not explicitly empty may still
+        // carry content via its transitive closure. Force the depset-shaped check
+        // by looking at direct values as a list when possible; treat anything
+        // non-trivially shaped as non-empty (we only use this as an early skip
+        // guard — the late binding handles the empty case safely as a no-op).
+        !v.is_none() && !matches!(ListRef::from_value(v).map(|l| l.is_empty()), Some(true))
+    };
+    depset_nonempty(files)
+        || dict_nonempty(symlinks)
+        || dict_nonempty(root_symlinks)
+        || depset_nonempty(empty_filenames)
 }
 
 // ============================================================================
@@ -954,6 +1067,24 @@ pub struct RunfilesGen<V: ValueLifetimeless> {
 }
 
 starlark::starlark_complex_value!(pub Runfiles);
+
+impl<V: ValueLifetimeless> RunfilesGen<V> {
+    pub fn files(&self) -> &V {
+        &self.files
+    }
+
+    pub fn symlinks(&self) -> &V {
+        &self.symlinks
+    }
+
+    pub fn root_symlinks(&self) -> &V {
+        &self.root_symlinks
+    }
+
+    pub fn empty_filenames(&self) -> &V {
+        &self.empty_filenames
+    }
+}
 
 impl<V: ValueLifetimeless> std::fmt::Display for RunfilesGen<V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

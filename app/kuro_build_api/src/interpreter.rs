@@ -9,4 +9,5 @@
  */
 
 pub mod more;
+pub mod rule_ctx_storage;
 pub mod rule_defs;

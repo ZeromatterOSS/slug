@@ -445,7 +445,7 @@ where
 }
 
 /// Helper function to recursively collect elements from any depset type.
-pub(crate) fn collect_depset_elements<'v>(
+pub fn collect_depset_elements<'v>(
     value: Value<'v>,
     elements: &mut Vec<Value<'v>>,
     heap: Heap<'v>,

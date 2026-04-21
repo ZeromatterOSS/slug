@@ -92,6 +92,20 @@ impl StarlarkArtifact {
         }
     }
 
+    /// Constructor for `StarlarkArtifact` with an existing set of associated artifacts.
+    /// Used by `SYNTHESIZE_RUNFILES_TREE` to attach a runfiles symlink tree to an
+    /// executable without going through `with_associated_artifacts`'s `UnpackList`
+    /// argument shape.
+    pub fn new_with_associated_artifacts(
+        artifact: Artifact,
+        associated_artifacts: AssociatedArtifacts,
+    ) -> Self {
+        StarlarkArtifact {
+            artifact,
+            associated_artifacts,
+        }
+    }
+
     pub fn artifact(&self) -> Artifact {
         self.artifact.dupe()
     }

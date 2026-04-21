@@ -316,10 +316,32 @@ async fn declare_all_source_artifacts(
                 )
             })?;
 
+            // Preserve the executable bit from the source so shell scripts
+            // (e.g. rules_python's build_data_writer.sh) remain invokable when
+            // kuro materialises them under buck-out/v2/external_cells/bzlmod.
+            let metadata = entry.metadata().await.map_err(|e| {
+                kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Environment,
+                    "Failed to stat bzlmod file {:?}: {}",
+                    abs_path,
+                    e
+                )
+            })?;
+            #[cfg(unix)]
+            let is_executable = {
+                use std::os::unix::fs::PermissionsExt;
+                metadata.permissions().mode() & 0o111 != 0
+            };
+            #[cfg(not(unix))]
+            let is_executable = {
+                let _ = metadata;
+                false
+            };
+
             requests.push(WriteRequest {
                 path,
                 content,
-                is_executable: false,
+                is_executable,
             });
         }
     }

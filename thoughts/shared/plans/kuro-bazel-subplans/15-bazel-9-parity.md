@@ -1527,12 +1527,106 @@ the same py_binary runfiles tree missing at action time (§15.5.21
 confirmed in
 `buck-out/v2/gen/llvm-project/.../llvm/LLVMDriverTools.def`.
 
-### 15.5.23 py_binary runfiles tree materialization (OPEN, scope note)
+### 15.5.23 py_binary runfiles tree materialization (LANDED)
 
-**Status:** Open. Blocks execution of any py_binary used as a tool
-(e.g. `clang:analysis_htmllogger_gen` → `run_binary(tool =
-:bundle_resources)`). Investigation landed 2026-04-20; implementation
-deferred because it spans multiple subsystems.
+**Status:** Landed 2026-04-21. `DefaultInfo(executable=..., default_runfiles=...)`
+now synthesizes a `<exe>.runfiles/<workspace>/<short_path>` symlink tree at
+analysis time and wraps the executable so consumer actions pick the tree up
+via `visit_artifacts`. rules_python's `py_binary` stub finds its runfiles
+directory and successfully dispatches to the stage2 bootstrap → main Python
+module.
+
+Implementation, file:line:
+- `app/kuro_build_api/src/interpreter/rule_ctx_storage.rs` (new): moved the
+  thread-local that holds the current rule's `ctx` value out of
+  `kuro_interpreter_for_build::subrule` so that `default_info_creator` in
+  `kuro_build_api` can reach it.
+- `app/kuro_build_api/src/interpreter.rs:12`: declares the new module.
+- `app/kuro_interpreter_for_build/src/subrule.rs:80-85`: re-exports the
+  storage API so existing callers (`kuro_analysis::analysis::env`) keep
+  compiling unchanged.
+- `app/kuro_build_api/src/interpreter/rule_defs/provider/builtin/default_info.rs`:
+    - adds `SYNTHESIZE_RUNFILES_TREE: LateBinding<...>` (≈ line 90).
+    - `default_info_creator` (≈ line 970): when `executable` is set and
+      runfiles are non-empty, dispatches through `SYNTHESIZE_RUNFILES_TREE`,
+      replaces the stored executable with the wrapped value, and appends the
+      tree artifact to `other_outputs` as a safety net.
+    - `RunfilesGen` gets `pub files()/symlinks()/root_symlinks()/empty_filenames()`
+      accessors so the synthesis can read them cross-crate.
+    - `runfiles_has_content` helper (≈ line 1016) cheaply gates the dispatch.
+- `app/kuro_build_api/src/interpreter/rule_defs/context.rs:251-280`: adds
+  `AnalysisContext::workspace_name_str()` (derived from the target cell name)
+  and `AnalysisContext::actions_typed()` accessor for the synthesis.
+- `app/kuro_build_api/src/interpreter/rule_defs/depset.rs:448`: relaxes
+  `collect_depset_elements` from `pub(crate)` to `pub` so the synthesis can
+  unpack the runfiles depset.
+- `app/kuro_build_api/src/interpreter/rule_defs/artifact/starlark_artifact.rs`:
+  adds `StarlarkArtifact::new_with_associated_artifacts(...)` constructor.
+- `app/kuro_action_impl/src/context/runfiles_tree.rs` (new): late-binding
+  implementation — builds the `srcs` dict, declares the tree output as a
+  sibling of the executable via `AnalysisActions::state().declare_output(...,
+  OutputType::Directory, ...)`, registers `UnregisteredSymlinkedDirAction::new(Symlink, srcs)`,
+  and wraps the executable by constructing a fresh `StarlarkArtifact` whose
+  `associated_artifacts` union the original associations with the tree.
+- `app/kuro_action_impl/src/context.rs:24`: declares the new
+  `runfiles_tree` submodule.
+- `app/kuro_action_impl/src/lib.rs:28`: wires
+  `context::runfiles_tree::init_synthesize_runfiles_tree()` into
+  `init_late_bindings`.
+
+Unblocker that also landed with §15.5.23:
+- `app/kuro_external_cells/src/bzlmod.rs:319-349`: `declare_all_source_artifacts`
+  was hardcoding `is_executable: false` on every bzlmod source it registered
+  with the materializer, so materialized scripts under
+  `buck-out/v2/external_cells/bzlmod/...` had no `+x`. rules_python's
+  `build_data_writer.sh` (a `py_write_build_data` sub-action of every py_binary)
+  failed to spawn with "Failed to spawn a process". Now reads
+  `entry.metadata().permissions().mode() & 0o111` on Unix. Strictly orthogonal
+  to the runfiles tree synth but kept in the same commit because the py_binary
+  milestone cannot be verified without it.
+
+**Design choices worth noting.**
+- External-repo files in runfiles carry a `short_path` of the form
+  `../<repo>/<rel>`. The synthesis strips the leading `../` and drops the
+  workspace prefix in that case so the generated key is a valid forward-
+  relative path. See `runfile_key` in `runfiles_tree.rs`.
+- `empty_filenames` (used by Bazel for implicit `__init__.py` in py_library
+  runfiles) is not materialized. Python 3 namespace packages cover the cases
+  we've seen in LLVM; a follow-up task tracks wiring zero-byte placeholders
+  through `ctx.actions.write` if a consumer needs them.
+
+**Milestone verification.** From
+`/var/mnt/dev/llvm-project/utils/bazel`, `kuro build
+@llvm-project//clang:analysis_htmllogger_gen` now progresses through the
+py_binary stage2 bootstrap and starts executing
+`clang/utils/bundle_resources.py`. The build still fails, but at a distinct
+layer:
+
+```
+File ".../bundle_resources.py", line 21, in <module>
+    with open(outfile, "w") as out:
+FileNotFoundError: [Errno 2] No such file or directory:
+    '$(execpath lib/Analysis/FlowSensitive/HTMLLogger.inc)'
+```
+
+That is not a §15.5.23 problem — `run_binary` is passing its `args` through
+to the executable without expanding `$(execpath ...)` tokens. Tracked as
+§15.5.24 below.
+
+**Follow-ups opened by this work.**
+- §15.5.24: `run_binary` doesn't resolve `$(execpath …)` / `$(location …)` in
+  its `args` before invoking the tool.
+- §15.5.25: `runfiles.empty_filenames` is dropped on the floor in
+  `SYNTHESIZE_RUNFILES_TREE`. Acceptable while Python 3 namespace packages
+  suffice, but wire `ctx.actions.write("", output=...)` through the synth if
+  a consumer needs real zero-byte entries.
+
+---
+
+### 15.5.23 historical context (superseded)
+
+*(Kept for reference — the "three stacked gaps" and the original design
+sketch.)*
 
 **Observed.** After §15.5.21 + §15.5.21.1 + §15.5.22 clear analysis,
 `bundle_resources.runfiles/llvm-project/_bundle_resources_stage2_bootstrap.py`

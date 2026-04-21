@@ -21,6 +21,7 @@ mod copy;
 mod download;
 pub(crate) mod dynamic_output;
 pub(crate) mod run;
+pub(crate) mod runfiles_tree;
 mod unsorted;
 mod write;
 
