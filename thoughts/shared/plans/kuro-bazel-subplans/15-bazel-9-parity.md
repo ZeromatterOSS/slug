@@ -1527,6 +1527,89 @@ the same py_binary runfiles tree missing at action time (§15.5.21
 confirmed in
 `buck-out/v2/gen/llvm-project/.../llvm/LLVMDriverTools.def`.
 
+### 15.5.23 py_binary runfiles tree materialization (OPEN, scope note)
+
+**Status:** Open. Blocks execution of any py_binary used as a tool
+(e.g. `clang:analysis_htmllogger_gen` → `run_binary(tool =
+:bundle_resources)`). Investigation landed 2026-04-20; implementation
+deferred because it spans multiple subsystems.
+
+**Observed.** After §15.5.21 + §15.5.21.1 + §15.5.22 clear analysis,
+`bundle_resources.runfiles/llvm-project/_bundle_resources_stage2_bootstrap.py`
+is never created on disk, and the stub's `FindModuleSpace` asserts:
+
+```
+AssertionError: Cannot find .runfiles directory for
+    buck-out/v2/gen/llvm-project/.../clang/__bundle_resources__/bundle_resources
+```
+
+**Root cause map (investigated, not fixed).**
+
+1. **Runfiles aren't built.** kuro's
+   `app/kuro_build_api/src/build/outputs.rs::get_outputs_for_top_level_target`
+   collects only `DefaultInfo.default_outputs`,
+   `default_outputs[i].associated_artifacts`, and `other_outputs`.
+   `default_runfiles` / `data_runfiles` are tracked on `DefaultInfo`
+   but never enumerated for building. rules_python declares the
+   stage2 bootstrap (and the py_binary main source) as *runfiles only*,
+   so the `expand_template`/`write` action that produces them never
+   fires.
+
+2. **No symlink-tree action type.** Kuro has
+   `ctx.actions.symlinked_dir(output, srcs_dict)` which is the
+   building block, but no analysis-time machinery synthesises a
+   `<exe>.runfiles/<workspace>/<path>` tree from a target's
+   `DefaultInfo.default_runfiles`. Bazel's `SymlinkTreeAction` is
+   what produces this; kuro doesn't emit it from any rule today.
+
+3. **`ctx.actions.run` doesn't propagate tool runfiles.**
+   `app/kuro_action_impl/src/context/run.rs` accepts `executable=`
+   as a `File` and `tools=[...]` as files-or-depsets. It reads
+   `visit_artifacts` which already walks
+   `StarlarkArtifact::associated_artifacts`, but nothing *sets*
+   those associated_artifacts to the target's runfiles tree. The
+   Bazel-equivalent is "tool expansion" — when `tools=[X]` is a
+   runnable target, Bazel auto-pulls its `data_runfiles` into the
+   action's input set and materialises the runfiles symlink tree
+   next to X. Kuro's run action sees only the stub File.
+
+**Approach (for a future session).**
+
+Two changes, landable in sequence, each independently useful:
+
+- **A.** `DefaultInfo(executable = X, default_runfiles = R)` auto-
+  synthesizes a `symlinked_dir` action at
+  `<X_parent>/<X_name>.runfiles/` whose `srcs` dict is built from
+  `R.files` (keyed by `<workspace_name>/<short_path>`), `R.symlinks`,
+  and `R.root_symlinks`. Wrap `X` via
+  `StarlarkArtifact::with_associated_artifacts([tree])` before
+  storing in `DefaultInfo.executable`. Requires threading an
+  `AnalysisActions` handle into `default_info_creator`, which today
+  only gets a `heap` / `eval`.
+
+- **B.** `ctx.actions.run` / `run_shell`, when building the action's
+  input set, walk `associated_artifacts` on each executable/tool
+  File (already done via `visit_artifacts`). Because A makes the
+  runfiles tree an associated artifact of the stub, the tree is
+  built before the run action fires and the Python bootstrap
+  finds it via the standard `<stub>.runfiles/` lookup.
+
+**Scope warning.** The threading in (A) is where most of the
+engineering is: the `default_info_creator` is defined via
+`#[starlark_module]`/`#[internal_provider]` and needs access to the
+current rule's `AnalysisActions` (reachable from
+`kuro_interpreter_for_build::subrule::get_current_rule_ctx_raw` but
+not idiomatic at that layer). Expect ~1 day of plumbing + testing
+before any llvm-project result. Until landed,
+`kuro build @llvm-project//clang:clang` analyzes cleanly but can't
+execute py_binary tool invocations.
+
+**Workaround for the short term.** None in-tree. A workspace-side
+shim (user-defined `py_binary` macro that writes a plain shell
+wrapper invoking `python3 $main_py "$@"`) would sidestep the
+runfiles tree for the handful of rules_python tools LLVM uses at
+build time. Not landed.
+
 ## Dependencies and ordering
 
 **Status:** Open. Blocks `@llvm-project//clang:clang` after the
