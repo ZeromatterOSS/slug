@@ -133,7 +133,7 @@ run_one() {
   log_src=$(ls -t "$ws/buck-out/v2/log/"*.pb.zst 2>/dev/null | head -n1 || true)
   if [[ -n "$log_src" ]]; then
     cp "$log_src" "$rundir/build.pb.zst"
-    "$KURO_BIN" log summary --format json --path "$rundir/build.pb.zst" \
+    "$KURO_BIN" log summary --format json "$rundir/build.pb.zst" \
       >"$rundir/summary.json" 2>"$rundir/summary.err" || {
       echo "  [$label] kuro log summary failed — see $rundir/summary.err" >&2
     }
