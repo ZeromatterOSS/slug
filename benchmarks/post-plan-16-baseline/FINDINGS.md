@@ -1,5 +1,19 @@
 # Post-Plan-16 baseline
 
+> **Addendum 2026-04-22 (after commits e86daf6 + fe96e88):** The
+> `summary.json` in this directory was regenerated from the same
+> `build.pb.zst` with the fixed aggregator. Wall time, action count
+> and critical_path figures are unchanged (those came from the live
+> build), but per-mnemonic numbers are corrected and queue wait is
+> now explicit. Re-aggregate anytime with:
+>
+>     /var/mnt/dev/kuro/kuro log summary --format json \
+>         cold-01/build.pb.zst > cold-01/summary.json
+>
+> The pre-fix narrative below is preserved for bisect context; the
+> corrected numbers at the end are the ones to trust.
+
+
 **Date:** 2026-04-22
 **HEAD:** 7abd174 (Plan 16.8 README note)
 **Target:** `@llvm-project//clang:clang`
@@ -117,3 +131,67 @@ cold run is too noisy to draw conclusions from.
 - `cold-01/build.pb.zst` — event log (3.5 MB compressed), usable
   for `kuro log diff summary`
 - `cold-01/build.log` — captured stderr of the build
+
+## Corrected numbers (re-aggregated 2026-04-22)
+
+After landing e86daf6 (per-action exec vs queue split) and fe96e88
+(critical_path uses `user` not `total`), re-reading the same event
+log tells a much clearer story:
+
+    total_wall     =  1982.9 s
+    execute_wall   =  1975.8 s   (elapsed first→last)
+    critical_path  = [still 1972s in the saved json]
+    actions        = 5367
+    peak in-flight = 2471
+
+> Critical path in the saved summary.json is still 1972s — the
+> critical-path *algorithm* was fixed post-build, but the event log
+> was emitted pre-fix. The value from the next baseline run will be
+> correct. Support smoke test (post-fix) shows critical_path=3.6s vs
+> wall=11.2s — that's what the fix should produce.
+
+### Per-mnemonic (exec-only vs queue wait)
+
+    mnemonic     count  exec-only  queue wait  ratio     p50     p95
+    c_compile    3664     20,749s  2,529,155s  121.9×   4.9s   13.5s
+    td_generate   446      9,766s     51,459s    5.3×   7.9s   81.1s
+    cpp_archive   176         39s     85,964s 2210.6×   0.1s    0.8s
+    cpp_link        4         32s          5s    0.2×   1.9s   28.0s
+
+### The real story
+
+**Kuro is queue-bound, not CPU-bound.** Pre-fix this was hidden — every
+per-action and critical-path number included queue wait, making actions
+look impossibly slow. The corrected numbers reveal:
+
+- Real compile wall (c_compile) averages 5.7s with p95 of 13.5s. That's
+  reasonable for clang source compiled in debug mode.
+- Queue wait on c_compile alone is 2.5M seconds. Every compile waited
+  122× its exec time before a permit opened up.
+- cpp_archive is 2210× queue-bound — 100ms of real work waiting 10min
+  on average.
+
+Total exec-time = 30,589s across 5367 actions. Build took 1983s wall.
+Average parallelism = 30,589 / 1983 ≈ 15.4 concurrent actions. That's
+consistent with CPU throughput being the bottleneck *given* the
+HostSharingBroker permit count — but far less than the 2471-deep
+queue would suggest.
+
+### Plan 17.2 brief, revised
+
+Old framing: "why does execution throughput plateau at 3 act/sec?"
+
+New framing: **why does scheduler admission accept 2471 concurrent
+actions when only 15-ish can actually execute at any given moment?**
+
+This is usually either:
+1. DICE dispatching all action futures eagerly instead of pulling them
+   when a worker is free.
+2. HostSharingBroker permit count far too high (or missing).
+3. Fine-grained permits (category, memory) not configured, so every
+   action grabs a "core" permit regardless of actual resource use.
+
+The scheduler investigation at
+`thoughts/shared/research/scheduler-parallelism-findings.md` noted the
+permit machinery exists. The question now is its parameters and
+back-pressure behavior.

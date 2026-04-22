@@ -7,70 +7,77 @@
       "category": "c_compile",
       "count": 3664,
       "critical_wall_us": 1022892669,
-      "p50_us": 783634715,
-      "p95_us": 949611204,
-      "p99_us": 976180808,
-      "total_wall_us": 2549905076808
-    },
-    {
-      "cached": 0,
-      "category": "cpp_archive",
-      "count": 176,
-      "critical_wall_us": 3509311,
-      "p50_us": 549374078,
-      "p95_us": 859039405,
-      "p99_us": 891902435,
-      "total_wall_us": 86002604458
+      "p50_us": 4859607,
+      "p95_us": 13496826,
+      "p99_us": 21964859,
+      "total_queue_us": 2529155718296,
+      "total_wall_us": 20749358512
     },
     {
       "cached": 0,
       "category": "td_generate",
       "count": 446,
       "critical_wall_us": 911042942,
-      "p50_us": 38232019,
-      "p95_us": 472401197,
-      "p99_us": 621581989,
-      "total_wall_us": 61225515318
+      "p50_us": 7889464,
+      "p95_us": 81112430,
+      "p99_us": 424482077,
+      "total_queue_us": 51458974031,
+      "total_wall_us": 9766541287
+    },
+    {
+      "cached": 0,
+      "category": "cpp_archive",
+      "count": 176,
+      "critical_wall_us": 3509311,
+      "p50_us": 101945,
+      "p95_us": 776606,
+      "p99_us": 1553656,
+      "total_queue_us": 85963717138,
+      "total_wall_us": 38887320
     },
     {
       "cached": 0,
       "category": "cpp_link",
       "count": 4,
       "critical_wall_us": 30606134,
-      "p50_us": 6860961,
-      "p95_us": 28228871,
-      "p99_us": 28228871,
-      "total_wall_us": 37466954
-    },
-    {
-      "cached": 0,
-      "category": "run_binary",
-      "count": 1,
-      "critical_wall_us": 0,
-      "p50_us": 11417615,
-      "p95_us": 11417615,
-      "p99_us": 11417615,
-      "total_wall_us": 11417615
+      "p50_us": 1923214,
+      "p95_us": 27982570,
+      "p99_us": 27982570,
+      "total_queue_us": 5230474,
+      "total_wall_us": 32236480
     },
     {
       "cached": 0,
       "category": "genrule",
       "count": 1,
       "critical_wall_us": 0,
-      "p50_us": 3393746,
-      "p95_us": 3393746,
-      "p99_us": 3393746,
-      "total_wall_us": 3393746
+      "p50_us": 2114615,
+      "p95_us": 2114615,
+      "p99_us": 2114615,
+      "total_queue_us": 1279131,
+      "total_wall_us": 2114615
+    },
+    {
+      "cached": 0,
+      "category": "run_binary",
+      "count": 1,
+      "critical_wall_us": 0,
+      "p50_us": 312747,
+      "p95_us": 312747,
+      "p99_us": 312747,
+      "total_queue_us": 11104868,
+      "total_wall_us": 312747
     },
     {
       "cached": 0,
       "category": "py_write_build_data",
       "count": 1,
       "critical_wall_us": 0,
-      "p50_us": 113277,
-      "p95_us": 113277,
-      "p99_us": 113277,
-      "total_wall_us": 113277
+      "p50_us": 9894,
+      "p95_us": 9894,
+      "p99_us": 9894,
+      "total_queue_us": 103383,
+      "total_wall_us": 9894
     }
   ],
   "cache_hit_pct": 0.0,
@@ -84,63 +91,63 @@
   "slowest_actions": [
     {
       "cached": false,
-      "category": "c_compile",
-      "identifier": "external/llvm-project/clang/lib/Analysis/ExprMutationAnalyzer.cpp",
-      "wall_us": 1643290580
+      "category": "td_generate",
+      "identifier": "lib/Target/AMDGPU/AMDGPUGenRegisterInfo.inc",
+      "wall_us": 536347406
     },
     {
       "cached": false,
-      "category": "c_compile",
-      "identifier": "external/llvm-project/llvm/lib/Transforms/Coroutines/CoroConditionalWrapper.cpp",
-      "wall_us": 1640817964
+      "category": "td_generate",
+      "identifier": "lib/Target/AMDGPU/AMDGPUGenRegisterBank.inc",
+      "wall_us": 519788539
     },
     {
       "cached": false,
-      "category": "c_compile",
-      "identifier": "external/llvm-project/llvm/lib/CodeGen/ComplexDeinterleavingPass.cpp",
-      "wall_us": 1638723575
+      "category": "td_generate",
+      "identifier": "lib/Target/AMDGPU/AMDGPUGenAsmMatcher.inc",
+      "wall_us": 446241777
     },
     {
       "cached": false,
-      "category": "c_compile",
-      "identifier": "external/llvm-project/llvm/lib/CodeGen/RegisterClassInfo.cpp",
-      "wall_us": 1635790265
+      "category": "td_generate",
+      "identifier": "lib/Target/AMDGPU/AMDGPUGenDAGISel.inc",
+      "wall_us": 434391649
     },
     {
       "cached": false,
-      "category": "c_compile",
-      "identifier": "external/llvm-project/llvm/lib/Transforms/Instrumentation/AllocToken.cpp",
-      "wall_us": 1635284017
+      "category": "td_generate",
+      "identifier": "lib/Target/AMDGPU/AMDGPUGenGlobalISel.inc",
+      "wall_us": 424482077
     },
     {
       "cached": false,
-      "category": "c_compile",
-      "identifier": "external/llvm-project/clang/lib/AST/Comment.cpp",
-      "wall_us": 1530488019
+      "category": "td_generate",
+      "identifier": "lib/Target/AMDGPU/AMDGPUGenInstrInfo.inc",
+      "wall_us": 407673202
     },
     {
       "cached": false,
-      "category": "c_compile",
-      "identifier": "external/llvm-project/llvm/lib/Transforms/Instrumentation/ValueProfileCollector.cpp",
-      "wall_us": 1501552971
+      "category": "td_generate",
+      "identifier": "lib/Target/AMDGPU/AMDGPUGenCallingConv.inc",
+      "wall_us": 380440053
     },
     {
       "cached": false,
-      "category": "c_compile",
-      "identifier": "external/llvm-project/llvm/lib/IR/MemoryModelRelaxationAnnotations.cpp",
-      "wall_us": 1410906002
+      "category": "td_generate",
+      "identifier": "lib/Target/AMDGPU/AMDGPUGenAsmWriter.inc",
+      "wall_us": 372027807
     },
     {
       "cached": false,
-      "category": "c_compile",
-      "identifier": "external/llvm-project/llvm/lib/MC/MCParser/ELFAsmParser.cpp",
-      "wall_us": 1402924835
+      "category": "td_generate",
+      "identifier": "lib/Target/RISCV/RISCVGenDAGISel.inc",
+      "wall_us": 198495973
     },
     {
       "cached": false,
-      "category": "c_compile",
-      "identifier": "external/llvm-project/llvm/lib/Transforms/Scalar/JumpThreading.cpp",
-      "wall_us": 1253038492
+      "category": "td_generate",
+      "identifier": "lib/Target/AMDGPU/AMDGPUGenSearchableTables.inc",
+      "wall_us": 173682493
     }
   ],
   "slowest_analyses": [
