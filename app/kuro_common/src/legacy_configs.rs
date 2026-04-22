@@ -15,6 +15,7 @@ mod access;
 mod aggregator;
 pub mod args;
 pub mod cells;
+mod cells_symlinks;
 pub mod configs;
 pub mod dice;
 pub mod file_ops;

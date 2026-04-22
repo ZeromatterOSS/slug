@@ -657,11 +657,13 @@ async fn compute_dep_aspects<'v>(
                     aspect_results.insert(dep_label, aspect_value.providers);
                 }
             }
-            Ok(Err(_e)) => {
-                // Aspect computation failed - skip this dep
+            Ok(Err(e)) => {
+                // Aspect computation failed - skip this dep but log the error
+                tracing::warn!("Aspect computation failed for dep {}: {}", key.target, e);
             }
-            Err(_e) => {
-                // Aspect DICE computation failed - skip this dep
+            Err(e) => {
+                // Aspect DICE computation failed - skip this dep but log the error
+                tracing::warn!("Aspect computation failed for dep {}: {}", key.target, e);
             }
         }
     }

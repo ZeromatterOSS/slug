@@ -68,6 +68,34 @@ use crate::interpreter::module_internals::ModuleInternals;
 pub(crate) mod rule_defs {
     use super::*;
 
+    /// Helper to construct a native `Rule` with the common sentinel defaults
+    /// (no incoming transition, no plugins/providers/toolchains/exec groups/fragments,
+    /// not a build setting). All native rules in this file share those defaults; they
+    /// vary only in `attributes`, `rule_type`, `rule_kind`, `is_test`, and `is_executable`.
+    fn make_native_rule(
+        attributes: AttributeSpec,
+        kind: NativeRuleKind,
+        rule_kind: RuleKind,
+        is_test: bool,
+        is_executable: bool,
+    ) -> Arc<Rule> {
+        Arc::new(Rule {
+            attributes,
+            rule_type: RuleType::Native(kind),
+            rule_kind,
+            cfg: RuleIncomingTransition::None,
+            uses_plugins: vec![],
+            is_test,
+            is_executable,
+            provides: vec![],
+            toolchain_types: vec![],
+            exec_group_defs: vec![],
+            fragments: vec![],
+            build_setting_type: None,
+            build_setting_is_flag: false,
+        })
+    }
+
     /// Creates the AttributeSpec for constraint_setting.
     /// constraint_setting only has the standard internal attributes (name, visibility, etc.)
     fn constraint_setting_attributes() -> AttributeSpec {
@@ -103,40 +131,24 @@ pub(crate) mod rule_defs {
 
     /// The Rule definition for constraint_setting.
     pub static CONSTRAINT_SETTING_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: constraint_setting_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::ConstraintSetting),
-            rule_kind: RuleKind::Configuration,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            constraint_setting_attributes(),
+            NativeRuleKind::ConstraintSetting,
+            RuleKind::Configuration,
+            false,
+            false,
+        )
     });
 
     /// The Rule definition for constraint_value.
     pub static CONSTRAINT_VALUE_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: constraint_value_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::ConstraintValue),
-            rule_kind: RuleKind::Configuration,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            constraint_value_attributes(),
+            NativeRuleKind::ConstraintValue,
+            RuleKind::Configuration,
+            false,
+            false,
+        )
     });
 
     /// Creates the AttributeSpec for alias.
@@ -158,21 +170,13 @@ pub(crate) mod rule_defs {
 
     /// The Rule definition for alias.
     pub static ALIAS_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: alias_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::Alias),
-            rule_kind: RuleKind::Normal, // Aliases can be used anywhere
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            alias_attributes(),
+            NativeRuleKind::Alias,
+            RuleKind::Normal, // Aliases can be used anywhere
+            false,
+            false,
+        )
     });
 
     /// Creates the AttributeSpec for filegroup.
@@ -213,21 +217,13 @@ pub(crate) mod rule_defs {
 
     /// The Rule definition for filegroup.
     pub static FILEGROUP_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: filegroup_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::Filegroup),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            filegroup_attributes(),
+            NativeRuleKind::Filegroup,
+            RuleKind::Normal,
+            false,
+            false,
+        )
     });
 
     /// Creates the AttributeSpec for label_flag.
@@ -257,21 +253,13 @@ pub(crate) mod rule_defs {
 
     /// The Rule definition for label_flag.
     pub static LABEL_FLAG_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: label_flag_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::LabelFlag),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            label_flag_attributes(),
+            NativeRuleKind::LabelFlag,
+            RuleKind::Normal,
+            false,
+            false,
+        )
     });
 
     /// Creates the AttributeSpec for config_setting.
@@ -335,41 +323,25 @@ pub(crate) mod rule_defs {
 
     /// The Rule definition for config_setting.
     pub static CONFIG_SETTING_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: config_setting_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::ConfigSetting),
-            rule_kind: RuleKind::Configuration,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            config_setting_attributes(),
+            NativeRuleKind::ConfigSetting,
+            RuleKind::Configuration,
+            false,
+            false,
+        )
     });
 
     /// The Rule definition for package_group.
     /// package_group defines a set of packages for visibility control.
     pub static PACKAGE_GROUP_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: constraint_setting_attributes(), // Same as constraint_setting - just name + visibility
-            rule_type: RuleType::Native(NativeRuleKind::PackageGroup),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            constraint_setting_attributes(), // Same as constraint_setting - just name + visibility
+            NativeRuleKind::PackageGroup,
+            RuleKind::Normal,
+            false,
+            false,
+        )
     });
 
     /// Creates the AttributeSpec for toolchain.
@@ -401,41 +373,25 @@ pub(crate) mod rule_defs {
     /// The Rule definition for toolchain.
     /// toolchain registers a toolchain implementation for a toolchain_type + platform.
     pub static TOOLCHAIN_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: toolchain_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::Toolchain),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            toolchain_attributes(),
+            NativeRuleKind::Toolchain,
+            RuleKind::Normal,
+            false,
+            false,
+        )
     });
 
     /// The Rule definition for toolchain_type.
     /// toolchain_type is a simple marker target with no special attributes.
     pub static TOOLCHAIN_TYPE_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: constraint_setting_attributes(), // Same as constraint_setting - just name + visibility
-            rule_type: RuleType::Native(NativeRuleKind::ToolchainType),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            constraint_setting_attributes(), // Same as constraint_setting - just name + visibility
+            NativeRuleKind::ToolchainType,
+            RuleKind::Normal,
+            false,
+            false,
+        )
     });
 
     /// Creates the AttributeSpec for genrule.
@@ -521,21 +477,13 @@ pub(crate) mod rule_defs {
 
     /// The Rule definition for genrule.
     pub static GENRULE_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: genrule_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::Genrule),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            genrule_attributes(),
+            NativeRuleKind::Genrule,
+            RuleKind::Normal,
+            false,
+            false,
+        )
     });
 
     /// Creates the AttributeSpec for platform.
@@ -587,21 +535,13 @@ pub(crate) mod rule_defs {
     }
 
     pub static PLATFORM_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: platform_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::Platform),
-            rule_kind: RuleKind::Configuration,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            platform_attributes(),
+            NativeRuleKind::Platform,
+            RuleKind::Configuration,
+            false,
+            false,
+        )
     });
 
     pub static EXECUTION_PLATFORM_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
@@ -610,26 +550,19 @@ pub(crate) mod rule_defs {
             "The platform target for this execution platform",
             AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
         );
-        Arc::new(Rule {
-            attributes: AttributeSpec::from(
-                vec![("platform".to_owned(), platform_attr)],
-                false,
-                &RuleIncomingTransition::None,
-            )
-            .expect("execution_platform attributes should be valid"),
-            rule_type: RuleType::Native(NativeRuleKind::ExecutionPlatform),
-            rule_kind: RuleKind::Configuration,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        let attributes = AttributeSpec::from(
+            vec![("platform".to_owned(), platform_attr)],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("execution_platform attributes should be valid");
+        make_native_rule(
+            attributes,
+            NativeRuleKind::ExecutionPlatform,
+            RuleKind::Configuration,
+            false,
+            false,
+        )
     });
 
     pub static EXECUTION_PLATFORMS_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
@@ -640,26 +573,19 @@ pub(crate) mod rule_defs {
             "The list of execution platform targets",
             AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
         );
-        Arc::new(Rule {
-            attributes: AttributeSpec::from(
-                vec![("platforms".to_owned(), platforms_attr)],
-                false,
-                &RuleIncomingTransition::None,
-            )
-            .expect("execution_platforms attributes should be valid"),
-            rule_type: RuleType::Native(NativeRuleKind::ExecutionPlatforms),
-            rule_kind: RuleKind::Configuration,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        let attributes = AttributeSpec::from(
+            vec![("platforms".to_owned(), platforms_attr)],
+            false,
+            &RuleIncomingTransition::None,
+        )
+        .expect("execution_platforms attributes should be valid");
+        make_native_rule(
+            attributes,
+            NativeRuleKind::ExecutionPlatforms,
+            RuleKind::Configuration,
+            false,
+            false,
+        )
     });
 
     /// Creates the AttributeSpec for native cc rules (cc_library, cc_binary, cc_test).
@@ -731,57 +657,33 @@ pub(crate) mod rule_defs {
     }
 
     pub static CC_LIBRARY_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: cc_rule_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::CcLibrary),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            cc_rule_attributes(),
+            NativeRuleKind::CcLibrary,
+            RuleKind::Normal,
+            false,
+            false,
+        )
     });
 
     pub static CC_BINARY_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: cc_rule_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::CcBinary),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: true,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            cc_rule_attributes(),
+            NativeRuleKind::CcBinary,
+            RuleKind::Normal,
+            false,
+            true,
+        )
     });
 
     pub static CC_TEST_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: cc_rule_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::CcTest),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: true,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            cc_rule_attributes(),
+            NativeRuleKind::CcTest,
+            RuleKind::Normal,
+            true,
+            false,
+        )
     });
 
     fn test_suite_attributes() -> AttributeSpec {
@@ -794,21 +696,13 @@ pub(crate) mod rule_defs {
     }
 
     pub static TEST_SUITE_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: test_suite_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::TestSuite),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            test_suite_attributes(),
+            NativeRuleKind::TestSuite,
+            RuleKind::Normal,
+            false,
+            false,
+        )
     });
 
     /// Creates the AttributeSpec for sh_binary / sh_test / sh_library.
@@ -857,98 +751,58 @@ pub(crate) mod rule_defs {
     }
 
     pub static SH_BINARY_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: sh_rule_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::ShBinary),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: true,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            sh_rule_attributes(),
+            NativeRuleKind::ShBinary,
+            RuleKind::Normal,
+            false,
+            true,
+        )
     });
 
     pub static SH_TEST_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: sh_rule_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::ShTest),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: true,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            sh_rule_attributes(),
+            NativeRuleKind::ShTest,
+            RuleKind::Normal,
+            true,
+            false,
+        )
     });
 
     pub static SH_LIBRARY_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: sh_rule_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::ShLibrary),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            sh_rule_attributes(),
+            NativeRuleKind::ShLibrary,
+            RuleKind::Normal,
+            false,
+            false,
+        )
     });
 
     /// The Rule definition for cc_libc_top_alias.
     /// This is a Bazel internal rule used by rules_cc to alias the libc top directory.
     /// It's a simple stub with no extra attributes beyond name/visibility.
     pub static CC_LIBC_TOP_ALIAS_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: constraint_setting_attributes(), // Same as constraint_setting - just name + visibility
-            rule_type: RuleType::Native(NativeRuleKind::CcLibcTopAlias),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            constraint_setting_attributes(), // Same as constraint_setting - just name + visibility
+            NativeRuleKind::CcLibcTopAlias,
+            RuleKind::Normal,
+            false,
+            false,
+        )
     });
 
     /// The Rule definition for analysis_test.
     /// Created by `testing.analysis_test()` - an analysis-time test with no build actions.
     pub static ANALYSIS_TEST_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: constraint_setting_attributes(), // Minimal: just name + visibility
-            rule_type: RuleType::Native(NativeRuleKind::AnalysisTest),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: true,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            constraint_setting_attributes(), // Minimal: just name + visibility
+            NativeRuleKind::AnalysisTest,
+            RuleKind::Normal,
+            true,
+            false,
+        )
     });
 
     /// Attributes for the genquery rule.
@@ -990,21 +844,13 @@ pub(crate) mod rule_defs {
 
     /// The Rule definition for genquery.
     pub static GENQUERY_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: genquery_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::Genquery),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            genquery_attributes(),
+            NativeRuleKind::Genquery,
+            RuleKind::Normal,
+            false,
+            false,
+        )
     });
 
     /// Attributes for starlark_doc_extract rule.
@@ -1033,21 +879,13 @@ pub(crate) mod rule_defs {
 
     /// The Rule definition for starlark_doc_extract.
     pub static STARLARK_DOC_EXTRACT_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: starlark_doc_extract_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::StarlarkDocExtract),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+        make_native_rule(
+            starlark_doc_extract_attributes(),
+            NativeRuleKind::StarlarkDocExtract,
+            RuleKind::Normal,
+            false,
+            false,
+        )
     });
 
     /// Attributes for cc_toolchain rule.

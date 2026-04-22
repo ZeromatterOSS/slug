@@ -103,26 +103,33 @@ static DECLARED_TOOLCHAINS: std::sync::RwLock<Vec<(String, DeclaredToolchainInfo
     std::sync::RwLock::new(Vec::new());
 
 /// Register a declared toolchain (called during toolchain() analysis).
+///
+/// Panics if the lock was poisoned by a concurrent writer panic. A poisoned
+/// lock here means analysis state is already corrupt; silently recovering
+/// would make build results non-deterministic.
 pub fn register_declared_toolchain(toolchain_label: String, info: DeclaredToolchainInfo) {
-    if let Ok(mut guard) = DECLARED_TOOLCHAINS.write() {
-        guard.push((toolchain_label, info));
-    }
+    DECLARED_TOOLCHAINS
+        .write()
+        .expect("DECLARED_TOOLCHAINS poisoned")
+        .push((toolchain_label, info));
 }
 
-/// Get all declared toolchains.
+/// Get all declared toolchains. Panics on poisoned lock (see
+/// [`register_declared_toolchain`]).
 pub fn get_declared_toolchains() -> Vec<(String, DeclaredToolchainInfo)> {
     DECLARED_TOOLCHAINS
         .read()
-        .ok()
-        .map(|v| v.clone())
-        .unwrap_or_default()
+        .expect("DECLARED_TOOLCHAINS poisoned")
+        .clone()
 }
 
-/// Clear declared toolchains (for fresh builds).
+/// Clear declared toolchains (for fresh builds). Panics on poisoned lock (see
+/// [`register_declared_toolchain`]).
 pub fn clear_declared_toolchains() {
-    if let Ok(mut guard) = DECLARED_TOOLCHAINS.write() {
-        guard.clear();
-    }
+    DECLARED_TOOLCHAINS
+        .write()
+        .expect("DECLARED_TOOLCHAINS poisoned")
+        .clear();
 }
 
 /// Analyze a native rule target and return the analysis result.
@@ -351,36 +358,8 @@ fn analyze_genrule(
         default_info.to_frozen_value(),
     )]);
 
-    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-        heap.alloc(FrozenProviderCollection::new(providers)),
-    )?;
-
-    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-        value: FrozenAnalysisValueStorage::new_native(
-            self_key.dupe(),
-            DYNAMIC_LAMBDA_PARAMS_STORAGES
-                .get()
-                .unwrap()
-                .new_frozen_dynamic_lambda_params_storage(),
-            Some(provider_collection),
-        ),
-    });
-
-    let heap_ref = heap.into_ref();
-    let analysis_storage =
-        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
-
-    let recorded_values =
-        RecordedAnalysisValues::new_native(self_key, Some(analysis_storage), recorded_actions);
-
-    Ok(AnalysisResult::new(
-        recorded_values,
-        None,
-        HashMap::new(),
-        1, // 1 action registered
-        out_names.len() as u64,
-        None,
-    ))
+    let num_outputs = out_names.len() as u64;
+    make_native_analysis_result(target, heap, providers, 1, num_outputs, recorded_actions)
 }
 
 /// Extract all unique labels from $(location label), $(locations label),
@@ -586,39 +565,8 @@ fn analyze_constraint_setting(
             constraint_setting_info,
         ),
     ]);
-    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-        heap.alloc(FrozenProviderCollection::new(providers)),
-    )?;
-    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
-    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-        value: FrozenAnalysisValueStorage::new_native(
-            self_key.dupe(),
-            DYNAMIC_LAMBDA_PARAMS_STORAGES
-                .get()
-                .unwrap()
-                .new_frozen_dynamic_lambda_params_storage(),
-            Some(provider_collection),
-        ),
-    });
 
-    let heap_ref = heap.into_ref();
-    let analysis_storage =
-        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
-
-    let recorded_values = RecordedAnalysisValues::new_native(
-        self_key,
-        Some(analysis_storage),
-        RecordedActions::new(0),
-    );
-
-    Ok(AnalysisResult::new(
-        recorded_values,
-        None,
-        HashMap::new(),
-        0,
-        0,
-        None,
-    ))
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Analyze a constraint_value target.
@@ -674,42 +622,7 @@ fn analyze_constraint_value(
         );
     }
 
-    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-        heap.alloc(FrozenProviderCollection::new(providers)),
-    )?;
-
-    // Create analysis storage
-    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
-
-    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-        value: FrozenAnalysisValueStorage::new_native(
-            self_key.dupe(),
-            DYNAMIC_LAMBDA_PARAMS_STORAGES
-                .get()
-                .unwrap()
-                .new_frozen_dynamic_lambda_params_storage(),
-            Some(provider_collection),
-        ),
-    });
-
-    let heap_ref = heap.into_ref();
-    let analysis_storage =
-        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
-
-    let recorded_values = RecordedAnalysisValues::new_native(
-        self_key,
-        Some(analysis_storage),
-        RecordedActions::new(0),
-    );
-
-    Ok(AnalysisResult::new(
-        recorded_values,
-        None,
-        HashMap::new(),
-        0,
-        0,
-        None,
-    ))
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Analyze a label_flag target.
@@ -739,36 +652,7 @@ fn analyze_label_flag(
         ),
         (CcInfoProvider::provider_id().dupe(), cc_info),
     ]);
-    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-        heap.alloc(FrozenProviderCollection::new(providers)),
-    )?;
-    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
-    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-        value: FrozenAnalysisValueStorage::new_native(
-            self_key.dupe(),
-            DYNAMIC_LAMBDA_PARAMS_STORAGES
-                .get()
-                .unwrap()
-                .new_frozen_dynamic_lambda_params_storage(),
-            Some(provider_collection),
-        ),
-    });
-    let heap_ref = heap.into_ref();
-    let analysis_storage =
-        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
-    let recorded_values = RecordedAnalysisValues::new_native(
-        self_key,
-        Some(analysis_storage),
-        RecordedActions::new(0),
-    );
-    Ok(AnalysisResult::new(
-        recorded_values,
-        None,
-        HashMap::new(),
-        0,
-        0,
-        None,
-    ))
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Returns the default value for known Bazel command-line flags.
@@ -835,42 +719,7 @@ fn analyze_config_setting(
         config_info,
     );
 
-    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-        heap.alloc(FrozenProviderCollection::new(providers)),
-    )?;
-
-    // Create analysis storage
-    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
-
-    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-        value: FrozenAnalysisValueStorage::new_native(
-            self_key.dupe(),
-            DYNAMIC_LAMBDA_PARAMS_STORAGES
-                .get()
-                .unwrap()
-                .new_frozen_dynamic_lambda_params_storage(),
-            Some(provider_collection),
-        ),
-    });
-
-    let heap_ref = heap.into_ref();
-    let analysis_storage =
-        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
-
-    let recorded_values = RecordedAnalysisValues::new_native(
-        self_key,
-        Some(analysis_storage),
-        RecordedActions::new(0),
-    );
-
-    Ok(AnalysisResult::new(
-        recorded_values,
-        None,
-        HashMap::new(),
-        0,
-        0,
-        None,
-    ))
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Analyze an alias target.
@@ -965,37 +814,7 @@ fn analyze_filegroup(
             DefaultInfoCallable::provider_id().dupe(),
             default_info.to_frozen_value(),
         )]);
-        let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-            heap.alloc(FrozenProviderCollection::new(providers)),
-        )?;
-        let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
-        let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-            value: FrozenAnalysisValueStorage::new_native(
-                self_key.dupe(),
-                DYNAMIC_LAMBDA_PARAMS_STORAGES
-                    .get()
-                    .unwrap()
-                    .new_frozen_dynamic_lambda_params_storage(),
-                Some(provider_collection),
-            ),
-        });
-        let heap_ref = heap.into_ref();
-        let analysis_storage = unsafe {
-            OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()?
-        };
-        let recorded_values = RecordedAnalysisValues::new_native(
-            self_key,
-            Some(analysis_storage),
-            RecordedActions::new(0),
-        );
-        return Ok(AnalysisResult::new(
-            recorded_values,
-            None,
-            HashMap::new(),
-            0,
-            0,
-            None,
-        ));
+        return make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0));
     }
 
     // Fast path: single dep with no source files, just forward its result directly
@@ -1026,41 +845,7 @@ fn analyze_filegroup(
         default_info.to_frozen_value(),
     )]);
 
-    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-        heap.alloc(FrozenProviderCollection::new(providers)),
-    )?;
-
-    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
-
-    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-        value: FrozenAnalysisValueStorage::new_native(
-            self_key.dupe(),
-            DYNAMIC_LAMBDA_PARAMS_STORAGES
-                .get()
-                .unwrap()
-                .new_frozen_dynamic_lambda_params_storage(),
-            Some(provider_collection),
-        ),
-    });
-
-    let heap_ref = heap.into_ref();
-    let analysis_storage =
-        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
-
-    let recorded_values = RecordedAnalysisValues::new_native(
-        self_key,
-        Some(analysis_storage),
-        RecordedActions::new(0),
-    );
-
-    Ok(AnalysisResult::new(
-        recorded_values,
-        None,
-        HashMap::new(),
-        0,
-        0,
-        None,
-    ))
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Create an analysis result with DefaultInfo + CcInfo for native cc rules.
@@ -1129,41 +914,7 @@ fn create_cc_analysis_result(
         (CcInfoProvider::provider_id().dupe(), cc_info),
     ]);
 
-    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-        heap.alloc(FrozenProviderCollection::new(providers)),
-    )?;
-
-    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
-
-    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-        value: FrozenAnalysisValueStorage::new_native(
-            self_key.dupe(),
-            DYNAMIC_LAMBDA_PARAMS_STORAGES
-                .get()
-                .unwrap()
-                .new_frozen_dynamic_lambda_params_storage(),
-            Some(provider_collection),
-        ),
-    });
-
-    let heap_ref = heap.into_ref();
-    let analysis_storage =
-        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
-
-    let recorded_values = RecordedAnalysisValues::new_native(
-        self_key,
-        Some(analysis_storage),
-        RecordedActions::new(0),
-    );
-
-    Ok(AnalysisResult::new(
-        recorded_values,
-        None,
-        HashMap::new(),
-        0,
-        0,
-        None,
-    ))
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Analyze a `platform()` target.
@@ -1229,41 +980,7 @@ fn analyze_platform(
         platform_info,
     );
 
-    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-        heap.alloc(FrozenProviderCollection::new(providers)),
-    )?;
-
-    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
-
-    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-        value: FrozenAnalysisValueStorage::new_native(
-            self_key.dupe(),
-            DYNAMIC_LAMBDA_PARAMS_STORAGES
-                .get()
-                .unwrap()
-                .new_frozen_dynamic_lambda_params_storage(),
-            Some(provider_collection),
-        ),
-    });
-
-    let heap_ref = heap.into_ref();
-    let analysis_storage =
-        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
-
-    let recorded_values = RecordedAnalysisValues::new_native(
-        self_key,
-        Some(analysis_storage),
-        RecordedActions::new(0),
-    );
-
-    Ok(AnalysisResult::new(
-        recorded_values,
-        None,
-        HashMap::new(),
-        0,
-        0,
-        None,
-    ))
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Analyze an `sh_library` target.
@@ -1312,7 +1029,7 @@ fn analyze_sh_library(
         default_info.to_frozen_value(),
     )]);
 
-    make_native_analysis_result(target, heap, providers, 0)
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Analyze a `test_suite` target.
@@ -1360,7 +1077,7 @@ fn analyze_sh_binary(
         default_info.to_frozen_value(),
     )]);
 
-    make_native_analysis_result(target, heap, providers, 0)
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Analyze an `sh_test` target.
@@ -1410,7 +1127,7 @@ fn analyze_sh_test(
         ),
     ]);
 
-    make_native_analysis_result(target, heap, providers, 0)
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Analyze an `analysis_test` target created by `testing.analysis_test()`.
@@ -1437,7 +1154,7 @@ fn analyze_analysis_test(target: &ConfiguredTargetLabel) -> kuro_error::Result<A
         ),
     ]);
 
-    make_native_analysis_result(target, heap, providers, 0)
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Analyze a `genquery` target.
@@ -1492,10 +1209,29 @@ fn analyze_genquery(target: &ConfiguredTargetLabel) -> kuro_error::Result<Analys
         default_info.to_frozen_value(),
     )]);
 
+    make_native_analysis_result(target, heap, providers, 1, 1, recorded_actions)
+}
+
+/// Build an `AnalysisResult` from a FrozenHeap + providers map.
+/// Consolidates the ~25-line tail shared across all native `analyze_X` functions.
+///
+/// Parameters:
+/// - `num_actions` and `num_declared_artifacts` are forwarded into `AnalysisResult::new`.
+/// - `recorded_actions` carries any actions registered by the caller (or
+///   `RecordedActions::new(0)` for action-less rules).
+fn make_native_analysis_result(
+    target: &ConfiguredTargetLabel,
+    heap: FrozenHeap,
+    providers: SmallMap<std::sync::Arc<kuro_core::provider::id::ProviderId>, FrozenValue>,
+    num_actions: u64,
+    num_declared_artifacts: u64,
+    recorded_actions: RecordedActions,
+) -> kuro_error::Result<AnalysisResult> {
     let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
         heap.alloc(FrozenProviderCollection::new(providers)),
     )?;
 
+    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
     let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
         value: FrozenAnalysisValueStorage::new_native(
             self_key.dupe(),
@@ -1518,52 +1254,8 @@ fn analyze_genquery(target: &ConfiguredTargetLabel) -> kuro_error::Result<Analys
         recorded_values,
         None,
         HashMap::new(),
-        1, // 1 action registered
-        1, // 1 declared artifact
-        None,
-    ))
-}
-
-/// Build a `AnalysisResult` from a FrozenHeap + providers map.
-/// Avoids boilerplate duplication across sh_library, sh_binary, sh_test.
-fn make_native_analysis_result(
-    target: &ConfiguredTargetLabel,
-    heap: FrozenHeap,
-    providers: SmallMap<std::sync::Arc<kuro_core::provider::id::ProviderId>, FrozenValue>,
-    num_actions: u64,
-) -> kuro_error::Result<AnalysisResult> {
-    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-        heap.alloc(FrozenProviderCollection::new(providers)),
-    )?;
-
-    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
-    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-        value: FrozenAnalysisValueStorage::new_native(
-            self_key.dupe(),
-            DYNAMIC_LAMBDA_PARAMS_STORAGES
-                .get()
-                .unwrap()
-                .new_frozen_dynamic_lambda_params_storage(),
-            Some(provider_collection),
-        ),
-    });
-
-    let heap_ref = heap.into_ref();
-    let analysis_storage =
-        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
-
-    let recorded_values = RecordedAnalysisValues::new_native(
-        self_key,
-        Some(analysis_storage),
-        RecordedActions::new(0),
-    );
-
-    Ok(AnalysisResult::new(
-        recorded_values,
-        None,
-        HashMap::new(),
         num_actions,
-        0,
+        num_declared_artifacts,
         None,
     ))
 }
@@ -1616,41 +1308,7 @@ fn analyze_execution_platform(
         exec_platform_info,
     );
 
-    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-        heap.alloc(FrozenProviderCollection::new(providers)),
-    )?;
-
-    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
-
-    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-        value: FrozenAnalysisValueStorage::new_native(
-            self_key.dupe(),
-            DYNAMIC_LAMBDA_PARAMS_STORAGES
-                .get()
-                .unwrap()
-                .new_frozen_dynamic_lambda_params_storage(),
-            Some(provider_collection),
-        ),
-    });
-
-    let heap_ref = heap.into_ref();
-    let analysis_storage =
-        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
-
-    let recorded_values = RecordedAnalysisValues::new_native(
-        self_key,
-        Some(analysis_storage),
-        RecordedActions::new(0),
-    );
-
-    Ok(AnalysisResult::new(
-        recorded_values,
-        None,
-        HashMap::new(),
-        0,
-        0,
-        None,
-    ))
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Analyze an execution_platforms target.
@@ -1690,41 +1348,7 @@ fn analyze_execution_platforms(
         registration_info,
     );
 
-    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-        heap.alloc(FrozenProviderCollection::new(providers)),
-    )?;
-
-    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
-
-    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-        value: FrozenAnalysisValueStorage::new_native(
-            self_key.dupe(),
-            DYNAMIC_LAMBDA_PARAMS_STORAGES
-                .get()
-                .unwrap()
-                .new_frozen_dynamic_lambda_params_storage(),
-            Some(provider_collection),
-        ),
-    });
-
-    let heap_ref = heap.into_ref();
-    let analysis_storage =
-        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
-
-    let recorded_values = RecordedAnalysisValues::new_native(
-        self_key,
-        Some(analysis_storage),
-        RecordedActions::new(0),
-    );
-
-    Ok(AnalysisResult::new(
-        recorded_values,
-        None,
-        HashMap::new(),
-        0,
-        0,
-        None,
-    ))
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Analyze a toolchain() target.
@@ -1855,41 +1479,7 @@ fn analyze_package_group(target: &ConfiguredTargetLabel) -> kuro_error::Result<A
         ),
     ]);
 
-    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-        heap.alloc(FrozenProviderCollection::new(providers)),
-    )?;
-
-    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
-
-    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-        value: FrozenAnalysisValueStorage::new_native(
-            self_key.dupe(),
-            DYNAMIC_LAMBDA_PARAMS_STORAGES
-                .get()
-                .unwrap()
-                .new_frozen_dynamic_lambda_params_storage(),
-            Some(provider_collection),
-        ),
-    });
-
-    let heap_ref = heap.into_ref();
-    let analysis_storage =
-        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
-
-    let recorded_values = RecordedAnalysisValues::new_native(
-        self_key,
-        Some(analysis_storage),
-        RecordedActions::new(0),
-    );
-
-    Ok(AnalysisResult::new(
-        recorded_values,
-        None,
-        HashMap::new(),
-        0,
-        0,
-        None,
-    ))
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Analyze xcode_config native rule.
@@ -1917,41 +1507,7 @@ fn analyze_xcode_config(target: &ConfiguredTargetLabel) -> kuro_error::Result<An
         ),
     ]);
 
-    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-        heap.alloc(FrozenProviderCollection::new(providers)),
-    )?;
-
-    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
-
-    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-        value: FrozenAnalysisValueStorage::new_native(
-            self_key.dupe(),
-            DYNAMIC_LAMBDA_PARAMS_STORAGES
-                .get()
-                .unwrap()
-                .new_frozen_dynamic_lambda_params_storage(),
-            Some(provider_collection),
-        ),
-    });
-
-    let heap_ref = heap.into_ref();
-    let analysis_storage =
-        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
-
-    let recorded_values = RecordedAnalysisValues::new_native(
-        self_key,
-        Some(analysis_storage),
-        RecordedActions::new(0),
-    );
-
-    Ok(AnalysisResult::new(
-        recorded_values,
-        None,
-        HashMap::new(),
-        0,
-        0,
-        None,
-    ))
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 fn create_minimal_analysis_result(
@@ -1968,40 +1524,5 @@ fn create_minimal_analysis_result(
         default_info.to_frozen_value(),
     )]);
 
-    let provider_collection = FrozenValueTyped::<FrozenProviderCollection>::new_err(
-        heap.alloc(FrozenProviderCollection::new(providers)),
-    )?;
-
-    // Create analysis storage
-    let self_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(target.dupe()));
-
-    let analysis_storage = heap.alloc_simple(StarlarkAnyComplex {
-        value: FrozenAnalysisValueStorage::new_native(
-            self_key.dupe(),
-            DYNAMIC_LAMBDA_PARAMS_STORAGES
-                .get()
-                .unwrap()
-                .new_frozen_dynamic_lambda_params_storage(),
-            Some(provider_collection),
-        ),
-    });
-
-    let heap_ref = heap.into_ref();
-    let analysis_storage =
-        unsafe { OwnedFrozenValue::new(heap_ref.dupe(), analysis_storage).downcast_starlark()? };
-
-    let recorded_values = RecordedAnalysisValues::new_native(
-        self_key,
-        Some(analysis_storage),
-        RecordedActions::new(0),
-    );
-
-    Ok(AnalysisResult::new(
-        recorded_values,
-        None,           // No profiling data
-        HashMap::new(), // No promise artifacts
-        0,              // No actions
-        0,              // No artifacts
-        None,           // No validations
-    ))
+    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }

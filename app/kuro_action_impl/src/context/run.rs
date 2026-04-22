@@ -129,6 +129,68 @@ pub(crate) enum RunActionError {
     ExpectEligibleForDedupeWithIneligibleInput { input: ArtifactGroup },
 }
 
+/// Convert a Bazel-style PascalCase mnemonic (e.g. "CppCompile") into a
+/// Kuro/Buck2 snake_case category (e.g. "cpp_compile").
+///
+/// Lowercases the first char with no preceding underscore; for each subsequent
+/// uppercase char, prepends `_` and lowercases it. Non-alpha characters pass
+/// through in lowercased form. Falls back to `"action"` when the input is
+/// empty.
+fn mnemonic_to_category(mnemonic: &str) -> String {
+    if mnemonic.is_empty() {
+        return "action".to_owned();
+    }
+    mnemonic
+        .chars()
+        .enumerate()
+        .flat_map(|(i, c)| {
+            if c.is_uppercase() && i > 0 {
+                vec!['_', c.to_ascii_lowercase()]
+            } else {
+                vec![c.to_ascii_lowercase()]
+            }
+        })
+        .collect()
+}
+
+/// Resolve Bazel-style `%{output}` and `%{input}` placeholders in a progress
+/// message against the action's declared outputs and inputs.
+///
+/// Substitutes the first declared output for `%{output}` and the first input
+/// artifact for `%{input}`. Returns `None` when there are no placeholders to
+/// avoid needless allocations at call sites.
+fn resolve_progress_message<'a, 'v, O, I>(
+    progress_message: &str,
+    declared_outputs: O,
+    inputs: I,
+) -> Option<String>
+where
+    O: IntoIterator<Item = &'a OutputArtifact<'v>>,
+    I: IntoIterator<Item = &'a ArtifactGroup>,
+    'v: 'a,
+{
+    if !progress_message.contains("%{") {
+        return None;
+    }
+    let mut resolved = progress_message.to_owned();
+    if let Some(first_output) = declared_outputs.into_iter().next() {
+        first_output.get_path().with_short_path(|p| {
+            resolved = resolved.replace("%{output}", p.as_str());
+        });
+    }
+    if resolved.contains("%{input}") {
+        for input in inputs {
+            if let ArtifactGroup::Artifact(a) = input {
+                a.get_path().with_short_path(|p| {
+                    resolved = resolved.replace("%{input}", p.as_str());
+                });
+                break;
+            }
+        }
+    }
+    Some(resolved)
+}
+
 #[starlark_module]
 pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
     /// Run a command to produce one or more artifacts.
@@ -667,22 +729,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
         let used_mnemonic = category_opt.is_none() && mnemonic_opt.is_some();
         let effective_category = match (category_opt, mnemonic_opt) {
             (Some(c), _) => c,
-            (None, Some(m)) => {
-                // Convert PascalCase mnemonic to snake_case category
-                let mnemonic_str = m.as_str();
-                let snake_case: String = mnemonic_str
-                    .chars()
-                    .enumerate()
-                    .flat_map(|(i, c)| {
-                        if c.is_uppercase() && i > 0 {
-                            vec!['_', c.to_ascii_lowercase()]
-                        } else {
-                            vec![c.to_ascii_lowercase()]
-                        }
-                    })
-                    .collect();
-                heap.alloc_str(&snake_case)
-            }
+            (None, Some(m)) => heap.alloc_str(&mnemonic_to_category(m.as_str())),
             (None, None) => heap.alloc_str("action"), // Default fallback
         };
 
@@ -815,27 +862,13 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
 
         // Bazel-compat: resolve %{output} and %{input} placeholders in progress_message
         let resolved_progress_message = progress_message.into_option().map(|msg| {
-            let s = msg.as_str();
-            if s.contains("%{") {
-                let mut resolved = s.to_owned();
-                if let Some(first_output) = artifacts.declared_outputs.first() {
-                    first_output.get_path().with_short_path(|p| {
-                        resolved = resolved.replace("%{output}", p.as_str());
-                    });
-                }
-                if resolved.contains("%{input}") {
-                    for input in artifacts.inputs.iter() {
-                        if let ArtifactGroup::Artifact(a) = input {
-                            a.get_path().with_short_path(|p| {
-                                resolved = resolved.replace("%{input}", p.as_str());
-                            });
-                            break;
-                        }
-                    }
-                }
-                heap.alloc_str(&resolved)
-            } else {
-                msg
+            match resolve_progress_message(
+                msg.as_str(),
+                &artifacts.declared_outputs,
+                &artifacts.inputs,
+            ) {
+                Some(resolved) => heap.alloc_str(&resolved),
+                None => msg,
             }
         });
 
@@ -1146,21 +1179,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
 
         // Determine category from mnemonic (convert PascalCase to snake_case)
         let effective_category = match mnemonic.into_option() {
-            Some(m) => {
-                let snake_case: String = m
-                    .as_str()
-                    .chars()
-                    .enumerate()
-                    .flat_map(|(i, c)| {
-                        if c.is_uppercase() && i > 0 {
-                            vec!['_', c.to_ascii_lowercase()]
-                        } else {
-                            vec![c.to_ascii_lowercase()]
-                        }
-                    })
-                    .collect();
-                heap.alloc_str(&snake_case)
-            }
+            Some(m) => heap.alloc_str(&mnemonic_to_category(m.as_str())),
             None => heap.alloc_str("run_shell"),
         };
         CategoryRef::new(effective_category.as_str())?;
@@ -1177,29 +1196,17 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
         };
 
         // Resolve progress_message placeholders now that outputs/inputs are available
-        let resolved_progress_message = progress_message_str.map(|s| {
-            if s.contains("%{") {
-                let mut resolved = s;
-                if let Some(first_output) = artifact_visitor.declared_outputs.iter().next() {
-                    first_output.get_path().with_short_path(|p| {
-                        resolved = resolved.replace("%{output}", p.as_str());
-                    });
+        let resolved_progress_message =
+            progress_message_str.map(|s| {
+                match resolve_progress_message(
+                    &s,
+                    &artifact_visitor.declared_outputs,
+                    &artifact_visitor.inputs,
+                ) {
+                    Some(resolved) => heap.alloc_str(&resolved),
+                    None => heap.alloc_str(&s),
                 }
-                if resolved.contains("%{input}") {
-                    for input in artifact_visitor.inputs.iter() {
-                        if let ArtifactGroup::Artifact(a) = input {
-                            a.get_path().with_short_path(|p| {
-                                resolved = resolved.replace("%{input}", p.as_str());
-                            });
-                            break;
-                        }
-                    }
-                }
-                heap.alloc_str(&resolved)
-            } else {
-                heap.alloc_str(&s)
-            }
-        });
+            });
 
         let starlark_values = heap.alloc_complex(StarlarkRunActionValues {
             exe: heap.alloc_typed(starlark_exe),

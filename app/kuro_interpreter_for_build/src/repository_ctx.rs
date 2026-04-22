@@ -47,7 +47,6 @@ use std::process::Command;
 use std::sync::Arc;
 
 use allocative::Allocative;
-use anyhow::anyhow;
 use base64::Engine;
 use derive_more::Display;
 use flate2::read::GzDecoder;
@@ -310,19 +309,17 @@ fn repository_path_methods(builder: &mut MethodsBuilder) {
         Ok(this.absolute_path().is_dir())
     }
 
-    /// Whether this path exists.
-    #[starlark(attribute)]
-    fn exists(this: &RepositoryPath) -> starlark::Result<bool> {
-        Ok(this.absolute_path().exists())
-    }
-
     /// Read directory contents.
     fn readdir(this: &RepositoryPath) -> starlark::Result<Vec<RepositoryPath>> {
         let abs_path = this.absolute_path();
         if abs_path.is_dir() {
             let entries: Vec<RepositoryPath> = std::fs::read_dir(&abs_path)
                 .map_err(|e| {
-                    starlark::Error::new_other(anyhow!("Failed to read directory: {}", e))
+                    starlark::Error::from(kuro_error::kuro_error!(
+                        kuro_error::ErrorTag::Input,
+                        "Failed to read directory: {}",
+                        e
+                    ))
                 })?
                 .filter_map(|entry| entry.ok())
                 .map(|entry| {
@@ -885,6 +882,134 @@ pub(crate) fn verify_integrity(data: &[u8], expected: &str) -> Result<(), String
     }
 }
 
+/// Try each URL in turn, verify integrity, and write the first success to
+/// `output_path`. Shared between `module_ctx.download()` and
+/// `repository_ctx.download()`; path resolution differs between the two
+/// contexts and stays at the call site.
+///
+/// Returns the `DownloadInfo` describing the successful fetch.
+/// Returns `Err` on verification failure or if every URL fails — the caller
+/// decides whether that should propagate or produce an `allow_fail` sentinel.
+pub(crate) fn perform_download_to_path(
+    urls: &[String],
+    output_path: &Path,
+    sha256: &str,
+    integrity: &str,
+    executable: bool,
+) -> kuro_error::Result<DownloadInfo> {
+    let mut last_error: Option<String> = None;
+    for url in urls {
+        match download_url(url) {
+            Ok(data) => {
+                if !sha256.is_empty() {
+                    verify_sha256(&data, sha256).map_err(|e| {
+                        kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", e)
+                    })?;
+                }
+                if !integrity.is_empty() {
+                    verify_integrity(&data, integrity).map_err(|e| {
+                        kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", e)
+                    })?;
+                }
+
+                if let Some(parent) = output_path.parent() {
+                    std::fs::create_dir_all(parent).map_err(|e| {
+                        kuro_error::kuro_error!(
+                            kuro_error::ErrorTag::Input,
+                            "Failed to create directory: {}",
+                            e
+                        )
+                    })?;
+                }
+
+                std::fs::write(output_path, &data).map_err(|e| {
+                    kuro_error::kuro_error!(
+                        kuro_error::ErrorTag::Input,
+                        "Failed to write file: {}",
+                        e
+                    )
+                })?;
+
+                #[cfg(unix)]
+                if executable {
+                    use std::os::unix::fs::PermissionsExt;
+                    let mut perms = std::fs::metadata(output_path)
+                        .map_err(|e| kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", e))?
+                        .permissions();
+                    perms.set_mode(perms.mode() | 0o111);
+                    std::fs::set_permissions(output_path, perms).map_err(|e| {
+                        kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", e)
+                    })?;
+                }
+                #[cfg(not(unix))]
+                let _ = executable;
+
+                return Ok(DownloadInfo::new(true, &data));
+            }
+            Err(e) => {
+                last_error = Some(e);
+            }
+        }
+    }
+
+    Err(kuro_error::kuro_error!(
+        kuro_error::ErrorTag::Input,
+        "All download URLs failed: {}",
+        last_error.unwrap_or_else(|| "unknown error".to_owned())
+    ))
+}
+
+/// Try each URL in turn, verify integrity, and extract the first success into
+/// `output_dir`. Shared between `module_ctx.download_and_extract()` and
+/// `repository_ctx.download_and_extract()`.
+pub(crate) fn perform_download_and_extract_to_dir(
+    urls: &[String],
+    output_dir: &Path,
+    sha256: &str,
+    integrity: &str,
+    strip_prefix: Option<&str>,
+) -> kuro_error::Result<DownloadInfo> {
+    let mut last_error: Option<String> = None;
+    for url in urls {
+        match download_url(url) {
+            Ok(data) => {
+                if !sha256.is_empty() {
+                    verify_sha256(&data, sha256).map_err(|e| {
+                        kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", e)
+                    })?;
+                }
+                if !integrity.is_empty() {
+                    verify_integrity(&data, integrity).map_err(|e| {
+                        kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", e)
+                    })?;
+                }
+
+                std::fs::create_dir_all(output_dir).map_err(|e| {
+                    kuro_error::kuro_error!(
+                        kuro_error::ErrorTag::Input,
+                        "Failed to create directory: {}",
+                        e
+                    )
+                })?;
+
+                extract_archive(&data, output_dir, strip_prefix)
+                    .map_err(|e| kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", e))?;
+
+                return Ok(DownloadInfo::new(true, &data));
+            }
+            Err(e) => {
+                last_error = Some(format!("{}: {}", url, e));
+            }
+        }
+    }
+
+    Err(kuro_error::kuro_error!(
+        kuro_error::ErrorTag::Input,
+        "All download URLs failed: {}",
+        last_error.unwrap_or_else(|| "unknown error".to_owned())
+    ))
+}
+
 /// Extract a tar.gz archive to a destination directory.
 fn extract_tar_gz(data: &[u8], dest_dir: &Path, strip_prefix: Option<&str>) -> Result<(), String> {
     let decoder = GzDecoder::new(data);
@@ -1248,9 +1373,11 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                     sha256: String::new(),
                 }));
             }
-            return Err(starlark::Error::new_other(anyhow!(
+            return Err(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
                 "No URL provided for download"
-            )));
+            )
+            .into());
         }
 
         // Determine output path - accept string, RepositoryPath, or None
@@ -1274,82 +1401,14 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             this.resolve_path(&output_str)
         };
 
-        // Try each URL until one succeeds
-        let mut last_error = None;
-        for url_str in &urls {
-            match download_url(url_str) {
-                Ok(data) => {
-                    // Verify integrity if specified
-                    if !sha256.is_empty() {
-                        if let Err(e) = verify_sha256(&data, sha256) {
-                            if allow_fail {
-                                return Ok(heap.alloc(DownloadInfo {
-                                    success: false,
-                                    integrity: String::new(),
-                                    sha256: String::new(),
-                                }));
-                            }
-                            return Err(starlark::Error::new_other(anyhow!("{}", e)));
-                        }
-                    }
-                    if !integrity.is_empty() {
-                        if let Err(e) = verify_integrity(&data, integrity) {
-                            if allow_fail {
-                                return Ok(heap.alloc(DownloadInfo {
-                                    success: false,
-                                    integrity: String::new(),
-                                    sha256: String::new(),
-                                }));
-                            }
-                            return Err(starlark::Error::new_other(anyhow!("{}", e)));
-                        }
-                    }
-
-                    // Create parent directories
-                    if let Some(parent) = output_path.parent() {
-                        std::fs::create_dir_all(parent).map_err(|e| {
-                            starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
-                        })?;
-                    }
-
-                    // Write the file
-                    std::fs::write(&output_path, &data).map_err(|e| {
-                        starlark::Error::new_other(anyhow!("Failed to write file: {}", e))
-                    })?;
-
-                    // Set executable if requested
-                    if executable {
-                        #[cfg(unix)]
-                        {
-                            use std::os::unix::fs::PermissionsExt;
-                            let mut perms = std::fs::metadata(&output_path)
-                                .map_err(|e| starlark::Error::new_other(anyhow!("{}", e)))?
-                                .permissions();
-                            perms.set_mode(perms.mode() | 0o111);
-                            std::fs::set_permissions(&output_path, perms)
-                                .map_err(|e| starlark::Error::new_other(anyhow!("{}", e)))?;
-                        }
-                    }
-
-                    return Ok(heap.alloc(DownloadInfo::new(true, &data)));
-                }
-                Err(e) => {
-                    last_error = Some(e);
-                }
-            }
-        }
-
-        if allow_fail {
-            Ok(heap.alloc(DownloadInfo {
+        match perform_download_to_path(&urls, &output_path, sha256, integrity, executable) {
+            Ok(info) => Ok(heap.alloc(info)),
+            Err(_) if allow_fail => Ok(heap.alloc(DownloadInfo {
                 success: false,
                 integrity: String::new(),
                 sha256: String::new(),
-            }))
-        } else {
-            Err(starlark::Error::new_other(anyhow!(
-                "All download URLs failed: {}",
-                last_error.unwrap_or_else(|| "unknown error".to_owned())
-            )))
+            })),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -1391,9 +1450,11 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                     sha256: String::new(),
                 }));
             }
-            return Err(starlark::Error::new_other(anyhow!(
+            return Err(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
                 "No URL provided for download_and_extract"
-            )));
+            )
+            .into());
         }
 
         // Determine output directory - accept string or RepositoryPath
@@ -1413,83 +1474,24 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             this.resolve_path(&output_str)
         };
 
-        // Try each URL until one succeeds
-        tracing::warn!(
-            "download_and_extract: {} URLs, strip='{}', out='{}'",
-            urls.len(),
-            strip_prefix,
-            output_dir.display()
-        );
-        let mut last_error = None;
-        for url_str in &urls {
-            tracing::warn!("download_and_extract: trying '{}'", url_str);
-            match download_url(url_str) {
-                Ok(data) => {
-                    // Verify integrity if specified
-                    if !sha256.is_empty() {
-                        if let Err(e) = verify_sha256(&data, sha256) {
-                            if allow_fail {
-                                return Ok(heap.alloc(DownloadInfo {
-                                    success: false,
-                                    integrity: String::new(),
-                                    sha256: String::new(),
-                                }));
-                            }
-                            return Err(starlark::Error::new_other(anyhow!("{}", e)));
-                        }
-                    }
-                    if !integrity.is_empty() {
-                        if let Err(e) = verify_integrity(&data, integrity) {
-                            if allow_fail {
-                                return Ok(heap.alloc(DownloadInfo {
-                                    success: false,
-                                    integrity: String::new(),
-                                    sha256: String::new(),
-                                }));
-                            }
-                            return Err(starlark::Error::new_other(anyhow!("{}", e)));
-                        }
-                    }
-
-                    // Create output directory
-                    std::fs::create_dir_all(&output_dir).map_err(|e| {
-                        starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
-                    })?;
-
-                    // Extract the archive (support both strip_prefix and stripPrefix)
-                    let effective_strip = if !strip_prefix.is_empty() {
-                        strip_prefix
-                    } else {
-                        stripPrefix
-                    };
-                    let strip = if effective_strip.is_empty() {
-                        None
-                    } else {
-                        Some(effective_strip)
-                    };
-                    extract_archive(&data, &output_dir, strip)
-                        .map_err(|e| starlark::Error::new_other(anyhow!("{}", e)))?;
-
-                    return Ok(heap.alloc(DownloadInfo::new(true, &data)));
-                }
-                Err(e) => {
-                    tracing::warn!("download_and_extract: URL '{}' failed: {}", url_str, e);
-                    last_error = Some(format!("{}: {}", url_str, e));
-                }
-            }
-        }
-
-        if allow_fail {
-            Ok(heap.alloc(DownloadInfo {
+        let effective_strip = if !strip_prefix.is_empty() {
+            strip_prefix
+        } else {
+            stripPrefix
+        };
+        let strip = if effective_strip.is_empty() {
+            None
+        } else {
+            Some(effective_strip)
+        };
+        match perform_download_and_extract_to_dir(&urls, &output_dir, sha256, integrity, strip) {
+            Ok(info) => Ok(heap.alloc(info)),
+            Err(_) if allow_fail => Ok(heap.alloc(DownloadInfo {
                 success: false,
                 integrity: String::new(),
                 sha256: String::new(),
-            }))
-        } else {
-            Err(starlark::Error::new_other(anyhow!(
-                "All download URLs failed: {}",
-                last_error.unwrap_or_else(|| "unknown error".to_owned())
-            )))
+            })),
+            Err(e) => Err(e.into()),
         }
     }
 
@@ -1514,13 +1516,22 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         // Create parent directories
         if let Some(parent) = file_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
+                starlark::Error::from(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Failed to create directory: {}",
+                    e
+                ))
             })?;
         }
 
         // Write the file
-        std::fs::write(&file_path, content)
-            .map_err(|e| starlark::Error::new_other(anyhow!("Failed to write file: {}", e)))?;
+        std::fs::write(&file_path, content).map_err(|e| {
+            starlark::Error::from(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "Failed to write file: {}",
+                e
+            ))
+        })?;
 
         // Set executable if requested
         if executable {
@@ -1528,11 +1539,22 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             {
                 use std::os::unix::fs::PermissionsExt;
                 let mut perms = std::fs::metadata(&file_path)
-                    .map_err(|e| starlark::Error::new_other(anyhow!("{}", e)))?
+                    .map_err(|e| {
+                        starlark::Error::from(kuro_error::kuro_error!(
+                            kuro_error::ErrorTag::Input,
+                            "{}",
+                            e
+                        ))
+                    })?
                     .permissions();
                 perms.set_mode(perms.mode() | 0o111);
-                std::fs::set_permissions(&file_path, perms)
-                    .map_err(|e| starlark::Error::new_other(anyhow!("{}", e)))?;
+                std::fs::set_permissions(&file_path, perms).map_err(|e| {
+                    starlark::Error::from(kuro_error::kuro_error!(
+                        kuro_error::ErrorTag::Input,
+                        "{}",
+                        e
+                    ))
+                })?;
             }
         }
 
@@ -1570,15 +1592,19 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                     })
                     .collect()
             } else {
-                return Err(starlark::Error::new_other(anyhow!(
+                return Err(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
                     "arguments must be a list"
-                )));
+                )
+                .into());
             };
 
         if args.is_empty() {
-            return Err(starlark::Error::new_other(anyhow!(
+            return Err(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
                 "arguments cannot be empty"
-            )));
+            )
+            .into());
         }
 
         let program = &args[0];
@@ -1607,9 +1633,13 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         }
 
         // Execute with timeout
-        let output = cmd
-            .output()
-            .map_err(|e| starlark::Error::new_other(anyhow!("Failed to execute command: {}", e)))?;
+        let output = cmd.output().map_err(|e| {
+            starlark::Error::from(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "Failed to execute command: {}",
+                e
+            ))
+        })?;
 
         let return_code = output.status.code().unwrap_or(-1);
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -1654,7 +1684,11 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         // Create parent directories
         if let Some(parent) = link_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
+                starlark::Error::from(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Failed to create directory: {}",
+                    e
+                ))
             })?;
         }
 
@@ -1666,7 +1700,11 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                 let _ = std::fs::remove_dir_all(&link_path);
             }
             std::os::unix::fs::symlink(&target_str, &link_path).map_err(|e| {
-                starlark::Error::new_other(anyhow!("Failed to create symlink: {}", e))
+                starlark::Error::from(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Failed to create symlink: {}",
+                    e
+                ))
             })?;
         }
 
@@ -1709,7 +1747,8 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                             Ok(())
                         }
                         copy_dir_all(target_path, &link_path).map_err(|e| {
-                            starlark::Error::new_other(anyhow!(
+                            starlark::Error::from(kuro_error::kuro_error!(
+                                kuro_error::ErrorTag::Input,
                                 "Failed to copy directory '{}' to '{}': {}",
                                 target_str,
                                 link_path.display(),
@@ -1720,7 +1759,8 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                 }
             } else if target_path.exists() {
                 std::fs::copy(target_path, &link_path).map_err(|e| {
-                    starlark::Error::new_other(anyhow!(
+                    starlark::Error::from(kuro_error::kuro_error!(
+                        kuro_error::ErrorTag::Input,
                         "Failed to copy file '{}' to '{}': {}",
                         target_str,
                         link_path.display(),
@@ -1758,7 +1798,8 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         } else if let Some(repo_path) = template.downcast_ref::<RepositoryPath>() {
             let template_path = repo_path.absolute_path();
             std::fs::read_to_string(&template_path).map_err(|e| {
-                starlark::Error::new_other(anyhow!(
+                starlark::Error::from(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
                     "Failed to read template '{}': {}",
                     template_path.display(),
                     e
@@ -1785,13 +1826,22 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         // Create parent directories
         if let Some(parent) = file_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
+                starlark::Error::from(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Failed to create directory: {}",
+                    e
+                ))
             })?;
         }
 
         // Write the file
-        std::fs::write(&file_path, &content)
-            .map_err(|e| starlark::Error::new_other(anyhow!("Failed to write file: {}", e)))?;
+        std::fs::write(&file_path, &content).map_err(|e| {
+            starlark::Error::from(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "Failed to write file: {}",
+                e
+            ))
+        })?;
 
         // Set executable if requested
         if executable {
@@ -1799,11 +1849,22 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             {
                 use std::os::unix::fs::PermissionsExt;
                 let mut perms = std::fs::metadata(&file_path)
-                    .map_err(|e| starlark::Error::new_other(anyhow!("{}", e)))?
+                    .map_err(|e| {
+                        starlark::Error::from(kuro_error::kuro_error!(
+                            kuro_error::ErrorTag::Input,
+                            "{}",
+                            e
+                        ))
+                    })?
                     .permissions();
                 perms.set_mode(perms.mode() | 0o111);
-                std::fs::set_permissions(&file_path, perms)
-                    .map_err(|e| starlark::Error::new_other(anyhow!("{}", e)))?;
+                std::fs::set_permissions(&file_path, perms).map_err(|e| {
+                    starlark::Error::from(kuro_error::kuro_error!(
+                        kuro_error::ErrorTag::Input,
+                        "{}",
+                        e
+                    ))
+                })?;
             }
         }
 
@@ -1829,7 +1890,8 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             this.resolve_path(&path.to_str())
         };
         std::fs::read_to_string(&file_path).map_err(|e| {
-            starlark::Error::new_other(anyhow!(
+            starlark::Error::from(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
                 "Failed to read file '{}': {}",
                 file_path.display(),
                 e
@@ -1854,11 +1916,20 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
 
         if file_path.is_dir() {
             std::fs::remove_dir_all(&file_path).map_err(|e| {
-                starlark::Error::new_other(anyhow!("Failed to delete directory: {}", e))
+                starlark::Error::from(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Failed to delete directory: {}",
+                    e
+                ))
             })?;
         } else if file_path.exists() {
-            std::fs::remove_file(&file_path)
-                .map_err(|e| starlark::Error::new_other(anyhow!("Failed to delete file: {}", e)))?;
+            std::fs::remove_file(&file_path).map_err(|e| {
+                starlark::Error::from(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Failed to delete file: {}",
+                    e
+                ))
+            })?;
         }
 
         Ok(Value::new_none())
@@ -1886,14 +1957,22 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             .arg(&patch_path)
             .current_dir(this.working_dir.as_ref())
             .output()
-            .map_err(|e| starlark::Error::new_other(anyhow!("Failed to execute patch: {}", e)))?;
+            .map_err(|e| {
+                starlark::Error::from(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Failed to execute patch: {}",
+                    e
+                ))
+            })?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(starlark::Error::new_other(anyhow!(
+            return Err(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
                 "Patch failed: {}",
                 stderr
-            )));
+            )
+            .into());
         }
 
         Ok(Value::new_none())
@@ -1923,8 +2002,13 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         };
 
         // Read the archive
-        let data = std::fs::read(&archive_path)
-            .map_err(|e| starlark::Error::new_other(anyhow!("Failed to read archive: {}", e)))?;
+        let data = std::fs::read(&archive_path).map_err(|e| {
+            starlark::Error::from(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "Failed to read archive: {}",
+                e
+            ))
+        })?;
 
         // Extract
         let strip = if strip_prefix.is_empty() {
@@ -1934,11 +2018,20 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         };
 
         std::fs::create_dir_all(&output_dir).map_err(|e| {
-            starlark::Error::new_other(anyhow!("Failed to create directory: {}", e))
+            starlark::Error::from(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "Failed to create directory: {}",
+                e
+            ))
         })?;
 
-        extract_archive(&data, &output_dir, strip)
-            .map_err(|e| starlark::Error::new_other(anyhow!("{}", e)))?;
+        extract_archive(&data, &output_dir, strip).map_err(|e| {
+            starlark::Error::from(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "{}",
+                e
+            ))
+        })?;
 
         Ok(Value::new_none())
     }
@@ -1967,11 +2060,20 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         let dst_path = this.resolve_path(&dst_str);
         if let Some(parent) = dst_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| {
-                starlark::Error::new_other(anyhow!("Failed to create parent directory: {}", e))
+                starlark::Error::from(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Failed to create parent directory: {}",
+                    e
+                ))
             })?;
         }
-        std::fs::rename(&src_path, &dst_path)
-            .map_err(|e| starlark::Error::new_other(anyhow!("Failed to rename: {}", e)))?;
+        std::fs::rename(&src_path, &dst_path).map_err(|e| {
+            starlark::Error::from(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "Failed to rename: {}",
+                e
+            ))
+        })?;
         Ok(Value::new_none())
     }
 

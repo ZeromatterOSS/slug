@@ -19,7 +19,6 @@ use dice::DiceTransactionUpdater;
 use dupe::Dupe;
 use kuro_common::file_ops::dice::FileChangeTracker;
 use kuro_common::ignores::ignore_set::IgnoreSet;
-use kuro_common::invocation_paths::InvocationPaths;
 use kuro_core::cells::CellResolver;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::cells::name::CellName;
@@ -88,11 +87,22 @@ impl NotifyFileData {
             // It's not documented though.
             let path = root.relativize(AbsNormPath::new(&path)?)?;
 
-            // We ignore the buck-out prefix, as those are uninteresting events caused by us.
-            // We also ignore other buck-out directories, as if you have two isolation dirs running at once, they are not interesting.
-            // We do this in the notify-watcher, rather than a generic layer, as watchman users should configure
-            // to ignore buck-out, to reduce the number of events, rather than hiding them later.
-            if path.starts_with(InvocationPaths::buck_out_dir_prefix()) {
+            // Ignore events whose path has a `buck-out` component. A prefix-only match misses
+            // events that arrive with an aliased path: notify 5.0's recursive inotify walker
+            // follows symlinks (`WalkDir::follow_links(true)` in notify's `inotify.rs`), so when
+            // any cell's materialized source (e.g. a bzlmod `local_path` override that resolves
+            // back through the project) contains a path that loops into the project root, the
+            // watcher ends up with duplicate watches at the aliased paths. Events from those
+            // duplicate watches arrive with paths like `bazel-external/<mod>/utils/bazel/buck-out/...`
+            // or `external/<cell>/.../buck-out/...`. Letting those through fires DICE invalidation
+            // on every kuro-written artifact and makes every rebuild behave like a cold build.
+            //
+            // `buck-out` is reserved by buck2/kuro — no legitimate source tree nests a directory by
+            // that name — so a component-match is safe.
+            //
+            // We do this in the notify-watcher, rather than a generic layer, as watchman users should
+            // configure to ignore buck-out, to reduce the number of events, rather than hiding them later.
+            if path.iter().any(|c| c.as_str() == "buck-out") {
                 // We don't want to event add them as ignored events, since they are super common
                 // and very boring
                 continue;

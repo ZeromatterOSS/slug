@@ -129,9 +129,18 @@ def _compile(
     Returns:
         None (stub implementation).
     """
-    _ = (actions, proto_info, proto_lang_toolchain_info, generated_files,
-         plugin_output, additional_args, additional_inputs, additional_tools,
-         resource_set, experimental_progress_message)
+    _ = (
+        actions,
+        proto_info,
+        proto_lang_toolchain_info,
+        generated_files,
+        plugin_output,
+        additional_args,
+        additional_inputs,
+        additional_tools,
+        resource_set,
+        experimental_progress_message,
+    )
     return None
 
 # ============================================================================
@@ -151,22 +160,5 @@ proto_common_do_not_use = struct(
     has_plugin = _has_plugin,
     experimental_use_proto_source_order = _experimental_use_proto_source_order,
     # Action primitive (returns None)
-    compile = _compile,
-)
-
-# ============================================================================
-# Legacy exports for compatibility
-# ============================================================================
-
-# These are exported for backward compatibility with code that loads
-# individual helpers from this file.
-
-proto_common_helpers = struct(
-    proto_path_flag = _proto_path_flag,
-    descriptor_set_flag = _descriptor_set_flag,
-    get_tool_path = _get_tool_path,
-    has_plugin = _has_plugin,
-    experimental_use_proto_source_order = _experimental_use_proto_source_order,
-    INCOMPATIBLE_ENABLE_PROTO_TOOLCHAIN_RESOLUTION = True,
     compile = _compile,
 )

@@ -311,10 +311,12 @@ where
     fn bit_or(&self, other: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         match self.add(other, heap) {
             Some(result) => result,
-            None => Err(starlark::Error::new_other(anyhow::anyhow!(
+            None => Err(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
                 "Operation `|` not supported for types `Select` and `{}`",
                 other.get_type()
-            ))),
+            )
+            .into()),
         }
     }
 

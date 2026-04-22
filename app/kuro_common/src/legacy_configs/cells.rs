@@ -10,7 +10,6 @@
 
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -23,8 +22,6 @@ use kuro_bzlmod::MvsResolver;
 use kuro_bzlmod::ResolvedGraph;
 use kuro_bzlmod::parse_module_bazel;
 use kuro_bzlmod::resolve_local_modules;
-use kuro_bzlmod::synthetic_repos::collect_synthetic_repos_with_root;
-use kuro_bzlmod::synthetic_repos::materialize_synthetic_repos;
 use kuro_bzlmod::types::ParsedModuleFile;
 use kuro_bzlmod::types::TagValue;
 use kuro_core::cells::CellAliasResolver;
@@ -54,6 +51,8 @@ use crate::legacy_configs::aggregator::CellsAggregator;
 use crate::legacy_configs::args::ResolvedLegacyConfigArg;
 use crate::legacy_configs::args::resolve_config_args;
 use crate::legacy_configs::args::to_proto_config_args;
+use crate::legacy_configs::cells_symlinks::cleanup_stale_symlinks;
+use crate::legacy_configs::cells_symlinks::ensure_symlink;
 use crate::legacy_configs::configs::LegacyBuckConfig;
 use crate::legacy_configs::dice::HasInjectedLegacyConfigs;
 use crate::legacy_configs::file_ops::ConfigDirEntry;
@@ -70,121 +69,45 @@ use crate::legacy_configs::path::DOT_BUCKCONFIG_LOCAL;
 use crate::legacy_configs::path::ExternalConfigSource;
 use crate::legacy_configs::path::ProjectConfigSource;
 
-/// Ensure a symlink exists from `link` to `target`. Modeled after Bazel's
-/// [`FileSystemUtils.ensureSymbolicLink`](https://github.com/bazelbuild/bazel/blob/master/src/main/java/com/google/devtools/build/lib/vfs/FileSystemUtils.java).
+/// Bundled toolchain labels auto-injected when `rules_python` is in the
+/// module graph but the root module didn't register a py3 toolchain.
 ///
-/// - If symlink already points to target: no-op
-/// - If symlink points elsewhere: replace it
-/// - If non-symlink exists: return error
-fn ensure_symlink(link: &Path, target: &Path) -> std::io::Result<()> {
-    // Check if symlink already exists and points to the correct target
-    if let Ok(existing) = std::fs::read_link(link) {
-        if existing == target {
-            return Ok(());
-        }
-        // Stale symlink pointing to wrong target - remove it
-        if cfg!(windows) {
-            // On Windows, symlinks to directories need remove_dir
-            let _ = std::fs::remove_dir(link);
-            let _ = std::fs::remove_file(link);
-        } else {
-            std::fs::remove_file(link)?;
-        }
-    } else if link.exists() {
-        // Path exists but is not a symlink (real directory) - don't touch it
-        tracing::warn!(
-            "bazel-external/{} is a real directory, not a symlink - skipping",
-            link.file_name().unwrap_or_default().to_string_lossy()
-        );
-        return Ok(());
-    }
+/// Ordering matters: `host_toolchain` provides the default py3 runtime; the
+/// launcher_maker stub satisfies rules_python 1.9+'s mandatory
+/// launcher_maker_toolchain_type (only actually invoked on Windows, but
+/// resolution must succeed on Linux/macOS too).
+///
+/// Grep for this constant to find every place that implicitly assumes the
+/// bundled `local_config_python` cell is registered.
+const BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS: &[&str] = &[
+    "@local_config_python//:host_toolchain",
+    "@local_config_python//:host_launcher_maker_toolchain",
+];
 
-    // Create parent directories
-    if let Some(parent) = link.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
+/// The module name used by the canonical rules_python Bazel module. Matched
+/// against `ParsedModuleFile::module.name` (the declared `module(name = ...)`
+/// value), not against cell names.
+const RULES_PYTHON_MODULE_NAME: &str = "rules_python";
 
-    // Create symlink (platform-specific)
-    #[cfg(unix)]
-    return std::os::unix::fs::symlink(target, link);
+/// Sentinel substring used to detect whether a user-registered toolchain
+/// label already targets the bundled `@local_config_python` cell. Any label
+/// containing this substring means we should not auto-inject duplicates.
+const LOCAL_CONFIG_PYTHON_CELL: &str = "local_config_python";
 
-    #[cfg(windows)]
-    {
-        // Try symlink first (requires Developer Mode or admin privileges)
-        match std::os::windows::fs::symlink_dir(target, link) {
-            Ok(()) => return Ok(()),
-            Err(symlink_err) => {
-                // Fall back to junction point (no special privileges needed)
-                let output = std::process::Command::new("cmd")
-                    .args(["/c", "mklink", "/j"])
-                    .arg(link)
-                    .arg(target)
-                    .output();
-                match output {
-                    Ok(o) if o.status.success() => return Ok(()),
-                    _ => return Err(symlink_err),
-                }
-            }
-        }
-    }
+/// True iff `parsed_modules` contains the canonical rules_python module.
+fn module_depends_on_rules_python(parsed_modules: &[(String, ParsedModuleFile)]) -> bool {
+    parsed_modules
+        .iter()
+        .any(|(name, _)| name == RULES_PYTHON_MODULE_NAME)
 }
 
-/// Remove stale symlinks from bazel-external/ that don't correspond to any resolved module.
-/// This handles the case where a module is removed from MODULE.bazel or its version changes.
-fn cleanup_stale_symlinks(
-    external_base_dir: &Path,
-    valid_entries: &std::collections::HashSet<String>,
-) {
-    if !external_base_dir.exists() {
-        return;
-    }
-
-    let entries = match std::fs::read_dir(external_base_dir) {
-        Ok(entries) => entries,
-        Err(e) => {
-            tracing::debug!("Could not read bazel-external/ for cleanup: {}", e);
-            return;
-        }
-    };
-
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().to_string();
-        if !valid_entries.contains(&name) {
-            let path = entry.path();
-            // Only remove symlinks/junctions, not real directories
-            if path.is_symlink() || (cfg!(windows) && is_junction(&path)) {
-                if let Err(e) = if cfg!(windows) {
-                    std::fs::remove_dir(&path).or_else(|_| std::fs::remove_file(&path))
-                } else {
-                    std::fs::remove_file(&path)
-                } {
-                    tracing::debug!(
-                        "Could not remove stale symlink bazel-external/{}: {}",
-                        name,
-                        e
-                    );
-                } else {
-                    tracing::info!("Removed stale symlink: bazel-external/{}", name);
-                }
-            }
-        }
-    }
-}
-
-/// Check if a path is a Windows junction point.
-#[cfg(windows)]
-fn is_junction(path: &Path) -> bool {
-    use std::os::windows::fs::MetadataExt;
-    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
-    match std::fs::symlink_metadata(path) {
-        Ok(meta) => meta.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0,
-        Err(_) => false,
-    }
-}
-
-#[cfg(not(windows))]
-fn is_junction(_path: &Path) -> bool {
-    false
+/// True iff any toolchain label already references the bundled
+/// `@local_config_python` cell (meaning the user has already wired up
+/// bundled rules_python toolchains and we should skip auto-injection).
+fn toolchains_include_bundled_python(toolchain_labels: &[String]) -> bool {
+    toolchain_labels
+        .iter()
+        .any(|lbl| lbl.contains(LOCAL_CONFIG_PYTHON_CELL))
 }
 
 /// Buckconfigs can partially be loaded from within dice. However, some parts of what makes up the
@@ -763,316 +686,282 @@ impl BuckConfigBasedCells {
                 parsed.module.bazel_deps.len()
             );
 
-            match ModuleCache::new() {
-                Ok(cache) => match MvsResolver::new(cache).await {
-                    Ok(mut resolver) => {
-                        match resolver.resolve(&parsed.module, workspace_root).await {
-                            Ok(mut resolved_graph) => {
-                                tracing::info!(
-                                    "MVS resolved {} total modules (including transitive)",
-                                    resolved_graph.modules.len()
-                                );
+            // Propagate resolver-level errors: a failure here means the
+            // bzlmod resolver itself is broken (e.g. cache dir inaccessible,
+            // BCR unreachable, MVS couldn't converge). This is distinct from
+            // "no MODULE.bazel" (handled above) or "module has no deps"
+            // (parsed.module.bazel_deps.is_empty() branch). Callers need to
+            // see the difference so they don't silently build against a
+            // truncated cell graph.
+            let cache = ModuleCache::new().with_buck_error_context(|| {
+                format!(
+                    "Failed to initialize bzlmod module cache while resolving MODULE.bazel for root \
+                     module '{}'",
+                    parsed.module.name
+                )
+            })?;
+            let mut resolver = MvsResolver::new(cache).await.with_buck_error_context(|| {
+                format!(
+                    "Failed to create MVS resolver while resolving MODULE.bazel for root module '{}'",
+                    parsed.module.name
+                )
+            })?;
+            let mut resolved_graph = resolver
+                .resolve(&parsed.module, workspace_root)
+                .await
+                .with_buck_error_context(|| {
+                    format!(
+                        "MVS resolution failed for root module '{}' ({} direct dependencies)",
+                        parsed.module.name,
+                        parsed.module.bazel_deps.len()
+                    )
+                })?;
 
-                                // Fetch sources for all resolved modules (downloads and extracts)
-                                if let Err(e) = resolver.fetch_sources(&mut resolved_graph).await {
-                                    tracing::warn!("Failed to fetch some module sources: {}", e);
-                                }
+            tracing::info!(
+                "MVS resolved {} total modules (including transitive)",
+                resolved_graph.modules.len()
+            );
 
-                                // Build a set of local override names to skip
-                                let local_override_names: std::collections::HashSet<_> = parsed
-                                    .module
-                                    .overrides
-                                    .iter()
-                                    .filter_map(|o| match o {
-                                        kuro_bzlmod::types::Override::LocalPath(local) => {
-                                            Some(local.module_name.clone())
-                                        }
-                                        _ => None,
-                                    })
-                                    .collect();
+            // Fetch sources for all resolved modules (downloads and extracts).
+            // Keep as a warning: partial fetch failures (e.g. one registry URL
+            // down) shouldn't block the whole build — cells for modules whose
+            // sources did fetch remain usable, and unresolved cells will surface
+            // a concrete "path does not exist" error at cell-access time.
+            if let Err(e) = resolver.fetch_sources(&mut resolved_graph).await {
+                tracing::warn!(
+                    "Failed to fetch some module sources for root module '{}': {}",
+                    parsed.module.name,
+                    e
+                );
+            }
 
-                                // Create symlinks from bazel-external/ to cached sources
-                                // This enables external tools and build actions to access files directly
-                                let external_base_dir =
-                                    project_root.root().as_path().join("bazel-external");
-                                // Also create symlinks in buck-out/v2/external_cells/bzlmod/ for
-                                // build action source resolution (recreated after kuro clean)
-                                let buck_out_external_cells_dir = project_root
-                                    .root()
-                                    .as_path()
-                                    .join("buck-out/v2/external_cells/bzlmod");
-                                // Track valid symlink names for stale cleanup
-                                let mut valid_symlink_names = std::collections::HashSet::new();
-                                for (module_name, module_info) in &resolved_graph.modules {
-                                    // Skip root module and local overrides
-                                    if module_name == &parsed.module.name
-                                        || local_override_names.contains(module_name)
-                                    {
-                                        continue;
-                                    }
+            // Build a set of local override names to skip
+            let local_override_names: std::collections::HashSet<_> = parsed
+                .module
+                .overrides
+                .iter()
+                .filter_map(|o| match o {
+                    kuro_bzlmod::types::Override::LocalPath(local) => {
+                        Some(local.module_name.clone())
+                    }
+                    _ => None,
+                })
+                .collect();
 
-                                    // Only create symlinks for modules with cached source paths
-                                    if let Some(source_path) = &module_info.source_path {
-                                        let entry_name =
-                                            format!("{}+{}", module_name, module_info.version);
-                                        valid_symlink_names.insert(entry_name.clone());
-                                        let link_path = external_base_dir.join(&entry_name);
+            // Create symlinks from bazel-external/ to cached sources
+            // This enables external tools and build actions to access files directly
+            let external_base_dir = project_root.root().as_path().join("bazel-external");
+            // Also create symlinks in buck-out/v2/external_cells/bzlmod/ for
+            // build action source resolution (recreated after kuro clean)
+            let buck_out_external_cells_dir = project_root
+                .root()
+                .as_path()
+                .join("buck-out/v2/external_cells/bzlmod");
+            // Track valid symlink names for stale cleanup
+            let mut valid_symlink_names = std::collections::HashSet::new();
+            for (module_name, module_info) in &resolved_graph.modules {
+                // Skip root module and local overrides
+                if module_name == &parsed.module.name || local_override_names.contains(module_name)
+                {
+                    continue;
+                }
 
-                                        match ensure_symlink(&link_path, source_path) {
-                                            Ok(()) => {
-                                                tracing::debug!(
-                                                    "Created symlink: {:?} -> {:?}",
-                                                    link_path,
-                                                    source_path
-                                                );
-                                            }
-                                            Err(e) => {
-                                                tracing::warn!(
-                                                    "Failed to create symlink for {}@{}: {}",
-                                                    module_name,
-                                                    module_info.version,
-                                                    e
-                                                );
-                                            }
-                                        }
+                // Only create symlinks for modules with cached source paths
+                if let Some(source_path) = &module_info.source_path {
+                    let entry_name = format!("{}+{}", module_name, module_info.version);
+                    valid_symlink_names.insert(entry_name.clone());
+                    let link_path = external_base_dir.join(&entry_name);
 
-                                        // Also create buck-out/v2/external_cells/bzlmod/ symlink
-                                        // so that build action command lines can reference source
-                                        // files at their resolved paths (re-created after clean)
-                                        let buck_out_link =
-                                            buck_out_external_cells_dir.join(&entry_name);
-                                        if let Err(e) = ensure_symlink(&buck_out_link, source_path)
-                                        {
-                                            tracing::warn!(
-                                                "Failed to create external_cells symlink for \
-                                                 {}@{}: {}",
-                                                module_name,
-                                                module_info.version,
-                                                e
-                                            );
-                                        }
-                                    }
-                                }
-
-                                // Remove stale symlinks from previous resolutions
-                                // (e.g., modules removed from MODULE.bazel or version changes)
-                                cleanup_stale_symlinks(&external_base_dir, &valid_symlink_names);
-                                cleanup_stale_symlinks(
-                                    &buck_out_external_cells_dir,
-                                    &valid_symlink_names,
-                                );
-
-                                // Register ALL resolved modules as cells
-                                for (module_name, module_info) in &resolved_graph.modules {
-                                    // Skip the root module and local overrides
-                                    if module_name == &parsed.module.name
-                                        || local_override_names.contains(module_name)
-                                    {
-                                        continue;
-                                    }
-
-                                    let cell_name = CellName::unchecked_new(module_name)?;
-
-                                    // Determine the cell path and setup based on source type
-                                    match &module_info.source {
-                                        ModuleSource::Registry { url } => {
-                                            let source_path_str = module_info
-                                                .source_path
-                                                .as_ref()
-                                                .map(|p| p.to_string_lossy().to_string())
-                                                .unwrap_or_default();
-
-                                            // Create a project-relative path for this external module
-                                            let external_path = format!(
-                                                "bazel-external/{}+{}",
-                                                module_name, module_info.version
-                                            );
-                                            let cell_path = CellRootPathBuf::new(
-                                                ProjectRelativePath::new(&external_path)?
-                                                    .to_owned(),
-                                            );
-
-                                            tracing::info!(
-                                                "Registered module: {}@{} -> {} (external path: {})",
-                                                module_name,
-                                                module_info.version,
-                                                source_path_str,
-                                                external_path
-                                            );
-
-                                            let setup =
-                                                kuro_core::cells::external::BzlmodCellSetup {
-                                                    module_name: Arc::from(module_name.as_str()),
-                                                    version: Arc::from(
-                                                        module_info.version.as_str(),
-                                                    ),
-                                                    registry_url: Arc::from(url.as_str()),
-                                                    source_path: Arc::from(
-                                                        source_path_str.as_str(),
-                                                    ),
-                                                };
-
-                                            cells.push((cell_name, cell_path, Some(setup)));
-                                        }
-                                        ModuleSource::LocalPath { path } => {
-                                            // Local path modules from overrides are handled separately
-                                            let cell_path = CellRootPathBuf::new(
-                                                ProjectRelativePath::new(path)?.to_owned(),
-                                            );
-                                            cells.push((cell_name, cell_path, None));
-                                            tracing::info!(
-                                                "Registered local module: {} -> {}",
-                                                module_name,
-                                                path
-                                            );
-                                        }
-                                        ModuleSource::Git { remote, commit, .. } => {
-                                            let source_path_str = module_info
-                                                .source_path
-                                                .as_ref()
-                                                .map(|p| p.to_string_lossy().to_string())
-                                                .unwrap_or_default();
-
-                                            let external_path = format!(
-                                                "bazel-external/{}+{}",
-                                                module_name, module_info.version
-                                            );
-                                            let cell_path = CellRootPathBuf::new(
-                                                ProjectRelativePath::new(&external_path)?
-                                                    .to_owned(),
-                                            );
-
-                                            // Git modules use Bzlmod setup with empty registry URL
-                                            let setup =
-                                                kuro_core::cells::external::BzlmodCellSetup {
-                                                    module_name: Arc::from(module_name.as_str()),
-                                                    version: Arc::from(
-                                                        module_info.version.as_str(),
-                                                    ),
-                                                    registry_url: Arc::from(
-                                                        format!("git+{}", remote).as_str(),
-                                                    ),
-                                                    source_path: Arc::from(
-                                                        source_path_str.as_str(),
-                                                    ),
-                                                };
-
-                                            cells.push((cell_name, cell_path, Some(setup)));
-                                            tracing::info!(
-                                                "Registered git module: {}@{} -> {} (commit: {})",
-                                                module_name,
-                                                module_info.version,
-                                                external_path,
-                                                commit
-                                            );
-                                        }
-                                        ModuleSource::Archive { urls, .. } => {
-                                            let source_path_str = module_info
-                                                .source_path
-                                                .as_ref()
-                                                .map(|p| p.to_string_lossy().to_string())
-                                                .unwrap_or_default();
-
-                                            let external_path = format!(
-                                                "bazel-external/{}+{}",
-                                                module_name, module_info.version
-                                            );
-                                            let cell_path = CellRootPathBuf::new(
-                                                ProjectRelativePath::new(&external_path)?
-                                                    .to_owned(),
-                                            );
-
-                                            // Use first URL as the registry URL
-                                            let url = urls
-                                                .first()
-                                                .map(|u| u.as_str())
-                                                .unwrap_or("archive");
-                                            let setup =
-                                                kuro_core::cells::external::BzlmodCellSetup {
-                                                    module_name: Arc::from(module_name.as_str()),
-                                                    version: Arc::from(
-                                                        module_info.version.as_str(),
-                                                    ),
-                                                    registry_url: Arc::from(url),
-                                                    source_path: Arc::from(
-                                                        source_path_str.as_str(),
-                                                    ),
-                                                };
-
-                                            cells.push((cell_name, cell_path, Some(setup)));
-                                            tracing::info!(
-                                                "Registered archive module: {}@{} -> {}",
-                                                module_name,
-                                                module_info.version,
-                                                external_path
-                                            );
-                                        }
-                                    }
-                                }
-
-                                // Handle repo_name aliases from root module's direct deps
-                                // Transitive repo_name aliasing requires parsing each module's MODULE.bazel
-                                // which we defer to a future enhancement
-                                for dep in &parsed.module.bazel_deps {
-                                    if let Some(repo_name) = &dep.repo_name {
-                                        if repo_name != &dep.name {
-                                            let cell_name = CellName::unchecked_new(&dep.name)?;
-                                            let alias_name =
-                                                NonEmptyCellAlias::new(repo_name.clone())?;
-                                            tracing::info!(
-                                                "Creating repo_name alias: {} -> {}",
-                                                repo_name,
-                                                dep.name
-                                            );
-                                            aliases.push((alias_name, cell_name));
-                                        }
-                                    }
-                                }
-
-                                // Populate the global module version registry
-                                // so module_version() builtin returns the correct version
-                                {
-                                    let mut version_map = std::collections::HashMap::new();
-                                    // Add root module
-                                    version_map.insert(
-                                        parsed.module.name.clone(),
-                                        parsed.module.version.to_string(),
-                                    );
-                                    // Add all resolved external modules
-                                    for (name, info) in &resolved_graph.modules {
-                                        version_map.insert(name.clone(), info.version.clone());
-                                    }
-                                    kuro_bzlmod::set_module_versions(version_map);
-                                }
-
-                                // Handle repo_name aliases from transitive deps
-                                // Parse each resolved module's MODULE.bazel to extract repo_name aliases
-                                Self::collect_transitive_repo_aliases(
-                                    &resolved_graph,
-                                    &parsed.module.name,
-                                    &mut aliases,
-                                )
-                                .await;
-                            }
-                            Err(e) => {
-                                tracing::warn!("MVS resolution failed: {}", e);
-                            }
+                    match ensure_symlink(&link_path, source_path) {
+                        Ok(()) => {
+                            tracing::debug!(
+                                "Created symlink: {:?} -> {:?}",
+                                link_path,
+                                source_path
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to create symlink for {}@{}: {}",
+                                module_name,
+                                module_info.version,
+                                e
+                            );
                         }
                     }
-                    Err(e) => {
-                        tracing::warn!("Failed to create MVS resolver: {}", e);
+
+                    // Also create buck-out/v2/external_cells/bzlmod/ symlink
+                    // so that build action command lines can reference source
+                    // files at their resolved paths (re-created after clean)
+                    let buck_out_link = buck_out_external_cells_dir.join(&entry_name);
+                    if let Err(e) = ensure_symlink(&buck_out_link, source_path) {
+                        tracing::warn!(
+                            "Failed to create external_cells symlink for {}@{}: {}",
+                            module_name,
+                            module_info.version,
+                            e
+                        );
                     }
-                },
-                Err(e) => {
-                    tracing::warn!("Failed to create module cache: {}", e);
                 }
             }
-        }
 
-        // Collect extension usages from all resolved modules and generate synthetic repos
-        let synthetic_cells =
-            Self::generate_synthetic_extension_repos(project_root, &parsed, &cells).await?;
-        cells.extend(synthetic_cells);
+            // Remove stale symlinks from previous resolutions
+            // (e.g., modules removed from MODULE.bazel or version changes)
+            cleanup_stale_symlinks(&external_base_dir, &valid_symlink_names);
+            cleanup_stale_symlinks(&buck_out_external_cells_dir, &valid_symlink_names);
+
+            // Register ALL resolved modules as cells
+            for (module_name, module_info) in &resolved_graph.modules {
+                // Skip the root module and local overrides
+                if module_name == &parsed.module.name || local_override_names.contains(module_name)
+                {
+                    continue;
+                }
+
+                let cell_name = CellName::unchecked_new(module_name)?;
+
+                // Determine the cell path and setup based on source type
+                match &module_info.source {
+                    ModuleSource::Registry { url } => {
+                        let source_path_str = module_info
+                            .source_path
+                            .as_ref()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_default();
+
+                        // Create a project-relative path for this external module
+                        let external_path =
+                            format!("bazel-external/{}+{}", module_name, module_info.version);
+                        let cell_path = CellRootPathBuf::new(
+                            ProjectRelativePath::new(&external_path)?.to_owned(),
+                        );
+
+                        tracing::info!(
+                            "Registered module: {}@{} -> {} (external path: {})",
+                            module_name,
+                            module_info.version,
+                            source_path_str,
+                            external_path
+                        );
+
+                        let setup = kuro_core::cells::external::BzlmodCellSetup {
+                            module_name: Arc::from(module_name.as_str()),
+                            version: Arc::from(module_info.version.as_str()),
+                            registry_url: Arc::from(url.as_str()),
+                            source_path: Arc::from(source_path_str.as_str()),
+                        };
+
+                        cells.push((cell_name, cell_path, Some(setup)));
+                    }
+                    ModuleSource::LocalPath { path } => {
+                        // Local path modules from overrides are handled separately
+                        let cell_path =
+                            CellRootPathBuf::new(ProjectRelativePath::new(path)?.to_owned());
+                        cells.push((cell_name, cell_path, None));
+                        tracing::info!("Registered local module: {} -> {}", module_name, path);
+                    }
+                    ModuleSource::Git { remote, commit, .. } => {
+                        let source_path_str = module_info
+                            .source_path
+                            .as_ref()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_default();
+
+                        let external_path =
+                            format!("bazel-external/{}+{}", module_name, module_info.version);
+                        let cell_path = CellRootPathBuf::new(
+                            ProjectRelativePath::new(&external_path)?.to_owned(),
+                        );
+
+                        // Git modules use Bzlmod setup with empty registry URL
+                        let setup = kuro_core::cells::external::BzlmodCellSetup {
+                            module_name: Arc::from(module_name.as_str()),
+                            version: Arc::from(module_info.version.as_str()),
+                            registry_url: Arc::from(format!("git+{}", remote).as_str()),
+                            source_path: Arc::from(source_path_str.as_str()),
+                        };
+
+                        cells.push((cell_name, cell_path, Some(setup)));
+                        tracing::info!(
+                            "Registered git module: {}@{} -> {} (commit: {})",
+                            module_name,
+                            module_info.version,
+                            external_path,
+                            commit
+                        );
+                    }
+                    ModuleSource::Archive { urls, .. } => {
+                        let source_path_str = module_info
+                            .source_path
+                            .as_ref()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .unwrap_or_default();
+
+                        let external_path =
+                            format!("bazel-external/{}+{}", module_name, module_info.version);
+                        let cell_path = CellRootPathBuf::new(
+                            ProjectRelativePath::new(&external_path)?.to_owned(),
+                        );
+
+                        // Use first URL as the registry URL
+                        let url = urls.first().map(|u| u.as_str()).unwrap_or("archive");
+                        let setup = kuro_core::cells::external::BzlmodCellSetup {
+                            module_name: Arc::from(module_name.as_str()),
+                            version: Arc::from(module_info.version.as_str()),
+                            registry_url: Arc::from(url),
+                            source_path: Arc::from(source_path_str.as_str()),
+                        };
+
+                        cells.push((cell_name, cell_path, Some(setup)));
+                        tracing::info!(
+                            "Registered archive module: {}@{} -> {}",
+                            module_name,
+                            module_info.version,
+                            external_path
+                        );
+                    }
+                }
+            }
+
+            // Handle repo_name aliases from root module's direct deps
+            // Transitive repo_name aliasing requires parsing each module's MODULE.bazel
+            // which we defer to a future enhancement
+            for dep in &parsed.module.bazel_deps {
+                if let Some(repo_name) = &dep.repo_name {
+                    if repo_name != &dep.name {
+                        let cell_name = CellName::unchecked_new(&dep.name)?;
+                        let alias_name = NonEmptyCellAlias::new(repo_name.clone())?;
+                        tracing::info!("Creating repo_name alias: {} -> {}", repo_name, dep.name);
+                        aliases.push((alias_name, cell_name));
+                    }
+                }
+            }
+
+            // Populate the global module version registry
+            // so module_version() builtin returns the correct version
+            {
+                let mut version_map = std::collections::HashMap::new();
+                // Add root module
+                version_map.insert(
+                    parsed.module.name.clone(),
+                    parsed.module.version.to_string(),
+                );
+                // Add all resolved external modules
+                for (name, info) in &resolved_graph.modules {
+                    version_map.insert(name.clone(), info.version.clone());
+                }
+                kuro_bzlmod::set_module_versions(version_map);
+            }
+
+            // Handle repo_name aliases from transitive deps
+            // Parse each resolved module's MODULE.bazel to extract repo_name aliases
+            Self::collect_transitive_repo_aliases(
+                &resolved_graph,
+                &parsed.module.name,
+                &mut aliases,
+            )
+            .await;
+        }
 
         // Build parsed_modules list for extension resolution
         let mut parsed_modules: Vec<(String, ParsedModuleFile)> = Vec::new();
@@ -1164,28 +1053,26 @@ impl BuckConfigBasedCells {
                 }
             }
             // If the module graph depends on rules_python but never registers
-            // a py3 toolchain, auto-inject @local_config_python//:host_toolchain
+            // a py3 toolchain, auto-inject BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS
             // at lowest priority so ctx.toolchains[@rules_python//python:toolchain_type]
             // resolves to a host py_runtime. Users can override by registering
             // their own toolchain earlier in MODULE.bazel.
-            let has_rules_python = parsed_modules
-                .iter()
-                .any(|(name, _)| name == "rules_python");
-            let already_has_py_toolchain = all_toolchains
-                .iter()
-                .any(|lbl| lbl.contains("local_config_python"));
-            if has_rules_python && !already_has_py_toolchain {
-                all_toolchains.push("@local_config_python//:host_toolchain".to_owned());
-                // rules_python 1.9+ on bazel_9_or_later declares
-                // launcher_maker_toolchain_type as a mandatory rule-level
-                // toolchain on py_binary. The launcher is only invoked on
-                // Windows, but resolution must succeed on Linux/macOS too —
-                // register a stub impl that returns an empty ToolchainInfo.
-                all_toolchains
-                    .push("@local_config_python//:host_launcher_maker_toolchain".to_owned());
+            //
+            // WHY string match on the module name: ParsedModuleFile currently has no
+            // typed "is rules_python" flag, and adding one would require threading a
+            // new field through kuro_bzlmod::types + the MVS resolver + every caller
+            // that constructs ParsedModuleFile — well out of scope for an error-
+            // handling fix. The constants below keep the magic strings grep-able so a
+            // future typed flag can replace them in one place.
+            if module_depends_on_rules_python(&parsed_modules)
+                && !toolchains_include_bundled_python(&all_toolchains)
+            {
+                for label in BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS {
+                    all_toolchains.push((*label).to_owned());
+                }
                 tracing::info!(
-                    "Auto-registered @local_config_python//:host_toolchain + \
-                     host_launcher_maker_toolchain (rules_python in deps)"
+                    "Auto-registered bundled rules_python toolchains (rules_python in deps): {:?}",
+                    BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS
                 );
             }
 
@@ -1568,92 +1455,6 @@ impl BuckConfigBasedCells {
         }
     }
 
-    /// Generate synthetic repos for known module extensions.
-    ///
-    /// This function:
-    /// 1. Collects MODULE.bazel from all resolved dependencies
-    /// 2. Extracts extension usages (use_extension + use_repo)
-    /// 3. Generates synthetic repos for known extensions (e.g., bazel_features)
-    /// 4. Materializes them to bazel-external/
-    async fn generate_synthetic_extension_repos(
-        project_root: &ProjectRoot,
-        root_parsed: &kuro_bzlmod::types::ParsedModuleFile,
-        resolved_cells: &[(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
-    ) -> kuro_error::Result<Vec<(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)>> {
-        let mut parsed_modules: Vec<(String, ParsedModuleFile)> = Vec::new();
-
-        // Add root module
-        parsed_modules.push((root_parsed.module.name.clone(), root_parsed.clone()));
-
-        // Parse MODULE.bazel from each resolved dependency
-        for (cell_name, _cell_path, setup) in resolved_cells {
-            if let Some(bzlmod_setup) = setup {
-                // Read MODULE.bazel from the cached source
-                let module_bazel_path = std::path::PathBuf::from(bzlmod_setup.source_path.as_ref())
-                    .join("MODULE.bazel");
-                if module_bazel_path.exists() {
-                    match parse_module_bazel(&module_bazel_path) {
-                        Ok(dep_parsed) => {
-                            let module_key = if dep_parsed.module.name.is_empty() {
-                                cell_name.as_str().to_string()
-                            } else {
-                                dep_parsed.module.name.clone()
-                            };
-                            parsed_modules.push((module_key, dep_parsed));
-                        }
-                        Err(e) => {
-                            tracing::debug!(
-                                "Failed to parse MODULE.bazel for {}: {}",
-                                cell_name.as_str(),
-                                e
-                            );
-                        }
-                    }
-                }
-            }
-        }
-
-        // Collect synthetic repos from all extension usages
-        let synthetic_repos =
-            collect_synthetic_repos_with_root(&parsed_modules, Some(project_root.root().as_path()));
-        if synthetic_repos.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        tracing::info!(
-            "Generating {} synthetic extension repos",
-            synthetic_repos.len()
-        );
-
-        // Materialize synthetic repos to bazel-external/
-        let synthetic_base_dir = project_root.root().as_path().join("bazel-external");
-        match materialize_synthetic_repos(&synthetic_repos, &synthetic_base_dir) {
-            Ok(paths) => {
-                let mut cells = Vec::new();
-                for (repo, _path) in synthetic_repos.iter().zip(paths.iter()) {
-                    let cell_name = CellName::unchecked_new(&repo.name)?;
-                    let external_path = format!("bazel-external/{}", repo.name);
-                    let cell_path =
-                        CellRootPathBuf::new(ProjectRelativePath::new(&external_path)?.to_owned());
-
-                    tracing::info!(
-                        "Registered synthetic repo: {} -> {}",
-                        repo.name,
-                        external_path
-                    );
-
-                    // Synthetic repos don't need BzlmodCellSetup - they're local
-                    cells.push((cell_name, cell_path, None));
-                }
-                Ok(cells)
-            }
-            Err(e) => {
-                tracing::warn!("Failed to materialize synthetic repos: {}", e);
-                Ok(Vec::new())
-            }
-        }
-    }
-
     pub(crate) fn get_cell_aliases_from_config(
         config: &LegacyBuckConfig,
     ) -> kuro_error::Result<impl Iterator<Item = (NonEmptyCellAlias, NonEmptyCellAlias)> + use<>>
@@ -1670,83 +1471,6 @@ impl BuckConfigBasedCells {
             }
         }
         Ok(aliases.into_iter())
-    }
-
-    /// Register extension-generated repository cells with a CellsAggregator.
-    ///
-    /// This is called after module extension execution to register the repositories
-    /// created by extensions (e.g., from pip.parse(), go_deps, etc.) as cells.
-    ///
-    /// Extension repos are registered as "pending" cells - they aren't materialized
-    /// until first accessed, at which point DICE triggers lazy execution via
-    /// `ExtensionRepoExecutionKey`.
-    ///
-    /// # Arguments
-    /// * `aggregator` - The CellsAggregator to add cells to
-    /// * `pending_cells` - Pending repo cell definitions from `build_extension_cells()`
-    /// * `aliases` - Repo aliases from `build_use_repo_aliases()`
-    ///
-    /// # Example
-    /// ```ignore
-    /// // After extension execution:
-    /// let ext_result = dice.compute(&ModuleExtensionExecutionKey::new(...)).await?;
-    /// let use_repos = extract_use_repos_for_extension(&ext_id, &extension_usages);
-    /// let ext_defs = build_extension_cell_definitions(&ext_result, &use_repos)?;
-    /// register_extension_cells(&mut aggregator, ext_defs.cells, ext_defs.aliases)?;
-    /// ```
-    #[allow(dead_code)] // Infrastructure for future DICE-based extension execution
-    pub(crate) fn register_extension_cells(
-        aggregator: &mut CellsAggregator,
-        pending_cells: &[kuro_bzlmod::PendingRepoCell],
-        aliases: &[kuro_bzlmod::RepoAlias],
-    ) -> kuro_error::Result<()> {
-        // Register each extension repo cell
-        for cell in pending_cells {
-            let cell_name = CellName::unchecked_new(&cell.canonical_name)?;
-
-            // Create ExtensionRepoCellSetup from PendingRepoCell
-            let setup = ExtensionRepoCellSetup {
-                canonical_name: Arc::from(cell.canonical_name.as_str()),
-                extension_id: Arc::from(cell.extension_id.as_str()),
-                internal_name: Arc::from(cell.internal_name.as_str()),
-                spec_hash: Arc::from(cell.spec_hash.as_str()),
-                repo_spec_json: Arc::from(cell.repo_spec_json.as_str()),
-                materialized: false,
-            };
-
-            tracing::info!(
-                "Registering extension repo cell: {} -> {} (pending: true)",
-                cell.canonical_name,
-                cell.path,
-            );
-
-            // Mark as external cell with ExtensionRepo origin
-            // Note: The cell must already be in the aggregator's cell_infos for mark_external_cell to work.
-            // For dynamic registration, we would need to extend CellsAggregator to add new cells.
-            // For now, this function documents the expected pattern for future DICE integration.
-            if let Err(e) =
-                aggregator.mark_external_cell(cell_name, ExternalCellOrigin::ExtensionRepo(setup))
-            {
-                tracing::debug!(
-                    "Could not mark extension repo '{}' as external: {} (may not be pre-registered)",
-                    cell.canonical_name,
-                    e
-                );
-            }
-        }
-
-        // Note: Aliases are typically added during CellsAggregator construction.
-        // For dynamic extension repos, the aliases would need to be added to
-        // the root_aliases map before make_cell_resolver() is called.
-        for alias in aliases {
-            tracing::info!(
-                "Extension repo alias: {} -> {}",
-                alias.apparent_name,
-                alias.canonical_name
-            );
-        }
-
-        Ok(())
     }
 
     pub(crate) async fn parse_single_cell_with_dice(
@@ -2669,7 +2393,6 @@ mod tests {
     }
 }
 
-/// Convert a TagValue to a repository invocation AttrValue.
 /// Extract the repo name from a toolchain/platform label.
 /// E.g., "@local_config_cc_toolchains//:all" → "local_config_cc_toolchains"
 ///       "//cc/private/toolchain/test:default_test_runner_toolchain" → None (relative)

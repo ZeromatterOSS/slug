@@ -334,22 +334,28 @@ impl EvaluationResult {
         // survive coercion as a full label and hit DICE target lookup
         // here, where we need the same redirect.
         //
-        // Linear scan is O(N) per miss, but misses are rare (normally a
-        // target with the given name exists) so we accept it over the
-        // bookkeeping cost of maintaining a reverse index on every
-        // EvaluationResult.
+        // The scan is O(N * K) where N = targets in the package and K =
+        // file-carrying attrs per target. We cap K by looking only at
+        // attributes that conventionally hold file refs (`srcs`, `hdrs`,
+        // `out`, `outs`, `data`). Misses still only hit this path when the
+        // label looks like a C/C++ file that a rule might have produced,
+        // so N × K stays small in practice. A true reverse index would be
+        // faster; add one if this profile hot.
+        const FILE_CARRYING_ATTRS: &[&str] = &["srcs", "hdrs", "out", "outs", "data"];
         let file_name = path.as_str();
-        if file_name.contains('/')
+        let looks_like_file = file_name.contains('/')
             && (file_name.ends_with(".inc")
                 || file_name.ends_with(".h")
-                || file_name.ends_with(".h.inc")
                 || file_name.ends_with(".cpp")
-                || file_name.ends_with(".def"))
-        {
+                || file_name.ends_with(".def"));
+        if looks_like_file {
             use crate::attrs::coerced_attr::CoercedAttr;
             use crate::attrs::inspect_options::AttrInspectOptions;
             for node in self.targets.values() {
                 for attr in node.attrs(AttrInspectOptions::All) {
+                    if !FILE_CARRYING_ATTRS.contains(&attr.name) {
+                        continue;
+                    }
                     match &attr.value {
                         CoercedAttr::String(s) if s.0.as_str() == file_name => {
                             return Ok(node);

@@ -874,7 +874,7 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
             // If the default is empty string and it's not in the values list,
             // use the first value as default (Bazel behavior)
             AttrType::enumeration(variants)
-                .map_err(|e| starlark::Error::new_other(anyhow::anyhow!("{}", e)))?
+                .map_err(|e| kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", e))?
         };
 
         let mut attr = Attribute::attr(eval, effective_default, doc, attr_type)?;

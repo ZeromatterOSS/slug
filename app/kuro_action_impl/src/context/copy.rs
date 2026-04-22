@@ -202,12 +202,16 @@ pub(crate) fn analysis_actions_methods_copy(methods: &mut MethodsBuilder) {
                     .into_declared_artifact(AssociatedArtifacts::new())
                     .to_value())
             }
-            (Some(_), Some(_)) => Err(starlark::Error::new_other(anyhow::anyhow!(
+            (Some(_), Some(_)) => Err(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
                 "ctx.actions.symlink(): exactly one of target_file or target_path must be specified, got both"
-            ))),
-            (None, None) => Err(starlark::Error::new_other(anyhow::anyhow!(
+            )
+            .into()),
+            (None, None) => Err(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
                 "ctx.actions.symlink(): exactly one of target_file or target_path must be specified, got neither"
-            ))),
+            )
+            .into()),
         }
     }
 

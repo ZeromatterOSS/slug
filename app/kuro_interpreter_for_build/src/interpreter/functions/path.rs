@@ -73,10 +73,12 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
                 .map(|path| path.as_str().to_owned())
                 .collect();
             if results.is_empty() {
-                return Err(starlark::Error::new_other(anyhow::anyhow!(
+                return Err(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
                     "glob pattern '{}' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with package(default_glob_allow_empty = ...))",
                     include.items.join(", ")
-                )));
+                )
+                .into());
             }
             Ok(eval
                 .heap()

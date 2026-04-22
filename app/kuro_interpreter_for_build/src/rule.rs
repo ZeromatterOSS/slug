@@ -791,12 +791,7 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRuleCallable {
                     }
                     for (k, v) in result_dict.iter() {
                         if let Some(key_str) = k.unpack_str() {
-                            merged.insert(
-                                // SAFETY: key_str is allocated on the heap which outlives
-                                // this function call since the heap owns the evaluation.
-                                unsafe { &*(key_str as *const str) },
-                                v,
-                            );
+                            merged.insert(key_str, v);
                         }
                     }
                     modified_pairs = merged.into_iter().collect();
@@ -959,6 +954,152 @@ where
     }
 }
 
+/// Extract execution group definitions from the `exec_groups` parameter of `rule()`.
+///
+/// In Bazel, `exec_groups` is a dict mapping group name → `exec_group()` value.
+/// We extract both the toolchain type labels and `exec_compatible_with` constraints.
+fn parse_exec_groups<'v>(
+    exec_groups: Option<Value<'v>>,
+    heap: Heap<'v>,
+) -> kuro_error::Result<Vec<(String, ExecGroupDef)>> {
+    let Some(eg_val) = exec_groups else {
+        return Ok(Vec::new());
+    };
+    let Some(dict) = DictRef::from_value(eg_val) else {
+        return Ok(Vec::new());
+    };
+    let defs = dict
+        .iter()
+        .filter_map(|(k, v)| {
+            let name = k.unpack_str()?.to_owned();
+            // Extract toolchain types from exec_group value
+            let tc_types = if let Some(tc_val) = v.get_attr("toolchains", heap).ok().flatten() {
+                if let Some(list) = ListRef::from_value(tc_val) {
+                    list.iter()
+                        .filter_map(|item| {
+                            if let Some(s) = item.unpack_str() {
+                                Some(s.to_owned())
+                            } else if let Ok(Some(attr)) = item.get_attr("toolchain_type", heap) {
+                                if let Some(s) = attr.unpack_str() {
+                                    return Some(s.to_owned());
+                                }
+                                Some(format!("{}", attr))
+                            } else {
+                                Some(format!("{}", item))
+                            }
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            };
+            // Extract exec_compatible_with constraint labels
+            let exec_compat =
+                if let Some(ec_val) = v.get_attr("exec_compatible_with", heap).ok().flatten() {
+                    if let Some(list) = ListRef::from_value(ec_val) {
+                        list.iter()
+                            .filter_map(|item| item.unpack_str().map(|s| s.to_owned()))
+                            .collect()
+                    } else {
+                        Vec::new()
+                    }
+                } else {
+                    Vec::new()
+                };
+            Some((
+                name,
+                ExecGroupDef {
+                    toolchain_types: tc_types,
+                    exec_compatible_with: exec_compat,
+                },
+            ))
+        })
+        .collect();
+    Ok(defs)
+}
+
+/// Extract provider type names from the `provides` parameter of `rule()`.
+///
+/// Each item is a provider constructor (e.g., `CcInfo`, `JavaInfo`).
+/// We store the provider id names for post-analysis validation.
+fn parse_provides<'v>(provides: &UnpackListOrTuple<Value<'v>>) -> kuro_error::Result<Vec<String>> {
+    use kuro_interpreter::types::provider::callable::ValueAsProviderCallableLike;
+    let names = provides
+        .items
+        .iter()
+        .filter_map(|v| {
+            if let Some(callable) = v.as_provider_callable() {
+                callable.id().ok().map(|id| id.name.clone())
+            } else {
+                // Fallback: use the string representation
+                Some(format!("{}", v))
+            }
+        })
+        .collect();
+    Ok(names)
+}
+
+/// Extract toolchain type labels + mandatory flag from the `toolchains` parameter of `rule()`.
+///
+/// Each item is a string label, a `Label` object, or a `ToolchainTypeRequirement`
+/// (produced by `config_common.toolchain_type()`).
+///   - String / Label: treated as mandatory (Bazel default).
+///   - `ToolchainTypeRequirement`: extract `.toolchain_type` and `.mandatory`.
+fn parse_toolchains<'v>(
+    toolchains: &UnpackListOrTuple<Value<'v>>,
+    heap: Heap<'v>,
+) -> kuro_error::Result<Vec<(String, bool)>> {
+    let items = toolchains
+        .items
+        .iter()
+        .filter_map(|v| {
+            if let Some(s) = v.unpack_str() {
+                return Some((s.to_owned(), true));
+            }
+            let label_opt = v
+                .get_attr("toolchain_type", heap)
+                .ok()
+                .flatten()
+                .and_then(|attr| attr.unpack_str().map(|s| s.to_owned()));
+            let mandatory = v
+                .get_attr("mandatory", heap)
+                .ok()
+                .flatten()
+                .and_then(|attr| attr.unpack_bool())
+                .unwrap_or(true);
+            if let Some(label) = label_opt {
+                return Some((label, mandatory));
+            }
+            // Fallback: Display (covers Label objects)
+            Some((format!("{}", v), true))
+        })
+        .collect();
+    Ok(items)
+}
+
+/// Extract `rule(outputs={...})` patterns.
+///
+/// Each key→value pair maps an output name to a template like `"%{name}.binpb"`.
+fn parse_rule_outputs<'v>(outputs: Option<Value<'v>>) -> kuro_error::Result<Vec<(String, String)>> {
+    let Some(outputs_val) = outputs else {
+        return Ok(Vec::new());
+    };
+    let Some(dict) = DictRef::from_value(outputs_val) else {
+        return Ok(Vec::new());
+    };
+    let items = dict
+        .iter()
+        .filter_map(|(k, v)| {
+            let key = k.unpack_str()?.to_owned();
+            let val = v.unpack_str()?.to_owned();
+            Some((key, val))
+        })
+        .collect();
+    Ok(items)
+}
+
 #[starlark_module]
 pub fn register_rule_function(builder: &mut GlobalsBuilder) {
     /// Define a rule. Supports both Bazel-style (`implementation`) and Kuro-style (`impl`)
@@ -1055,138 +1196,10 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         let fragment_names: Vec<String> =
             fragments.items.into_iter().map(|s| s.to_owned()).collect();
 
-        // Extract execution group definitions from the exec_groups parameter.
-        // In Bazel, exec_groups is a dict mapping group name → exec_group() value.
-        // We extract both the toolchain type labels and exec_compatible_with constraints.
-        let exec_group_defs: Vec<(String, ExecGroupDef)> = if let Some(eg_val) = exec_groups {
-            if let Some(dict) = DictRef::from_value(eg_val) {
-                dict.iter()
-                    .filter_map(|(k, v)| {
-                        let name = k.unpack_str()?.to_owned();
-                        // Extract toolchain types from exec_group value
-                        let tc_types = if let Some(tc_val) =
-                            v.get_attr("toolchains", eval.heap()).ok().flatten()
-                        {
-                            if let Some(list) = ListRef::from_value(tc_val) {
-                                list.iter()
-                                    .filter_map(|item| {
-                                        if let Some(s) = item.unpack_str() {
-                                            Some(s.to_owned())
-                                        } else if let Ok(Some(attr)) =
-                                            item.get_attr("toolchain_type", eval.heap())
-                                        {
-                                            if let Some(s) = attr.unpack_str() {
-                                                return Some(s.to_owned());
-                                            }
-                                            Some(format!("{}", attr))
-                                        } else {
-                                            Some(format!("{}", item))
-                                        }
-                                    })
-                                    .collect()
-                            } else {
-                                Vec::new()
-                            }
-                        } else {
-                            Vec::new()
-                        };
-                        // Extract exec_compatible_with constraint labels
-                        let exec_compat = if let Some(ec_val) = v
-                            .get_attr("exec_compatible_with", eval.heap())
-                            .ok()
-                            .flatten()
-                        {
-                            if let Some(list) = ListRef::from_value(ec_val) {
-                                list.iter()
-                                    .filter_map(|item| item.unpack_str().map(|s| s.to_owned()))
-                                    .collect()
-                            } else {
-                                Vec::new()
-                            }
-                        } else {
-                            Vec::new()
-                        };
-                        Some((
-                            name,
-                            ExecGroupDef {
-                                toolchain_types: tc_types,
-                                exec_compatible_with: exec_compat,
-                            },
-                        ))
-                    })
-                    .collect()
-            } else {
-                Vec::new()
-            }
-        } else {
-            Vec::new()
-        };
-
-        // Extract provider type names from the provides parameter.
-        // Each item is a provider constructor (e.g., CcInfo, JavaInfo).
-        // We store the provider id names for post-analysis validation.
-        use kuro_interpreter::types::provider::callable::ValueAsProviderCallableLike;
-        let provides_names: Vec<String> = provides
-            .items
-            .iter()
-            .filter_map(|v| {
-                if let Some(callable) = v.as_provider_callable() {
-                    callable.id().ok().map(|id| id.name.clone())
-                } else {
-                    // Fallback: use the string representation
-                    Some(format!("{}", v))
-                }
-            })
-            .collect();
-
-        // Extract toolchain type labels + mandatory flag from the toolchains parameter.
-        // Each item is a string label, a Label object, or a ToolchainTypeRequirement
-        // (produced by config_common.toolchain_type()).
-        //   - String / Label: treated as mandatory (Bazel default).
-        //   - ToolchainTypeRequirement: extract .toolchain_type and .mandatory.
-        let toolchain_types: Vec<(String, bool)> = toolchains
-            .items
-            .iter()
-            .filter_map(|v| {
-                if let Some(s) = v.unpack_str() {
-                    return Some((s.to_owned(), true));
-                }
-                let label_opt = v
-                    .get_attr("toolchain_type", eval.heap())
-                    .ok()
-                    .flatten()
-                    .and_then(|attr| attr.unpack_str().map(|s| s.to_owned()));
-                let mandatory = v
-                    .get_attr("mandatory", eval.heap())
-                    .ok()
-                    .flatten()
-                    .and_then(|attr| attr.unpack_bool())
-                    .unwrap_or(true);
-                if let Some(label) = label_opt {
-                    return Some((label, mandatory));
-                }
-                // Fallback: Display (covers Label objects)
-                Some((format!("{}", v), true))
-            })
-            .collect();
-
-        // Extract rule(outputs={...}) patterns.
-        // Each key→value pair maps an output name to a template like "%{name}.binpb".
-        let rule_outputs: Vec<(String, String)> = if let Some(outputs_val) = outputs {
-            if let Some(dict) = DictRef::from_value(outputs_val) {
-                dict.iter()
-                    .filter_map(|(k, v)| {
-                        let key = k.unpack_str()?.to_owned();
-                        let val = v.unpack_str()?.to_owned();
-                        Some((key, val))
-                    })
-                    .collect()
-            } else {
-                Vec::new()
-            }
-        } else {
-            Vec::new()
-        };
+        let exec_group_defs = parse_exec_groups(exec_groups, eval.heap())?;
+        let provides_names = parse_provides(&provides)?;
+        let toolchain_types = parse_toolchains(&toolchains, eval.heap())?;
+        let rule_outputs = parse_rule_outputs(outputs)?;
 
         // When build_setting is specified, add build_setting_default as an implicit attribute.
         // In Bazel, rules with build_setting automatically accept build_setting_default.
@@ -1388,10 +1401,12 @@ pub fn register_rule_function(builder: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         if copy_from_rule {
-            return Err(starlark::Error::new_other(anyhow::anyhow!(
+            return Err(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
                 "copy_from_rule is no longer supported (removed in Bazel 7). \
                  Specify toolchains and exec_compatible_with explicitly."
-            )));
+            )
+            .into());
         }
         let heap = eval.heap();
         Ok(heap.alloc(ExecGroupValue {

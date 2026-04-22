@@ -3188,6 +3188,33 @@ impl<'v> StarlarkValue<'v> for CtxVarDict {
     }
 }
 
+/// Single source of truth for Kuro's builtin Make-variable (`$(VAR)`) bindings
+/// exposed via `ctx.var`. Each lookup recomputes the list because host_cc_path
+/// and compilation_mode may change between analyses.
+fn builtin_ctx_vars() -> Vec<(&'static str, String)> {
+    let cpu = host_target_cpu();
+    let cc = host_cc_path();
+    let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+    let java = if cfg!(windows) {
+        "java.exe"
+    } else {
+        "/usr/bin/java"
+    };
+    vec![
+        ("BINDIR", format!("bazel-out/{cpu}-{comp_mode}/bin")),
+        ("GENDIR", format!("bazel-out/{cpu}-{comp_mode}/genfiles")),
+        ("TARGET_CPU", cpu.to_owned()),
+        ("COMPILATION_MODE", comp_mode),
+        ("CC", cc.to_owned()),
+        ("CC_FLAGS", String::new()),
+        ("JAVA", java.to_owned()),
+        ("JAVA_RUNFILES", String::new()),
+        ("JAVABASE", String::new()),
+        ("ABI_GLIBC_VERSION", "2.17".to_owned()),
+        ("ABI", "local".to_owned()),
+    ]
+}
+
 #[starlark_module]
 fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
     /// Get a Make variable by name, with optional default.
@@ -3198,30 +3225,11 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let _ = this;
-        let cpu = host_target_cpu();
-        let cc = host_cc_path();
-        let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
-        let value: Option<String> = match key {
-            "BINDIR" => Some(format!("bazel-out/{cpu}-{comp_mode}/bin")),
-            "GENDIR" => Some(format!("bazel-out/{cpu}-{comp_mode}/genfiles")),
-            "TARGET_CPU" => Some(cpu.to_owned()),
-            "COMPILATION_MODE" => Some(comp_mode),
-            "CC" => Some(cc.to_owned()),
-            "CC_FLAGS" => Some(String::new()),
-            "JAVA" => Some(
-                if cfg!(windows) {
-                    "java.exe"
-                } else {
-                    "/usr/bin/java"
-                }
-                .to_owned(),
-            ),
-            "JAVA_RUNFILES" => Some(String::new()),
-            "JAVABASE" => Some(String::new()),
-            "ABI_GLIBC_VERSION" => Some("2.17".to_owned()),
-            "ABI" => Some("local".to_owned()),
-            _ => crate::interpreter::rule_defs::build_config::get_define(key),
-        };
+        let value = builtin_ctx_vars()
+            .into_iter()
+            .find(|(k, _)| *k == key)
+            .map(|(_, v)| v)
+            .or_else(|| crate::interpreter::rule_defs::build_config::get_define(key));
         match value {
             Some(v) => Ok(heap.alloc_str(&v).to_value()),
             None => Ok(default),
@@ -3231,25 +3239,12 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
     /// Get all keys in the Make variables dict.
     fn keys<'v>(this: &CtxVarDict, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
-        let mut keys: Vec<String> = vec![
-            "BINDIR",
-            "GENDIR",
-            "TARGET_CPU",
-            "COMPILATION_MODE",
-            "CC",
-            "CC_FLAGS",
-            "JAVA",
-            "JAVA_RUNFILES",
-            "JAVABASE",
-            "ABI_GLIBC_VERSION",
-            "ABI",
-        ]
-        .into_iter()
-        .map(String::from)
-        .collect();
-        // Include --define keys
+        let mut keys: Vec<String> = builtin_ctx_vars()
+            .into_iter()
+            .map(|(k, _)| k.to_owned())
+            .collect();
         for key in crate::interpreter::rule_defs::build_config::get_all_defines().keys() {
-            if !keys.contains(key) {
+            if !keys.iter().any(|k| k == key) {
                 keys.push(key.clone());
             }
         }
@@ -3260,29 +3255,10 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
     /// Get all values in the Make variables dict.
     fn values<'v>(this: &CtxVarDict, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
-        let cpu = host_target_cpu();
-        let cc = host_cc_path();
-        let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
-        let mut result: Vec<Value> = vec![
-            heap.alloc_str(&format!("bazel-out/{cpu}-{comp_mode}/bin"))
-                .to_value(),
-            heap.alloc_str(&format!("bazel-out/{cpu}-{comp_mode}/genfiles"))
-                .to_value(),
-            heap.alloc_str(cpu).to_value(),
-            heap.alloc_str(&comp_mode).to_value(),
-            heap.alloc_str(cc).to_value(),
-            heap.alloc_str("").to_value(), // CC_FLAGS
-            heap.alloc_str(if cfg!(windows) {
-                "java.exe"
-            } else {
-                "/usr/bin/java"
-            })
-            .to_value(),
-            heap.alloc_str("").to_value(),      // JAVA_RUNFILES
-            heap.alloc_str("").to_value(),      // JAVABASE
-            heap.alloc_str("2.17").to_value(),  // ABI_GLIBC_VERSION
-            heap.alloc_str("local").to_value(), // ABI
-        ];
+        let mut result: Vec<Value> = builtin_ctx_vars()
+            .into_iter()
+            .map(|(_, v)| heap.alloc_str(&v).to_value())
+            .collect();
         for (_, v) in crate::interpreter::rule_defs::build_config::get_all_defines() {
             result.push(heap.alloc_str(&v).to_value());
         }
@@ -3292,35 +3268,10 @@ fn ctx_var_dict_methods(builder: &mut MethodsBuilder) {
     /// Get all key-value pairs as a list of tuples.
     fn items<'v>(this: &CtxVarDict, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let _ = this;
-        let cpu = host_target_cpu();
-        let cc = host_cc_path();
-        let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
-        let mut result: Vec<Value> = Vec::new();
-        let entries: Vec<(&str, String)> = vec![
-            ("BINDIR", format!("bazel-out/{cpu}-{comp_mode}/bin")),
-            ("GENDIR", format!("bazel-out/{cpu}-{comp_mode}/genfiles")),
-            ("TARGET_CPU", cpu.to_owned()),
-            ("COMPILATION_MODE", comp_mode),
-            ("CC", cc.to_owned()),
-            ("CC_FLAGS", String::new()),
-            (
-                "JAVA",
-                if cfg!(windows) {
-                    "java.exe"
-                } else {
-                    "/usr/bin/java"
-                }
-                .to_owned(),
-            ),
-            ("JAVA_RUNFILES", String::new()),
-            ("JAVABASE", String::new()),
-            ("ABI_GLIBC_VERSION", "2.17".to_owned()),
-            ("ABI", "local".to_owned()),
-        ];
-        for (k, v) in &entries {
-            let tuple = heap.alloc((heap.alloc_str(k).to_value(), heap.alloc_str(v).to_value()));
-            result.push(tuple);
-        }
+        let mut result: Vec<Value> = builtin_ctx_vars()
+            .into_iter()
+            .map(|(k, v)| heap.alloc((heap.alloc_str(k).to_value(), heap.alloc_str(&v).to_value())))
+            .collect();
         for (k, v) in crate::interpreter::rule_defs::build_config::get_all_defines() {
             let tuple = heap.alloc((heap.alloc_str(&k).to_value(), heap.alloc_str(&v).to_value()));
             result.push(tuple);

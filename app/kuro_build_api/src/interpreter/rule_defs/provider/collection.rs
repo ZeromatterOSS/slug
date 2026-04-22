@@ -86,6 +86,26 @@ pub fn extract_providers_from_struct<'v>(value: Value<'v>) -> Option<Value<'v>> 
     None
 }
 
+/// Provider type names that were historically skipped when
+/// `ValueAsProviderLike::unpack_value` couldn't recognize them. These are
+/// Bazel-native providers that should have working `ProviderLike` impls in
+/// Kuro; the fallback is kept defensively for edge cases encountered by
+/// early test-rule integrations.
+///
+/// If the `tracing::debug!` below never fires in practice, this list — and
+/// the fallback — can be removed.
+const BAZEL_COMPAT_SKIP_PROVIDER_TYPES: &[&str] = &[
+    "RunEnvironmentInfo",
+    "ExecutionInfo",
+    "InstrumentedFilesInfo",
+    "DebugPackageInfo",
+    "OutputGroupInfo",
+];
+
+fn is_bazel_compat_skip_provider(type_name: &str) -> bool {
+    BAZEL_COMPAT_SKIP_PROVIDER_TYPES.contains(&type_name)
+}
+
 fn format_provider_keys_for_error(keys: &[String]) -> String {
     format!(
         "[{}]",
@@ -298,18 +318,11 @@ impl<'v, V: ValueLike<'v>> ProviderCollectionGen<V> {
                     };
                 }
                 None => {
-                    // For Bazel compatibility: skip known Bazel provider types that
-                    // implement ProviderLike via provide() but aren't recognized by
-                    // the standard unpack path. These include test-related providers
-                    // like RunEnvironmentInfo and testing.ExecutionInfo.
-                    let type_name = value.get_type();
-                    if type_name == "RunEnvironmentInfo"
-                        || type_name == "ExecutionInfo"
-                        || type_name == "InstrumentedFilesInfo"
-                        || type_name == "DebugPackageInfo"
-                        || type_name == "OutputGroupInfo"
-                    {
-                        // Skip silently — these are handled by test infrastructure
+                    if is_bazel_compat_skip_provider(value.get_type()) {
+                        tracing::debug!(
+                            type_name = value.get_type(),
+                            "Skipping known Bazel-compat provider that failed ValueAsProviderLike unpack",
+                        );
                         continue;
                     }
                     return Err(ProviderCollectionError::CollectionElementNotAProvider {

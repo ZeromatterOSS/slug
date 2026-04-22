@@ -489,28 +489,3 @@ cc_common = struct(
     # Action primitives (return None)
     create_compile_action = _create_compile_action,
 )
-
-# ============================================================================
-# Legacy exports for compatibility
-# ============================================================================
-
-# These are exported for backward compatibility with code that loads
-# individual helpers from this file.
-
-cc_common_helpers = struct(
-    get_tool_for_action = _get_tool_for_action,
-    get_execution_requirements = _get_execution_requirements,
-    action_is_enabled = _action_is_enabled,
-    get_memory_inefficient_command_line = _get_memory_inefficient_command_line,
-    get_environment_variables = _get_environment_variables,
-    empty_variables = _empty_variables,
-    legacy_cc_flags_make_variable_do_not_use = _legacy_cc_flags_make_variable_do_not_use,
-    check_experimental_cc_shared_library = _check_experimental_cc_shared_library,
-    incompatible_disable_objc_library_transition = _incompatible_disable_objc_library_transition,
-    add_go_exec_groups_to_binary_rules = _add_go_exec_groups_to_binary_rules,
-    implementation_deps_allowed_by_allowlist = _implementation_deps_allowed_by_allowlist,
-    # Internal helpers
-    internal = _cc_common_internal,
-)
-
-cc_common_internal_helpers = _cc_common_internal

@@ -298,15 +298,30 @@ impl<'v> StarlarkValue<'v> for Depset {
 fn frozen_depset_methods(builder: &mut MethodsBuilder) {
     /// Return a list of all elements in the depset.
     fn to_list<'v>(#[starlark(this)] this: &Depset, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let mut elements: Vec<Value<'v>> = this
+        let collected: Vec<Value<'v>> = this
             .collect_all_frozen()
             .into_iter()
             .map(|v| v.to_value())
             .collect();
-        // Bazel depsets deduplicate elements
-        let mut seen = HashSet::new();
-        elements.retain(|v| seen.insert(v.to_str()));
-        Ok(heap.alloc(AllocList(elements)))
+        // Bazel depsets deduplicate elements by value equality while preserving
+        // insertion order. Use Value::equals (which short-circuits on ptr_eq) to
+        // merge values that are semantically equal, since arbitrary Starlark
+        // values are not Hash-stable and Display-string collisions would
+        // incorrectly merge distinct values.
+        let mut deduped: Vec<Value<'v>> = Vec::with_capacity(collected.len());
+        for v in collected {
+            let mut is_dup = false;
+            for existing in &deduped {
+                if existing.equals(v)? {
+                    is_dup = true;
+                    break;
+                }
+            }
+            if !is_dup {
+                deduped.push(v);
+            }
+        }
+        Ok(heap.alloc(AllocList(deduped)))
     }
 }
 
@@ -396,15 +411,14 @@ where
     fn length(&self) -> starlark::Result<i32> {
         // Count direct elements
         let direct_len = self.direct.to_value().length().unwrap_or(0);
-        // Count transitive elements by summing children lengths
+        // Count transitive elements by summing children lengths.
+        // Hoist ListRef::from_value out of the loop and iterate forward once
+        // instead of using nth(i), which walked from scratch each iteration.
         let mut total = direct_len;
         let trans_val = self.transitive.to_value();
-        let trans_len = trans_val.length().unwrap_or(0);
-        for i in 0..trans_len {
-            if let Some(list) = ListRef::from_value(trans_val) {
-                if let Some(child) = list.iter().nth(i as usize) {
-                    total += child.length().unwrap_or(0);
-                }
+        if let Some(list) = ListRef::from_value(trans_val) {
+            for child in list.iter() {
+                total += child.length().unwrap_or(0);
             }
         }
         Ok(total)
@@ -579,8 +593,6 @@ pub fn depset_direct_and_transitive<'v>(
     Err(kuro_error::Error::from(DepsetError::TransitiveNotDepset).into())
 }
 
-// Removed live_depset_methods - using generic_live_depset_methods for all cases
-
 /// Recursively collect elements from any depset type, respecting traversal order.
 fn collect_depset_elements_ordered<'v>(
     value: Value<'v>,
@@ -687,10 +699,24 @@ fn generic_live_depset_methods(builder: &mut MethodsBuilder) {
         let mut elements: Vec<Value<'v>> = Vec::new();
         collect_depset_elements_ordered(this, &mut elements, heap, order);
         // Bazel depsets deduplicate elements: depset(["a", "a"]).to_list() == ["a"]
-        // Use string representation for dedup since Value doesn't implement Hash/Eq
-        let mut seen = HashSet::new();
-        elements.retain(|v| seen.insert(v.to_str()));
-        Ok(heap.alloc(AllocList(elements)))
+        // Dedup by value equality (preserving insertion order) using
+        // Value::equals, which short-circuits on ptr_eq. Using the Display
+        // string would wrongly collapse distinct values whose representations
+        // happen to coincide (e.g. artifacts at different configurations).
+        let mut deduped: Vec<Value<'v>> = Vec::with_capacity(elements.len());
+        for v in elements {
+            let mut is_dup = false;
+            for existing in &deduped {
+                if existing.equals(v)? {
+                    is_dup = true;
+                    break;
+                }
+            }
+            if !is_dup {
+                deduped.push(v);
+            }
+        }
+        Ok(heap.alloc(AllocList(deduped)))
     }
 }
 

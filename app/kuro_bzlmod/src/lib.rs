@@ -43,7 +43,6 @@ pub mod repository_executor;
 pub mod repository_invocations;
 pub mod resolution;
 pub mod starlark_repo_rule_executor;
-pub mod synthetic_repos;
 pub mod types;
 pub mod version;
 

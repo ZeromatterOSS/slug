@@ -598,10 +598,12 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
                 .map(|path| path.as_str().to_owned())
                 .collect();
             if results.is_empty() {
-                return Err(starlark::Error::new_other(anyhow::anyhow!(
+                return Err(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
                     "glob pattern '{}' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with package(default_glob_allow_empty = ...))",
                     include.items.join(", ")
-                )));
+                )
+                .into());
             }
             Ok(eval
                 .heap()
@@ -674,23 +676,29 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
         match order {
             "default" | "preorder" | "postorder" | "topological" => {}
             _ => {
-                return Err(starlark::Error::new_other(anyhow!(
+                return Err(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
                     "expected order to be one of `default`, `preorder`, `postorder`, `topological`, got `{order}`"
-                )));
+                )
+                .into());
             }
         }
         let actions = match actions {
             NoneOr::None => {
-                return Err(starlark::Error::new_other(anyhow!(
+                return Err(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
                     "native.transitive_set_from_depset requires actions=ctx.actions"
-                )));
+                )
+                .into());
             }
             NoneOr::Other(value) => value,
         };
         let Some(actions) = actions.downcast_ref::<AnalysisActions>() else {
-            return Err(starlark::Error::new_other(anyhow!(
+            return Err(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
                 "actions must be an AnalysisActions instance"
-            )));
+            )
+            .into());
         };
 
         let definition = bazel_depset_tset_definition()?;
@@ -711,9 +719,11 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
             "postorder" => TransitiveSetOrdering::Postorder,
             "topological" => TransitiveSetOrdering::Topological,
             _ => {
-                return Err(starlark::Error::new_other(anyhow!(
+                return Err(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
                     "expected order to be one of `default`, `preorder`, `postorder`, `topological`, got `{order}`"
-                )));
+                )
+                .into());
             }
         };
 
@@ -730,9 +740,11 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
             // Already a depset; return it directly.
             return Ok(tset);
         } else {
-            return Err(starlark::Error::new_other(anyhow!(
+            return Err(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
                 "depset_from_transitive_set expects a transitive_set"
-            )));
+            )
+            .into());
         }
 
         let heap = eval.heap();

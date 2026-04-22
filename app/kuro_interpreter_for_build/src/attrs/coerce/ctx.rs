@@ -377,12 +377,9 @@ impl BuildAttrCoercionContext {
                 } else {
                     false
                 };
-                if is_bare_name && self.strict_label_parsing {
-                    // In strict mode (bzl file attr defaults), bare names like "LICENSE"
-                    // should still be allowed — Bazel treats them as relative labels
-                    // (e.g., attr.label(default = "LICENSE") resolves to ":LICENSE").
-                    // Fall through to the bare name handling below.
-                }
+                // Even in strict mode (bzl file attr defaults), bare names like
+                // "LICENSE" resolve as relative labels — Bazel treats
+                // `attr.label(default = "LICENSE")` as `:LICENSE`.
                 if is_bare_name && !value.contains('/') {
                     // Bazel-compatible: bare target names without slashes (e.g., "foo_bar",
                     // "declare_config_settings.bzl") resolve as ":foo_bar" in the current
@@ -502,14 +499,6 @@ impl AttrCoercionContext for BuildAttrCoercionContext {
         value: &str,
     ) -> Option<kuro_core::provider::label::ProvidersLabel> {
         let producer = self.output_file_registry.borrow().get(value).cloned();
-        if value.contains("ACC.inc") {
-            tracing::error!(
-                "output_file_target: value={} producer={:?} registry.len={}",
-                value,
-                producer,
-                self.output_file_registry.borrow().len()
-            );
-        }
         let producer = producer?;
         let (pkg_label, _) = self.enclosing_package.as_ref()?;
         let target_name = kuro_core::target::name::TargetNameRef::new(&producer).ok()?;

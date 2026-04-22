@@ -313,26 +313,28 @@ impl TargetNode {
         }
     }
 
+    /// Bazel-compatibility approximation of visibility.
+    ///
+    /// Bazel checks implicit rule-attr dependencies against the *rule
+    /// definition's* package, not the BUILD file's. Kuro doesn't track dep
+    /// origin, so we approximate by bypassing visibility for anything we
+    /// can't reasonably have a visibility opinion about:
+    ///
+    /// 1. Same-package: always visible.
+    /// 2. Cross-cell: bzlmod `bazel_dep()` already governs inter-module
+    ///    access; intra-module `__subpackages__` patterns are module-internal.
+    /// 3. Non-root cell: external modules' visibility constraints are their
+    ///    own workflow concern, not ours to enforce here.
+    ///
+    /// Only intra-cell refs inside the root cell consult the declared
+    /// visibility spec.
     pub fn is_visible_to(&self, target: &TargetLabel) -> kuro_error::Result<bool> {
         if self.label().pkg() == target.pkg() {
             return Ok(true);
         }
-        // Cross-cell references bypass visibility checks.
-        // In Bazel's bzlmod model, inter-module access is governed by bazel_dep()
-        // declarations, and intra-module visibility patterns (like __subpackages__)
-        // are for organizing code within a module. Implicit rule dependencies
-        // (attr defaults from rule definitions) bypass visibility in Bazel; since
-        // we don't track dep origin, we approximate by skipping cross-cell checks.
         if self.label().pkg().cell_name() != target.pkg().cell_name() {
             return Ok(true);
         }
-        // For external (non-root) cells, skip intra-cell visibility enforcement.
-        // External modules from the registry are pre-validated; their internal
-        // visibility constraints are for their own development workflow. In Bazel,
-        // implicit deps from rule definitions bypass visibility (they are checked
-        // against the rule definition's package, not the BUILD file's package).
-        // Since kuro doesn't track dep origin, we approximate by skipping
-        // intra-cell visibility for all external modules.
         let cell_name = self.label().pkg().cell_name();
         if !is_root_cell_name(cell_name.as_str()) {
             return Ok(true);

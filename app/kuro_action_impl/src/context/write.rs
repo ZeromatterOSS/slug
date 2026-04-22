@@ -685,118 +685,109 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
         let (declaration, output_artifact) =
             this.get_or_declare_output(eval, output, OutputType::File, None)?;
 
-        // Try to read the template content from the source file
-        let template_content = if let Some(artifact_like) =
-            <&dyn kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkArtifactLike>::unpack_value(template)?
-        {
-            // Try to get the source path of the template
-            if let Some((pkg, rel_path)) = artifact_like.source_path_info() {
-                // Read from the source file on disk
-                // The source path is relative to the cell root
-                let cell_name = pkg.cell_name().as_str();
-                let pkg_path = pkg.cell_relative_path().as_str();
-                let full_path = if pkg_path.is_empty() {
-                    rel_path.clone()
-                } else {
-                    format!("{}/{}", pkg_path, rel_path)
-                };
-                // The daemon's CWD may be inside buck-out/v2, resolve to project root
-                let project_root = std::env::current_dir()
-                    .ok()
-                    .and_then(|cwd| {
-                        if cwd.ends_with("buck-out/v2") {
-                            Some(cwd.parent()?.parent()?.to_path_buf())
-                        } else {
-                            Some(cwd)
-                        }
-                    })
-                    .unwrap_or_default();
-                // Try reading the file from various cell locations
-                let file_content = if kuro_core::cells::is_root_cell_name(cell_name) {
-                    let p = project_root.join(&full_path);
-                    std::fs::read_to_string(&p)
-                        .map_err(|e| {
-                            tracing::warn!("expand_template: failed to read template {:?}: {}", p, e);
-                            e
-                        })
-                        .ok()
-                } else {
-                    // Try bundled cell path first
-                    let bundled_path = project_root.join(format!(
-                        "buck-out/v2/external_cells/bundled/{}/{}",
-                        cell_name, full_path
-                    ));
-                    std::fs::read_to_string(&bundled_path)
-                        .or_else(|_| {
-                            // Try bazel-external/{cell}+{version}/{path} format
-                            // Scan bazel-external/ for dirs matching {cell_name}+*
-                            let external_dir = project_root.join("bazel-external");
-                            if let Ok(entries) = std::fs::read_dir(&external_dir) {
-                                let prefix = format!("{}+", cell_name);
-                                for entry in entries.flatten() {
-                                    let name = entry.file_name();
-                                    let name_str = name.to_string_lossy();
-                                    if name_str.starts_with(&prefix)
-                                        || name_str == cell_name
-                                    {
-                                        let versioned_path = entry.path().join(&full_path);
-                                        if let Ok(content) =
-                                            std::fs::read_to_string(&versioned_path)
-                                        {
-                                            return Ok(content);
-                                        }
-                                    }
-                                }
-                            }
-                            // Also try buck-out/v2/external_cells/bzlmod/{cell}+{version}/{path}
-                            let bzlmod_dir =
-                                project_root.join("buck-out/v2/external_cells/bzlmod");
-                            if let Ok(entries) = std::fs::read_dir(&bzlmod_dir) {
-                                let prefix = format!("{}+", cell_name);
-                                for entry in entries.flatten() {
-                                    let name = entry.file_name();
-                                    let name_str = name.to_string_lossy();
-                                    if name_str.starts_with(&prefix)
-                                        || name_str == cell_name
-                                    {
-                                        let versioned_path = entry.path().join(&full_path);
-                                        if let Ok(content) =
-                                            std::fs::read_to_string(&versioned_path)
-                                        {
-                                            return Ok(content);
-                                        }
-                                    }
-                                }
-                            }
-                            Err(std::io::Error::new(
-                                std::io::ErrorKind::NotFound,
-                                format!(
-                                    "template not found in any location for cell '{}', path '{}'",
-                                    cell_name, full_path
-                                ),
-                            ))
-                        })
-                        .map_err(|e| {
-                            tracing::warn!(
-                                "expand_template: failed to read template for cell '{}', path '{}': {}",
-                                cell_name, full_path, e
-                            );
-                            e
-                        })
-                        .ok()
-                };
-                file_content.unwrap_or_else(|| {
-                    tracing::warn!(
-                        "expand_template: producing empty content for template '{}' in cell '{}'",
-                        full_path, cell_name
-                    );
-                    String::new()
-                })
-            } else {
-                String::new()
-            }
+        // Try to read the template content from the source file.
+        //
+        // TODO(kuro): This reads templates directly from disk at analysis time,
+        // bypassing DICE/artifact infrastructure. Replace with an action or
+        // proper source-file materialization that goes through the normal
+        // artifact path. Until then, any missing/unreadable template must fail
+        // loudly rather than silently producing an empty output file.
+        let artifact_like = <&dyn kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkArtifactLike>::unpack_value(template)?
+            .ok_or_else(|| kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "expand_template: `template` must be an artifact, got {}",
+                template.to_repr()
+            ))?;
+        let (pkg, rel_path) = artifact_like.source_path_info().ok_or_else(|| {
+            kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "expand_template: template artifact has no source path ({})",
+                template.to_repr()
+            )
+        })?;
+        let cell_name = pkg.cell_name().as_str();
+        let pkg_path = pkg.cell_relative_path().as_str();
+        let full_path = if pkg_path.is_empty() {
+            rel_path.clone()
         } else {
-            String::new()
+            format!("{}/{}", pkg_path, rel_path)
+        };
+        // The daemon's CWD may be inside buck-out/v2, resolve to project root.
+        let project_root = std::env::current_dir()
+            .ok()
+            .and_then(|cwd| {
+                if cwd.ends_with("buck-out/v2") {
+                    Some(cwd.parent()?.parent()?.to_path_buf())
+                } else {
+                    Some(cwd)
+                }
+            })
+            .unwrap_or_default();
+        let template_content: String = if kuro_core::cells::is_root_cell_name(cell_name) {
+            let p = project_root.join(&full_path);
+            std::fs::read_to_string(&p).map_err(|e| {
+                kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "expand_template: failed to read template '{}' (resolved to {}): {}",
+                    full_path,
+                    p.display(),
+                    e
+                )
+            })?
+        } else {
+            let bundled_path = project_root.join(format!(
+                "buck-out/v2/external_cells/bundled/{}/{}",
+                cell_name, full_path
+            ));
+            std::fs::read_to_string(&bundled_path)
+                .or_else(|_| {
+                    // Try bazel-external/{cell}+{version}/{path} format.
+                    let external_dir = project_root.join("bazel-external");
+                    if let Ok(entries) = std::fs::read_dir(&external_dir) {
+                        let prefix = format!("{}+", cell_name);
+                        for entry in entries.flatten() {
+                            let name = entry.file_name();
+                            let name_str = name.to_string_lossy();
+                            if name_str.starts_with(&prefix) || name_str == cell_name {
+                                let versioned_path = entry.path().join(&full_path);
+                                if let Ok(content) = std::fs::read_to_string(&versioned_path) {
+                                    return Ok(content);
+                                }
+                            }
+                        }
+                    }
+                    // Try buck-out/v2/external_cells/bzlmod/{cell}+{version}/{path}.
+                    let bzlmod_dir = project_root.join("buck-out/v2/external_cells/bzlmod");
+                    if let Ok(entries) = std::fs::read_dir(&bzlmod_dir) {
+                        let prefix = format!("{}+", cell_name);
+                        for entry in entries.flatten() {
+                            let name = entry.file_name();
+                            let name_str = name.to_string_lossy();
+                            if name_str.starts_with(&prefix) || name_str == cell_name {
+                                let versioned_path = entry.path().join(&full_path);
+                                if let Ok(content) = std::fs::read_to_string(&versioned_path) {
+                                    return Ok(content);
+                                }
+                            }
+                        }
+                    }
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!(
+                            "template not found in any location for cell '{}', path '{}'",
+                            cell_name, full_path
+                        ),
+                    ))
+                })
+                .map_err(|e| {
+                    kuro_error::kuro_error!(
+                        kuro_error::ErrorTag::Input,
+                        "expand_template: failed to read template for cell '{}', path '{}': {}",
+                        cell_name,
+                        full_path,
+                        e
+                    )
+                })?
         };
 
         // Apply substitutions

@@ -874,106 +874,12 @@ async fn run_analysis_with_env_underlying(
         // calculation.rs::get_analysis_result_inner() which covers all rule types.
         // The resolution reads from the DeclaredToolchainInfo registry which is
         // populated by eager loading above and by toolchain() target analysis.
-        let (toolchain_resolution_result, exec_group_resolution_results) = {
-            let toolchain_types = analysis_env.rule_spec.toolchain_types();
-            let exec_group_defs = analysis_env.rule_spec.exec_group_defs();
-            tracing::debug!(
-                "Toolchain types for '{}': {:?} (count={}), exec_groups: {}",
-                node.label(),
-                toolchain_types,
-                toolchain_types.len(),
-                exec_group_defs.len()
+        let (toolchain_resolution_result, exec_group_resolution_results) =
+            resolve_toolchain_types(
+                analysis_env.rule_spec.toolchain_types(),
+                analysis_env.rule_spec.exec_group_defs(),
+                node,
             );
-            if !toolchain_types.is_empty() || !exec_group_defs.is_empty() {
-                use crate::analysis::toolchain_resolution::{
-                    ExecGroupResolutionRequest, PlatformConstraints, RequiredToolchainType,
-                    resolve_toolchains_multi_group,
-                };
-
-                // Build resolution requests: default group + named exec groups.
-                // The mandatory flag comes from the rule's per-toolchain declaration
-                // (`config_common.toolchain_type(..., mandatory=False)`). Optional
-                // toolchains with no matching registration resolve to None; the ctx
-                // still exposes the entry so `ctx.toolchains[type]` returns the
-                // collection (None-typed), not a lookup error.
-                let mut requests = vec![ExecGroupResolutionRequest {
-                    group_name: "default".to_owned(),
-                    required_types: toolchain_types
-                        .iter()
-                        .map(|(label, mandatory)| RequiredToolchainType {
-                            type_label: label.clone(),
-                            mandatory: *mandatory,
-                        })
-                        .collect(),
-                    exec_constraints: vec![],
-                }];
-                for (name, def) in &exec_group_defs {
-                    requests.push(ExecGroupResolutionRequest {
-                        group_name: name.clone(),
-                        required_types: def
-                            .toolchain_types
-                            .iter()
-                            .map(|t| RequiredToolchainType {
-                                type_label: t.clone(),
-                                // Exec group toolchains default to optional — many rules
-                                // declare them with mandatory=False (e.g., cc_test's
-                                // test_runner_toolchain_type). The mandatory flag should
-                                // be extracted from the rule definition, but for now we
-                                // default to false to avoid breaking builds.
-                                mandatory: false,
-                            })
-                            .collect(),
-                        exec_constraints: def.exec_compatible_with.clone(),
-                    });
-                }
-
-                let host = PlatformConstraints::host_platform();
-                let exec_platforms = vec![host.clone()];
-
-                match resolve_toolchains_multi_group(&requests, &host, &exec_platforms) {
-                    Ok(multi_result) => {
-                        let default_result = multi_result.groups.get("default").cloned();
-                        if let Some(ref result) = default_result {
-                            let resolved_count = result
-                                .resolved_toolchains
-                                .values()
-                                .filter(|v| v.is_some())
-                                .count();
-                            tracing::debug!(
-                                "Toolchain resolution for '{}': {}/{} type(s) resolved",
-                                node.label(),
-                                resolved_count,
-                                result.resolved_toolchains.len()
-                            );
-                            for (type_label, resolved) in &result.resolved_toolchains {
-                                tracing::debug!(
-                                    "  {} → {:?}",
-                                    type_label,
-                                    resolved.as_ref().map(|r| &r.toolchain_impl)
-                                );
-                            }
-                        }
-                        // Collect named exec group results (everything except "default")
-                        let exec_groups: std::collections::HashMap<String, _> = multi_result
-                            .groups
-                            .into_iter()
-                            .filter(|(name, _)| name != "default")
-                            .collect();
-                        (default_result, exec_groups)
-                    }
-                    Err(e) => {
-                        tracing::debug!(
-                            "Toolchain resolution failed for '{}': {}",
-                            node.label(),
-                            e
-                        );
-                        (None, std::collections::HashMap::new())
-                    }
-                }
-            } else {
-                (None, std::collections::HashMap::new())
-            }
-        };
 
         // Build ResolvedToolchains from the resolution result.
         // For each resolved toolchain type, analyze the impl target via DICE
@@ -1248,6 +1154,117 @@ async fn run_analysis_with_env_underlying(
     .await
 }
 
+/// Resolve a rule's declared toolchain types and exec groups.
+///
+/// Returns `(default_group_result, named_exec_group_results)`. The default
+/// group corresponds to the rule-level `toolchains=[...]` declaration; named
+/// exec groups come from `exec_groups={...}`. Each group is resolved
+/// independently and may pick a different exec platform.
+fn resolve_toolchain_types(
+    toolchain_types: Vec<(String, bool)>,
+    exec_group_defs: Vec<(String, kuro_node::rule::ExecGroupDef)>,
+    node: ConfiguredTargetNodeRef<'_>,
+) -> (
+    Option<crate::analysis::toolchain_resolution::ToolchainResolutionResult>,
+    std::collections::HashMap<
+        String,
+        crate::analysis::toolchain_resolution::ToolchainResolutionResult,
+    >,
+) {
+    tracing::debug!(
+        "Toolchain types for '{}': {:?} (count={}), exec_groups: {}",
+        node.label(),
+        toolchain_types,
+        toolchain_types.len(),
+        exec_group_defs.len()
+    );
+    if toolchain_types.is_empty() && exec_group_defs.is_empty() {
+        return (None, std::collections::HashMap::new());
+    }
+
+    use crate::analysis::toolchain_resolution::ExecGroupResolutionRequest;
+    use crate::analysis::toolchain_resolution::PlatformConstraints;
+    use crate::analysis::toolchain_resolution::RequiredToolchainType;
+    use crate::analysis::toolchain_resolution::resolve_toolchains_multi_group;
+
+    // Build resolution requests: default group + named exec groups.
+    // The mandatory flag comes from the rule's per-toolchain declaration
+    // (`config_common.toolchain_type(..., mandatory=False)`). Optional
+    // toolchains with no matching registration resolve to None; the ctx
+    // still exposes the entry so `ctx.toolchains[type]` returns the
+    // collection (None-typed), not a lookup error.
+    let mut requests = vec![ExecGroupResolutionRequest {
+        group_name: "default".to_owned(),
+        required_types: toolchain_types
+            .iter()
+            .map(|(label, mandatory)| RequiredToolchainType {
+                type_label: label.clone(),
+                mandatory: *mandatory,
+            })
+            .collect(),
+        exec_constraints: vec![],
+    }];
+    for (name, def) in &exec_group_defs {
+        requests.push(ExecGroupResolutionRequest {
+            group_name: name.clone(),
+            required_types: def
+                .toolchain_types
+                .iter()
+                .map(|t| RequiredToolchainType {
+                    type_label: t.clone(),
+                    // Exec group toolchains default to optional — many rules
+                    // declare them with mandatory=False (e.g., cc_test's
+                    // test_runner_toolchain_type). The mandatory flag should
+                    // be extracted from the rule definition, but for now we
+                    // default to false to avoid breaking builds.
+                    mandatory: false,
+                })
+                .collect(),
+            exec_constraints: def.exec_compatible_with.clone(),
+        });
+    }
+
+    let host = PlatformConstraints::host_platform();
+    let exec_platforms = vec![host.clone()];
+
+    match resolve_toolchains_multi_group(&requests, &host, &exec_platforms) {
+        Ok(multi_result) => {
+            let default_result = multi_result.groups.get("default").cloned();
+            if let Some(ref result) = default_result {
+                let resolved_count = result
+                    .resolved_toolchains
+                    .values()
+                    .filter(|v| v.is_some())
+                    .count();
+                tracing::debug!(
+                    "Toolchain resolution for '{}': {}/{} type(s) resolved",
+                    node.label(),
+                    resolved_count,
+                    result.resolved_toolchains.len()
+                );
+                for (type_label, resolved) in &result.resolved_toolchains {
+                    tracing::debug!(
+                        "  {} → {:?}",
+                        type_label,
+                        resolved.as_ref().map(|r| &r.toolchain_impl)
+                    );
+                }
+            }
+            // Collect named exec group results (everything except "default")
+            let exec_groups: std::collections::HashMap<String, _> = multi_result
+                .groups
+                .into_iter()
+                .filter(|(name, _)| name != "default")
+                .collect();
+            (default_result, exec_groups)
+        }
+        Err(e) => {
+            tracing::debug!("Toolchain resolution failed for '{}': {}", node.label(), e);
+            (None, std::collections::HashMap::new())
+        }
+    }
+}
+
 pub fn transitive_validations(
     deps: SmallMap<ConfiguredTargetLabel, TransitiveValidations>,
     provider_collection: FrozenProviderCollectionValueRef,
@@ -1336,13 +1353,21 @@ pub fn get_user_defined_rule_spec(
 
             // Store the ctx in thread-local for subrule invocations to use.
             // SAFETY: ctx.to_value() is on the evaluator's heap which outlives eval_function.
+            // The TLS slot is cleared in `CtxGuard::drop`, so an error or panic from
+            // eval_function cannot leave a stale pointer behind for a later caller.
             let ctx_val = ctx.to_value();
             let ctx_bits: usize = unsafe { std::mem::transmute(ctx_val) };
             kuro_interpreter_for_build::subrule::set_current_rule_ctx_raw(ctx_bits);
 
-            let result = eval.eval_function(rule_impl.to_value(), &[ctx_val], &[]);
+            struct CtxGuard;
+            impl Drop for CtxGuard {
+                fn drop(&mut self) {
+                    kuro_interpreter_for_build::subrule::clear_current_rule_ctx();
+                }
+            }
+            let _guard = CtxGuard;
 
-            kuro_interpreter_for_build::subrule::clear_current_rule_ctx();
+            let result = eval.eval_function(rule_impl.to_value(), &[ctx_val], &[]);
 
             Ok(result?)
         }
