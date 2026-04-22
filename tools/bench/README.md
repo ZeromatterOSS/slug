@@ -8,7 +8,11 @@ pairs them with `kuro log diff summary` for before / after analysis.
 ```bash
 # Cold + warm × 3 runs against the large canary target. Requires
 # /var/mnt/dev/llvm-project/utils/bazel to be set up as a Kuro workspace.
-KURO=$(pwd)/target/debug/kuro tools/bench/run.sh \
+#
+# BUCKD_STARTUP_TIMEOUT=180 is required on cold daemons — the 10s
+# default is too tight when bundled-cell init has to run. Kuro cold
+# start takes 20–30s in practice.
+BUCKD_STARTUP_TIMEOUT=180 KURO=$(pwd)/target/debug/kuro tools/bench/run.sh \
     --target '@llvm-project//clang:clang' --runs 3 --both \
     --workspace /var/mnt/dev/llvm-project/utils/bazel
 
