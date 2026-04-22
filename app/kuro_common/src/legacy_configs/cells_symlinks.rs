@@ -14,6 +14,25 @@
 
 use std::path::Path;
 
+/// Compare two symlink-target paths for equality, tolerating the common
+/// absolute-vs-relative-to-link-parent mismatch. `std::fs::read_link`
+/// returns exactly what was stored in the symlink, and bzlmod resolution
+/// sometimes passes absolute paths (registry cache) and sometimes paths
+/// relative to the link's parent (project-local). Without this, a symlink
+/// created from one flavor and re-checked from the other looks stale and
+/// triggers remove+create, which the file watcher picks up as an
+/// invalidation on every build.
+fn paths_equal(a: &Path, b: &Path) -> bool {
+    if a == b {
+        return true;
+    }
+    // Canonicalize only on mismatch — avoids stat'ing on the common path.
+    match (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
+        (Ok(x), Ok(y)) => x == y,
+        _ => false,
+    }
+}
+
 /// Ensure a symlink exists from `link` to `target`. Modeled after Bazel's
 /// [`FileSystemUtils.ensureSymbolicLink`](https://github.com/bazelbuild/bazel/blob/master/src/main/java/com/google/devtools/build/lib/vfs/FileSystemUtils.java).
 ///
@@ -22,9 +41,17 @@ use std::path::Path;
 /// - If non-symlink exists: return error
 pub(crate) fn ensure_symlink(link: &Path, target: &Path) -> std::io::Result<()> {
     if let Ok(existing) = std::fs::read_link(link) {
-        if existing == target {
+        if paths_equal(&existing, target) {
             return Ok(());
         }
+        // Trace the no-match so the file-watcher Plan 17.4 can chase the
+        // residual invalidation events reported in the memory note.
+        tracing::debug!(
+            "ensure_symlink: replacing stale link {} (was {} -> now {})",
+            link.display(),
+            existing.display(),
+            target.display(),
+        );
         if cfg!(windows) {
             let _ = std::fs::remove_dir(link);
             let _ = std::fs::remove_file(link);

@@ -181,11 +181,35 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
     let desired_target = std::path::PathBuf::from("..").join(cell_path);
     match link_path.symlink_metadata() {
         Ok(meta) if meta.file_type().is_symlink() => {
-            // Replace symlink only if it points to a different target. Comparing
-            // the raw readlink output avoids stat'ing dangling targets.
+            // Replace symlink only if it points to a different target.
+            // Comparing the raw readlink output avoids stat'ing the target,
+            // but can miss absolute-vs-relative flavor mismatches when the
+            // same target was created from different call sites. Fall back
+            // to canonicalize on mismatch so a semantically-equal link
+            // doesn't get remove+create'd (→ invalidation event on every
+            // build). See Plan 17.4 / memory/file_watcher_buck_out_alias.
             match std::fs::read_link(&link_path) {
-                Ok(current) if current == desired_target => return,
-                _ => {
+                Ok(current) => {
+                    if current == desired_target {
+                        return;
+                    }
+                    match (
+                        std::fs::canonicalize(&link_path),
+                        std::fs::canonicalize(&desired_target),
+                    ) {
+                        (Ok(a), Ok(b)) if a == b => return,
+                        _ => {
+                            tracing::debug!(
+                                "ensure_external_symlink: replacing stale link {} (was {} -> now {})",
+                                link_path.display(),
+                                current.display(),
+                                desired_target.display(),
+                            );
+                            let _ = std::fs::remove_file(&link_path);
+                        }
+                    }
+                }
+                Err(_) => {
                     let _ = std::fs::remove_file(&link_path);
                 }
             }
