@@ -15,6 +15,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -66,11 +68,12 @@ use kuro_node::nodes::eval_result::EvaluationResult;
 use kuro_util::time_span::TimeSpan;
 use smallvec::SmallVec;
 use static_assertions::assert_eq_size;
-use tokio::sync::mpsc::UnboundedReceiver;
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::error::TrySendError;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_stream::wrappers::ReceiverStream;
 
 use crate::backend::backend::BuildListenerBackend;
 use crate::backend::logging::LoggingBackend;
@@ -301,9 +304,33 @@ pub(crate) struct Evaluation {
     extra_data: NodeExtraData,
 }
 
+/// Capacity for the build-signal MPSC channel. Bounded so a wedged receiver
+/// can't drive the daemon to OOM on large builds; sized so that realistic
+/// graphs (≤1M nodes, a handful of signals per node) never hit the bound in
+/// steady state. Sync senders drop+count on Full; the async `BuildFinished`
+/// path awaits.
+const BUILD_SIGNAL_CHANNEL_CAPACITY: usize = 256 * 1024;
+
 #[derive(Clone)]
 pub(crate) struct BuildSignalSender {
-    sender: UnboundedSender<BuildSignal>,
+    sender: Sender<BuildSignal>,
+    /// Incremented every time a sync send hits Full. Reported once at build
+    /// finish via soft_error so drops don't go unnoticed.
+    dropped: Arc<AtomicU64>,
+}
+
+impl BuildSignalSender {
+    fn try_send_sync(&self, signal: BuildSignal) {
+        match self.sender.try_send(signal) {
+            Ok(()) => {}
+            Err(TrySendError::Full(_)) => {
+                self.dropped.fetch_add(1, Ordering::Relaxed);
+            }
+            Err(TrySendError::Closed(_)) => {
+                // Receiver gone; this path is reachable on abnormal shutdown.
+            }
+        }
+    }
 }
 
 impl BuildSignals for BuildSignalSender {
@@ -312,12 +339,10 @@ impl BuildSignals for BuildSignalSender {
         label: ConfiguredTargetLabel,
         artifacts: Vec<ResolvedArtifactGroupBuildSignalsKey>,
     ) {
-        let _ignored = self
-            .sender
-            .send(BuildSignal::TopLevelTarget(TopLevelTargetSignal {
-                label,
-                artifacts,
-            }));
+        self.try_send_sync(BuildSignal::TopLevelTarget(TopLevelTargetSignal {
+            label,
+            artifacts,
+        }));
     }
 
     fn final_materialization(
@@ -327,7 +352,7 @@ impl BuildSignals for BuildSignalSender {
         span_id: Option<SpanId>,
         waiting_data: WaitingData,
     ) {
-        let _ignored = self.sender.send(BuildSignal::FinalMaterialization(
+        self.try_send_sync(BuildSignal::FinalMaterialization(
             FinalMaterializationSignal {
                 artifact,
                 duration,
@@ -344,14 +369,12 @@ impl BuildSignals for BuildSignalSender {
         duration: NodeDuration,
         deps: &[ActionKey],
     ) {
-        let _ignored = self
-            .sender
-            .send(BuildSignal::TestListing(TestListingSignal {
-                target,
-                suite,
-                deps: deps.to_vec(),
-                duration,
-            }));
+        self.try_send_sync(BuildSignal::TestListing(TestListingSignal {
+            target,
+            suite,
+            deps: deps.to_vec(),
+            duration,
+        }));
     }
 
     fn test_execution(
@@ -363,16 +386,14 @@ impl BuildSignals for BuildSignalSender {
         duration: NodeDuration,
         deps: &[ActionKey],
     ) {
-        let _ignored = self
-            .sender
-            .send(BuildSignal::TestExecution(TestExecutionSignal {
-                target,
-                suite,
-                testcases: testcases.to_vec(),
-                variant,
-                deps: deps.to_vec(),
-                duration,
-            }));
+        self.try_send_sync(BuildSignal::TestExecution(TestExecutionSignal {
+            target,
+            suite,
+            testcases: testcases.to_vec(),
+            variant,
+            deps: deps.to_vec(),
+            duration,
+        }));
     }
 }
 
@@ -468,13 +489,13 @@ impl ActivationTracker for BuildSignalSender {
             }
         }
 
-        let _ignored = self.sender.send(BuildSignal::Evaluation(signal));
+        self.try_send_sync(BuildSignal::Evaluation(signal));
     }
 }
 
 pub(crate) struct DeferredBuildSignalsImpl {
     sender: Arc<BuildSignalSender>,
-    receiver: UnboundedReceiver<BuildSignal>,
+    receiver: Receiver<BuildSignal>,
 }
 
 impl DeferredBuildSignals for DeferredBuildSignalsImpl {
@@ -511,7 +532,22 @@ pub(crate) struct FinishBuildSignalsImpl {
 #[async_trait]
 impl FinishBuildSignals for FinishBuildSignalsImpl {
     async fn finish(self: Box<Self>) -> kuro_error::Result<()> {
-        let _ignored = self.sender.sender.send(BuildSignal::BuildFinished);
+        // BuildFinished is not optional — await so it can't drop even under
+        // back-pressure. Closed receiver means a prior error is already being
+        // reported; swallow here.
+        let _ignored = self.sender.sender.send(BuildSignal::BuildFinished).await;
+
+        let dropped = self.sender.dropped.load(Ordering::Relaxed);
+        if dropped > 0 {
+            let _ignored = kuro_core::soft_error!(
+                "build_signals_dropped",
+                kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Tier0,
+                    "build-signal channel full: {dropped} signals dropped (capacity {BUILD_SIGNAL_CHANNEL_CAPACITY}). Critical-path, what-ran and cache-hit metrics may be incomplete."
+                ),
+                quiet: true
+            );
+        }
 
         self.handle
             .await
@@ -521,7 +557,7 @@ impl FinishBuildSignals for FinishBuildSignalsImpl {
 
 fn start_backend(
     events: EventDispatcher,
-    receiver: UnboundedReceiver<BuildSignal>,
+    receiver: Receiver<BuildSignal>,
     backend: impl BuildListenerBackend + Send + 'static,
     ctx: BuildSignalsContext,
 ) -> JoinHandle<kuro_error::Result<()>> {
@@ -532,7 +568,7 @@ fn start_backend(
 }
 
 struct BuildSignalReceiver<T> {
-    receiver: UnboundedReceiverStream<BuildSignal>,
+    receiver: ReceiverStream<BuildSignal>,
     // Maps a PackageLabel to the first PackageLabel that had an edge to it. When that PackageLabel
     // shows up, we'll give it a dependency on said first PackageLabel that had an edge to it, which
     // is how we discovered its existence.
@@ -548,9 +584,9 @@ impl<T> BuildSignalReceiver<T>
 where
     T: BuildListenerBackend,
 {
-    fn new(receiver: UnboundedReceiver<BuildSignal>, backend: T) -> Self {
+    fn new(receiver: Receiver<BuildSignal>, backend: T) -> Self {
         Self {
-            receiver: UnboundedReceiverStream::new(receiver),
+            receiver: ReceiverStream::new(receiver),
             backend,
             first_edge_to_load: HashMap::new(),
             test_listing_keys: HashMap::new(),
@@ -939,9 +975,12 @@ impl AnalysisNodeData {
 assert_eq_size!(NodeData, [usize; 20]);
 
 fn create_build_signals() -> (BuildSignalsInstaller, Box<dyn DeferredBuildSignals>) {
-    let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
+    let (sender, receiver) = tokio::sync::mpsc::channel(BUILD_SIGNAL_CHANNEL_CAPACITY);
 
-    let sender = Arc::new(BuildSignalSender { sender });
+    let sender = Arc::new(BuildSignalSender {
+        sender,
+        dropped: Arc::new(AtomicU64::new(0)),
+    });
     let installer = BuildSignalsInstaller {
         build_signals: sender.dupe() as _,
         activation_tracker: sender.dupe() as _,
