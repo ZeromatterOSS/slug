@@ -325,8 +325,14 @@ fn analyze_genrule(
     }
 
     // Create the genrule action
-    let genrule_action =
-        GenruleAction::new(cmd, inputs, output_artifacts, location_mappings, shell);
+    let genrule_action = GenruleAction::new(
+        cmd,
+        inputs,
+        output_artifacts,
+        out_names.clone(),
+        location_mappings,
+        shell,
+    );
 
     // Register the action
     let registered_action = Arc::new(RegisteredAction::new(
@@ -1468,6 +1474,7 @@ fn analyze_genquery(target: &ConfiguredTargetLabel) -> kuro_error::Result<Analys
         "touch \"$@\"".to_owned(),
         vec![],
         vec![output_artifact],
+        vec![],
         vec![],
         GenruleShell::Bash,
     );

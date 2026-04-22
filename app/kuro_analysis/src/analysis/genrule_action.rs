@@ -68,6 +68,12 @@ pub struct GenruleAction {
     inputs: Vec<ArtifactGroup>,
     /// Output build artifacts (one per entry in genrule's `outs`).
     outputs: Vec<BuildArtifact>,
+    /// Output names as declared in the genrule's `outs` attribute (relative paths).
+    /// Used to compute `$(@D)` for multi-output genrules (Bazel's semantics: the
+    /// package's root directory in the genfiles tree, which for kuro is the
+    /// `__<target>__/` output root obtained by stripping the relative out name
+    /// off the resolved output path).
+    out_names: Vec<String>,
     /// Location mappings: (normalized_label, artifacts) for $(location label) expansion.
     /// The normalized_label is a string key used to match $(location <key>) patterns.
     /// Each entry stores the artifact groups for the matching dependency.
@@ -81,6 +87,7 @@ impl GenruleAction {
         cmd: String,
         inputs: Vec<ArtifactGroup>,
         outputs: Vec<BuildArtifact>,
+        out_names: Vec<String>,
         location_mappings: Vec<(String, Vec<ArtifactGroup>)>,
         shell: GenruleShell,
     ) -> Self {
@@ -88,6 +95,7 @@ impl GenruleAction {
             cmd,
             inputs,
             outputs,
+            out_names,
             location_mappings,
             shell,
         }
@@ -178,6 +186,7 @@ fn expand_genrule_cmd(
     cmd: &str,
     srcs: &[String],
     outs: &[String],
+    out_names: &[String],
     locations: &[(String, Vec<String>)],
     quote_fn: fn(&str) -> String,
 ) -> String {
@@ -198,11 +207,36 @@ fn expand_genrule_cmd(
 
     // Compute output directory (dirname of first output) from the raw path,
     // then apply shell quoting to the result.
-    let out_dir_raw = std::path::Path::new(first_out_raw)
-        .parent()
-        .and_then(|p| p.to_str())
-        .unwrap_or("");
-    let out_dir = quote_fn(out_dir_raw);
+    //
+    // Bazel's $(@D) semantics:
+    //   - Single out: directory containing the output file.
+    //   - Multiple outs: the package's root directory in the genfiles tree,
+    //     even if every out shares a subdirectory.
+    //
+    // For kuro this means the rule's `__<target>__/` output root. Compute by
+    // stripping the declared relative out name (e.g. `staging/include/foo.h`)
+    // off the resolved buck-out path, leaving `buck-out/.../__<target>__/`.
+    // Falls back to the first-out's parent if something is mismatched so
+    // single-output genrules and earlier behaviour are preserved.
+    let out_dir_raw = if outs.len() > 1 {
+        let fallback = std::path::Path::new(first_out_raw)
+            .parent()
+            .and_then(|p| p.to_str())
+            .unwrap_or("")
+            .to_owned();
+        out_names
+            .first()
+            .and_then(|n| first_out_raw.strip_suffix(n.as_str()))
+            .map(|root| root.trim_end_matches('/').to_owned())
+            .unwrap_or(fallback)
+    } else {
+        std::path::Path::new(first_out_raw)
+            .parent()
+            .and_then(|p| p.to_str())
+            .unwrap_or("")
+            .to_owned()
+    };
+    let out_dir = quote_fn(&out_dir_raw);
 
     // Compute $(GENDIR) / $(BINDIR): the bin_dir root (buck-out/v2/gen/<cell>/<cfg_hash>).
     // Output paths look like: buck-out/v2/gen/<cell>/<cfg_hash>/<package>/__<target>__/<file>
@@ -213,7 +247,7 @@ fn expand_genrule_cmd(
             // buck-out/v2/gen/<cell>/<cfg_hash>
             parts[..5].join("/")
         } else {
-            out_dir_raw.to_owned()
+            out_dir_raw.clone()
         }
     };
     let bin_dir = quote_fn(&bin_dir_raw);
@@ -221,6 +255,15 @@ fn expand_genrule_cmd(
     // Expand $(VARNAME) style make variables
     // $(GENDIR) / $(BINDIR) = bin output root (buck-out/v2/gen/<cell>/<cfg_hash>)
     // $(RULEDIR) / $(@D) = directory containing this rule's outputs
+    // $(WORKSPACE_ROOT) = path from exec root to workspace root. Bazel's value is
+    //   "" for the main workspace and "external/<cell>" for external cells. Kuro
+    //   runs genrule commands with cwd = project root, which is also the workspace
+    //   root, so expanding to "" matches user expectations even for external-cell
+    //   targets. The external-cell artifact paths that srcs expand to include a
+    //   kuro-specific prefix (`buck-out/v2/external_cells/...`); shell patterns
+    //   of the form `${src#*"$(WORKSPACE_ROOT)"/clang/lib/Headers}` match
+    //   regardless because `*""/clang/lib/Headers` behaves the same as
+    //   `*/clang/lib/Headers` under bash parameter expansion.
     let mut cmd = cmd
         .replace("$(SRCS)", &srcs_str)
         .replace("$(OUTS)", &outs_str)
@@ -228,6 +271,7 @@ fn expand_genrule_cmd(
         .replace("$(RULEDIR)", &out_dir)
         .replace("$(GENDIR)", &bin_dir)
         .replace("$(BINDIR)", &bin_dir)
+        .replace("$(WORKSPACE_ROOT)", "")
         .replace("$(TARGET)", ""); // Not easily available at exec time, skip
 
     // Expand single-char $ substitutions
@@ -242,6 +286,17 @@ fn expand_genrule_cmd(
     // Expand $(location ...) and related patterns.
     // We do a single-pass scan to handle all variants consistently.
     cmd = expand_location_patterns(&cmd, locations, quote_fn);
+
+    // Bazel genrule semantics: `$$` in `cmd` is an escape for a literal `$`
+    // that must survive Make-variable expansion. The shell ultimately sees a
+    // single `$`, which is what it needs for command substitution (`$(…)`),
+    // variable expansion (`$var`), etc. Without this step bash reads `$$` as
+    // its PID and `$$(…)` becomes a syntax error.
+    //
+    // Done last so it doesn't affect any earlier replace() calls, and so
+    // users who write `$$(SRCS)` get `$(SRCS)` (a literal) in the output
+    // rather than Make-expanded paths.
+    cmd = cmd.replace("$$", "$");
 
     cmd
 }
@@ -486,6 +541,7 @@ impl Action for GenruleAction {
             &self.cmd,
             &srcs_abs_paths,
             &outs_abs_paths,
+            &self.out_names,
             &location_resolved,
             quote_fn,
         );
