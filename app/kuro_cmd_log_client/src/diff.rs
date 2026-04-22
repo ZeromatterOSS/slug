@@ -16,12 +16,14 @@ use kuro_client_ctx::exit_result::ExitResult;
 mod action_divergence;
 mod diff_options;
 mod external_config_diff;
+mod summary_diff;
 
 #[derive(Debug, clap::Subcommand)]
 #[clap(about = "Subcommands for diff'ing two kuro commands")]
 pub enum DiffCommand {
     ActionDivergence(action_divergence::ActionDivergenceCommand),
     ExternalConfigs(external_config_diff::ExternalConfigDiffCommand),
+    Summary(summary_diff::SummaryDiffCommand),
 }
 
 impl DiffCommand {
@@ -34,6 +36,7 @@ impl DiffCommand {
         match self {
             Self::ExternalConfigs(cmd) => ctx.exec(cmd, matches, events_ctx),
             Self::ActionDivergence(cmd) => ctx.exec(cmd, matches, events_ctx),
+            Self::Summary(cmd) => ctx.exec(cmd, matches, events_ctx),
         }
     }
 }
