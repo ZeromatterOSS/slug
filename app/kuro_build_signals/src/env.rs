@@ -41,10 +41,27 @@ pub struct NodeDuration {
 }
 
 impl NodeDuration {
-    /// Returns the duration we are using in our critical path calculation. This doesn't really
-    /// *need* to be a function but is helpful so that not every callsite has to know which one we chose.
+    /// Returns the duration we feed into the critical-path calculation.
+    ///
+    /// For actions, this is [`Self::user`] — the exec-only wall from the
+    /// executor (`ActionExecutionEnd.wall_time`). The alternative,
+    /// [`Self::total`], includes the *queue wait* between scheduler
+    /// admission and worker dispatch. On throughput-bound builds queue
+    /// wait can exceed exec wall by 100×; folding it into critical-path
+    /// durations makes the reported critical path meaningless (we saw
+    /// critical_path ≈ total_wall on the post-Plan-16 clang baseline).
+    ///
+    /// For analyses and loads, `user` is populated with the same wall as
+    /// `total`, so the preference is a no-op. The `total`-fallback covers
+    /// the pathological case where an action's wall_time field is absent
+    /// (old event logs): we'd rather over-attribute than zero out an
+    /// entry the algorithm needs.
     pub fn critical_path_duration(&self) -> Duration {
-        self.total.duration()
+        if self.user.is_zero() {
+            self.total.duration()
+        } else {
+            self.user
+        }
     }
 
     pub fn zero() -> Self {
