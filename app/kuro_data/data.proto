@@ -1884,6 +1884,17 @@ message AnalysisStageStart {
   reserved 1;
   oneof stage {
     google.protobuf.Empty evaluate_rule = 2;
+    // Plan 16.6: three fine-grained sub-stages nested under EvaluateRule,
+    // so the rollup engine can distinguish "did we regress configure or
+    // run-impl?" on an otherwise-opaque analysis span.
+    //
+    // configure: toolchain resolution + exec-platform selection + recursive
+    //            analysis of toolchain impl targets via DICE.
+    // attr_eval: coerce+resolve rule attributes (node_to_attrs_struct).
+    // run_impl:  the rule's implementation function invocation.
+    google.protobuf.Empty configure = 3;
+    google.protobuf.Empty attr_eval = 4;
+    google.protobuf.Empty run_impl = 5;
   }
 }
 

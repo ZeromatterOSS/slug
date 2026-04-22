@@ -475,6 +475,9 @@ pub fn display_analysis_stage(stage: &kuro_data::analysis_stage_start::Stage) ->
 
     match stage {
         Stage::EvaluateRule(()) => "evaluate_rule",
+        Stage::Configure(()) => "configure",
+        Stage::AttrEval(()) => "attr_eval",
+        Stage::RunImpl(()) => "run_impl",
     }
 }
 

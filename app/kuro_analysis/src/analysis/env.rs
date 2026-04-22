@@ -51,7 +51,9 @@ use kuro_core::target::name::TargetNameRef;
 use kuro_core::unsafe_send_future::UnsafeSendFuture;
 use kuro_error::BuckErrorContext;
 use kuro_error::conversion::from_any_with_tag;
+use kuro_events::dispatch::Span as DispatchSpan;
 use kuro_events::dispatch::get_dispatcher;
+use kuro_events::dispatch::span_simple as dispatch_span_simple;
 use kuro_execute::digest_config::HasDigestConfig;
 use kuro_interpreter::dice::starlark_provider::StarlarkEvalKind;
 use kuro_interpreter::factory::BuckStarlarkModule;
@@ -835,34 +837,59 @@ async fn run_analysis_with_env_underlying(
             })
             .collect::<SmallMap<_, _>>();
 
-        let (attributes, plugins) = {
-            let mut dep_analysis_results = get_deps_from_analysis_results(analysis_env.deps)?;
+        // Plan 16.6: attr_eval sub-span — attribute coercion + plugin resolution.
+        let (attributes, plugins) = dispatch_span_simple::<
+            _,
+            kuro_data::AnalysisStageEnd,
+            _,
+            kuro_error::Result<_>,
+        >(
+            kuro_data::AnalysisStageStart {
+                stage: Some(kuro_data::analysis_stage_start::Stage::AttrEval(())),
+            },
+            || {
+                let mut dep_analysis_results = get_deps_from_analysis_results(analysis_env.deps)?;
 
-            // Phase 8h: Merge aspect providers into dependency provider collections.
-            // When a rule's attribute has aspects (e.g., deps with aspects=[cc_proto_aspect]),
-            // the aspect produces additional providers that should be accessible via dep[Provider].
-            if !analysis_env.aspect_results.is_empty() {
-                use kuro_build_api::interpreter::rule_defs::provider::collection::merge_provider_collections;
-                for (dep_label, aspect_providers) in &analysis_env.aspect_results {
-                    if let Some(base_providers) = dep_analysis_results.get(dep_label) {
-                        let merged = merge_provider_collections(base_providers, aspect_providers);
-                        dep_analysis_results.insert(dep_label.dupe(), merged);
+                // Phase 8h: Merge aspect providers into dependency provider collections.
+                // When a rule's attribute has aspects (e.g., deps with aspects=[cc_proto_aspect]),
+                // the aspect produces additional providers that should be accessible via dep[Provider].
+                if !analysis_env.aspect_results.is_empty() {
+                    use kuro_build_api::interpreter::rule_defs::provider::collection::merge_provider_collections;
+                    for (dep_label, aspect_providers) in &analysis_env.aspect_results {
+                        if let Some(base_providers) = dep_analysis_results.get(dep_label) {
+                            let merged =
+                                merge_provider_collections(base_providers, aspect_providers);
+                            dep_analysis_results.insert(dep_label.dupe(), merged);
+                        }
                     }
                 }
-            }
 
-            let resolution_ctx = RuleAnalysisAttrResolutionContext {
-                module: &env,
-                dep_analysis_results,
-                query_results: analysis_env.query_results,
-                execution_platform_resolution: node.execution_platform_resolution().clone(),
-            };
+                let resolution_ctx = RuleAnalysisAttrResolutionContext {
+                    module: &env,
+                    dep_analysis_results,
+                    query_results: analysis_env.query_results,
+                    execution_platform_resolution: node.execution_platform_resolution().clone(),
+                };
 
-            (
-                node_to_attrs_struct(node, &mut &resolution_ctx)?,
-                plugins_to_starlark_value(node, &mut &resolution_ctx)?,
-            )
-        };
+                Ok((
+                    node_to_attrs_struct(node, &mut &resolution_ctx)?,
+                    plugins_to_starlark_value(node, &mut &resolution_ctx)?,
+                ))
+            },
+            kuro_data::AnalysisStageEnd {},
+        )?;
+
+        // Plan 16.6: configure sub-span — toolchain resolution + exec-group
+        // resolution + recursive DICE analysis of toolchain impl targets. Uses
+        // a guard (Span::start + .end) because the body has `.await` which
+        // rules out span_simple, and the captures make an async-block
+        // refactor here more invasive than it's worth.
+        let configure_span = DispatchSpan::start(
+            get_dispatcher(),
+            kuro_data::AnalysisStageStart {
+                stage: Some(kuro_data::analysis_stage_start::Stage::Configure(())),
+            },
+        );
 
         let registry = AnalysisRegistry::new_from_owner(
             BaseDeferredKey::TargetLabel(node.label().dupe()),
@@ -978,6 +1005,8 @@ async fn run_analysis_with_env_underlying(
             None
         };
 
+        configure_span.end(kuro_data::AnalysisStageEnd {});
+
         let eval_kind = StarlarkEvalKind::Analysis(node.label().dupe());
         let eval_provider = StarlarkEvaluatorProvider::new(dice, eval_kind).await?;
         let mut reentrant_eval =
@@ -1038,7 +1067,21 @@ async fn run_analysis_with_env_underlying(
                 ctx.set_resolved_exec_groups(exec_groups_value);
             }
 
-            let list_res = analysis_env.rule_spec.invoke(&mut eval, ctx)?;
+            // Plan 16.6: run_impl sub-span — the rule's Starlark impl
+            // invocation itself, excluding toolchain resolution and attr
+            // coercion. This is what "rule took too long" actually measures.
+            let list_res = dispatch_span_simple::<
+                _,
+                kuro_data::AnalysisStageEnd,
+                _,
+                kuro_error::Result<_>,
+            >(
+                kuro_data::AnalysisStageStart {
+                    stage: Some(kuro_data::analysis_stage_start::Stage::RunImpl(())),
+                },
+                || analysis_env.rule_spec.invoke(&mut eval, ctx),
+                kuro_data::AnalysisStageEnd {},
+            )?;
 
             // Bazel convention: when a rule declares outputs via `attr.output`
             // / `attr.output_list` and the impl does not return DefaultInfo
