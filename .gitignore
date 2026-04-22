@@ -25,3 +25,9 @@ examples/hello_world/library.exp
 examples/hello_world/library.lib
 kuro.exe
 tests/manual_test/**
+
+# Benchmark artifacts: keep FINDINGS.md + summary.json + wall.txt;
+# skip the large event logs and captured stderr.
+benchmarks/**/*.pb.zst
+benchmarks/**/build.log
+benchmarks/**/summary.err
