@@ -76,8 +76,12 @@ pub struct MnemonicRow {
     /// Actions in this mnemonic that were served by any cache (local,
     /// remote, or remote dep-file).
     pub cached: u64,
-    /// Sum of wall durations across all actions in this mnemonic.
+    /// Sum of exec-only wall (`ActionExecutionEnd.wall_time`).
     pub total_wall_us: u64,
+    /// Sum of queue wait per action (outer span duration minus exec wall).
+    /// Non-zero means the scheduler admitted work faster than it could
+    /// dispatch it — the signal for Plan 17.2.
+    pub total_queue_us: u64,
     /// Sum of wall durations for entries of this mnemonic that appeared on
     /// the critical path. Zero if the critical path wasn't emitted.
     pub critical_wall_us: u64,
@@ -144,7 +148,11 @@ pub struct BuildSummaryBuilder {
 struct MnemonicAcc {
     count: u64,
     cached: u64,
+    /// Sum of exec-only wall times (ActionExecutionEnd.wall_time).
     total_wall_us: u64,
+    /// Sum of queue waits (span duration − exec wall). Non-zero values
+    /// here are the scheduler-pressure signal we were missing before.
+    total_queue_us: u64,
     durations_us: Vec<u64>,
 }
 
@@ -306,7 +314,19 @@ impl BuildSummaryBuilder {
                 self.in_flight_actions = self.in_flight_actions.saturating_sub(1);
                 self.action_stats.update(action);
                 self.total_action_count += 1;
-                self.record_action(action, duration_us);
+                // ActionExecutionEnd.wall_time is the exec-only wall
+                // ("Omits queue time", see data.proto:1634). Prefer it over
+                // SpanEndEvent.duration which wraps the whole calculation
+                // future — queue wait + dispatch + exec. Using the outer
+                // span's duration inflates every per-mnemonic total by the
+                // queue-depth factor on throughput-bound builds.
+                let exec_wall_us = action
+                    .wall_time
+                    .as_ref()
+                    .map(duration_to_us)
+                    .unwrap_or(duration_us);
+                let queue_wall_us = duration_us.saturating_sub(exec_wall_us);
+                self.record_action(action, exec_wall_us, queue_wall_us);
             }
             Some(Data::FinalMaterialization(_)) | Some(Data::Materialization(_)) => {
                 self.materialize_phase.observe_end(ts_us);
@@ -315,7 +335,12 @@ impl BuildSummaryBuilder {
         }
     }
 
-    fn record_action(&mut self, action: &ActionExecutionEnd, duration_us: u64) {
+    fn record_action(
+        &mut self,
+        action: &ActionExecutionEnd,
+        exec_wall_us: u64,
+        queue_wall_us: u64,
+    ) {
         // Only count real Run actions in per-mnemonic rollup. Skip the
         // synthetic action kinds (copy/symlink) which would pollute the
         // mnemonic list.
@@ -338,13 +363,14 @@ impl BuildSummaryBuilder {
         if is_cached {
             acc.cached += 1;
         }
-        acc.total_wall_us += duration_us;
-        acc.durations_us.push(duration_us);
+        acc.total_wall_us += exec_wall_us;
+        acc.total_queue_us += queue_wall_us;
+        acc.durations_us.push(exec_wall_us);
 
         self.push_top_n_action(ActionRow {
             category,
             identifier: name.identifier.clone(),
-            wall_us: duration_us,
+            wall_us: exec_wall_us,
             cached: is_cached,
         });
     }
@@ -448,6 +474,7 @@ impl BuildSummaryBuilder {
                     count: acc.count,
                     cached: acc.cached,
                     total_wall_us: acc.total_wall_us,
+                    total_queue_us: acc.total_queue_us,
                     critical_wall_us,
                     p50_us: p(0.50),
                     p95_us: p(0.95),
@@ -558,6 +585,23 @@ impl BuildSummary {
                 String::new()
             };
             lines.push(format!("Top mnemonics: {}{}", top.join(" "), suffix));
+        }
+
+        // Scheduler-pressure signal: ratio of total queue-wait to
+        // total exec-wall, summed over all actions. >1× means the
+        // scheduler admitted more work than cores could run. Only
+        // surface when non-trivial — a cold incremental rebuild with
+        // zero actions would otherwise always show "0ms / 0ms".
+        let total_exec: u64 = self.by_mnemonic.iter().map(|r| r.total_wall_us).sum();
+        let total_queue: u64 = self.by_mnemonic.iter().map(|r| r.total_queue_us).sum();
+        if total_exec > 0 && total_queue > 0 {
+            let ratio = total_queue as f64 / total_exec as f64;
+            lines.push(format!(
+                "Queue: {} wait / {} exec ({:.2}× ratio)",
+                fmt_duration_us(total_queue),
+                fmt_duration_us(total_exec),
+                ratio,
+            ));
         }
 
         if self.critical_path_wall_us > 0 {
@@ -722,6 +766,43 @@ mod tests {
         assert_eq!(row.cached, 3);
         assert_eq!(row.total_wall_us, 6_000);
         assert_eq!(summary.cache_hit_pct, 100.0);
+    }
+
+    #[test]
+    fn rollup_splits_exec_and_queue_wall() {
+        // SpanEnd.duration = 5s (total). ActionExecutionEnd.wall_time = 1s
+        // (exec-only). So queue_wait = 4s.
+        let mut action = remote_cache_hit();
+        action.wall_time = Some(prost_types::Duration {
+            seconds: 1,
+            nanos: 0,
+        });
+        let mut b = BuildSummaryBuilder::new();
+        b.handle_event(&span_end(
+            kuro_data::span_end_event::Data::ActionExecution(Box::new(action)),
+            5_000_000, // outer span = 5s
+        ));
+        let summary = b.finalize();
+        assert_eq!(summary.by_mnemonic.len(), 1);
+        let row = &summary.by_mnemonic[0];
+        assert_eq!(row.total_wall_us, 1_000_000, "exec-only wall");
+        assert_eq!(row.total_queue_us, 4_000_000, "queue-wait remainder");
+    }
+
+    #[test]
+    fn rollup_falls_back_to_span_duration_when_wall_time_absent() {
+        // Pre-Plan-17.2-first-half event logs don't set wall_time — the
+        // aggregator must not zero out total_wall_us on those.
+        let mut action = remote_cache_hit();
+        action.wall_time = None;
+        let mut b = BuildSummaryBuilder::new();
+        b.handle_event(&span_end(
+            kuro_data::span_end_event::Data::ActionExecution(Box::new(action)),
+            2_500_000,
+        ));
+        let summary = b.finalize();
+        assert_eq!(summary.by_mnemonic[0].total_wall_us, 2_500_000);
+        assert_eq!(summary.by_mnemonic[0].total_queue_us, 0);
     }
 
     #[test]

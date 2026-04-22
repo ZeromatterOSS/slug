@@ -448,16 +448,17 @@ fn format_build_summary_table(summary: &BuildSummary, include_mnemonics: bool) -
     if include_mnemonics && !summary.by_mnemonic.is_empty() {
         s.push_str("\nBy mnemonic\n");
         s.push_str(&format!(
-            "  {:<24} {:>8} {:>8} {:>10} {:>10} {:>10} {:>10} {:>10}\n",
-            "category", "count", "cached", "total", "crit", "p50", "p95", "p99"
+            "  {:<24} {:>8} {:>8} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10}\n",
+            "category", "count", "cached", "exec", "queue", "crit", "p50", "p95", "p99"
         ));
         for row in &summary.by_mnemonic {
             s.push_str(&format!(
-                "  {:<24} {:>8} {:>8} {:>10} {:>10} {:>10} {:>10} {:>10}\n",
+                "  {:<24} {:>8} {:>8} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10}\n",
                 truncate(&row.category, 24),
                 row.count,
                 row.cached,
                 fmt_us(row.total_wall_us),
+                fmt_us(row.total_queue_us),
                 fmt_us(row.critical_wall_us),
                 fmt_us(row.p50_us),
                 fmt_us(row.p95_us),
@@ -499,6 +500,7 @@ fn build_summary_to_json(trace_id: &str, summary: &BuildSummary) -> serde_json::
                 "count": row.count,
                 "cached": row.cached,
                 "total_wall_us": row.total_wall_us,
+                "total_queue_us": row.total_queue_us,
                 "critical_wall_us": row.critical_wall_us,
                 "p50_us": row.p50_us,
                 "p95_us": row.p95_us,
@@ -559,6 +561,7 @@ fn build_summary_to_csv(summary: &BuildSummary) -> std::io::Result<String> {
             "count",
             "cached",
             "total_wall_us",
+            "total_queue_us",
             "critical_wall_us",
             "p50_us",
             "p95_us",
@@ -570,6 +573,7 @@ fn build_summary_to_csv(summary: &BuildSummary) -> std::io::Result<String> {
                 &row.count.to_string(),
                 &row.cached.to_string(),
                 &row.total_wall_us.to_string(),
+                &row.total_queue_us.to_string(),
                 &row.critical_wall_us.to_string(),
                 &row.p50_us.to_string(),
                 &row.p95_us.to_string(),
