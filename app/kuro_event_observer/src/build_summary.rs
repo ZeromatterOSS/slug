@@ -20,7 +20,6 @@
 //! [`BuildSummaryBuilder::finalize`] once, at BuildFinished or EOF.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use kuro_data::ActionExecutionEnd;
 use kuro_data::ActionKind;
@@ -175,7 +174,7 @@ impl BuildSummaryBuilder {
         }
     }
 
-    pub fn handle_event(&mut self, event: &Arc<BuckEvent>) {
+    pub fn handle_event(&mut self, event: &BuckEvent) {
         use kuro_data::buck_event::Data;
 
         match event.data() {
@@ -194,7 +193,7 @@ impl BuildSummaryBuilder {
         }
     }
 
-    fn on_span_start(&mut self, event: &Arc<BuckEvent>, span: &kuro_data::SpanStartEvent) {
+    fn on_span_start(&mut self, event: &BuckEvent, span: &kuro_data::SpanStartEvent) {
         use kuro_data::span_start_event::Data;
 
         let ts_us = timestamp_us(event);
@@ -212,7 +211,7 @@ impl BuildSummaryBuilder {
         }
     }
 
-    fn on_span_end(&mut self, event: &Arc<BuckEvent>, span: &kuro_data::SpanEndEvent) {
+    fn on_span_end(&mut self, event: &BuckEvent, span: &kuro_data::SpanEndEvent) {
         use kuro_data::span_end_event::Data;
 
         let duration_us = span
@@ -589,18 +588,18 @@ mod tests {
 
     use super::*;
 
-    fn span_start(data: kuro_data::span_start_event::Data) -> Arc<BuckEvent> {
-        Arc::new(BuckEvent::new(
+    fn span_start(data: kuro_data::span_start_event::Data) -> BuckEvent {
+        BuckEvent::new(
             SystemTime::UNIX_EPOCH,
             TraceId::new(),
             Some(SpanId::next()),
             None,
             SpanStartEvent { data: Some(data) }.into(),
-        ))
+        )
     }
 
-    fn span_end(data: kuro_data::span_end_event::Data, duration_us: u64) -> Arc<BuckEvent> {
-        Arc::new(BuckEvent::new(
+    fn span_end(data: kuro_data::span_end_event::Data, duration_us: u64) -> BuckEvent {
+        BuckEvent::new(
             SystemTime::UNIX_EPOCH,
             TraceId::new(),
             Some(SpanId::next()),
@@ -614,7 +613,7 @@ mod tests {
                 data: Some(data),
             }
             .into(),
-        ))
+        )
     }
 
     fn remote_cache_hit() -> kuro_data::ActionExecutionEnd {

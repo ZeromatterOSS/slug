@@ -23,9 +23,12 @@ use kuro_client_ctx::exit_result::ExitResult;
 use kuro_client_ctx::subscribers::recorder::process_memory;
 use kuro_data::ActionExecutionKind;
 use kuro_event_log::stream_value::StreamValue;
+use kuro_event_observer::build_summary::BuildSummary;
+use kuro_event_observer::build_summary::BuildSummaryBuilder;
 use kuro_event_observer::fmt_duration;
 use kuro_event_observer::humanized::HumanizedBytes;
 use kuro_event_observer::humanized::HumanizedBytesPerSecond;
+use kuro_events::BuckEvent;
 use kuro_util::network_speed_average::NetworkSpeedAverage;
 use kuro_util::sliding_window::SlidingWindow;
 use tokio_stream::StreamExt;
@@ -304,11 +307,35 @@ impl Display for Stats {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum SummaryFormat {
+    /// Human-readable table (default).
+    Table,
+    /// JSON object with stable field names. Suitable for CI pipelines.
+    Json,
+    /// CSV, one row per mnemonic.
+    Csv,
+}
+
 /// Outputs high level statistics about the build
 #[derive(Debug, clap::Parser)]
 pub struct SummaryCommand {
     #[clap(flatten)]
     event_log: EventLogOptions,
+
+    /// Output format. Default is a human-readable table with a
+    /// BuildSummary rollup after the existing stats sections.
+    #[clap(long, value_enum, default_value = "table")]
+    format: SummaryFormat,
+
+    /// Number of entries to keep in slowest-actions / slowest-analyses.
+    #[clap(long, default_value_t = 10)]
+    top_n: usize,
+
+    /// Suppress the per-mnemonic rollup in table output. JSON/CSV always
+    /// include it.
+    #[clap(long)]
+    no_by_mnemonic: bool,
 }
 
 impl BuckSubcommand for SummaryCommand {
@@ -324,12 +351,6 @@ impl BuckSubcommand for SummaryCommand {
 
         let (invocation, mut events) = log_path.unpack_stream().await?;
 
-        kuro_client_ctx::println!(
-            "Showing summary from: {}",
-            invocation.display_command_line()
-        )?;
-        kuro_client_ctx::println!("build ID: {}", invocation.trace_id)?;
-
         let mut stats = Stats {
             re_max_download_speeds: vec![
                 SlidingWindow::new(Duration::from_secs(1)),
@@ -344,13 +365,241 @@ impl BuckSubcommand for SummaryCommand {
             ..Default::default()
         };
 
+        let mut builder = BuildSummaryBuilder::with_top_n(self.top_n);
+
         while let Some(event) = events.try_next().await? {
             match event {
-                StreamValue::Event(event) => stats.update_with_event(&event),
+                StreamValue::Event(proto) => {
+                    stats.update_with_event(&proto);
+                    // Convert proto -> wrapped once, feed both sinks. A
+                    // conversion error means the event is malformed;
+                    // skip it rather than failing the whole summary.
+                    if let Ok(wrapped) = BuckEvent::try_from(proto) {
+                        builder.handle_event(&wrapped);
+                    }
+                }
                 StreamValue::Result(..) | StreamValue::PartialResult(..) => {}
             }
         }
-        kuro_client_ctx::println!("{}", stats)?;
+        let summary = builder.finalize();
+
+        match self.format {
+            SummaryFormat::Table => {
+                kuro_client_ctx::println!(
+                    "Showing summary from: {}",
+                    invocation.display_command_line()
+                )?;
+                kuro_client_ctx::println!("build ID: {}", invocation.trace_id)?;
+                kuro_client_ctx::println!("{}", stats)?;
+                let include_mnemonics = !self.no_by_mnemonic;
+                kuro_client_ctx::println!(
+                    "{}",
+                    format_build_summary_table(&summary, include_mnemonics)
+                )?;
+            }
+            SummaryFormat::Json => {
+                let json = build_summary_to_json(&invocation.trace_id.to_string(), &summary)
+                    .map_err(|e| {
+                        kuro_error::conversion::from_any_with_tag(e, kuro_error::ErrorTag::Tier0)
+                    })?;
+                kuro_client_ctx::println!("{}", json)?;
+            }
+            SummaryFormat::Csv => {
+                let csv = build_summary_to_csv(&summary).map_err(|e| {
+                    kuro_error::conversion::from_any_with_tag(e, kuro_error::ErrorTag::Tier0)
+                })?;
+                kuro_client_ctx::println!("{}", csv)?;
+            }
+        }
         ExitResult::success()
     }
+}
+
+fn format_build_summary_table(summary: &BuildSummary, include_mnemonics: bool) -> String {
+    let mut s = String::new();
+
+    s.push_str("\nBuild Rollup\n");
+    s.push_str(&format!(
+        "- Load: {}\n- Analyze: {}\n- Execute: {}\n- Materialize: {}\n- Total wall: {}\n",
+        fmt_us(summary.load_wall_us),
+        fmt_us(summary.analyze_wall_us),
+        fmt_us(summary.execute_wall_us),
+        fmt_us(summary.materialize_wall_us),
+        fmt_us(summary.total_wall_us),
+    ));
+    if summary.critical_path_wall_us > 0 {
+        s.push_str(&format!(
+            "- Critical path: {}\n- Slowest path: {}\n",
+            fmt_us(summary.critical_path_wall_us),
+            fmt_us(summary.slowest_path_wall_us),
+        ));
+    }
+    s.push_str(&format!(
+        "- Peak in-flight actions: {}\n- Action count: {}\n",
+        summary.peak_in_flight_actions, summary.total_action_count
+    ));
+    if summary.num_dice_nodes > 0 {
+        s.push_str(&format!(
+            "- Graph: {} nodes, {} edges, {} action-graph\n",
+            summary.num_dice_nodes, summary.num_dice_edges, summary.action_graph_size,
+        ));
+    }
+
+    if include_mnemonics && !summary.by_mnemonic.is_empty() {
+        s.push_str("\nBy mnemonic\n");
+        s.push_str(&format!(
+            "  {:<24} {:>8} {:>8} {:>10} {:>10} {:>10} {:>10} {:>10}\n",
+            "category", "count", "cached", "total", "crit", "p50", "p95", "p99"
+        ));
+        for row in &summary.by_mnemonic {
+            s.push_str(&format!(
+                "  {:<24} {:>8} {:>8} {:>10} {:>10} {:>10} {:>10} {:>10}\n",
+                truncate(&row.category, 24),
+                row.count,
+                row.cached,
+                fmt_us(row.total_wall_us),
+                fmt_us(row.critical_wall_us),
+                fmt_us(row.p50_us),
+                fmt_us(row.p95_us),
+                fmt_us(row.p99_us),
+            ));
+        }
+    }
+
+    if !summary.slowest_actions.is_empty() {
+        s.push_str("\nSlowest actions\n");
+        for row in &summary.slowest_actions {
+            s.push_str(&format!(
+                "  {:>10}  {}  {}{}\n",
+                fmt_us(row.wall_us),
+                row.category,
+                row.identifier,
+                if row.cached { "  (cached)" } else { "" },
+            ));
+        }
+    }
+
+    if !summary.slowest_analyses.is_empty() {
+        s.push_str("\nSlowest analyses\n");
+        for row in &summary.slowest_analyses {
+            s.push_str(&format!("  {:>10}  {}\n", fmt_us(row.wall_us), row.target));
+        }
+    }
+
+    s
+}
+
+fn build_summary_to_json(trace_id: &str, summary: &BuildSummary) -> serde_json::Result<String> {
+    let by_mnemonic: Vec<serde_json::Value> = summary
+        .by_mnemonic
+        .iter()
+        .map(|row| {
+            serde_json::json!({
+                "category": row.category,
+                "count": row.count,
+                "cached": row.cached,
+                "total_wall_us": row.total_wall_us,
+                "critical_wall_us": row.critical_wall_us,
+                "p50_us": row.p50_us,
+                "p95_us": row.p95_us,
+                "p99_us": row.p99_us,
+            })
+        })
+        .collect();
+    let slowest_actions: Vec<serde_json::Value> = summary
+        .slowest_actions
+        .iter()
+        .map(|row| {
+            serde_json::json!({
+                "category": row.category,
+                "identifier": row.identifier,
+                "wall_us": row.wall_us,
+                "cached": row.cached,
+            })
+        })
+        .collect();
+    let slowest_analyses: Vec<serde_json::Value> = summary
+        .slowest_analyses
+        .iter()
+        .map(|row| {
+            serde_json::json!({
+                "target": row.target,
+                "wall_us": row.wall_us,
+            })
+        })
+        .collect();
+    let value = serde_json::json!({
+        "trace_id": trace_id,
+        "load_wall_us": summary.load_wall_us,
+        "analyze_wall_us": summary.analyze_wall_us,
+        "execute_wall_us": summary.execute_wall_us,
+        "materialize_wall_us": summary.materialize_wall_us,
+        "total_wall_us": summary.total_wall_us,
+        "cache_hit_pct": summary.cache_hit_pct,
+        "peak_in_flight_actions": summary.peak_in_flight_actions,
+        "total_action_count": summary.total_action_count,
+        "num_dice_nodes": summary.num_dice_nodes,
+        "num_dice_edges": summary.num_dice_edges,
+        "action_graph_size": summary.action_graph_size,
+        "critical_path_wall_us": summary.critical_path_wall_us,
+        "slowest_path_wall_us": summary.slowest_path_wall_us,
+        "by_mnemonic": by_mnemonic,
+        "slowest_actions": slowest_actions,
+        "slowest_analyses": slowest_analyses,
+    });
+    serde_json::to_string_pretty(&value)
+}
+
+fn build_summary_to_csv(summary: &BuildSummary) -> std::io::Result<String> {
+    let mut buf: Vec<u8> = Vec::new();
+    {
+        let mut w = csv::Writer::from_writer(&mut buf);
+        w.write_record([
+            "category",
+            "count",
+            "cached",
+            "total_wall_us",
+            "critical_wall_us",
+            "p50_us",
+            "p95_us",
+            "p99_us",
+        ])?;
+        for row in &summary.by_mnemonic {
+            w.write_record([
+                row.category.as_str(),
+                &row.count.to_string(),
+                &row.cached.to_string(),
+                &row.total_wall_us.to_string(),
+                &row.critical_wall_us.to_string(),
+                &row.p50_us.to_string(),
+                &row.p95_us.to_string(),
+                &row.p99_us.to_string(),
+            ])?;
+        }
+        w.flush()?;
+    }
+    String::from_utf8(buf).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+}
+
+fn fmt_us(us: u64) -> String {
+    // Match the live summary's duration style so CI output doesn't have to
+    // learn two formats.
+    if us == 0 {
+        return "0s".to_owned();
+    }
+    let total_ms = us / 1_000;
+    if total_ms < 1_000 {
+        return format!("{total_ms}ms");
+    }
+    let total_secs = total_ms as f64 / 1_000.0;
+    if total_secs < 60.0 {
+        return format!("{total_secs:.1}s");
+    }
+    let minutes = (total_secs / 60.0) as u64;
+    let seconds = (total_secs - (minutes as f64) * 60.0) as u64;
+    format!("{minutes}m{seconds:02}s")
+}
+
+fn truncate(s: &str, max: usize) -> &str {
+    if s.len() <= max { s } else { &s[..max] }
 }
