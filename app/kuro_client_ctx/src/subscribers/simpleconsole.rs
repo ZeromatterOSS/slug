@@ -20,7 +20,9 @@ use std::time::SystemTime;
 
 use async_trait::async_trait;
 use dupe::Dupe;
+use kuro_core::kuro_env;
 use kuro_error::conversion::from_any_with_tag;
+use kuro_event_observer::build_summary::BuildSummaryBuilder;
 use kuro_event_observer::display;
 use kuro_event_observer::display::TargetDisplayOptions;
 use kuro_event_observer::display::display_file_watcher_end;
@@ -153,6 +155,7 @@ pub struct SimpleConsole<E> {
     // Whether to show "Waiting for daemon..." when no root spans are received
     expect_spans: bool,
     pub(crate) observer: EventObserver<E>,
+    build_summary: BuildSummaryBuilder,
     action_errors: Vec<kuro_data::ActionError>,
     last_print_time: Instant,
     last_shown_snapshot_ts: Option<SystemTime>,
@@ -175,6 +178,7 @@ where
             verbosity,
             expect_spans,
             observer: EventObserver::new(trace_id),
+            build_summary: BuildSummaryBuilder::new(),
             action_errors: Vec::new(),
             last_print_time: Instant::now(),
             last_shown_snapshot_ts: None,
@@ -194,6 +198,7 @@ where
             verbosity,
             expect_spans,
             observer: EventObserver::new(trace_id),
+            build_summary: BuildSummaryBuilder::new(),
             action_errors: Vec::new(),
             last_print_time: Instant::now(),
             last_shown_snapshot_ts: None,
@@ -232,6 +237,7 @@ where
         &mut self,
         event: &Arc<BuckEvent>,
     ) -> kuro_error::Result<()> {
+        self.build_summary.handle_event(event);
         self.observer.observe(event).await
     }
 
@@ -444,8 +450,6 @@ where
         _command: &kuro_data::CommandEnd,
         _event: &BuckEvent,
     ) -> kuro_error::Result<()> {
-        let snapshots = self.observer().two_snapshots();
-
         if self.verbosity.print_status() && self.observer().action_stats().log_stats() {
             let cache_hit_percentage = self.observer().action_stats().total_cache_hit_percentage();
             echo!("Cache hits: {}%", cache_hit_percentage)?;
@@ -465,8 +469,20 @@ where
                     self.observer().action_stats().total_executed_actions()
                 )?;
             }
+
+            // Plan 16.2: short end-of-build rollup under the bare Cache-hits
+            // line. Set KURO_BUILD_SUMMARY=off to suppress. std::mem::take the
+            // builder — it's only used at command-end; keeping it around
+            // would just pin accumulated Vecs for the rest of this SimpleConsole.
+            if kuro_env!("KURO_BUILD_SUMMARY").unwrap_or(None).as_deref() != Some("off") {
+                let summary = std::mem::take(&mut self.build_summary).finalize();
+                for line in summary.short_lines() {
+                    echo!("{}", line)?;
+                }
+            }
         }
 
+        let snapshots = self.observer().two_snapshots();
         if let Some(re) = &self
             .observer()
             .re_state()

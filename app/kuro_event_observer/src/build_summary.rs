@@ -464,6 +464,82 @@ impl Default for BuildSummaryBuilder {
     }
 }
 
+impl BuildSummary {
+    /// Compact two-line summary suitable for the live end-of-build TTY
+    /// output. Empty Vec if nothing useful to show.
+    pub fn short_lines(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+
+        if self.total_wall_us > 0
+            || self.load_wall_us > 0
+            || self.analyze_wall_us > 0
+            || self.execute_wall_us > 0
+        {
+            lines.push(format!(
+                "Phases: load={} analyze={} execute={} materialize={} total={}",
+                fmt_duration_us(self.load_wall_us),
+                fmt_duration_us(self.analyze_wall_us),
+                fmt_duration_us(self.execute_wall_us),
+                fmt_duration_us(self.materialize_wall_us),
+                fmt_duration_us(self.total_wall_us),
+            ));
+        }
+
+        if !self.by_mnemonic.is_empty() {
+            const SHOW: usize = 3;
+            let top: Vec<String> = self
+                .by_mnemonic
+                .iter()
+                .take(SHOW)
+                .map(|row| {
+                    format!(
+                        "{}={}/{}",
+                        row.category,
+                        fmt_duration_us(row.total_wall_us),
+                        row.count
+                    )
+                })
+                .collect();
+            let extra = self.by_mnemonic.len().saturating_sub(SHOW);
+            let suffix = if extra > 0 {
+                format!(" ({extra} more)")
+            } else {
+                String::new()
+            };
+            lines.push(format!("Top mnemonics: {}{}", top.join(" "), suffix));
+        }
+
+        if self.critical_path_wall_us > 0 {
+            lines.push(format!(
+                "Critical path: {}  Slowest path: {}",
+                fmt_duration_us(self.critical_path_wall_us),
+                fmt_duration_us(self.slowest_path_wall_us),
+            ));
+        }
+
+        lines
+    }
+}
+
+fn fmt_duration_us(us: u64) -> String {
+    // Mirror bazel's "12.3s" / "1m34s" short style. No humanized library
+    // dependency — the existing crate's HumanizedBytes is bytes-only.
+    if us == 0 {
+        return "0s".to_owned();
+    }
+    let total_ms = us / 1_000;
+    if total_ms < 1_000 {
+        return format!("{total_ms}ms");
+    }
+    let total_secs = total_ms as f64 / 1_000.0;
+    if total_secs < 60.0 {
+        return format!("{total_secs:.1}s");
+    }
+    let minutes = (total_secs / 60.0) as u64;
+    let seconds = (total_secs - (minutes as f64) * 60.0) as u64;
+    format!("{minutes}m{seconds:02}s")
+}
+
 fn timestamp_us(event: &BuckEvent) -> Option<u64> {
     event
         .event()
@@ -621,6 +697,46 @@ mod tests {
         assert_eq!(summary.slowest_actions.len(), 2);
         assert_eq!(summary.slowest_actions[0].wall_us, 900);
         assert_eq!(summary.slowest_actions[1].wall_us, 700);
+    }
+
+    #[test]
+    fn short_lines_format() {
+        let mut b = BuildSummaryBuilder::new();
+        b.handle_event(&span_end(
+            kuro_data::span_end_event::Data::Load(kuro_data::LoadBuildFileEnd {
+                ..Default::default()
+            }),
+            1_500_000, // 1.5s
+        ));
+        b.handle_event(&span_end(
+            kuro_data::span_end_event::Data::ActionExecution(Box::new(remote_cache_hit())),
+            2_300_000, // 2.3s
+        ));
+        let summary = b.finalize();
+        let lines = summary.short_lines();
+        assert!(
+            lines.iter().any(|l| l.contains("load=1.5s")),
+            "got: {lines:?}"
+        );
+        assert!(
+            lines.iter().any(|l| l.contains("cxx_compile=")),
+            "got: {lines:?}"
+        );
+    }
+
+    #[test]
+    fn short_lines_empty_summary() {
+        let summary = BuildSummaryBuilder::new().finalize();
+        assert!(summary.short_lines().is_empty());
+    }
+
+    #[test]
+    fn fmt_duration_humanized() {
+        assert_eq!(fmt_duration_us(0), "0s");
+        assert_eq!(fmt_duration_us(999_000), "999ms");
+        assert_eq!(fmt_duration_us(1_500_000), "1.5s");
+        assert_eq!(fmt_duration_us(61_000_000), "1m01s");
+        assert_eq!(fmt_duration_us(3_665_000_000), "61m05s");
     }
 
     #[test]
