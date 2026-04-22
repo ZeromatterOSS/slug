@@ -106,11 +106,15 @@ pub struct BuildSummaryBuilder {
     top_n: usize,
     per_mnemonic: HashMap<String, MnemonicAcc>,
 
-    // Phase accumulators.
-    load_wall_us: u64,
-    analyze_wall_us: u64,
-    execute_wall_us: u64,
-    materialize_wall_us: u64,
+    // Phase wall tracking. For each phase, the earliest SpanStart
+    // timestamp and latest SpanEnd timestamp. Elapsed = last - first.
+    // This gives the true wall slice attributed to the phase; summing
+    // overlapping span durations would wildly overcount in parallel
+    // phases (observed: execute_wall=23m58s when total_wall=22.8s).
+    load_phase: PhaseSpan,
+    analyze_phase: PhaseSpan,
+    execute_phase: PhaseSpan,
+    materialize_phase: PhaseSpan,
     command_first_ts_us: Option<u64>,
     command_last_ts_us: Option<u64>,
 
@@ -144,6 +148,39 @@ struct MnemonicAcc {
     durations_us: Vec<u64>,
 }
 
+#[derive(Debug, Default)]
+struct PhaseSpan {
+    first_start_us: Option<u64>,
+    last_end_us: Option<u64>,
+}
+
+impl PhaseSpan {
+    fn observe_start(&mut self, ts_us: Option<u64>) {
+        if let Some(ts) = ts_us {
+            self.first_start_us = Some(match self.first_start_us {
+                Some(prev) => prev.min(ts),
+                None => ts,
+            });
+        }
+    }
+
+    fn observe_end(&mut self, ts_us: Option<u64>) {
+        if let Some(ts) = ts_us {
+            self.last_end_us = Some(match self.last_end_us {
+                Some(prev) => prev.max(ts),
+                None => ts,
+            });
+        }
+    }
+
+    fn elapsed_us(&self) -> u64 {
+        match (self.first_start_us, self.last_end_us) {
+            (Some(s), Some(e)) if e >= s => e - s,
+            _ => 0,
+        }
+    }
+}
+
 impl BuildSummaryBuilder {
     pub fn new() -> Self {
         Self::with_top_n(10)
@@ -153,10 +190,10 @@ impl BuildSummaryBuilder {
         Self {
             top_n,
             per_mnemonic: HashMap::new(),
-            load_wall_us: 0,
-            analyze_wall_us: 0,
-            execute_wall_us: 0,
-            materialize_wall_us: 0,
+            load_phase: PhaseSpan::default(),
+            analyze_phase: PhaseSpan::default(),
+            execute_phase: PhaseSpan::default(),
+            materialize_phase: PhaseSpan::default(),
             command_first_ts_us: None,
             command_last_ts_us: None,
             slowest_actions: Vec::new(),
@@ -206,6 +243,16 @@ impl BuildSummaryBuilder {
                 self.in_flight_actions += 1;
                 self.peak_in_flight_actions =
                     self.peak_in_flight_actions.max(self.in_flight_actions);
+                self.execute_phase.observe_start(ts_us);
+            }
+            Some(Data::Load(_)) | Some(Data::LoadPackage(_)) => {
+                self.load_phase.observe_start(ts_us);
+            }
+            Some(Data::Analysis(_)) => {
+                self.analyze_phase.observe_start(ts_us);
+            }
+            Some(Data::FinalMaterialization(_)) | Some(Data::Materialization(_)) => {
+                self.materialize_phase.observe_start(ts_us);
             }
             _ => {}
         }
@@ -234,11 +281,11 @@ impl BuildSummaryBuilder {
                     }
                 }
             }
-            Some(Data::Load(_)) => {
-                self.load_wall_us += duration_us;
+            Some(Data::Load(_)) | Some(Data::LoadPackage(_)) => {
+                self.load_phase.observe_end(ts_us);
             }
             Some(Data::Analysis(analysis)) => {
-                self.analyze_wall_us += duration_us;
+                self.analyze_phase.observe_end(ts_us);
                 let target = match &analysis.target {
                     Some(kuro_data::analysis_end::Target::StandardTarget(t)) => {
                         format_target_label(t)
@@ -255,14 +302,14 @@ impl BuildSummaryBuilder {
                 });
             }
             Some(Data::ActionExecution(action)) => {
-                self.execute_wall_us += duration_us;
+                self.execute_phase.observe_end(ts_us);
                 self.in_flight_actions = self.in_flight_actions.saturating_sub(1);
                 self.action_stats.update(action);
                 self.total_action_count += 1;
                 self.record_action(action, duration_us);
             }
             Some(Data::FinalMaterialization(_)) | Some(Data::Materialization(_)) => {
-                self.materialize_wall_us += duration_us;
+                self.materialize_phase.observe_end(ts_us);
             }
             _ => {}
         }
@@ -426,16 +473,21 @@ impl BuildSummaryBuilder {
         let slowest_actions = self.slowest_actions;
         let slowest_analyses = self.slowest_analyses;
 
+        let load_wall_us = self.load_phase.elapsed_us();
+        let analyze_wall_us = self.analyze_phase.elapsed_us();
+        let execute_wall_us = self.execute_phase.elapsed_us();
+        let materialize_wall_us = self.materialize_phase.elapsed_us();
+
         let total_wall_us = match (self.command_first_ts_us, self.command_last_ts_us) {
             (Some(start), Some(end)) if end > start => end - start,
-            _ => self.load_wall_us + self.analyze_wall_us + self.execute_wall_us,
+            _ => load_wall_us + analyze_wall_us + execute_wall_us,
         };
 
         BuildSummary {
-            load_wall_us: self.load_wall_us,
-            analyze_wall_us: self.analyze_wall_us,
-            execute_wall_us: self.execute_wall_us,
-            materialize_wall_us: self.materialize_wall_us,
+            load_wall_us,
+            analyze_wall_us,
+            execute_wall_us,
+            materialize_wall_us,
             total_wall_us,
             by_mnemonic,
             slowest_actions,
@@ -589,8 +641,12 @@ mod tests {
     use super::*;
 
     fn span_start(data: kuro_data::span_start_event::Data) -> BuckEvent {
+        span_start_at(data, 0)
+    }
+
+    fn span_start_at(data: kuro_data::span_start_event::Data, ts_us: u64) -> BuckEvent {
         BuckEvent::new(
-            SystemTime::UNIX_EPOCH,
+            SystemTime::UNIX_EPOCH + std::time::Duration::from_micros(ts_us),
             TraceId::new(),
             Some(SpanId::next()),
             None,
@@ -599,8 +655,16 @@ mod tests {
     }
 
     fn span_end(data: kuro_data::span_end_event::Data, duration_us: u64) -> BuckEvent {
+        span_end_at(data, duration_us, 0)
+    }
+
+    fn span_end_at(
+        data: kuro_data::span_end_event::Data,
+        duration_us: u64,
+        ts_us: u64,
+    ) -> BuckEvent {
         BuckEvent::new(
-            SystemTime::UNIX_EPOCH,
+            SystemTime::UNIX_EPOCH + std::time::Duration::from_micros(ts_us),
             TraceId::new(),
             Some(SpanId::next()),
             None,
@@ -701,20 +765,50 @@ mod tests {
     #[test]
     fn short_lines_format() {
         let mut b = BuildSummaryBuilder::new();
-        b.handle_event(&span_end(
+
+        // Load span: starts at t=0, ends at t=1.5s (elapsed = 1.5s).
+        b.handle_event(&span_start_at(
+            kuro_data::span_start_event::Data::Load(kuro_data::LoadBuildFileStart {
+                ..Default::default()
+            }),
+            0,
+        ));
+        b.handle_event(&span_end_at(
             kuro_data::span_end_event::Data::Load(kuro_data::LoadBuildFileEnd {
                 ..Default::default()
             }),
-            1_500_000, // 1.5s
+            1_500_000,
+            1_500_000,
         ));
-        b.handle_event(&span_end(
+
+        // Action spans: two overlapping actions. Earliest start t=2s,
+        // latest end t=4.3s → elapsed 2.3s.
+        let action_start = || {
+            kuro_data::span_start_event::Data::ActionExecution(
+                kuro_data::ActionExecutionStart::default(),
+            )
+        };
+        b.handle_event(&span_start_at(action_start(), 2_000_000));
+        b.handle_event(&span_start_at(action_start(), 2_500_000));
+        b.handle_event(&span_end_at(
             kuro_data::span_end_event::Data::ActionExecution(Box::new(remote_cache_hit())),
-            2_300_000, // 2.3s
+            2_000_000,
+            4_000_000,
         ));
+        b.handle_event(&span_end_at(
+            kuro_data::span_end_event::Data::ActionExecution(Box::new(remote_cache_hit())),
+            1_800_000,
+            4_300_000,
+        ));
+
         let summary = b.finalize();
         let lines = summary.short_lines();
         assert!(
             lines.iter().any(|l| l.contains("load=1.5s")),
+            "got: {lines:?}"
+        );
+        assert!(
+            lines.iter().any(|l| l.contains("execute=2.3s")),
             "got: {lines:?}"
         );
         assert!(
