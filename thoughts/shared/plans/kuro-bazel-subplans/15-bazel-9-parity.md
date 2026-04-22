@@ -1614,12 +1614,74 @@ to the executable without expanding `$(execpath ...)` tokens. Tracked as
 §15.5.24 below.
 
 **Follow-ups opened by this work.**
-- §15.5.24: `run_binary` doesn't resolve `$(execpath …)` / `$(location …)` in
-  its `args` before invoking the tool.
 - §15.5.25: `runfiles.empty_filenames` is dropped on the floor in
   `SYNTHESIZE_RUNFILES_TREE`. Acceptable while Python 3 namespace packages
   suffice, but wire `ctx.actions.write("", output=...)` through the synth if
   a consumer needs real zero-byte entries.
+
+---
+
+### 15.5.24 `ctx.expand_location` resolves rule's own attrs / outputs (LANDED)
+
+**Status:** Landed 2026-04-21. `ctx.expand_location(input, targets)` now also
+consults the rule's own `ctx.attrs.*` values (for deps / source files) and
+`ctx.outputs.*` (for `attr.output` / `attr.output_list` outputs) so
+`bazel_skylib//rules:run_binary.bzl` — which only passes `[ctx.attr.tool]`
+explicitly — can still expand `$(execpath <output>)` and
+`$(execpath <source>)` in its `args`.
+
+**Observed.** After §15.5.23 landed, `kuro build
+@llvm-project//clang:analysis_htmllogger_gen` reached the bundle_resources
+py_binary, then failed with `FileNotFoundError: '$(execpath
+lib/Analysis/FlowSensitive/HTMLLogger.inc)'` — run_binary was passing the
+raw token through to the tool. Kuro's `expand_location` only looked at the
+`targets` list, so output labels in `outs=[...]` and source-file labels in
+`srcs=[...]` were never resolvable.
+
+**Fix, file:line.**
+- `app/kuro_build_api/src/interpreter/rule_defs/context.rs:expand_location`
+  (around lines 1609-1865). Three additions:
+    1. **Lazy CtxOutputs init.** The Bazel rule impl may call expand_location
+       before ctx.outputs, so `this.0.outputs` can still be `None` at the
+       time we need it. We now allocate the CtxOutputs wrapper on-demand,
+       mirroring the `outputs(...)` starlark attribute method.
+    2. **Walk the attrs struct.** Iterate via `StructRef::iter()` (not
+       `value.iterate`, which doesn't yield field names for structs), and
+       for each attribute value downcast to `StarlarkArtifact` /
+       `StarlarkDeclaredArtifact` / `Dependency`. For source-file `File`
+       values we register the artifact's `short_path` as the lookup key so
+       user-typed relative labels match.
+    3. **Deferred output declaration.** For `attr.output` / `attr.output_list`
+       attrs the raw value in `ctx.attrs` is a plain string / list[str], so
+       we can't read them as artifacts until CtxOutputs declares them.
+       Eagerly calling `outputs_val.get_attr(name)` for every list[str] attr
+       turns `tags`, `args`, and similar into unbound declared outputs
+       (triggers "Artifact must be bound by now" at analysis resolution). We
+       snapshot `(attr_name, list[str])` pairs up-front and only call
+       CtxOutputs when `find_paths` actually sees a query label equal to one
+       of the snapshotted strings — exactly the attrs where declaration is
+       legitimate.
+    4. **Path-suffix matching.** Source files from external cells carry a
+       short_path of `../<repo>/<pkg>/<rel>`; `find_paths` now matches when
+       the recorded label ends with `/<query>` so
+       `../llvm-project/clang/lib/Analysis/FlowSensitive/HTMLLogger.html`
+       resolves for `$(execpath lib/Analysis/FlowSensitive/HTMLLogger.html)`.
+
+**Milestone verification.** `kuro build
+@llvm-project//clang:analysis_htmllogger_gen` → BUILD SUCCEEDED. Output at
+`buck-out/v2/gen/llvm-project/9b5202f249973417/external/llvm-project/clang/lib/Analysis/FlowSensitive/HTMLLogger.inc`.
+The bundle_resources py_binary receives the resolved buck-out paths as args
+and successfully bakes the HTML/CSS/JS sources into the .inc file.
+
+**Known limitations worth tracking.**
+- `find_paths` does `ends_with(/query)` — if two targets share the same
+  filename (e.g. both packages have a `foo.h`), the first recorded entry
+  wins. Matches how `$(execpath …)` works in small Bazel rules; revisit if
+  we see ambiguity bugs.
+- The deferred CtxOutputs trigger assumes the list-of-strings index maps
+  1:1 to the declared artifact list index. Holds today because
+  CtxOutputs.get_attr declares in list order. If that changes we'll need
+  to match by filename instead of index.
 
 ---
 
