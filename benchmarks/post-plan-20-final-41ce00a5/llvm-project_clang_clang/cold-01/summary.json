@@ -1,0 +1,199 @@
+{
+  "action_graph_size": 15,
+  "analyze_wall_us": 1131189,
+  "by_mnemonic": [
+    {
+      "cached": 0,
+      "category": "c_compile",
+      "count": 3874,
+      "critical_wall_us": 47521654,
+      "p50_us": 3248715,
+      "p95_us": 10410379,
+      "p99_us": 15983354,
+      "total_queue_us": 1051329542182,
+      "total_wall_us": 15836213743
+    },
+    {
+      "cached": 0,
+      "category": "td_generate",
+      "count": 450,
+      "critical_wall_us": 33098392,
+      "p50_us": 586168,
+      "p95_us": 6300086,
+      "p99_us": 21438191,
+      "total_queue_us": 5787581037,
+      "total_wall_us": 655992386
+    },
+    {
+      "cached": 0,
+      "category": "cpp_archive",
+      "count": 184,
+      "critical_wall_us": 1291444,
+      "p50_us": 67294,
+      "p95_us": 626766,
+      "p99_us": 1759021,
+      "total_queue_us": 33072597618,
+      "total_wall_us": 32364116
+    },
+    {
+      "cached": 0,
+      "category": "cpp_link",
+      "count": 4,
+      "critical_wall_us": 26093210,
+      "p50_us": 161252,
+      "p95_us": 25828507,
+      "p99_us": 25828507,
+      "total_queue_us": 226323,
+      "total_wall_us": 26212216
+    },
+    {
+      "cached": 0,
+      "category": "genrule",
+      "count": 1,
+      "critical_wall_us": 0,
+      "p50_us": 739444,
+      "p95_us": 739444,
+      "p99_us": 739444,
+      "total_queue_us": 441185,
+      "total_wall_us": 739444
+    },
+    {
+      "cached": 0,
+      "category": "run_binary",
+      "count": 1,
+      "critical_wall_us": 0,
+      "p50_us": 97425,
+      "p95_us": 97425,
+      "p99_us": 97425,
+      "total_queue_us": 13498291,
+      "total_wall_us": 97425
+    },
+    {
+      "cached": 0,
+      "category": "py_write_build_data",
+      "count": 1,
+      "critical_wall_us": 0,
+      "p50_us": 7667,
+      "p95_us": 7667,
+      "p99_us": 7667,
+      "total_queue_us": 151090,
+      "total_wall_us": 7667
+    }
+  ],
+  "cache_hit_pct": 0.0,
+  "critical_path_wall_us": 109694657,
+  "execute_wall_us": 1077121435,
+  "load_wall_us": 2426516,
+  "materialize_wall_us": 1074634737,
+  "num_dice_edges": 1206335,
+  "num_dice_nodes": 7849,
+  "peak_in_flight_actions": 2379,
+  "slowest_actions": [
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Passes/PassBuilder.cpp.pic",
+      "wall_us": 36986014
+    },
+    {
+      "cached": false,
+      "category": "td_generate",
+      "identifier": "lib/Target/AMDGPU/AMDGPUGenRegisterBank.inc",
+      "wall_us": 30903507
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/clang/lib/Sema/SemaOpenMP.cpp.pic",
+      "wall_us": 28869679
+    },
+    {
+      "cached": false,
+      "category": "td_generate",
+      "identifier": "lib/Target/AMDGPU/AMDGPUGenRegisterInfo.inc",
+      "wall_us": 28288971
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Transforms/Vectorize/SLPVectorizer.cpp.pic",
+      "wall_us": 26952723
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Target/AMDGPU/AMDGPUTargetMachine.cpp.pic",
+      "wall_us": 26467045
+    },
+    {
+      "cached": false,
+      "category": "cpp_link",
+      "identifier": "clang",
+      "wall_us": 25828507
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/clang/lib/CodeGen/CGDebugInfo.cpp.pic",
+      "wall_us": 25553834
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/clang/lib/Sema/SemaTemplate.cpp.pic",
+      "wall_us": 25110831
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/clang/lib/Sema/SemaExpr.cpp.pic",
+      "wall_us": 25090217
+    }
+  ],
+  "slowest_analyses": [
+    {
+      "target": "//llvm-project//llvm:CodeGen (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 129279
+    },
+    {
+      "target": "//llvm-project//clang:codegen (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 104089
+    },
+    {
+      "target": "//llvm-project//clang:static_analyzer_checkers (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 101871
+    },
+    {
+      "target": "//bazel_tools//tools/cpp:malloc (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 86931
+    },
+    {
+      "target": "//bazel_tools//tools/cpp:link_extra_lib (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 85696
+    },
+    {
+      "target": "//rules_cc//:link_extra_lib (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 85654
+    },
+    {
+      "target": "//llvm-project//llvm:ir_headers (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 85042
+    },
+    {
+      "target": "//llvm-project//llvm:pass_registry_def (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 84196
+    },
+    {
+      "target": "//llvm-project//llvm:asm_printer_defs (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 82418
+    },
+    {
+      "target": "//llvm-project//llvm:config (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 81755
+    }
+  ],
+  "slowest_path_wall_us": 68010717,
+  "total_action_count": 5599,
+  "total_wall_us": 1080767527,
+  "trace_id": "e98c2c11-a352-4d7b-9e4b-aa79120da21f"
+}
