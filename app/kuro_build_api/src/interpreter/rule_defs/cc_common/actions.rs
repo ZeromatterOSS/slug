@@ -598,8 +598,20 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
 
         // Build named arguments for run()
         // run(arguments, outputs=outputs, mnemonic=mnemonic, progress_message=msg, identifier=id)
-        // Use source path as identifier to disambiguate multiple compile actions
-        let identifier = heap.alloc_str(&source_path).to_value();
+        //
+        // Use source path + PIC-ness as identifier to disambiguate multiple
+        // compile actions for the same source. rules_cc's `cc_common.compile`
+        // may register both a PIC and a non-PIC compile of the same source
+        // when `use_pic_for_dynamic_libs` differs from `use_pic_for_binaries`
+        // (Plan 20.2) — notably in opt mode. Without this suffix both
+        // actions register under the same (category, identifier), tripping
+        // kuro's action-registry dedup.
+        let identifier_str = if use_pic {
+            format!("{source_path}.pic")
+        } else {
+            source_path.clone()
+        };
+        let identifier = heap.alloc_str(&identifier_str).to_value();
         let mut named_args: Vec<(&str, Value<'v>)> = vec![
             ("outputs", outputs_list),
             ("mnemonic", heap.alloc_str(&action_name_str).to_value()),
