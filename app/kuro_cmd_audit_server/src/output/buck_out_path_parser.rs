@@ -505,9 +505,7 @@ mod tests {
 
         let configuration = ConfigurationData::from_platform(
             "cfg_for//:testing_exec".to_owned(),
-            ConfigurationDataData {
-                constraints: BTreeMap::new(),
-            },
+            ConfigurationDataData::empty(),
         )
         .unwrap();
         let config_hash = configuration.output_hash().to_string();

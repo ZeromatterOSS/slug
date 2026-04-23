@@ -20,6 +20,7 @@
 
 pub mod bound_id;
 pub mod bound_label;
+pub mod build_setting;
 pub(crate) mod builtin;
 pub mod cfg_diff;
 pub mod compatibility;

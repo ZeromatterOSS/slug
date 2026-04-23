@@ -106,7 +106,7 @@ impl<'v, V: ValueLike<'v>> ConfigurationInfoGen<V> {
         if !buckconfigs.is_empty() {
             return Err(ConfigurationInfoError::BuckConfigsNotAllowed.into());
         }
-        Ok(ConfigurationDataData { constraints })
+        Ok(ConfigurationDataData::new(constraints))
     }
 }
 

@@ -29,6 +29,8 @@ use strong_hash::StrongHash;
 
 use crate::configuration::bound_id::BoundConfigurationId;
 use crate::configuration::bound_label::BoundConfigurationLabel;
+use crate::configuration::build_setting::BuildSettingLabel;
+use crate::configuration::build_setting::BuildSettingValue;
 use crate::configuration::builtin::BuiltinPlatform;
 use crate::configuration::constraints::ConstraintKey;
 use crate::configuration::constraints::ConstraintValue;
@@ -197,9 +199,7 @@ impl ConfigurationData {
         Self::from_data(HashedConfigurationPlatform::new(
             ConfigurationPlatform::Bound(
                 BoundConfigurationLabel::new("<testing>".to_owned()).unwrap(),
-                ConfigurationDataData {
-                    constraints: BTreeMap::new(),
-                },
+                ConfigurationDataData::empty(),
             ),
         ))
         .0
@@ -246,6 +246,36 @@ impl ConfigurationData {
         key: &ConstraintKey,
     ) -> kuro_error::Result<Option<&ConstraintValue>> {
         Ok(self.data()?.constraints.get(key))
+    }
+
+    pub fn get_build_setting(
+        &self,
+        label: &BuildSettingLabel,
+    ) -> kuro_error::Result<Option<&BuildSettingValue>> {
+        Ok(self.data()?.build_settings.get(label))
+    }
+
+    /// Returns a new configuration identical to this one except that `label` is
+    /// bound to `value` in `build_settings`. The platform label is preserved so
+    /// outgoing transitions share the same `BoundConfigurationLabel` and only
+    /// the settings change.
+    pub fn with_build_setting(
+        &self,
+        label: BuildSettingLabel,
+        value: BuildSettingValue,
+    ) -> kuro_error::Result<Self> {
+        let label_str = self.label()?.to_owned();
+        let data = self.data()?;
+        let mut constraints = BTreeMap::new();
+        for (k, v) in &data.constraints {
+            constraints.insert(k.dupe(), v.dupe());
+        }
+        let mut build_settings = data.build_settings.clone();
+        build_settings.insert(label, value);
+        Self::from_platform(
+            label_str,
+            ConfigurationDataData::new_with_build_settings(constraints, build_settings),
+        )
     }
 
     pub fn label(&self) -> kuro_error::Result<&str> {
@@ -349,8 +379,13 @@ impl ConfigurationPlatform {
 /// A set of values used in configuration-related contexts.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Allocative, StrongHash, Pagable)]
 pub struct ConfigurationDataData {
-    // contains the full specification of the platform configuration
+    /// Constraint values (`constraint_setting` → `constraint_value`) that define
+    /// the platform's properties.
     pub constraints: BTreeMap<ConstraintKey, ConstraintValue>,
+    /// Build-setting values (`rule(build_setting=...)`) resolved into the
+    /// configuration. Set by top-level CLI flags, transitions, and
+    /// `platform(exec_properties=...)` defaults.
+    pub build_settings: BTreeMap<BuildSettingLabel, BuildSettingValue>,
 }
 
 /// We don't use derive(Hash) here because we build Buck 2 on two different versions of Rustc at
@@ -362,6 +397,9 @@ impl Hash for ConfigurationDataData {
         for elt in self.constraints.iter() {
             elt.hash(state);
         }
+        for elt in self.build_settings.iter() {
+            elt.hash(state);
+        }
     }
 }
 
@@ -369,15 +407,33 @@ impl ConfigurationDataData {
     pub fn empty() -> Self {
         Self {
             constraints: Default::default(),
+            build_settings: Default::default(),
         }
     }
 
     pub fn new(constraints: BTreeMap<ConstraintKey, ConstraintValue>) -> Self {
-        Self { constraints }
+        Self {
+            constraints,
+            build_settings: Default::default(),
+        }
+    }
+
+    pub fn new_with_build_settings(
+        constraints: BTreeMap<ConstraintKey, ConstraintValue>,
+        build_settings: BTreeMap<BuildSettingLabel, BuildSettingValue>,
+    ) -> Self {
+        Self {
+            constraints,
+            build_settings,
+        }
     }
 
     pub fn get_constraint_value(&self, key: &ConstraintKey) -> Option<&ConstraintValue> {
         self.constraints.get(key)
+    }
+
+    pub fn get_build_setting(&self, label: &BuildSettingLabel) -> Option<&BuildSettingValue> {
+        self.build_settings.get(label)
     }
 
     /// merges this into other, with values in other taking precedence
@@ -387,6 +443,12 @@ impl ConfigurationDataData {
                 .constraints
                 .entry(k.dupe())
                 .or_insert_with(|| v.dupe());
+        }
+        for (k, v) in &self.build_settings {
+            other
+                .build_settings
+                .entry(k.dupe())
+                .or_insert_with(|| v.clone());
         }
         other
     }
@@ -452,38 +514,48 @@ impl HashedConfigurationPlatform {
 mod tests {
     use std::collections::BTreeMap;
 
+    use dupe::Dupe;
+
     use crate::configuration::bound_id::BoundConfigurationId;
+    use crate::configuration::build_setting::BuildSettingLabel;
+    use crate::configuration::build_setting::BuildSettingValue;
     use crate::configuration::constraints::ConstraintKey;
     use crate::configuration::constraints::ConstraintValue;
     use crate::configuration::data::ConfigurationData;
     use crate::configuration::data::ConfigurationDataData;
+    use crate::target::label::label::TargetLabel;
+
+    fn sample_constraints() -> BTreeMap<ConstraintKey, ConstraintValue> {
+        BTreeMap::from_iter([
+            (
+                ConstraintKey::testing_new("foo//bar:c"),
+                ConstraintValue::testing_new("foo//bar:v", None),
+            ),
+            (
+                ConstraintKey::testing_new("foo//qux:c"),
+                ConstraintValue::testing_new("foo//qux:vx", None),
+            ),
+        ])
+    }
 
     /// We don't want the output hash to change by accident. This test is here to assert that it
     /// doesn't. If we have a legit reason to update the config hash, we can update the hash here,
     /// but this will ensure we a) know and b) don't do it by accident.
+    ///
+    /// Plan 19.1 intentionally updated this value when `build_settings` became
+    /// part of `ConfigurationDataData`. The hash must not drift further.
     #[test]
     fn test_stable_output_hash() -> kuro_error::Result<()> {
         let configuration = ConfigurationData::from_platform(
             "cfg_for//:testing_exec".to_owned(),
-            ConfigurationDataData {
-                constraints: BTreeMap::from_iter([
-                    (
-                        ConstraintKey::testing_new("foo//bar:c"),
-                        ConstraintValue::testing_new("foo//bar:v", None),
-                    ),
-                    (
-                        ConstraintKey::testing_new("foo//qux:c"),
-                        ConstraintValue::testing_new("foo//qux:vx", None),
-                    ),
-                ]),
-            },
+            ConfigurationDataData::new(sample_constraints()),
         )
         .unwrap();
 
-        assert_eq!(configuration.output_hash().as_str(), "6770d7f2ebfc0845");
+        assert_eq!(configuration.output_hash().as_str(), "1f92d8f761d7806f");
         assert_eq!(
             configuration.to_string(),
-            "cfg_for//:testing_exec#6770d7f2ebfc0845"
+            "cfg_for//:testing_exec#1f92d8f761d7806f"
         );
 
         Ok(())
@@ -493,27 +565,73 @@ mod tests {
     fn test_lookup_from_string() {
         let configuration = ConfigurationData::from_platform(
             "cfg_for//:testing_exec".to_owned(),
-            ConfigurationDataData {
-                constraints: BTreeMap::from_iter([
-                    (
-                        ConstraintKey::testing_new("foo//bar:c"),
-                        ConstraintValue::testing_new("foo//bar:v", None),
-                    ),
-                    (
-                        ConstraintKey::testing_new("foo//qux:c"),
-                        ConstraintValue::testing_new("foo//qux:vx", None),
-                    ),
-                ]),
-            },
+            ConfigurationDataData::new(sample_constraints()),
         )
         .unwrap();
 
-        let expected_cfg_str = "cfg_for//:testing_exec#6770d7f2ebfc0845";
+        let expected_cfg_str = "cfg_for//:testing_exec#1f92d8f761d7806f";
         assert_eq!(expected_cfg_str, configuration.to_string());
 
         let looked_up =
             ConfigurationData::lookup_bound(BoundConfigurationId::parse(expected_cfg_str).unwrap())
                 .unwrap();
         assert_eq!(configuration, looked_up);
+    }
+
+    /// Two configurations identical apart from a single build-setting value must
+    /// produce distinct output hashes — otherwise analysis cache keys collide.
+    #[test]
+    fn test_build_settings_affect_output_hash() -> kuro_error::Result<()> {
+        let label =
+            BuildSettingLabel::new(TargetLabel::testing_parse("@bazel_tools//tools/cpp:mode"));
+
+        let a = ConfigurationData::from_platform(
+            "cfg_for//:testing".to_owned(),
+            ConfigurationDataData::new_with_build_settings(
+                sample_constraints(),
+                BTreeMap::from_iter([(label.dupe(), BuildSettingValue::String("opt".to_owned()))]),
+            ),
+        )?;
+        let b = ConfigurationData::from_platform(
+            "cfg_for//:testing".to_owned(),
+            ConfigurationDataData::new_with_build_settings(
+                sample_constraints(),
+                BTreeMap::from_iter([(label.dupe(), BuildSettingValue::String("dbg".to_owned()))]),
+            ),
+        )?;
+
+        assert_ne!(a.output_hash(), b.output_hash());
+        assert_eq!(
+            a.get_build_setting(&label)?,
+            Some(&BuildSettingValue::String("opt".to_owned()))
+        );
+        assert_eq!(
+            b.get_build_setting(&label)?,
+            Some(&BuildSettingValue::String("dbg".to_owned()))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_with_build_setting_overrides() -> kuro_error::Result<()> {
+        let label = BuildSettingLabel::new(TargetLabel::testing_parse("@foo//:flag"));
+        let base = ConfigurationData::from_platform(
+            "cfg_for//:testing".to_owned(),
+            ConfigurationDataData::new(sample_constraints()),
+        )?;
+        assert_eq!(base.get_build_setting(&label)?, None);
+
+        let updated = base.with_build_setting(label.dupe(), BuildSettingValue::Bool(true))?;
+        assert_eq!(
+            updated.get_build_setting(&label)?,
+            Some(&BuildSettingValue::Bool(true))
+        );
+        assert_ne!(base.output_hash(), updated.output_hash());
+
+        // Overriding the same label with the same value gives the same cfg
+        // (interning makes equal data alias to the same Arc).
+        let updated_again = base.with_build_setting(label.dupe(), BuildSettingValue::Bool(true))?;
+        assert_eq!(updated, updated_again);
+        Ok(())
     }
 }

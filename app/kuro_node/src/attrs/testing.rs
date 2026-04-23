@@ -66,9 +66,7 @@ pub fn configuration_ctx() -> impl AttrConfigurationContext {
         ConfigurationData::testing_new(),
         ConfigurationData::from_platform(
             "cfg_for//:testing_exec".to_owned(),
-            ConfigurationDataData {
-                constraints: BTreeMap::new(),
-            },
+            ConfigurationDataData::empty(),
         )
         .unwrap(),
         MatchedConfigurationSettingKeys::new(UnorderedMap::from_iter([
