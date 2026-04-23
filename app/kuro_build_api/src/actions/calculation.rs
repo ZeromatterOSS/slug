@@ -136,6 +136,11 @@ async fn build_action_no_redirect(
         results
     };
 
+    // Plan 17.2-instrument: capture "inputs resolved" timestamp. Zero cost
+    // when `KURO_LOG_ADMISSION` is unset (inner fn short-circuits via
+    // `OnceLock` load).
+    let ready_admission = crate::actions::admission_log::now_if_enabled();
+
     let start_event = kuro_data::ActionExecutionStart {
         key: Some(action.key().as_proto()),
         kind: action.kind().into(),
@@ -172,6 +177,7 @@ async fn build_action_no_redirect(
         ensured_inputs,
         action,
         target_rule_type_name,
+        ready_admission,
     );
 
     // boxed() the future so that we don't need to allocate space for it while waiting on input dependencies.
@@ -215,7 +221,20 @@ async fn build_action_inner(
     ensured_inputs: IndexMap<ArtifactGroup, ArtifactGroupValues>,
     action: &Arc<RegisteredAction>,
     target_rule_type_name: Option<String>,
+    ready_admission: Option<std::time::Instant>,
 ) -> (ActionExecutionData, Box<kuro_data::ActionExecutionEnd>) {
+    // Plan 17.2-instrument: capture "handed to executor" timestamp. Fires
+    // when the fut actually begins polling, which is after `span_async` has
+    // dispatched the ActionExecutionStart event. Delta vs `ready_admission`
+    // measures kuro's build-api admission latency.
+    let start_admission = crate::actions::admission_log::now_if_enabled();
+    crate::actions::admission_log::record(
+        action.category().as_str(),
+        &action.key().to_string(),
+        ready_admission,
+        start_admission,
+    );
+
     let is_eligible_for_dedupe = is_action_eligible_for_dedupe(action, &ensured_inputs);
     let is_expected_eligible_for_dedupe = match action.is_expected_eligible_for_dedupe() {
         Some(v) => {

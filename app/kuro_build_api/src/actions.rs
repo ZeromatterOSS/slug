@@ -85,6 +85,7 @@ use crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact
 use crate::interpreter::rule_defs::artifact::starlark_artifact_value::StarlarkArtifactValue;
 use crate::interpreter::rule_defs::cmd_args::ArtifactPathMapper;
 
+pub mod admission_log;
 pub mod artifact;
 pub mod box_slice_set;
 pub mod calculation;
