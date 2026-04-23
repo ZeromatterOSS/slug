@@ -529,8 +529,10 @@ fn is_bazel_specific_flag(normalized_flag: &str) -> bool {
             | "remote_default_exec_properties"
             | "remote_local_fallback"
             | "remote_timeout"
-            // Compilation / output flags
-            | "compilation_mode"
+            // Compilation / output flags. Note: `compilation_mode` is NOT
+            // here because kuro's clap parser accepts it (see
+            // `CommonBuildConfigurationOptions::compilation_mode`) and Plan
+            // 19.4 routes it into `ConfigurationData.build_settings`.
             | "copt"
             | "cxxopt"
             | "host_copt"

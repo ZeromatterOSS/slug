@@ -448,6 +448,14 @@ pub(crate) mod rule_defs {
             ])),
         );
 
+        // NOTE: Bazel marks `tools` as `cfg="exec"` so tools are built in the
+        // execution configuration. Kuro keeps target-cfg here for now because
+        // exec-dep propagation through the legacy include-path synthesis has
+        // unresolved edge cases (siphash virtual_includes regression observed
+        // when this was temporarily switched to `exec_dep`). Plan 19 unblocked
+        // the exec-cfg build_settings machinery; a follow-up phase can flip
+        // genrule + cc_binary's `tools` / `additional_linker_inputs` to
+        // `exec_dep` once the include-path path is proven safe.
         let tools_attr = Attribute::new(
             Some(Arc::new(CoercedAttr::List(
                 ListLiteral(ArcSlice::default()),

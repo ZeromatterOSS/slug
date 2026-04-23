@@ -75,6 +75,34 @@ use crate::interpreter::rule_defs::cc_common::register_external_include_dir;
 /// Starlark string, iff `val` isn't `None`. Used by `create_compile_variables`
 /// and `create_link_variables` to build variable dicts without 10-line
 /// `if !x.is_none() { map.insert_hashed(heap.alloc_str(...)...) }` blocks.
+/// Derives `compilation_mode` from a FeatureConfiguration. rules_cc's
+/// `configure_features.bzl` adds `cpp_configuration.compilation_mode()` (the
+/// per-cfg value, from Plan 19.5) as a requested feature, so the active mode
+/// is detectable by checking which of "opt" / "dbg" / "fastbuild" is
+/// enabled. Falls back to the process-global `BUILD_CONFIG` entry for
+/// contexts that never plumb through `configure_features` (tests, stubbed
+/// toolchains).
+fn compilation_mode_from_features(feature_configuration: Value<'_>) -> String {
+    if let Some(fc) = feature_configuration.downcast_ref::<FeatureConfiguration>() {
+        for mode in ["opt", "dbg", "fastbuild"] {
+            if fc.is_feature_enabled(mode) {
+                return mode.to_owned();
+            }
+        }
+    }
+    crate::interpreter::rule_defs::build_config::get_compilation_mode()
+}
+
+/// Returns whether an action name describes a C/C++ compile action.
+/// Matches Bazel's `c-compile`, `c++-compile`, `c++-module-compile`, etc.
+/// while excluding preprocess-only actions.
+fn is_compile_action_name(name: NoneOr<&str>) -> bool {
+    match name.into_option() {
+        Some(n) => n.contains("compile") && !n.contains("preprocess"),
+        None => true, // Default path: treat as compile.
+    }
+}
+
 fn insert_if_set<'v>(
     map: &mut SmallMap<Value<'v>, Value<'v>>,
     heap: starlark::values::Heap<'v>,
@@ -300,6 +328,43 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             args_vec.push(output_artifact);
             // -fPIC for position-independent code (not applicable to MSVC)
             args_vec.push(heap.alloc_str("-fPIC").to_value());
+
+            // Plan 19.6: always-on compile flags + compilation-mode flag set.
+            // Matches rules_cc's linux_cc_toolchain_config `compile_flags` and
+            // mode-specific `*_compile_flags` features. Sourced from the
+            // feature_configuration so exec-cfg tool builds pick up the opt
+            // default declared by `platform(exec_properties={...})` while
+            // target-cfg builds see the user's `--compilation_mode`.
+            for flag in [
+                "-U_FORTIFY_SOURCE",
+                "-fstack-protector",
+                "-Wall",
+                "-fno-omit-frame-pointer",
+            ] {
+                args_vec.push(heap.alloc_str(flag).to_value());
+            }
+            let mode = compilation_mode_from_features(feature_configuration);
+            match mode.as_str() {
+                "opt" => {
+                    for flag in [
+                        "-g0",
+                        "-O2",
+                        "-D_FORTIFY_SOURCE=1",
+                        "-DNDEBUG",
+                        "-ffunction-sections",
+                        "-fdata-sections",
+                    ] {
+                        args_vec.push(heap.alloc_str(flag).to_value());
+                    }
+                }
+                "dbg" => {
+                    args_vec.push(heap.alloc_str("-g").to_value());
+                    args_vec.push(heap.alloc_str("-O0").to_value());
+                }
+                _ => {
+                    args_vec.push(heap.alloc_str("-g0").to_value());
+                }
+            }
         }
 
         // Add workspace root as include path (Bazel always includes the workspace root
@@ -3009,13 +3074,15 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 }
             }
 
-            // Compilation-mode-based linker flags
+            // Compilation-mode-based linker flags. Mode is read from the
+            // feature configuration (Plan 19.6) so exec-cfg links pick up
+            // the exec platform's opt default while target-cfg links see
+            // the user-requested mode from `--compilation_mode`.
             if !is_static_lib {
-                let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+                let mode = compilation_mode_from_features(feature_configuration);
                 match mode.as_str() {
                     "opt" => {
                         if !msvc {
-                            // Strip debug info in opt mode
                             let strip = crate::interpreter::rule_defs::build_config::get_strip();
                             if strip == "always" || (strip == "sometimes") {
                                 args.push(heap.alloc_str("-Wl,-S").to_value());
@@ -3058,17 +3125,50 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             }
         }
 
-        // Compilation-mode-based flags (Bazel adds these via feature configuration)
+        // Compilation-mode-based flags. Mode comes from the feature
+        // configuration (Plan 19.6) so an exec-cfg compile sees the exec
+        // platform's opt default from `platform(exec_properties=...)`, and
+        // a target-cfg compile sees whatever the user requested via
+        // `--compilation_mode`. Also emit rules_cc's always-on compile flags
+        // that the cc_toolchain_config feature set assumes as baseline.
         if is_compile {
-            let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+            if !msvc {
+                // Always-on flags from rules_cc's `compile_flags` feature.
+                // rules_cc's default linux_cc_toolchain_config sets these
+                // unconditionally via `compile_flags = [...]` on the
+                // toolchain; emit them here so exec-cfg tool builds
+                // (llvm-tblgen etc.) pick up the full baseline kuro
+                // previously skipped.
+                for flag in [
+                    "-U_FORTIFY_SOURCE",
+                    "-fstack-protector",
+                    "-Wall",
+                    "-fno-omit-frame-pointer",
+                ] {
+                    args.push(heap.alloc_str(flag).to_value());
+                }
+            }
+
+            let mode = compilation_mode_from_features(feature_configuration);
             match mode.as_str() {
                 "opt" => {
                     if msvc {
                         args.push(heap.alloc_str("/O2").to_value());
                         args.push(heap.alloc_str("/DNDEBUG").to_value());
                     } else {
-                        args.push(heap.alloc_str("-O2").to_value());
-                        args.push(heap.alloc_str("-DNDEBUG").to_value());
+                        // Matches rules_cc's `opt_compile_flags` feature:
+                        // `-g0 -O2 -D_FORTIFY_SOURCE=1 -DNDEBUG
+                        //  -ffunction-sections -fdata-sections`.
+                        for flag in [
+                            "-g0",
+                            "-O2",
+                            "-D_FORTIFY_SOURCE=1",
+                            "-DNDEBUG",
+                            "-ffunction-sections",
+                            "-fdata-sections",
+                        ] {
+                            args.push(heap.alloc_str(flag).to_value());
+                        }
                     }
                 }
                 "dbg" => {
@@ -3081,7 +3181,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     }
                 }
                 _ => {
-                    // fastbuild: minimal flags for fast compilation
+                    // fastbuild: rules_cc adds `-g0` for skipping debug info.
+                    if !msvc {
+                        args.push(heap.alloc_str("-g0").to_value());
+                    }
                 }
             }
         }
@@ -3432,6 +3535,45 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             args_vec.push(heap.alloc_str("-o").to_value());
             args_vec.push(output_artifact);
             args_vec.push(heap.alloc_str("-fPIC").to_value());
+        }
+
+        // Plan 19.6: always-on compile flags + compilation-mode flag set,
+        // derived from the feature configuration so exec-cfg tool builds
+        // (llvm-tblgen etc.) get the opt defaults that
+        // `platform(exec_properties=...)` declares while target-cfg builds
+        // get the mode the user requested via `--compilation_mode`.
+        if is_compile_action_name(action_name) && !msvc {
+            for flag in [
+                "-U_FORTIFY_SOURCE",
+                "-fstack-protector",
+                "-Wall",
+                "-fno-omit-frame-pointer",
+            ] {
+                args_vec.push(heap.alloc_str(flag).to_value());
+            }
+            let mode = compilation_mode_from_features(feature_configuration);
+            match mode.as_str() {
+                "opt" => {
+                    for flag in [
+                        "-g0",
+                        "-O2",
+                        "-D_FORTIFY_SOURCE=1",
+                        "-DNDEBUG",
+                        "-ffunction-sections",
+                        "-fdata-sections",
+                    ] {
+                        args_vec.push(heap.alloc_str(flag).to_value());
+                    }
+                }
+                "dbg" => {
+                    args_vec.push(heap.alloc_str("-g").to_value());
+                    args_vec.push(heap.alloc_str("-O0").to_value());
+                }
+                _ => {
+                    // fastbuild: rules_cc appends -g0 as the minimal default.
+                    args_vec.push(heap.alloc_str("-g0").to_value());
+                }
+            }
         }
 
         // Add include dirs from compilation context

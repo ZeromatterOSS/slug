@@ -78,8 +78,25 @@ fn imp() -> io::Result<()> {
 
     // Generate BUILD.bazel for local_config_platform with a platform() target
     // that uses the auto-detected host OS/CPU constraints.
-    // This mirrors what Bazel's auto-generated @local_config_platform//:host provides.
-    let build_content = "load(\":constraints.bzl\", \"HOST_CONSTRAINTS\")\n\nplatform(\n    name = \"host\",\n    constraint_values = HOST_CONSTRAINTS,\n)\n";
+    //
+    // `exec_properties` declares rule-authored defaults that are folded into
+    // `ConfigurationData.build_settings` when this platform is used as an
+    // execution platform (Plan 19.3). The canonical case is
+    // `@bazel_tools//tools/cpp:compilation_mode = "opt"`, which mirrors
+    // Bazel's `HostTransitionFactory` behaviour: exec-cfg tool builds (e.g.
+    // llvm-tblgen) are compiled with opt flags by default, even when the
+    // user's target-cfg build is in fastbuild mode.
+    let build_content = concat!(
+        "load(\":constraints.bzl\", \"HOST_CONSTRAINTS\")\n",
+        "\n",
+        "platform(\n",
+        "    name = \"host\",\n",
+        "    constraint_values = HOST_CONSTRAINTS,\n",
+        "    exec_properties = {\n",
+        "        \"@bazel_tools//tools/cpp:compilation_mode\": \"opt\",\n",
+        "    },\n",
+        ")\n",
+    );
     std::fs::write(local_config_platform_out.join("BUILD.bazel"), build_content)?;
 
     write_include_file(

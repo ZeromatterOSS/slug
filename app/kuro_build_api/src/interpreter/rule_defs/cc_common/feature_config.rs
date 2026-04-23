@@ -48,6 +48,12 @@ pub struct FeatureConfiguration {
 
 /// Default features that are typically enabled by CC toolchains.
 /// These match common Bazel CC toolchain defaults.
+///
+/// `fastbuild` / `dbg` / `opt` are intentionally excluded: rules_cc activates
+/// exactly one of them via `configure_features()`'s `requested_features`
+/// (sourced from `ctx.fragments.cpp.compilation_mode()`). Having all three
+/// always enabled would prevent `FeatureConfiguration::is_feature_enabled`
+/// from distinguishing modes in `get_memory_inefficient_command_line`.
 pub(crate) fn default_cc_features() -> Vec<&'static str> {
     let mut features = vec![
         // Core features always enabled
@@ -55,10 +61,6 @@ pub(crate) fn default_cc_features() -> Vec<&'static str> {
         "supports_start_end_lib",
         "compiler_param_file",
         "linker_param_file",
-        // Compilation modes
-        "fastbuild",
-        "dbg",
-        "opt",
         // Standard features
         "no_legacy_features",
         "dependency_file",
@@ -290,5 +292,36 @@ fn cc_toolchain_features_methods(builder: &mut MethodsBuilder) {
             }
         }
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compilation_mode_is_not_default_enabled() {
+        // After Plan 19.6, "opt" / "dbg" / "fastbuild" must NOT appear in the
+        // default feature set — they are activated per-cfg via
+        // configure_features's `requested_features`.
+        let defaults = default_cc_features();
+        assert!(!defaults.contains(&"opt"));
+        assert!(!defaults.contains(&"dbg"));
+        assert!(!defaults.contains(&"fastbuild"));
+    }
+
+    #[test]
+    fn requesting_opt_enables_opt_only() {
+        let fc = FeatureConfiguration::new(vec!["opt".to_owned()], vec![]);
+        assert!(fc.is_feature_enabled("opt"));
+        assert!(!fc.is_feature_enabled("dbg"));
+        assert!(!fc.is_feature_enabled("fastbuild"));
+    }
+
+    #[test]
+    fn requesting_dbg_enables_dbg_only() {
+        let fc = FeatureConfiguration::new(vec!["dbg".to_owned()], vec![]);
+        assert!(fc.is_feature_enabled("dbg"));
+        assert!(!fc.is_feature_enabled("opt"));
     }
 }
