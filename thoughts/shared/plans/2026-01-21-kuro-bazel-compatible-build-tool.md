@@ -285,6 +285,7 @@ The detailed implementation is split into focused sub-plans:
 | [11-toolchain-resolution.md](./kuro-bazel-subplans/11-toolchain-resolution.md)                       | Replace ToolchainsStub with real Bazel toolchain resolution algorithm | **Complete** (automated; manual verification remaining) |
 | [12-stub-cleanup-and-exec-groups.md](./kuro-bazel-subplans/12-stub-cleanup-and-exec-groups.md)       | Rename remaining stubs, real BuildConfiguration, exec group resolution | **Complete** (automated; manual verification remaining) |
 | [13-lazy-toolchain-loading.md](./kuro-bazel-subplans/13-lazy-toolchain-loading.md)                   | Filter dev_dependency, make toolchain loading resilient, reduce eager loading | **Not Started** |
+| [19-configuration-transitions.md](./kuro-bazel-subplans/19-configuration-transitions.md)             | Real Bazel-compatible configuration transitions: build settings on ConfigurationData, transition() impl fn execution, built-in exec transition (incl. compilation_mode=opt), select() on build settings, cc_toolchain_config flag-set selection | **Not Started** |
 
 ### Remaining Stub Behavior (No Plans Yet)
 
@@ -308,7 +309,10 @@ explicit decision that the stub is adequate. Organized by priority.
 |------|----------|------------------|------------|
 | `BuildConfigurationStub` | `context.rs:2928` | Real `ctx.configuration` object | Plan 12 |
 | `ExecGroupsDict` / `ExecGroupToolchains` stubs | `context.rs:3043` | Real per-group toolchain resolution | Plan 12 |
-| `FeatureConfigurationStub` | `context.rs:3883` | Real CC feature configuration | Needs plan |
+| `FeatureConfigurationStub` | `context.rs:3883` | Real CC feature configuration | Plan 19 (cc_toolchain_config flag-set selection depends on configured compilation_mode) |
+| `--compilation_mode` accepted-and-ignored | `common.rs:261` | Flag populates `ConfigurationData.build_settings` | Plan 19 |
+| `transition(impl=...)` impl fn never runs | `app/kuro_transition/src/transition/starlark.rs` | Transition dict returned from `impl` actually mutates the outgoing cfg | Plan 19 |
+| `ctx.var["COMPILATION_MODE"]` not set | `context.rs:943` | Reads from configured build settings so rules can select on it | Plan 19 |
 | `proto_common.compile()` no-op | `proto_common.rs:212` | Real proto compilation actions | Needs plan |
 | `proto_common.get_tool_path()` hardcoded | `proto_common.rs:272` | Protoc path from toolchain | Needs plan |
 | `CppFragment.sysroot()` returns None | `fragments.rs:482` | Real sysroot from CC toolchain | Needs plan |
