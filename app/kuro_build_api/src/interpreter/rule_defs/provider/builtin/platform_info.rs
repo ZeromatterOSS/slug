@@ -12,6 +12,8 @@ use std::fmt::Debug;
 
 use allocative::Allocative;
 use kuro_build_api_derive::internal_provider;
+use kuro_core::configuration::build_setting::BuildSettingLabel;
+use kuro_core::configuration::build_setting::BuildSettingValue;
 use kuro_core::configuration::data::ConfigurationData;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::label::label::TargetLabel;
@@ -30,6 +32,9 @@ use starlark::values::ValueLike;
 use starlark::values::ValueOf;
 use starlark::values::ValueOfUnchecked;
 use starlark::values::ValueOfUncheckedGeneric;
+use starlark::values::dict::AllocDict;
+use starlark::values::dict::DictRef;
+use starlark::values::dict::DictType;
 
 use crate as kuro_build_api;
 use crate::interpreter::rule_defs::provider::builtin::configuration_info::ConfigurationInfo;
@@ -41,21 +46,43 @@ use crate::interpreter::rule_defs::provider::builtin::configuration_info::Frozen
 pub struct PlatformInfoGen<V: ValueLifetimeless> {
     label: ValueOfUncheckedGeneric<V, String>,
     configuration: ValueOfUncheckedGeneric<V, FrozenConfigurationInfo>,
+    /// Bazel `platform(exec_properties={...})`. When this platform is used as
+    /// an execution platform, each entry is applied to the resulting
+    /// `ConfigurationData.build_settings` — this is how rules_cc declares its
+    /// opt-mode default for exec-config tool builds without kuro hardcoding it.
+    exec_properties: ValueOfUncheckedGeneric<V, DictType<String, String>>,
 }
 
 impl<'v, V: ValueLike<'v>> PlatformInfoGen<V> {
     pub fn to_configuration(&self) -> kuro_error::Result<ConfigurationData> {
-        ConfigurationData::from_platform(
-            self.label
-                .to_value()
-                .get()
-                .unpack_str()
-                .expect("type checked during construction")
-                .to_owned(),
-            ConfigurationInfo::from_value(self.configuration.get().to_value())
-                .expect("type checked during construction")
-                .to_configuration_data()?,
-        )
+        let label = self
+            .label
+            .to_value()
+            .get()
+            .unpack_str()
+            .expect("type checked during construction")
+            .to_owned();
+        let mut data = ConfigurationInfo::from_value(self.configuration.get().to_value())
+            .expect("type checked during construction")
+            .to_configuration_data()?;
+        for (k, v) in self.exec_properties_entries() {
+            let key = BuildSettingLabel::from_bazel_label(&k)?;
+            data.build_settings
+                .insert(key, BuildSettingValue::String(v));
+        }
+        ConfigurationData::from_platform(label, data)
+    }
+
+    /// Returns the exec_properties entries as (label, value) pairs. Empty for
+    /// `PlatformInfo` instances that did not set exec_properties.
+    pub fn exec_properties_entries(&self) -> Vec<(String, String)> {
+        match DictRef::from_value(self.exec_properties.get().to_value()) {
+            Some(dict) => dict
+                .iter()
+                .filter_map(|(k, v)| Some((k.unpack_str()?.to_owned(), v.unpack_str()?.to_owned())))
+                .collect(),
+            None => Vec::new(),
+        }
     }
 }
 
@@ -69,9 +96,17 @@ impl<'v> PlatformInfo<'v> {
             cfg.data()?,
             heap,
         ));
+        // Round-tripping a ConfigurationData through `PlatformInfo` is lossy
+        // for exec_properties: the dict is not stored on ConfigurationInfo.
+        // The cfg's build_settings remain authoritative for consumers that
+        // read `ConfigurationData.build_settings` directly (e.g. `ctx.var`
+        // in a later phase). This is acceptable because `from_configuration`
+        // is used by transition machinery that already carries the cfg.
+        let exec_properties = heap.alloc(AllocDict(Vec::<(&str, &str)>::new()));
         Ok(PlatformInfoGen {
             label: label.to_value_of_unchecked().cast(),
             configuration: ValueOfUnchecked::<FrozenConfigurationInfo>::new(configuration),
+            exec_properties: ValueOfUnchecked::<DictType<String, String>>::new(exec_properties),
         })
     }
 }
@@ -79,20 +114,26 @@ impl<'v> PlatformInfo<'v> {
 impl FrozenPlatformInfo {
     /// Create a frozen PlatformInfo for a native `platform()` rule.
     ///
-    /// Takes the platform label string and constraint pairs collected from
-    /// `constraint_values` deps (and parent platforms), and produces a frozen
-    /// `PlatformInfo` value ready for inclusion in a provider collection.
+    /// `exec_properties` is applied to the produced `ConfigurationData`'s
+    /// `build_settings` when the platform is used as an execution platform.
     pub fn for_native_platform(
         label_str: &str,
         constraint_pairs: &[(TargetLabel, ProvidersLabel)],
+        exec_properties: &[(String, String)],
         heap: &FrozenHeap,
     ) -> FrozenValue {
         let label_frozen = heap.alloc_str(label_str).to_frozen_value();
         let config_info =
             FrozenConfigurationInfo::for_native_config_setting(constraint_pairs, heap);
+        let exec_properties_frozen = heap.alloc(AllocDict(
+            exec_properties
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str())),
+        ));
         heap.alloc(PlatformInfoGen::<FrozenValue> {
             label: FrozenValueOfUnchecked::new(label_frozen),
             configuration: FrozenValueOfUnchecked::new(config_info),
+            exec_properties: FrozenValueOfUnchecked::new(exec_properties_frozen),
         })
     }
 }
@@ -103,10 +144,21 @@ fn platform_info_creator(globals: &mut GlobalsBuilder) {
     fn PlatformInfo<'v>(
         #[starlark(require = named)] label: StringValue<'v>,
         #[starlark(require = named)] configuration: ValueOf<'v, &'v ConfigurationInfo<'v>>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        exec_properties: starlark::values::Value<'v>,
+        eval: &mut starlark::eval::Evaluator<'v, '_, '_>,
     ) -> starlark::Result<PlatformInfo<'v>> {
+        let exec_properties_value = if exec_properties.is_none() {
+            eval.heap().alloc(AllocDict(Vec::<(&str, &str)>::new()))
+        } else {
+            exec_properties
+        };
         Ok(PlatformInfo {
             label: label.to_value_of_unchecked().cast(),
             configuration: ValueOfUnchecked::<FrozenConfigurationInfo>::new(configuration.value),
+            exec_properties: ValueOfUnchecked::<DictType<String, String>>::new(
+                exec_properties_value,
+            ),
         })
     }
 }

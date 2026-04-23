@@ -155,7 +155,7 @@ pub fn analyze_native_rule(
         NativeRuleKind::ToolchainType => create_minimal_analysis_result(target),
         NativeRuleKind::PackageGroup => analyze_package_group(target),
         NativeRuleKind::Genrule => analyze_genrule(target, configured_node, dep_analysis),
-        NativeRuleKind::Platform => analyze_platform(target, dep_analysis),
+        NativeRuleKind::Platform => analyze_platform(target, configured_node, dep_analysis),
         NativeRuleKind::CcLibrary => create_cc_analysis_result(target, Some(configured_node)),
         NativeRuleKind::CcBinary => create_cc_analysis_result(target, Some(configured_node)),
         NativeRuleKind::CcTest => create_cc_analysis_result(target, Some(configured_node)),
@@ -927,6 +927,7 @@ fn create_cc_analysis_result(
 /// `select()` matching against platform constraints.
 fn analyze_platform(
     target: &ConfiguredTargetLabel,
+    configured_node: ConfiguredTargetNodeRef<'_>,
     dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
 ) -> kuro_error::Result<AnalysisResult> {
     let heap = FrozenHeap::new();
@@ -938,6 +939,7 @@ fn analyze_platform(
     // constraint_value deps expose ConfigurationInfo with their single constraint pair.
     // parent platform deps expose PlatformInfo whose configuration also has constraint pairs.
     let mut all_constraint_pairs = Vec::new();
+    let mut inherited_exec_properties: Vec<(String, String)> = Vec::new();
     for (_dep_label, dep_result) in &dep_analysis {
         if let Ok(providers) = dep_result.providers() {
             // Collect from ConfigurationInfo (provided by constraint_value and config_setting deps)
@@ -960,16 +962,39 @@ fn analyze_platform(
                         }
                     }
                 }
+                // Parent platforms contribute their exec_properties; child
+                // `exec_properties` will override any shared keys below.
+                for (k, v) in platform_info.exec_properties_entries() {
+                    inherited_exec_properties.push((k, v));
+                }
             }
         }
     }
+
+    // Read this platform's own exec_properties and merge over the inherited set.
+    let mut exec_properties: std::collections::BTreeMap<String, String> =
+        inherited_exec_properties.into_iter().collect();
+    if let Some(attr) = configured_node.get("exec_properties", AttrInspectOptions::All) {
+        if let ConfiguredAttr::Dict(dict) = &attr.value {
+            for (k, v) in dict.0.iter() {
+                if let (ConfiguredAttr::String(kstr), ConfiguredAttr::String(vstr)) = (k, v) {
+                    exec_properties.insert(kstr.0.to_string(), vstr.0.to_string());
+                }
+            }
+        }
+    }
+    let exec_properties_vec: Vec<(String, String)> = exec_properties.into_iter().collect();
 
     // The platform label is the unconfigured target label string.
     let label_str = target.unconfigured().to_string();
 
     // Create PlatformInfo with the merged constraint configuration.
-    let platform_info =
-        FrozenPlatformInfo::for_native_platform(&label_str, &all_constraint_pairs, &heap);
+    let platform_info = FrozenPlatformInfo::for_native_platform(
+        &label_str,
+        &all_constraint_pairs,
+        &exec_properties_vec,
+        &heap,
+    );
 
     let mut providers = SmallMap::from_iter([(
         DefaultInfoCallable::provider_id().dupe(),
@@ -1268,11 +1293,12 @@ fn analyze_execution_platform(
 ) -> kuro_error::Result<AnalysisResult> {
     let heap = FrozenHeap::new();
 
-    // Extract constraint data from the `platform` dep's PlatformInfo
+    // Extract constraint data and exec_properties from the `platform` dep's PlatformInfo.
     let mut constraint_pairs: Vec<(
         kuro_core::target::label::label::TargetLabel,
         kuro_core::provider::label::ProvidersLabel,
     )> = Vec::new();
+    let mut exec_properties: Vec<(String, String)> = Vec::new();
 
     for (_dep_label, dep_result) in &dep_analysis {
         if let Ok(providers) = dep_result.providers() {
@@ -1285,6 +1311,7 @@ fn analyze_execution_platform(
                         }
                     }
                 }
+                exec_properties = platform_info.exec_properties_entries();
                 break;
             }
         }
@@ -1292,10 +1319,11 @@ fn analyze_execution_platform(
 
     let default_info = FrozenDefaultInfo::testing_empty(&heap);
 
-    // Create ExecutionPlatformInfo from constraint data
+    // Create ExecutionPlatformInfo from constraint data + exec_properties
     let exec_platform_info = FrozenExecutionPlatformInfo::for_native_execution_platform(
         target.unconfigured().dupe(),
         &constraint_pairs,
+        &exec_properties,
         &heap,
     );
 
