@@ -93,6 +93,61 @@ b. **Serial dep chains.** 694 s of `waiting for_deps` on CP means
 - Admission CSV for clang:clang archived at
   `/tmp/kuro-admission-clang.csv` (not committed — regenerable).
 
+## cquery / aquery comparison
+
+To isolate pure analysis cost (no compile noise), compared kuro and
+Bazel on the same `@llvm-project//clang:clang` graph:
+
+| Command           | Bazel cold | Kuro cold | Bazel warm | Kuro warm |
+|-------------------|-----------:|----------:|-----------:|----------:|
+| cquery            | 4.87 s     | 46.1 s    | 0.17 s     | 2.04 s    |
+| aquery deps(...)  | 9.92 s     | 50.3 s    | —          | —         |
+
+Ratios: cold 9.5× slower, warm 12× slower.
+
+**Where the 51 s of cold time goes.** Client log shows:
+
+    14:06:27 Could not connect to kuro daemon, killing daemon
+    14:06:27 Starting new kuro daemon
+    14:07:18 Connected to new kuro daemon     ← 51 s later
+    14:07:18 File change events (<100 ms)
+    14:07:22 Toolchain warnings (4 s after connected)
+    14:07:23 cquery result emitted
+
+So ≈ 51 s is daemon startup + bzlmod cold load, ≈ 4 s is
+module-load / cell-resolver, and ≈ 2 s is the cquery itself.
+Warm run (daemon already up) confirms analysis-only cost is 2 s.
+
+**This is Plan 17.5 territory** (external-cell fetch caching):
+> How to measure: `tools/bench/run.sh --cold --target @llvm-project//clang:clang`
+> on a fresh tree — look at the `load_wall_us` slice of the
+> resulting `summary.json`. If load wall >> analyze wall on first
+> daemon start, module hashing is likely dominant.
+
+On the post-Plan-20 summary.json: `load_wall_us = 2.4 s`,
+`analyze_wall_us = 1.1 s`. That doesn't match the 51 s cold cost,
+so whatever the 51 s is, it's happening outside the build's
+load/analyze phase boundary — likely in daemon-level init before
+the build phases even start.
+
+The cold clang:clang wall-clock breakdown then looks like:
+
+    Daemon startup + module resolution:   ~50 s
+    Load + analyze phase:                   ~4 s
+    Execute phase:                       ~1055 s
+    Total:                               ~1108 s
+
+Bazel's equivalent:
+
+    Cold analysis (≈ full startup):       ~5 s
+    Execute phase:                       ~1126 s
+    Total:                               ~1131 s
+
+So **kuro beats Bazel on action execution by ~70 s** but loses
+~45 s on cold startup. Net: kuro 23 s faster overall, but for the
+ideal "match Bazel on every axis" narrative, the startup gap is
+the single biggest measurable item left.
+
 ## Next steps (supersedes 17.2-fix)
 
 Re-scope 17.2-fix or split into two follow-ups:
