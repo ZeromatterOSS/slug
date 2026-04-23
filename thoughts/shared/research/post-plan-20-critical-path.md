@@ -81,41 +81,54 @@ first td_generate (RISCV, 35.0 s start) also ran. Between 35 and
 57 s nothing else on the CP appears to block AMDGPU directly —
 suggesting admission, not dep.
 
-## Recommended plan
+## This is Plan 17.2 territory
 
-Split Plan 17.2 into a concrete action:
+17.2 was already scoped around exactly this investigation
+(`thoughts/shared/plans/kuro-bazel-subplans/17-optimization.md:106`)
+with hypotheses (a) through (d), and
+`scheduler-parallelism-findings.md` already ranked
+"Add instrumentation to measure action queue depth and spawn
+latency" as item #3 (zero-risk, enables debugging). 17.2's
+deliverable is `act/sec ≥ 5.5` on cold clang:clang; post-Plan-20 is
+**5.05**, so the plan is still open and its own success threshold
+is unmet.
 
-**21.1** Instrument action admission. Log `(action_key, ready_us,
-start_us, inputs_ready_count)` per action. One-off event log flag
-(e.g. `--log-admission`) is fine — this is debugging not production.
+Concrete sub-phases to pick up under 17.2:
 
-**21.2** Run the instrumented build and plot admission latency per
-category. Expected outcome: td_generate actions show >10 s
-ready-to-start latency when lib compiles are saturating the local
+**17.2-instrument.** Log `(action_key, ready_us, start_us,
+inputs_ready_count)` per action. A one-off `--log-admission` event
+flag is fine; this is debugging, not production.
+
+**17.2-measure.** Run the instrumented build and plot admission
+latency per category. Expected outcome: td_generate actions show
+>10 s ready-to-start latency while c_compile saturates the local
 executor.
 
-**21.3** Fix whichever the data implicates:
+**17.2-fix.** Apply whichever the data implicates:
 - If admission: reduce host-sharing pressure for tablegen (give
-  td_generate a small dedicated permit pool that lib compiles can't
+  td_generate a small dedicated permit pool lib-compiles can't
   exhaust), or raise tablegen priority in the scheduler.
 - If dep: identify the bogus serial edge in DICE and fix the
-  ReductionKey or analysis output.
+  ReductionKey or analysis output (hypothesis (d) in the 17.2
+  research doc).
 
 ## Cost/benefit
 
 Closing 33 s of CP on a 1107 s build is a 3 % overall-wall win.
-Modest. The bigger practical value: bringing CP in line with Bazel
-(~71 s) gives a clean "we match Bazel on every axis" story.
+Modest for wall, but it closes the `act/sec` gap 17.2 was scoped
+against (5.05 → ~5.6) and brings critical path in line with Bazel
+(~71 s) for a clean "we match Bazel on every axis" story.
 
-If prioritising by measured-win-per-effort:
-- 21.x (CP scheduling): 3 % wall, 1-3 days
-- 17.5 (external-cell fetch caching): unknown, mostly affects
-  warm-cache scenarios and daemon-restart behaviour
-- 17.8 (DICE key granularity for incremental): unknown, affects
-  warm rebuilds
+Priority vs the other open 17.x phases:
+- **17.2** (this doc): 3 % wall + closes act/sec target. Signal is
+  visible in every run.
+- **17.5** (external-cell fetch caching): unknown impact, mostly
+  warm-cache / daemon-restart.
+- **17.8** (DICE key granularity for incremental): unknown, affects
+  warm rebuilds.
 
-21.x has the tightest measurement signal (the 33 s CP gap is visible
-in every benchmark run).
+17.2 has the tightest measurement signal and an explicit unmet
+deliverable. Promote it first.
 
 ## References
 
