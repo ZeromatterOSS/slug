@@ -448,21 +448,20 @@ pub(crate) mod rule_defs {
             ])),
         );
 
-        // NOTE: Bazel marks `tools` as `cfg="exec"` so tools are built in the
-        // execution configuration. Kuro keeps target-cfg here for now because
-        // exec-dep propagation through the legacy include-path synthesis has
-        // unresolved edge cases (siphash virtual_includes regression observed
-        // when this was temporarily switched to `exec_dep`). Plan 19 unblocked
-        // the exec-cfg build_settings machinery; a follow-up phase can flip
-        // genrule + cc_binary's `tools` / `additional_linker_inputs` to
-        // `exec_dep` once the include-path path is proven safe.
+        // `tools` is Bazel-compatible `cfg="exec"`: the referenced binaries are
+        // built in the execution configuration so they run on the build host
+        // regardless of the target platform. Plan 19.3 routes the resulting
+        // exec cfg through `exec_properties` → `build_settings`, giving tools
+        // like llvm-tblgen an opt compilation mode by default. Plan 20.1
+        // restored this after an earlier attempt exposed a siphash
+        // `_virtual_includes` regression — see commit history.
         let tools_attr = Attribute::new(
             Some(Arc::new(CoercedAttr::List(
                 ListLiteral(ArcSlice::default()),
             ))),
-            "Tool dependencies for the command",
+            "Tool dependencies for the command (exec-configured)",
             AttrType::list(AttrType::one_of(vec![
-                AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
+                AttrType::exec_dep(ProviderIdSet::EMPTY),
                 AttrType::source(false),
             ])),
         );

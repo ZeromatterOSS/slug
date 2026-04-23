@@ -88,6 +88,71 @@ async fn legacy_execution_platform(
     )
 }
 
+/// Builds the cfg that kuro uses as the legacy exec-configuration when
+/// `build.execution_platforms` is not set.
+///
+/// In Bazel, omitting `register_execution_platforms()` means exec cfg ==
+/// target cfg. Kuro used to do the same (pass through `target_cfg`), but
+/// that collapses Plan 19.3's `platform(exec_properties = {...})` defaults
+/// — they become no-ops for every tool build because the top-level
+/// `apply_cli_build_settings` (Plan 19.4) has already pinned the target
+/// cfg's `compilation_mode` before the exec-transition can apply the
+/// platform's "opt" default.
+///
+/// This helper loads `@local_config_platform//:host`'s `PlatformInfo`
+/// directly (mirroring `get_default_platform` in
+/// `target_platform_resolution`) and returns *its* cfg, which carries
+/// `compilation_mode = "opt"` via the exec_properties folded in by
+/// `PlatformInfo::to_configuration`. Fall back to `target_cfg` when the
+/// host platform is unavailable (e.g. Meta-internal builds that don't
+/// auto-register local_config_platform).
+async fn legacy_exec_cfg(
+    ctx: &mut DiceComputations<'_>,
+    target_cfg: &ConfigurationNoExec,
+) -> ConfigurationNoExec {
+    use kuro_build_api::interpreter::rule_defs::provider::builtin::platform_info::FrozenPlatformInfo;
+    use kuro_core::cells::name::CellName;
+    use kuro_core::cells::paths::CellRelativePath;
+    use kuro_core::package::PackageLabel;
+    use kuro_core::target::name::TargetNameRef;
+
+    let lcp_cell = match CellName::unchecked_new("local_config_platform") {
+        Ok(name) => name,
+        Err(_) => return target_cfg.dupe(),
+    };
+    match ctx.get_cell_resolver().await {
+        Ok(resolver) if resolver.get(lcp_cell).is_ok() => {}
+        _ => return target_cfg.dupe(),
+    };
+    let pkg = match PackageLabel::new(lcp_cell, CellRelativePath::empty()) {
+        Ok(p) => p,
+        Err(_) => return target_cfg.dupe(),
+    };
+    let target_name = match TargetNameRef::new("host") {
+        Ok(n) => n,
+        Err(_) => return target_cfg.dupe(),
+    };
+    let host_label = TargetLabel::new(pkg, target_name);
+    let providers_label = ProvidersLabel::default_for(host_label);
+    let providers = match ctx
+        .get_configuration_analysis_result(&providers_label)
+        .await
+    {
+        Ok(p) => p,
+        Err(_) => return target_cfg.dupe(),
+    };
+    let Some(platform_info) = providers
+        .provider_collection()
+        .builtin_provider::<FrozenPlatformInfo>()
+    else {
+        return target_cfg.dupe();
+    };
+    match platform_info.to_configuration() {
+        Ok(cfg) => ConfigurationNoExec::new(cfg),
+        Err(_) => target_cfg.dupe(),
+    }
+}
+
 pub async fn find_execution_platform_by_configuration(
     ctx: &mut DiceComputations<'_>,
     exec_cfg: &ConfigurationData,
@@ -104,7 +169,11 @@ pub async fn find_execution_platform_by_configuration(
                 ExecutionPlatformComputationError::ToolchainDepMissingPlatform(exec_cfg.dupe()),
             ))
         }
-        _ => Ok(legacy_execution_platform(ctx, &ConfigurationNoExec::new(cfg.dupe())).await),
+        _ => {
+            let target_cfg = ConfigurationNoExec::new(cfg.dupe());
+            let exec_cfg = legacy_exec_cfg(ctx, &target_cfg).await;
+            Ok(legacy_execution_platform(ctx, &exec_cfg).await)
+        }
     }
 }
 
@@ -343,14 +412,16 @@ pub(crate) async fn resolve_execution_platform(
     cfg_ctx: &(dyn AttrConfigurationContext + Sync),
 ) -> kuro_error::Result<ExecutionPlatformResolution> {
     // If no execution platforms are configured, we fall back to the legacy execution
-    // platform behavior. We currently only support legacy execution platforms. That behavior is that there is a
-    // single executor config (the fallback config) and the execution platform is in the same
-    // configuration as the target.
+    // platform behavior: a single executor config (the fallback config) with an exec
+    // cfg derived from `@local_config_platform//:host` (Plan 20.1). Using the host
+    // cfg rather than the target cfg activates the exec_properties defaults folded
+    // in by Plan 19.3 (`compilation_mode = "opt"` for tool builds).
     // The non-none case will be handled when we invoke the resolve_execution_platform() on ctx below, the none
     // case can't be handled there because we don't pass the full configuration into it.
     if ctx.get_execution_platforms().await?.is_none() {
+        let exec_cfg = legacy_exec_cfg(ctx, matched_cfg_keys.cfg()).await;
         return Ok(ExecutionPlatformResolution::new(
-            Some(legacy_execution_platform(ctx, matched_cfg_keys.cfg()).await),
+            Some(legacy_execution_platform(ctx, &exec_cfg).await),
             Vec::new(),
         ));
     };
