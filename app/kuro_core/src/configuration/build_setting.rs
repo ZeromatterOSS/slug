@@ -39,6 +39,34 @@ impl BuildSettingLabel {
     pub fn target(&self) -> &TargetLabel {
         &self.0
     }
+
+    /// Canonicalises a Bazel-style label string into a `BuildSettingLabel`.
+    ///
+    /// Transitions declare inputs/outputs as raw strings (`"//:my_flag"`,
+    /// `"//command_line_option:compilation_mode"`, `"@bazel_tools//..."`).
+    /// Kuro's `TargetLabel` parser needs an explicit cell prefix, so
+    /// unprefixed labels are routed through a synthetic `@kuro_settings`
+    /// cell. The synthetic cell is only a storage key — it is not resolved
+    /// or analysed as a real target. Cell-aware parsing is a follow-up;
+    /// see Plan 19.4.
+    pub fn from_bazel_label(raw: &str) -> kuro_error::Result<Self> {
+        const SYNTHETIC_CELL: &str = "@kuro_settings";
+
+        let canon = if raw.starts_with('@') {
+            raw.to_owned()
+        } else if let Some(rest) = raw.strip_prefix("//") {
+            format!("{SYNTHETIC_CELL}//{rest}")
+        } else {
+            return Err(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "build-setting label must start with `@` or `//`: `{}`",
+                raw
+            ));
+        };
+
+        let target = TargetLabel::testing_parse(&canon);
+        Ok(BuildSettingLabel(target))
+    }
 }
 
 /// Typed value of a build setting.

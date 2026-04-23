@@ -26,6 +26,8 @@ use kuro_build_api::interpreter::rule_defs::provider::builtin::platform_info::Pl
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 use kuro_build_api::transition::TRANSITION_CALCULATION;
 use kuro_build_api::transition::TransitionCalculation;
+use kuro_core::configuration::build_setting::BuildSettingLabel;
+use kuro_core::configuration::build_setting::BuildSettingValue;
 use kuro_core::configuration::cfg_diff::cfg_diff;
 use kuro_core::configuration::data::ConfigurationData;
 use kuro_core::configuration::transition::applied::TransitionApplied;
@@ -131,10 +133,16 @@ fn call_transition_function<'v>(
 /// Call a Bazel-style transition function.
 ///
 /// Bazel transitions have the signature `def impl(settings, attr)` where:
-/// - `settings` is a dict of {input_setting_label: current_value}
-/// - `attr` is a struct of attribute values (or None if no attrs declared)
+/// - `settings` is a dict of {input_setting_label: current_value} sourced from
+///   the incoming `ConfigurationData.build_settings`, with the top-level
+///   global `BUILD_CONFIG` as a fallback for flags the CLI has not yet
+///   plumbed into the cfg (pre-Plan-19.4 compat).
+/// - `attr` is a struct of attribute values (or `None` if no attrs declared).
 ///
-/// Returns a dict of {output_setting_label: new_value}, or {} for no-op.
+/// Returns either a dict of {output_setting_label: new_value} (which is
+/// folded into a new `ConfigurationData` via
+/// `ConfigurationData::with_build_setting`), `None` / `{}` for a no-op, or
+/// a `PlatformInfo` for legacy mixed-style transitions.
 fn call_bazel_transition_function<'v>(
     transition: &TransitionData,
     conf: &ConfigurationData,
@@ -146,13 +154,14 @@ fn call_bazel_transition_function<'v>(
         TransitionData::Target(v) => v.r#impl.to_value().get(),
     };
 
-    // Build the settings dict from the transition's inputs list.
-    // Each input is a label like "//command_line_option:cpu" or "//pkg:flag".
+    // Build the settings dict from the transition's inputs list, reading
+    // each input from conf.build_settings (falling back to global config
+    // when absent — 19.4 will remove that fallback once the CLI populates
+    // the cfg directly).
     let inputs = transition.inputs();
     let mut settings_entries: Vec<(&str, Value<'v>)> = Vec::new();
     for input in inputs {
         let value = resolve_setting_value(input, conf, eval)?;
-        // We need to alloc the key string on the heap for the dict
         settings_entries.push((eval.heap().alloc_str(input).as_str(), value));
     }
     let settings_dict = eval.heap().alloc(starlark::values::dict::AllocDict(
@@ -168,87 +177,151 @@ fn call_bazel_transition_function<'v>(
         .eval_function(impl_, &[settings_dict, attr_value], &[])
         .map_err(kuro_error::Error::from)?;
 
-    // Parse the return value.
-    // Bazel transitions return a dict of {setting_label: new_value}
-    // or {} / None for no changes.
     if result.is_none() {
-        // No-op transition - return current configuration unchanged
         return Ok(TransitionApplied::Single(conf.dupe()));
     }
 
-    // Check if it's a dict
     if let Some(dict) = DictRef::from_value(result) {
         if dict.is_empty() {
-            // Empty dict = no-op
             return Ok(TransitionApplied::Single(conf.dupe()));
         }
 
-        // For split transitions, the return is a dict of {split_key: {setting: value}}
         if transition.is_split() {
+            // Split transitions return {split_key: {setting_label: value}}.
+            // Each inner dict is applied to the incoming cfg independently.
             let mut split = OrderedMap::new();
-            for (k, _v) in dict.iter() {
-                let key = k.unpack_str().unwrap_or_default();
-                // For split Bazel transitions, each value should be a dict of settings.
-                // For now, pass through the current configuration since we don't yet
-                // apply setting changes to the configuration.
-                split.insert(key.to_owned(), conf.dupe());
+            for (k, v) in dict.iter() {
+                let split_key = k.unpack_str().unwrap_or_default().to_owned();
+                let inner = DictRef::from_value(v).ok_or_else(|| {
+                    kuro_error::kuro_error!(
+                        kuro_error::ErrorTag::Input,
+                        "split transition branch `{}` did not return a dict",
+                        split_key
+                    )
+                })?;
+                let branch_cfg = apply_setting_dict_to_cfg(conf, &inner, transition.outputs())?;
+                split.insert(split_key, branch_cfg);
             }
             return Ok(TransitionApplied::Split(SortedMap::from(split)));
         }
 
-        // Non-split: the returned dict maps setting labels to new values.
-        // Store the setting changes in the build config for later resolution.
-        let outputs = transition.outputs();
-        for (k, v) in dict.iter() {
-            let key = k.unpack_str().unwrap_or_default();
-            // Validate that returned keys are in outputs
-            if !outputs.is_empty() && !outputs.iter().any(|o| o.as_str() == key) {
-                // Setting not declared in outputs - log but don't error
-                eprintln!(
-                    "Warning: transition returned setting '{}' not declared in outputs",
-                    key
-                );
-            }
-            // Apply the setting value to the build config
-            let value_str = if v.is_none() {
-                continue; // None means no change
-            } else if let Some(b) = v.unpack_bool() {
-                if b { "True" } else { "False" }.to_owned()
-            } else {
-                v.unpack_str()
-                    .map(|s| s.to_owned())
-                    .unwrap_or_else(|| format!("{}", v))
-            };
-            // Store in the global build config so ctx.build_setting_value picks it up
-            kuro_build_api::interpreter::rule_defs::build_config::set_starlark_flag(
-                key, &value_str,
-            );
-        }
-
-        // Return the current configuration (settings are applied via BuildConfig)
-        return Ok(TransitionApplied::Single(conf.dupe()));
+        let new_cfg = apply_setting_dict_to_cfg(conf, &dict, transition.outputs())?;
+        return Ok(TransitionApplied::Single(new_cfg));
     }
 
-    // Try treating as PlatformInfo (compatibility with mixed-style transitions)
+    // Legacy mixed-style transitions may return a PlatformInfo directly.
     match <&PlatformInfo>::unpack_value_err(result) {
         Ok(platform) => Ok(TransitionApplied::Single(platform.to_configuration()?)),
-        Err(_) => {
-            // If it's not a dict and not PlatformInfo, return current config as no-op
-            // Unexpected return type - treat as no-op
-            Ok(TransitionApplied::Single(conf.dupe()))
-        }
+        Err(_) => Ok(TransitionApplied::Single(conf.dupe())),
     }
 }
 
-/// Resolve the current value of a build setting for transition inputs.
+/// Folds a transition's returned `{label: value}` dict into a new
+/// `ConfigurationData`.
+///
+/// Also mirrors each setting into the global `BUILD_CONFIG` map (as pre-Plan-19
+/// code did). Read paths in `ctx.build_setting_value` and `config_setting`
+/// matching still consult that global; Plan 19.5 rewires them to consult
+/// `ConfigurationData.build_settings` and the mirror-write will be removed.
+fn apply_setting_dict_to_cfg(
+    conf: &ConfigurationData,
+    dict: &DictRef<'_>,
+    declared_outputs: &[String],
+) -> kuro_error::Result<ConfigurationData> {
+    let mut out = conf.dupe();
+    for (k, v) in dict.iter() {
+        let key_str = match k.unpack_str() {
+            Some(s) => s,
+            None => continue,
+        };
+        if v.is_none() {
+            continue;
+        }
+        if !declared_outputs.is_empty() && !declared_outputs.iter().any(|o| o == key_str) {
+            return Err(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "transition returned setting `{}` not declared in outputs={:?}",
+                key_str,
+                declared_outputs
+            ));
+        }
+        let label = BuildSettingLabel::from_bazel_label(key_str)?;
+        let value = build_setting_value_from_starlark(v)?;
+        mirror_setting_to_global(key_str, &value);
+        out = out.with_build_setting(label, value)?;
+    }
+    Ok(out)
+}
+
+/// Writes a setting to the global `BUILD_CONFIG` using the same string
+/// encoding the pre-19.2 code used. Kept as compatibility while legacy read
+/// paths still consult the global map.
+fn mirror_setting_to_global(label: &str, value: &BuildSettingValue) {
+    let encoded = match value {
+        BuildSettingValue::Bool(b) => if *b { "True" } else { "False" }.to_owned(),
+        BuildSettingValue::Int(i) => i.to_string(),
+        BuildSettingValue::String(s) => s.clone(),
+        BuildSettingValue::StringList(xs) | BuildSettingValue::StringSet(xs) => xs.join(","),
+    };
+    kuro_build_api::interpreter::rule_defs::build_config::set_starlark_flag(label, &encoded);
+}
+
+/// Converts a Starlark value returned by a transition into a typed
+/// `BuildSettingValue`. String lists/sets are inferred by element types
+/// rather than pre-declared; this keeps parity with Bazel's runtime
+/// coercion while a proper typecheck against the output rule's
+/// `build_setting_type` is added in a follow-up phase.
+fn build_setting_value_from_starlark(v: Value<'_>) -> kuro_error::Result<BuildSettingValue> {
+    if let Some(b) = v.unpack_bool() {
+        return Ok(BuildSettingValue::Bool(b));
+    }
+    if let Some(i) = v.unpack_i32() {
+        return Ok(BuildSettingValue::Int(i64::from(i)));
+    }
+    if let Some(s) = v.unpack_str() {
+        return Ok(BuildSettingValue::String(s.to_owned()));
+    }
+    if let Some(list) = starlark::values::list::ListRef::from_value(v) {
+        let items: Vec<String> = list
+            .iter()
+            .map(|e| e.unpack_str().map(|s| s.to_owned()))
+            .collect::<Option<Vec<_>>>()
+            .ok_or_else(|| {
+                kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "transition list value must contain only strings"
+                )
+            })?;
+        return Ok(BuildSettingValue::StringList(items));
+    }
+    Err(kuro_error::kuro_error!(
+        kuro_error::ErrorTag::Input,
+        "transition value type is not supported as a build setting: `{}`",
+        v.get_type()
+    ))
+}
+
+/// Resolve the current value of a build setting for the transition-input dict.
+///
+/// Priority order:
+/// 1. `conf.build_settings` — the per-configuration value written by an earlier
+///    transition or CLI flag.
+/// 2. Known `//command_line_option:*` pseudo-labels backed by the global
+///    `BUILD_CONFIG` (kept until Plan 19.4 routes CLI flags through the cfg).
+/// 3. Other Starlark flag globals.
+/// 4. Empty string fallback.
 fn resolve_setting_value<'v>(
     setting_label: &str,
-    _conf: &ConfigurationData,
+    conf: &ConfigurationData,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> kuro_error::Result<Value<'v>> {
-    // Check for command_line_option settings
-    if setting_label.starts_with("//command_line_option:") {
-        let option_name = &setting_label["//command_line_option:".len()..];
+    if let Ok(label) = BuildSettingLabel::from_bazel_label(setting_label) {
+        if let Ok(Some(value)) = conf.get_build_setting(&label) {
+            return Ok(build_setting_value_to_starlark(value, eval));
+        }
+    }
+
+    if let Some(option_name) = setting_label.strip_prefix("//command_line_option:") {
         let value = match option_name {
             "compilation_mode" => {
                 kuro_build_api::interpreter::rule_defs::build_config::get_compilation_mode()
@@ -262,27 +335,18 @@ fn resolve_setting_value<'v>(
                     "unknown".to_owned()
                 }
             }
-            "crosstool_top" => "".to_owned(),
-            "compiler" => "".to_owned(),
-            "platforms" => "".to_owned(),
-            "host_platform" => "".to_owned(),
-            _ => {
-                // Check if there's a Starlark flag override
-                kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(&format!(
-                    "//command_line_option:{}",
-                    option_name
-                ))
-                .unwrap_or_default()
-            }
+            "crosstool_top" | "compiler" | "platforms" | "host_platform" => String::new(),
+            _ => kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(&format!(
+                "//command_line_option:{option_name}"
+            ))
+            .unwrap_or_default(),
         };
         return Ok(eval.heap().alloc_str(&value).to_value());
     }
 
-    // Check for user-defined build settings (Starlark flags)
     if let Some(value) =
         kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(setting_label)
     {
-        // Parse the value appropriately
         return Ok(match value.as_str() {
             "True" | "true" => eval.heap().alloc(true),
             "False" | "false" => eval.heap().alloc(false),
@@ -290,8 +354,21 @@ fn resolve_setting_value<'v>(
         });
     }
 
-    // Default: return empty string for unknown settings
     Ok(eval.heap().alloc_str("").to_value())
+}
+
+fn build_setting_value_to_starlark<'v>(
+    value: &BuildSettingValue,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> Value<'v> {
+    match value {
+        BuildSettingValue::Bool(b) => eval.heap().alloc(*b),
+        BuildSettingValue::Int(i) => eval.heap().alloc(*i),
+        BuildSettingValue::String(s) => eval.heap().alloc_str(s).to_value(),
+        BuildSettingValue::StringList(xs) | BuildSettingValue::StringSet(xs) => eval
+            .heap()
+            .alloc(starlark::values::list::AllocList(xs.iter().cloned())),
+    }
 }
 
 async fn do_apply_transition(
@@ -583,5 +660,66 @@ impl TransitionCalculation for TransitionCalculationImpl {
         };
 
         ctx.compute(&key).await?.map_err(kuro_error::Error::from)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use kuro_core::configuration::build_setting::BuildSettingLabel;
+    use kuro_core::configuration::build_setting::BuildSettingValue;
+    use kuro_core::configuration::data::ConfigurationData;
+    use kuro_core::configuration::data::ConfigurationDataData;
+
+    #[test]
+    fn bazel_label_parses_unprefixed() {
+        let l = BuildSettingLabel::from_bazel_label("//:my_flag").unwrap();
+        // Synthetic cell form is stable and round-trips.
+        let l2 = BuildSettingLabel::from_bazel_label("//:my_flag").unwrap();
+        assert_eq!(l, l2);
+    }
+
+    #[test]
+    fn bazel_label_parses_command_line_option() {
+        let a =
+            BuildSettingLabel::from_bazel_label("//command_line_option:compilation_mode").unwrap();
+        let b = BuildSettingLabel::from_bazel_label("//command_line_option:cpu").unwrap();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn bazel_label_parses_cell_prefixed() {
+        let l = BuildSettingLabel::from_bazel_label("@bazel_tools//tools/cpp:compilation_mode")
+            .unwrap();
+        let l2 =
+            BuildSettingLabel::from_bazel_label("//command_line_option:compilation_mode").unwrap();
+        // A prefixed label and a pseudo-label both resolve to valid, distinct keys.
+        assert_ne!(l, l2);
+    }
+
+    #[test]
+    fn bazel_label_rejects_bare() {
+        assert!(BuildSettingLabel::from_bazel_label("my_flag").is_err());
+    }
+
+    /// `with_build_setting` on a cfg with no prior settings adds the entry and
+    /// the resulting cfg has a distinct output hash. Exercises the plumbing
+    /// that `apply_setting_dict_to_cfg` relies on without requiring a
+    /// Starlark evaluator.
+    #[test]
+    fn apply_setting_changes_cfg_identity() -> kuro_error::Result<()> {
+        let base = ConfigurationData::from_platform(
+            "cfg_for//:testing".to_owned(),
+            ConfigurationDataData::empty(),
+        )?;
+        let label = BuildSettingLabel::from_bazel_label("//:my_flag")?;
+        let updated =
+            base.with_build_setting(label.clone(), BuildSettingValue::String("baz".to_owned()))?;
+        assert_ne!(base.output_hash(), updated.output_hash());
+        assert_eq!(
+            updated.get_build_setting(&label)?,
+            Some(&BuildSettingValue::String("baz".to_owned()))
+        );
+        assert_eq!(base.get_build_setting(&label)?, None);
+        Ok(())
     }
 }
