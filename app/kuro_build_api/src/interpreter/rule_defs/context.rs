@@ -19,6 +19,9 @@ use allocative::Allocative;
 use derive_more::Display;
 use dice::DiceComputations;
 use futures::FutureExt;
+use kuro_core::configuration::build_setting::BuildSettingLabel;
+use kuro_core::configuration::build_setting::BuildSettingValue;
+use kuro_core::configuration::data::ConfigurationData;
 use kuro_core::provider::id::ProviderId;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::ProvidersName;
@@ -569,9 +572,10 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// `ctx.fragments.java`, etc.
     #[starlark(attribute)]
     fn fragments<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        // Build configuration fragments using the global compilation mode
-        let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+        // compilation_mode comes from the target's configuration so that a
+        // transitioned dep (exec cfg, user cfg) sees its own mode rather than
+        // leaking the top-level target's.
+        let mode = compilation_mode_from_cfg(cfg_from_label(this.0.label));
         let force_pic = crate::interpreter::rule_defs::build_config::get_force_pic();
         let coverage = crate::interpreter::rule_defs::build_config::get_collect_code_coverage();
         let cpp = crate::interpreter::rule_defs::fragments::CppFragment::new(
@@ -590,8 +594,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         this: RefAnalysisContext<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let _ = this;
-        let mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+        let mode = compilation_mode_from_cfg(cfg_from_label(this.0.label));
         let force_pic = crate::interpreter::rule_defs::build_config::get_force_pic();
         let coverage = crate::interpreter::rule_defs::build_config::get_collect_code_coverage();
         let cpp = crate::interpreter::rule_defs::fragments::CppFragment::new(
@@ -943,7 +946,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         // Return an actual Dict so that dict(ctx.var) and iteration work correctly.
         // BINDIR and GENDIR are derived from the actual target's cell/configuration.
         let bin_dir = bin_dir_path_from_label(this.0.label);
-        let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+        let comp_mode = compilation_mode_from_cfg(cfg_from_label(this.0.label));
         use starlark::values::dict::Dict;
         let entries: &[(&str, &str)] = &[
             ("BINDIR", bin_dir.as_str()),
@@ -1022,10 +1025,12 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             })
             .unwrap_or(false);
 
-        // Check for command-line override via --//pkg:target=value
+        // Resolve from the target's own ConfigurationData. This is where CLI
+        // overrides (Plan 19.4) and transition-produced overrides (Plan 19.2)
+        // land.
         if let Some(label) = this.0.label {
             let target = label.label().target();
-            // Build the label string in //pkg:target format
+            let cfg = label.label().cfg();
             let pkg_path = target.pkg().cell_relative_path().as_str();
             let target_name = target.name().as_str();
             let label_str = if pkg_path.is_empty() {
@@ -1034,20 +1039,33 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
                 format!("//{}:{}", pkg_path, target_name)
             };
 
-            if let Some(cli_value) =
-                crate::interpreter::rule_defs::build_config::get_starlark_flag(&label_str)
-            {
-                // Parse the CLI string value into the appropriate type
-                // For bool settings, convert "True"/"False"/"true"/"false" to bool
-                // For int settings, parse as int
-                // For string/string_list, return as-is
-                let value = match cli_value.as_str() {
-                    "True" | "true" | "1" => heap.alloc(true).to_value(),
-                    "False" | "false" | "0" => heap.alloc(false).to_value(),
-                    s => heap.alloc_str(s).to_value(),
-                };
+            let cfg_value: Option<Value<'v>> = BuildSettingLabel::from_bazel_label(&label_str)
+                .ok()
+                .and_then(|l| cfg.get_build_setting(&l).ok().flatten())
+                .map(|v| build_setting_value_to_starlark(v, heap));
+
+            // Fallback: the process-global starlark_flags store (pre-19.4 and
+            // any other path that wrote there, e.g. transition mirror-writes).
+            let final_value = cfg_value.or_else(|| {
+                crate::interpreter::rule_defs::build_config::get_starlark_flag(&label_str).map(
+                    |cli_value| match cli_value.as_str() {
+                        "True" | "true" | "1" => heap.alloc(true).to_value(),
+                        "False" | "false" | "0" => heap.alloc(false).to_value(),
+                        s => heap.alloc_str(s).to_value(),
+                    },
+                )
+            });
+
+            if let Some(value) = final_value {
                 if allows_multiple {
                     use starlark::values::list::AllocList;
+                    use starlark::values::list::ListRef;
+                    // If the typed read already produced a list (e.g. from
+                    // `BuildSettingValue::StringList`) return it as-is;
+                    // otherwise wrap a scalar.
+                    if ListRef::from_value(value).is_some() {
+                        return Ok(value);
+                    }
                     return Ok(heap.alloc(AllocList([value])));
                 }
                 return Ok(value);
@@ -2057,6 +2075,65 @@ pub fn bin_dir_path_from_label(
         format!("buck-out/v2/gen/{}/{}", cell_name, cfg_hash)
     } else {
         "buck-out/v2/gen".to_owned()
+    }
+}
+
+/// Canonical label of Bazel's `--compilation_mode` CLI flag. Kept in sync
+/// with `kuro_configured::target_platform_resolution`.
+const COMPILATION_MODE_LABEL: &str = "@bazel_tools//tools/cpp:compilation_mode";
+
+/// Returns the current target's `ConfigurationData`, if the context has a
+/// configured label (all rule-impl ctxs do).
+fn cfg_from_label<'v>(
+    label: Option<
+        starlark::values::ValueTyped<
+            'v,
+            kuro_interpreter::types::configured_providers_label::StarlarkConfiguredProvidersLabel,
+        >,
+    >,
+) -> Option<&'v ConfigurationData> {
+    // `ValueTyped<'v, T>` dereferences to `&'v T`, so `.label().cfg()` yields
+    // a `&'v ConfigurationData` tied to the Starlark heap's lifetime.
+    let typed = label?;
+    let starlark_label: &'v StarlarkConfiguredProvidersLabel = typed.as_ref();
+    Some(starlark_label.label().cfg())
+}
+
+/// Reads `compilation_mode` from the target cfg's build_settings. Falls back
+/// to the process-global `BUILD_CONFIG` entry (pre-Plan-19.4 path) when the
+/// cfg does not carry the setting — preserves behaviour during the
+/// phased rollout for contexts that never route through
+/// `get_configured_target` (e.g. bxl top-level, anonymous targets).
+fn compilation_mode_from_cfg(cfg: Option<&ConfigurationData>) -> String {
+    if let Some(cfg) = cfg {
+        if let Ok(label) = BuildSettingLabel::from_bazel_label(COMPILATION_MODE_LABEL) {
+            if let Ok(Some(BuildSettingValue::String(value))) = cfg.get_build_setting(&label) {
+                return value.clone();
+            }
+        }
+    }
+    crate::interpreter::rule_defs::build_config::get_compilation_mode()
+}
+
+/// Converts a typed `BuildSettingValue` into the Starlark representation used
+/// by `ctx.build_setting_value`.
+fn build_setting_value_to_starlark<'v>(value: &BuildSettingValue, heap: Heap<'v>) -> Value<'v> {
+    match value {
+        BuildSettingValue::Bool(b) => heap.alloc(*b).to_value(),
+        BuildSettingValue::Int(i) => heap.alloc(*i).to_value(),
+        BuildSettingValue::String(s) => {
+            // Preserve the CLI boolean encoding so bool-typed build settings
+            // stored as "True"/"False" by Plan 19.2's mirror-write round-trip
+            // to a Starlark bool here.
+            match s.as_str() {
+                "True" | "true" | "1" => heap.alloc(true).to_value(),
+                "False" | "false" | "0" => heap.alloc(false).to_value(),
+                other => heap.alloc_str(other).to_value(),
+            }
+        }
+        BuildSettingValue::StringList(xs) | BuildSettingValue::StringSet(xs) => heap
+            .alloc(starlark::values::list::AllocList(xs.iter().cloned()))
+            .to_value(),
     }
 }
 

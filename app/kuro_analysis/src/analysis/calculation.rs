@@ -32,6 +32,8 @@ use kuro_build_signals::env::WaitingData;
 use kuro_common::dice::cells::HasCellResolver;
 use kuro_common::legacy_configs::dice::HasLegacyConfigs;
 use kuro_common::legacy_configs::key::BuckconfigKeyRef;
+use kuro_core::configuration::build_setting::BuildSettingLabel;
+use kuro_core::configuration::build_setting::BuildSettingValue;
 use kuro_core::configuration::compatibility::MaybeCompatible;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::deferred::key::DeferredHolderKey;
@@ -331,8 +333,32 @@ async fn check_config_setting_flag_values(
         //     default is the full tool name list. Every
         //     `driver-tools-include-<tool>` config_setting should match
         //     against the default because each tool is in the list.
+        let cfg_value: Option<BuildSettingValue> =
+            BuildSettingLabel::from_bazel_label(&flag_label_str)
+                .ok()
+                .and_then(|l| {
+                    configured_node
+                        .label()
+                        .cfg()
+                        .get_build_setting(&l)
+                        .ok()
+                        .flatten()
+                        .cloned()
+                });
+
         let (scalar_actual, list_actual): (Option<String>, Option<Vec<String>>) =
-            if let Some(cli_val) =
+            if let Some(value) = &cfg_value {
+                match value {
+                    BuildSettingValue::String(s) => (Some(s.clone()), None),
+                    BuildSettingValue::Bool(b) => {
+                        (Some(if *b { "True" } else { "False" }.to_owned()), None)
+                    }
+                    BuildSettingValue::Int(i) => (Some(i.to_string()), None),
+                    BuildSettingValue::StringList(xs) | BuildSettingValue::StringSet(xs) => {
+                        (None, Some(xs.clone()))
+                    }
+                }
+            } else if let Some(cli_val) =
                 kuro_build_api::interpreter::rule_defs::build_config::get_starlark_flag(
                     &flag_label_str,
                 )

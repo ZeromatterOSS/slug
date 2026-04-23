@@ -217,12 +217,9 @@ fn call_bazel_transition_function<'v>(
 }
 
 /// Folds a transition's returned `{label: value}` dict into a new
-/// `ConfigurationData`.
-///
-/// Also mirrors each setting into the global `BUILD_CONFIG` map (as pre-Plan-19
-/// code did). Read paths in `ctx.build_setting_value` and `config_setting`
-/// matching still consult that global; Plan 19.5 rewires them to consult
-/// `ConfigurationData.build_settings` and the mirror-write will be removed.
+/// `ConfigurationData`. Downstream analyses run under the returned cfg
+/// and read settings directly via `ConfigurationData.build_settings`, so
+/// no global side effect is needed.
 fn apply_setting_dict_to_cfg(
     conf: &ConfigurationData,
     dict: &DictRef<'_>,
@@ -247,23 +244,9 @@ fn apply_setting_dict_to_cfg(
         }
         let label = BuildSettingLabel::from_bazel_label(key_str)?;
         let value = build_setting_value_from_starlark(v)?;
-        mirror_setting_to_global(key_str, &value);
         out = out.with_build_setting(label, value)?;
     }
     Ok(out)
-}
-
-/// Writes a setting to the global `BUILD_CONFIG` using the same string
-/// encoding the pre-19.2 code used. Kept as compatibility while legacy read
-/// paths still consult the global map.
-fn mirror_setting_to_global(label: &str, value: &BuildSettingValue) {
-    let encoded = match value {
-        BuildSettingValue::Bool(b) => if *b { "True" } else { "False" }.to_owned(),
-        BuildSettingValue::Int(i) => i.to_string(),
-        BuildSettingValue::String(s) => s.clone(),
-        BuildSettingValue::StringList(xs) | BuildSettingValue::StringSet(xs) => xs.join(","),
-    };
-    kuro_build_api::interpreter::rule_defs::build_config::set_starlark_flag(label, &encoded);
 }
 
 /// Converts a Starlark value returned by a transition into a typed
