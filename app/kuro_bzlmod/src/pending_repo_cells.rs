@@ -297,7 +297,7 @@ fn tag_value_to_attr_value(tv: &TagValue) -> AttrValue {
             AttrValue::StringList(strings)
         }
         TagValue::Dict(entries) => {
-            let map: fxhash::FxHashMap<String, AttrValue> = entries
+            let map: indexmap::IndexMap<String, AttrValue> = entries
                 .iter()
                 .map(|(k, v)| (k.clone(), tag_value_to_attr_value(v)))
                 .collect();

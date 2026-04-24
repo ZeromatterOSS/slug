@@ -2438,7 +2438,7 @@ fn tag_value_to_attr_value(tv: &TagValue) -> kuro_bzlmod::repository_invocations
             AttrValue::StringList(strings)
         }
         TagValue::Dict(entries) => {
-            let map: fxhash::FxHashMap<String, AttrValue> = entries
+            let map: indexmap::IndexMap<String, AttrValue> = entries
                 .iter()
                 .map(|(k, v)| (k.clone(), tag_value_to_attr_value(v)))
                 .collect();
@@ -2471,7 +2471,7 @@ fn tag_value_to_repo_attr(tv: &TagValue) -> kuro_bzlmod::RepoAttrValue {
             kuro_bzlmod::RepoAttrValue::StringList(strings)
         }
         TagValue::Dict(entries) => {
-            let map: fxhash::FxHashMap<String, kuro_bzlmod::RepoAttrValue> = entries
+            let map: indexmap::IndexMap<String, kuro_bzlmod::RepoAttrValue> = entries
                 .iter()
                 .map(|(k, v)| (k.clone(), tag_value_to_repo_attr(v)))
                 .collect();

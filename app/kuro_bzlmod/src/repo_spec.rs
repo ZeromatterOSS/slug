@@ -31,6 +31,7 @@ use std::cell::RefCell;
 use allocative::Allocative;
 use base64::Engine;
 use fxhash::FxHashMap;
+use indexmap::IndexMap;
 use serde::Deserialize;
 use serde::Serialize;
 use sha2::Digest;
@@ -52,7 +53,12 @@ pub struct RepoSpec {
 
     /// All attributes passed to the rule EXCEPT 'name'.
     /// The name is stored separately in the containing map.
-    pub attributes: FxHashMap<String, AttrValue>,
+    ///
+    /// `IndexMap` preserves insertion order so the serialised JSON
+    /// (`repo_spec_json`) reflects the order the attributes were passed at
+    /// the Starlark call site. This matches Bazel's lockfile behaviour and
+    /// gives stable JSON across invocations without sorting.
+    pub attributes: IndexMap<String, AttrValue>,
 }
 
 impl RepoSpec {
@@ -60,7 +66,7 @@ impl RepoSpec {
     pub fn new(repo_rule_id: String) -> Self {
         Self {
             repo_rule_id,
-            attributes: FxHashMap::default(),
+            attributes: IndexMap::new(),
         }
     }
 

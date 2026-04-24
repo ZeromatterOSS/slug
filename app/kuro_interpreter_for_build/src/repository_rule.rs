@@ -159,7 +159,7 @@ fn starlark_to_repo_attr_value(value: Value) -> RepoAttrValue {
     }
 
     if let Some(dict) = DictRef::from_value(value) {
-        let mut map = fxhash::FxHashMap::default();
+        let mut map = indexmap::IndexMap::new();
         for (k, v) in dict.iter() {
             if let Some(key) = k.unpack_str() {
                 map.insert(key.to_owned(), starlark_to_repo_attr_value(v));

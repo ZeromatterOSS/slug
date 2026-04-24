@@ -28,7 +28,7 @@ use std::sync::Mutex;
 
 use allocative::Allocative;
 use base64::Engine;
-use fxhash::FxHashMap;
+use indexmap::IndexMap;
 use serde::Deserialize;
 use serde::Serialize;
 use sha2::Digest;
@@ -50,7 +50,11 @@ pub struct RepositoryInvocation {
     pub rule_source: Option<String>,
 
     /// Attribute values passed to the invocation.
-    pub attrs: FxHashMap<String, AttrValue>,
+    ///
+    /// `IndexMap` preserves insertion order (the Starlark call-site kwarg
+    /// order) so serialising this as JSON produces stable output matching
+    /// Bazel conventions.
+    pub attrs: IndexMap<String, AttrValue>,
 }
 
 impl RepositoryInvocation {
@@ -60,7 +64,7 @@ impl RepositoryInvocation {
             name,
             rule_name,
             rule_source: None,
-            attrs: FxHashMap::default(),
+            attrs: IndexMap::new(),
         }
     }
 
@@ -110,7 +114,7 @@ pub enum AttrValue {
     None,
     StringList(Vec<String>),
     Label(String),
-    Dict(FxHashMap<String, AttrValue>),
+    Dict(IndexMap<String, AttrValue>),
 }
 
 impl AttrValue {

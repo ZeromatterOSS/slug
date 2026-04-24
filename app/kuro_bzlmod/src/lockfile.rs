@@ -41,12 +41,12 @@
 //! }
 //! ```
 
-use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
+use indexmap::IndexMap;
 use kuro_error::BuckErrorContext;
 use serde::Deserialize;
 use serde::Serialize;
@@ -107,21 +107,21 @@ pub struct Lockfile {
     /// Keys are URLs like "https://bcr.bazel.build/modules/rules_cc/0.0.9/MODULE.bazel"
     /// Values are hex-encoded SHA256 hashes.
     #[serde(default)]
-    pub registry_file_hashes: HashMap<String, String>,
+    pub registry_file_hashes: IndexMap<String, String>,
 
     /// Map of yanked versions that were explicitly allowed.
     /// Keys are "module@version", values are the yanked reason.
     #[serde(default)]
-    pub selected_yanked_versions: HashMap<String, String>,
+    pub selected_yanked_versions: IndexMap<String, String>,
 
     /// Module extension results.
     /// Keys are extension identifiers (e.g., "@@rules_python+//python/extensions:pip.bzl%pip").
     #[serde(default)]
-    pub module_extensions: HashMap<String, LockfileExtensionData>,
+    pub module_extensions: IndexMap<String, LockfileExtensionData>,
 
     /// Bazel 9.0 facts field. Used by some extensions for metadata.
     #[serde(default)]
-    pub facts: HashMap<String, serde_json::Value>,
+    pub facts: IndexMap<String, serde_json::Value>,
 
     // =========================================================================
     // Deprecated fields (Bazel 8.0+ removed these)
@@ -136,12 +136,12 @@ pub struct Lockfile {
     /// DEPRECATED: The resolved module dependency graph (removed in Bazel 8.0+).
     /// Kept as opaque JSON for backwards-compatible deserialization only.
     #[serde(default, skip_serializing)]
-    pub module_dep_graph: HashMap<String, serde_json::Value>,
+    pub module_dep_graph: IndexMap<String, serde_json::Value>,
 
     /// DEPRECATED: Repository rule execution results (Kuro-specific, not in Bazel).
     /// Kept as opaque JSON for backwards-compatible deserialization only.
     #[serde(default, skip_serializing)]
-    pub repository_rules: HashMap<String, serde_json::Value>,
+    pub repository_rules: IndexMap<String, serde_json::Value>,
 }
 
 /// Module extension data in the lockfile (Bazel-compatible format).
@@ -184,7 +184,7 @@ pub struct LockfileExtensionGeneral {
     /// Generated repository specifications.
     /// Keys are internal names (e.g., "numpy"), values are full RepoSpec data.
     #[serde(default)]
-    pub generated_repo_specs: HashMap<String, LockfileRepoSpec>,
+    pub generated_repo_specs: IndexMap<String, LockfileRepoSpec>,
 
     /// Module extension metadata. Nullable (null when not provided by the extension).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -205,7 +205,7 @@ pub struct LockfileRepoSpec {
 
     /// All attributes (serialized as JSON values).
     #[serde(default)]
-    pub attributes: HashMap<String, serde_json::Value>,
+    pub attributes: IndexMap<String, serde_json::Value>,
 }
 
 impl LockfileExtensionData {
@@ -213,7 +213,7 @@ impl LockfileExtensionData {
     pub fn new(
         bzl_transitive_digest: String,
         usages_digest: String,
-        generated_repo_specs: HashMap<String, LockfileRepoSpec>,
+        generated_repo_specs: IndexMap<String, LockfileRepoSpec>,
     ) -> Self {
         Self {
             general: Some(LockfileExtensionGeneral {
@@ -240,7 +240,7 @@ impl LockfileExtensionData {
     }
 
     /// Get the generated repo specs if valid.
-    pub fn get_repo_specs(&self) -> Option<&HashMap<String, LockfileRepoSpec>> {
+    pub fn get_repo_specs(&self) -> Option<&IndexMap<String, LockfileRepoSpec>> {
         self.general.as_ref().map(|g| &g.generated_repo_specs)
     }
 }
@@ -250,7 +250,7 @@ impl LockfileRepoSpec {
     pub fn new(repo_rule_id: String) -> Self {
         Self {
             repo_rule_id,
-            attributes: HashMap::new(),
+            attributes: IndexMap::new(),
         }
     }
 
@@ -339,7 +339,7 @@ pub fn json_to_attr_value(value: &serde_json::Value) -> AttrValue {
                 return AttrValue::Label(label.clone());
             }
             // Otherwise, treat as dict
-            let dict: fxhash::FxHashMap<String, AttrValue> = obj
+            let dict: IndexMap<String, AttrValue> = obj
                 .iter()
                 .map(|(k, v)| (k.clone(), json_to_attr_value(v)))
                 .collect();
@@ -359,14 +359,14 @@ impl Lockfile {
     pub fn new() -> Self {
         Self {
             lock_file_version: LOCKFILE_VERSION,
-            registry_file_hashes: HashMap::new(),
-            selected_yanked_versions: HashMap::new(),
-            module_extensions: HashMap::new(),
-            facts: HashMap::new(),
+            registry_file_hashes: IndexMap::new(),
+            selected_yanked_versions: IndexMap::new(),
+            module_extensions: IndexMap::new(),
+            facts: IndexMap::new(),
             // Deprecated fields
             module_file_hash: String::new(),
-            module_dep_graph: HashMap::new(),
-            repository_rules: HashMap::new(),
+            module_dep_graph: IndexMap::new(),
+            repository_rules: IndexMap::new(),
         }
     }
 
@@ -526,9 +526,13 @@ impl Lockfile {
         usages_digest: String,
         generated_repo_specs: &fxhash::FxHashMap<String, RepoSpec>,
     ) {
-        // Convert RepoSpecs to lockfile format
-        let lockfile_specs: HashMap<String, LockfileRepoSpec> = generated_repo_specs
-            .iter()
+        // Convert RepoSpecs to lockfile format. Sort by key so the
+        // serialised lockfile JSON is stable across invocations
+        // regardless of the in-memory FxHashMap's insertion order.
+        let mut entries: Vec<_> = generated_repo_specs.iter().collect();
+        entries.sort_by(|a, b| a.0.cmp(b.0));
+        let lockfile_specs: IndexMap<String, LockfileRepoSpec> = entries
+            .into_iter()
             .map(|(name, spec)| (name.clone(), LockfileRepoSpec::from_repo_spec(spec)))
             .collect();
 
