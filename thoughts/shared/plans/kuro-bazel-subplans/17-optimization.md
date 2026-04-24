@@ -103,24 +103,33 @@ delta.
 
 ---
 
-### 17.2 Scheduler parallelism (OPEN, priority)
+### 17.2 Scheduler parallelism (INVESTIGATED + DISPROVED 2026-04-23)
 
-**Parity source.** Bazel's `--jobs` default = `HOST_CPUS`, with true
-work-stealing over the action queue.
+**Status.** Hypothesis instrumented and disproved. `act/sec` on the
+post-Plan-20 cold clang:clang is 5.05 vs 5.6 Bazel; the remaining gap
+is not admission-shaped.
 
-Investigate `app/kuro_execute/src/scheduler*.rs`,
-`app/kuro_build_api/src/execute/*`. Hypotheses to test via plan-16 traces:
+Phases landed:
+- **17.2-instrument** (commit `c9e2de7f`): side-channel CSV logger in
+  `app/kuro_build_api/src/actions/admission_log.rs`, gated by
+  `KURO_LOG_ADMISSION=<path>`. Captures ready_us / start_us / delta_us
+  per action.
+- **17.2-measure** (commit `3ea26d37`, findings
+  `thoughts/shared/research/plan-17-2-measure-findings.md`):
+  admission delta p95 = 15 ms, worst = 19 ms. Scheduler admission is
+  not the bottleneck. Real CP anomalies are:
+  1. One c_compile (`SemaConcept.cpp.pic`) taking 279 s on fastbuild.
+  2. 694 s of "waiting for_deps" on the critical path.
 
-a. Per-category concurrency caps that are too conservative (common AI
-   shortcut: "set to 4 to avoid races").
-b. Blocking calls inside the scheduler that hold a mutex spanning task
-   dispatch.
-c. Tasks run inline on the dispatcher rather than spawned onto tokio.
-d. Dependency edges incorrectly inherited (e.g., per-package barrier
-   from a missing fine-grained ReductionKey).
+Deferred splits (NOT YET SCHEDULED — pick up when prioritised):
+- **17.2-compile-outlier.** Is kuro's 279 s on SemaConcept kuro-specific
+  or intrinsic? Time the single file isolated in both Bazel and kuro,
+  compare.
+- **17.2-dep-chain.** DICE-trace the 446 s and 247 s `waiting for_deps`
+  blocks on CP. Identify what dep chain is forcing serial progress and
+  whether a ReductionKey is too coarse.
 
-Deliverable: `act/sec` metric from Plan 16's harness at ≥5.5 on a cold
-clang:clang build on the same hardware that produced the baseline.
+Out-of-scope for 17.2: the warm-invocation overhead (Plan 21).
 
 ---
 
@@ -142,17 +151,28 @@ clang:clang build on the same hardware that produced the baseline.
 
 ---
 
-### 17.4 File-watcher catch-up cost (OPEN)
+### 17.4 File-watcher catch-up cost (PARTIAL; cold fix LANDED 2026-04-23)
 
-`app/kuro_file_watcher/*`. Investigate why warm invocations re-enumerate
-26k+ file change events. Hypotheses:
+**Cold-start sliver landed** (commit `5a6c346a`): `NotifyFileWatcher::new`
+used to call `watcher.watch(root, RecursiveMode::Recursive)` which
+walked 29 k directories and followed symlinks into `bazel-external/`.
+Replaced with a `walkdir` pass that skips symlinks and applies the
+root-cell ignore spec. Cold cquery dropped 46.1 s → 3.0 s.
 
-- Watcher state persisted only in RAM; daemon restart → re-enumeration.
-- Watcher triggered by `buck-out/v2/log/*.pb.zst` writes (self-writes).
-  Check ignore patterns.
-- Watchman (if used) session not reused across invocations.
+**Self-invalidation loop landed** (commit `0c326250`):
+`ensure_external_symlink` was replacing `external/<apparent>` symlinks
+on every invocation when both the stored and desired targets failed
+`canonicalize()` (target not yet materialized, two callers picking
+different canonical names). Mtime flapped → notify fired → DICE
+invalidated. Fix: no-op when both canonicalize fail.
 
-Expected win: warm analysis latency (currently 2.1s, target <1s).
+**Warm residual still 1.85 s** (Plan 21). With the flap gone,
+back-to-back warm cqueries still take ~1.85 s; pinpointed to
+`load_package_futs.next()` = 1.32 s loading an already-parsed package.
+Investigation continues under Plan 21.
+
+Full warm-cquery breakdown:
+`thoughts/shared/research/plan-17-2-measure-findings.md`.
 
 ---
 
@@ -234,9 +254,9 @@ then **17.2** (largest expected single win), then fan out.
 ## Open questions
 
 - Should 17.2's scheduler investigation land in a separate subplan if it
-  turns out to be a rewrite, not a fix? Hold at current granularity
-  until the plan-16 trace shows whether it's a small bug or a structural
-  issue.
+  turns out to be a rewrite, not a fix? **Resolved (2026-04-23):**
+  17.2 was disproved; real work splits into 17.2-compile-outlier,
+  17.2-dep-chain, and Plan 21 (warm-invocation overhead).
 - Is there an `--incremental` mode in the Plan 16 harness? If not, add
   one before 17.8.
 

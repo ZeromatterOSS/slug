@@ -1,5 +1,11 @@
 # Plan 20: Exec-cfg tool builds — unblock the td_generate win
 
+> **Status:** COMPLETE (2026-04-23). Phase 20.1 + 20.2 landed in
+> `68cb2097` and `41ce00a5`; 20.3 final benchmark `8a286bb6`.
+> Cold `@llvm-project//clang:clang` wall: **1107.6 s** vs Plan 19's
+> 1416.1 s baseline and the 1200 s plan target — target met.
+> Full write-up: `benchmarks/post-plan-20-final-41ce00a5/FINDINGS.md`.
+
 > Parent: [2026-01-21-kuro-bazel-compatible-build-tool.md](../2026-01-21-kuro-bazel-compatible-build-tool.md)
 >
 > Prerequisites: Plan 19.1–19.6 (complete). Plan 19 delivered the
