@@ -32,9 +32,46 @@ enum CellInstanceError {
 }
 
 /// A 'CellInstance', contains a 'CellName' and a path for that cell.
-#[derive(Clone, Debug, derive_more::Display, Dupe, PartialEq, Eq, Allocative)]
+#[derive(Clone, Debug, derive_more::Display, Dupe, Allocative)]
 #[display("{}", _0.name)]
 pub struct CellInstance(Arc<CellData>);
+
+/// Custom equality ignores the `external` field (see [`CellData`]). Two cell
+/// instances with the same canonical name and materialized path are the same
+/// as far as DICE caching is concerned; how we got the content doesn't affect
+/// what's currently on disk.
+impl PartialEq for CellInstance {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.name == other.0.name
+            && self.0.path == other.0.path
+            && self.0.nested_cells == other.0.nested_cells
+            && external_origin_eq(&self.0.external, &other.0.external)
+    }
+}
+impl Eq for CellInstance {}
+
+/// Semantic equality for `ExternalCellOrigin` that tolerates textual churn
+/// in extension-repo metadata. When bzlmod re-resolves the module graph, the
+/// canonical-name / extension-id / repo_spec_json fields can each pick up a
+/// different textual form (apparent vs canonical module name, sorted vs
+/// unsorted JSON attribute keys) without the repo content on disk changing.
+/// Treating those as equal keeps the CellResolver stable across warm
+/// invocations, which is load-bearing for DICE cache hits on ReadDirKey and
+/// friends (see Plan 21).
+fn external_origin_eq(a: &Option<ExternalCellOrigin>, b: &Option<ExternalCellOrigin>) -> bool {
+    match (a, b) {
+        (None, None) => true,
+        (Some(a), Some(b)) => match (a, b) {
+            (ExternalCellOrigin::ExtensionRepo(a), ExternalCellOrigin::ExtensionRepo(b)) => {
+                a.internal_name == b.internal_name && a.materialized == b.materialized
+            }
+            // For deterministic origins (Bundled, Git, LocalPath, Bzlmod,
+            // RepositoryRule) fall back to the derived equality.
+            _ => a == b,
+        },
+        _ => false,
+    }
+}
 
 #[derive(Derivative, PartialEq, Eq, Allocative)]
 #[derivative(Debug)]
@@ -43,6 +80,10 @@ struct CellData {
     name: CellName,
     /// the project relative path to this 'CellInstance'
     path: CellRootPathBuf,
+    /// How this cell was sourced (bundled / git / bzlmod / extension repo).
+    /// Excluded from `PartialEq` for [`CellInstance`]; see its impl for the
+    /// reason. Still part of the derived `CellData` equality for tests and
+    /// internal consistency checks.
     external: Option<ExternalCellOrigin>,
     nested_cells: NestedCells,
 }

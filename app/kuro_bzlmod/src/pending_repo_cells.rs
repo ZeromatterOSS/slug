@@ -343,7 +343,13 @@ pub fn build_extension_cells(
 ) -> kuro_error::Result<ExtensionCellDefinitions> {
     let mut defs = ExtensionCellDefinitions::new();
 
-    for (internal_name, repo_spec) in &result.generated_repo_specs {
+    // `generated_repo_specs` is a HashMap; iterating it directly lets HashMap
+    // random-order leak into the downstream Vec<PendingRepoCell>, which the
+    // cell aggregator dedups by first-seen CellName. Sort by internal name so
+    // downstream dedup picks the same winner every run.
+    let mut specs: Vec<_> = result.generated_repo_specs.iter().collect();
+    specs.sort_by(|a, b| a.0.cmp(b.0));
+    for (internal_name, repo_spec) in specs {
         let canonical = result.canonical_name(internal_name).ok_or_else(|| {
             kuro_error::kuro_error!(
                 kuro_error::ErrorTag::Input,
@@ -484,7 +490,15 @@ pub fn build_all_extension_cells(
 ) -> kuro_error::Result<ExtensionCellDefinitions> {
     let mut all_defs = ExtensionCellDefinitions::new();
 
-    for (extension_id, (result, use_repos)) in extension_results {
+    // Iterate in deterministic extension_id order. Downstream callers dedup by
+    // first-seen CellName — a non-deterministic iteration order would flip which
+    // canonical path wins for cells registered by multiple extensions (e.g.
+    // `io_bazel_rules_go+go_sdk+...` vs `rules_go+go_sdk+...` for the same
+    // CellName). That flip invalidates the CellResolver InjectedKey on every
+    // warm invocation; see Plan 21.2.
+    let mut sorted: Vec<_> = extension_results.iter().collect();
+    sorted.sort_by(|a, b| a.0.cmp(b.0));
+    for (extension_id, (result, use_repos)) in sorted {
         match build_extension_cell_definitions(result, use_repos) {
             Ok(defs) => {
                 tracing::info!(
