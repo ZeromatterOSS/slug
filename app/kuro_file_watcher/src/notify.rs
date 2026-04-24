@@ -255,6 +255,106 @@ impl NotifyFileData {
     }
 }
 
+/// Installs `notify` watches on every source directory under the project
+/// root, filtering against the root cell's `[project].ignore` spec and
+/// skipping symlinks so Bazel's `external/` convention (symlinks into
+/// `bazel-external/`) doesn't pull thousands of generated-tree
+/// directories into the inotify set.
+///
+/// Pre-fix, `NotifyFileWatcher::new` called
+/// `watcher.watch(root, RecursiveMode::Recursive)` which made the
+/// `notify` backend recursively walk every subdirectory and install an
+/// inotify watch per directory — including the 29 000+ directories
+/// inside `buck-out/` and the symlink-followed targets of `external/`.
+/// That cold-start walk was measured at ~46 s on a fresh daemon with
+/// the llvm-project workspace.
+///
+/// The post-fix walk uses `walkdir` with `follow_links(false)` and
+/// installs a `RecursiveMode::NonRecursive` watch on each kept
+/// directory. Newly-created directories surface as `Create` events on
+/// the parent; the event processor can install watches for them on
+/// demand (follow-up).
+fn install_filtered_watches(
+    watcher: &mut RecommendedWatcher,
+    root: &ProjectRoot,
+    cells: &CellResolver,
+    ignore_specs: &HashMap<CellName, IgnoreSet>,
+) -> kuro_error::Result<()> {
+    let root_path = root.root().as_path();
+    let root_cell = cells.root_cell();
+    let root_ignore = ignore_specs.get(&root_cell);
+
+    let mut watched = 0usize;
+    let mut skipped_ignored = 0usize;
+    let mut skipped_symlink = 0usize;
+    let walker = walkdir::WalkDir::new(root_path)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|e| {
+            // Always include the root itself so we can install a watch
+            // on it for top-level event detection.
+            if e.depth() == 0 {
+                return true;
+            }
+            // Skip symlinks wholesale — on Bazel workspaces these point
+            // into generated/external trees that aren't interesting for
+            // source-change tracking.
+            if e.file_type().is_symlink() {
+                return false;
+            }
+            // Ignore-spec filter uses the relative path from the root.
+            let rel = match e.path().strip_prefix(root_path) {
+                Ok(r) => r,
+                Err(_) => return true,
+            };
+            let Some(rel_str) = rel.to_str() else {
+                return true;
+            };
+            if rel_str.is_empty() {
+                return true;
+            }
+            let ignored = root_ignore.is_some_and(|ignores| {
+                ignores.is_match(kuro_core::cells::paths::CellRelativePath::unchecked_new(
+                    rel_str,
+                ))
+            });
+            !ignored
+        });
+
+    for entry in walker {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+        if !entry.file_type().is_dir() {
+            // walkdir emits files too; only directories need a watch.
+            // Count a symlink skip so the log reflects what we trimmed.
+            if entry.file_type().is_symlink() {
+                skipped_symlink += 1;
+            }
+            continue;
+        }
+        match watcher.watch(entry.path(), notify::RecursiveMode::NonRecursive) {
+            Ok(()) => watched += 1,
+            Err(e) => {
+                // Filter-out errors come back as already-watched / path
+                // vanished; log at debug to avoid noise.
+                if watched < 5 {
+                    tracing::warn!("notify: failed to watch {:?}: {}", entry.path(), e);
+                }
+                skipped_ignored += 1;
+            }
+        }
+    }
+    tracing::info!(
+        "notify: installed watches on {} dirs, skipped {} symlinks / {} errors",
+        watched,
+        skipped_symlink,
+        skipped_ignored,
+    );
+    Ok(())
+}
+
 #[derive(Allocative)]
 pub struct NotifyFileWatcher {
     #[allocative(skip)]
@@ -273,18 +373,20 @@ impl NotifyFileWatcher {
         let data = Arc::new(Mutex::new(Ok(NotifyFileData::new())));
         let data2 = data.dupe();
         let root2 = root.dupe();
+        let cells_for_cb = cells.clone();
+        let ignore_specs_for_cb = ignore_specs.clone();
         let mut watcher = notify::recommended_watcher(move |event| {
             let mut guard = data2.lock().unwrap();
             if let Ok(state) = &mut *guard {
-                if let Err(e) = state.process(event, &root2, &cells, &ignore_specs) {
+                if let Err(e) = state.process(event, &root2, &cells_for_cb, &ignore_specs_for_cb) {
                     *guard = Err(e);
                 }
             }
         })
         .map_err(|e| from_any_with_tag(e, kuro_error::ErrorTag::NotifyWatcher))?;
-        watcher
-            .watch(root.root().as_path(), notify::RecursiveMode::Recursive)
-            .map_err(|e| from_any_with_tag(e, kuro_error::ErrorTag::NotifyWatcher))?;
+
+        install_filtered_watches(&mut watcher, root, &cells, &ignore_specs)?;
+
         Ok(Self { watcher, data })
     }
 
