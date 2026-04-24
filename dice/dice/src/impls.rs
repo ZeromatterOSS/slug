@@ -13,6 +13,7 @@ pub(crate) mod core;
 pub(crate) mod ctx;
 mod deps;
 pub(crate) mod dice;
+pub(crate) mod dice_log;
 pub(crate) mod evaluator;
 pub(crate) mod events;
 mod hash;

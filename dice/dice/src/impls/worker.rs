@@ -35,6 +35,7 @@ use crate::impls::core::state::CoreStateHandle;
 use crate::impls::core::versions::VersionEpoch;
 use crate::impls::deps::graph::SeriesParallelDeps;
 use crate::impls::deps::iterator::SeriesParallelDepsIteratorItem;
+use crate::impls::dice_log;
 use crate::impls::evaluator::AsyncEvaluator;
 use crate::impls::evaluator::KeyEvaluationResult;
 use crate::impls::evaluator::SyncEvaluator;
@@ -151,6 +152,7 @@ impl DiceTaskWorker {
         task_state: DiceWorkerStateLookupNode,
     ) -> CancellableResult<DiceWorkerStateFinishedAndCached> {
         let v = self.eval.per_live_version_ctx.get_version();
+        let log_started = dice_log::now_if_enabled();
 
         let state_result = state_handle
             .lookup_key(VersionedGraphKey::new(v, self.k))
@@ -159,6 +161,9 @@ impl DiceTaskWorker {
         // handle cancelled/cache hits before sending started events
         let deps_to_check = match state_result {
             VersionedGraphResult::Match(entry) => {
+                if log_started.is_some() {
+                    dice_log::record(self.eval.dice.key_index.get(self.k), "hit", log_started);
+                }
                 return task_state.lookup_matches(handle, entry);
             }
             VersionedGraphResult::CheckDeps(mismatch2) => Some(mismatch2),
@@ -220,6 +225,13 @@ impl DiceTaskWorker {
                             )
                             .await;
 
+                        if log_started.is_some() {
+                            dice_log::record(
+                                self.eval.dice.key_index.get(self.k),
+                                "reused",
+                                log_started,
+                            );
+                        }
                         return response.map(|r| task_state.cached(r, activation_info));
                     }
                     CheckDependenciesResult::NoDeps => {
@@ -277,6 +289,9 @@ impl DiceTaskWorker {
             }
         };
 
+        if log_started.is_some() {
+            dice_log::record(self.eval.dice.key_index.get(self.k), "miss", log_started);
+        }
         res.map(|res| state.cached(res, activation_info))
     }
 
