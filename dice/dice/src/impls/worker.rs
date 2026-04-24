@@ -159,6 +159,12 @@ impl DiceTaskWorker {
             .await;
 
         // handle cancelled/cache hits before sending started events
+        let lookup_outcome: &'static str = match &state_result {
+            VersionedGraphResult::Match(..) => "hit",
+            VersionedGraphResult::CheckDeps(..) => "check",
+            VersionedGraphResult::Compute => "compute",
+            VersionedGraphResult::Rejected(..) => "rejected",
+        };
         let deps_to_check = match state_result {
             VersionedGraphResult::Match(entry) => {
                 if log_started.is_some() {
@@ -290,7 +296,12 @@ impl DiceTaskWorker {
         };
 
         if log_started.is_some() {
-            dice_log::record(self.eval.dice.key_index.get(self.k), "miss", log_started);
+            let outcome = match lookup_outcome {
+                "check" => "miss_deps",
+                "compute" => "miss_fresh",
+                other => other,
+            };
+            dice_log::record(self.eval.dice.key_index.get(self.k), outcome, log_started);
         }
         res.map(|res| state.cached(res, activation_info))
     }
