@@ -151,7 +151,7 @@ Out-of-scope for 17.2: the warm-invocation overhead (Plan 21).
 
 ---
 
-### 17.4 File-watcher catch-up cost (PARTIAL; cold fix LANDED 2026-04-23)
+### 17.4 File-watcher catch-up cost (DONE — cold fix 2026-04-23, warm residual fixed by Plan 21)
 
 **Cold-start sliver landed** (commit `5a6c346a`): `NotifyFileWatcher::new`
 used to call `watcher.watch(root, RecursiveMode::Recursive)` which
@@ -166,13 +166,16 @@ on every invocation when both the stored and desired targets failed
 different canonical names). Mtime flapped → notify fired → DICE
 invalidated. Fix: no-op when both canonicalize fail.
 
-**Warm residual still 1.85 s** (Plan 21). With the flap gone,
-back-to-back warm cqueries still take ~1.85 s; pinpointed to
-`load_package_futs.next()` = 1.32 s loading an already-parsed package.
-Investigation continues under Plan 21.
+**Warm residual fixed by Plan 21** (commit `8668b19e` + followups).
+Root cause was `CellResolverKey` churning every transaction because
+the bzlmod data flow produced a different CellInstance path/external
+tuple across invocations. Fix: sort iteration at three consumer sites
+plus custom `CellInstance::PartialEq` ignoring textual noise in
+`ExtensionRepoCellSetup`. Warm cquery 1.85 s → 0.20 s.
 
 Full warm-cquery breakdown:
 `thoughts/shared/research/plan-17-2-measure-findings.md`.
+Plan 21 write-up: `thoughts/shared/research/2026-04-24-plan-21-warm-invalidation.md`.
 
 ---
 

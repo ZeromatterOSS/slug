@@ -1,5 +1,10 @@
 # Plan 19: Configuration transitions and exec-configuration semantics
 
+> **Status:** COMPLETE (19.1–19.6 landed; see commit `ac51eb9` and
+> `benchmarks/post-plan-19-final-ac51eb9/FINDINGS.md`). Phase 19.7
+> (user-written transitions) remains exploratory / deferred.
+> Plan 20 built on top of this and closed the tool-build integration.
+
 > Parent: [2026-01-21-kuro-bazel-compatible-build-tool.md](../2026-01-21-kuro-bazel-compatible-build-tool.md)
 >
 > Prerequisites: Plan 11 (toolchain resolution, complete) and Plan 12
