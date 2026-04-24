@@ -139,6 +139,40 @@ Warm cquery wall (3 runs, same daemon):
 Warm build wall (Demangle, 2 runs): 0.21–0.26 s (target <0.6 s).
 Cold cquery unchanged at ~2.9 s.
 
+## Alternative considered: swap `HashMap` → `FxHashMap` everywhere
+
+A follow-up experiment tested the theory "just pick a deterministic
+hasher and drop the sort." Reasoning: Rust's `HashMap` iteration
+reveals bucket order, which is a pure function of `(hash(keys),
+capacity)`; with a fixed-seed hasher those are stable across
+invocations, so iteration order would be stable too.
+
+**The theory is wrong for `hashbrown`.** Rust's `HashMap` uses
+hashbrown (SwissTable — SIMD linear probing within 16-slot groups),
+not Robin Hood hashing. Within-group collisions mean insertion order
+affects which slot a key lands in, so iteration order still depends
+on insertion order even with a deterministic hasher. Verified
+empirically: same 40 string keys inserted into `HashMap<String, u32,
+BuildHasherDefault<FxHasher>>` in forward vs reverse vs rotated
+orders gives different iteration orders every time (`/tmp/kuro-map-
+bench/src/bin/order_test.rs`).
+
+Swapping ~8 struct fields (`ResolvedGraph.modules`,
+`ExtensionExecutionOutput.generated_repo_specs`,
+`ModuleExtensionResult.generated_repo_specs + canonical_names`,
+`RepoSpec.attributes`, `RepositoryInvocation.attrs`,
+`AttrValue::Dict`, `RepoRuleInvocation.attrs`,
+`RepoSpecRegistry.specs`) to `FxHashMap` did **not** fix the
+invalidation — `parsed_modules` iteration still varied per warm
+invocation because `selected: HashMap<String, Version>` upstream
+still had random-state iteration, and the downstream FxHashMap
+inherited that via insertion order.
+
+Any fix has to inject a sort somewhere along the data-flow — either
+at the consumer (sort-on-read, what 21.3 does) or at the producer
+(sort before inserting into the final map). The choice of hasher is
+orthogonal.
+
 ## References
 
 - DICE hit/miss instrumentation: commit 6c25ea29 (21.1)
@@ -146,3 +180,4 @@ Cold cquery unchanged at ~2.9 s.
 - CellInstance fix: `app/kuro_core/src/cells/instance.rs`
 - Sort fixes: `app/kuro_bzlmod/src/pending_repo_cells.rs`,
   `app/kuro_common/src/legacy_configs/cells.rs`
+- Hashbrown order-invariance test: `/tmp/kuro-map-bench/src/bin/order_test.rs`
