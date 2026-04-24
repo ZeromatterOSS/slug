@@ -198,6 +198,21 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
                         std::fs::canonicalize(&desired_target),
                     ) {
                         (Ok(a), Ok(b)) if a == b => return,
+                        (Err(_), Err(_)) => {
+                            // Both targets fail to canonicalize — we can't
+                            // tell whether the existing link is really
+                            // stale. In practice two different callers
+                            // (bzlmod resolver and the dynamic extension
+                            // cell registry) pick different canonical
+                            // names for the same `apparent_name`, and
+                            // when the `bazel-external/` target hasn't
+                            // been materialized yet, both canonicalize
+                            // calls fail. Replacing the link would touch
+                            // its mtime on every invocation, the file
+                            // watcher would pick that up, and DICE would
+                            // invalidate package loads. Leave it.
+                            return;
+                        }
                         _ => {
                             tracing::debug!(
                                 "ensure_external_symlink: replacing stale link {} (was {} -> now {})",
