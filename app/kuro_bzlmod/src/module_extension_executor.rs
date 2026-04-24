@@ -45,7 +45,10 @@ use crate::repo_spec::RepoSpec;
 pub struct ExtensionExecutionOutput {
     /// Captured repository specifications (NOT materialized).
     /// Keys are internal names (e.g., "numpy"), values are RepoSpecs.
-    pub generated_repo_specs: HashMap<String, RepoSpec>,
+    ///
+    /// `FxHashMap` so that iteration order is stable across invocations
+    /// (Plan 21.2 — fixes CellResolver churn).
+    pub generated_repo_specs: fxhash::FxHashMap<String, RepoSpec>,
 }
 
 /// Trait for module extension execution.

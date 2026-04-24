@@ -187,7 +187,7 @@ impl ConcreteModuleExtensionExecutor {
         ctx: &mut DiceComputations<'_>,
         aggregated: &AggregatedExtension,
         mut module_ctx: crate::module_ctx::ModuleContext,
-    ) -> kuro_error::Result<std::collections::HashMap<String, kuro_bzlmod::RepoSpec>> {
+    ) -> kuro_error::Result<fxhash::FxHashMap<String, kuro_bzlmod::RepoSpec>> {
         // 1. Get the cell resolver to parse the bzl path
         let cell_resolver = ctx.get_cell_resolver().await?;
 
@@ -393,7 +393,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
                     aggregated.extension_id,
                     e
                 );
-                std::collections::HashMap::new()
+                fxhash::FxHashMap::default()
             }
         };
 

@@ -42,6 +42,7 @@ use dice::CancellationContext;
 use dice::DiceComputations;
 use dice::Key;
 use dupe::Dupe;
+use fxhash::FxHashMap;
 
 use crate::extensions::AggregatedExtension;
 use crate::extensions::compute_extension_input_hash;
@@ -152,11 +153,13 @@ pub struct ModuleExtensionResult {
 
     /// Generated repository specifications (NOT materialized).
     /// Keys are internal names (e.g., "numpy"), values are RepoSpecs.
-    pub generated_repo_specs: HashMap<String, RepoSpec>,
+    ///
+    /// `FxHashMap` so iteration is stable across invocations (Plan 21.2).
+    pub generated_repo_specs: FxHashMap<String, RepoSpec>,
 
     /// Canonical name mapping.
     /// Maps internal_name -> canonical_name (e.g., "numpy" -> "_main+pip+numpy")
-    pub canonical_names: HashMap<String, String>,
+    pub canonical_names: FxHashMap<String, String>,
 }
 
 impl ModuleExtensionResult {
@@ -167,7 +170,7 @@ impl ModuleExtensionResult {
     pub fn new(
         extension_id: Arc<str>,
         input_hash: String,
-        generated_repo_specs: HashMap<String, RepoSpec>,
+        generated_repo_specs: FxHashMap<String, RepoSpec>,
     ) -> Self {
         let canonical_names = build_canonical_names(&extension_id, &generated_repo_specs);
         Self {
@@ -496,7 +499,7 @@ impl Key for ModuleExtensionExecutionKey {
 
                 // Return empty result in stub mode
                 Ok(crate::module_extension_executor::ExtensionExecutionOutput {
-                    generated_repo_specs: HashMap::new(),
+                    generated_repo_specs: FxHashMap::default(),
                 })
             }
         };
@@ -627,8 +630,8 @@ fn sanitize_extension_id_for_path(extension_id: &str) -> String {
 /// the extension name (after the `%` in the bzl label).
 pub fn build_canonical_names(
     extension_id: &str,
-    specs: &HashMap<String, RepoSpec>,
-) -> HashMap<String, String> {
+    specs: &FxHashMap<String, RepoSpec>,
+) -> FxHashMap<String, String> {
     let ext_name = extract_extension_name(extension_id);
     let owning_module = extract_owning_module(extension_id);
     specs
@@ -725,7 +728,7 @@ fn update_lockfile_extension_cache(
     extension_id: &str,
     bzl_transitive_digest: &str,
     usages_digest: &str,
-    generated_repo_specs: &HashMap<String, RepoSpec>,
+    generated_repo_specs: &FxHashMap<String, RepoSpec>,
 ) -> kuro_error::Result<()> {
     // Read existing lockfile or create new one
     let mut lockfile = if lock_path.exists() {

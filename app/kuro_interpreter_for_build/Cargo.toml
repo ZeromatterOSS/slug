@@ -17,6 +17,7 @@ derive_more = { workspace = true }
 either = { workspace = true }
 fancy-regex = { workspace = true }
 futures = { workspace = true }
+fxhash = { workspace = true }
 glob = { workspace = true }
 hashbrown = { workspace = true }
 flate2 = { workspace = true }

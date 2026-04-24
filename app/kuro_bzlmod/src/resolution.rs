@@ -21,6 +21,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use allocative::Allocative;
+use fxhash::FxHashMap;
 use kuro_error::BuckErrorContext;
 use serde::Deserialize;
 use serde::Serialize;
@@ -251,7 +252,11 @@ pub struct ResolvedGraph {
     /// Map from module name to selected version.
     pub selected_versions: HashMap<String, String>,
     /// Full module information for each selected module.
-    pub modules: HashMap<String, ResolvedModuleInfo>,
+    ///
+    /// `FxHashMap` (fixed-seed, deterministic across invocations) so that
+    /// iterating this map produces a stable order for the same content,
+    /// without anyone having to sort on read. See Plan 21.2.
+    pub modules: FxHashMap<String, ResolvedModuleInfo>,
     /// Resolution order (topological).
     pub resolution_order: Vec<String>,
 }
@@ -901,7 +906,7 @@ impl MvsResolver {
         &self,
         selected: &HashMap<String, Version>,
     ) -> kuro_error::Result<ResolvedGraph> {
-        let mut modules = HashMap::new();
+        let mut modules: FxHashMap<String, ResolvedModuleInfo> = FxHashMap::default();
         let mut resolution_order = Vec::new();
 
         // Build module info for each selected version

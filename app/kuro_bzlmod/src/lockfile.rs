@@ -339,7 +339,7 @@ pub fn json_to_attr_value(value: &serde_json::Value) -> AttrValue {
                 return AttrValue::Label(label.clone());
             }
             // Otherwise, treat as dict
-            let dict: HashMap<String, AttrValue> = obj
+            let dict: fxhash::FxHashMap<String, AttrValue> = obj
                 .iter()
                 .map(|(k, v)| (k.clone(), json_to_attr_value(v)))
                 .collect();
@@ -447,7 +447,7 @@ impl Lockfile {
         extension_id: &str,
         bzl_transitive_digest: &str,
         usages_digest: &str,
-    ) -> Option<HashMap<String, RepoSpec>> {
+    ) -> Option<fxhash::FxHashMap<String, RepoSpec>> {
         // Try exact match first, then normalized forms for Bazel lockfile compat.
         // Lockfiles may use "//:file.bzl%name" while kuro uses ":file.bzl%name" or vice versa.
         let ext_data = self
@@ -524,7 +524,7 @@ impl Lockfile {
         extension_id: String,
         bzl_transitive_digest: String,
         usages_digest: String,
-        generated_repo_specs: &HashMap<String, RepoSpec>,
+        generated_repo_specs: &fxhash::FxHashMap<String, RepoSpec>,
     ) {
         // Convert RepoSpecs to lockfile format
         let lockfile_specs: HashMap<String, LockfileRepoSpec> = generated_repo_specs

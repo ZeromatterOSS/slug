@@ -98,7 +98,7 @@ pub struct RepoRuleInvocation {
     /// The rule source: "bzl_path%rule_name".
     pub rule_source: String,
     /// Attribute values (excluding name).
-    pub attrs: std::collections::HashMap<String, TagValue>,
+    pub attrs: fxhash::FxHashMap<String, TagValue>,
 }
 
 /// The module() declaration.
@@ -928,7 +928,7 @@ impl<'v> StarlarkValue<'v> for RepoRuleProxy {
                 let mut ctx = module_ctx.borrow_mut();
                 // Store as a repo rule invocation with rule source info
                 let rule_source = format!("{}%{}", self.rule_bzl_file, self.rule_name);
-                let mut attrs = std::collections::HashMap::new();
+                let mut attrs = fxhash::FxHashMap::default();
                 for (key, value) in kwargs.iter() {
                     let key_str = key.as_str();
                     if key_str != "name" {

@@ -811,12 +811,11 @@ impl BuckConfigBasedCells {
             cleanup_stale_symlinks(&buck_out_external_cells_dir, &valid_symlink_names);
 
             // Register ALL resolved modules as cells. Sort the map by
-            // module name first — `resolved_graph.modules` is a HashMap and
-            // its iteration order leaks into the cells Vec, which in turn
-            // drives `parsed_modules` order downstream. Non-determinism
-            // there flips which `canonical_name` wins for cells registered
-            // by multiple extensions, invalidating the CellResolver DICE
-            // InjectedKey every warm invocation (Plan 21.2).
+            // module name first — HashMap/FxHashMap iteration order is
+            // insertion-order-dependent under hashbrown (SwissTable), and
+            // the upstream `selected` is a default-hashed HashMap, so
+            // iteration here would otherwise vary across invocations and
+            // flip first-wins dedup downstream (Plan 21.2).
             let mut sorted_modules: Vec<_> = resolved_graph.modules.iter().collect();
             sorted_modules.sort_by(|a, b| a.0.cmp(b.0));
             for (module_name, module_info) in sorted_modules {
@@ -2439,7 +2438,7 @@ fn tag_value_to_attr_value(tv: &TagValue) -> kuro_bzlmod::repository_invocations
             AttrValue::StringList(strings)
         }
         TagValue::Dict(entries) => {
-            let map: std::collections::HashMap<String, AttrValue> = entries
+            let map: fxhash::FxHashMap<String, AttrValue> = entries
                 .iter()
                 .map(|(k, v)| (k.clone(), tag_value_to_attr_value(v)))
                 .collect();
@@ -2472,7 +2471,7 @@ fn tag_value_to_repo_attr(tv: &TagValue) -> kuro_bzlmod::RepoAttrValue {
             kuro_bzlmod::RepoAttrValue::StringList(strings)
         }
         TagValue::Dict(entries) => {
-            let map: std::collections::HashMap<String, kuro_bzlmod::RepoAttrValue> = entries
+            let map: fxhash::FxHashMap<String, kuro_bzlmod::RepoAttrValue> = entries
                 .iter()
                 .map(|(k, v)| (k.clone(), tag_value_to_repo_attr(v)))
                 .collect();

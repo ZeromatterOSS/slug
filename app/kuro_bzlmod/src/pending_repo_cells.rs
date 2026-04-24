@@ -297,7 +297,7 @@ fn tag_value_to_attr_value(tv: &TagValue) -> AttrValue {
             AttrValue::StringList(strings)
         }
         TagValue::Dict(entries) => {
-            let map: std::collections::HashMap<String, AttrValue> = entries
+            let map: fxhash::FxHashMap<String, AttrValue> = entries
                 .iter()
                 .map(|(k, v)| (k.clone(), tag_value_to_attr_value(v)))
                 .collect();
@@ -343,10 +343,11 @@ pub fn build_extension_cells(
 ) -> kuro_error::Result<ExtensionCellDefinitions> {
     let mut defs = ExtensionCellDefinitions::new();
 
-    // `generated_repo_specs` is a HashMap; iterating it directly lets HashMap
-    // random-order leak into the downstream Vec<PendingRepoCell>, which the
-    // cell aggregator dedups by first-seen CellName. Sort by internal name so
-    // downstream dedup picks the same winner every run.
+    // Sort by internal name — HashMap/FxHashMap iteration order is
+    // insertion-order-dependent under hashbrown, and the downstream cell
+    // aggregator dedups by first-seen CellName. Without sort, warm
+    // invocations pick different winners for cells registered by
+    // multiple extensions (Plan 21.2).
     let mut specs: Vec<_> = result.generated_repo_specs.iter().collect();
     specs.sort_by(|a, b| a.0.cmp(b.0));
     for (internal_name, repo_spec) in specs {
@@ -486,16 +487,14 @@ pub fn build_extension_cell_definitions(
 /// # Returns
 /// Merged cell definitions for all extensions.
 pub fn build_all_extension_cells(
-    extension_results: &HashMap<String, (ModuleExtensionResult, Vec<UseRepo>)>,
+    extension_results: &fxhash::FxHashMap<String, (ModuleExtensionResult, Vec<UseRepo>)>,
 ) -> kuro_error::Result<ExtensionCellDefinitions> {
     let mut all_defs = ExtensionCellDefinitions::new();
 
-    // Iterate in deterministic extension_id order. Downstream callers dedup by
-    // first-seen CellName — a non-deterministic iteration order would flip which
-    // canonical path wins for cells registered by multiple extensions (e.g.
-    // `io_bazel_rules_go+go_sdk+...` vs `rules_go+go_sdk+...` for the same
-    // CellName). That flip invalidates the CellResolver InjectedKey on every
-    // warm invocation; see Plan 21.2.
+    // Sort by extension id — FxHashMap iteration is insertion-order-
+    // dependent under hashbrown, and the downstream CellName dedup is
+    // first-wins, so without sort the winner flips across warm
+    // invocations (Plan 21.2).
     let mut sorted: Vec<_> = extension_results.iter().collect();
     sorted.sort_by(|a, b| a.0.cmp(b.0));
     for (extension_id, (result, use_repos)) in sorted {

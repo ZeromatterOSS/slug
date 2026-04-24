@@ -27,10 +27,10 @@
 //! in that RepoSpecs track the full rule identity for lazy execution.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
 
 use allocative::Allocative;
 use base64::Engine;
+use fxhash::FxHashMap;
 use serde::Deserialize;
 use serde::Serialize;
 use sha2::Digest;
@@ -52,7 +52,7 @@ pub struct RepoSpec {
 
     /// All attributes passed to the rule EXCEPT 'name'.
     /// The name is stored separately in the containing map.
-    pub attributes: HashMap<String, AttrValue>,
+    pub attributes: FxHashMap<String, AttrValue>,
 }
 
 impl RepoSpec {
@@ -60,7 +60,7 @@ impl RepoSpec {
     pub fn new(repo_rule_id: String) -> Self {
         Self {
             repo_rule_id,
-            attributes: HashMap::new(),
+            attributes: FxHashMap::default(),
         }
     }
 
@@ -99,7 +99,7 @@ impl RepoSpec {
 #[derive(Debug, Default)]
 pub struct RepoSpecRegistry {
     /// Collected specs: internal_name -> RepoSpec
-    specs: RefCell<HashMap<String, RepoSpec>>,
+    specs: RefCell<fxhash::FxHashMap<String, RepoSpec>>,
 }
 
 impl RepoSpecRegistry {
@@ -113,7 +113,7 @@ impl RepoSpecRegistry {
     }
 
     /// Take all collected specs.
-    pub fn take(&self) -> HashMap<String, RepoSpec> {
+    pub fn take(&self) -> fxhash::FxHashMap<String, RepoSpec> {
         std::mem::take(&mut *self.specs.borrow_mut())
     }
 }
@@ -131,7 +131,9 @@ thread_local! {
 /// being recorded as RepositoryInvocations.
 ///
 /// Returns a tuple of (result, captured_specs).
-pub fn with_repo_spec_registry<R>(f: impl FnOnce() -> R) -> (R, HashMap<String, RepoSpec>) {
+pub fn with_repo_spec_registry<R>(
+    f: impl FnOnce() -> R,
+) -> (R, fxhash::FxHashMap<String, RepoSpec>) {
     REPO_SPEC_REGISTRY.with(|cell| {
         *cell.borrow_mut() = Some(RepoSpecRegistry::new());
     });

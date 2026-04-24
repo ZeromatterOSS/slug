@@ -19,6 +19,7 @@ dirs = { workspace = true }
 dupe = { workspace = true }
 flate2 = { workspace = true }
 futures = { workspace = true }
+fxhash = { workspace = true }
 hex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

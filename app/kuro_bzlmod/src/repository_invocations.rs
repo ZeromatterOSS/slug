@@ -24,11 +24,11 @@
 //! by the DICE-based repository execution system.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::sync::Mutex;
 
 use allocative::Allocative;
 use base64::Engine;
+use fxhash::FxHashMap;
 use serde::Deserialize;
 use serde::Serialize;
 use sha2::Digest;
@@ -50,7 +50,7 @@ pub struct RepositoryInvocation {
     pub rule_source: Option<String>,
 
     /// Attribute values passed to the invocation.
-    pub attrs: HashMap<String, AttrValue>,
+    pub attrs: FxHashMap<String, AttrValue>,
 }
 
 impl RepositoryInvocation {
@@ -60,7 +60,7 @@ impl RepositoryInvocation {
             name,
             rule_name,
             rule_source: None,
-            attrs: HashMap::new(),
+            attrs: FxHashMap::default(),
         }
     }
 
@@ -110,7 +110,7 @@ pub enum AttrValue {
     None,
     StringList(Vec<String>),
     Label(String),
-    Dict(HashMap<String, AttrValue>),
+    Dict(FxHashMap<String, AttrValue>),
 }
 
 impl AttrValue {
