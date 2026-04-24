@@ -107,7 +107,7 @@ Meaning: some invalidation source remains that isn't the symlink flap.
 
 ## Phases
 
-### 21.1 DICE-hit vs DICE-miss visibility (OPEN, instrumentation)
+### 21.1 DICE-hit vs DICE-miss visibility (DONE 2026-04-24, commit 6c25ea29)
 
 Add one-shot instrumentation that tells us, on a warm command, which
 nodes are cache hits vs misses:
@@ -127,7 +127,7 @@ nodes are cache hits vs misses:
 **Deferrals:** don't touch DICE internals deeper than the outermost
 instrumentation point; that would risk invalidation-correctness bugs.
 
-### 21.2 Identify the invalidation source (OPEN)
+### 21.2 Identify the invalidation source (DONE 2026-04-24, commit 0d866da4)
 
 Using the DICE CSV from 21.1:
 
@@ -156,7 +156,13 @@ c. `file_watcher.sync` is reporting "changed since last sync" on
    directories whose mtime the kernel bumps for access (unlikely with
    noatime, but worth ruling out).
 
-### 21.3 Fix + validate (OPEN)
+### 21.3 Fix + validate (DONE 2026-04-24, commit 8668b19e)
+
+**Result:** warm cquery Demangle 1.86 → **0.20 s** (9.5×); warm
+cquery clang:clang 1.93 → **0.21 s** (9.2×); warm build Demangle
+**0.22 s** (target ≤0.6 s). See
+`thoughts/shared/research/2026-04-24-plan-21-warm-invalidation.md`
+for the full trail.
 
 Apply the minimal change 21.2 points at. Validate with:
 
