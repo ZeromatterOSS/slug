@@ -451,7 +451,13 @@ impl<'a> ServerCommandContext<'a> {
             .and_then(|opts| opts.concurrency.as_ref())
             .and_then(|obj| parse_concurrency(obj.concurrency));
 
-        let executor_config = get_default_executor_config(self.host_platform_override);
+        let re_configured = self
+            .base_context
+            .daemon
+            .re_client_manager
+            .is_re_configured();
+        let executor_config =
+            get_default_executor_config(self.host_platform_override, re_configured);
         let re_connection = Arc::new(self.get_re_connection());
 
         let upload_all_actions = self

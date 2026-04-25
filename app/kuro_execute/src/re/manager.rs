@@ -35,6 +35,7 @@ use kuro_error::BuckErrorContext;
 use kuro_error::conversion::from_any_with_tag;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
 use kuro_re_configuration::RemoteExecutionStaticMetadata;
+use kuro_re_configuration::RemoteExecutionStaticMetadataImpl;
 use prost::Message;
 use remote_execution as RE;
 use remote_execution::ActionResultResponse;
@@ -221,6 +222,15 @@ impl ReConnectionManager {
     /// Gets a new guard that holds a RE connection open
     pub fn get_re_connection(&self) -> ReConnectionHandle {
         ReConnectionHandle::new(self.get_client_handle())
+    }
+
+    /// Whether a remote-execution backend address is configured. Used by
+    /// the executor-config defaulting path to promote the otherwise-local
+    /// default to a hybrid local/remote executor when the user has
+    /// pointed kuro at an RE service via `--remote_executor` /
+    /// `[kuro_re_client] address`.
+    pub fn is_re_configured(&self) -> bool {
+        self.config.static_metadata.is_re_configured()
     }
 
     fn get_client_handle(&self) -> Arc<LazyRemoteExecutionClient> {

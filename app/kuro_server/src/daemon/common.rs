@@ -500,8 +500,20 @@ impl ExecutionStrategyExt for ExecutionStrategy {
 }
 
 /// This is used when execution platforms are not configured.
-pub fn get_default_executor_config(host_platform: HostPlatformOverride) -> CommandExecutorConfig {
-    let executor = if kuro_core::is_open_source() {
+///
+/// `re_configured` indicates whether the daemon has an RE backend
+/// address set (`[kuro_re_client] address` or the equivalent
+/// `--remote_executor` overlay). When true, the open-source default
+/// (which would otherwise be local-only) is promoted to the same
+/// hybrid local/remote shape that the fbcode build uses, so a user
+/// who passes `--remote_executor=grpcs://X` actually dispatches
+/// actions remotely (Plan 25.2).
+pub fn get_default_executor_config(
+    host_platform: HostPlatformOverride,
+    re_configured: bool,
+) -> CommandExecutorConfig {
+    let use_remote_default = !kuro_core::is_open_source() || re_configured;
+    let executor = if !use_remote_default {
         Executor::Local(LocalExecutorOptions::default())
     } else {
         Executor::RemoteEnabled(RemoteEnabledExecutorOptions {

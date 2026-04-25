@@ -136,12 +136,57 @@ them.
 
 ---
 
-### 25.2 Promote `Executor::Local` to remote when RE is configured (OPEN)
+### 25.2 Promote `Executor::Local` to remote when RE is configured (DONE 2026-04-24)
 
 **Goal.** When `--remote_executor` is set (equivalently:
-`static_metadata.engine_address.is_some()`), every rule's local-only
-`CommandExecutorConfig` is treated as if it were
-`RemoteEnabled{ executor: Hybrid, prefer_remote }`.
+`static_metadata.engine_address.is_some()`), the default
+`CommandExecutorConfig` (returned by `get_default_executor_config` for
+rules that don't specify their own platform) is treated as if it were
+`RemoteEnabled{ executor: Hybrid, level: Limited }`.
+
+**Implementation.**
+
+- `app/kuro_re_configuration/src/lib.rs`: added
+  `RemoteExecutionStaticMetadataImpl::is_re_configured()` to the trait
+  and impls (both fbcode and OSS variants). Returns `true` when
+  `engine_address.is_some()`.
+
+- `app/kuro_execute/src/re/manager.rs`: added
+  `ReConnectionManager::is_re_configured()` delegating to the static
+  metadata.
+
+- `app/kuro_server/src/daemon/common.rs::get_default_executor_config`:
+  takes a new `re_configured: bool` argument. The previous
+  `if kuro_core::is_open_source()` branch becomes
+  `if !kuro_core::is_open_source() || re_configured`. OSS without RE
+  configured continues to return `Executor::Local`; OSS with RE
+  configured now returns the same `RemoteEnabled{Hybrid, Limited}`
+  shape as the fbcode build.
+
+- `app/kuro_server/src/ctx.rs`: at command-context construction the
+  caller reads `base_context.daemon.re_client_manager.is_re_configured()`
+  and passes it into `get_default_executor_config`.
+
+**Acceptance — verified.**
+
+- `kuro build @llvm-project//llvm:Demangle --config=remote` reports
+  `Commands: 2 (cached: 0, remote: 2, local: 0)` and `Network:
+  (GRPC-SESSION-ID)`. Actions reach BuildBuddy (action digests appear
+  in the failure path).
+- `kuro build hello_world//:main` from a workspace with no RE
+  configuration reports `Commands: 4 (cached: 0, remote: 0, local: 4)`
+  and `BUILD SUCCEEDED` — no regression for non-RE workflows.
+
+**Known follow-up for 25.3.** Remote actions for the LLVM smoke test
+fail with `fatal error: llvm/Demangle/Demangle.h: No such file or
+directory`. Local builds succeeded because the host filesystem made
+the headers visible without sandboxing. RE requires every input to be
+in the action's input tree, so cc-rule transitive header propagation
+(or include-path resolution under remote sandboxing) is the next
+issue. Tracked in 25.3.
+
+**Est. effort (actual).** ~1 hour. Mostly threading the
+`re_configured` boolean through.
 
 **Changes — option A: factory-side promotion (smaller).**
 

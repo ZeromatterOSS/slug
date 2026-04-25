@@ -24,6 +24,11 @@ static BUCK2_RE_CLIENT_CFG_SECTION: &str = "kuro_re_client";
 pub trait RemoteExecutionStaticMetadataImpl: Sized {
     fn from_legacy_config(legacy_config: &LegacyBuckConfig) -> kuro_error::Result<Self>;
     fn cas_semaphore_size(&self) -> usize;
+    /// Returns true when an RE backend address is configured. The
+    /// executor-config defaulting path uses this to decide whether to
+    /// promote the open-source `Executor::Local` default to a hybrid
+    /// local/remote executor (Plan 25.2).
+    fn is_re_configured(&self) -> bool;
 }
 
 #[derive(Clone, Debug, Allocative)]
@@ -382,6 +387,10 @@ mod fbcode {
         fn cas_semaphore_size(&self) -> usize {
             self.cas_connection_count as usize * 30
         }
+
+        fn is_re_configured(&self) -> bool {
+            self.engine_address.is_some()
+        }
     }
 }
 
@@ -403,6 +412,10 @@ mod not_fbcode {
         fn cas_semaphore_size(&self) -> usize {
             // FIXME: make this configurable?
             1024
+        }
+
+        fn is_re_configured(&self) -> bool {
+            self.0.engine_address.is_some()
         }
     }
 }
