@@ -248,31 +248,60 @@ exists for `Executor::RemoteEnabled`; reusing it is mostly wiring.
 
 ---
 
-### 25.3 Smoke-test CAS upload + remote dispatch end-to-end (OPEN)
+### 25.3 Smoke-test CAS upload + remote dispatch end-to-end (PARTIAL 2026-04-24)
 
-After 25.1 + 25.2 land, exercise:
+**Goal.** With 25.1 + 25.2 in place, verify a real C++ compile actually
+runs on BuildBuddy and lands its outputs in CAS.
 
-1. Compile a single C++ source, force `cached: 0, remote: 1, local: 0`.
-2. Re-run; expect `cached: 1, remote: 0, local: 0`.
-3. Inspect BuildBuddy's invocation page Actions tab, confirm:
-   - Each action shows up with timing.
-   - `executor_kind` reads `remote` (or `cached` on the second pass).
-   - Output digests are present.
+**Bug found while smoke-testing — fixed.** The first remote dispatch
+of `@llvm-project//llvm:Demangle --config=remote` failed every action
+with `fatal error: llvm/Demangle/<X>.h: No such file or directory`.
+Root cause:
 
-Failure modes to watch for and fix incrementally:
+- `cc_helper._get_public_hdrs(ctx)` (rules_cc) returns
+  `[(artifact, label), ...]` tuples — see `_map_to_list` in
+  rules_cc/cc/common/cc_helper.bzl.
+- `cc_common.compile()` in
+  `app/kuro_build_api/src/interpreter/rule_defs/cc_common/actions.rs`
+  pushed those tuples into `compile_inputs` verbatim.
+- `actions.run(inputs=...)` in
+  `app/kuro_action_impl/src/context/run.rs:793-804` only downcasts
+  list elements to `StarlarkArtifact` /
+  `StarlarkDeclaredArtifact`; tuple entries silently fall out, so
+  the action's declared input set was empty for those headers.
+- Local execution (non-sandboxed) found the headers via the project
+  filesystem regardless. RE strictly enforces declared inputs and
+  the workers compiled in a sandbox without the headers, so every
+  `#include "llvm/Demangle/X.h"` failed.
 
-- CAS upload size limits (`max_total_batch_size`); kuro's existing
-  `BatchUploadReqAggregator` handles batching but the limit comes from
-  `Capabilities`. Should "just work" given 25.1.
-- Action platform constraints: BuildBuddy may reject actions that
-  don't carry an `OSFamily=Linux`/`container-image=…` exec_property.
-  Plan 23 already strips these from build_settings; we'd need to
-  re-add them as RE platform properties on the action message.
-- TLS handshake quirks against `grpcs://remote.buildbuddy.io`. Smoke
-  test (probe_re example) confirmed the basic capabilities call
-  works, so the cert chain is already trusted.
+Fix: unwrap the `(artifact, label)` tuple at compile-input collection
+time so the artifact lands in `compile_inputs`. The unwrap is a no-op
+for plain artifacts coming from upstream `CcCompilationContext.headers`
+depsets. After the fix, 4 of 4 LLVM Demangle compiles get past the
+header-resolution stage; remaining failures are unrelated cell-extraction
+and action-key/auth issues to chase separately.
 
-**Est. effort.** 2-4 hours, mostly debugging.
+**Status.** RE upload + dispatch + CAS round-trip are real (action
+digests appear, BuildBuddy invocation pages populate). The cc-rule
+input-tree gap is closed for the `public_hdrs` / `private_hdrs` /
+`textual_hdrs` paths. Remaining smoke-test acceptance items (cached
+re-run, full build success) blocked on the workspace's
+`bazel-external/llvm-project` cell repeatedly stubbing out under
+`kuro clean` (see "Known issues" below).
+
+**Known issues uncovered during smoke test.**
+
+- `llvm_configure` repository_rule's `_overlay_directories` resolves
+  `repository_ctx.path(Label("@llvm-raw//:WORKSPACE")).dirname` to a
+  path *inside* the llvm-project repo (`bazel-external/llvm-project/llvm-raw/...`)
+  rather than the sibling llvm-raw repo, so the rule fails on
+  CMakeLists.txt and kuro stubs the cell. Out of scope for Plan 25;
+  needs investigation in `kuro_external_cells`/`kuro_bzlmod` repo-rule
+  handling.
+
+**Est. effort (actual so far).** ~1 hour for the cc_common fix.
+Remaining smoke-test verification deferred until the cell-extraction
+issue is sorted.
 
 ---
 

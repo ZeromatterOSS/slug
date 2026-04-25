@@ -2103,6 +2103,19 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         //     (may include declared-output artifacts from `attr.output` like
         //     `:abi_breaking_h_gen`)
         //   - `headers` depset from each dep's `CcCompilationContext`
+        // `cc_helper._get_public_hdrs(ctx)` returns `[(artifact, label),
+        // ...]` tuples (see rules_cc cc_helper.bzl `_map_to_list`). The
+        // `actions.run(inputs=...)` handler in
+        // `kuro_action_impl::context::run` only downcasts list items to
+        // `StarlarkArtifact` / `StarlarkDeclaredArtifact`; tuple entries
+        // silently drop out of the action's declared input set. Local
+        // execution still found the headers via the project filesystem,
+        // but RE strictly enforces declared inputs and the compile
+        // failed with `fatal error: <hdr>: No such file or directory`.
+        // Unwrap tuples to the first element here so the artifact lands
+        // in `compile_inputs` (Plan 25.3).
+        let unwrap_artifact_tuple =
+            |v: Value<'v>| -> Value<'v> { v.at(heap.alloc(0i32).to_value(), heap).unwrap_or(v) };
         let mut compile_inputs: Vec<Value<'v>> = Vec::new();
         for hdr_val in &[public_hdrs, private_hdrs, textual_hdrs] {
             if !hdr_val.is_none() {
@@ -2113,7 +2126,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     heap,
                 );
                 for h in elements {
-                    compile_inputs.push(h);
+                    compile_inputs.push(unwrap_artifact_tuple(h));
                 }
             }
         }
@@ -2129,7 +2142,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                 heap,
                             );
                             for h in elements {
-                                compile_inputs.push(h);
+                                // Some upstream contexts store headers as
+                                // bare artifacts; others as the same
+                                // (artifact, label) tuples. The unwrap
+                                // is a no-op for plain artifacts.
+                                compile_inputs.push(unwrap_artifact_tuple(h));
                             }
                         }
                     }
