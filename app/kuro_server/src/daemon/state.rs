@@ -375,9 +375,23 @@ impl DaemonState {
                     .buck_error_context("Error initializing DigestConfig")?;
 
             // TODO(rafaelc): merge configs from all cells once they are consistent
-            let static_metadata = Arc::new(RemoteExecutionStaticMetadata::from_legacy_config(
-                root_config,
-            )?);
+            //
+            // Layer the daemon-startup `re_config` snapshot over the
+            // buckconfig-derived metadata so per-invocation flags
+            // (`--remote_executor`, `--remote_header`, …) the client
+            // baked into `DaemonStartupConfig` actually reach the RE
+            // client. Without this overlay the daemon would silently
+            // run with whatever `[kuro_re_client]` was in `.buckconfig`
+            // at startup, even though the constraint check forced this
+            // daemon to spawn precisely because the user changed those
+            // flags.
+            let mut static_metadata =
+                RemoteExecutionStaticMetadata::from_legacy_config(root_config)?;
+            apply_re_config_overlay(
+                &mut static_metadata,
+                &init_ctx.daemon_startup_config.re_config,
+            );
+            let static_metadata = Arc::new(static_metadata);
 
             let mut ignore_specs: HashMap<CellName, IgnoreSet> = HashMap::new();
             for (cell, _) in cells.cells() {
@@ -895,6 +909,66 @@ impl DaemonState {
 
         Ok(())
     }
+}
+
+/// Apply the daemon-startup `re_config` snapshot (constructed by the
+/// client from `--remote_executor` / `--remote_header` / etc.) on top
+/// of the buckconfig-derived `RemoteExecutionStaticMetadata`. Only
+/// fields the snapshot explicitly sets win; everything else stays at
+/// the buckconfig value. No-op in fbcode builds where the metadata
+/// struct is internal-only.
+#[cfg(not(fbcode_build))]
+fn apply_re_config_overlay(
+    metadata: &mut RemoteExecutionStaticMetadata,
+    snapshot: &kuro_common::init::ReConfigSnapshot,
+) {
+    let oss = &mut metadata.0;
+    if let Some(ref addr) = snapshot.address {
+        // `address` is the catch-all default in
+        // `KuroOssReConfiguration::from_legacy_config`; populate every
+        // service address that was unset so a bare `--remote_executor`
+        // configures CAS, engine, and action cache uniformly.
+        if oss.cas_address.is_none() {
+            oss.cas_address = Some(addr.clone());
+        }
+        if oss.engine_address.is_none() {
+            oss.engine_address = Some(addr.clone());
+        }
+        if oss.action_cache_address.is_none() {
+            oss.action_cache_address = Some(addr.clone());
+        }
+    }
+    if let Some(ref addr) = snapshot.cas_address {
+        oss.cas_address = Some(addr.clone());
+    }
+    if let Some(ref addr) = snapshot.engine_address {
+        oss.engine_address = Some(addr.clone());
+    }
+    if let Some(ref addr) = snapshot.action_cache_address {
+        oss.action_cache_address = Some(addr.clone());
+    }
+    if let Some(tls) = snapshot.tls {
+        oss.tls = tls;
+    }
+    if !snapshot.http_headers.is_empty() {
+        oss.http_headers = snapshot
+            .http_headers
+            .iter()
+            .filter_map(|raw| std::str::FromStr::from_str(raw).ok())
+            .collect();
+    }
+    if let Some(ref name) = snapshot.instance_name {
+        oss.instance_name = Some(name.clone());
+    }
+}
+
+#[cfg(fbcode_build)]
+fn apply_re_config_overlay(
+    _metadata: &mut RemoteExecutionStaticMetadata,
+    _snapshot: &kuro_common::init::ReConfigSnapshot,
+) {
+    // Internal RE config has its own pathway; CLI-flag overlays for
+    // OSS RE wiring are not relevant inside fbcode.
 }
 
 fn convert_algorithm_kind(kind: DigestAlgorithmFamily) -> kuro_error::Result<DigestAlgorithm> {

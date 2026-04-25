@@ -387,12 +387,15 @@ pub struct CommonBuildConfigurationOptions {
     /// Remote execution options (Bazel compatibility).
     ///
     /// Accepted for compatibility with Bazel's --remote_* flags.
-    /// These are currently accepted but not applied.
+    /// `overrides_with_self` allows last-wins semantics so a `common` line
+    /// in `.bazelrc` followed by a `build:remote` line (or a CLI override)
+    /// resolves to the final occurrence rather than erroring on duplicates.
     #[clap(
         long = "remote-executor",
         alias = "remote_executor",
         hide = true,
-        value_name = "HOST:PORT"
+        value_name = "HOST:PORT",
+        overrides_with = "remote_executor"
     )]
     pub remote_executor: Option<String>,
 
@@ -400,7 +403,8 @@ pub struct CommonBuildConfigurationOptions {
         long = "remote-cache",
         alias = "remote_cache",
         hide = true,
-        value_name = "URL"
+        value_name = "URL",
+        overrides_with = "remote_cache"
     )]
     pub remote_cache: Option<String>,
 
@@ -1219,6 +1223,55 @@ impl CommonBuildConfigurationOptions {
         }
 
         Ok(result)
+    }
+
+    /// Bazel-shape RE flags (`--remote_executor`, `--remote_cache`,
+    /// `--remote_*_header`, `--bes_instance_name`) projected into the
+    /// `ReConfigSnapshot` that `DaemonStartupConfig` carries. The result
+    /// is layered onto the daemon's startup config so a daemon already
+    /// running with stale RE settings restarts via the constraint check
+    /// when the user supplies new remote-exec arguments.
+    ///
+    /// Returns `None` when none of the relevant flags are set, so the
+    /// caller can leave the buckconfig-derived snapshot untouched.
+    pub fn cli_re_config_snapshot(&self) -> Option<kuro_common::init::ReConfigSnapshot> {
+        let header_strs: Vec<String> = self
+            .remote_header
+            .iter()
+            .chain(self.remote_cache_header.iter())
+            .chain(self.remote_exec_header.iter())
+            .filter_map(|kv| {
+                let (key, value) = kv.split_once('=')?;
+                Some(format!("{key}: {value}"))
+            })
+            .collect();
+
+        let address = self
+            .remote_executor
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned);
+        let cache_address = self
+            .remote_cache
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned);
+
+        if address.is_none() && cache_address.is_none() && header_strs.is_empty() {
+            return None;
+        }
+
+        Some(kuro_common::init::ReConfigSnapshot {
+            address: address.clone(),
+            cas_address: cache_address.clone(),
+            engine_address: address,
+            action_cache_address: cache_address,
+            tls: None, // `KuroOssReConfiguration::from_legacy_config`
+            // already defaults to `tls=true` when unset; we
+            // only flip it via explicit buckconfig.
+            http_headers: header_strs,
+            instance_name: self.bes_instance_name.clone(),
+        })
     }
 
     pub fn host_platform_override(&self) -> HostPlatformOverride {

@@ -16,6 +16,7 @@ use dupe::Dupe;
 use kuro_common::argv::Argv;
 use kuro_common::argv::SanitizedArgv;
 use kuro_common::init::DEFAULT_RETAINED_EVENT_LOGS;
+use kuro_common::init::ReConfigSnapshot;
 use kuro_common::invocation_paths::InvocationPaths;
 use kuro_error::ExitCode;
 use kuro_event_observer::span_tracker::EventTimestamp;
@@ -229,6 +230,16 @@ impl<T: StreamingCommand> BuckSubcommand for T {
                 let mut req =
                     DaemonConstraintsRequest::new(ctx.immediate_config, T::trace_io(&self))?;
                 ctx.restarter.apply_to_constraints(&mut req);
+                // Layer Bazel-shape RE flags (`--remote_executor`,
+                // `--remote_header`, …) onto the daemon-startup snapshot
+                // before the constraint check. Any change here forces a
+                // `ConstraintMismatchStartupConfig` daemon restart, so the
+                // newly-spawned daemon picks up the user's updated RE
+                // backend instead of silently keeping its prior one.
+                if let Some(cli_re) = self.build_config_opts().cli_re_config_snapshot() {
+                    req.daemon_startup_config.re_config =
+                        merge_re_config(&req.daemon_startup_config.re_config, &cli_re);
+                }
                 BuckdConnectConstraints::Constraints(req)
             };
             let buckd = match ctx.start_in_process_daemon.take() {
@@ -460,6 +471,36 @@ fn get_bes_subscriber<T: StreamingCommand>(
             tracing::warn!("BES subscriber disabled: {e}");
             None
         }
+    }
+}
+
+/// Layer the CLI-derived RE snapshot onto the buckconfig-derived one.
+/// Set fields on the CLI side win; the buckconfig values stand in for
+/// anything the CLI didn't override. Used at constraint-check time so
+/// `--remote_executor` etc. force a daemon restart with the user's
+/// requested RE backend.
+fn merge_re_config(base: &ReConfigSnapshot, cli: &ReConfigSnapshot) -> ReConfigSnapshot {
+    ReConfigSnapshot {
+        address: cli.address.clone().or_else(|| base.address.clone()),
+        cas_address: cli.cas_address.clone().or_else(|| base.cas_address.clone()),
+        engine_address: cli
+            .engine_address
+            .clone()
+            .or_else(|| base.engine_address.clone()),
+        action_cache_address: cli
+            .action_cache_address
+            .clone()
+            .or_else(|| base.action_cache_address.clone()),
+        tls: cli.tls.or(base.tls),
+        http_headers: if cli.http_headers.is_empty() {
+            base.http_headers.clone()
+        } else {
+            cli.http_headers.clone()
+        },
+        instance_name: cli
+            .instance_name
+            .clone()
+            .or_else(|| base.instance_name.clone()),
     }
 }
 

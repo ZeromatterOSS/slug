@@ -462,6 +462,75 @@ pub struct DaemonStartupConfig {
     pub log_download_method: LogDownloadMethod,
     pub health_check_config: HealthCheckConfig,
     pub retained_event_logs: usize,
+    /// Snapshot of the `[kuro_re_client]` buckconfig section at daemon
+    /// startup. Held here (rather than read fresh per-build) so that
+    /// changing `--remote_executor` / `--remote_header` (which arrive as
+    /// per-invocation buckconfig overrides) triggers a daemon restart via
+    /// `DaemonConstraintsRequest::satisfied`. The daemon's
+    /// `RemoteExecutionStaticMetadata` is bound at init time from the
+    /// same underlying config keys; without this field a stale daemon
+    /// would silently keep its old RE client.
+    #[serde(default)]
+    pub re_config: ReConfigSnapshot,
+}
+
+/// Subset of `[kuro_re_client]` buckconfig that's load-bearing for the
+/// daemon's remote-execution client. Not the full
+/// `KuroOssReConfiguration` — just the fields that, if changed,
+/// require reconnecting the RE client (i.e. addresses, TLS, headers,
+/// instance).
+#[derive(
+    Allocative,
+    Clone,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq
+)]
+pub struct ReConfigSnapshot {
+    pub address: Option<String>,
+    pub cas_address: Option<String>,
+    pub engine_address: Option<String>,
+    pub action_cache_address: Option<String>,
+    pub tls: Option<bool>,
+    pub http_headers: Vec<String>,
+    pub instance_name: Option<String>,
+}
+
+impl ReConfigSnapshot {
+    pub fn from_config(config: &LegacyBuckConfig) -> kuro_error::Result<Self> {
+        let get = |property| {
+            config
+                .get(BuckconfigKeyRef {
+                    section: "kuro_re_client",
+                    property,
+                })
+                .map(ToOwned::to_owned)
+        };
+        let parse_bool = |property| -> kuro_error::Result<Option<bool>> {
+            config.parse(BuckconfigKeyRef {
+                section: "kuro_re_client",
+                property,
+            })
+        };
+        let http_headers = config
+            .parse_list::<String>(BuckconfigKeyRef {
+                section: "kuro_re_client",
+                property: "http_headers",
+            })?
+            .unwrap_or_default();
+        Ok(Self {
+            address: get("address"),
+            cas_address: get("cas_address"),
+            engine_address: get("engine_address"),
+            action_cache_address: get("action_cache_address"),
+            tls: parse_bool("tls")?,
+            http_headers,
+            instance_name: get("instance_name"),
+        })
+    }
 }
 
 impl DaemonStartupConfig {
@@ -550,6 +619,7 @@ impl DaemonStartupConfig {
                 })
                 .and_then(|s| s.parse::<usize>().ok())
                 .unwrap_or(DEFAULT_RETAINED_EVENT_LOGS),
+            re_config: ReConfigSnapshot::from_config(config)?,
         })
     }
 
@@ -579,6 +649,7 @@ impl DaemonStartupConfig {
             },
             health_check_config: HealthCheckConfig::default(),
             retained_event_logs: DEFAULT_RETAINED_EVENT_LOGS,
+            re_config: ReConfigSnapshot::default(),
         }
     }
 }
