@@ -487,7 +487,44 @@ pub struct CommonBuildConfigurationOptions {
     )]
     pub loading_phase_threads: Option<String>,
 
-    /// Build event text file (Bazel compatibility, accepted but ignored).
+    /// Remote gRPC metadata header (Bazel compatibility, accepted but
+    /// ignored — kuro's RE client does not yet plumb custom headers).
+    /// Distinct from `--bes_header`, which is honored.
+    #[clap(
+        long = "remote-header",
+        alias = "remote_header",
+        hide = true,
+        value_name = "KEY=VALUE",
+        num_args = 1
+    )]
+    pub remote_header: Vec<String>,
+
+    /// Remote Cache gRPC metadata header (Bazel compatibility, accepted
+    /// but ignored).
+    #[clap(
+        long = "remote-cache-header",
+        alias = "remote_cache_header",
+        hide = true,
+        value_name = "KEY=VALUE",
+        num_args = 1
+    )]
+    pub remote_cache_header: Vec<String>,
+
+    /// Remote Executor gRPC metadata header (Bazel compatibility,
+    /// accepted but ignored).
+    #[clap(
+        long = "remote-exec-header",
+        alias = "remote_exec_header",
+        hide = true,
+        value_name = "KEY=VALUE",
+        num_args = 1
+    )]
+    pub remote_exec_header: Vec<String>,
+
+    /// Write BEP events to the given path in a `Debug`-formatted,
+    /// form-feed-delimited stream. Intended for developer inspection;
+    /// consumers that need byte-exact Bazel parity should prefer
+    /// `--build_event_binary_file`.
     #[clap(
         long = "build-event-text-file",
         alias = "build_event_text_file",
@@ -496,7 +533,9 @@ pub struct CommonBuildConfigurationOptions {
     )]
     pub build_event_text_file: Option<String>,
 
-    /// Build event binary file (Bazel compatibility, accepted but ignored).
+    /// Write BEP events to the given path as length-delimited protobuf. Wire
+    /// format matches Bazel's `--build_event_binary_file`; Bazel's BEP tooling
+    /// and BuildBuddy's offline parsers accept the file verbatim.
     #[clap(
         long = "build-event-binary-file",
         alias = "build_event_binary_file",
@@ -504,6 +543,64 @@ pub struct CommonBuildConfigurationOptions {
         value_name = "PATH"
     )]
     pub build_event_binary_file: Option<String>,
+
+    /// gRPC endpoint for Build Event Service uploads (e.g.
+    /// `grpcs://remote.buildbuddy.io`). When set, Kuro streams BEP events
+    /// via `PublishBuildEvent` so BuildBuddy / EngFlow / Trunk / custom BES
+    /// collectors render the invocation.
+    #[clap(long = "bes-backend", alias = "bes_backend", value_name = "URI")]
+    pub bes_backend: Option<String>,
+
+    /// URL prefix for BES invocation links; Kuro logs
+    /// `Streaming build results to: <prefix><invocation_id>` at build start
+    /// so CI log scrapers can find the URL.
+    #[clap(
+        long = "bes-results-url",
+        alias = "bes_results_url",
+        value_name = "URL"
+    )]
+    pub bes_results_url: Option<String>,
+
+    /// BES gRPC metadata entry (repeatable). BuildBuddy requires
+    /// `x-buildbuddy-api-key=<KEY>`; other backends use their own headers.
+    #[clap(
+        long = "bes-header",
+        alias = "bes_header",
+        value_name = "KEY=VALUE",
+        num_args = 1
+    )]
+    pub bes_header: Vec<String>,
+
+    /// Comma-separated notification keywords attached to the BES stream.
+    /// BuildBuddy uses them as invocation tags (e.g. `role=CI`).
+    #[clap(
+        long = "bes-keywords",
+        alias = "bes_keywords",
+        value_name = "CSV",
+        value_delimiter = ','
+    )]
+    pub bes_keywords: Vec<String>,
+
+    /// Wait bound for the BES upload at build exit.
+    #[clap(long = "bes-timeout", alias = "bes_timeout", value_name = "DURATION")]
+    pub bes_timeout: Option<String>,
+
+    /// Behaviour when the build exits before the BES upload completes.
+    /// `wait_for_upload_complete` (default), `nowait`, or `fully_async`.
+    #[clap(
+        long = "bes-upload-mode",
+        alias = "bes_upload_mode",
+        value_name = "MODE"
+    )]
+    pub bes_upload_mode: Option<String>,
+
+    /// BES `project_id`. BuildBuddy accepts any non-empty value.
+    #[clap(
+        long = "bes-instance-name",
+        alias = "bes_instance_name",
+        value_name = "NAME"
+    )]
+    pub bes_instance_name: Option<String>,
 
     /// --repo_env NAME=VALUE pairs (Bazel compatibility).
     /// Sets environment variables for repository rules.
@@ -1056,7 +1153,72 @@ impl CommonBuildConfigurationOptions {
         ordered_merged_configs.extend(config_values_args);
         ordered_merged_configs.sort_by(|(lhs_index, _), (rhs_index, _)| lhs_index.cmp(rhs_index));
 
-        Ok(ordered_merged_configs.into_map(|(_, config_arg)| config_arg))
+        let mut result: Vec<ConfigOverride> =
+            ordered_merged_configs.into_map(|(_, config_arg)| config_arg);
+
+        // Translate Bazel-shape remote-execution flags into the
+        // `kuro_re_client` buckconfig overrides that
+        // `KuroOssReConfiguration::from_legacy_config` reads. Without
+        // this routing, a workspace `.bazelrc` that declares
+        // `common --remote_executor=grpcs://…` and
+        // `common --remote_header=x-buildbuddy-api-key=…` would be
+        // parsed by clap into the matching `Vec<String>` fields and
+        // then dropped on the floor, leaving the RE client with no
+        // backend address and the user with no diagnosable failure.
+        if let Some(uri) = self.remote_executor.as_deref()
+            && !uri.is_empty()
+        {
+            result.push(ConfigOverride {
+                cell: None,
+                config_override: format!("kuro_re_client.address={uri}"),
+                config_type: ConfigType::Value as i32,
+            });
+            // `--remote_executor` only specifies the engine; CAS and
+            // action-cache default to the same backend unless
+            // explicitly overridden.
+        }
+
+        // `--remote_cache=URI` overrides the CAS / action-cache
+        // address only. Bazel applies it to both.
+        if let Some(uri) = self.remote_cache.as_deref()
+            && !uri.is_empty()
+        {
+            result.push(ConfigOverride {
+                cell: None,
+                config_override: format!("kuro_re_client.cas_address={uri}"),
+                config_type: ConfigType::Value as i32,
+            });
+            result.push(ConfigOverride {
+                cell: None,
+                config_override: format!("kuro_re_client.action_cache_address={uri}"),
+                config_type: ConfigType::Value as i32,
+            });
+        }
+
+        // `--remote_header=KEY=VALUE` (and the cache/exec-specific
+        // variants) all flow into the RE client's `http_headers`.
+        // Bazel uses `KEY=VALUE`; kuro's `HttpHeader::from_str`
+        // expects `KEY: VALUE`, so translate, and combine into a
+        // single comma-separated buckconfig list (parse_list).
+        let header_strs: Vec<String> = self
+            .remote_header
+            .iter()
+            .chain(self.remote_cache_header.iter())
+            .chain(self.remote_exec_header.iter())
+            .filter_map(|kv| {
+                let (key, value) = kv.split_once('=')?;
+                Some(format!("{key}: {value}"))
+            })
+            .collect();
+        if !header_strs.is_empty() {
+            result.push(ConfigOverride {
+                cell: None,
+                config_override: format!("kuro_re_client.http_headers={}", header_strs.join(",")),
+                config_type: ConfigType::Value as i32,
+            });
+        }
+
+        Ok(result)
     }
 
     pub fn host_platform_override(&self) -> HostPlatformOverride {
@@ -1113,8 +1275,18 @@ impl CommonBuildConfigurationOptions {
             symlink_prefix: None,
             remote_timeout: None,
             loading_phase_threads: None,
+            remote_header: vec![],
+            remote_cache_header: vec![],
+            remote_exec_header: vec![],
             build_event_text_file: None,
             build_event_binary_file: None,
+            bes_backend: None,
+            bes_results_url: None,
+            bes_header: vec![],
+            bes_keywords: vec![],
+            bes_timeout: None,
+            bes_upload_mode: None,
+            bes_instance_name: None,
             repo_env: vec![],
             remote_upload_local_results: false,
             remote_accept_cached: false,
@@ -1216,8 +1388,18 @@ impl CommonBuildConfigurationOptions {
             symlink_prefix: None,
             remote_timeout: None,
             loading_phase_threads: None,
+            remote_header: vec![],
+            remote_cache_header: vec![],
+            remote_exec_header: vec![],
             build_event_text_file: None,
             build_event_binary_file: None,
+            bes_backend: None,
+            bes_results_url: None,
+            bes_header: vec![],
+            bes_keywords: vec![],
+            bes_timeout: None,
+            bes_upload_mode: None,
+            bes_instance_name: None,
             repo_env: vec![],
             remote_upload_local_results: false,
             remote_accept_cached: false,

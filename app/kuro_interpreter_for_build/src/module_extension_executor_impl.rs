@@ -380,13 +380,25 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
             }
         }
 
-        // Try to load and execute the extension's Starlark implementation
+        // Try to load and execute the extension's Starlark implementation.
+        //
+        // Failure-mode design: we still fall back to empty specs so a broken
+        // optional extension (e.g. a telemetry one) doesn't block builds
+        // that never use its repos. But silent fallback used to hide real
+        // bugs — any extension whose repos are actually referenced would
+        // later fail with `Unknown target` errors that bear no trace back
+        // to the extension. So we also print a user-visible stderr line
+        // with the extension id and underlying error; analysis errors
+        // downstream can be correlated to the extension they came from.
         let specs = match self.try_execute_starlark(ctx, aggregated, module_ctx).await {
             Ok(specs) => specs,
             Err(e) => {
-                // Fall back to empty specs - some extensions (e.g., test-only ones)
-                // may legitimately fail to load, and hard-failing would break builds
-                // that don't need those repos.
+                eprintln!(
+                    "warning: module extension '{}' failed; any repo it was \
+                     supposed to generate will be stubbed out and subsequent \
+                     `Unknown target` errors will trace back here.\n  cause: {e:#}",
+                    aggregated.extension_id,
+                );
                 tracing::warn!(
                     "Could not execute extension '{}' Starlark implementation, \
                      falling back to empty specs: {:?}",

@@ -37,6 +37,8 @@ use crate::events_ctx::EventsCtx;
 use crate::exit_result::ExitResult;
 use crate::path_arg::PathArg;
 use crate::signal_handler::with_simple_sigint_handler;
+use crate::subscribers::bep_bes_sink::BesSubscriber;
+use crate::subscribers::bep_file_sink::BepFileSubscriber;
 use crate::subscribers::build_graph_stats::BuildGraphStats;
 use crate::subscribers::build_id_writer::BuildIdWriter;
 use crate::subscribers::event_log::EventLog;
@@ -114,6 +116,12 @@ fn update_events_ctx<T: StreamingCommand>(
     }
     if let Some(build_id_writer) = get_build_id_writer(cmd.event_log_opts(), ctx) {
         subscribers.push(build_id_writer)
+    }
+    if let Some(bep_subscriber) = get_bep_file_subscriber(cmd, ctx) {
+        subscribers.push(bep_subscriber);
+    }
+    if let Some(bes_subscriber) = get_bes_subscriber(cmd, ctx) {
+        subscribers.push(bes_subscriber);
     }
     if let Some(build_graph_stats) = get_build_graph_stats(cmd, ctx) {
         subscribers.push(build_graph_stats)
@@ -333,6 +341,125 @@ fn get_build_graph_stats<T: StreamingCommand>(
         )))
     } else {
         None
+    }
+}
+
+/// Build the BEP file-output subscriber from CLI flags
+/// (`--build_event_binary_file`, `--build_event_text_file`).
+///
+/// Returns `None` when neither flag is set, so the subscriber stack pays zero
+/// cost for invocations that don't ask for BEP output.
+fn get_bep_file_subscriber<T: StreamingCommand>(
+    cmd: &T,
+    ctx: &ClientCommandContext,
+) -> Option<Box<dyn EventSubscriber>> {
+    let opts = cmd.build_config_opts();
+    let binary_path = opts
+        .build_event_binary_file
+        .as_ref()
+        .map(|p| resolve_relative_path(p, ctx));
+    let text_path = opts
+        .build_event_text_file
+        .as_ref()
+        .map(|p| resolve_relative_path(p, ctx));
+
+    let build_event_ctx = bep_build_event_context::<T>(cmd, ctx);
+
+    match BepFileSubscriber::maybe_new(binary_path, text_path, build_event_ctx) {
+        Ok(Some(sub)) => Some(Box::new(sub)),
+        Ok(None) => None,
+        Err(e) => {
+            tracing::warn!("BEP file subscriber disabled: {e}");
+            None
+        }
+    }
+}
+
+/// Build a `BuildEventContext` from invocation-level state. Shared between
+/// the file and BES subscribers.
+fn bep_build_event_context<T: StreamingCommand>(
+    cmd: &T,
+    ctx: &ClientCommandContext,
+) -> kuro_build_event_stream::translate::BuildEventContext {
+    let workspace_directory = ctx
+        .paths()
+        .ok()
+        .map(|p| p.project_root().root().to_string())
+        .unwrap_or_default();
+    // Best-effort root cell name from the workspace directory's basename.
+    // Kuro's `TargetPattern.value` records patterns as `<cell>//pkg:name`;
+    // Bazel's BEP emits root-cell patterns without the prefix. The
+    // translator strips this prefix from PatternExpanded ids so
+    // BuildBuddy's pattern-extraction code finds something to display.
+    // If the actual cell name in `MODULE.bazel` differs from the workspace
+    // directory name, the prefix won't strip and BB will see kuro's
+    // internal form — visually wrong but not broken. Revisit when we
+    // have a real cell-resolver hookup on the client side.
+    let root_cell_name = std::path::Path::new(&workspace_directory)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default()
+        .to_owned();
+    // Use the kuro crate version (`0.1.0` etc.) so the BuildBuddy
+    // invocation header shows something other than `vunknown`. If the
+    // revision is also baked in (release builds set this via
+    // `kuro_build_info::revision()`) append it for traceability.
+    let kuro_version = match kuro_build_info::revision() {
+        Some(rev) => format!("kuro {} ({})", env!("CARGO_PKG_VERSION"), rev),
+        None => format!("kuro {}", env!("CARGO_PKG_VERSION")),
+    };
+    kuro_build_event_stream::translate::BuildEventContext {
+        invocation_id: ctx.trace_id.to_string(),
+        build_tool_version: kuro_version,
+        root_cell_name,
+        workspace_directory,
+        working_directory: ctx.working_dir.path().to_string(),
+        user: std::env::var("USER")
+            .or_else(|_| std::env::var("USERNAME"))
+            .unwrap_or_default(),
+        host: hostname::get()
+            .ok()
+            .and_then(|s| s.into_string().ok())
+            .unwrap_or_default(),
+        command: T::COMMAND_NAME.to_owned(),
+        cli_args: cmd.sanitize_argv(ctx.argv.clone()).argv,
+        server_pid: 0,
+    }
+}
+
+fn resolve_relative_path(path: &str, ctx: &ClientCommandContext) -> std::path::PathBuf {
+    let p = std::path::Path::new(path);
+    if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        ctx.working_dir.path().as_path().join(p)
+    }
+}
+
+/// Build the BES gRPC subscriber. Connection is deferred to the first
+/// event so we can return synchronously from here; a failing connection
+/// logs a warning and becomes a no-op.
+fn get_bes_subscriber<T: StreamingCommand>(
+    cmd: &T,
+    ctx: &ClientCommandContext,
+) -> Option<Box<dyn EventSubscriber>> {
+    let opts = cmd.build_config_opts();
+    if opts.bes_backend.is_none() {
+        return None;
+    }
+
+    // Announce the results URL once, up front, so CI scrapers can find it in
+    // both success and failure paths.
+    BesSubscriber::log_results_url(opts.bes_results_url.as_deref(), &ctx.trace_id.to_string());
+
+    let build_event_ctx = bep_build_event_context::<T>(cmd, ctx);
+    match BesSubscriber::maybe_new(opts, build_event_ctx) {
+        Ok(Some(sub)) => Some(Box::new(sub)),
+        Ok(None) => None,
+        Err(e) => {
+            tracing::warn!("BES subscriber disabled: {e}");
+            None
+        }
     }
 }
 

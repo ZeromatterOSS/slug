@@ -1667,6 +1667,14 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             s.to_owned()
         } else if let Some(repo_path) = target.downcast_ref::<RepositoryPath>() {
             repo_path.absolute_path().to_string_lossy().to_string()
+        } else if target.get_type() == "Label" {
+            // `rctx.symlink(Label("//templates:foo.bzl"), "foo.bzl")` must
+            // resolve the Label to an absolute path so the resulting
+            // symlink points at a real file on disk, not at the label's
+            // string form (which would stringify as
+            // `@@cell//templates:foo.bzl` and be a dangling link).
+            let label_str = format!("{target}");
+            resolve_label_to_path(&label_str, &this.working_dir)
         } else {
             target.to_repr()
         };
@@ -1803,6 +1811,22 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                     "Failed to read template '{}': {}",
                     template_path.display(),
                     e
+                ))
+            })?
+        } else if template.get_type() == "Label" {
+            // `rctx.template(out, Label("//templates:foo.tpl"), subs)` is the
+            // canonical Bazel usage. Resolve the Label to a workspace path
+            // and read the file content; without this branch we fall
+            // through to `to_repr()` below and write the Label's string
+            // form ("@@cell//templates:foo.tpl") as if it were the
+            // template body, corrupting every generated file.
+            let label_str = format!("{template}");
+            let template_path = PathBuf::from(resolve_label_to_path(&label_str, &this.working_dir));
+            std::fs::read_to_string(&template_path).map_err(|e| {
+                starlark::Error::from(kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Failed to read template label '{label_str}' at '{}': {e}",
+                    template_path.display(),
                 ))
             })?
         } else {

@@ -1275,13 +1275,31 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = true)] allow_empty: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkAttribute> {
-        let _unused = (mandatory, allow_empty);
+        let _unused = allow_empty;
+        // Bazel semantics: if `mandatory=False` (default) and no explicit
+        // `default`, callers may omit the attribute and it resolves to
+        // `{}`. Mirror the `string_dict` branch above — without this,
+        // rules whose attr def looks like `attr.string_list_dict()`
+        // (e.g. rules_java's `compatible_javacopts` on
+        // `java_toolchain`) reject every BUILD-file invocation that
+        // doesn't pass them.
+        let effective_default = match (default, mandatory) {
+            (Some(d), _) => Some(d),
+            (None, false) => Some(
+                eval.heap()
+                    .alloc(starlark::collections::SmallMap::<Value, Value>::new()),
+            ),
+            (None, true) => None,
+        };
+        let implicit = default.is_none() && !mandatory;
         let coercer = AttrType::dict(
             AttrType::string(),
             AttrType::list(AttrType::string()),
             false,
         );
-        Ok(Attribute::attr(eval, default, doc, coercer)?)
+        let mut attr = Attribute::attr(eval, effective_default, doc, coercer)?;
+        attr.implicit_default = implicit;
+        Ok(attr)
     }
 
     /// Takes a dict with label keys and string values.

@@ -26,6 +26,7 @@ fs4 = { workspace = true }
 futures = { workspace = true }
 gazebo = { workspace = true }
 hex = { workspace = true }
+hostname = { workspace = true }
 httparse = { workspace = true }
 humantime = { workspace = true }
 itertools = { workspace = true }
@@ -50,10 +51,12 @@ tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }
+uuid = { workspace = true }
 
 superconsole = { version = "0.2.0", path = "../../superconsole" }
 
 # Please do not add dependency on `kuro_build_api`.
+kuro_build_event_stream = { workspace = true }
 kuro_build_info = { workspace = true }
 kuro_cli_proto = { workspace = true }
 kuro_common = { workspace = true }

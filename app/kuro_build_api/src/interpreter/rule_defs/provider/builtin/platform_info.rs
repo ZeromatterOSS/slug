@@ -65,10 +65,21 @@ impl<'v, V: ValueLike<'v>> PlatformInfoGen<V> {
         let mut data = ConfigurationInfo::from_value(self.configuration.get().to_value())
             .expect("type checked during construction")
             .to_configuration_data()?;
+        // `exec_properties` carries opaque-key remote-execution metadata
+        // (e.g. `OSFamily`, `Arch`, `container-image`); the keys are
+        // arbitrary strings, NOT Bazel labels. Bazel passes these
+        // through to the executor unchanged. Conflating them with
+        // build settings here errors on every platform that uses
+        // RBE-style exec_properties, which `toolchains_buildbuddy`
+        // does. Only entries whose key parses as a real label belong
+        // in build_settings; everything else is exec metadata and is
+        // applied via the platform's `exec_properties` field, not its
+        // configuration.
         for (k, v) in self.exec_properties_entries() {
-            let key = BuildSettingLabel::from_bazel_label(&k)?;
-            data.build_settings
-                .insert(key, BuildSettingValue::String(v));
+            if let Ok(key) = BuildSettingLabel::from_bazel_label(&k) {
+                data.build_settings
+                    .insert(key, BuildSettingValue::String(v));
+            }
         }
         ConfigurationData::from_platform(label, data)
     }

@@ -12,5 +12,10 @@ kuro_common = { workspace = true }
 kuro_core = { workspace = true }
 kuro_error = { workspace = true }
 
+[dev-dependencies]
+remote_execution = { workspace = true }
+rustls = { workspace = true }
+tokio = { workspace = true }
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(fbcode_build)"] }

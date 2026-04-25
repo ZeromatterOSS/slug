@@ -1,0 +1,24 @@
+[package]
+name = "kuro_build_event_stream"
+edition = "2024"
+license = { workspace = true }
+repository = { workspace = true }
+version = "0.1.0"
+
+[dependencies]
+futures = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tonic = { workspace = true }
+tracing = { workspace = true }
+
+kuro_data = { workspace = true }
+kuro_error = { workspace = true }
+
+[build-dependencies]
+kuro_protoc_dev = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

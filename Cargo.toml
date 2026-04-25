@@ -11,6 +11,7 @@ members = [
     "app/kuro_cmd_audit_client",
     "app/kuro_cmd_audit_server",
     "app/kuro_bxl",
+    "app/kuro_build_event_stream",
     "app/kuro_build_info",
     "app/kuro_certs",
     "app/kuro_cfg_constructor",
@@ -391,6 +392,7 @@ kuro_anon_target = { path = "app/kuro_anon_target" }
 kuro_artifact = { path = "app/kuro_artifact" }
 kuro_build_api = { path = "app/kuro_build_api" }
 kuro_build_api_derive = { path = "app/kuro_build_api_derive" }
+kuro_build_event_stream = { path = "app/kuro_build_event_stream" }
 kuro_build_info = { path = "app/kuro_build_info" }
 kuro_build_signals = { path = "app/kuro_build_signals" }
 kuro_build_signals_impl = { path = "app/kuro_build_signals_impl" }

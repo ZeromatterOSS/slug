@@ -204,13 +204,15 @@ struct BazelRcData {
     entries: Vec<(String, Option<String>, Vec<String>)>,
 }
 
-/// Flags that are processed during bazelrc loading and should not be passed to clap.
-/// These are either handled by the bazelrc system itself or conflict with
-/// Buck2/kuro's own flag definitions.
+/// Flags that belong to the bazelrc front end and should not be passed
+/// through to clap when they appear inside `.bazelrc` `common`/`build` lines.
+/// (CLI-side handling of these flags lives in `filter_bazelrc_only_cli_flags`,
+/// which applies a shape check for `--config=` since that flag is overloaded
+/// between Bazel selectors and Buck overrides.)
 const BAZELRC_ONLY_FLAGS: &[&str] = &[
     "--enable-platform-specific-config",
     "--enable_platform_specific_config",
-    "--config", // Bazel named config - conflicts with Buck2's `-c SECTION.KEY=VALUE`
+    "--config",
 ];
 
 /// Flags that are only valid on the `test` command and should be stripped
@@ -364,9 +366,20 @@ fn parse_bazelrc_file(
 /// Find any `--config=name` values in the args list.
 fn find_active_configs(args: &[String]) -> Vec<String> {
     let mut configs = Vec::new();
-    for arg in args {
-        if let Some(config) = arg.strip_prefix("--config=") {
-            configs.push(config.to_owned());
+    let mut i = 0;
+    while i < args.len() {
+        match config_flag_value(args, i) {
+            ConfigArg::Bazelrc { span } => {
+                let value = if args[i] == "--config" {
+                    args[i + 1].clone()
+                } else {
+                    args[i].strip_prefix("--config=").unwrap_or("").to_owned()
+                };
+                configs.push(value);
+                i += span;
+            }
+            ConfigArg::Buck { span } => i += span,
+            ConfigArg::None => i += 1,
         }
     }
     configs
@@ -718,7 +731,91 @@ pub fn inject_bazelrc_args(mut args: Vec<String>, project_root: Option<&Path>) -
     let tail = args.split_off(insert_pos);
     args.extend(bazelrc_flags);
     args.extend(tail);
+
+    // CLI args still contain flags that were used above by the bazelrc
+    // machinery (`--config=NAME`, `--enable_platform_specific_config`).
+    // Remove the bazelrc-only ones before clap sees them.
+    filter_bazelrc_only_cli_flags(&mut args);
     args
+}
+
+/// Rewrite `args` in place, removing entries that belong to the bazelrc
+/// front end rather than clap:
+///
+/// - `--enable_platform_specific_config` / `--enable-platform-specific-config`
+///   — always removed; already consumed as an OS-config trigger.
+/// - `--config=VALUE` / `--config VALUE` — `VALUE` is a bazelrc selector
+///   (bare identifier) → remove. `VALUE` is a buck-style override (contains
+///   `.` or `=`) → leave for clap.
+///
+/// `-c` short form is buck-only and never touched.
+fn filter_bazelrc_only_cli_flags(args: &mut Vec<String>) {
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+
+        if is_enable_platform_specific_config(arg) {
+            args.remove(i);
+            continue;
+        }
+
+        match config_flag_value(args, i) {
+            ConfigArg::None => {
+                i += 1;
+            }
+            ConfigArg::Bazelrc { span } => {
+                args.drain(i..i + span);
+            }
+            ConfigArg::Buck { span } => {
+                i += span;
+            }
+        }
+    }
+}
+
+fn is_enable_platform_specific_config(arg: &str) -> bool {
+    matches!(
+        arg,
+        "--enable-platform-specific-config" | "--enable_platform_specific_config"
+    )
+}
+
+/// Classify the arg at `i` as a `--config` flag occurrence.
+enum ConfigArg {
+    /// Not a `--config` flag.
+    None,
+    /// Bazel-style selector (`--config=NAME` or `--config NAME`).
+    Bazelrc { span: usize },
+    /// Buck-style override (`--config=SECTION.KEY=VALUE` etc).
+    Buck { span: usize },
+}
+
+fn config_flag_value(args: &[String], i: usize) -> ConfigArg {
+    let arg = &args[i];
+    let (value, span) = if let Some(v) = arg.strip_prefix("--config=") {
+        (v.to_owned(), 1)
+    } else if arg == "--config" {
+        match args.get(i + 1) {
+            Some(next) => (next.clone(), 2),
+            None => return ConfigArg::None,
+        }
+    } else {
+        return ConfigArg::None;
+    };
+
+    if is_buck_config_value(&value) {
+        ConfigArg::Buck { span }
+    } else {
+        ConfigArg::Bazelrc { span }
+    }
+}
+
+/// Buck's `-c`/`--config` takes `SECTION.KEY=VALUE`; the section parser
+/// requires both a `.` (section/key separator) and a `=` (key/value
+/// separator). Bazelrc config names are bare identifiers and contain
+/// neither character. That difference is the disambiguator.
+fn is_buck_config_value(value: &str) -> bool {
+    value.contains('.') || value.contains('=')
 }
 
 #[cfg(test)]
@@ -906,5 +1003,119 @@ mod tests {
         ];
         let result = normalize_args(args);
         assert_eq!(result, vec!["kuro", "build", "--keep-going", "//..."]);
+    }
+
+    fn strs(v: Vec<&str>) -> Vec<String> {
+        v.into_iter().map(str::to_owned).collect()
+    }
+
+    #[test]
+    fn bazelrc_config_is_bare_identifier() {
+        assert!(!is_buck_config_value("remote"));
+        assert!(!is_buck_config_value("ci"));
+        assert!(!is_buck_config_value("generic_clang"));
+    }
+
+    #[test]
+    fn buck_config_value_has_dot_and_equals() {
+        assert!(is_buck_config_value("buck2.log_configured_graph_size=true"));
+        assert!(is_buck_config_value("cell.foo=bar"));
+        // Even just a dot is enough to disambiguate — a bare `foo.bar`
+        // without `=` is still buck-shaped and will fail loudly at the
+        // section parser rather than being silently routed to bazelrc.
+        assert!(is_buck_config_value("section.key"));
+        assert!(is_buck_config_value("plain=value"));
+    }
+
+    #[test]
+    fn find_active_configs_accepts_bazelrc_selectors_only() {
+        let args = strs(vec![
+            "--config=remote",
+            "--config=buck2.debug=true",
+            "-c",
+            "cell.foo=bar",
+            "--config",
+            "ci",
+            "--config",
+            "buck2.x=y",
+        ]);
+        assert_eq!(find_active_configs(&args), vec!["remote", "ci"]);
+    }
+
+    #[test]
+    fn filter_strips_bazelrc_style_config_preserves_buck_style() {
+        let mut args = strs(vec![
+            "kuro",
+            "build",
+            "--config=remote",
+            "--config=buck2.debug=true",
+            "-c",
+            "cell.foo=bar",
+            "//x",
+        ]);
+        filter_bazelrc_only_cli_flags(&mut args);
+        assert_eq!(
+            args,
+            strs(vec![
+                "kuro",
+                "build",
+                "--config=buck2.debug=true",
+                "-c",
+                "cell.foo=bar",
+                "//x",
+            ])
+        );
+    }
+
+    #[test]
+    fn filter_handles_two_arg_config_form() {
+        // `--config ci` (space-separated) and `--config cell.foo=bar` need
+        // the same shape check as the `=` form.
+        let mut args = strs(vec![
+            "kuro",
+            "build",
+            "--config",
+            "ci",
+            "--config",
+            "cell.foo=bar",
+            "//x",
+        ]);
+        filter_bazelrc_only_cli_flags(&mut args);
+        assert_eq!(
+            args,
+            strs(vec!["kuro", "build", "--config", "cell.foo=bar", "//x"])
+        );
+    }
+
+    #[test]
+    fn filter_strips_enable_platform_specific_config() {
+        let mut args = strs(vec![
+            "kuro",
+            "build",
+            "--enable_platform_specific_config",
+            "//x",
+        ]);
+        filter_bazelrc_only_cli_flags(&mut args);
+        assert_eq!(args, strs(vec!["kuro", "build", "//x"]));
+    }
+
+    #[test]
+    fn filter_preserves_bare_short_c_flag() {
+        // `-c` is buck-only; never mis-identified.
+        let mut args = strs(vec!["kuro", "build", "-c", "cell.foo=bar", "//x"]);
+        filter_bazelrc_only_cli_flags(&mut args);
+        assert_eq!(
+            args,
+            strs(vec!["kuro", "build", "-c", "cell.foo=bar", "//x"])
+        );
+    }
+
+    #[test]
+    fn filter_ignores_trailing_bare_config_without_value() {
+        // Malformed `--config` at end of args — leave it for clap to
+        // reject with its own error rather than eating it silently.
+        let mut args = strs(vec!["kuro", "build", "//x", "--config"]);
+        filter_bazelrc_only_cli_flags(&mut args);
+        assert_eq!(args, strs(vec!["kuro", "build", "//x", "--config"]));
     }
 }

@@ -55,7 +55,16 @@ What's missing vs Bazel:
 
 ## Phases
 
-### 18.1 Vendor BEP proto schema (OPEN)
+### 18.1 Vendor BEP proto schema (DONE 2026-04-24)
+
+Landed as `app/kuro_build_event_stream/` (Bazel 9.0.0rc1+834 + googleapis
+`de157ca3`). One local modification: `analysis_cache_service_metadata_status.proto`
+converted from `edition = "2023"` to `syntax = "proto3"` because prost-build
+0.13 does not yet support proto editions; the file contains only an enum so
+the change is wire-compatible. REv2 turned out to be unused by
+`build_event_stream.proto` after checking the imports — not vendored.
+Round-trip tests: `tests/roundtrip.rs`.
+
 
 **Parity source.** Bazel 9.x source tree:
 - `src/main/java/com/google/devtools/build/lib/buildeventstream/proto/build_event_stream.proto`
@@ -73,7 +82,96 @@ Rust types.
 
 ---
 
-### 18.2 Translation layer (OPEN)
+### 18.2 Translation layer (DONE 2026-04-24 — extended for BB dashboard parity 2026-04-24)
+
+`src/translate.rs` with `BuildEventContext` + per-event-kind functions. Covered:
+
+- `CommandStart` → 8-event burst at invocation start: `Started`,
+  `BuildMetadata`, `UnstructuredCommandLine`, three
+  `StructuredCommandLine` views (original/canonical/tool), `OptionsParsed`,
+  `WorkspaceStatus`. `Started.children[]` announces them all plus the
+  `PatternExpandedId` (BuildBuddy reads its top-level invocation pattern
+  from `Started.children[].id.pattern`, *not* from the standalone
+  `Expanded` event's id).
+- `CommandEnd` → `BuildFinished` (no longer terminal — `BuildMetrics`
+  closes the stream now).
+- `AnalysisEnd` → `TargetConfigured` + synthetic `TargetCompleted`. The
+  `TargetConfigured.children[]` announces its `TargetCompleted` so BB
+  flips the per-target card to `BUILT`.
+- `ActionExecutionEnd` → `ActionExecuted` with `start_time` /
+  `end_time` populated (BB action-timing graph; derived by subtracting
+  `wall_time` from the event timestamp).
+- `TestRunEnd` → `TestResult`.
+- `ParsedTargetPatterns` (instant) → `PatternExpanded`. Pattern strings
+  go through `normalize_root_cell_pattern` so root-cell patterns render
+  as `//:foo` (Bazel-shape) instead of kuro's internal `<cell>//:foo`.
+- `ConfigurationCreated` (instant) → `Configuration`.
+- `make_aborted()` helper.
+- `make_progress()` helper.
+- `BepStreamState` accumulator: counts actions/targets across the
+  stream and synthesizes a closing `BuildMetrics` event with
+  `actions_executed`, `targets_configured`, `first_started_ms`,
+  `last_ended_ms` (BB action-count chip + critical path).
+
+Subscribers (`BesSubscriber`, `BepFileSubscriber`) own a
+`BepStreamState`, observe each translated event, override
+`handle_output` / `handle_tailer_stderr` to forward stdout/stderr as
+`Progress` events, and emit the closing `BuildMetrics` in `finalize()`.
+
+Verified against BuildBuddy (`hello_world//:main`):
+
+| Field | Status |
+|-------|--------|
+| `pattern` (`["//:main"]`) | populated |
+| `host` (`wg-laptop`) | populated |
+| `user` (`wgray`) | populated |
+| `command` (`build`) | populated |
+| `actionCount` (5) | populated |
+| `targetConfiguredCount` (8) | populated |
+| `targetGroups[].status` (`BUILT`) | populated |
+| `durationUsec` | populated |
+| `invocationStatus` (`COMPLETE_INVOCATION_STATUS`) | populated |
+| `success` (`true`) / `bazelExitCode` (`SUCCESS`) | populated |
+| `cacheStats` | empty (out of scope until kuro records cache stats) |
+| `targetGroups[].outputs` | empty (out of scope until per-target artifact tracking lands) |
+
+Not yet covered (residual gap list):
+
+- `WorkspaceInfo`, `Fetch`, `ConvenienceSymlinksIdentified`,
+  `BuildToolLogs` — Bazel emits these but BB doesn't depend on them
+  for the main invocation card.
+- Per-target artifact tracking (`NamedSetOfFiles` with real outputs +
+  `TargetCompleted.output_group`) — currently the `Completed` event
+  is synthetic with empty outputs, which renders as "BUILT" but with
+  no Outputs tab content.
+- `Progress` events fire only when the daemon's tailer pushes
+  stdout/stderr; for a quiet kuro build (no tailer activity) the BB
+  Build Log tab stays empty.
+- `--build_event_json_file` (proto3 canonical JSON) still deferred
+  pending pbjson integration.
+
+Table-driven tests: `tests/translate.rs`.
+
+`src/translate.rs` with `BuildEventContext` + per-event-kind functions. Covered:
+
+- `CommandStart` → `Started`
+- `CommandEnd` → `BuildFinished`
+- `AnalysisEnd` → `TargetConfigured`
+- `ActionExecutionEnd` → `ActionExecuted` (exit code from `signed_exit_code`)
+- `TestRunEnd` → `TestResult`
+- `ParsedTargetPatterns` (instant) → `PatternExpanded`
+- `ConfigurationCreated` (instant) → `Configuration`
+- `make_aborted()` helper
+- `make_progress()` helper
+
+Not yet covered (tracked in `README.md` conformance snapshot):
+`BuildMetadata`, `UnstructuredCommandLine`, `StructuredCommandLine`,
+`OptionsParsed`, `WorkspaceStatus`, `Progress` accumulation,
+`NamedSetOfFiles` + `TargetCompleted` with outputs, `BuildToolLogs`,
+`BuildMetrics`, `ConvenienceSymlinksIdentified`.
+
+Table-driven tests: `tests/translate.rs`.
+
 
 New `app/kuro_build_event_stream/src/translate.rs`. Maps `BuckEvent` →
 BEP `BuildEvent`. One visitor per Kuro event kind; lossy cases
@@ -108,7 +206,23 @@ driven.
 
 ---
 
-### 18.3 File sinks (OPEN)
+### 18.3 File sinks (DONE 2026-04-24 — JSON deferred)
+
+`src/file_sink.rs` (`FileSink` with `Binary` and `Text` encodings) +
+`kuro_client_ctx/src/subscribers/bep_file_sink.rs` (`BepFileSubscriber`) wire
+the existing `--build_event_binary_file` / `--build_event_text_file` flags
+so they actually write BEP events (they previously accepted the flags and
+dropped them).
+
+Binary output = length-delimited prost, matching Bazel's wire format. Text
+output = `Debug`-formatted, form-feed delimited (NOT proto `TextFormat` —
+developer diagnostic only).
+
+`--build_event_json_file` deferred: proto3-canonical JSON requires
+`pbjson-build` integration (camelCase fields, ISO-8601 timestamps,
+string-name enums). Tracked against 18.8 conformance work where byte-exact
+Bazel parity matters.
+
 
 Flags:
 - `--build_event_json_file=<path>` — newline-delimited JSON (NDJSON),
@@ -130,7 +244,76 @@ default per `app/kuro_events/src/dispatch.rs`).
 
 ---
 
-### 18.4 gRPC / BES sink (OPEN)
+### 18.4 gRPC / BES sink (DONE 2026-04-24, REOPENED + RELANDED 2026-04-24)
+
+Initial implementation streamed events to BuildBuddy's gRPC endpoint and got
+HTTP 200 back from the invocation URL — but **the invocations never showed
+up on the dashboard**. HTTP 200 was misleading: BuildBuddy's web UI is an
+SPA that returns 200 for any URL, so it confirmed nothing about ingestion.
+Querying the public API (`SearchInvocation` / `GetInvocation`) reported
+"NotFound" for every kuro invocation.
+
+Five compounding bugs were uncovered chasing this:
+
+1. **Always `BuildComponent::Tool`** in stream IDs. Bazel uses three
+   shapes: `Controller` (no invocation_id) for `BuildEnqueued` /
+   `BuildFinished`, `Controller` (with invocation_id) for the
+   `InvocationAttempt*` events, `Tool` (with invocation_id) for the
+   bidi tool stream. Sending everything as `Tool` left BuildBuddy with
+   no controller-scope bracket to attach the tool stream to.
+2. **Identical `build_id` and `invocation_id`**. Bazel mints two
+   independent UUIDs (`buildRequestId` + `commandId`); BuildBuddy keys
+   its routing tables off them being distinct. Now mint a fresh build_id
+   in the subscriber.
+3. **Bidi stream open deadlocked.**
+   `client.publish_build_tool_event_stream(req_stream).await`'s
+   server-side handler waits for the first request frame before
+   completing setup; awaiting the open *before* feeding events meant
+   we sat forever in `rx.recv()` waiting for events while the open
+   blocked waiting for a request. Spawning the request feeder before
+   awaiting the open call unsticks it.
+4. **`InvocationAttemptFinished` / `BuildFinished` lifecycle calls
+   missing `invocation_status`**. Empty status was treated as still-
+   running and the invocation was never finalized. Now populated with
+   `COMMAND_SUCCEEDED` + the build's exit code.
+5. **`Started.options_description` empty.** The actual silent killer.
+   BuildBuddy's `EventChannel.FinalizeInvocation` early-returns when
+   `!hasReceivedEventWithOptions`, which is set true only when either
+   `Started.options_description != ""` or an `OptionsParsed` event
+   arrives. Our translator emitted `Started.options_description: ""`
+   and we never sent `OptionsParsed`, so BuildBuddy *acked every
+   event* and then dropped the invocation in finalization. Populated
+   `options_description` with the joined sanitized argv as a stopgap;
+   add a real `OptionsParsed` event in 18.2 follow-up work.
+
+Verified post-fix: `kuro build //:main --bes_backend=grpcs://remote.buildbuddy.io ...`
+produces an invocation that `GetInvocation` returns with `invocationStatus=COMPLETE_INVOCATION_STATUS`, `success=true`. The
+invocation pattern (`pat=[]`) is still empty — fixing that needs
+`OptionsParsed` or correct `PatternExpanded` parent/child wiring;
+tracked in the 18.2 gap list.
+
+`src/grpc_sink.rs` (`BesSink` + background uploader task) +
+`kuro_client_ctx/src/subscribers/bep_bes_sink.rs` (`BesSubscriber`).
+
+URIs: `grpcs://` / `grpc://` rewritten to `https://` / `http://` for tonic.
+TLS enabled via `ClientTlsConfig::with_webpki_roots()`.
+
+Flags wired: `--bes_backend`, `--bes_results_url`, `--bes_header`
+(repeatable `KEY=VALUE`), `--bes_keywords` (CSV), `--bes_timeout`,
+`--bes_upload_mode`, `--bes_instance_name`.
+
+Lifecycle: `BuildEnqueued` → `InvocationAttemptStarted` → (bidi stream of
+`bazel_event`-packed BEP events) → `ComponentStreamFinished(FINISHED)` →
+`InvocationAttemptFinished` → `BuildFinished`.
+
+Backpressure: bounded `mpsc::channel<_>` (capacity 10k); senders block on
+overflow. Failure handling: connect/enqueue failures log once, mark the
+sink `State::Failed`, and stop trying — BES upload never fails the user's
+build.
+
+Validated against BuildBuddy: `kuro build //:main --bes_backend=grpcs://remote.buildbuddy.io --bes_header=x-buildbuddy-api-key=<KEY>` produced an accessible invocation page at
+`https://app.buildbuddy.io/invocation/<trace_id>`.
+
 
 **Parity source.** `publish_build_event.proto` — `PublishLifecycleEvent`
 (invocation start/attempt/finish) and `PublishBuildToolEventStream`
@@ -165,7 +348,23 @@ Failure handling:
 
 ---
 
-### 18.5 Invocation metadata (OPEN)
+### 18.5 Invocation metadata (PARTIAL 2026-04-24)
+
+`BuildEventContext` (built in `streaming.rs::bep_build_event_context`) is
+populated from existing invocation state:
+
+- `invocation_id` = `trace_id`
+- `build_tool_version` = `kuro_build_info::revision()`
+- `workspace_directory` = `ctx.paths().project_root()`
+- `working_directory` = `ctx.working_dir`
+- `user` = `$USER` / `$USERNAME`
+- `host` = `hostname::get()`
+- `command` = subcommand name
+- `cli_args` = sanitized argv
+
+Not yet lifted into BEP `BuildMetadata` / `UnstructuredCommandLine` /
+`OptionsParsed` events (see 18.2 gap list).
+
 
 BEP `BuildMetadata` carries:
 
@@ -184,7 +383,20 @@ are missing, lift at BEP `Started` emission time in the translate layer.
 
 ---
 
-### 18.6 Results-URL surfacing (OPEN)
+### 18.6 Results-URL surfacing (DONE 2026-04-24)
+
+`BesSubscriber::log_results_url` emits the BuildBuddy-standard line to
+stderr at subscriber construction time:
+
+```
+Streaming build results to: <prefix>/<invocation_id>
+```
+
+Currently printed once at startup; CI scrapers can find it in both success
+and failure paths because it precedes any build work. Plan called for a
+second emission at end-of-build; deferred until we see a concrete log
+scraper that needs it.
+
 
 When `--bes_results_url=<prefix>` is set, log at build start:
 
@@ -198,7 +410,18 @@ it in both the success and failure paths.
 
 ---
 
-### 18.7 Cancellation + abort path (OPEN)
+### 18.7 Cancellation + abort path (DONE 2026-04-24)
+
+Both `BepFileSubscriber` and `BesSubscriber` track whether they observed a
+`SpanEnd::Command` event. In `finalize()` (which runs on every exit path,
+including Ctrl+C via `EventsCtx::finalize_events`), if no CommandEnd was
+seen they emit a synthetic `Aborted` event scoped to `BuildFinishedId` with
+reason `USER_INTERRUPTED`. Closes the BES stream cleanly so BuildBuddy
+transitions the invocation out of "still running" state.
+
+Shutdown is bounded by `--bes_timeout` (default 60s); events in-flight past
+that bound are dropped.
+
 
 Trap SIGINT and SIGTERM before daemon teardown. Emit BEP `Aborted`
 event with `reason={USER_INTERRUPTED,TIME_OUT,REMOTE_ENVIRONMENT_FAILURE,
@@ -216,7 +439,18 @@ in "still running" state indefinitely. Fixing this requires:
 
 ---
 
-### 18.8 Conformance tests (OPEN)
+### 18.8 Conformance tests (PARTIAL 2026-04-24)
+
+Landed: `examples/bep_diff.rs` runs a histogram diff between two BEP
+binary files (typically Bazel vs Kuro). Initial snapshot captured in
+`app/kuro_build_event_stream/README.md` — gap list in that table is the
+working checklist for 18.2-extensions.
+
+Not yet landed: dedicated `tests/bep_conformance/` fixture workspace (the
+plan's genrule + cc_library/cc_binary + cc_test + `tags=["manual"]`
+fixture) + a CI runner that re-runs the diff on every PR. `examples/hello_world`
+already builds under both Kuro and Bazel and is a workable stopgap.
+
 
 New directory `tests/bep_conformance/`. Small fixture workspace with:
 

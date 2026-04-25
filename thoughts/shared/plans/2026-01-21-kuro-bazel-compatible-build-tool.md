@@ -286,6 +286,8 @@ The detailed implementation is split into focused sub-plans:
 | [12-stub-cleanup-and-exec-groups.md](./kuro-bazel-subplans/12-stub-cleanup-and-exec-groups.md)       | Rename remaining stubs, real BuildConfiguration, exec group resolution | **Complete** (automated; manual verification remaining) |
 | [13-lazy-toolchain-loading.md](./kuro-bazel-subplans/13-lazy-toolchain-loading.md)                   | Filter dev_dependency, make toolchain loading resilient, reduce eager loading | **Not Started** |
 | [19-configuration-transitions.md](./kuro-bazel-subplans/19-configuration-transitions.md)             | Real Bazel-compatible configuration transitions: build settings on ConfigurationData, transition() impl fn execution, built-in exec transition (incl. compilation_mode=opt), select() on build settings, cc_toolchain_config flag-set selection | **Not Started** |
+| [22-cli-flag-compat.md](./kuro-bazel-subplans/22-cli-flag-compat.md)                                 | CLI flag parity with Bazel: `--config=NAME` vs `--config=SECTION.KEY=VALUE` disambiguation, remote-header stubs, `common --*` flags from real-world `.bazelrc` files. Discovered during Plan 18 end-to-end testing. | **In Progress** (22.1 done; 22.2–22.3 open) |
+| [23-module-extension-realworld.md](./kuro-bazel-subplans/23-module-extension-realworld.md)           | Real-world bzlmod module-extension parity (`toolchains_buildbuddy` / `mctx.modules` / root-tag / macro-wrapped `repository_rule` pattern). Canonical extension id, rctx.template/symlink Label handling, loud extension-exec errors. | **Complete** (23.1–23.5 landed; next blocker is Plan 13 / rules_java / remote-exec client) |
 
 ### Remaining Stub Behavior (No Plans Yet)
 

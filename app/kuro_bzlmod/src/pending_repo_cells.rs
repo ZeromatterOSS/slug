@@ -162,7 +162,15 @@ pub fn pre_compute_extension_repo_cells(
                 );
                 continue;
             }
-            let ext_id = usage.extension_id();
+            // Match the canonical form used by `aggregate_extensions_with_root`
+            // so the executor-side lookup (`create_extension_execution_key`)
+            // finds the aggregation for this setup. See
+            // `extensions::canonical_extension_id`.
+            let ext_id = crate::extensions::canonical_extension_id(
+                &usage.extension_bzl_file,
+                &usage.extension_name,
+                module_name,
+            );
             let ext_name = extract_extension_name(&ext_id);
 
             // The canonical name prefix is the module that OWNS the .bzl file, not

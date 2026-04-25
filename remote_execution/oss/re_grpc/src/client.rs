@@ -200,7 +200,11 @@ fn prepare_uri(uri: Uri, tls: bool) -> anyhow::Result<Uri> {
     // Many people (including Bazel), use grpc://, so we tolerate it.
 
     match uri.scheme_str() {
-        Some("grpc") | Some("dns") | Some("ipv4") | Some("ipv6") | None => {}
+        // `grpcs` is Bazel's TLS-on alias and shows up unmodified in
+        // `.bazelrc` files (`--remote_executor=grpcs://…`); accept it
+        // alongside the documented schemes. The `tls` arg below
+        // overrides anyway, so we just need to not error out here.
+        Some("grpc") | Some("grpcs") | Some("dns") | Some("ipv4") | Some("ipv6") | None => {}
         Some(scheme) => {
             return Err(anyhow::anyhow!(
                 "Invalid URI scheme: `{}` for `{}` (you should omit it)",

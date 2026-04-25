@@ -155,13 +155,20 @@ pub fn aggregate_extensions_with_root(
                 }
             }
 
-            let ext_id = usage.extension_id();
+            // Same module extension can be referenced in two shapes: the
+            // owning module writes `use_extension("//:ext.bzl", "name")`
+            // (relative), consumers write `use_extension("@owner//:ext.bzl",
+            // "name")` (explicit). Both must collapse into a single
+            // AggregatedExtension; otherwise the consumer's tags + root-ness
+            // live in one entry and the owner's in another, and whichever
+            // the executor happens to look up is missing half the data.
+            let ext_id = canonical_extension_id(
+                &usage.extension_bzl_file,
+                &usage.extension_name,
+                module_name,
+            );
 
             let agg = aggregated.entry(ext_id.clone()).or_insert_with(|| {
-                // If the bzl file path is relative (starts with //), expand it with the
-                // declaring module's cell name so the executor can load the right file.
-                // e.g., "//java:rules_java_deps.bzl" from "rules_java" module
-                //     → "@rules_java//java:rules_java_deps.bzl"
                 let resolved_bzl_file =
                     if usage.extension_bzl_file.starts_with("//") && !module_name.is_empty() {
                         format!("@{}{}", module_name, usage.extension_bzl_file)
@@ -169,7 +176,6 @@ pub fn aggregate_extensions_with_root(
                         usage.extension_bzl_file.clone()
                     };
                 let mut ext = AggregatedExtension::new(&resolved_bzl_file, &usage.extension_name);
-                // Keep the original (relative) id for lockfile correlation
                 ext.extension_id = ext_id.clone();
                 ext
             });
@@ -188,6 +194,35 @@ pub fn aggregate_extensions_with_root(
     }
 
     aggregated
+}
+
+/// Build the canonical extension id from a `use_extension()` call.
+///
+/// The two in-workspace shapes
+///
+/// - `use_extension("//:ext.bzl", "name")` inside module `X`
+/// - `use_extension("@X//:ext.bzl", "name")` from anywhere else
+///
+/// must produce the same id, or the executor loads a partial aggregation
+/// keyed under one shape and misses the other. Returns
+/// `@X//:ext.bzl%name` in both cases.
+pub fn canonical_extension_id(
+    extension_bzl_file: &str,
+    extension_name: &str,
+    declaring_module_name: &str,
+) -> String {
+    let resolved = if extension_bzl_file.starts_with("//") && !declaring_module_name.is_empty() {
+        format!("@{}{}", declaring_module_name, extension_bzl_file)
+    } else if let Some(rest) = extension_bzl_file.strip_prefix(':') {
+        if declaring_module_name.is_empty() {
+            format!("//{rest}")
+        } else {
+            format!("@{}//{}", declaring_module_name, rest)
+        }
+    } else {
+        extension_bzl_file.to_owned()
+    };
+    format!("{resolved}%{extension_name}")
 }
 
 /// Result of executing a module extension.

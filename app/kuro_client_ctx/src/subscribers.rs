@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+pub mod bep_bes_sink;
+pub mod bep_file_sink;
 pub(crate) mod build_graph_stats;
 pub(crate) mod build_id_writer;
 pub(crate) mod classify_server_stderr;
