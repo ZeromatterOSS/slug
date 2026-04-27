@@ -236,11 +236,16 @@ impl EventSubscriber for BesSubscriber {
 
         // Bazel order: `BuildFinished` → `BuildToolLogs` → `BuildMetrics
         // last=true`. The Timing tab in BuildBuddy reads
-        // `command.profile.gz` from BuildToolLogs; without it the tab
-        // renders blank even though `BuildMetrics.action_data` carries
-        // the same per-mnemonic numbers.
+        // `command.profile.gz` from BuildToolLogs; the entry must be a
+        // `bytestream://` URI (BB ignores inline `contents` for this
+        // file specifically). Upload the gzipped trace bytes via the
+        // BES backend's ByteStream service, then attach the resulting
+        // URI to the BuildToolLogs event.
         if let State::Connected(sink) = &self.state {
-            if let Some(tool_logs) = self.stream_state.build_tool_logs_event() {
+            if let Some(gz_bytes) = self.stream_state.build_profile_gz()
+                && let Some(uri) = sink.upload_blob_bytestream(gz_bytes).await
+                && let Some(tool_logs) = self.stream_state.build_tool_logs_event_with_uri(uri)
+            {
                 let _ = sink.enqueue(tool_logs).await;
             }
             let metrics = self.stream_state.build_metrics_event();

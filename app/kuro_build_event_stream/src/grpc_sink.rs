@@ -78,6 +78,14 @@ pub struct BesSink {
     tx: mpsc::Sender<StreamItem>,
     upload_task: Arc<Mutex<Option<JoinHandle<()>>>>,
     config: BesConfig,
+    /// Channel used to talk to BES; reused for ByteStream uploads of
+    /// blobs (`command.profile.gz`) so BuildBuddy's Timing tab can
+    /// fetch them via `bytestream://…/blobs/<hash>/<size>` URIs.
+    /// Stored separately because cloning the channel is cheap whereas
+    /// the BES client itself wraps it with an interceptor and is not
+    /// reusable for another service.
+    channel: tonic::transport::Channel,
+    interceptor: HeaderInterceptor,
 }
 
 /// Internal channel payload.
@@ -125,7 +133,72 @@ impl BesSink {
             tx,
             upload_task: Arc::new(Mutex::new(Some(upload_task))),
             config,
+            channel,
+            interceptor,
         })
+    }
+
+    /// Upload `bytes` to the BES backend's CAS via ByteStream `Write`
+    /// and return a `bytestream://<host>/blobs/<sha256_hex>/<size>`
+    /// URI suitable for use as `BuildToolLogs.File.uri`.
+    ///
+    /// BuildBuddy's invocation Timing tab refuses inline-bytes
+    /// `BuildToolLogs.File.contents` for `command.profile.gz` and
+    /// only renders timing data when the file is referenced via a
+    /// `bytestream://` URI. Bazel uploads the same way; mirroring it
+    /// is the only way the tab populates.
+    ///
+    /// On error returns `None` and logs — the build still succeeds,
+    /// the timing tab just stays blank.
+    pub async fn upload_blob_bytestream(&self, bytes: Vec<u8>) -> Option<String> {
+        use re_grpc_proto::google::bytestream::WriteRequest;
+        use re_grpc_proto::google::bytestream::byte_stream_client::ByteStreamClient;
+        use sha2::Digest;
+
+        let size = bytes.len() as i64;
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(&bytes);
+        let hash_hex = hex_lower(&hasher.finalize());
+        // BuildBuddy's resource-name shape is `uploads/<uuid>/blobs/<hash>/<size>`.
+        // The `uploads/<uuid>/` prefix is required by the ByteStream
+        // contract for client-side dedup; the suffix names the CAS blob.
+        let uuid = uuid::Uuid::new_v4();
+        let resource_name = format!("uploads/{uuid}/blobs/{hash_hex}/{size}");
+
+        let mut client =
+            ByteStreamClient::with_interceptor(self.channel.clone(), self.interceptor.clone());
+
+        // Stream a single chunk — `command.profile.gz` is small (≤
+        // a few MB even for huge builds).
+        let req = WriteRequest {
+            resource_name: resource_name.clone(),
+            write_offset: 0,
+            finish_write: true,
+            data: bytes,
+        };
+        let stream = tokio_stream::iter([req]);
+        match client.write(Request::new(stream)).await {
+            Ok(resp) => {
+                let committed = resp.into_inner().committed_size;
+                if committed != size {
+                    tracing::warn!(
+                        "BES bytestream upload: server committed {} of {} bytes",
+                        committed,
+                        size
+                    );
+                    return None;
+                }
+            }
+            Err(e) => {
+                tracing::warn!("BES bytestream upload failed: {e}");
+                return None;
+            }
+        }
+
+        // Pull the host out of `--bes_backend` for the URI; BuildBuddy
+        // accepts both `<host>` and `<host>:<port>` forms.
+        let host = bes_uri_host(&self.config.backend).unwrap_or_else(|| String::from(""));
+        Some(format!("bytestream://{host}/blobs/{hash_hex}/{size}"))
     }
 
     /// Queue a BEP event for upload.
@@ -580,5 +653,28 @@ fn now_timestamp() -> prost_types::Timestamp {
     prost_types::Timestamp {
         seconds: d.as_secs() as i64,
         nanos: d.subsec_nanos() as i32,
+    }
+}
+
+fn hex_lower(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        out.push_str(&format!("{b:02x}"));
+    }
+    out
+}
+
+/// Pull the bare host (or host:port) out of a `grpc(s)://host:port` /
+/// `https://host:port` URL. Returns `None` for malformed inputs;
+/// callers fall back to the empty string and let BuildBuddy
+/// reconstruct the host from the BES connection metadata.
+fn bes_uri_host(backend: &str) -> Option<String> {
+    let (_scheme, rest) = backend.split_once("://")?;
+    // Strip any path component.
+    let host = rest.split('/').next()?;
+    if host.is_empty() {
+        None
+    } else {
+        Some(host.to_owned())
     }
 }

@@ -525,6 +525,96 @@ impl BepStreamState {
     /// the action timeline / critical path. Without this event the
     /// tab renders blank even when `BuildMetrics.action_data` carries
     /// the same numbers (BB's frontend hardcodes the trace JSON path).
+    /// Returns the gzipped Chrome-trace bytes for the build, suitable
+    /// for upload as `command.profile.gz`. `None` when no actions were
+    /// observed (so we'd just be sending an empty profile).
+    pub fn build_profile_gz(&self) -> Option<Vec<u8>> {
+        if self.action_traces.is_empty() {
+            return None;
+        }
+        let json = self.build_profile_json();
+        let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        use std::io::Write;
+        if gz.write_all(json.as_bytes()).is_err() {
+            return None;
+        }
+        gz.finish().ok()
+    }
+
+    /// JSON form of the same trace, used as a fallback `BuildToolLogs`
+    /// entry (some BES consumers parse the uncompressed file).
+    pub fn build_profile_json(&self) -> String {
+        // Match Bazel's `JsonTraceFileWriter` output shape:
+        //   {"otherData":{...},"traceEvents":[<metadata>...,<actions>...]}
+        let mut json = String::with_capacity(256 + self.action_traces.len() * 128);
+        json.push_str(r#"{"otherData":{"build_tool":"kuro"},"traceEvents":["#);
+        json.push_str(
+            r#"{"ph":"M","pid":1,"tid":0,"name":"process_name","args":{"name":"actions"}}"#,
+        );
+        json.push_str(
+            r#",{"ph":"M","pid":1,"tid":0,"name":"thread_name","args":{"name":"Actions"}}"#,
+        );
+        json.push_str(
+            r#",{"ph":"M","pid":1,"tid":0,"name":"thread_sort_index","args":{"sort_index":0}}"#,
+        );
+        let origin_us = self
+            .action_traces
+            .iter()
+            .map(|e| e.ts_us)
+            .min()
+            .unwrap_or(0);
+        for e in &self.action_traces {
+            json.push(',');
+            let ts = e.ts_us.saturating_sub(origin_us);
+            json.push_str(&format!(
+                "{{\"ph\":\"X\",\"cat\":{cat},\"name\":{name},\"ts\":{ts},\"dur\":{dur},\"pid\":1,\"tid\":0,\"args\":{{}}}}",
+                name = json_string(&e.name),
+                cat = json_string(&e.category),
+                ts = ts,
+                dur = e.dur_us,
+            ));
+        }
+        json.push_str("]}");
+        json
+    }
+
+    /// Build a `BuildToolLogs` event whose `command.profile.gz` entry
+    /// references `gz_uri` (a `bytestream://…/blobs/<hash>/<size>`
+    /// URL produced by uploading the bytes from `build_profile_gz()`
+    /// to BB's CAS). BuildBuddy's Timing tab requires the URI form;
+    /// inline `contents` does not light it up.
+    pub fn build_tool_logs_event_with_uri(&self, gz_uri: String) -> Option<bep::BuildEvent> {
+        use bep::build_event_id as beid;
+
+        if self.action_traces.is_empty() {
+            return None;
+        }
+        // Length is best-effort; the bytestream resource path is the
+        // authoritative size for BB.
+        let length = self
+            .build_profile_gz()
+            .map(|b| b.len() as i64)
+            .unwrap_or(-1);
+        Some(bep::BuildEvent {
+            id: Some(bep::BuildEventId {
+                id: Some(beid::Id::BuildToolLogs(beid::BuildToolLogsId {})),
+            }),
+            children: Vec::new(),
+            last_message: false,
+            payload: Some(bep::build_event::Payload::BuildToolLogs(
+                bep::BuildToolLogs {
+                    log: vec![bep::File {
+                        path_prefix: Vec::new(),
+                        name: "command.profile.gz".to_owned(),
+                        digest: String::new(),
+                        length,
+                        file: Some(bep::file::File::Uri(gz_uri)),
+                    }],
+                },
+            )),
+        })
+    }
+
     pub fn build_tool_logs_event(&self) -> Option<bep::BuildEvent> {
         use bep::build_event_id as beid;
 
