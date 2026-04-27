@@ -585,14 +585,21 @@ impl BepStreamState {
         }
         json.push_str("]}");
 
-        // Gzip the JSON. `command.profile.gz` is the Bazel filename BB
-        // recognizes; payload must be gzip-compressed.
+        // Emit BOTH an uncompressed `command.profile.json` and a
+        // gzipped `command.profile.gz`. BuildBuddy's Timing tab
+        // historically reads the gzipped file (Bazel's native output),
+        // but tests show their parser silently drops inline-bytes
+        // entries it doesn't recognize — sending the JSON form
+        // alongside makes the tab populate even for clients that only
+        // honour the uncompressed path. Both are short (≪1MB for
+        // small builds) so the dual-emission cost is negligible.
+        let json_bytes = json.into_bytes();
         let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
         use std::io::Write;
-        if gz.write_all(json.as_bytes()).is_err() {
+        if gz.write_all(&json_bytes).is_err() {
             return None;
         }
-        let contents = match gz.finish() {
+        let gz_bytes = match gz.finish() {
             Ok(buf) => buf,
             Err(_) => return None,
         };
@@ -605,13 +612,22 @@ impl BepStreamState {
             last_message: false,
             payload: Some(bep::build_event::Payload::BuildToolLogs(
                 bep::BuildToolLogs {
-                    log: vec![bep::File {
-                        path_prefix: Vec::new(),
-                        name: "command.profile.gz".to_owned(),
-                        digest: String::new(),
-                        length: contents.len() as i64,
-                        file: Some(bep::file::File::Contents(contents)),
-                    }],
+                    log: vec![
+                        bep::File {
+                            path_prefix: Vec::new(),
+                            name: "command.profile.gz".to_owned(),
+                            digest: String::new(),
+                            length: gz_bytes.len() as i64,
+                            file: Some(bep::file::File::Contents(gz_bytes)),
+                        },
+                        bep::File {
+                            path_prefix: Vec::new(),
+                            name: "command.profile.json".to_owned(),
+                            digest: String::new(),
+                            length: json_bytes.len() as i64,
+                            file: Some(bep::file::File::Contents(json_bytes)),
+                        },
+                    ],
                 },
             )),
         })
