@@ -127,8 +127,13 @@ impl EventSubscriber for BepFileSubscriber {
             self.write_bep(&aborted);
         }
 
-        // Mirror what BesSubscriber emits as the final BEP event so the
-        // file output matches what BuildBuddy receives over BES.
+        // Mirror what BesSubscriber emits as the final BEP events so the
+        // file output matches what BuildBuddy receives over BES:
+        // `BuildToolLogs` (chrome trace for the Timing tab) followed by
+        // `BuildMetrics` (last=true).
+        if let Some(tool_logs) = self.stream_state.build_tool_logs_event() {
+            self.write_bep(&tool_logs);
+        }
         self.write_bep(&self.stream_state.build_metrics_event());
 
         for output in &self.outputs {

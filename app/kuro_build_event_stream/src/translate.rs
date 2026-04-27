@@ -181,6 +181,7 @@ pub fn translate_command_start(
         id(beid::Id::OptionsParsed(beid::OptionsParsedId {})),
         id(beid::Id::WorkspaceStatus(beid::WorkspaceStatusId {})),
         id(beid::Id::BuildFinished(beid::BuildFinishedId {})),
+        id(beid::Id::BuildToolLogs(beid::BuildToolLogsId {})),
         id(beid::Id::BuildMetrics(beid::BuildMetricsId {})),
     ]);
 
@@ -437,6 +438,23 @@ pub struct BepStreamState {
     targets_configured: i64,
     first_action_started_ms: i64,
     last_action_ended_ms: i64,
+    /// Per-action records (name, start_us, dur_us, category) used to
+    /// synthesize a Chrome-trace `command.profile.gz` for BuildBuddy's
+    /// Timing tab. The Timing tab reads from a `BuildToolLogs.File`
+    /// named `command.profile.gz` (Bazel convention) — without it the
+    /// tab renders blank even when `BuildMetrics.action_data` carries
+    /// the same numbers.
+    action_traces: Vec<TraceEvent>,
+}
+
+#[derive(Clone, Debug)]
+struct TraceEvent {
+    name: String,
+    category: String,
+    /// Start in microseconds since epoch.
+    ts_us: i64,
+    /// Duration in microseconds.
+    dur_us: i64,
 }
 
 impl BepStreamState {
@@ -451,17 +469,45 @@ impl BepStreamState {
         match event.payload.as_ref() {
             Some(bep::build_event::Payload::Action(action)) => {
                 self.actions_executed += 1;
-                if let Some(start) = action.start_time.as_ref() {
-                    let ms = start.seconds * 1000 + i64::from(start.nanos / 1_000_000);
+                let start_us = action
+                    .start_time
+                    .as_ref()
+                    .map(|t| t.seconds * 1_000_000 + i64::from(t.nanos / 1_000));
+                let end_us = action
+                    .end_time
+                    .as_ref()
+                    .map(|t| t.seconds * 1_000_000 + i64::from(t.nanos / 1_000));
+                if let Some(start) = start_us {
+                    let ms = start / 1_000;
                     if self.first_action_started_ms == 0 || ms < self.first_action_started_ms {
                         self.first_action_started_ms = ms;
                     }
                 }
-                if let Some(end) = action.end_time.as_ref() {
-                    let ms = end.seconds * 1000 + i64::from(end.nanos / 1_000_000);
+                if let Some(end) = end_us {
+                    let ms = end / 1_000;
                     if ms > self.last_action_ended_ms {
                         self.last_action_ended_ms = ms;
                     }
+                }
+                if let (Some(start), Some(end)) = (start_us, end_us) {
+                    let dur = (end - start).max(0);
+                    let label = action.label.clone();
+                    let mnemonic = if action.r#type.is_empty() {
+                        "Action".to_owned()
+                    } else {
+                        action.r#type.clone()
+                    };
+                    let name = if label.is_empty() {
+                        mnemonic.clone()
+                    } else {
+                        format!("{} {}", mnemonic, label)
+                    };
+                    self.action_traces.push(TraceEvent {
+                        name,
+                        category: mnemonic,
+                        ts_us: start,
+                        dur_us: dur,
+                    });
                 }
             }
             Some(bep::build_event::Payload::Configured(_)) => {
@@ -469,6 +515,72 @@ impl BepStreamState {
             }
             _ => {}
         }
+    }
+
+    /// Synthesize the `BuildToolLogs` event Bazel emits between
+    /// `BuildFinished` and the closing `BuildMetrics`. The single
+    /// `command.profile.gz` log file we emit is a chrome-trace JSON
+    /// (gzipped) built from the per-action timestamps `observe`
+    /// recorded — BuildBuddy's Timing tab reads this file and renders
+    /// the action timeline / critical path. Without this event the
+    /// tab renders blank even when `BuildMetrics.action_data` carries
+    /// the same numbers (BB's frontend hardcodes the trace JSON path).
+    pub fn build_tool_logs_event(&self) -> Option<bep::BuildEvent> {
+        use bep::build_event_id as beid;
+
+        if self.action_traces.is_empty() {
+            return None;
+        }
+
+        // Chrome-trace `traceEvents` array. Each completed action is one
+        // duration event (ph=X). We pin everything to a single
+        // (pid=1, tid=1) lane; BuildBuddy's renderer flows them onto
+        // multiple lanes by overlap regardless.
+        let mut events = String::from("[");
+        for (i, e) in self.action_traces.iter().enumerate() {
+            if i > 0 {
+                events.push(',');
+            }
+            events.push_str(&format!(
+                "{{\"ph\":\"X\",\"name\":{name},\"cat\":{cat},\"ts\":{ts},\"dur\":{dur},\"pid\":1,\"tid\":1}}",
+                name = json_string(&e.name),
+                cat = json_string(&e.category),
+                ts = e.ts_us,
+                dur = e.dur_us,
+            ));
+        }
+        events.push(']');
+
+        // Gzip the JSON. `command.profile.gz` is the Bazel filename BB
+        // recognizes; payload must be gzip-compressed.
+        let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        use std::io::Write;
+        if gz.write_all(events.as_bytes()).is_err() {
+            return None;
+        }
+        let contents = match gz.finish() {
+            Ok(buf) => buf,
+            Err(_) => return None,
+        };
+
+        Some(bep::BuildEvent {
+            id: Some(bep::BuildEventId {
+                id: Some(beid::Id::BuildToolLogs(beid::BuildToolLogsId {})),
+            }),
+            children: Vec::new(),
+            last_message: false,
+            payload: Some(bep::build_event::Payload::BuildToolLogs(
+                bep::BuildToolLogs {
+                    log: vec![bep::File {
+                        path_prefix: Vec::new(),
+                        name: "command.profile.gz".to_owned(),
+                        digest: String::new(),
+                        length: -1,
+                        file: Some(bep::file::File::Contents(contents)),
+                    }],
+                },
+            )),
+        })
     }
 
     /// Synthesize the closing `BuildMetrics` event Bazel emits last in its
@@ -528,6 +640,29 @@ impl BepStreamState {
             })),
         }
     }
+}
+
+/// Minimal JSON-string escaper for the chrome-trace name/cat fields.
+/// We don't pull `serde_json` in just for this — the inputs come from
+/// `data::ActionExecutionEnd.label` / `.type`, which can contain
+/// quotes, backslashes, and (rarely) control characters in label
+/// strings. Output is wrapped in double quotes.
+fn json_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
 }
 
 /// Pull out tokens from a sanitized argv that look like Bazel target

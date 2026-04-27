@@ -234,10 +234,15 @@ impl EventSubscriber for BesSubscriber {
             let _ = sink.enqueue(aborted).await;
         }
 
-        // Emit synthetic `BuildMetrics` last (Bazel does the same). BB
-        // reads `actions_executed` to populate its action chip + critical
-        // path graph, and `targets_configured` for the targets header.
+        // Bazel order: `BuildFinished` → `BuildToolLogs` → `BuildMetrics
+        // last=true`. The Timing tab in BuildBuddy reads
+        // `command.profile.gz` from BuildToolLogs; without it the tab
+        // renders blank even though `BuildMetrics.action_data` carries
+        // the same per-mnemonic numbers.
         if let State::Connected(sink) = &self.state {
+            if let Some(tool_logs) = self.stream_state.build_tool_logs_event() {
+                let _ = sink.enqueue(tool_logs).await;
+            }
             let metrics = self.stream_state.build_metrics_event();
             let _ = sink.enqueue(metrics).await;
         }
