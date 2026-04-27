@@ -75,14 +75,31 @@ impl ArtifactFs {
         source_artifact_path: SourcePathRef,
     ) -> kuro_error::Result<ProjectRelativePathBuf> {
         let cell_resolver = self.cell_resolver();
-        if let Some(origin) = cell_resolver
-            .get(source_artifact_path.package().cell_name())?
-            .external()
-        {
-            Ok(self.buck_out_path_resolver.resolve_external_cell_source(
-                source_artifact_path.to_cell_path().path(),
-                origin.dupe(),
-            ))
+        let cell_name = source_artifact_path.package().cell_name();
+        if cell_resolver.get(cell_name)?.external().is_some() {
+            // Bazel convention: source files in non-root cells live at
+            // `external/<cell>/<rel>` in the action sandbox. rules_cc's
+            // `init_cc_compilation_context` emits `-Iexternal/<cell>/include`
+            // for cc_libraries in external repos, so the action's input
+            // tree must place the headers at that path or the compiler
+            // can't resolve them. Local execution works through a
+            // pre-existing `external/<cell> -> bazel-external/<cell>`
+            // symlink at the project root; remote execution sees only
+            // what we explicitly upload, so the project-relative path we
+            // hand the input-tree builder must match the `-I` flag.
+            //
+            // Previously `resolve_source` returned the buck-out
+            // materialization path (`buck-out/v2/external_cells/<origin>/<cell>/<rel>`)
+            // — which works locally because all three of `external/<cell>`,
+            // `buck-out/v2/external_cells/.../<cell>`, and `bazel-external/<cell>`
+            // resolve to the same files via symlinks, but fails on RE
+            // because the worker only has whatever path we uploaded.
+            // Switch to the `external/<cell>/<rel>` form everywhere
+            // (matching `ArtifactPath::with_path`).
+            let cell_path = source_artifact_path.to_cell_path();
+            let rel = cell_path.path().as_str();
+            let combined = format!("external/{}/{}", cell_name.as_str(), rel);
+            Ok(ProjectRelativePathBuf::unchecked_new(combined))
         } else {
             Ok(cell_resolver
                 .resolve_path(source_artifact_path.package().as_cell_path())?

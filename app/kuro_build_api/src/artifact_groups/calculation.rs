@@ -418,10 +418,89 @@ async fn path_artifact_value(
         RawPathMetadata::Symlink {
             at: _,
             to: RawSymlink::External(external_symlink),
-        } => Ok(ArtifactValue::new(
-            ActionDirectoryEntry::Leaf(ActionDirectoryMember::ExternalSymlink(external_symlink)),
-            None,
-        )),
+        } => {
+            // Bazel's repository_ctx.symlink() with an absolute target
+            // (rules_cc, llvm_configure's _overlay_directories, etc.) puts
+            // a symlink whose target leaves the project tree (e.g.
+            // `bazel-external/llvm-project/llvm/include/llvm/Config/llvm-config.h
+            // -> /abs/path/to/llvm-raw/.../llvm-config.h`). Returning an
+            // `ExternalSymlink` entry here uploads the symlink target
+            // verbatim into the RE input tree as a `SymlinkNode` with
+            // an absolute target — RE workers cannot resolve absolute
+            // symlinks outside the action's input root, so any compile
+            // including the linked file fails with "No such file or
+            // directory" on remote even though the local executor finds
+            // the file via the host filesystem.
+            //
+            // Materialize the link target as an actual `File` entry so
+            // the input tree carries the bytes RE needs. We can't use
+            // FileMetadata::from_xattr because the xattr lookup follows
+            // the link without telling us, so prefer reading the file
+            // through.
+            let abs_target = external_symlink.to_path_buf();
+            let target_path = match kuro_fs::paths::abs_path::AbsPath::new(&abs_target) {
+                Ok(p) => p.to_owned(),
+                Err(_) => {
+                    // Not a valid absolute path — fall back to the
+                    // symlink representation; not common.
+                    return Ok(ArtifactValue::new(
+                        ActionDirectoryEntry::Leaf(ActionDirectoryMember::ExternalSymlink(
+                            external_symlink,
+                        )),
+                        None,
+                    ));
+                }
+            };
+            let digest_config = ctx.global_data().get_digest_config();
+            let file_digest_config = kuro_common::file_ops::metadata::FileDigestConfig::source(
+                digest_config.cas_digest_config(),
+            );
+            match kuro_common::file_ops::metadata::FileDigest::from_file(
+                &target_path,
+                file_digest_config,
+            ) {
+                Ok(digest) => {
+                    let metadata = std::fs::metadata(&abs_target).ok();
+                    let is_executable = metadata
+                        .as_ref()
+                        .map(|m| {
+                            #[cfg(unix)]
+                            {
+                                use std::os::unix::fs::PermissionsExt;
+                                m.permissions().mode() & 0o111 != 0
+                            }
+                            #[cfg(not(unix))]
+                            {
+                                false
+                            }
+                        })
+                        .unwrap_or(false);
+                    let tracked = kuro_common::cas_digest::TrackedCasDigest::new(
+                        digest,
+                        digest_config.cas_digest_config(),
+                    );
+                    Ok(ArtifactValue::new(
+                        ActionDirectoryEntry::Leaf(ActionDirectoryMember::File(
+                            kuro_common::file_ops::metadata::FileMetadata {
+                                digest: tracked,
+                                is_executable,
+                            },
+                        )),
+                        None,
+                    ))
+                }
+                Err(_) => {
+                    // Target unreadable — preserve the symlink entry so
+                    // downstream errors point at the right thing.
+                    Ok(ArtifactValue::new(
+                        ActionDirectoryEntry::Leaf(ActionDirectoryMember::ExternalSymlink(
+                            external_symlink,
+                        )),
+                        None,
+                    ))
+                }
+            }
+        }
         RawPathMetadata::File(metadata) => Ok(ArtifactValue::new(
             ActionDirectoryEntry::Leaf(ActionDirectoryMember::File(metadata)),
             None,

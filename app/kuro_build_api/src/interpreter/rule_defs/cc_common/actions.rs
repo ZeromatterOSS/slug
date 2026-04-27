@@ -3795,14 +3795,92 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(kwargs)] kwargs: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
+        // Merge `dependent_cc_compilation_contexts` (passed via kwargs) into
+        // the new context — Bazel's API guarantees that the resulting
+        // `headers` / `includes` / etc. include both the values explicitly
+        // passed AND every dependent context's. rules_cc's
+        // `cc_compilation_helper.init_cc_compilation_context` relies on
+        // this: it builds the new context with `headers = depset(declared_include_srcs)`
+        // (only THIS rule's hdrs) and passes `dependent_cc_compilation_contexts = deps`
+        // expecting Bazel to merge transitive headers in. Without the
+        // merge, a cc_library compile only sees its own hdrs and the
+        // first failing transitive include (e.g. `:config` exposing
+        // `llvm-config.h` to a Demangle compile via DemangleConfig.h)
+        // can't be resolved on RE.
+        let dep_contexts = kwargs
+            .get_attr("dependent_cc_compilation_contexts", heap)
+            .ok()
+            .flatten()
+            .unwrap_or(Value::new_none());
+        let exported_dep_contexts = kwargs
+            .get_attr("exported_dependent_cc_compilation_contexts", heap)
+            .ok()
+            .flatten()
+            .unwrap_or(Value::new_none());
+
+        let mut all_dep_contexts: Vec<Value<'v>> = Vec::new();
+        for ctxs_val in &[dep_contexts, exported_dep_contexts] {
+            if !ctxs_val.is_none() {
+                if let Ok(iter) = ctxs_val.iterate(heap) {
+                    for c in iter {
+                        if !c.is_none() {
+                            all_dep_contexts.push(c);
+                        }
+                    }
+                }
+            }
+        }
+
+        let merge_field = |direct_val: Value<'v>, attr: &str| -> Value<'v> {
+            let mut transitive_depsets: Vec<Value<'v>> = Vec::new();
+            for c in &all_dep_contexts {
+                if let Ok(Some(v)) = c.get_attr(attr, heap) {
+                    if !v.is_none() {
+                        transitive_depsets.push(v);
+                    }
+                }
+            }
+            // Build a depset whose direct elements are the explicit value
+            // (collected here) and whose transitive children are the dep
+            // contexts' depsets. If only transitives, return a depset
+            // wrapping just those; if neither, return None.
+            let mut direct_elems: Vec<Value<'v>> = Vec::new();
+            if !direct_val.is_none() {
+                let mut elems = Vec::new();
+                crate::interpreter::rule_defs::depset::collect_depset_elements(
+                    direct_val, &mut elems, heap,
+                );
+                if elems.is_empty() {
+                    if let Ok(it) = direct_val.iterate(heap) {
+                        for e in it {
+                            direct_elems.push(e);
+                        }
+                    }
+                } else {
+                    direct_elems = elems;
+                }
+            }
+
+            if direct_elems.is_empty() && transitive_depsets.is_empty() {
+                return Value::new_none();
+            }
+            crate::interpreter::rule_defs::depset::make_depset_from_lists(
+                heap,
+                direct_elems,
+                transitive_depsets,
+                "default",
+            )
+            .unwrap_or(Value::new_none())
+        };
+
         Ok(heap.alloc(CcCompilationContextGen {
-            headers,
-            includes,
-            quote_includes,
-            system_includes,
-            external_includes,
-            framework_includes,
-            defines,
+            headers: merge_field(headers, "headers"),
+            includes: merge_field(includes, "includes"),
+            quote_includes: merge_field(quote_includes, "quote_includes"),
+            system_includes: merge_field(system_includes, "system_includes"),
+            external_includes: merge_field(external_includes, "external_includes"),
+            framework_includes: merge_field(framework_includes, "framework_includes"),
+            defines: merge_field(defines, "defines"),
             local_defines,
         }))
     }
