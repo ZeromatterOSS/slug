@@ -78,6 +78,14 @@ pub struct CcCompilationContextGen<V: ValueLifetimeless> {
     pub(crate) quote_includes: V,
     /// System include directories (-isystem)
     pub(crate) system_includes: V,
+    /// External include directories. rules_cc's
+    /// `init_cc_compilation_context` writes the `-I` paths for
+    /// external-repo cc_libraries here (instead of `includes`) when the
+    /// label's repo is non-empty. Stored separately because the
+    /// downstream compile-action wiring iterates this field with `-I`
+    /// just like `includes` — collapsing it onto `system_includes`
+    /// loses the path entirely whenever both are non-empty.
+    pub(crate) external_includes: V,
     /// Framework include directories (-F)
     pub(crate) framework_includes: V,
     /// Defines
@@ -147,11 +155,18 @@ where
                     Some(self.quote_includes.to_value())
                 }
             }
-            "system_includes" | "external_includes" => {
+            "system_includes" => {
                 if self.system_includes.to_value().is_none() {
                     Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
                 } else {
                     Some(self.system_includes.to_value())
+                }
+            }
+            "external_includes" => {
+                if self.external_includes.to_value().is_none() {
+                    Some(heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty()))
+                } else {
+                    Some(self.external_includes.to_value())
                 }
             }
             "framework_includes" => {

@@ -253,39 +253,155 @@ exists for `Executor::RemoteEnabled`; reusing it is mostly wiring.
 **Goal.** With 25.1 + 25.2 in place, verify a real C++ compile actually
 runs on BuildBuddy and lands its outputs in CAS.
 
-**Bug found while smoke-testing — fixed.** The first remote dispatch
-of `@llvm-project//llvm:Demangle --config=remote` failed every action
-with `fatal error: llvm/Demangle/<X>.h: No such file or directory`.
-Root cause:
-
-- `cc_helper._get_public_hdrs(ctx)` (rules_cc) returns
-  `[(artifact, label), ...]` tuples — see `_map_to_list` in
-  rules_cc/cc/common/cc_helper.bzl.
-- `cc_common.compile()` in
-  `app/kuro_build_api/src/interpreter/rule_defs/cc_common/actions.rs`
-  pushed those tuples into `compile_inputs` verbatim.
-- `actions.run(inputs=...)` in
-  `app/kuro_action_impl/src/context/run.rs:793-804` only downcasts
-  list elements to `StarlarkArtifact` /
-  `StarlarkDeclaredArtifact`; tuple entries silently fall out, so
-  the action's declared input set was empty for those headers.
-- Local execution (non-sandboxed) found the headers via the project
-  filesystem regardless. RE strictly enforces declared inputs and
-  the workers compiled in a sandbox without the headers, so every
-  `#include "llvm/Demangle/X.h"` failed.
-
-Fix: unwrap the `(artifact, label)` tuple at compile-input collection
-time so the artifact lands in `compile_inputs`. The unwrap is a no-op
-for plain artifacts coming from upstream `CcCompilationContext.headers`
-depsets. After the fix, 4 of 4 LLVM Demangle compiles get past the
-header-resolution stage; remaining failures are unrelated cell-extraction
-and action-key/auth issues to chase separately.
-
 **Status.** RE upload + dispatch + CAS round-trip are real (action
-digests appear, BuildBuddy invocation pages populate). The cc-rule
-input-tree gap is closed for the `public_hdrs` / `private_hdrs` /
-`textual_hdrs` paths. Remaining smoke-test acceptance items (cached
-re-run, full build success) blocked on the workspace's
+digests appear, BuildBuddy invocation pages populate). Most LLVM
+Demangle compiles upload and dispatch correctly. One blocking issue
+(documented in 25.3.A below) prevents full green: kuro's command-line
+path resolution for source/header artifacts in external repos
+diverges from rules_cc's `-I` flag convention, so RE workers can't
+resolve `#include` lookups even though the headers are in the input
+tree.
+
+**Pre-blocker fixes shipped this session:**
+
+#### 25.3.B Workspace re-materialization for extension repos (DONE)
+
+`@llvm-raw//utils/bazel:configure.bzl%llvm_configure` was failing to
+re-materialize after `kuro clean`. The repo's
+`_overlay_directories(repository_ctx)` calls
+`repository_ctx.path(Label("@llvm-raw//:WORKSPACE")).dirname` to find
+its sibling repo's source tree. Kuro's `resolve_label_to_path` in
+`app/kuro_interpreter_for_build/src/repository_ctx.rs` could not find
+the canonical name `_main+llvm_repos_extension+llvm-raw` when the
+caller asked for `llvm-raw`:
+
+- `bazel-external/llvm-raw/` does not exist (canonical name has the
+  three-segment `<owner>+<ext>+<repo>` shape).
+- The directory scan only matched names matching the *first* segment
+  (`<repo>+<version>`), then explicitly rejected names with more than
+  two segments to avoid grabbing extension-generated spoke repos for
+  bzlmod-module lookups.
+
+Result: `Label("@llvm-raw//:WORKSPACE")` resolved to the unresolved
+fallback string `llvm-raw/WORKSPACE`, which then got joined with the
+working dir to give `bazel-external/llvm-project/llvm-raw/WORKSPACE`
+— a path inside the repo being constructed, not the sibling. The
+rule's `_extract_cmake_settings` then read from a non-existent file
+and the rule failed; kuro stubbed `bazel-external/llvm-project/` as
+a placeholder, which caused all subsequent loads of
+`@llvm-project//llvm:...` to error with `dir does not exist`.
+
+Fix: extend the scan to also match directory names whose **last**
+`+`-segment equals the requested repo (e.g. `_main+ext+llvm-raw`
+matches a request for `llvm-raw`). Matching the last segment is
+unambiguous — for extension-generated spoke repos the apparent name
+(what the user types) IS the last segment by canonical-name
+construction. The first-segment match preserves the previous behavior
+for bzlmod-module deps.
+
+After the fix, deleting `bazel-external/llvm-project/` and rerunning
+`kuro build` rematerializes it correctly via `llvm_configure`, and
+local builds succeed (`Commands: 8 local, BUILD SUCCEEDED`).
+
+#### 25.3.C `external_includes` / `system_includes` field collision (DONE)
+
+`CcCompilationContext.external_includes` and `.system_includes` were
+sharing a single backing field in `CcCompilationContextGen`
+(`providers.rs`) — `get_attr("external_includes")` returned the
+system_includes value. `create_compilation_context` accepted only
+`system_includes` as a Rust parameter and silently dropped any
+`external_includes` kwarg into `**kwargs`. Both bugs are independent
+of the cc_library path that hit 25.3.A but would have produced wrong
+behavior the first time a rule called `cc_common.create_compilation_context(external_includes=...)`.
+
+Fix: split the two fields, accept `external_includes` as a named
+parameter, and merge it correctly through
+`merge_cc_compilation_contexts`. Also extended `create_cc_compile_action`'s
+include-flag emission loop to iterate `external_includes` alongside
+the existing three include kinds, so when a rules_cc upgrade *does*
+populate that field, the `-I` flags emit correctly.
+
+#### 25.3.D cc_common.compile() unwrap for tuple inputs (DONE)
+
+The Rust `CcCommonModule::compile()` method's compile-inputs
+collection only handled depsets, not `(artifact, label)` tuple
+lists, and only handled depset element types, not bare list elements.
+Updated to:
+1. Unwrap `(artifact, label)` tuples to their first element when
+   pushing into `compile_inputs` (so `cc_helper._get_public_hdrs`
+   results aren't silently dropped by the actions.run input
+   downcaster).
+2. Iterate plain lists/tuples directly when the value isn't a depset.
+3. Propagate `compilation_contexts.includes` /
+   `system_includes` / `quote_includes` into `extra_flags` (was
+   previously only registered globally, never emitted on the compile
+   command line).
+
+This path is currently dormant — rules_cc's cc_library compiles flow
+through `_cc_internal.create_cc_compile_action` (a different Rust
+entrypoint) — but other Bazel callers and future rules_cc versions
+may invoke `cc_common.compile()` directly, so the fix prevents a
+latent recurrence of the same bug.
+
+#### 25.3.A Path-scheme mismatch between artifact uploads and `-I` flags (OPEN — BLOCKING)
+
+After 25.3.B the workspace re-materializes, after 25.3.C/D the
+non-rules_cc paths are sound, and after 25.1+25.2 actions actually
+dispatch to BuildBuddy. The remaining failure on
+`@llvm-project//llvm:Demangle --config=remote` is:
+
+```
+buck-out/v2/external_cells/extension_repo/llvm-project/llvm/lib/Demangle/Demangle.cpp:13:36:
+  fatal error: llvm/Demangle/Demangle.h: No such file or directory
+```
+
+The header IS in the action's input tree. The bug is two divergent
+path schemes for source artifacts in external cells:
+
+1. `ArtifactPath::with_path` (the Starlark `artifact.path` attribute,
+   used for `progress_message` and the rules_cc analytical paths)
+   emits `external/<cell>/<rel>` — the Bazel-execution-time
+   convention.
+2. Command-line argument resolution
+   (`ArtifactFs::resolve_source` →
+   `BuckOutPathResolver::resolve_external_cell_source`) emits
+   `buck-out/v2/external_cells/<origin>/<cell>/<rel>` — kuro's
+   on-disk layout.
+
+Locally these resolve to the same file because kuro creates a
+`external/<cell> -> bazel-external/<cell>` symlink at the project
+root and `bazel-external/<cell>` symlinks (or is) the buck-out
+extracted location. Remotely there is no such symlink in the action
+sandbox, so:
+
+- The action's `-c <source>` argument uses path (2): GCC opens the
+  source from `buck-out/v2/external_cells/.../Demangle.cpp` —
+  works, the file is in the input tree at that path.
+- The action's `-I` flags are emitted by rules_cc's
+  `init_cc_compilation_context` using `repository_exec_path()`,
+  which produces path (1): `external/llvm-project/llvm/include`.
+  GCC's `#include "llvm/Demangle/Demangle.h"` lookup hits this -I
+  but the file isn't at `external/llvm-project/...` in the input
+  tree (it's at `buck-out/.../include/llvm/Demangle/Demangle.h`).
+
+Two ways to fix:
+
+- **A.** Change kuro's command-line resolution for source artifacts
+  in external cells to emit `external/<cell>/<rel>` instead of
+  `buck-out/v2/external_cells/<origin>/<cell>/<rel>`. The action's
+  input tree builder would need to follow suit so the source is
+  uploaded under the same prefix. Matches Bazel exactly.
+- **B.** Add SymlinkNodes to the action's RE input tree mapping
+  `external/<cell>` → `buck-out/v2/external_cells/<origin>/<cell>`.
+  Lower blast radius but touches the RE input-root construction
+  path, which is non-trivial.
+
+Option A is the right long-term fix. It would also let kuro drop the
+local `external/<cell> -> bazel-external/<cell>` symlink dance in
+favor of the same path layout everywhere.
+
+**Older notes (kept for context):**
+
 `bazel-external/llvm-project` cell repeatedly stubbing out under
 `kuro clean` (see "Known issues" below).
 

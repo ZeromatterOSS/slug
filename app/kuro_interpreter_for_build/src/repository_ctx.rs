@@ -751,6 +751,37 @@ pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> S
                     }
                 }
             }
+            // Scan for extension-generated repos whose canonical name is
+            // `<owning_module>+<extension_name>+<repo>` (three `+`-segments,
+            // with the requested apparent name as the final segment). The
+            // above filter intentionally rejects these when the apparent
+            // name matches the FIRST segment (to avoid a rules_cc miss
+            // grabbing an extension's compatibility_proxy spoke). Here we
+            // match on the LAST segment, which is unambiguous: for
+            // `_main+llvm_repos_extension+llvm-raw`, the final segment
+            // is exactly the repo the user typed (`llvm-raw`).
+            if let Ok(entries) = std::fs::read_dir(scan_dir) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name();
+                    let name_str = name.to_string_lossy();
+                    if name_str.matches('+').count() < 2 {
+                        continue;
+                    }
+                    if !entry.path().is_dir() {
+                        continue;
+                    }
+                    let last_segment = name_str.rsplit('+').next().unwrap_or("");
+                    if last_segment != repo {
+                        continue;
+                    }
+                    let path = if pkg.is_empty() {
+                        entry.path().join(target)
+                    } else {
+                        entry.path().join(pkg).join(target)
+                    };
+                    return path.to_string_lossy().to_string();
+                }
+            }
         }
 
         // 3. Fallback: return unresolved path

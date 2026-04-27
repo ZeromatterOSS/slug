@@ -376,9 +376,26 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             seen_include_dirs.insert(".".to_string());
         }
 
-        // Add include directories from compilation context (deduplicated)
+        // Add include directories from compilation context (deduplicated).
+        //
+        // `external_includes` is the field rules_cc's
+        // `init_cc_compilation_context` populates when the target lives
+        // in an external repo (cc_helper.bzl: `external_include_dirs.append(...)`
+        // when `repo_name != ""`). The `-I` paths a target's hdrs glob
+        // expects (e.g. `-Iexternal/llvm-project/llvm/include` for
+        // `@llvm-project//llvm:config`) land there, not in `includes`.
+        // Without iterating it, every external-repo cc_library compile
+        // gets the headers in its input tree but never the `-I` flag
+        // that maps the include name to the file, and the compile fails
+        // with `fatal error: <hdr>: No such file or directory` even
+        // though the file is on disk in the sandbox.
         if !cc_compilation_context.is_none() {
-            for attr_name in &["includes", "system_includes", "quote_includes"] {
+            for attr_name in &[
+                "includes",
+                "system_includes",
+                "quote_includes",
+                "external_includes",
+            ] {
                 if let Ok(Some(includes_val)) = cc_compilation_context.get_attr(attr_name, heap) {
                     if !includes_val.is_none() {
                         let mut elements = Vec::new();
@@ -1985,12 +2002,32 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         let declare_file_method = actions.get_attr("declare_file", heap).ok().flatten();
         let run_method = actions.get_attr("run", heap).ok().flatten();
 
-        // Register include directories from compilation_contexts (deps' contexts)
+        // Propagate include directories from `compilation_contexts` (the
+        // CcCompilationContext from each dep's CcInfo). The cc_library
+        // pattern is to set `includes = ["include"]` on a hub target
+        // (e.g. `:config` in @llvm-project//llvm:Demangle's transitive
+        // closure) and have dependents pick up the resulting `-I` via
+        // CcCompilationContext propagation. Without adding these to the
+        // compile command line, the action's source `#include
+        // "llvm/Demangle/Demangle.h"` resolves to nothing on RE workers
+        // even when the header is in the action's input tree, because
+        // the `-I` path that maps the include name to the file is
+        // missing.
+        //
+        // The `register_external_include_dir` calls retain the previous
+        // behavior — that registry is read by the older compile path at
+        // the top of this file (Buck-style cxx_library wiring). The new
+        // bit is appending `-I` / `-iquote` / `-isystem` flags to
+        // `extra_flags` so this `cc_common.compile` path actually emits
+        // them on the final compile command.
         if !compilation_contexts.is_none() {
             if let Ok(iter) = compilation_contexts.iterate(heap) {
                 for ctx in iter {
-                    // Extract includes from each dep compilation context
-                    for attr_name in &["includes", "system_includes", "quote_includes"] {
+                    for (attr_name, flag) in &[
+                        ("includes", "-I"),
+                        ("system_includes", "-isystem"),
+                        ("quote_includes", "-iquote"),
+                    ] {
                         if let Ok(Some(includes_val)) = ctx.get_attr(attr_name, heap) {
                             if !includes_val.is_none() {
                                 let mut elements = Vec::new();
@@ -2003,6 +2040,8 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                     let dir = elem.to_str();
                                     if !dir.is_empty() {
                                         register_external_include_dir(&dir);
+                                        extra_flags.push(flag.to_string());
+                                        extra_flags.push(dir.to_string());
                                     }
                                 }
                             }
@@ -2112,43 +2151,50 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // execution still found the headers via the project filesystem,
         // but RE strictly enforces declared inputs and the compile
         // failed with `fatal error: <hdr>: No such file or directory`.
-        // Unwrap tuples to the first element here so the artifact lands
-        // in `compile_inputs` (Plan 25.3).
+        //
+        // Two shapes need handling:
+        //   1. plain `list` of `(artifact, label)` tuples — what
+        //      `_get_public_hdrs` returns. `collect_depset_elements`
+        //      no-ops on lists, so we must iterate them directly.
+        //   2. `depset` of bare artifacts — what
+        //      `CcCompilationContext.headers` is built from. Use the
+        //      depset traversal helper as before.
+        //
+        // After collecting, unwrap any tuple to its first element so the
+        // artifact lands in `compile_inputs` (no-op for bare artifacts).
         let unwrap_artifact_tuple =
             |v: Value<'v>| -> Value<'v> { v.at(heap.alloc(0i32).to_value(), heap).unwrap_or(v) };
-        let mut compile_inputs: Vec<Value<'v>> = Vec::new();
-        for hdr_val in &[public_hdrs, private_hdrs, textual_hdrs] {
-            if !hdr_val.is_none() {
-                let mut elements = Vec::new();
-                crate::interpreter::rule_defs::depset::collect_depset_elements(
-                    *hdr_val,
-                    &mut elements,
-                    heap,
-                );
-                for h in elements {
-                    compile_inputs.push(unwrap_artifact_tuple(h));
+        let collect_hdr_value = |hdr_val: Value<'v>, out: &mut Vec<Value<'v>>| {
+            if hdr_val.is_none() {
+                return;
+            }
+            // Try depset path first.
+            let mut tmp: Vec<Value<'v>> = Vec::new();
+            crate::interpreter::rule_defs::depset::collect_depset_elements(hdr_val, &mut tmp, heap);
+            if !tmp.is_empty() {
+                for h in tmp {
+                    out.push(unwrap_artifact_tuple(h));
+                }
+                return;
+            }
+            // Fall back to plain iteration (lists, tuples, sets).
+            // `collect_depset_elements` returns silently for non-depsets,
+            // so an empty `tmp` here just means the value isn't a depset.
+            if let Ok(iter) = hdr_val.iterate(heap) {
+                for h in iter {
+                    out.push(unwrap_artifact_tuple(h));
                 }
             }
+        };
+        let mut compile_inputs: Vec<Value<'v>> = Vec::new();
+        for hdr_val in &[public_hdrs, private_hdrs, textual_hdrs] {
+            collect_hdr_value(*hdr_val, &mut compile_inputs);
         }
         if !compilation_contexts.is_none() {
             if let Ok(iter) = compilation_contexts.iterate(heap) {
                 for ctx in iter {
                     if let Ok(Some(headers)) = ctx.get_attr("headers", heap) {
-                        if !headers.is_none() {
-                            let mut elements = Vec::new();
-                            crate::interpreter::rule_defs::depset::collect_depset_elements(
-                                headers,
-                                &mut elements,
-                                heap,
-                            );
-                            for h in elements {
-                                // Some upstream contexts store headers as
-                                // bare artifacts; others as the same
-                                // (artifact, label) tuples. The unwrap
-                                // is a no-op for plain artifacts.
-                                compile_inputs.push(unwrap_artifact_tuple(h));
-                            }
-                        }
+                        collect_hdr_value(headers, &mut compile_inputs);
                     }
                 }
             }
@@ -2442,6 +2488,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             includes,
             quote_includes,
             system_includes,
+            external_includes: Value::new_none(),
             framework_includes,
             defines,
             local_defines,
@@ -3736,6 +3783,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] includes: Value<'v>,
         #[starlark(require = named, default = NoneType)] quote_includes: Value<'v>,
         #[starlark(require = named, default = NoneType)] system_includes: Value<'v>,
+        #[starlark(require = named, default = NoneType)] external_includes: Value<'v>,
         #[starlark(require = named, default = NoneType)] framework_includes: Value<'v>,
         #[starlark(require = named, default = NoneType)] defines: Value<'v>,
         #[starlark(require = named, default = NoneType)] local_defines: Value<'v>,
@@ -3752,6 +3800,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             includes,
             quote_includes,
             system_includes,
+            external_includes,
             framework_includes,
             defines,
             local_defines,
@@ -4240,6 +4289,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         let mut framework_includes_depsets: Vec<Value<'v>> = Vec::new();
         let mut defines_depsets: Vec<Value<'v>> = Vec::new();
         let mut local_defines_depsets: Vec<Value<'v>> = Vec::new();
+        let mut external_includes_depsets: Vec<Value<'v>> = Vec::new();
 
         // Helper closure to extract contexts from a CcInfo
         let mut process_info = |info: Value<'v>| {
@@ -4264,6 +4314,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     if let Ok(Some(si)) = comp_ctx.get_attr("system_includes", heap) {
                         if !si.is_none() {
                             system_includes_depsets.push(si);
+                        }
+                    }
+                    if let Ok(Some(ei)) = comp_ctx.get_attr("external_includes", heap) {
+                        if !ei.is_none() {
+                            external_includes_depsets.push(ei);
                         }
                     }
                     if let Ok(Some(fi)) = comp_ctx.get_attr("framework_includes", heap) {
@@ -4313,6 +4368,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             || !includes_depsets.is_empty()
             || !quote_includes_depsets.is_empty()
             || !system_includes_depsets.is_empty()
+            || !external_includes_depsets.is_empty()
             || !framework_includes_depsets.is_empty()
             || !defines_depsets.is_empty()
             || !local_defines_depsets.is_empty();
@@ -4337,6 +4393,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 includes: merge_field(includes_depsets)?,
                 quote_includes: merge_field(quote_includes_depsets)?,
                 system_includes: merge_field(system_includes_depsets)?,
+                external_includes: merge_field(external_includes_depsets)?,
                 framework_includes: merge_field(framework_includes_depsets)?,
                 defines: merge_field(defines_depsets)?,
                 local_defines: merge_field(local_defines_depsets)?,
@@ -4388,6 +4445,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         let mut includes_depsets: Vec<Value<'v>> = Vec::new();
         let mut quote_includes_depsets: Vec<Value<'v>> = Vec::new();
         let mut system_includes_depsets: Vec<Value<'v>> = Vec::new();
+        let mut external_includes_depsets: Vec<Value<'v>> = Vec::new();
         let mut framework_includes_depsets: Vec<Value<'v>> = Vec::new();
         let mut defines_depsets: Vec<Value<'v>> = Vec::new();
         let mut local_defines_depsets: Vec<Value<'v>> = Vec::new();
@@ -4413,6 +4471,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     if let Ok(Some(si)) = ctx_val.get_attr("system_includes", heap) {
                         if !si.is_none() {
                             system_includes_depsets.push(si);
+                        }
+                    }
+                    if let Ok(Some(ei)) = ctx_val.get_attr("external_includes", heap) {
+                        if !ei.is_none() {
+                            external_includes_depsets.push(ei);
                         }
                     }
                     if let Ok(Some(fi)) = ctx_val.get_attr("framework_includes", heap) {
@@ -4452,6 +4515,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             includes: merge_field(includes_depsets)?,
             quote_includes: merge_field(quote_includes_depsets)?,
             system_includes: merge_field(system_includes_depsets)?,
+            external_includes: merge_field(external_includes_depsets)?,
             framework_includes: merge_field(framework_includes_depsets)?,
             defines: merge_field(defines_depsets)?,
             local_defines: merge_field(local_defines_depsets)?,
