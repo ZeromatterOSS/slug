@@ -541,21 +541,43 @@ impl BepStreamState {
         gz.finish().ok()
     }
 
-    /// JSON form of the same trace, used as a fallback `BuildToolLogs`
-    /// entry (some BES consumers parse the uncompressed file).
+    /// JSON form of the trace, matching Bazel's `JsonTraceFileWriter`
+    /// output shape so BuildBuddy's Timing tab parser accepts it.
+    /// Reverse-engineered from `bazel build … --profile=…` output:
+    ///
+    ///   ```text
+    ///   {"otherData":{"bazel_version":"…","build_id":"…",…},"traceEvents":[
+    ///       {"name":"thread_name","ph":"M","pid":1,"tid":0,"args":{"name":"Critical Path"}},
+    ///       {"name":"thread_sort_index","ph":"M","pid":1,"tid":0,"args":{"sort_index":0}},
+    ///       {"cat":"…","name":"…","ph":"X","ts":<us>,"dur":<us>,"pid":1,"tid":0},
+    ///       …
+    ///     ]
+    ///   }
+    ///   ```
+    ///
+    /// Notable: action `X` events do NOT include `args` when there's
+    /// nothing to put in them (kuro previously emitted `"args":{}`),
+    /// the `tid` is always set, and Bazel pretty-prints with newlines
+    /// between events. The `otherData` is a Bazel-specific manifest
+    /// — `build_tool` isn't a field name Bazel uses, so we mirror the
+    /// real names with kuro-shaped values.
     pub fn build_profile_json(&self) -> String {
-        // Match Bazel's `JsonTraceFileWriter` output shape:
-        //   {"otherData":{...},"traceEvents":[<metadata>...,<actions>...]}
-        let mut json = String::with_capacity(256 + self.action_traces.len() * 128);
-        json.push_str(r#"{"otherData":{"build_tool":"kuro"},"traceEvents":["#);
+        let mut json = String::with_capacity(256 + self.action_traces.len() * 160);
+        json.push_str(r#"{"otherData":{"#);
+        json.push_str(&format!(
+            r#""bazel_version":"kuro","build_id":{build_id},"output_base":""#,
+            build_id = json_string("kuro"),
+        ));
+        json.push_str(r#""}"#);
         json.push_str(
-            r#"{"ph":"M","pid":1,"tid":0,"name":"process_name","args":{"name":"actions"}}"#,
+            r#","traceEvents":[
+"#,
         );
         json.push_str(
-            r#",{"ph":"M","pid":1,"tid":0,"name":"thread_name","args":{"name":"Actions"}}"#,
+            r#"    {"name":"thread_name","ph":"M","pid":1,"tid":0,"args":{"name":"Critical Path"}}"#,
         );
         json.push_str(
-            r#",{"ph":"M","pid":1,"tid":0,"name":"thread_sort_index","args":{"sort_index":0}}"#,
+            ",\n    {\"name\":\"thread_sort_index\",\"ph\":\"M\",\"pid\":1,\"tid\":0,\"args\":{\"sort_index\":0}}",
         );
         let origin_us = self
             .action_traces
@@ -564,17 +586,19 @@ impl BepStreamState {
             .min()
             .unwrap_or(0);
         for e in &self.action_traces {
-            json.push(',');
+            json.push_str(",\n    ");
             let ts = e.ts_us.saturating_sub(origin_us);
+            // Field order matches Bazel's `TaskData.writeTraceData`:
+            // `cat`, `name`, `ph`, `ts`, `dur`, `pid`, `tid`.
             json.push_str(&format!(
-                "{{\"ph\":\"X\",\"cat\":{cat},\"name\":{name},\"ts\":{ts},\"dur\":{dur},\"pid\":1,\"tid\":0,\"args\":{{}}}}",
+                "{{\"cat\":{cat},\"name\":{name},\"ph\":\"X\",\"ts\":{ts},\"dur\":{dur},\"pid\":1,\"tid\":0}}",
                 name = json_string(&e.name),
                 cat = json_string(&e.category),
                 ts = ts,
                 dur = e.dur_us,
             ));
         }
-        json.push_str("]}");
+        json.push_str("\n  ]\n}");
         json
     }
 
@@ -589,18 +613,13 @@ impl BepStreamState {
         if self.action_traces.is_empty() {
             return None;
         }
-        // Bazel sets `File.length` to the *uncompressed* size for
-        // `command.profile.gz`. BuildBuddy's frontend reads `length`
-        // and stops parsing once it has consumed that many bytes — so
-        // sending the compressed size (smaller than the uncompressed
-        // payload by ~4×) leaves the parser inside the trailing
-        // traceEvents array with `JSON.parse: end of data when ',' or
-        // ']' was expected`.
-        //
-        // Compute the JSON length directly from the same source the
-        // gzip used. The bytestream resource's `<size>` (the
-        // compressed length) is unrelated.
-        let length = self.build_profile_json().len() as i64;
+        // `File.length` shape isn't actually defined by the BEP proto
+        // for the `uri` case — Bazel sets it to whatever it has handy
+        // and BuildBuddy's frontend mostly ignores it (the bytestream
+        // resource path encodes the compressed size, which is
+        // authoritative). Leaving it at `-1` prevents a stale
+        // mismatch between this field and what the URI carries.
+        let length: i64 = -1;
         Some(bep::BuildEvent {
             id: Some(bep::BuildEventId {
                 id: Some(beid::Id::BuildToolLogs(beid::BuildToolLogsId {})),
@@ -628,67 +647,12 @@ impl BepStreamState {
             return None;
         }
 
-        // Match Bazel's `JsonTraceFileWriter` output shape exactly so
-        // BuildBuddy's Timing tab parser doesn't reject it as a
-        // non-default profile:
-        //
-        //   {
-        //     "otherData": { … },
-        //     "traceEvents": [
-        //       {"ph":"M","pid":1,"tid":0,"name":"process_name","args":{"name":"action_count"}},
-        //       {"ph":"M","pid":1,"tid":0,"name":"thread_name","args":{"name":"Critical Path"}},
-        //       {"ph":"M","pid":1,"tid":0,"name":"thread_sort_index","args":{"sort_index":0}},
-        //       {"ph":"X", "cat":…, "name":…, "ts":…, "dur":…, "pid":1,"tid":0, "args":{}},
-        //       …
-        //     ]
-        //   }
-        //
-        // BB looks for the bare-array form too but rejects empty trace
-        // streams with "Could not find profile info." A wrapped object
-        // with metadata events sidesteps that path entirely.
-        let mut json = String::with_capacity(256 + self.action_traces.len() * 128);
-        json.push_str(r#"{"otherData":{"build_tool":"kuro"},"traceEvents":["#);
-        // Metadata events naming the lane.
-        json.push_str(
-            r#"{"ph":"M","pid":1,"tid":0,"name":"process_name","args":{"name":"actions"}}"#,
-        );
-        json.push_str(
-            r#",{"ph":"M","pid":1,"tid":0,"name":"thread_name","args":{"name":"Actions"}}"#,
-        );
-        json.push_str(
-            r#",{"ph":"M","pid":1,"tid":0,"name":"thread_sort_index","args":{"sort_index":0}}"#,
-        );
-        // Per-action duration events. Timestamps shift to a build-relative
-        // origin so the trace starts near zero; absolute epoch
-        // microseconds parse fine but make Bazel's timeline UI start at
-        // year-1970-relative offsets that look wrong in BB.
-        let origin_us = self
-            .action_traces
-            .iter()
-            .map(|e| e.ts_us)
-            .min()
-            .unwrap_or(0);
-        for e in &self.action_traces {
-            json.push(',');
-            let ts = e.ts_us.saturating_sub(origin_us);
-            json.push_str(&format!(
-                "{{\"ph\":\"X\",\"cat\":{cat},\"name\":{name},\"ts\":{ts},\"dur\":{dur},\"pid\":1,\"tid\":0,\"args\":{{}}}}",
-                name = json_string(&e.name),
-                cat = json_string(&e.category),
-                ts = ts,
-                dur = e.dur_us,
-            ));
-        }
-        json.push_str("]}");
-
-        // Emit BOTH an uncompressed `command.profile.json` and a
-        // gzipped `command.profile.gz`. BuildBuddy's Timing tab
-        // historically reads the gzipped file (Bazel's native output),
-        // but tests show their parser silently drops inline-bytes
-        // entries it doesn't recognize — sending the JSON form
-        // alongside makes the tab populate even for clients that only
-        // honour the uncompressed path. Both are short (≪1MB for
-        // small builds) so the dual-emission cost is negligible.
+        // Mirrors `build_profile_json()` so the inline-bytes BEP file
+        // path emitted by `bep_file_sink` carries the same Bazel-shaped
+        // JSON the bytestream upload does. BuildBuddy's Timing tab
+        // requires the URI form (separate code path); this one is
+        // mostly used for local debugging via `--build_event_binary_file`.
+        let json = self.build_profile_json();
         let json_bytes = json.into_bytes();
         let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
         use std::io::Write;
