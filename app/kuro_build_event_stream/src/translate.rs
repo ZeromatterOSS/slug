@@ -589,12 +589,18 @@ impl BepStreamState {
         if self.action_traces.is_empty() {
             return None;
         }
-        // Length is best-effort; the bytestream resource path is the
-        // authoritative size for BB.
-        let length = self
-            .build_profile_gz()
-            .map(|b| b.len() as i64)
-            .unwrap_or(-1);
+        // Bazel sets `File.length` to the *uncompressed* size for
+        // `command.profile.gz`. BuildBuddy's frontend reads `length`
+        // and stops parsing once it has consumed that many bytes — so
+        // sending the compressed size (smaller than the uncompressed
+        // payload by ~4×) leaves the parser inside the trailing
+        // traceEvents array with `JSON.parse: end of data when ',' or
+        // ']' was expected`.
+        //
+        // Compute the JSON length directly from the same source the
+        // gzip used. The bytestream resource's `<size>` (the
+        // compressed length) is unrelated.
+        let length = self.build_profile_json().len() as i64;
         Some(bep::BuildEvent {
             id: Some(bep::BuildEventId {
                 id: Some(beid::Id::BuildToolLogs(beid::BuildToolLogsId {})),
