@@ -417,6 +417,25 @@ pub struct CommonBuildConfigurationOptions {
     )]
     pub remote_retries: Option<u32>,
 
+    /// Default execution platform properties to attach to every remote
+    /// action (Bazel `--remote_default_exec_properties`).
+    ///
+    /// Format: `--remote_default_exec_properties=KEY=VALUE`. May be
+    /// repeated. Values land on the action's RE `Platform` message
+    /// alongside (or in lieu of) the kuro defaults from
+    /// `[kuro_re_client]` buckconfig. Useful for steering BuildBuddy's
+    /// worker-pool selection (e.g.
+    /// `container-image=docker://gcr.io/flame-public/rbe-ubuntu22-04:latest`)
+    /// without writing a custom Starlark `platform()` rule.
+    #[clap(
+        long = "remote-default-exec-properties",
+        alias = "remote_default_exec_properties",
+        hide = true,
+        value_name = "KEY=VALUE",
+        num_args = 1
+    )]
+    pub remote_default_exec_properties: Vec<String>,
+
     /// Spawn strategy (Bazel compatibility, accepted but ignored).
     #[clap(
         long = "spawn-strategy",
@@ -1257,7 +1276,20 @@ impl CommonBuildConfigurationOptions {
             .filter(|s| !s.is_empty())
             .map(str::to_owned);
 
-        if address.is_none() && cache_address.is_none() && header_strs.is_empty() {
+        let default_exec_properties: Vec<(String, String)> = self
+            .remote_default_exec_properties
+            .iter()
+            .filter_map(|kv| {
+                let (key, value) = kv.split_once('=')?;
+                Some((key.to_owned(), value.to_owned()))
+            })
+            .collect();
+
+        if address.is_none()
+            && cache_address.is_none()
+            && header_strs.is_empty()
+            && default_exec_properties.is_empty()
+        {
             return None;
         }
 
@@ -1271,6 +1303,7 @@ impl CommonBuildConfigurationOptions {
             // only flip it via explicit buckconfig.
             http_headers: header_strs,
             instance_name: self.bes_instance_name.clone(),
+            default_exec_properties,
         })
     }
 
@@ -1320,6 +1353,7 @@ impl CommonBuildConfigurationOptions {
             remote_executor: None,
             remote_cache: None,
             remote_retries: None,
+            remote_default_exec_properties: Vec::new(),
             spawn_strategy: None,
             dynamic_local_strategy: vec![],
             dynamic_remote_strategy: vec![],
@@ -1433,6 +1467,7 @@ impl CommonBuildConfigurationOptions {
             remote_executor: None,
             remote_cache: None,
             remote_retries: None,
+            remote_default_exec_properties: Vec::new(),
             spawn_strategy: None,
             dynamic_local_strategy: vec![],
             dynamic_remote_strategy: vec![],

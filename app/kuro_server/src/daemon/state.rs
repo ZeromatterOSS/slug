@@ -960,6 +960,9 @@ fn apply_re_config_overlay(
     if let Some(ref name) = snapshot.instance_name {
         oss.instance_name = Some(name.clone());
     }
+    if !snapshot.default_exec_properties.is_empty() {
+        oss.default_exec_properties = snapshot.default_exec_properties.clone();
+    }
 }
 
 #[cfg(fbcode_build)]

@@ -534,13 +534,13 @@ fn is_bazel_specific_flag(normalized_flag: &str) -> bool {
             | "sandbox_default_allow_network"
             | "sandbox_fake_hostname"
             | "sandbox_fake_username"
-            // Remote execution / caching flags. Note: `remote_cache` and
-            // `remote_executor` are NOT here — kuro accepts them via
-            // `CommonBuildConfigurationOptions` and routes them through the
-            // `cli_re_config_snapshot()` overlay.
+            // Remote execution / caching flags. Note: `remote_cache`,
+            // `remote_executor`, and `remote_default_exec_properties`
+            // are NOT here — kuro accepts them via
+            // `CommonBuildConfigurationOptions` and routes them through
+            // the `cli_re_config_snapshot()` overlay.
             | "remote_upload_local_results"
             | "remote_accept_cached"
-            | "remote_default_exec_properties"
             | "remote_local_fallback"
             | "remote_timeout"
             // Compilation / output flags. Note: `compilation_mode` is NOT

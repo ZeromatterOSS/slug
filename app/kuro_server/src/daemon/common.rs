@@ -511,6 +511,7 @@ impl ExecutionStrategyExt for ExecutionStrategy {
 pub fn get_default_executor_config(
     host_platform: HostPlatformOverride,
     re_configured: bool,
+    default_exec_properties: &[(String, String)],
 ) -> CommandExecutorConfig {
     let use_remote_default = !kuro_core::is_open_source() || re_configured;
     let executor = if !use_remote_default {
@@ -522,7 +523,7 @@ pub fn get_default_executor_config(
                 remote: RemoteExecutorOptions::default(),
                 level: HybridExecutionLevel::Limited,
             },
-            re_properties: get_default_re_properties(host_platform),
+            re_properties: get_default_re_properties(host_platform, default_exec_properties),
             re_use_case: RemoteExecutorUseCase::kuro_default(),
             re_action_key: None,
             cache_upload_behavior: CacheUploadBehavior::Disabled,
@@ -544,7 +545,30 @@ pub fn get_default_executor_config(
     }
 }
 
-fn get_default_re_properties(host_platform: HostPlatformOverride) -> RePlatformFields {
+fn get_default_re_properties(
+    host_platform: HostPlatformOverride,
+    extra_properties: &[(String, String)],
+) -> RePlatformFields {
+    // When the user has supplied
+    // `--remote_default_exec_properties=KEY=VALUE` (or the buckconfig
+    // equivalent), use *only* those — they're meant to fully describe
+    // the remote backend's worker selection (`OSFamily`, `Arch`,
+    // `container-image`, etc.) and the kuro-internal
+    // `linux-remote-execution` placeholder is just confusion alongside
+    // them. When nothing is set, fall back to the
+    // legacy-Meta-internal default keys so existing fbcode flows keep
+    // working.
+    if !extra_properties.is_empty() {
+        return RePlatformFields {
+            properties: Arc::new(
+                extra_properties
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect(),
+            ),
+        };
+    }
+
     let linux = &[("platform", "linux-remote-execution")];
     let macos = &[("platform", "mac"), ("subplatform", "any")];
     let windows = &[("platform", "windows")];

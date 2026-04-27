@@ -456,8 +456,16 @@ impl<'a> ServerCommandContext<'a> {
             .daemon
             .re_client_manager
             .is_re_configured();
-        let executor_config =
-            get_default_executor_config(self.host_platform_override, re_configured);
+        let default_exec_properties = self
+            .base_context
+            .daemon
+            .re_client_manager
+            .default_exec_properties();
+        let executor_config = get_default_executor_config(
+            self.host_platform_override,
+            re_configured,
+            &default_exec_properties,
+        );
         let re_connection = Arc::new(self.get_re_connection());
 
         let upload_all_actions = self

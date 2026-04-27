@@ -233,6 +233,15 @@ impl ReConnectionManager {
         self.config.static_metadata.is_re_configured()
     }
 
+    /// `(key, value)` properties to attach to every default-executor
+    /// remote action's `Platform` message. Populated from
+    /// `--remote_default_exec_properties=KEY=VALUE` (CLI) or the
+    /// equivalent `[kuro_re_client] default_exec_properties` buckconfig
+    /// list. Empty when no override has been set.
+    pub fn default_exec_properties(&self) -> Vec<(String, String)> {
+        self.config.static_metadata.default_exec_properties()
+    }
+
     fn get_client_handle(&self) -> Arc<LazyRemoteExecutionClient> {
         if let Some(conn) = self.data.read().unwrap().upgrade() {
             return conn;

@@ -29,6 +29,10 @@ pub trait RemoteExecutionStaticMetadataImpl: Sized {
     /// promote the open-source `Executor::Local` default to a hybrid
     /// local/remote executor (Plan 25.2).
     fn is_re_configured(&self) -> bool;
+    /// User-supplied default platform properties to attach to every
+    /// remote action (Bazel `--remote_default_exec_properties`).
+    /// Empty when not configured. Plan 25.3.E.
+    fn default_exec_properties(&self) -> Vec<(String, String)>;
 }
 
 #[derive(Clone, Debug, Allocative)]
@@ -391,6 +395,14 @@ mod fbcode {
         fn is_re_configured(&self) -> bool {
             self.engine_address.is_some()
         }
+
+        fn default_exec_properties(&self) -> Vec<(String, String)> {
+            // Internal RE fbcode metadata doesn't expose a
+            // user-overridable platform-properties list; default keys
+            // come from the use_case configuration. Return empty so the
+            // caller falls through to legacy defaults.
+            Vec::new()
+        }
     }
 }
 
@@ -416,6 +428,10 @@ mod not_fbcode {
 
         fn is_re_configured(&self) -> bool {
             self.0.engine_address.is_some()
+        }
+
+        fn default_exec_properties(&self) -> Vec<(String, String)> {
+            self.0.default_exec_properties.clone()
         }
     }
 }
@@ -470,6 +486,13 @@ pub struct KuroOssReConfiguration {
     pub grpc_keepalive_timeout_secs: Option<u64>,
     /// Whether to send HTTP/2 pings when connection is idle.
     pub grpc_keepalive_while_idle: Option<bool>,
+    /// Default `(key, value)` properties to attach to every remote
+    /// action's `Platform` message. Sourced from
+    /// `--remote_default_exec_properties=KEY=VALUE` (CLI) or
+    /// `[kuro_re_client] default_exec_properties = ...` (buckconfig).
+    /// Bazel uses this to steer RBE worker selection (e.g.
+    /// `container-image=...`, `OSFamily=Linux`).
+    pub default_exec_properties: Vec<(String, String)>,
 }
 
 #[derive(Clone, Debug, Default, Allocative)]
@@ -587,6 +610,18 @@ impl KuroOssReConfiguration {
                 section: BUCK2_RE_CLIENT_CFG_SECTION,
                 property: "grpc_keepalive_while_idle",
             })?,
+            default_exec_properties: legacy_config
+                .parse_list::<String>(BuckconfigKeyRef {
+                    section: BUCK2_RE_CLIENT_CFG_SECTION,
+                    property: "default_exec_properties",
+                })?
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|kv| {
+                    let (k, v) = kv.split_once('=')?;
+                    Some((k.to_owned(), v.to_owned()))
+                })
+                .collect(),
         })
     }
 }

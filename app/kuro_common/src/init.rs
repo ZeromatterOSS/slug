@@ -497,6 +497,13 @@ pub struct ReConfigSnapshot {
     pub tls: Option<bool>,
     pub http_headers: Vec<String>,
     pub instance_name: Option<String>,
+    /// Default `(key, value)` properties to attach to every remote
+    /// action's `Platform` message. Populated from
+    /// `--remote_default_exec_properties=KEY=VALUE` (Bazel
+    /// compatibility) and merged with the kuro defaults at action
+    /// upload time. Empty for daemons started without the flag.
+    #[serde(default)]
+    pub default_exec_properties: Vec<(String, String)>,
 }
 
 impl ReConfigSnapshot {
@@ -521,6 +528,20 @@ impl ReConfigSnapshot {
                 property: "http_headers",
             })?
             .unwrap_or_default();
+        // `[kuro_re_client] default_exec_properties = key=val,key=val`
+        // mirrors the CLI flag for users who prefer buckconfig.
+        let default_exec_properties: Vec<(String, String)> = config
+            .parse_list::<String>(BuckconfigKeyRef {
+                section: "kuro_re_client",
+                property: "default_exec_properties",
+            })?
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|kv| {
+                let (k, v) = kv.split_once('=')?;
+                Some((k.to_owned(), v.to_owned()))
+            })
+            .collect();
         Ok(Self {
             address: get("address"),
             cas_address: get("cas_address"),
@@ -529,6 +550,7 @@ impl ReConfigSnapshot {
             tls: parse_bool("tls")?,
             http_headers,
             instance_name: get("instance_name"),
+            default_exec_properties,
         })
     }
 }

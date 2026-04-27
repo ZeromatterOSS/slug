@@ -501,6 +501,11 @@ fn merge_re_config(base: &ReConfigSnapshot, cli: &ReConfigSnapshot) -> ReConfigS
             .instance_name
             .clone()
             .or_else(|| base.instance_name.clone()),
+        default_exec_properties: if cli.default_exec_properties.is_empty() {
+            base.default_exec_properties.clone()
+        } else {
+            cli.default_exec_properties.clone()
+        },
     }
 }
 
