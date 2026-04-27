@@ -532,30 +532,64 @@ impl BepStreamState {
             return None;
         }
 
-        // Chrome-trace `traceEvents` array. Each completed action is one
-        // duration event (ph=X). We pin everything to a single
-        // (pid=1, tid=1) lane; BuildBuddy's renderer flows them onto
-        // multiple lanes by overlap regardless.
-        let mut events = String::from("[");
-        for (i, e) in self.action_traces.iter().enumerate() {
-            if i > 0 {
-                events.push(',');
-            }
-            events.push_str(&format!(
-                "{{\"ph\":\"X\",\"name\":{name},\"cat\":{cat},\"ts\":{ts},\"dur\":{dur},\"pid\":1,\"tid\":1}}",
+        // Match Bazel's `JsonTraceFileWriter` output shape exactly so
+        // BuildBuddy's Timing tab parser doesn't reject it as a
+        // non-default profile:
+        //
+        //   {
+        //     "otherData": { … },
+        //     "traceEvents": [
+        //       {"ph":"M","pid":1,"tid":0,"name":"process_name","args":{"name":"action_count"}},
+        //       {"ph":"M","pid":1,"tid":0,"name":"thread_name","args":{"name":"Critical Path"}},
+        //       {"ph":"M","pid":1,"tid":0,"name":"thread_sort_index","args":{"sort_index":0}},
+        //       {"ph":"X", "cat":…, "name":…, "ts":…, "dur":…, "pid":1,"tid":0, "args":{}},
+        //       …
+        //     ]
+        //   }
+        //
+        // BB looks for the bare-array form too but rejects empty trace
+        // streams with "Could not find profile info." A wrapped object
+        // with metadata events sidesteps that path entirely.
+        let mut json = String::with_capacity(256 + self.action_traces.len() * 128);
+        json.push_str(r#"{"otherData":{"build_tool":"kuro"},"traceEvents":["#);
+        // Metadata events naming the lane.
+        json.push_str(
+            r#"{"ph":"M","pid":1,"tid":0,"name":"process_name","args":{"name":"actions"}}"#,
+        );
+        json.push_str(
+            r#",{"ph":"M","pid":1,"tid":0,"name":"thread_name","args":{"name":"Actions"}}"#,
+        );
+        json.push_str(
+            r#",{"ph":"M","pid":1,"tid":0,"name":"thread_sort_index","args":{"sort_index":0}}"#,
+        );
+        // Per-action duration events. Timestamps shift to a build-relative
+        // origin so the trace starts near zero; absolute epoch
+        // microseconds parse fine but make Bazel's timeline UI start at
+        // year-1970-relative offsets that look wrong in BB.
+        let origin_us = self
+            .action_traces
+            .iter()
+            .map(|e| e.ts_us)
+            .min()
+            .unwrap_or(0);
+        for e in &self.action_traces {
+            json.push(',');
+            let ts = e.ts_us.saturating_sub(origin_us);
+            json.push_str(&format!(
+                "{{\"ph\":\"X\",\"cat\":{cat},\"name\":{name},\"ts\":{ts},\"dur\":{dur},\"pid\":1,\"tid\":0,\"args\":{{}}}}",
                 name = json_string(&e.name),
                 cat = json_string(&e.category),
-                ts = e.ts_us,
+                ts = ts,
                 dur = e.dur_us,
             ));
         }
-        events.push(']');
+        json.push_str("]}");
 
         // Gzip the JSON. `command.profile.gz` is the Bazel filename BB
         // recognizes; payload must be gzip-compressed.
         let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
         use std::io::Write;
-        if gz.write_all(events.as_bytes()).is_err() {
+        if gz.write_all(json.as_bytes()).is_err() {
             return None;
         }
         let contents = match gz.finish() {
@@ -575,7 +609,7 @@ impl BepStreamState {
                         path_prefix: Vec::new(),
                         name: "command.profile.gz".to_owned(),
                         digest: String::new(),
-                        length: -1,
+                        length: contents.len() as i64,
                         file: Some(bep::file::File::Contents(contents)),
                     }],
                 },

@@ -83,6 +83,21 @@ impl FrozenExecutionPlatformInfo {
         exec_properties: &[(String, String)],
         heap: &starlark::values::FrozenHeap,
     ) -> starlark::values::FrozenValue {
+        use std::sync::Arc;
+
+        use kuro_core::execution_types::executor_config::CacheUploadBehavior;
+        use kuro_core::execution_types::executor_config::CommandExecutorConfig;
+        use kuro_core::execution_types::executor_config::CommandGenerationOptions;
+        use kuro_core::execution_types::executor_config::Executor;
+        use kuro_core::execution_types::executor_config::HybridExecutionLevel;
+        use kuro_core::execution_types::executor_config::LocalExecutorOptions;
+        use kuro_core::execution_types::executor_config::MetaInternalExtraParams;
+        use kuro_core::execution_types::executor_config::PathSeparatorKind;
+        use kuro_core::execution_types::executor_config::RePlatformFields;
+        use kuro_core::execution_types::executor_config::RemoteEnabledExecutor;
+        use kuro_core::execution_types::executor_config::RemoteEnabledExecutorOptions;
+        use kuro_core::execution_types::executor_config::RemoteExecutorOptions;
+        use kuro_core::execution_types::executor_config::RemoteExecutorUseCase;
         use starlark::values::FrozenValueOfUnchecked;
 
         use crate::interpreter::rule_defs::provider::builtin::configuration_info::FrozenConfigurationInfo;
@@ -90,9 +105,58 @@ impl FrozenExecutionPlatformInfo {
         let label_value = heap.alloc(StarlarkTargetLabel::new(label));
         let config_value =
             FrozenConfigurationInfo::for_native_config_setting(constraint_pairs, heap);
-        let exec_config_value = heap.alloc(StarlarkCommandExecutorConfig(
-            kuro_core::execution_types::executor_config::CommandExecutorConfig::testing_local(),
-        ));
+
+        // When the platform carries `exec_properties` the user has
+        // signaled that this is a remote-execution platform — Bazel's
+        // convention is `OSFamily=…`, `Arch=…`, `container-image=…`,
+        // etc. Materialize them into the platform's
+        // `CommandExecutorConfig.re_properties` so an action configured
+        // under this exec platform sends the right RE `Platform`
+        // message at upload time. The executor shape is `Hybrid`
+        // (Limited) so daemon-side wiring still falls back to local for
+        // workspaces without a configured remote backend; the daemon's
+        // executor factory checks whether RE is configured before
+        // dispatching to remote.
+        //
+        // Without `exec_properties`, fall back to `testing_local()` to
+        // preserve the previous behavior for `:host` / generic
+        // platforms that don't intend remote execution.
+        let exec_config = if exec_properties.is_empty() {
+            CommandExecutorConfig::testing_local()
+        } else {
+            let re_properties = RePlatformFields {
+                properties: Arc::new(
+                    exec_properties
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .collect(),
+                ),
+            };
+            Arc::new(CommandExecutorConfig {
+                executor: Executor::RemoteEnabled(RemoteEnabledExecutorOptions {
+                    executor: RemoteEnabledExecutor::Hybrid {
+                        local: LocalExecutorOptions::default(),
+                        remote: RemoteExecutorOptions::default(),
+                        level: HybridExecutionLevel::Limited,
+                    },
+                    re_properties,
+                    re_use_case: RemoteExecutorUseCase::kuro_default(),
+                    re_action_key: None,
+                    cache_upload_behavior: CacheUploadBehavior::Disabled,
+                    remote_cache_enabled: true,
+                    remote_dep_file_cache_enabled: false,
+                    dependencies: Vec::new(),
+                    custom_image: None,
+                    meta_internal_extra_params: MetaInternalExtraParams::default(),
+                }),
+                options: CommandGenerationOptions {
+                    path_separator: PathSeparatorKind::system_default(),
+                    output_paths_behavior: Default::default(),
+                    use_bazel_protocol_remote_persistent_workers: false,
+                },
+            })
+        };
+        let exec_config_value = heap.alloc(StarlarkCommandExecutorConfig(exec_config));
         let exec_properties_value = heap.alloc(AllocDict(
             exec_properties
                 .iter()

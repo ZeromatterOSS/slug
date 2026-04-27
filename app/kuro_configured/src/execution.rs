@@ -79,13 +79,144 @@ enum ExecutionPlatformComputationError {
 }
 
 async fn legacy_execution_platform(
-    ctx: &DiceComputations<'_>,
-    cfg: &ConfigurationNoExec,
+    ctx: &mut DiceComputations<'_>,
+    target_cfg: &ConfigurationNoExec,
+    exec_cfg: &ConfigurationNoExec,
 ) -> ExecutionPlatform {
-    ExecutionPlatform::legacy_execution_platform(
-        ctx.get_fallback_executor_config().clone(),
-        cfg.dupe(),
+    use futures::FutureExt;
+
+    // Look up the *target* platform's exec_properties first — if the
+    // user passed `--platforms=@…/platform_linux_x86_64` the target
+    // cfg's PlatformInfo carries the RBE-shaped properties
+    // (`OSFamily=…`, `container-image=…`) we want on every action's
+    // RE Platform. Fall back to the exec cfg's platform (host) and
+    // finally the daemon's fallback.
+    //
+    // `.boxed()` on the inner futures keeps the overall future size
+    // bounded so this doesn't blow past
+    // `compute_configured_target_node_no_transition`'s 700-byte cap
+    // (rust async fns inline awaited futures into the parent's state
+    // machine; chained option-fallbacks compound that quickly).
+    let executor_config = match exec_platform_executor_config_from_cfg(ctx, target_cfg)
+        .boxed()
+        .await
+    {
+        Some(c) => c,
+        None => match exec_platform_executor_config_from_cfg(ctx, exec_cfg)
+            .boxed()
+            .await
+        {
+            Some(c) => c,
+            None => ctx.get_fallback_executor_config().clone(),
+        },
+    };
+    ExecutionPlatform::legacy_execution_platform(executor_config, exec_cfg.dupe())
+}
+
+/// Bazel `--config=remote` flow: the user puts
+/// `--platforms=@toolchains_buildbuddy//platforms:linux_x86_64` (or
+/// equivalent) in their bazelrc, the platform's `PlatformInfo.exec_properties`
+/// carries the right `OSFamily` / `Arch` / `container-image` keys that
+/// drive RBE worker selection, and Bazel propagates those onto every
+/// remote action's `Platform` message automatically. Kuro used to drop
+/// this signal: `legacy_execution_platform` returned the daemon's
+/// fallback executor config (the `linux-remote-execution` placeholder
+/// from `get_default_re_properties`), so RBE backends couldn't pick a
+/// matching worker pool and compiles failed mid-execution with
+/// `<optional>: No such file or directory` (the default container kuro
+/// targeted lacked a C++ toolchain).
+///
+/// Look up the cfg's platform label (e.g.
+/// `buildbuddy_toolchain//:platform_linux_x86_64`), load its
+/// `PlatformInfo`, and synthesize a `Hybrid` `CommandExecutorConfig`
+/// whose `re_properties` are the platform's `exec_properties`. Returns
+/// `None` for cfgs without an attached platform (`unbound`,
+/// `unspecified`) or platforms without `exec_properties`, in which
+/// case the caller falls back to the daemon's fallback config.
+async fn exec_platform_executor_config_from_cfg(
+    ctx: &mut DiceComputations<'_>,
+    cfg: &ConfigurationNoExec,
+) -> Option<Arc<kuro_core::execution_types::executor_config::CommandExecutorConfig>> {
+    use kuro_build_api::interpreter::rule_defs::provider::builtin::platform_info::FrozenPlatformInfo;
+    use kuro_core::execution_types::executor_config::CacheUploadBehavior;
+    use kuro_core::execution_types::executor_config::CommandExecutorConfig;
+    use kuro_core::execution_types::executor_config::CommandGenerationOptions;
+    use kuro_core::execution_types::executor_config::Executor;
+    use kuro_core::execution_types::executor_config::HybridExecutionLevel;
+    use kuro_core::execution_types::executor_config::LocalExecutorOptions;
+    use kuro_core::execution_types::executor_config::MetaInternalExtraParams;
+    use kuro_core::execution_types::executor_config::PathSeparatorKind;
+    use kuro_core::execution_types::executor_config::RePlatformFields;
+    use kuro_core::execution_types::executor_config::RemoteEnabledExecutor;
+    use kuro_core::execution_types::executor_config::RemoteEnabledExecutorOptions;
+    use kuro_core::execution_types::executor_config::RemoteExecutorOptions;
+    use kuro_core::execution_types::executor_config::RemoteExecutorUseCase;
+    use kuro_core::pattern::pattern::ParsedPattern;
+    use kuro_core::pattern::pattern_type::TargetPatternExtra;
+    use kuro_core::provider::label::ProvidersLabel;
+
+    let label_str = cfg.cfg().label().ok()?;
+    // Parse `<cell>//<pkg>:<name>` into a TargetLabel using the root
+    // cell as the parsing context.
+    let cell_resolver = ctx.get_cell_resolver().await.ok()?;
+    let root_cell = cell_resolver.root_cell();
+    let alias_resolver = ctx.get_cell_alias_resolver(root_cell).await.ok()?;
+    let parsed = ParsedPattern::<TargetPatternExtra>::parse_precise(
+        label_str,
+        root_cell,
+        &cell_resolver,
+        &alias_resolver,
     )
+    .ok()?;
+    let (target_label, TargetPatternExtra) = parsed.as_literal(label_str).ok()?;
+    let providers_label = ProvidersLabel::default_for(target_label);
+    let providers = ctx
+        .get_configuration_analysis_result(&providers_label)
+        .await
+        .ok()?;
+    let platform_info = providers
+        .provider_collection()
+        .builtin_provider::<FrozenPlatformInfo>()?;
+    // RE platform messages take opaque string keys (`OSFamily`,
+    // `container-image`, `Arch`, …). Filter out exec_properties whose
+    // keys parse as Bazel labels — those are the build-setting-style
+    // entries (e.g. `@bazel_tools//tools/cpp:compilation_mode = "opt"`)
+    // that flow into ConfigurationData.build_settings, NOT to RE
+    // worker selection.
+    let entries: Vec<(String, String)> = platform_info
+        .exec_properties_entries()
+        .into_iter()
+        .filter(|(k, _)| !k.starts_with('@') && !k.starts_with("//") && !k.contains("//"))
+        .collect();
+    if entries.is_empty() {
+        return None;
+    }
+    let re_properties = RePlatformFields {
+        properties: Arc::new(entries.into_iter().collect()),
+    };
+    Some(Arc::new(CommandExecutorConfig {
+        executor: Executor::RemoteEnabled(RemoteEnabledExecutorOptions {
+            executor: RemoteEnabledExecutor::Hybrid {
+                local: LocalExecutorOptions::default(),
+                remote: RemoteExecutorOptions::default(),
+                level: HybridExecutionLevel::Limited,
+            },
+            re_properties,
+            re_use_case: RemoteExecutorUseCase::kuro_default(),
+            re_action_key: None,
+            cache_upload_behavior: CacheUploadBehavior::Disabled,
+            remote_cache_enabled: true,
+            remote_dep_file_cache_enabled: false,
+            dependencies: Vec::new(),
+            custom_image: None,
+            meta_internal_extra_params: MetaInternalExtraParams::default(),
+        }),
+        options: CommandGenerationOptions {
+            path_separator: PathSeparatorKind::system_default(),
+            output_paths_behavior: Default::default(),
+            use_bazel_protocol_remote_persistent_workers: false,
+        },
+    }))
 }
 
 /// Builds the cfg that kuro uses as the legacy exec-configuration when
@@ -172,7 +303,7 @@ pub async fn find_execution_platform_by_configuration(
         _ => {
             let target_cfg = ConfigurationNoExec::new(cfg.dupe());
             let exec_cfg = legacy_exec_cfg(ctx, &target_cfg).await;
-            Ok(legacy_execution_platform(ctx, &exec_cfg).await)
+            Ok(legacy_execution_platform(ctx, &target_cfg, &exec_cfg).await)
         }
     }
 }
@@ -419,9 +550,10 @@ pub(crate) async fn resolve_execution_platform(
     // The non-none case will be handled when we invoke the resolve_execution_platform() on ctx below, the none
     // case can't be handled there because we don't pass the full configuration into it.
     if ctx.get_execution_platforms().await?.is_none() {
-        let exec_cfg = legacy_exec_cfg(ctx, matched_cfg_keys.cfg()).await;
+        let target_cfg = matched_cfg_keys.cfg();
+        let exec_cfg = legacy_exec_cfg(ctx, target_cfg).await;
         return Ok(ExecutionPlatformResolution::new(
-            Some(legacy_execution_platform(ctx, &exec_cfg).await),
+            Some(legacy_execution_platform(ctx, target_cfg, &exec_cfg).await),
             Vec::new(),
         ));
     };
