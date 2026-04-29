@@ -6,6 +6,23 @@
 > kuro's BES upload land in BuildBuddy; this plan makes kuro's *actions*
 > land on BuildBuddy's remote executor instead of running locally.
 
+## Architectural successor
+
+Plan 25 plumbs the *transport* (CAS upload, action dispatch, BES,
+trace upload). The *exec platform selection* problem — how kuro
+decides which RBE worker pool an action lands on, given a Bazel-shape
+`.bazelrc` with `--platforms=…` and `--extra_execution_platforms=…` —
+is solved in [**Plan 24: Constraint-Based Exec Platform
+Resolution**](./24-exec-platform-resolution.md). 25.3.E
+(`--remote_default_exec_properties=KEY=VALUE` plumbing) and 25.3.F
+(reading the target_cfg's `PlatformInfo.exec_properties` inside
+`legacy_execution_platform`) were point fixes to make the bare
+`@llvm-project//llvm:Demangle --config=remote` smoke test pass; they
+don't generalize to host-transitioned deps (e.g. building clang).
+Plan 24 supersedes both with a constraint-based resolver that walks
+`register_execution_platforms()` + `--extra_execution_platforms`
+candidates the way Bazel does.
+
 ## Scope
 
 Make `kuro build … --config=remote` (with a Bazel-shape `.bazelrc`

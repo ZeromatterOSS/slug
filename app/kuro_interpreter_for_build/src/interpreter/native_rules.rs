@@ -33,6 +33,7 @@ use kuro_node::attrs::coerced_deps_collector::CoercedDepsCollector;
 use kuro_node::attrs::coerced_path::CoercedPath;
 use kuro_node::attrs::coercion_context::AttrCoercionContext;
 use kuro_node::attrs::configurable::AttrIsConfigurable;
+use kuro_node::attrs::spec::AttributeId;
 use kuro_node::attrs::spec::AttributeSpec;
 use kuro_node::attrs::spec::internal::NAME_ATTRIBUTE;
 use kuro_node::attrs::spec::internal::VISIBILITY_ATTRIBUTE;
@@ -511,14 +512,13 @@ pub(crate) mod rule_defs {
             AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
         );
 
-        let exec_properties_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::Dict({
-                use kuro_node::attrs::attr_type::dict::DictLiteral;
-                DictLiteral(ArcSlice::default())
-            }))),
-            "Execution properties for this platform",
-            AttrType::dict(AttrType::string(), AttrType::string(), false),
-        );
+        // `exec_properties` lives as an internal attribute (Plan 24 Phase 2)
+        // because Bazel exposes it as a common attribute on every rule —
+        // both `platform()` (where the dict drives RE worker selection)
+        // and ordinary rules (where the dict overrides keys on the
+        // resolved exec platform's properties at action time). Unifying
+        // them avoids two competing attribute definitions; the analysis
+        // path reads via `configured_node.get("exec_properties", ...)`.
 
         let flags_attr = Attribute::new(
             Some(Arc::new(CoercedAttr::List(
@@ -532,7 +532,6 @@ pub(crate) mod rule_defs {
             vec![
                 ("constraint_values".to_owned(), constraint_values_attr),
                 ("parents".to_owned(), parents_attr),
-                ("exec_properties".to_owned(), exec_properties_attr),
                 ("flags".to_owned(), flags_attr),
             ],
             false,
@@ -1259,15 +1258,24 @@ pub(crate) fn create_native_target_node(
         CoercedAttr::Visibility(visibility_spec),
     );
 
-    // Get the attribute IDs from the spec and add user-provided attrs
-    for (attr_name, coerced_value) in attrs {
-        if let Some((_, attr_id, _)) = rule
-            .attributes
-            .attr_specs()
-            .find(|(name, _, _)| *name == attr_name)
-        {
-            attr_values.push_sorted(attr_id, coerced_value);
-        }
+    // Resolve attribute IDs from the spec, then insert in id order so
+    // `push_sorted`'s monotonic-id invariant holds. Without sorting,
+    // a user-provided attribute whose id falls between internal
+    // attribute ids (e.g. `exec_properties` at id 16, internal,
+    // alongside rule-specific attrs that occupy higher ids) would
+    // panic with "attributes must be sorted".
+    let mut resolved: Vec<(AttributeId, CoercedAttr)> = attrs
+        .into_iter()
+        .filter_map(|(attr_name, coerced_value)| {
+            rule.attributes
+                .attr_specs()
+                .find(|(name, _, _)| *name == attr_name)
+                .map(|(_, attr_id, _)| (attr_id, coerced_value))
+        })
+        .collect();
+    resolved.sort_by_key(|(id, _)| *id);
+    for (attr_id, coerced_value) in resolved {
+        attr_values.push_sorted(attr_id, coerced_value);
     }
 
     // Collect dependencies for caching

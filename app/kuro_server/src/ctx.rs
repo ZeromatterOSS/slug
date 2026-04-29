@@ -669,6 +669,24 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
 
         ctx.set_enabled_optional_validations(optional_validations)?;
 
+        // Plan 24 Phase 1: thread `--extra_execution_platforms` from the
+        // BuildRequest into a DICE injected key so
+        // `compute_execution_platforms` is properly invalidated when the
+        // flag changes between builds in the same daemon. Modeled as
+        // `InjectedKey` (not `UserComputationData`) because compute()
+        // returning Err for one set of extras would otherwise be served
+        // to a follow-up build with different extras.
+        let extra_exec_platforms: Vec<String> = self
+            .cmd_ctx
+            .build_options
+            .as_ref()
+            .map(|opts| opts.extra_execution_platforms.clone())
+            .unwrap_or_default();
+        kuro_configured::execution::SetExtraExecutionPlatforms::set_extra_execution_platforms(
+            &mut ctx,
+            extra_exec_platforms,
+        )?;
+
         let profiler_instrumentation_override =
             &self.cmd_ctx.starlark_profiling_manager.configuration;
 

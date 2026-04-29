@@ -267,7 +267,29 @@ pub const PACKAGE_METADATA_ATTRIBUTE: InternalAttribute = InternalAttribute {
     is_configurable: AttrIsConfigurable::No,
 };
 
-const INTERNAL_ATTRS: [InternalAttribute; 16] = [
+/// Bazel-compatible `exec_properties` attribute.
+///
+/// Per-target dict that overrides keys on the resolved exec platform's
+/// `exec_properties` when computing an action's RE `Platform.properties`
+/// message. Merge order: platform → target → action kwarg (later wins)
+/// — see `app/kuro_action_impl/src/actions/impls/run` (Plan 24 Phase 2).
+/// Configurable so users can `select()` the dict on constraint values.
+pub const EXEC_PROPERTIES_ATTRIBUTE: InternalAttribute = InternalAttribute {
+    id: AttributeId(16),
+    name: "exec_properties",
+    attr: || {
+        Attribute::new(
+            Some(Arc::new(CoercedAttr::Dict(
+                crate::attrs::attr_type::dict::DictLiteral(Default::default()),
+            ))),
+            "a dict of opaque exec metadata to merge onto the action's RE Platform.properties",
+            AttrType::dict(AttrType::string(), AttrType::string(), false),
+        )
+    },
+    is_configurable: AttrIsConfigurable::Yes,
+};
+
+const INTERNAL_ATTRS: [InternalAttribute; 17] = [
     NAME_ATTRIBUTE,
     DEFAULT_TARGET_PLATFORM_ATTRIBUTE,
     TARGET_COMPATIBLE_WITH_ATTRIBUTE,
@@ -284,6 +306,7 @@ const INTERNAL_ATTRS: [InternalAttribute; 16] = [
     FEATURES_ATTRIBUTE,
     APPLICABLE_LICENSES_ATTRIBUTE,
     PACKAGE_METADATA_ATTRIBUTE,
+    EXEC_PROPERTIES_ATTRIBUTE,
 ];
 
 pub struct OptionalInternalAttribute {
@@ -315,7 +338,7 @@ const fn to_optional(attr: InternalAttribute) -> OptionalInternalAttribute {
 }
 
 /// Includes optional internal attrs
-const ALL_INTERNAL_ATTRS: [OptionalInternalAttribute; 17] = [
+const ALL_INTERNAL_ATTRS: [OptionalInternalAttribute; 18] = [
     to_optional(NAME_ATTRIBUTE),
     to_optional(DEFAULT_TARGET_PLATFORM_ATTRIBUTE),
     to_optional(TARGET_COMPATIBLE_WITH_ATTRIBUTE),
@@ -332,6 +355,7 @@ const ALL_INTERNAL_ATTRS: [OptionalInternalAttribute; 17] = [
     to_optional(FEATURES_ATTRIBUTE),
     to_optional(APPLICABLE_LICENSES_ATTRIBUTE),
     to_optional(PACKAGE_METADATA_ATTRIBUTE),
+    to_optional(EXEC_PROPERTIES_ATTRIBUTE),
     INCOMING_TRANSITION_ATTRIBUTE,
 ];
 

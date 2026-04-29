@@ -100,8 +100,12 @@ After implementation:
    declared on a rule. This is a mechanical extension once manual exec groups work.
    **Follow-up plan recommended** for Bazel 9 parity — needed when users opt in
    or when Bazel 10 flips the default.
-2. **`exec_properties` per exec group** — remote execution routing metadata (e.g.,
-   `"link.mem": "16g"`). No effect with local-only execution.
+2. ~~**`exec_properties` per exec group** — remote execution routing metadata (e.g.,
+   `"link.mem": "16g"`). No effect with local-only execution.~~
+   → **Covered by [Plan 24](./24-exec-platform-resolution.md) Phase 4**, which
+   wires the per-group selected platform's `exec_properties` into the action's
+   RE `Platform.properties` message and adds Phase 2's per-target /
+   per-action `exec_properties` overrides on top.
 3. **`target_settings` on `toolchain()`** — config_setting-based toolchain filtering.
    Documented in Bazel 9 but has known bugs (issue #16671 closed without fix).
    Can be added later.
@@ -522,7 +526,9 @@ Stop discarding the `exec_group` parameter. Store it on the action:
 - Validate that the exec group name is one of the rule's declared groups
 - Record the exec group name on the `RunActionValues` / action metadata
 - At execution time, this could be used to select the correct execution
-  platform (for now, log it — local execution uses the host regardless)
+  platform (→ **[Plan 24](./24-exec-platform-resolution.md) Phase 4**
+  wires the per-group selected platform into the action's RE
+  `Platform.properties` message, retiring the local-only assumption)
 
 #### 6. Delete old stub types
 Remove `ExecGroupsDict`, `ExecGroupInfo`, `ExecGroupToolchains` from `context.rs`.

@@ -116,6 +116,10 @@ pub(crate) enum RunActionError {
     )]
     IncrementalRemoteOutputsWithContentBasedOutputs { path: String },
     #[error(
+        "`actions.run(exec_group=\"{requested}\")` references an exec group not declared on this rule. Valid exec_groups: [{valid}]"
+    )]
+    UnknownExecGroup { requested: String, valid: String },
+    #[error(
         "Action is marked with `incremental_remote_outputs` but not `no_outputs_cleanup`, which is not allowed."
     )]
     IncrementalRemoteOutputsWithoutNoOutputsCleanup,
@@ -850,11 +854,30 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             }
         }
 
+        // Plan 24 Phase 4: validate `exec_group=` against the rule's
+        // declared exec groups. Per-group platform routing (using the
+        // group's resolved exec platform for the action's RE Platform
+        // message) is deferred until per-group resolution is plumbed
+        // through ResolvedExecGroups; for now this is purely a
+        // user-error check that surfaces typos loudly.
+        if let NoneOr::Other(exec_group_value) = exec_group {
+            if let Some(name) = exec_group_value.unpack_str() {
+                let registry = this.state()?;
+                let valid = registry.actions.valid_exec_group_names();
+                if !valid.iter().any(|v| v == name) {
+                    return Err(kuro_error::Error::from(RunActionError::UnknownExecGroup {
+                        requested: name.to_owned(),
+                        valid: valid.join(", "),
+                    })
+                    .into());
+                }
+            }
+        }
+
         // Ignore other Bazel-specific parameters that are not yet implemented.
         let _ = (
             resource_set,
             toolchain,
-            exec_group,
             input_manifests,
             unused_inputs_list,
             shadowed_action,

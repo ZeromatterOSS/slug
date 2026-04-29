@@ -42,6 +42,7 @@ use kuro_core::cells::cell_path::CellPathRef;
 use kuro_core::cells::name::CellName;
 use kuro_core::cells::paths::CellRelativePath;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
+use kuro_core::deferred::key::DeferredHolderKey;
 use kuro_core::execution_types::execution::ExecutionPlatformResolution;
 use kuro_core::package::PackageLabel;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
@@ -702,6 +703,29 @@ fn parse_registered_toolchain_label(label: &str) -> Option<(String, String)> {
     Some((repo_name.to_owned(), pkg_path.to_owned()))
 }
 
+/// Plan 24 Phase 2: read the configured target's `exec_properties`
+/// attribute and return it as a sorted `BTreeMap` for the actions
+/// registry. Empty when the attribute was unset (the default) or when
+/// every entry has a non-string key/value (which should be unreachable
+/// because the internal attribute type is `dict(string, string)`).
+fn collect_target_exec_properties(
+    node: kuro_node::nodes::configured::ConfiguredTargetNodeRef<'_>,
+) -> Arc<std::collections::BTreeMap<String, String>> {
+    use kuro_node::attrs::configured_attr::ConfiguredAttr;
+
+    let mut out = std::collections::BTreeMap::new();
+    if let Some(attr) = node.get("exec_properties", AttrInspectOptions::All) {
+        if let ConfiguredAttr::Dict(dict) = &attr.value {
+            for (k, v) in dict.0.iter() {
+                if let (ConfiguredAttr::String(kstr), ConfiguredAttr::String(vstr)) = (k, v) {
+                    out.insert(kstr.0.to_string(), vstr.0.to_string());
+                }
+            }
+        }
+    }
+    Arc::new(out)
+}
+
 /// Extract DeclaredToolchainInfo from an unconfigured toolchain() target node.
 ///
 /// Reads the `toolchain_type`, `toolchain`, `exec_compatible_with`, and
@@ -891,9 +915,29 @@ async fn run_analysis_with_env_underlying(
             },
         );
 
-        let registry = AnalysisRegistry::new_from_owner(
-            BaseDeferredKey::TargetLabel(node.label().dupe()),
+        // Plan 24 Phase 2: read the configured target's `exec_properties`
+        // attribute and hand it to the actions registry so each action's
+        // RE Platform message gets the keys merged on top of the resolved
+        // exec platform's own `exec_properties`. Empty dict (the default)
+        // is a no-op — the actions registry skips the merge in that case.
+        let target_exec_properties = collect_target_exec_properties(node);
+
+        // Plan 24 Phase 4: extract the names of exec groups declared via
+        // `rule(exec_groups={...})` so `actions.run(exec_group=…)` can
+        // validate against the list. Empty for rules with no exec groups.
+        let valid_exec_group_names: Arc<[String]> = analysis_env
+            .rule_spec
+            .exec_group_defs()
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect::<Vec<_>>()
+            .into();
+
+        let registry = AnalysisRegistry::new_from_owner_and_deferred_with_attrs(
             analysis_env.execution_platform.dupe(),
+            DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(node.label().dupe())),
+            target_exec_properties,
+            valid_exec_group_names,
         )?;
 
         // Run toolchain resolution BEFORE entering the Starlark evaluator.

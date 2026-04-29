@@ -91,6 +91,7 @@ automatic edits — each hit reviewed manually. Patterns to flag:
 | `std::fs::*` inside `async fn` | syntax pattern | Blocks the tokio runtime thread. |
 | `.unwrap()` / `.expect()` outside tests | grep + file filter | Should be `internal_error!`. |
 | `HashMap<K, V>` where tiny N dominates | context-dependent | `SmallMap` / `FxHashMap` / `Vec<(K,V)>` wins. |
+| Long-lived `String` / `HashMap<String, ...>` in Bazel-compat code | grep `HashMap<String`, `FxHashMap<String`, `Vec<String>` | Check [Plan 26](./26-string-interning.md): stable graph identifiers should usually be typed + interned or explicitly justified. |
 | `Arc::new(x.clone())` | grep `Arc::new\(.*\.clone` | Double-alloc. |
 | String concat in hot loops | context-dependent | Use `write!` into a buffer. |
 | Regex compilation inside `fn` called per-event | grep `Regex::new` | Compile once. |

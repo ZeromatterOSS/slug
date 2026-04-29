@@ -123,8 +123,46 @@ impl<'v> AnalysisRegistry<'v> {
         execution_platform: ExecutionPlatformResolution,
         self_key: DeferredHolderKey,
     ) -> kuro_error::Result<Self> {
+        Self::new_from_owner_and_deferred_with_target_exec_properties(
+            execution_platform,
+            self_key,
+            std::sync::Arc::new(std::collections::BTreeMap::new()),
+        )
+    }
+
+    /// Plan 24 Phase 2: variant that accepts the configured target's
+    /// `exec_properties` attribute so the actions registry can layer
+    /// it onto each action's RE Platform message at registration time.
+    pub fn new_from_owner_and_deferred_with_target_exec_properties(
+        execution_platform: ExecutionPlatformResolution,
+        self_key: DeferredHolderKey,
+        target_exec_properties: std::sync::Arc<std::collections::BTreeMap<String, String>>,
+    ) -> kuro_error::Result<Self> {
+        Self::new_from_owner_and_deferred_with_attrs(
+            execution_platform,
+            self_key,
+            target_exec_properties,
+            std::sync::Arc::from(Vec::<String>::new()),
+        )
+    }
+
+    /// Plan 24 Phase 4: variant that also accepts the rule's declared
+    /// exec_group names so `actions.run(exec_group=…)` can validate the
+    /// argument against the list. Empty when the rule didn't declare any
+    /// exec groups.
+    pub fn new_from_owner_and_deferred_with_attrs(
+        execution_platform: ExecutionPlatformResolution,
+        self_key: DeferredHolderKey,
+        target_exec_properties: std::sync::Arc<std::collections::BTreeMap<String, String>>,
+        valid_exec_group_names: std::sync::Arc<[String]>,
+    ) -> kuro_error::Result<Self> {
         Ok(AnalysisRegistry {
-            actions: ActionsRegistry::new(self_key.dupe(), execution_platform.dupe()),
+            actions: ActionsRegistry::new_with_attrs(
+                self_key.dupe(),
+                execution_platform.dupe(),
+                target_exec_properties,
+                valid_exec_group_names,
+            ),
             anon_targets: (ANON_TARGET_REGISTRY_NEW.get()?)(PhantomData, execution_platform),
             analysis_value_storage: AnalysisValueStorage::new(self_key),
             short_path_assertions: HashMap::new(),

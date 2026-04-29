@@ -90,7 +90,10 @@ After implementation:
 
 ## What We're NOT Doing
 
-1. **Remote execution platform selection** — local execution only for now
+1. ~~**Remote execution platform selection** — local execution only for now~~
+   → **Superseded by [Plan 24](./24-exec-platform-resolution.md)**, which adds
+   constraint-based exec platform resolution driven by
+   `register_execution_platforms()` and `--extra_execution_platforms`.
 2. **Split transitions** — `cfg = "exec"` and `cfg = "target"` on toolchain attrs
    (we'll use the simpler "all deps use target config" approach initially)
 3. **`target_settings` on toolchain()** — config_setting filtering (can be added later)

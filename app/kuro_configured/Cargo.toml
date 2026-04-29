@@ -22,6 +22,7 @@ tracing = { workspace = true }
 kuro_analysis = { workspace = true }
 kuro_build_api = { workspace = true }
 kuro_build_signals = { workspace = true }
+kuro_bzlmod = { workspace = true }
 kuro_common = { workspace = true }
 kuro_core = { workspace = true }
 kuro_error = { workspace = true }

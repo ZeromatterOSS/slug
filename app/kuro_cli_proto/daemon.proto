@@ -496,6 +496,15 @@ message CommonBuildOptions {
   /// Bazel-compatible --stamp / --nostamp flag from CommonBuildOptions.
   bool stamp = 22;
 
+  /// Bazel `--extra_execution_platforms=<label>` (repeatable). When
+  /// non-empty, the daemon loads the first platform's `PlatformInfo`
+  /// at command time and treats its `exec_properties` as the default
+  /// remote action `Platform` message — so users get the right RBE
+  /// worker selection (`container-image=…`, `OSFamily=…`, `Arch=…`)
+  /// without also having to pass
+  /// `--remote_default_exec_properties=KEY=VALUE`.
+  repeated string extra_execution_platforms = 23;
+
   // These should possibly be deleted and never become real options. Let's not
   // pollute the low ids (and then forever need a comment about them). The only
   // one of these that might stick around is print_build_report, it's unclear if

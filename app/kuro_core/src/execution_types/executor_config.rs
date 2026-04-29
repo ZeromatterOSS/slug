@@ -237,6 +237,28 @@ pub struct RePlatformFields {
     pub properties: Arc<SortedMap<String, String>>,
 }
 
+impl RePlatformFields {
+    /// Returns a new `RePlatformFields` whose `properties` are the
+    /// receiver's overlaid with `overrides` (later wins). Used by
+    /// Plan 24 Phase 2 to merge per-target `exec_properties` onto an
+    /// action's RE Platform message at action-construction time.
+    pub fn merged_with(&self, overrides: impl IntoIterator<Item = (String, String)>) -> Self {
+        // SortedMap is immutable post-construction, so collect into a
+        // mutable BTreeMap, layer overrides on top, then re-sort.
+        let mut props: std::collections::BTreeMap<String, String> = self
+            .properties
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        for (k, v) in overrides {
+            props.insert(k, v);
+        }
+        RePlatformFields {
+            properties: Arc::new(SortedMap::from_iter(props)),
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Clone, Hash, Pagable, Allocative)]
 #[allow(clippy::large_enum_variant)]
 pub enum Executor {
@@ -435,5 +457,52 @@ mod tests {
             Some(&"H100".to_owned())
         );
         assert_eq!(worker.capabilities.get("rack"), Some(&"rack_01".to_owned()));
+    }
+
+    /// Plan 24 Phase 2: per-target `exec_properties` overrides win over
+    /// the platform's keys; non-conflicting platform keys are preserved.
+    #[test]
+    fn re_platform_fields_merged_with_target_overrides_platform_and_preserves_others() {
+        let platform = RePlatformFields {
+            properties: Arc::new(SortedMap::from_iter([
+                ("OSFamily".to_owned(), "Linux".to_owned()),
+                (
+                    "container-image".to_owned(),
+                    "docker://platform:v0".to_owned(),
+                ),
+            ])),
+        };
+        let target_overrides = vec![
+            (
+                "container-image".to_owned(),
+                "docker://target:v1".to_owned(),
+            ),
+            ("Arch".to_owned(), "x86_64".to_owned()),
+        ];
+
+        let merged = platform.merged_with(target_overrides);
+
+        // platform-only key kept
+        assert_eq!(merged.properties.get("OSFamily"), Some(&"Linux".to_owned()));
+        // overridden key — target wins
+        assert_eq!(
+            merged.properties.get("container-image"),
+            Some(&"docker://target:v1".to_owned())
+        );
+        // target-only key added
+        assert_eq!(merged.properties.get("Arch"), Some(&"x86_64".to_owned()));
+        assert_eq!(merged.properties.len(), 3);
+    }
+
+    #[test]
+    fn re_platform_fields_merged_with_empty_overrides_is_clone() {
+        let platform = RePlatformFields {
+            properties: Arc::new(SortedMap::from_iter([(
+                "OSFamily".to_owned(),
+                "Linux".to_owned(),
+            )])),
+        };
+        let merged = platform.merged_with(std::iter::empty());
+        assert_eq!(merged.properties, platform.properties);
     }
 }

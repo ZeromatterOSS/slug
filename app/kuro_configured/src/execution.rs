@@ -78,6 +78,54 @@ enum ExecutionPlatformComputationError {
     MissingConstraintValueInfo(ProvidersLabel),
 }
 
+/// DICE injected key for the `--extra_execution_platforms` flag.
+///
+/// Populated by `kuro_server::ctx` from the BuildRequest's
+/// `CommonBuildOptions` before analysis runs. Read by
+/// `compute_execution_platforms` (Plan 24 Phase 1) to surface
+/// user-supplied labels as the highest-priority candidate exec
+/// platforms (matches Bazel's "last flag wins" semantics).
+///
+/// Modeled as an `InjectedKey` (not `UserComputationData`) so DICE
+/// invalidates downstream computations when the flag changes between
+/// builds in the same daemon — without this, a build that errors with
+/// `--extra_execution_platforms=A` would serve the cached failure to a
+/// follow-up build with `--extra_execution_platforms=B`.
+#[derive(Display, Debug, Hash, Eq, Clone, Dupe, PartialEq, Allocative)]
+#[display("ExtraExecutionPlatformsKey")]
+pub struct ExtraExecutionPlatformsKey;
+
+impl dice::InjectedKey for ExtraExecutionPlatformsKey {
+    type Value = Arc<[String]>;
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+pub trait SetExtraExecutionPlatforms {
+    fn set_extra_execution_platforms(&mut self, labels: Vec<String>) -> kuro_error::Result<()>;
+}
+
+impl SetExtraExecutionPlatforms for dice::DiceTransactionUpdater {
+    fn set_extra_execution_platforms(&mut self, labels: Vec<String>) -> kuro_error::Result<()> {
+        let value: Arc<[String]> = labels.into();
+        Ok(self.changed_to(vec![(ExtraExecutionPlatformsKey, value)])?)
+    }
+}
+
+/// Synthesizes a single-platform "legacy" `ExecutionPlatform` for
+/// workspaces with **zero** registered exec platforms.
+///
+/// Plan 24 invariant: this function only fires from
+/// `resolve_execution_platform` and `find_execution_platform_by_configuration`
+/// when `compute_execution_platforms` returned `None` — i.e. the user
+/// has set neither `--extra_execution_platforms`, nor
+/// `register_execution_platforms()` in MODULE.bazel, nor
+/// `build.execution_platforms` in buckconfig. With *any* of those, the
+/// constraint-based path runs instead and unmatched constraints surface
+/// `ExecutionPlatformError::NoCompatiblePlatform` (Phase 5: no silent
+/// host fallback when registrations exist).
 async fn legacy_execution_platform(
     ctx: &mut DiceComputations<'_>,
     target_cfg: &ConfigurationNoExec,
@@ -567,71 +615,185 @@ pub(crate) async fn resolve_execution_platform(
         .await
 }
 
-/// Returns the configured [ExecutionPlatforms] or None if `build.execution_platforms` is not configured.
+/// Load a single execution-platform candidate from a label string.
+///
+/// Bazel's `register_execution_platforms()` and `--extra_execution_platforms`
+/// flag both accept labels of `platform()` or `execution_platform()` rules.
+/// This helper accepts either:
+///
+/// - `execution_platform()` → produces `ExecutionPlatformInfo`, used directly.
+/// - `platform()` → produces `PlatformInfo`. Synthesized into an
+///   `ExecutionPlatform` whose `re_properties` come from the platform's
+///   `exec_properties` (filtered to the opaque-key RE entries — label-shaped
+///   keys land in `build_settings`, not `re_properties`).
+///
+/// Returns `Ok(None)` when the label parses but doesn't expose either
+/// provider. Returns `Err` for parse failures or analysis failures so
+/// misspelled labels surface loudly rather than being silently dropped.
+async fn load_platform_candidate(
+    ctx: &mut DiceComputations<'_>,
+    label_str: &str,
+) -> kuro_error::Result<Option<ExecutionPlatform>> {
+    use kuro_build_api::interpreter::rule_defs::provider::builtin::execution_platform_info::FrozenExecutionPlatformInfo;
+    use kuro_build_api::interpreter::rule_defs::provider::builtin::platform_info::FrozenPlatformInfo;
+
+    let cells = ctx.get_cell_resolver().await?;
+    let root_cell = cells.root_cell();
+    let alias_resolver = ctx.get_cell_alias_resolver(root_cell).await?;
+    let target_label = TargetLabel::parse(label_str, root_cell, &cells, &alias_resolver)?;
+    let providers_label = ProvidersLabel::default_for(target_label.dupe());
+    let providers = ctx
+        .get_configuration_analysis_result(&providers_label)
+        .await?;
+    let collection = providers.provider_collection();
+
+    if let Some(info) = collection.builtin_provider::<FrozenExecutionPlatformInfo>() {
+        return Ok(Some(info.to_execution_platform()?));
+    }
+
+    if let Some(platform_info) = collection.builtin_provider::<FrozenPlatformInfo>() {
+        let cfg = platform_info.to_configuration()?;
+        let cfg_no_exec = ConfigurationNoExec::new(cfg.dupe());
+        let executor_config = match exec_platform_executor_config_from_cfg(ctx, &cfg_no_exec)
+            .boxed()
+            .await
+        {
+            Some(c) => c,
+            None => ctx.get_fallback_executor_config().clone(),
+        };
+        return Ok(Some(ExecutionPlatform::platform(
+            target_label,
+            cfg,
+            executor_config,
+        )));
+    }
+
+    Ok(None)
+}
+
+/// Returns the configured [ExecutionPlatforms] or `None` if no source supplies any.
+///
+/// Sources, in priority order (matches Bazel: last flag wins, root module beats deps):
+///
+/// 1. **CLI** (`--extra_execution_platforms`) — top of the candidate list,
+///    so a user-supplied platform overrides any module/buckconfig
+///    registration when constraints match.
+/// 2. **MODULE.bazel** (`register_execution_platforms()`) — collected by
+///    `kuro_bzlmod` in BFS module order (root first), then transitive deps.
+/// 3. **`build.execution_platforms` buckconfig** — kuro's legacy single
+///    registration target (an `execution_platforms()` rule that exposes
+///    `FrozenExecutionPlatformRegistrationInfo` containing multiple
+///    inner platforms). Preserved for backward compat.
+///
+/// Returns `None` only when every source is empty, so the caller falls
+/// back to `legacy_execution_platform`. Otherwise returns a candidate
+/// list with `Fallback::Error` (matching Bazel's "no compatible
+/// execution platform" error semantics) — except when source 3 is the
+/// only source, in which case its `fallback()` is honored.
 async fn compute_execution_platforms(
     ctx: &mut DiceComputations<'_>,
 ) -> kuro_error::Result<Option<ExecutionPlatforms>> {
     let cells = ctx.get_cell_resolver().await?;
-    let cell_alias_resolver = ctx.get_cell_alias_resolver(cells.root_cell()).await?;
+    let root_cell = cells.root_cell();
+    let alias_resolver = ctx.get_cell_alias_resolver(root_cell).await?;
 
-    let execution_platforms_target = ctx
-        .get_legacy_config_property(cells.root_cell(), EXECUTION_PLATFORMS_BUCKCONFIG)
+    let cli_extras: Arc<[String]> = ctx.compute(&ExtraExecutionPlatformsKey).await?;
+    let cli_extras: Vec<String> = cli_extras.iter().cloned().collect();
+    let module_registrations = kuro_bzlmod::get_registered_execution_platforms();
+    let buckconfig_label = ctx
+        .get_legacy_config_property(root_cell, EXECUTION_PLATFORMS_BUCKCONFIG)
         .await?;
 
-    let execution_platforms_target = match execution_platforms_target {
-        Some(v) => TargetLabel::parse(&v, cells.root_cell(), &cells, &cell_alias_resolver)?,
-        None => {
-            return Ok(None);
-        }
-    };
-
-    let providers = &ctx
-        // Execution platform won't be supplied as a subtarget
-        .get_configuration_analysis_result(&ProvidersLabel::default_for(
-            execution_platforms_target.dupe(),
-        ))
-        .await?;
-
-    let result = providers
-        .provider_collection()
-        .builtin_provider::<FrozenExecutionPlatformRegistrationInfo>()
-        .ok_or_else(|| {
-            kuro_error::Error::from(
-                ExecutionPlatformComputationError::MissingExecutionPlatformRegistrationInfo(
-                    execution_platforms_target.dupe(),
-                ),
-            )
-        })?;
-
-    // Resolve the exec_marker_constraint if set
-    let marker_constraint = if let Some(marker_str) = result.exec_marker_constraint() {
-        let marker_label =
-            ProvidersLabel::parse(marker_str, cells.root_cell(), &cells, &cell_alias_resolver)?;
-        let marker_providers = ctx.get_configuration_analysis_result(&marker_label).await?;
-        let constraint_value_info = marker_providers
-            .provider_collection()
-            .builtin_provider::<FrozenConstraintValueInfo>()
-            .ok_or_else(|| {
-                kuro_error::Error::from(
-                    ExecutionPlatformComputationError::MissingConstraintValueInfo(
-                        marker_label.dupe(),
-                    ),
-                )
-            })?;
-
-        Some(constraint_value_info.to_constraint_key_value())
-    } else {
-        None
-    };
-
-    let mut platforms = Vec::new();
-    for platform in result.platforms()? {
-        platforms.push(platform.to_execution_platform_with_marker(marker_constraint.as_ref())?);
+    if cli_extras.is_empty() && module_registrations.is_empty() && buckconfig_label.is_none() {
+        return Ok(None);
     }
+
+    let mut platforms: Vec<ExecutionPlatform> = Vec::new();
+    let mut display_target: Option<TargetLabel> = None;
+
+    for label_str in cli_extras.iter().chain(module_registrations.iter()) {
+        if let Some(p) = load_platform_candidate(ctx, label_str).boxed().await? {
+            if display_target.is_none() {
+                display_target = Some(TargetLabel::parse(
+                    label_str,
+                    root_cell,
+                    &cells,
+                    &alias_resolver,
+                )?);
+            }
+            platforms.push(p);
+        }
+    }
+
+    let mut buckconfig_fallback: Option<ExecutionPlatformFallback> = None;
+    if let Some(value) = buckconfig_label {
+        let target = TargetLabel::parse(&value, root_cell, &cells, &alias_resolver)?;
+        let providers = ctx
+            .get_configuration_analysis_result(&ProvidersLabel::default_for(target.dupe()))
+            .await?;
+        if let Some(reg) = providers
+            .provider_collection()
+            .builtin_provider::<FrozenExecutionPlatformRegistrationInfo>()
+        {
+            let marker_constraint = if let Some(marker_str) = reg.exec_marker_constraint() {
+                let marker_label =
+                    ProvidersLabel::parse(marker_str, root_cell, &cells, &alias_resolver)?;
+                let marker_providers = ctx.get_configuration_analysis_result(&marker_label).await?;
+                let constraint_value_info = marker_providers
+                    .provider_collection()
+                    .builtin_provider::<FrozenConstraintValueInfo>()
+                    .ok_or_else(|| {
+                        kuro_error::Error::from(
+                            ExecutionPlatformComputationError::MissingConstraintValueInfo(
+                                marker_label.dupe(),
+                            ),
+                        )
+                    })?;
+                Some(constraint_value_info.to_constraint_key_value())
+            } else {
+                None
+            };
+            for platform in reg.platforms()? {
+                platforms
+                    .push(platform.to_execution_platform_with_marker(marker_constraint.as_ref())?);
+            }
+            buckconfig_fallback = Some(reg.fallback()?);
+            display_target = Some(target);
+        } else if let Some(p) = load_platform_candidate(ctx, &value).boxed().await? {
+            platforms.push(p);
+            if display_target.is_none() {
+                display_target = Some(target);
+            }
+        } else {
+            return Err(kuro_error::Error::from(
+                ExecutionPlatformComputationError::MissingExecutionPlatformRegistrationInfo(target),
+            ));
+        }
+    }
+
+    if platforms.is_empty() {
+        return Ok(None);
+    }
+
+    let display_target = display_target
+        .internal_error("compute_execution_platforms produced platforms with no display target")?;
+    let fallback = match (
+        buckconfig_fallback,
+        cli_extras.is_empty(),
+        module_registrations.is_empty(),
+    ) {
+        // Only the legacy buckconfig contributed → honor its fallback.
+        (Some(f), true, true) => f,
+        // CLI/MODULE registrations are present → use Bazel's "no
+        // compatible platform → error" semantics so misconfigurations
+        // surface loudly instead of silently routing to the host.
+        _ => ExecutionPlatformFallback::Error,
+    };
+
     Ok(Some(Arc::new(ExecutionPlatformsData::new(
-        execution_platforms_target,
+        display_target,
         platforms,
-        result.fallback()?,
+        fallback,
     ))))
 }
 

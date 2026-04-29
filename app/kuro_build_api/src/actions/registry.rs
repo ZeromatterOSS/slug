@@ -25,6 +25,9 @@ use kuro_artifact::artifact::build_artifact::BuildArtifact;
 use kuro_core::category::Category;
 use kuro_core::deferred::key::DeferredHolderKey;
 use kuro_core::execution_types::execution::ExecutionPlatformResolution;
+use kuro_core::execution_types::executor_config::CommandExecutorConfig;
+use kuro_core::execution_types::executor_config::Executor;
+use kuro_core::execution_types::executor_config::RemoteEnabledExecutorOptions;
 use kuro_core::fs::buck_out_path::BuckOutPathKind;
 use kuro_core::fs::buck_out_path::BuildArtifactPath;
 use kuro_directory::directory;
@@ -63,6 +66,18 @@ pub struct ActionsRegistry<'v> {
     declared_dynamic_outputs: SmallMap<ActionKey, DeclaredArtifact<'v>>,
     pending: Vec<ActionToBeRegistered>,
     pub execution_platform: ExecutionPlatformResolution,
+    /// Plan 24 Phase 2: per-target `exec_properties = {…}` attribute,
+    /// merged onto each action's `RePlatformFields` at registration time
+    /// so the resulting RE Platform message has the right keys for
+    /// per-target overrides (e.g. `container-image`). The platform's
+    /// `re_properties` are layered first; this dict overrides them.
+    target_exec_properties: Arc<std::collections::BTreeMap<String, String>>,
+    /// Plan 24 Phase 4: names of exec groups declared by this rule via
+    /// `rule(exec_groups={...})`. `actions.run(exec_group="<name>")`
+    /// validates against this list — naming a group not in the list
+    /// errors loudly with the valid names, matching Bazel's behavior.
+    /// Empty for rules that didn't declare any exec groups.
+    valid_exec_group_names: Arc<[String]>,
     claimed_output_paths: DirectoryBuilder<Option<FileSpan>, NoDigest>,
     /// Bazel-compat: map from path string → artifact so duplicate declare_file calls return same artifact.
     path_to_artifact: SmallMap<String, DeclaredArtifact<'v>>,
@@ -70,15 +85,51 @@ pub struct ActionsRegistry<'v> {
 
 impl<'v> ActionsRegistry<'v> {
     pub fn new(owner: DeferredHolderKey, execution_platform: ExecutionPlatformResolution) -> Self {
+        Self::new_with_attrs(
+            owner,
+            execution_platform,
+            Arc::new(std::collections::BTreeMap::new()),
+            Arc::from(Vec::<String>::new()),
+        )
+    }
+
+    pub fn new_with_target_exec_properties(
+        owner: DeferredHolderKey,
+        execution_platform: ExecutionPlatformResolution,
+        target_exec_properties: Arc<std::collections::BTreeMap<String, String>>,
+    ) -> Self {
+        Self::new_with_attrs(
+            owner,
+            execution_platform,
+            target_exec_properties,
+            Arc::from(Vec::<String>::new()),
+        )
+    }
+
+    pub fn new_with_attrs(
+        owner: DeferredHolderKey,
+        execution_platform: ExecutionPlatformResolution,
+        target_exec_properties: Arc<std::collections::BTreeMap<String, String>>,
+        valid_exec_group_names: Arc<[String]>,
+    ) -> Self {
         Self {
             owner,
             artifacts: Default::default(),
             declared_dynamic_outputs: SmallMap::new(),
             pending: Default::default(),
             execution_platform,
+            target_exec_properties,
+            valid_exec_group_names,
             claimed_output_paths: DirectoryBuilder::empty(),
             path_to_artifact: SmallMap::new(),
         }
+    }
+
+    /// Plan 24 Phase 4: returns the rule's declared exec_group names so
+    /// `actions.run(exec_group=…)` can validate the user-supplied value
+    /// against the list and surface a clear error with the valid names.
+    pub fn valid_exec_group_names(&self) -> &[String] {
+        &self.valid_exec_group_names
     }
 
     pub fn owner(&self) -> &DeferredHolderKey {
@@ -343,13 +394,17 @@ impl<'v> ActionsRegistry<'v> {
                     }
                 }
 
+                let executor_config = if self.target_exec_properties.is_empty() {
+                    (*self.execution_platform.executor_config()?).dupe()
+                } else {
+                    merge_target_exec_properties_into_executor_config(
+                        self.execution_platform.executor_config()?,
+                        &self.target_exec_properties,
+                    )
+                };
                 actions.insert(
                     key.dupe(),
-                    Arc::new(RegisteredAction::new(
-                        key,
-                        action,
-                        (*self.execution_platform.executor_config()?).dupe(),
-                    )),
+                    Arc::new(RegisteredAction::new(key, action, executor_config)),
                 );
             }
 
@@ -375,6 +430,35 @@ impl<'v> ActionsRegistry<'v> {
 
     pub(crate) fn artifacts_len(&self) -> usize {
         self.artifacts.len()
+    }
+}
+
+/// Plan 24 Phase 2: rebuild a `CommandExecutorConfig` whose
+/// `re_properties` are the receiver's overlaid with the target's
+/// `exec_properties` dict (target wins on key collisions). For
+/// non-`RemoteEnabled` executors the input is returned unchanged —
+/// `re_properties` only exists on the remote-enabled variant, and a
+/// pure-local action has no RE Platform message to populate.
+fn merge_target_exec_properties_into_executor_config(
+    config: &Arc<CommandExecutorConfig>,
+    target_exec_properties: &std::collections::BTreeMap<String, String>,
+) -> Arc<CommandExecutorConfig> {
+    match &config.executor {
+        Executor::RemoteEnabled(opts) => {
+            let merged_re_properties = opts.re_properties.merged_with(
+                target_exec_properties
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone())),
+            );
+            Arc::new(CommandExecutorConfig {
+                executor: Executor::RemoteEnabled(RemoteEnabledExecutorOptions {
+                    re_properties: merged_re_properties,
+                    ..opts.clone()
+                }),
+                options: config.options.clone(),
+            })
+        }
+        _ => config.dupe(),
     }
 }
 

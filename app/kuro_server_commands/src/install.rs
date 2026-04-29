@@ -21,7 +21,6 @@ use std::time::Duration;
 use std::time::Instant;
 
 use async_trait::async_trait;
-use chrono::DateTime;
 use chrono::Utc;
 use dice::DiceComputations;
 use dice::DiceTransaction;
@@ -377,9 +376,8 @@ fn get_random_tcp_port() -> kuro_error::Result<u16> {
     Ok(tcp_port)
 }
 
-fn get_timestamp_as_string() -> kuro_error::Result<String> {
-    let dt = DateTime::from_timestamp(Utc::now().timestamp(), 0).unwrap();
-    Ok(dt.format("%Y%m%d-%H%M%S").to_string())
+fn get_timestamp_as_string() -> String {
+    Utc::now().format("%Y%m%d-%H%M%S").to_string()
 }
 
 fn calculate_hash<T: Hash>(t: &T) -> u64 {
@@ -712,7 +710,7 @@ async fn handle_install_request<'a>(
 
     let log_filename = format!(
         "installer_{}_{}.log",
-        get_timestamp_as_string()?,
+        get_timestamp_as_string(),
         calculate_hash(&install_request_data.installer_label.target().name())
     );
     let log_path = install_log_dir.join(FileName::unchecked_new(&log_filename));

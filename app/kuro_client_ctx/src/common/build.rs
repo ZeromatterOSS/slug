@@ -357,6 +357,7 @@ impl CommonBuildOptions {
                 None
             },
             stamp: self.stamp && !self.nostamp,
+            extra_execution_platforms: self.extra_execution_platforms.clone(),
         }
     }
 }
