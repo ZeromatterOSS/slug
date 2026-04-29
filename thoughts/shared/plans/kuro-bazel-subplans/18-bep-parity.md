@@ -645,11 +645,13 @@ outcome tracing under `action_cache_query` target).
 
 #### 18.10 follow-ups (open)
 
-- **Retire `EXTERNAL_INCLUDE_DIRS`** in favour of dep-traversal
-  gathering at action prep time. Closes the remaining 25% miss-rate
-  gap on the warm path. Tracking this as 18.10.4 once a real consumer
-  rule lands; the sort fix above is good enough for the current
-  benchmark numbers.
+- **Retire `EXTERNAL_INCLUDE_DIRS`** in favour of provider-based
+  include-dir propagation (`CcCompilationContext.{includes,
+  external_includes, system_includes, quote_includes}`) — Bazel's
+  approach. Closes the remaining 25% miss-rate gap on the warm path
+  (membership of the global set still races with action prep; the
+  sort fix only stabilized iteration order). Filed as
+  [Plan 29: cc include-dir determinism](./29-cc-include-dir-determinism.md).
 - **Phase markers in chrome trace.** Today only the synthetic
   `buildTargets` event covers the full build span; emit
   `evaluateTargetPatterns` / `runAnalysisPhase` / `Launch Blaze`

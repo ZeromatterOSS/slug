@@ -292,11 +292,14 @@ The detailed implementation is split into focused sub-plans:
 | [25-remote-execution-buildbuddy.md](./kuro-bazel-subplans/25-remote-execution-buildbuddy.md)         | Make `kuro build … --config=remote` actually dispatch actions to BuildBuddy's RBE workers (currently runs locally despite RE config). Daemon constraint refresh, executor-factory promotion of `Executor::Local` → remote when RE configured, CAS upload smoke test. | **In Progress** (RE wire smoke-test landed; 25.1 next) |
 | [24-exec-platform-resolution.md](./kuro-bazel-subplans/24-exec-platform-resolution.md)               | Constraint-based execution-platform resolution: surface `register_execution_platforms()` + `--extra_execution_platforms` candidates into `compute_execution_platforms`, drive the existing `check_execution_platform` constraint matcher, retire the `legacy_execution_platform` host-fallback for registered workspaces, per-target `exec_properties` overrides, per-exec-group platform selection. Supersedes Plan 11's "no remote exec platform selection" exclusion and Plan 25.3.E/F point-fixes. | **Complete** (Phases 1–7 done modulo Phase 4 step 1 — per-exec-group platform routing — deferred awaiting a consumer rule; clang E2E verified: 4326 actions, 4325 remote on BB, 1 local, BUILD SUCCEEDED in 11m08s) |
 | [26-string-interning.md](./kuro-bazel-subplans/26-string-interning.md)                               | Audit and clean up string-heavy Bazel-compat code written after the Buck2 fork. Extend existing `static_interner`, `ConcurrentTargetLabelInterner`, and scoped attr interning patterns to stable graph identifiers and hot string-keyed maps; document guardrails for future AI-agent work. | **Not Started** |
+| [27-native-language-rule-removal.md](./kuro-bazel-subplans/27-native-language-rule-removal.md)       | Remove/quarantine remaining Buck2-era native language-rule implementations. Convert removed Bazel 9 symbols such as no-load `cc_*` into Bazel-shaped removed-rule diagnostics, migrate kuro-owned fixtures to explicit loads, and keep native modules such as `cc_common` available for external Starlark rulesets. | **Not Started** |
+| [28-builtins-module-architecture.md](./kuro-bazel-subplans/28-builtins-module-architecture.md)       | Add a bundled Bazel builtins module layer, inspired by Bonanza's exports/wrappers pattern but sourced from Bazel 9. Export selected Starlark builtins into BUILD globals, `native`, and external `.bzl` environments; add a rule-implementation wrapper for incremental `ctx` compatibility migration. | **Not Started** |
+| [29-cc-include-dir-determinism.md](./kuro-bazel-subplans/29-cc-include-dir-determinism.md)           | Retire the `EXTERNAL_INCLUDE_DIRS` process-global mutable registry in cc_common; route every `-I` / `-iquote` / `-isystem` / `-idirafter` flag through `CcCompilationContext` providers (matches Bazel + Bonanza). Closes the remaining 25% BB action-cache miss rate from Plan 18.10.3 — the global's *set membership* still races with parallel action prep even after the sort fix. Target: kuro→kuro warm = 99%+ cache hit on `@llvm-project//llvm`. | **Not Started** |
 
-### Remaining Stub Behavior (No Plans Yet)
+### Remaining Stub Behavior
 
-These are hardcoded stubs that bypass real Bazel behavior. Each needs a plan or
-explicit decision that the stub is adequate. Organized by priority.
+These are hardcoded stubs that bypass real Bazel behavior. Each needs a linked
+plan or an explicit decision that the stub is adequate. Organized by priority.
 
 **High Priority (blocks real builds):**
 
@@ -305,7 +308,7 @@ explicit decision that the stub is adequate. Organized by priority.
 | `ToolchainsStub` + 30 per-language stubs | `context.rs:2019` | Real toolchain resolution | Plan 11 |
 | `create_cc_compile_action` hardcoded compiler | `cc_common.rs:1400` | Real CC toolchain compiler path | Plan 11 |
 | `CtxCheat*` family (7 stubs) | `cc_common.rs:702` | Real `actions2ctx_cheat()` for rules_cc | Plan 11 (partially) |
-| `create_cc_analysis_result()` empty stubs | `native_rule_analysis.rs:1015` | Real CC rule analysis | Needs plan |
+| `create_cc_analysis_result()` empty stubs | `native_rule_analysis.rs:1015` | Real CC rule analysis | Plan 27 |
 | `analyze_genquery()` touch stub | `native_rule_analysis.rs:1360` | Real genquery execution | Needs plan |
 | `StampFile` stubs | `context.rs:4873` | Real build status stamping | Needs plan |
 
@@ -323,7 +326,7 @@ explicit decision that the stub is adequate. Organized by priority.
 | `proto_common.get_tool_path()` hardcoded | `proto_common.rs:272` | Protoc path from toolchain | Needs plan |
 | `CppFragment.sysroot()` returns None | `fragments.rs:482` | Real sysroot from CC toolchain | Needs plan |
 | `CppFragment.fdo_instrument()` returns None | `fragments.rs:151` | FDO instrumentation support | Needs plan |
-| `target_platform_has_constraint()` uses host OS | `context.rs:1013` | Real platform constraint query | Needs plan |
+| `target_platform_has_constraint()` uses host OS | `context.rs:1013` | Real platform constraint query | Plan 28 |
 
 **Low Priority (rarely hit, adequate for most builds):**
 
@@ -434,13 +437,21 @@ Quick reference to all phases and their locations:
 | 17    | Platform Support                   | [x] Functional (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; MSVC auto-detection; CcToolchainInfoStub per-platform; --copt/--cxxopt/--linkopt/--strip/--features flags; execution_requirements; PlatformFragment/JavaFragment/AppleFragment/CoverageFragment; 60+ common Bazel CLI flags accepted; package_group visibility resolution; 2026-03-12) |
 | 18    | Query Commands + Test Runner       | [x] Functional (deps, rdeps, allpaths, somepath, kind, attr, filter, buildfiles, tests; --output=label/json/build/graph; kuro test //... runs 4 tests; kuro version/shutdown/fetch Bazel-compat commands; ctx.workspace_name/build_file_path attrs; 2026-03-12) |
 
-### Real-World Compatibility (Phases 19-20) — NEXT
+### Real-World Compatibility and Bazel 9 Follow-ups (Phases 19-28) — NEXT
 
 | Phase | Title                                  | Sub-Plan | Status          |
 | ----- | -------------------------------------- | -------- | --------------- |
 | 19    | Module Extension Execution             | [10-module-extension-execution.md](./kuro-bazel-subplans/10-module-extension-execution.md) | [~] In Progress (extensions execute, 1230+ crate repos materialized, BCR overlays applied, rust extension produces real rust_toolchains; remaining: toolchain_type label mismatch blocks resolution) |
 | 20    | **Toolchain Resolution (NEXT)**        | [11-toolchain-resolution.md](./kuro-bazel-subplans/11-toolchain-resolution.md) | [x] Complete (automated; Rust toolchain_type label mismatch remaining) |
 | 21    | Lazy Toolchain Loading & dev_dep      | [13-lazy-toolchain-loading.md](./kuro-bazel-subplans/13-lazy-toolchain-loading.md) | [ ] Not Started (blocks zeromatter //sdk build) |
+| 22    | CLI Flag Compatibility                 | [22-cli-flag-compat.md](./kuro-bazel-subplans/22-cli-flag-compat.md) | [~] In Progress |
+| 23    | Module Extension Real-World Patterns   | [23-module-extension-realworld.md](./kuro-bazel-subplans/23-module-extension-realworld.md) | [x] Complete |
+| 24    | Exec Platform Resolution               | [24-exec-platform-resolution.md](./kuro-bazel-subplans/24-exec-platform-resolution.md) | [x] Complete |
+| 25    | Remote Execution against BuildBuddy    | [25-remote-execution-buildbuddy.md](./kuro-bazel-subplans/25-remote-execution-buildbuddy.md) | [~] In Progress |
+| 26    | String Interning Cleanup               | [26-string-interning.md](./kuro-bazel-subplans/26-string-interning.md) | [ ] Not Started |
+| 27    | Native Language Rule Removal           | [27-native-language-rule-removal.md](./kuro-bazel-subplans/27-native-language-rule-removal.md) | [ ] Not Started |
+| 28    | Bazel Builtins Module Architecture     | [28-builtins-module-architecture.md](./kuro-bazel-subplans/28-builtins-module-architecture.md) | [ ] Not Started |
+| 29    | cc Include-Dir Determinism             | [29-cc-include-dir-determinism.md](./kuro-bazel-subplans/29-cc-include-dir-determinism.md) | [ ] Not Started |
 
 ---
 
