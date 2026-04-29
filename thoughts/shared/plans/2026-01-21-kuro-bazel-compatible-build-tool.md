@@ -295,6 +295,7 @@ The detailed implementation is split into focused sub-plans:
 | [27-native-language-rule-removal.md](./kuro-bazel-subplans/27-native-language-rule-removal.md)       | Remove/quarantine remaining Buck2-era native language-rule implementations. Convert removed Bazel 9 symbols such as no-load `cc_*` into Bazel-shaped removed-rule diagnostics, migrate kuro-owned fixtures to explicit loads, and keep native modules such as `cc_common` available for external Starlark rulesets. | **Not Started** |
 | [28-builtins-module-architecture.md](./kuro-bazel-subplans/28-builtins-module-architecture.md)       | Add a bundled Bazel builtins module layer, inspired by Bonanza's exports/wrappers pattern but sourced from Bazel 9. Export selected Starlark builtins into BUILD globals, `native`, and external `.bzl` environments; add a rule-implementation wrapper for incremental `ctx` compatibility migration; integrate or remove remaining Buck2 prelude machinery. | **Not Started** |
 | [29-cc-include-dir-determinism.md](./kuro-bazel-subplans/29-cc-include-dir-determinism.md)           | Retire the `EXTERNAL_INCLUDE_DIRS` process-global mutable registry in cc_common; route every `-I` / `-iquote` / `-isystem` / `-idirafter` flag through `CcCompilationContext` providers (matches Bazel + Bonanza). Closes the remaining 25% BB action-cache miss rate from Plan 18.10.3 — the global's *set membership* still races with parallel action prep even after the sort fix. Target: kuro→kuro warm = 99%+ cache hit on `@llvm-project//llvm`. | **Complete** (29.2 + 29.3 + 29.4 landed; full llvm warm = 100% cache hit, 57s wall, digest match=4853/4853; copts now plumbed through `compile_build_variables.user_compile_flags` + `WORKSPACE_ROOT` hardcoded) |
+| [30-bes-upload-throughput.md](./kuro-bazel-subplans/30-bes-upload-throughput.md)                     | Close the BES-upload performance gap to bazel on warm `@llvm-project//llvm` (57 s kuro vs 50 s bazel; profiling pinpointed 23 s post-build BES drain wait as the entire delta). Earlier stream open, tonic flow-control tuning, daemon-resident uploader, parallel lifecycle handshakes. Substrate (tonic / prost) is fine; Connect-rs and grpcio are not viable replacements. | **Not Started** (30.4 already landed: `--bes_upload_mode=nowait` honored) |
 
 ### Remaining Stub Behavior
 
@@ -452,6 +453,7 @@ Quick reference to all phases and their locations:
 | 27    | Native Language Rule Removal           | [27-native-language-rule-removal.md](./kuro-bazel-subplans/27-native-language-rule-removal.md) | [ ] Not Started |
 | 28    | Bazel Builtins Module Architecture     | [28-builtins-module-architecture.md](./kuro-bazel-subplans/28-builtins-module-architecture.md) | [ ] Not Started |
 | 29    | cc Include-Dir Determinism             | [29-cc-include-dir-determinism.md](./kuro-bazel-subplans/29-cc-include-dir-determinism.md) | [x] Complete |
+| 30    | BES Upload Throughput                  | [30-bes-upload-throughput.md](./kuro-bazel-subplans/30-bes-upload-throughput.md) | [ ] Not Started (30.4 done) |
 
 ---
 
