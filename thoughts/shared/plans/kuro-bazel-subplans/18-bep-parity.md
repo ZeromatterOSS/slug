@@ -477,6 +477,189 @@ the test readme; any unpermitted difference fails CI.
 
 ---
 
+### 18.10 BB Timing tab + Action-digest determinism (DONE 2026-04-29)
+
+This phase covers the cluster of follow-ups required to make the
+BuildBuddy invocation page actually render every panel kuro had
+half-populated, and to make kuro's RE action digests stable enough
+that BuildBuddy's CAS hits for the same logical action across daemon
+restarts. The work split into three independent fixes plus a sweep of
+proto/tracing wiring; documenting them together because they were all
+discovered (and verified) by running `kuro build @llvm-project//llvm`
+end-to-end against BuildBuddy and watching the dashboard.
+
+#### 18.10.1 BB Timing tab parity
+
+The `command.profile.gz` chrome-trace upload (18.4) lit up the Timing
+tab's *flamegraph*, but every other Timing-tab card was empty:
+
+| BB card | Driver | Status before | Fix |
+|---|---|---|---|
+| Flamegraph timeline | `command.profile.gz` `X` events | Stuck on "Build is in progress…" for clang-scale | Captured `local_thread_id` + tokio thread name on `ActionExecutionEnd`, used as chrome-trace `tid`; lane labels read off `ThreadName` so BB shows `kuro-rt-N` instead of `Worker N`. Required `data.proto` fields `local_thread_id`/`local_thread_name` (47/48), per-worker tokio name via `thread_name_fn`, monotonic per-thread index in `kuro_util::threads::thread_index()` (mirrors `java.lang.Thread.getId()`). |
+| Phase Breakdown pie (Launch / Evaluation / Analysis / Execution) | `traceEvents` whose `name` is `buildTargets` / `runAnalysisPhase` / `evaluateTargetPatterns` / `Launch Blaze` | Card invisible (filter array filters to empty) | Synthetic `buildTargets` X-event covering `[command_start_us, command_end_us]` so BB sees ≥1 phase slice; remaining phase markers deferred until kuro plumbs per-phase timestamps to the translate layer. |
+| Execution Breakdown pie (Executing locally / Executing remotely / Checking cache hits / …) | trace events keyed by name `subprocess.run`, `execute remotely`, `check cache hit` (or `cat` `local action execution`, `remote output download`) | Card invisible | Per-action *companion* trace event with `cat: "general information"` and `name` selected by `ActionExecutionKind`: `subprocess.run` (Local/LocalWorker), `execute remotely` (Remote), `check cache hit` (ActionCache / LocalDepFile / RemoteDepFileCache). The descriptive event (`cat: "action processing"`, name = `<mnemonic> <label>`) stays so the timeline tooltip is still useful — BB's breakdown only sums by name. |
+| BuildMetrics chips (Action Count, Local Action Cache Hits, runner_count split, target_metrics, timing_metrics, build_graph_metrics) | `BuildMetrics` event from BES stream | Action count populated; everything else empty | Extended `BepStreamState` with per-mnemonic `MnemonicStats` map (actions_executed / first_started_ms / last_ended_ms), per-executor-kind `runner_counts`, ActionCache hit/miss split, `total_action_wall_us`, plus kuro-side accumulators populated by a new `observe_kuro_event(&BuckEvent)` method (Command-span timestamps, BuildGraphInfo critical-path stats, periodic Snapshot samples). `build_metrics_event()` now emits a Bazel-shape `BuildMetrics` with `action_summary.{actions_created, actions_executed, action_data[], runner_count[], action_cache_statistics}`, `target_metrics`, `timing_metrics.{cpu_time_in_ms, wall_time_in_ms, execution_phase_time_in_ms, critical_path_time}`, `build_graph_metrics`. |
+| Time-series line plots panel (CPU usage, Memory usage, System load, Network up/down) — between flamegraph and Breakdown | chrome-trace `C` (counter) events with names matching BB's `TIME_SERIES_METADATA` (`CPU usage (Bazel)`, `Memory usage (Bazel)`, `System load average`, `Network Up/Down usage (total)`, etc.) | Panel hidden (filtered out when no series) | Subscribe to `Instant::Snapshot` events in `BepStreamState`; sample `kuro_rss_bytes`, `kuro_user_cpu_us+kuro_system_cpu_us`, `host_cpu_usage_*`, `unix_system_stats.load1`, sum of `network_interface_stats.{tx,rx}_bytes`. In `build_profile_json()` emit one counter event per series per snapshot — level series (memory, load) directly, rate series (CPU cores = Δus/Δus, network Mbps = Δbytes·8/1e6/Δs) differenced against the prior snapshot. |
+
+Other BES-side fixes that landed in the same arc:
+
+- **Streaming-RPC lifetime**: removed `Endpoint::timeout(config.timeout)`
+  from `grpc_sink::build_endpoint`. tonic was applying it as a *per-RPC
+  deadline*, which cancelled `PublishBuildToolEventStream` mid-build at
+  the default 60 s — BB received the events that fit in the first
+  minute and the trailing `BuildToolLogs` / `BuildMetrics` / lifecycle
+  events were silently dropped. The deadline now only gates *shutdown*
+  via `tokio::time::timeout(timeout, upload_task)` in `BesSink::shutdown`.
+- **`build_id` cross-correlation**: chrome-trace `otherData.build_id`
+  populated from `BesConfig.invocation_id` (was hardcoded `"kuro"`).
+  Required because BB cross-checks the trace's `build_id` against the
+  BES stream's invocation id; mismatch ⇒ BB drops the trace and the
+  Timing tab stays at "Build is in progress…" even when the upload
+  completed.
+- **`bazel_version` shape**: `release 8.0.0-kuro` (was bare `kuro`).
+  BB's parser bails on an absent `release ` token at clang scale.
+- **Trace `tid` semantics**: per-thread monotonic counter, not OS tid.
+  Bazel uses `java.lang.Thread.getId()` which is a monotonic counter
+  too; `gettid(2)` would have been observably-different across daemon
+  restarts and confused BB's lane stitching.
+- **chrono on dates**: `BepStreamState` writes `otherData.date` as
+  `chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S%.9fZ")` instead of the
+  hand-rolled civil-date math.
+
+Verified end-to-end on
+`kuro build @llvm-project//clang:clang --config=remote`: Timing tab
+flamegraph populated with named `kuro-rt-N` lanes, Phase Breakdown +
+Execution Breakdown both render, BuildMetrics chips populated, and
+the time-series line plots show CPU/memory/network/load over the
+build's wall window.
+
+Files: `app/kuro_build_event_stream/src/translate.rs` (the bulk of the
+state-keeping + JSON emit), `app/kuro_build_event_stream/src/grpc_sink.rs`
+(timeout fix), `app/kuro_client_ctx/src/subscribers/bep_bes_sink.rs` +
+`bep_file_sink.rs` (`observe_kuro_event` wiring), `app/kuro_data/data.proto`
+(thread fields), `app/kuro_build_api/src/actions/calculation.rs`
+(thread capture site), `app/kuro_util/src/{threads.rs,tokio_runtime.rs}`
+(thread_index + per-worker tokio name).
+
+#### 18.10.2 RE action-digest determinism (canonical-name fix)
+
+End-to-end test: build `@llvm-project//llvm:Support` in a daemon,
+`kuro killall && rm -rf buck-out/v2/cache buck-out/v2/forkserver`,
+build again. Expected: ≈100% BB action-cache hits on the second build.
+Observed (pre-fix): 22% hits — even though every per-action input root
+matches and every command/env hash matches, the action digest itself
+differs across the two builds.
+
+**Root cause** — *two* code paths in kuro disagreed on the canonical
+prefix for repos generated by an extension defined in the **root**
+module:
+
+- `pending_repo_cells.rs` (Bazel-correct): root module's own extension
+  → canonical name `_main+<ext>+<repo>`. This is what Bazel writes
+  too, and what `pending_repo_cells.rs` registers as the cell path
+  `bazel-external/_main+<ext>+<repo>`.
+- `extension_execution_dice.rs::extract_owning_module` (and the
+  callers that reused it — `extension_repo.rs:481`,
+  `module_extension_executor_impl.rs:438`): returned the root module's
+  *declared* name from `module(name=…)`, e.g. `llvm-project-overlay`,
+  yielding `llvm-project-overlay+<ext>+<repo>`.
+
+Result: kuro materialized one path under bazel-external (the `_main+…`
+one) while later code paths registered dynamic cells / probed file
+paths under the *other* spelling, which never existed. Symptom #1 was
+"package `llvm-project//llvm` does not exist" after `kuro clean`
+(because the extension repo's own files were looked up under the
+non-materialized name); Symptom #2 was that the wrong canonical leaked
+into compile commands as `-I bazel-external/<wrong-prefix>/...`,
+making *every* compile action's digest unique to the kuro daemon
+that produced it. BuildBuddy correctly stored the result under each
+unique digest but the next daemon couldn't find any of them.
+
+**Fix.** `extract_owning_module(extension_id, root_module_name)` now
+substitutes `_main` when the extension's owning module matches the
+root module's declared name. `build_canonical_names` and
+`ModuleExtensionResult::new` thread `root_module_name` through.
+`extension_repo.rs` reads canonical names off `ext_result.canonical_names`
+(single source of truth from `build_canonical_names`) instead of
+recomputing them without root-module context.
+`module_extension_executor_impl.rs` already had `root_module_name` in
+scope at the call site; just passes it now.
+
+Verification: `@llvm-project//llvm:Support` daemon-restart test went
+from 0/183 cache hits to 183/183 cache hits — and *the kuro digests
+matched bazel's*, because the `_main+…` prefix is what bazel's RE
+client stores too.
+
+Files: `app/kuro_bzlmod/src/extension_execution_dice.rs`,
+`app/kuro_bzlmod/src/pending_repo_cells.rs` (test fixtures),
+`app/kuro_external_cells/src/extension_repo.rs`,
+`app/kuro_interpreter_for_build/src/module_extension_executor_impl.rs`.
+
+#### 18.10.3 Compile-flag determinism (`EXTERNAL_INCLUDE_DIRS` ordering)
+
+After 18.10.2 small builds hit 100%, but the full
+`@llvm-project//llvm:llvm` (4.8 k actions) still got only 23% hits
+across kuro→kuro restarts. Per-field hashing of every
+`RE::Command` field — added under `tracing::debug!(target =
+"action_digest_debug", …)` in `command_executor::prepare_action` —
+narrowed it to `args_hash` differing for ~3700 c_compile actions.
+Dumping the full args list for one specific action (`AdornedCFG.pic.o`)
+across two runs showed the *same set* of `-idirafter` flags but in
+*different order*.
+
+**Root cause.** `app/kuro_build_api/src/interpreter/rule_defs/cc_common/mod.rs`
+defines `EXTERNAL_INCLUDE_DIRS: Mutex<Vec<String>>`, a process-global
+mutable registry populated by `register_external_include_dir(...)`
+from inside `cc_common.compile()` and the native `cc_library` stub.
+Order of insertion is whatever the parallel analysis scheduler picks —
+non-deterministic across daemon restarts. `get_external_include_dirs()`
+returned the vec verbatim, so action prep emitted `-idirafter` flags
+in that random order. Compile-command bytes differed → command_digest
+differed → action_digest differed → BB cache miss.
+
+**Fix.** `get_external_include_dirs()` now sorts the vec
+lexicographically before returning. Sort is safe for `-idirafter`
+flags (lowest-priority include search; cross-repo dirs don't shadow
+each other in the LLVM/clang case verified, and Bazel itself doesn't
+guarantee a specific order between them).
+
+Verified: kuro→kuro warm went from 23% hits / 232 s wall to 75% hits /
+81 s wall (2.9× faster on the warm path).
+
+The remaining 25% miss rate is a *deeper* architectural issue that
+this fix only attenuates: `EXTERNAL_INCLUDE_DIRS` membership itself
+varies across runs, because `register_external_include_dir` is called
+during action prep and *which* actions have been prepped by the time
+a particular target's prep runs depends on scheduler order. So an
+action prepped early sees fewer registered dirs than one prepped late.
+The proper fix is to retire the global mutable registry and gather
+include dirs from `cc_compilation_context` deps directly at action
+prep time (proper DICE pure-function model) — see follow-up below.
+
+Files: `app/kuro_build_api/src/interpreter/rule_defs/cc_common/mod.rs`
+(sort + FIXME comment naming the architectural issue),
+`app/kuro_execute/src/execute/command_executor.rs` (per-field
+diagnostic tracing under `action_digest_debug` target),
+`app/kuro_execute_impl/src/executors/action_cache.rs` (HIT/MISS/ERR
+outcome tracing under `action_cache_query` target).
+
+#### 18.10 follow-ups (open)
+
+- **Retire `EXTERNAL_INCLUDE_DIRS`** in favour of dep-traversal
+  gathering at action prep time. Closes the remaining 25% miss-rate
+  gap on the warm path. Tracking this as 18.10.4 once a real consumer
+  rule lands; the sort fix above is good enough for the current
+  benchmark numbers.
+- **Phase markers in chrome trace.** Today only the synthetic
+  `buildTargets` event covers the full build span; emit
+  `evaluateTargetPatterns` / `runAnalysisPhase` / `Launch Blaze`
+  when kuro grows per-phase timestamps in `BepStreamState`.
+- **Memory / package / artifact metrics in `BuildMetrics`.** The
+  Bazel proto exposes them; kuro doesn't yet record the underlying
+  data on the BES side. Defer until a user asks.
+
+---
+
 ### 18.9 OTLP traces (OPEN, P2)
 
 **Parity source.** OpenTelemetry Protocol, `opentelemetry-otlp` crate.

@@ -260,9 +260,22 @@ async fn build_endpoint(config: &BesConfig) -> kuro_error::Result<Endpoint> {
             config.backend
         )
     })?;
-    let endpoint = endpoint
-        .timeout(config.timeout)
-        .connect_timeout(Duration::from_secs(10));
+    // Do NOT set `.timeout(config.timeout)` on the endpoint. tonic
+    // applies that as a per-RPC deadline, and the
+    // `PublishBuildToolEventStream` is a streaming RPC whose lifetime
+    // is the entire build. With `--bes_timeout` defaulting to 60s,
+    // any build longer than a minute would have the stream cancelled
+    // mid-flight ("status: Cancelled, message: \"Timeout expired\"") —
+    // BB would receive only the events that fit in the first 60s and
+    // none of the trailing `BuildToolLogs` / `BuildMetrics`, leaving
+    // the Timing tab stuck at "Build is in progress…".
+    //
+    // `--bes_timeout` semantically gates *shutdown* (how long we wait
+    // for in-flight events to flush at end-of-build); that wait is
+    // implemented in `BesSink::shutdown` via
+    // `tokio::time::timeout(timeout, upload_task)` and doesn't need
+    // any deadline on the gRPC stream itself.
+    let endpoint = endpoint.connect_timeout(Duration::from_secs(10));
     let endpoint = if tls {
         endpoint
             .tls_config(ClientTlsConfig::new().with_webpki_roots())
@@ -401,7 +414,9 @@ where
         tracing::warn!("BES request feeder join error: {e}");
     }
 
-    let _ = drain_task.await;
+    if let Err(e) = drain_task.await {
+        tracing::warn!("BES drain task join error: {e}");
+    }
 
     // Lifecycle: close invocation and build.
     // Without a populated `invocation_status`, BuildBuddy treats the
@@ -475,7 +490,7 @@ async fn feed_requests(
                 seq += 1;
                 let msg = wrap_bazel_event(&cfg, &bep_event, seq);
                 if req_tx.send(msg).await.is_err() {
-                    tracing::warn!("BES tool-event stream closed early");
+                    tracing::warn!("BES tool-event stream closed early at seq={seq}");
                     break;
                 }
             }
@@ -515,12 +530,16 @@ where
 {
     use futures::StreamExt;
     let mut acked = 0u64;
+    let mut last_ack_seq = 0i64;
     while let Some(result) = stream.next().await {
         match result {
-            Ok(_) => acked += 1,
+            Ok(resp) => {
+                acked += 1;
+                last_ack_seq = resp.sequence_number;
+            }
             Err(status) => {
                 tracing::warn!(
-                    "BES tool-event stream rejected: code={:?} message={:?} (after {acked} acks)",
+                    "BES tool-event stream rejected: code={:?} message={:?} (after {acked} acks; last_ack_seq={last_ack_seq})",
                     status.code(),
                     status.message(),
                 );
@@ -528,7 +547,9 @@ where
             }
         }
     }
-    tracing::debug!("BES tool-event stream drained: total ACKs = {acked}");
+    tracing::debug!(
+        "BES tool-event stream drained: total ACKs = {acked}, last_ack_seq = {last_ack_seq}"
+    );
 }
 
 fn wrap_bazel_event(

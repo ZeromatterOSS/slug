@@ -1695,6 +1695,25 @@ message ActionExecutionEnd {
   // Whether the action is expected to be eligible for deduplication across
   // configurations.
   ExpectedEligibleForDedupe expected_eligible_for_dedupe = 46;
+
+  // Plan 24 Phase 6 follow-up: small-integer thread index of the tokio
+  // worker that polled this action's completion. Used as the chrome
+  // trace `tid` for BuildBuddy's Timing tab — without it, all events
+  // stack on a single tid and BB's renderer chokes at clang scale
+  // ("Build is in progress…"). Mirrors Bazel's behavior: for remote
+  // actions, the recorded thread is the *submitting/awaiting* worker,
+  // not the BB executor that ran the compute. Captured by a per-thread
+  // monotonic counter (see `kuro_util::thread_index`); 0 means the
+  // index wasn't captured (e.g. test fixtures that build the proto
+  // by hand).
+  uint64 local_thread_id = 47;
+
+  // The OS-thread name set by tokio's `thread_name_fn` (e.g.
+  // `kuro-rt-3`). Used as the chrome trace lane label so BuildBuddy's
+  // Timing tab shows the actual runtime worker rather than a bare
+  // `Worker N` placeholder. Empty when the thread had no name (e.g.
+  // unit-test fixtures that synthesize the event proto directly).
+  string local_thread_name = 48;
 }
 
 enum IncrementalKind {

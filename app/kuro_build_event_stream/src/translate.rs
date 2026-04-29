@@ -397,11 +397,17 @@ pub fn translate_action_execution_end(
         .zip(span_duration)
         .map(|(end, dur)| timestamp_minus_duration(end, dur));
 
+    let owner_label = action
+        .key
+        .as_ref()
+        .map(action_owner_label)
+        .unwrap_or_default();
+
     bep::BuildEvent {
         id: Some(bep::BuildEventId {
             id: Some(beid::Id::ActionCompleted(beid::ActionCompletedId {
                 primary_output: String::new(),
-                label: String::new(),
+                label: owner_label.clone(),
                 configuration: None,
             })),
         }),
@@ -417,7 +423,7 @@ pub fn translate_action_execution_end(
             exit_code,
             stdout: None,
             stderr: None,
-            label: String::new(),
+            label: owner_label,
             configuration: None,
             primary_output: None,
             command_line: Vec::new(),
@@ -445,27 +451,279 @@ pub struct BepStreamState {
     /// tab renders blank even when `BuildMetrics.action_data` carries
     /// the same numbers.
     action_traces: Vec<TraceEvent>,
+    /// Invocation UUID used to populate the chrome trace's
+    /// `otherData.build_id`. BB cross-references this with the
+    /// invocation_id in the BES stream — for large traces (clang's
+    /// 4326 actions) BB's Timing tab gets stuck in "Build is in
+    /// progress…" if the build_id doesn't match. Defaults to "kuro"
+    /// for tests / contexts without a real invocation_id.
+    build_id: String,
+    /// Build start time as ISO 8601 (e.g.
+    /// `"2026-04-27T23:43:25.675932295Z"`) for the chrome trace's
+    /// `otherData.date`. Captured at construction. Bazel sets the same
+    /// field; BB's Timing parser uses it to anchor the timeline.
+    profile_start_iso: String,
+    /// Build start time as milliseconds since the Unix epoch, mirroring
+    /// Bazel's `otherData.profile_start_ts`. Same purpose as
+    /// `profile_start_iso` but in numeric form.
+    profile_start_ms: i64,
+    /// Local action-cache hit count
+    /// (`ActionExecutionKind::ActionCache`). Drives the
+    /// "Local Action Cache Hits" counter on BB's invocation page,
+    /// surfaced via `BuildMetrics.action_summary.action_cache_statistics`.
+    local_action_cache_hits: i32,
+    /// Actions that did NOT come from the local action cache
+    /// (i.e. ran locally / remotely or hit a remote cache). Recorded
+    /// as cache `misses` per the `ActionCacheStatistics` proto.
+    local_action_cache_misses: i32,
+    /// Per-mnemonic action stats. Bazel emits one
+    /// `ActionSummary.ActionData` row per mnemonic; BB uses this to
+    /// populate the per-mnemonic action breakdown. Keyed by mnemonic
+    /// string (e.g. `c_compile`, `cpp_link`).
+    actions_by_mnemonic: std::collections::HashMap<String, MnemonicStats>,
+    /// Per-executor-kind action counts ("local", "remote",
+    /// "remote-cache", etc.). Maps to Bazel's
+    /// `ActionSummary.runner_count[]` rows on BB's invocation page —
+    /// the breakdown chip that shows e.g. "1 local, 3499 remote".
+    runner_counts: std::collections::HashMap<String, i32>,
+    /// Sum of action wall-time durations in microseconds. Used as a
+    /// rough stand-in for Bazel's `TimingMetrics.cpu_time_in_ms` —
+    /// kuro doesn't separately track per-action OS-level CPU time, so
+    /// the sum of action wall durations is the best we can do without
+    /// additional per-action getrusage() instrumentation.
+    total_action_wall_us: i64,
+    /// Critical-path duration in microseconds, sourced from kuro's
+    /// terminal `BuildGraphExecutionInfo` instant event. Drives
+    /// Bazel's `TimingMetrics.critical_path_time` field, which BB's
+    /// invocation page renders as the "Critical path: 2m43s" chip.
+    critical_path_us: u64,
+    /// Action-graph node + edge counts from
+    /// `BuildGraphExecutionInfo`. Surface as
+    /// `BuildMetrics.build_graph_metrics.action_lookup_value_count` /
+    /// `action_count` so BB's invocation page can show the build
+    /// graph size. Approximations — BB's nomenclature treats these
+    /// as Bazel SkyFunction nodes, kuro's are DICE nodes; we map
+    /// them 1:1 since the user-visible counts roughly correspond.
+    graph_num_nodes: u64,
+    graph_num_edges: u64,
+    /// Wall-clock span of the top-level `Command` span — captured at
+    /// `CommandStart` and finalised at `CommandEnd`. Used as
+    /// `TimingMetrics.wall_time_in_ms` (overrides the action-span
+    /// estimate so analysis-only / cached-only invocations still get
+    /// a meaningful wall time).
+    command_start_us: i64,
+    command_end_us: i64,
+    /// Periodic system snapshots (rss, cpu, load, network) the kuro
+    /// daemon emits as `Instant::Snapshot` events. Drives the chrome
+    /// trace's counter (`ph: "C"`) events that BB renders as the
+    /// time-series line plots panel between the flamegraph and the
+    /// Timing Breakdown card. Without this panel the trace viewer
+    /// silently drops it (line plots panel is filtered out when
+    /// empty), which is why kuro builds previously had only the
+    /// flamegraph + breakdown but no metrics-over-time plots.
+    snapshots: Vec<SnapshotSample>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct SnapshotSample {
+    /// Microseconds since epoch.
+    ts_us: i64,
+    /// Daemon RSS in bytes. Drives "Memory usage (Bazel)" series (MB).
+    kuro_rss_bytes: u64,
+    /// Daemon user+system CPU time accumulated. Differenced across
+    /// consecutive samples to derive "CPU usage (Bazel)" (cores).
+    kuro_cpu_us: u64,
+    /// Host user+system CPU time accumulated since command start
+    /// (multi-core, may exceed wall by N cores). Differenced for
+    /// "CPU usage (total)" (cores).
+    host_cpu_ms: u64,
+    /// 1-minute system load average. Direct value to "System load
+    /// average" series.
+    load1: f64,
+    /// Sum of `tx_bytes` across all interfaces. Differenced for
+    /// "Network Up usage (total)" (Mbps).
+    net_tx_bytes: u64,
+    /// Sum of `rx_bytes` across all interfaces. Differenced for
+    /// "Network Down usage (total)" (Mbps).
+    net_rx_bytes: u64,
+}
+
+#[derive(Debug, Default, Clone)]
+struct MnemonicStats {
+    /// Total executed actions of this mnemonic. Cache hits count
+    /// (matching Bazel's `ActionData.actions_executed` semantics:
+    /// "includes remote cache hits but excludes local action cache
+    /// hits"). Filtered at observation time so this only counts
+    /// non-local-cache actions.
+    actions_executed: i64,
+    /// Earliest start_time_ms across this mnemonic's action events.
+    /// Stays at `i64::MAX` until the first event arrives so a `min()`
+    /// pattern works correctly.
+    first_started_ms: i64,
+    /// Latest end_time_ms across this mnemonic's action events.
+    last_ended_ms: i64,
 }
 
 #[derive(Clone, Debug)]
 struct TraceEvent {
+    /// Bazel-shape descriptive event name (e.g.
+    /// `Compiling external/llvm-project/llvm/lib/Foo.cpp`).
+    /// For our actions we currently produce `<mnemonic> <label>` since
+    /// kuro doesn't track the human-readable action description that
+    /// rules_cc would synthesize. BB's Timing tab uses this for the
+    /// per-event tooltip.
     name: String,
+    /// Chrome trace `cat` (event category). Action events use the
+    /// literal string `"action processing"` — Bazel's convention; BB
+    /// filters by it to identify action events in the Timing tab.
     category: String,
+    /// The action's mnemonic (e.g. `c_compile`, `cpp_link`,
+    /// `Genrule`). Embedded as `args.mnemonic` in the chrome trace
+    /// event JSON, matching Bazel's shape. Non-action events (test,
+    /// general) leave this empty and the JSON omits `args`.
+    mnemonic: String,
     /// Start in microseconds since epoch.
     ts_us: i64,
     /// Duration in microseconds.
     dur_us: i64,
+    /// Chrome trace `tid`. Sourced from the kuro action's
+    /// `local_thread_id` (the OS thread id of the worker that polled
+    /// the action's completion). `0` means "not captured" — the
+    /// trace renderer skips emitting events with tid 0 for actions
+    /// (tid 0 is reserved for the Critical Path lane in our schema).
+    tid: u64,
+    /// OS thread name (e.g. `kuro-rt-3`). Used as the chrome trace
+    /// `thread_name` metadata for this `tid` so BB's Timing tab shows
+    /// "kuro-rt-3" instead of a bare "Worker 3" placeholder. Empty
+    /// when the thread had no name (test fixtures, callers without a
+    /// tokio runtime).
+    thread_name: String,
+    /// Kuro `ActionExecutionKind` raw int — drives the companion
+    /// "breakdown-friendly" trace event name BB's Timing tab's
+    /// Execution Breakdown card filters on
+    /// (`subprocess.run` / `execute remotely` / `check cache hit`).
+    /// 0 means "not an action event"; no companion gets emitted.
+    execution_kind: i32,
 }
 
 impl BepStreamState {
     pub fn new() -> Self {
-        Self::default()
+        let (iso, ms) = current_time_pair();
+        Self {
+            build_id: "kuro".to_owned(),
+            profile_start_iso: iso,
+            profile_start_ms: ms,
+            ..Self::default()
+        }
+    }
+
+    /// Construct a state whose chrome trace's `otherData.build_id`
+    /// matches the BES invocation_id. BB's Timing tab cross-references
+    /// these — without the match, large invocations stay stuck in
+    /// "Build is in progress…" even after the BuildFinished /
+    /// BuildMetrics events arrive.
+    pub fn with_invocation_id(invocation_id: String) -> Self {
+        let (iso, ms) = current_time_pair();
+        Self {
+            build_id: invocation_id,
+            profile_start_iso: iso,
+            profile_start_ms: ms,
+            ..Self::default()
+        }
     }
 
     /// Walk a translated BEP event and update internal counters. Call this
     /// after `translate_buck_event` for each emitted BEP event so the
     /// final `BuildMetrics` reflects what we actually streamed.
-    pub fn observe(&mut self, event: &bep::BuildEvent) {
+    ///
+    /// Observe a raw kuro `BuckEvent` (regardless of whether it
+    /// translates to a BEP event). Picks up data that's only on the
+    /// kuro side — `BuildGraphExecutionInfo` for critical-path stats
+    /// and graph sizing, plus top-level `Command` span timestamps for
+    /// the invocation wall time. Idempotent and safe to call before
+    /// `observe`.
+    pub fn observe_kuro_event(&mut self, event: &data::BuckEvent) {
+        let ts_us = event
+            .timestamp
+            .as_ref()
+            .map(|t| t.seconds * 1_000_000 + i64::from(t.nanos / 1_000));
+        match event.data.as_ref() {
+            Some(data::buck_event::Data::SpanStart(span)) => {
+                if let Some(data::span_start_event::Data::Command(_)) = span.data.as_ref() {
+                    if let Some(t) = ts_us {
+                        // Latest CommandStart wins — there should be
+                        // at most one in a normal invocation.
+                        self.command_start_us = t;
+                    }
+                }
+            }
+            Some(data::buck_event::Data::SpanEnd(span)) => {
+                if let Some(data::span_end_event::Data::Command(_)) = span.data.as_ref() {
+                    if let Some(t) = ts_us {
+                        self.command_end_us = t;
+                    }
+                }
+            }
+            Some(data::buck_event::Data::Instant(instant)) => match instant.data.as_ref() {
+                Some(data::instant_event::Data::BuildGraphInfo(info)) => {
+                    self.graph_num_nodes = info.num_nodes;
+                    self.graph_num_edges = info.num_edges;
+                    self.critical_path_us = info
+                        .critical_path2
+                        .iter()
+                        .map(|e| {
+                            e.duration
+                                .as_ref()
+                                .map(|d| {
+                                    (d.seconds as u64).saturating_mul(1_000_000)
+                                        + (d.nanos as u64 / 1_000)
+                                })
+                                .unwrap_or(0)
+                        })
+                        .sum();
+                }
+                Some(data::instant_event::Data::Snapshot(snap)) => {
+                    if let Some(t) = ts_us {
+                        let net: (u64, u64) = snap.network_interface_stats.values().fold(
+                            (0u64, 0u64),
+                            |(tx, rx), stats| {
+                                (
+                                    tx.saturating_add(stats.tx_bytes),
+                                    rx.saturating_add(stats.rx_bytes),
+                                )
+                            },
+                        );
+                        self.snapshots.push(SnapshotSample {
+                            ts_us: t,
+                            kuro_rss_bytes: snap.kuro_rss.unwrap_or(0),
+                            kuro_cpu_us: snap
+                                .kuro_user_cpu_us
+                                .saturating_add(snap.kuro_system_cpu_us),
+                            host_cpu_ms: snap
+                                .host_cpu_usage_system_ms
+                                .unwrap_or(0)
+                                .saturating_add(snap.host_cpu_usage_user_ms.unwrap_or(0)),
+                            load1: snap
+                                .unix_system_stats
+                                .as_ref()
+                                .map(|s| s.load1)
+                                .unwrap_or(0.0),
+                            net_tx_bytes: net.0,
+                            net_rx_bytes: net.1,
+                        });
+                    }
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+    }
+
+    /// `source` is the original kuro `BuckEvent` the BEP event was
+    /// derived from. The chrome trace's `tid` is sourced from there
+    /// (`ActionExecutionEnd.local_thread_id`) — BEP's `Action` event
+    /// has no thread-id field so we read it off the kuro side.
+    pub fn observe(&mut self, source: Option<&data::BuckEvent>, event: &bep::BuildEvent) {
         match event.payload.as_ref() {
             Some(bep::build_event::Payload::Action(action)) => {
                 self.actions_executed += 1;
@@ -502,11 +760,91 @@ impl BepStreamState {
                     } else {
                         format!("{} {}", mnemonic, label)
                     };
+                    let action_end = source
+                        .and_then(|e| e.data.as_ref())
+                        .and_then(|d| match d {
+                            data::buck_event::Data::SpanEnd(se) => se.data.as_ref(),
+                            _ => None,
+                        })
+                        .and_then(|sed| match sed {
+                            data::span_end_event::Data::ActionExecution(ae) => Some(ae),
+                            _ => None,
+                        });
+                    let tid = action_end.map(|ae| ae.local_thread_id).unwrap_or(0);
+                    let thread_name = action_end
+                        .map(|ae| ae.local_thread_name.clone())
+                        .unwrap_or_default();
+
+                    // Track local action-cache hits separately. Bazel's
+                    // `ActionSummary.actions_executed` and per-mnemonic
+                    // `ActionData.actions_executed` explicitly *exclude*
+                    // local action-cache hits (their docs: "includes
+                    // remote cache hits but excludes local action cache
+                    // hits") — those go in `action_cache_statistics`.
+                    let exec_kind = action_end.map(|ae| ae.execution_kind).unwrap_or(0);
+                    let is_local_action_cache_hit =
+                        exec_kind == data::ActionExecutionKind::ActionCache as i32;
+                    if is_local_action_cache_hit {
+                        self.local_action_cache_hits =
+                            self.local_action_cache_hits.saturating_add(1);
+                    } else {
+                        self.local_action_cache_misses =
+                            self.local_action_cache_misses.saturating_add(1);
+                        let entry = self.actions_by_mnemonic.entry(mnemonic.clone()).or_insert(
+                            MnemonicStats {
+                                actions_executed: 0,
+                                first_started_ms: i64::MAX,
+                                last_ended_ms: 0,
+                            },
+                        );
+                        entry.actions_executed += 1;
+                        entry.first_started_ms = entry.first_started_ms.min(start / 1_000);
+                        entry.last_ended_ms = entry.last_ended_ms.max(end / 1_000);
+                    }
+
+                    // Track per-executor-kind counts for Bazel's
+                    // `ActionSummary.runner_count` chips. Names match
+                    // Bazel's display strings ("local", "remote", …).
+                    // Local-cache hits get their own bucket so the
+                    // chip totals reconcile to the cli's
+                    // `Commands: N (cached: A, remote: B, local: C)`.
+                    let kind_name = match data::ActionExecutionKind::try_from(exec_kind)
+                        .unwrap_or(data::ActionExecutionKind::NotSet)
+                    {
+                        data::ActionExecutionKind::Local => "local",
+                        data::ActionExecutionKind::Remote => "remote",
+                        data::ActionExecutionKind::ActionCache => "local-cache",
+                        data::ActionExecutionKind::Simple => "internal",
+                        data::ActionExecutionKind::Deferred => "deferred",
+                        data::ActionExecutionKind::LocalDepFile => "local-dep-file-cache",
+                        data::ActionExecutionKind::LocalWorker => "worker",
+                        data::ActionExecutionKind::RemoteDepFileCache => "remote-dep-file-cache",
+                        _ => "unknown",
+                    };
+                    *self.runner_counts.entry(kind_name.to_owned()).or_insert(0) += 1;
+
+                    // Sum action wall durations for `cpu_time_in_ms`.
+                    // Per-action OS-level CPU time isn't tracked at
+                    // this layer, so wall-sum is the best proxy.
+                    self.total_action_wall_us = self.total_action_wall_us.saturating_add(dur);
+                    // BB's Timing tab filters action events by `cat
+                    // == "action processing"` — that's the literal
+                    // string Bazel writes. Putting the mnemonic in
+                    // `cat` (as kuro did before) made BB's parser
+                    // ignore everything as "unknown event," so the
+                    // tab stayed at "Build is in progress…" even
+                    // when our trace was structurally well-formed.
+                    // The mnemonic moves to `args.mnemonic`,
+                    // matching Bazel exactly.
                     self.action_traces.push(TraceEvent {
                         name,
-                        category: mnemonic,
+                        category: "action processing".to_owned(),
+                        mnemonic,
                         ts_us: start,
                         dur_us: dur,
+                        tid,
+                        thread_name,
+                        execution_kind: exec_kind,
                     });
                 }
             }
@@ -558,17 +896,40 @@ impl BepStreamState {
     /// Notable: action `X` events do NOT include `args` when there's
     /// nothing to put in them (kuro previously emitted `"args":{}`),
     /// the `tid` is always set, and Bazel pretty-prints with newlines
-    /// between events. The `otherData` is a Bazel-specific manifest
-    /// — `build_tool` isn't a field name Bazel uses, so we mirror the
-    /// real names with kuro-shaped values.
+    /// between events.
+    ///
+    /// `otherData` shape mirrors Bazel's exactly — including
+    /// `bazel_version`, `build_id`, `output_base`, `date`, and
+    /// `profile_start_ts`. Earlier kuro versions only emitted the
+    /// first three; BuildBuddy's Timing tab tolerated the abbreviated
+    /// form on small invocations (a few hundred actions) but stayed
+    /// stuck at "Build is in progress…" for clang-scale builds (~4500
+    /// actions). Aligning with Bazel's full schema fixes the large
+    /// case. `bazel_version` reads `release 8.0.0-kuro` rather than a
+    /// bare `kuro` because BB parses the leading `release ` token.
+    ///
+    /// Tid assignment matches Bazel: each event's `tid` is the
+    /// `local_thread_id` captured at action-end time — a process-wide
+    /// monotonic counter incremented per OS thread, the same scheme
+    /// `java.lang.Thread.getId()` uses. Each tokio worker that polls
+    /// an action's completion gets one stable id, and parallel actions
+    /// fan out across distinct tids. For remote actions the tid is
+    /// the *submitting/awaiting* worker, not the BB executor that ran
+    /// the compute — Bazel does the same. `tid=0` is reserved for the
+    /// Critical Path metadata lane; events with `tid==0` (i.e. trace
+    /// events from before `local_thread_id` plumbing existed, or test
+    /// fixtures) are bumped to `tid=1` so they don't collide with
+    /// Critical Path.
     pub fn build_profile_json(&self) -> String {
-        let mut json = String::with_capacity(256 + self.action_traces.len() * 160);
+        let mut json = String::with_capacity(512 + self.action_traces.len() * 160);
         json.push_str(r#"{"otherData":{"#);
         json.push_str(&format!(
-            r#""bazel_version":"kuro","build_id":{build_id},"output_base":""#,
-            build_id = json_string("kuro"),
+            r#""bazel_version":"release 8.0.0-kuro","build_id":{build_id},"output_base":"","date":{date},"profile_start_ts":{ts}"#,
+            build_id = json_string(&self.build_id),
+            date = json_string(&self.profile_start_iso),
+            ts = self.profile_start_ms,
         ));
-        json.push_str(r#""}"#);
+        json.push_str(r#"}"#);
         json.push_str(
             r#","traceEvents":[
 "#,
@@ -579,23 +940,199 @@ impl BepStreamState {
         json.push_str(
             ",\n    {\"name\":\"thread_sort_index\",\"ph\":\"M\",\"pid\":1,\"tid\":0,\"args\":{\"sort_index\":0}}",
         );
+
         let origin_us = self
             .action_traces
             .iter()
             .map(|e| e.ts_us)
             .min()
             .unwrap_or(0);
+
+        // Bump the "not captured" sentinel (0) up to 1 so events don't
+        // collide with the Critical Path lane.
+        let event_tid = |e: &TraceEvent| -> u64 { if e.tid == 0 { 1 } else { e.tid } };
+
+        // Emit a `thread_name` / `thread_sort_index` metadata pair for
+        // every distinct tid that appears on an action event, in
+        // ascending order. Without these declarations BB renders the
+        // tid as a numeric label (e.g. `42`). The lane label prefers
+        // the OS thread's actual name (e.g. `kuro-rt-3` from tokio's
+        // `thread_name_fn`) — that mirrors Bazel's
+        // `Thread.currentThread().getName()` shape (e.g.
+        // `skyframe-evaluator-N`). Falls back to `Worker N` when no
+        // name was captured (test fixtures, callers without a tokio
+        // runtime).
+        let mut tid_to_name: std::collections::BTreeMap<u64, String> =
+            std::collections::BTreeMap::new();
+        for e in &self.action_traces {
+            let tid = event_tid(e);
+            let entry = tid_to_name.entry(tid).or_default();
+            // Keep the first non-empty name we see for this tid.
+            // Different actions on the same OS thread (which work-
+            // stealing is allowed to do) all share that thread's
+            // name, so any non-empty value is correct.
+            if entry.is_empty() && !e.thread_name.is_empty() {
+                *entry = e.thread_name.clone();
+            }
+        }
+        for (tid, name) in &tid_to_name {
+            let label = if name.is_empty() {
+                format!("Worker {tid}")
+            } else {
+                name.clone()
+            };
+            json.push_str(&format!(
+                ",\n    {{\"name\":\"thread_name\",\"ph\":\"M\",\"pid\":1,\"tid\":{tid},\"args\":{{\"name\":{label}}}}}",
+                tid = tid,
+                label = json_string(&label),
+            ));
+            json.push_str(&format!(
+                ",\n    {{\"name\":\"thread_sort_index\",\"ph\":\"M\",\"pid\":1,\"tid\":{tid},\"args\":{{\"sort_index\":{tid}}}}}",
+                tid = tid,
+            ));
+        }
+
         for e in &self.action_traces {
             json.push_str(",\n    ");
             let ts = e.ts_us.saturating_sub(origin_us);
+            let tid = event_tid(e);
             // Field order matches Bazel's `TaskData.writeTraceData`:
-            // `cat`, `name`, `ph`, `ts`, `dur`, `pid`, `tid`.
+            // `cat`, `name`, `ph`, `ts`, `dur`, `pid`, then `args`
+            // (when present), then `tid`. `args.mnemonic` carries
+            // the action mnemonic — BB's Timing tab reads it for the
+            // per-event tooltip and to color the timeline by mnemonic.
+            if e.mnemonic.is_empty() {
+                json.push_str(&format!(
+                    "{{\"cat\":{cat},\"name\":{name},\"ph\":\"X\",\"ts\":{ts},\"dur\":{dur},\"pid\":1,\"tid\":{tid}}}",
+                    name = json_string(&e.name),
+                    cat = json_string(&e.category),
+                    ts = ts,
+                    dur = e.dur_us,
+                    tid = tid,
+                ));
+            } else {
+                json.push_str(&format!(
+                    "{{\"cat\":{cat},\"name\":{name},\"ph\":\"X\",\"ts\":{ts},\"dur\":{dur},\"pid\":1,\"args\":{{\"mnemonic\":{mnemonic}}},\"tid\":{tid}}}",
+                    name = json_string(&e.name),
+                    cat = json_string(&e.category),
+                    ts = ts,
+                    dur = e.dur_us,
+                    mnemonic = json_string(&e.mnemonic),
+                    tid = tid,
+                ));
+            }
+            // Companion event: BB's Timing tab "Execution Breakdown"
+            // pie chart sums durations by *specific* event names —
+            // `subprocess.run` / `execute remotely` / `check cache hit`.
+            // Our descriptive `<mnemonic> <label>` name doesn't match,
+            // so without these companions the breakdown card stays
+            // hidden (its `phaseData`/`executionData` arrays filter
+            // out zero-value entries and the entire card returns nothing
+            // to render). Bazel emits the same shape: one descriptive
+            // action event for the timeline + nested `subprocess.run`
+            // events for the breakdown sums.
+            let companion_name = match data::ActionExecutionKind::try_from(e.execution_kind)
+                .unwrap_or(data::ActionExecutionKind::NotSet)
+            {
+                data::ActionExecutionKind::Local | data::ActionExecutionKind::LocalWorker => {
+                    Some("subprocess.run")
+                }
+                data::ActionExecutionKind::Remote => Some("execute remotely"),
+                data::ActionExecutionKind::ActionCache
+                | data::ActionExecutionKind::LocalDepFile
+                | data::ActionExecutionKind::RemoteDepFileCache => Some("check cache hit"),
+                _ => None,
+            };
+            if let Some(name) = companion_name {
+                json.push_str(&format!(
+                    ",\n    {{\"cat\":\"general information\",\"name\":\"{name}\",\"ph\":\"X\",\"ts\":{ts},\"dur\":{dur},\"pid\":1,\"tid\":{tid}}}",
+                    name = name,
+                    ts = ts,
+                    dur = e.dur_us,
+                    tid = tid,
+                ));
+            }
+        }
+
+        // Synthetic `buildTargets` event covering the entire command
+        // span. BB's Timing tab "Phase breakdown" pie computes
+        // `building = buildTargets - runAnalysisPhase - evaluateTargetPatterns`
+        // and renders only when at least one phase has positive
+        // duration. With analysis + evaluation phases unmeasured (kuro
+        // doesn't yet plumb phase markers through to BES), `buildTargets`
+        // alone yields a single "Execution" slice spanning the whole
+        // build — enough to make the card render.
+        if self.command_end_us > self.command_start_us && self.command_start_us > 0 {
+            let ts = self.command_start_us.saturating_sub(origin_us);
+            let dur = self.command_end_us - self.command_start_us;
             json.push_str(&format!(
-                "{{\"cat\":{cat},\"name\":{name},\"ph\":\"X\",\"ts\":{ts},\"dur\":{dur},\"pid\":1,\"tid\":0}}",
-                name = json_string(&e.name),
-                cat = json_string(&e.category),
+                ",\n    {{\"cat\":\"general information\",\"name\":\"buildTargets\",\"ph\":\"X\",\"ts\":{ts},\"dur\":{dur},\"pid\":1,\"tid\":1}}",
                 ts = ts,
-                dur = e.dur_us,
+                dur = dur,
+            ));
+        }
+
+        // Counter (`ph: "C"`) events for the timeseries panel BB
+        // renders between the flamegraph and the Timing Breakdown
+        // card. BB's `TIME_SERIES_METADATA` table (in
+        // `app/trace/trace_events.ts`) hardcodes the event names + arg
+        // keys that get rendered as line plots: "CPU usage (Bazel)" /
+        // args.cpu, "Memory usage (Bazel)" / args.memory, etc. The
+        // panel filters out empty sections, so without these events
+        // the panel disappears entirely. Rate-style series (CPU
+        // cores, network Mbps) need delta-vs-prev-snapshot; level
+        // series (memory, load) emit the value directly.
+        for (i, snap) in self.snapshots.iter().enumerate() {
+            let ts = snap.ts_us.saturating_sub(origin_us);
+            // Memory in MB — Bazel's plot expects megabytes.
+            let mem_mb = snap.kuro_rss_bytes as f64 / 1_000_000.0;
+            json.push_str(&format!(
+                ",\n    {{\"name\":\"Memory usage (Bazel)\",\"ph\":\"C\",\"ts\":{ts},\"pid\":1,\"tid\":1,\"args\":{{\"memory\":{mem:.2}}}}}",
+                ts = ts,
+                mem = mem_mb,
+            ));
+            json.push_str(&format!(
+                ",\n    {{\"name\":\"System load average\",\"ph\":\"C\",\"ts\":{ts},\"pid\":1,\"tid\":1,\"args\":{{\"load\":{load:.3}}}}}",
+                ts = ts,
+                load = snap.load1,
+            ));
+            // Rate series — need previous snapshot for the delta.
+            if i == 0 {
+                continue;
+            }
+            let prev = &self.snapshots[i - 1];
+            let dt_us = (snap.ts_us - prev.ts_us).max(1) as f64;
+            let dt_s = dt_us / 1_000_000.0;
+            // CPU usage in cores: dt_us of cpu over dt_us of wall.
+            let cpu_kuro_cores = (snap.kuro_cpu_us.saturating_sub(prev.kuro_cpu_us)) as f64 / dt_us;
+            let cpu_host_cores =
+                (snap.host_cpu_ms.saturating_sub(prev.host_cpu_ms)) as f64 * 1_000.0 / dt_us;
+            json.push_str(&format!(
+                ",\n    {{\"name\":\"CPU usage (Bazel)\",\"ph\":\"C\",\"ts\":{ts},\"pid\":1,\"tid\":1,\"args\":{{\"cpu\":{cpu:.3}}}}}",
+                ts = ts,
+                cpu = cpu_kuro_cores,
+            ));
+            json.push_str(&format!(
+                ",\n    {{\"name\":\"CPU usage (total)\",\"ph\":\"C\",\"ts\":{ts},\"pid\":1,\"tid\":1,\"args\":{{\"system cpu\":{cpu:.3}}}}}",
+                ts = ts,
+                cpu = cpu_host_cores,
+            ));
+            // Network throughput in Mbps: bytes*8 / 1e6 / sec.
+            let net_up_mbps = (snap.net_tx_bytes.saturating_sub(prev.net_tx_bytes)) as f64 * 8.0
+                / 1_000_000.0
+                / dt_s;
+            let net_dn_mbps = (snap.net_rx_bytes.saturating_sub(prev.net_rx_bytes)) as f64 * 8.0
+                / 1_000_000.0
+                / dt_s;
+            json.push_str(&format!(
+                ",\n    {{\"name\":\"Network Up usage (total)\",\"ph\":\"C\",\"ts\":{ts},\"pid\":1,\"tid\":1,\"args\":{{\"system network up (Mbps)\":{up:.3}}}}}",
+                ts = ts,
+                up = net_up_mbps,
+            ));
+            json.push_str(&format!(
+                ",\n    {{\"name\":\"Network Down usage (total)\",\"ph\":\"C\",\"ts\":{ts},\"pid\":1,\"tid\":1,\"args\":{{\"system network down (Mbps)\":{dn:.3}}}}}",
+                ts = ts,
+                dn = net_dn_mbps,
             ));
         }
         json.push_str("\n  ]\n}");
@@ -700,19 +1237,184 @@ impl BepStreamState {
     pub fn build_metrics_event(&self) -> bep::BuildEvent {
         use bep::build_event_id as beid;
 
-        let mut action_data = Vec::new();
-        if self.actions_executed > 0 {
-            action_data.push(bep::build_metrics::action_summary::ActionData {
-                mnemonic: String::new(),
-                actions_executed: self.actions_executed,
-                first_started_ms: self.first_action_started_ms,
-                last_ended_ms: self.last_action_ended_ms,
-                system_time: None,
-                user_time: None,
-                actions_created: self.actions_executed,
-            });
-        }
+        // Per-mnemonic action breakdown — Bazel emits one `ActionData`
+        // entry per mnemonic, sorted descending by `actions_executed`.
+        // BB's invocation page renders this as the action-count
+        // summary table. Mnemonics that only saw local-cache hits are
+        // skipped (they don't count as `actions_executed`, and Bazel
+        // only emits non-zero rows here).
+        let mut action_data: Vec<_> = self
+            .actions_by_mnemonic
+            .iter()
+            .map(
+                |(mnemonic, stats)| bep::build_metrics::action_summary::ActionData {
+                    mnemonic: mnemonic.clone(),
+                    actions_executed: stats.actions_executed,
+                    first_started_ms: if stats.first_started_ms == i64::MAX {
+                        0
+                    } else {
+                        stats.first_started_ms
+                    },
+                    last_ended_ms: stats.last_ended_ms,
+                    system_time: None,
+                    user_time: None,
+                    actions_created: stats.actions_executed,
+                },
+            )
+            .collect();
+        action_data.sort_by(|a, b| b.actions_executed.cmp(&a.actions_executed));
 
+        // `executed_total` follows Bazel's "executed actions excluding
+        // local-cache hits" definition. The on-screen "Action Count"
+        // chip on BB shows this directly.
+        let executed_total: i64 = self
+            .actions_by_mnemonic
+            .values()
+            .map(|s| s.actions_executed)
+            .sum();
+
+        // ActionCacheStatistics drives the "Local Action Cache Hits"
+        // panel. Only `hits` and `misses` are populated; the other
+        // fields (size_in_bytes, save_time_in_ms, miss_details) are
+        // bazel internals we don't track.
+        let action_cache_statistics =
+            if self.local_action_cache_hits + self.local_action_cache_misses > 0 {
+                Some(crate::blaze::ActionCacheStatistics {
+                    size_in_bytes: 0,
+                    save_time_in_ms: 0,
+                    hits: self.local_action_cache_hits,
+                    misses: self.local_action_cache_misses,
+                    miss_details: Vec::new(),
+                    load_time_in_ms: 0,
+                    cache_check_semaphore_wait_time_in_ms: 0,
+                })
+            } else {
+                None
+            };
+
+        // Wall-clock spans. Prefer the top-level `Command` span when
+        // we observed both ends — that gives us a meaningful
+        // wall_time even when the build is fully cached / has no
+        // action events. Otherwise fall back to the action-span
+        // estimate. `analysis_phase_time` stays 0 for now (kuro
+        // doesn't surface analysis-phase timing into BES yet); BB's
+        // "Timing Breakdown" pie chart lumps everything into
+        // Execution as a result.
+        let wall_us: i64 =
+            if self.command_end_us > self.command_start_us && self.command_start_us > 0 {
+                self.command_end_us - self.command_start_us
+            } else if self.last_action_ended_ms > self.first_action_started_ms
+                && self.first_action_started_ms > 0
+            {
+                (self.last_action_ended_ms - self.first_action_started_ms) * 1_000
+            } else {
+                0
+            };
+        let exec_us: i64 = if self.last_action_ended_ms > self.first_action_started_ms
+            && self.first_action_started_ms > 0
+        {
+            (self.last_action_ended_ms - self.first_action_started_ms) * 1_000
+        } else {
+            0
+        };
+        let critical_path_time = if self.critical_path_us > 0 {
+            // Saturating cast: critical path durations measured in us
+            // fit comfortably in i32 seconds for any reasonable build,
+            // but bound the conversion just in case.
+            let secs = (self.critical_path_us / 1_000_000) as i64;
+            let nanos = ((self.critical_path_us % 1_000_000) * 1_000) as i32;
+            Some(prost_types::Duration {
+                seconds: secs,
+                nanos,
+            })
+        } else {
+            None
+        };
+        let timing_metrics = if wall_us > 0 || exec_us > 0 {
+            // `cpu_time_in_ms` here is the sum of action wall
+            // durations (a rough proxy — kuro doesn't track per-action
+            // OS-level CPU time). For a heavily parallel build this
+            // exceeds wall_time_in_ms, matching Bazel's behaviour
+            // where summed CPU time also exceeds wall on multi-core
+            // builds.
+            Some(bep::build_metrics::TimingMetrics {
+                cpu_time_in_ms: self.total_action_wall_us / 1_000,
+                wall_time_in_ms: wall_us / 1_000,
+                analysis_phase_time_in_ms: 0,
+                execution_phase_time_in_ms: exec_us / 1_000,
+                actions_execution_start_in_ms: 0,
+                critical_path_time,
+            })
+        } else {
+            None
+        };
+
+        // Build graph metrics (action graph node/edge counts) come
+        // from the terminal `BuildGraphExecutionInfo` instant event.
+        // BB's invocation page surfaces these in the build-graph
+        // summary section.
+        let build_graph_metrics = if self.graph_num_nodes > 0 || self.graph_num_edges > 0 {
+            // Most BuildGraphMetrics fields are SkyFunction-specific
+            // (Bazel evaluator internals); kuro doesn't expose
+            // equivalents. Populate the universal node/action counts
+            // from BuildGraphExecutionInfo and leave the rest at
+            // their proto defaults so the BB invocation page still
+            // gets its build-graph summary chip.
+            Some(bep::build_metrics::BuildGraphMetrics {
+                action_lookup_value_count: self.graph_num_nodes as i32,
+                action_lookup_value_count_not_including_aspects: self.graph_num_nodes as i32,
+                action_count: self.graph_num_nodes as i32,
+                action_count_not_including_aspects: self.graph_num_nodes as i32,
+                input_file_configured_target_count: 0,
+                output_file_configured_target_count: 0,
+                other_configured_target_count: 0,
+                output_artifact_count: 0,
+                post_invocation_skyframe_node_count: self.graph_num_nodes as i32,
+                dirtied_values: Vec::new(),
+                changed_values: Vec::new(),
+                evaluated_values: Vec::new(),
+                built_values: Vec::new(),
+                cleaned_values: Vec::new(),
+                aspect: Vec::new(),
+                rule_class: Vec::new(),
+            })
+        } else {
+            None
+        };
+
+        // Bazel emits one `RunnerCount` row per executor kind
+        // (e.g. `local`, `remote`, `worker`). BB renders these as
+        // chips on the invocation page so the user can see the
+        // local/remote/cache split at a glance. Sorted descending
+        // by count so the heaviest bucket comes first.
+        let mut runner_count: Vec<_> = self
+            .runner_counts
+            .iter()
+            .map(
+                |(name, count)| bep::build_metrics::action_summary::RunnerCount {
+                    name: name.clone(),
+                    count: *count,
+                    exec_kind: name.clone(),
+                },
+            )
+            .collect();
+        runner_count.sort_by(|a, b| b.count.cmp(&a.count));
+
+        tracing::info!(
+            "BuildMetrics emit: actions_executed={} mnemonics={} runner_kinds={} \
+             cache_hits={} cache_misses={} graph_nodes={} crit_path_us={} \
+             wall_us={} cmd_span={}..{}",
+            executed_total,
+            action_data.len(),
+            runner_count.len(),
+            self.local_action_cache_hits,
+            self.local_action_cache_misses,
+            self.graph_num_nodes,
+            self.critical_path_us,
+            wall_us,
+            self.command_start_us,
+            self.command_end_us,
+        );
         bep::BuildEvent {
             id: Some(bep::BuildEventId {
                 id: Some(beid::Id::BuildMetrics(beid::BuildMetricsId {})),
@@ -725,11 +1427,11 @@ impl BepStreamState {
                 action_summary: Some(bep::build_metrics::ActionSummary {
                     actions_created: self.actions_executed,
                     actions_created_not_including_aspects: self.actions_executed,
-                    actions_executed: self.actions_executed,
+                    actions_executed: executed_total,
                     action_data,
                     remote_cache_hits: 0,
-                    runner_count: Vec::new(),
-                    action_cache_statistics: None,
+                    runner_count,
+                    action_cache_statistics,
                 }),
                 memory_metrics: None,
                 target_metrics: Some(bep::build_metrics::TargetMetrics {
@@ -738,10 +1440,10 @@ impl BepStreamState {
                     targets_configured_not_including_aspects: self.targets_configured,
                 }),
                 package_metrics: None,
-                timing_metrics: None,
+                timing_metrics,
                 cumulative_metrics: None,
                 artifact_metrics: None,
-                build_graph_metrics: None,
+                build_graph_metrics,
                 worker_metrics: Vec::new(),
                 network_metrics: None,
                 worker_pool_metrics: None,
@@ -833,6 +1535,19 @@ fn action_key_id(_key: &data::ActionKey) -> String {
     // label + primary output + configuration). Using a placeholder until the
     // callsite supplies the owning target label — see 18.3 for the caller.
     "<action>".to_owned()
+}
+
+/// Render the owning target label from an `ActionKey` as a Bazel-style
+/// `//pkg:name` string (or empty when the key has no `target_label`,
+/// e.g. anon targets / BXL keys / local-resource-setup actions).
+fn action_owner_label(key: &data::ActionKey) -> String {
+    use data::action_key::Owner;
+    match key.owner.as_ref() {
+        Some(Owner::TargetLabel(t))
+        | Some(Owner::TestTargetLabel(t))
+        | Some(Owner::LocalResourceSetup(t)) => render_configured_label(t),
+        _ => String::new(),
+    }
 }
 
 /// `AnalysisEnd` → BEP `TargetConfigured` + `TargetCompleted`.
@@ -1086,4 +1801,320 @@ pub fn system_time_to_timestamp(time: SystemTime) -> Timestamp {
 fn timestamp_to_millis(t: Option<&Timestamp>) -> i64 {
     t.map(|t| t.seconds * 1_000 + i64::from(t.nanos / 1_000_000))
         .unwrap_or_default()
+}
+
+/// Returns `(iso_8601_utc, millis_since_unix_epoch)` for "now". Both
+/// forms feed Bazel-shape `otherData` fields in the chrome trace.
+/// ISO formatting is RFC 3339 in UTC with nanosecond precision and the
+/// `Z` suffix, mirroring Bazel's `Instant.toString()` output (e.g.
+/// `2026-04-27T23:43:25.675932295Z`).
+fn current_time_pair() -> (String, i64) {
+    let now = chrono::Utc::now();
+    // `%9f` = 9-digit fractional seconds (nanoseconds), matching the
+    // shape of Bazel's `java.time.Instant.toString()`. `chrono`'s
+    // built-in `to_rfc3339()` uses microsecond precision and would
+    // fall short of Bazel's 9-digit form.
+    let iso = now.format("%Y-%m-%dT%H:%M:%S%.9fZ").to_string();
+    let ms = now.timestamp_millis();
+    (iso, ms)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `BepStreamState::with_invocation_id` populates the chrome trace's
+    /// `otherData.build_id`. BuildBuddy's Timing tab cross-references this
+    /// with the BES stream's invocation_id; for large invocations
+    /// (~thousands of actions) a mismatch leaves the tab stuck in
+    /// "Build is in progress…". This test pins the substring so a future
+    /// refactor can't silently regress to the hardcoded `"kuro"` literal.
+    #[test]
+    fn chrome_trace_build_id_uses_invocation_id() {
+        let invocation_id = "0d2d7a3f-eae9-4f10-a204-2cbc34961619".to_owned();
+        let mut state = BepStreamState::with_invocation_id(invocation_id.clone());
+        // Push at least one action so build_profile_json() actually emits.
+        state.action_traces.push(TraceEvent {
+            name: "test".to_owned(),
+            category: "Action".to_owned(),
+            mnemonic: "Action".to_owned(),
+            ts_us: 0,
+            dur_us: 1,
+            tid: 7,
+            thread_name: String::new(),
+            execution_kind: 0,
+        });
+        let json = state.build_profile_json();
+        assert!(
+            json.contains(&format!(r#""build_id":"{invocation_id}""#)),
+            "trace JSON must embed the invocation_id as build_id; got: {json}"
+        );
+        assert!(
+            !json.contains(r#""build_id":"kuro""#),
+            "trace JSON must NOT use the hardcoded 'kuro' literal; got: {json}"
+        );
+    }
+
+    /// `BepStreamState::new()` (used in non-BES contexts like file-only
+    /// BEP sinks) keeps the legacy `"kuro"` placeholder. This is fine —
+    /// no BB cross-correlation is happening, and the field is just
+    /// reference metadata.
+    #[test]
+    fn chrome_trace_default_build_id_is_kuro() {
+        let mut state = BepStreamState::new();
+        state.action_traces.push(TraceEvent {
+            name: "test".to_owned(),
+            category: "Action".to_owned(),
+            mnemonic: "Action".to_owned(),
+            ts_us: 0,
+            dur_us: 1,
+            tid: 1,
+            thread_name: String::new(),
+            execution_kind: 0,
+        });
+        let json = state.build_profile_json();
+        assert!(
+            json.contains(r#""build_id":"kuro""#),
+            "default build_id must remain 'kuro'; got: {json}"
+        );
+    }
+
+    /// Pin every Bazel-shape field BB's Timing parser checks for at
+    /// scale. Earlier kuro versions emitted only `bazel_version` /
+    /// `build_id` / `output_base`; BB tolerated this for small builds
+    /// (~hundreds of actions) but the Timing tab stayed stuck at
+    /// "Build is in progress…" for clang-scale invocations. Aligning
+    /// `otherData` with Bazel's full schema (`bazel_version` starts
+    /// with `release `, plus `date` and `profile_start_ts`) and
+    /// fanning action events across distinct worker tids (Bazel's
+    /// trace uses ~hundreds of distinct tids for parallel work)
+    /// restored the large-build path.
+    #[test]
+    fn chrome_trace_matches_bazel_schema() {
+        let mut state = BepStreamState::with_invocation_id("test-id".to_owned());
+        state.action_traces.push(TraceEvent {
+            name: "Compiling foo.cpp".to_owned(),
+            category: "action processing".to_owned(),
+            mnemonic: "c_compile".to_owned(),
+            ts_us: 1_000,
+            dur_us: 500,
+            tid: 7,
+            thread_name: String::new(),
+            execution_kind: 0,
+        });
+        let json = state.build_profile_json();
+
+        // bazel_version begins with "release " — BB parses the leading
+        // token. Bare "kuro" caused the parser to bail at scale.
+        assert!(
+            json.contains(r#""bazel_version":"release "#),
+            "bazel_version must start with 'release '; got: {json}"
+        );
+        // date / profile_start_ts are required for BB's anchoring.
+        assert!(
+            json.contains(r#""date":""#),
+            "trace must include otherData.date; got: {json}"
+        );
+        assert!(
+            json.contains(r#""profile_start_ts":"#),
+            "trace must include otherData.profile_start_ts; got: {json}"
+        );
+        // Captured tid (7) flows through unchanged.
+        assert!(
+            json.contains(r#""args":{"name":"Worker 7"}"#),
+            "trace must declare Worker 7 thread_name; got: {json}"
+        );
+        assert!(
+            json.contains(r#""tid":7}"#),
+            "action event must keep tid=7; got: {json}"
+        );
+        // Action events must use the literal `cat: "action processing"`
+        // (Bazel's convention) and carry the mnemonic in args.
+        assert!(
+            json.contains(r#""cat":"action processing""#),
+            "action event must use cat=\"action processing\"; got: {json}"
+        );
+        assert!(
+            json.contains(r#""args":{"mnemonic":"c_compile"}"#),
+            "action event must carry mnemonic in args; got: {json}"
+        );
+    }
+
+    /// Each distinct captured tid produces exactly one
+    /// `thread_name`/`thread_sort_index` metadata pair. Two events on
+    /// the same tid (same worker thread polled both completions) share
+    /// the same Worker N row; events on different tids each declare
+    /// their own row. This mirrors Bazel's behavior where one JVM
+    /// thread can handle many sequential actions.
+    #[test]
+    fn chrome_trace_distinct_tids_declare_distinct_workers() {
+        let mut state = BepStreamState::with_invocation_id("test-id".to_owned());
+        state.action_traces.push(TraceEvent {
+            name: "a".to_owned(),
+            category: "action processing".to_owned(),
+            mnemonic: "c".to_owned(),
+            ts_us: 1_000,
+            dur_us: 500,
+            tid: 3,
+            thread_name: String::new(),
+            execution_kind: 0,
+        });
+        state.action_traces.push(TraceEvent {
+            name: "b".to_owned(),
+            category: "action processing".to_owned(),
+            mnemonic: "c".to_owned(),
+            ts_us: 2_000,
+            dur_us: 500,
+            tid: 5,
+            thread_name: String::new(),
+            execution_kind: 0,
+        });
+        // Same tid as the first event — should not produce a second
+        // Worker 3 declaration.
+        state.action_traces.push(TraceEvent {
+            name: "c".to_owned(),
+            category: "action processing".to_owned(),
+            mnemonic: "c".to_owned(),
+            ts_us: 3_000,
+            dur_us: 500,
+            tid: 3,
+            thread_name: String::new(),
+            execution_kind: 0,
+        });
+        let json = state.build_profile_json();
+
+        assert!(
+            json.contains(r#""args":{"name":"Worker 3"}"#),
+            "Worker 3 must be declared; got: {json}"
+        );
+        assert!(
+            json.contains(r#""args":{"name":"Worker 5"}"#),
+            "Worker 5 must be declared; got: {json}"
+        );
+        // Worker 3 declared exactly once even though two events share it.
+        assert_eq!(
+            json.matches(r#""args":{"name":"Worker 3"}"#).count(),
+            1,
+            "Worker 3 must be declared exactly once for two events on tid=3; got: {json}"
+        );
+    }
+
+    /// When a `thread_name` is captured (e.g. tokio's
+    /// `thread_name_fn` set the worker's name to `kuro-rt-3`), the
+    /// chrome trace lane label uses that name verbatim instead of the
+    /// `Worker N` placeholder. Mirrors Bazel's
+    /// `Thread.currentThread().getName()` shape (e.g.
+    /// `skyframe-evaluator-N`).
+    #[test]
+    fn chrome_trace_uses_captured_thread_name_for_lane_label() {
+        let mut state = BepStreamState::with_invocation_id("test-id".to_owned());
+        state.action_traces.push(TraceEvent {
+            name: "a".to_owned(),
+            category: "action processing".to_owned(),
+            mnemonic: "c_compile".to_owned(),
+            ts_us: 1_000,
+            dur_us: 500,
+            tid: 3,
+            thread_name: "kuro-rt-3".to_owned(),
+            execution_kind: 0,
+        });
+        let json = state.build_profile_json();
+
+        // Lane label is the captured OS thread name, not "Worker 3".
+        assert!(
+            json.contains(r#""args":{"name":"kuro-rt-3"}"#),
+            "lane label must use captured thread name; got: {json}"
+        );
+        assert!(
+            !json.contains(r#""args":{"name":"Worker 3"}"#),
+            "lane label must NOT fall back to Worker 3 when name is captured; got: {json}"
+        );
+    }
+
+    /// Events with the "not captured" sentinel (`tid=0`) get bumped up
+    /// to `tid=1`. tid=0 is reserved for the Critical Path metadata
+    /// lane; mixing action events there would break BB's renderer.
+    #[test]
+    fn chrome_trace_zero_tid_is_bumped_to_worker_1() {
+        let mut state = BepStreamState::with_invocation_id("test-id".to_owned());
+        state.action_traces.push(TraceEvent {
+            name: "a".to_owned(),
+            category: "action processing".to_owned(),
+            mnemonic: "c".to_owned(),
+            ts_us: 1_000,
+            dur_us: 500,
+            tid: 0,
+            thread_name: String::new(),
+            execution_kind: 0,
+        });
+        let json = state.build_profile_json();
+
+        assert!(
+            json.contains(r#""args":{"name":"Worker 1"}"#),
+            "tid=0 must be bumped to Worker 1; got: {json}"
+        );
+        assert!(
+            !json.contains(r#""ph":"X","ts":0,"dur":500,"pid":1,"tid":0"#),
+            "action event must NOT keep tid=0 (reserved for Critical Path); got: {json}"
+        );
+    }
+
+    /// `build_metrics_event` now emits per-mnemonic `ActionData`
+    /// breakdown rows + `action_cache_statistics` + `timing_metrics`.
+    /// BB's invocation page reads these for the action-count summary
+    /// table, the "Local Action Cache Hits" panel, and the wall-time
+    /// chip respectively.
+    #[test]
+    fn build_metrics_carries_per_mnemonic_breakdown_and_cache_stats() {
+        use crate::build_event_stream::build_event::Payload;
+
+        let mut state = BepStreamState::with_invocation_id("test-id".to_owned());
+        // Two c_compile actions + one cpp_link action — non-cached.
+        state.actions_by_mnemonic.insert(
+            "c_compile".to_owned(),
+            MnemonicStats {
+                actions_executed: 2,
+                first_started_ms: 1_000,
+                last_ended_ms: 2_500,
+            },
+        );
+        state.actions_by_mnemonic.insert(
+            "cpp_link".to_owned(),
+            MnemonicStats {
+                actions_executed: 1,
+                first_started_ms: 2_500,
+                last_ended_ms: 3_000,
+            },
+        );
+        state.local_action_cache_hits = 5;
+        state.local_action_cache_misses = 3;
+        state.first_action_started_ms = 1_000;
+        state.last_action_ended_ms = 3_000;
+        state.targets_configured = 7;
+
+        let event = state.build_metrics_event();
+        let payload = match event.payload {
+            Some(Payload::BuildMetrics(m)) => m,
+            other => panic!("expected BuildMetrics payload, got {other:?}"),
+        };
+
+        let summary = payload.action_summary.expect("ActionSummary");
+        // Two distinct mnemonics → two ActionData rows, sorted descending
+        // by actions_executed.
+        assert_eq!(summary.action_data.len(), 2);
+        assert_eq!(summary.action_data[0].mnemonic, "c_compile");
+        assert_eq!(summary.action_data[0].actions_executed, 2);
+        assert_eq!(summary.action_data[1].mnemonic, "cpp_link");
+        assert_eq!(summary.action_data[1].actions_executed, 1);
+        // Total executed = sum of per-mnemonic.
+        assert_eq!(summary.actions_executed, 3);
+
+        let stats = summary.action_cache_statistics.expect("cache stats");
+        assert_eq!(stats.hits, 5);
+        assert_eq!(stats.misses, 3);
+
+        let timing = payload.timing_metrics.expect("timing metrics");
+        assert_eq!(timing.wall_time_in_ms, 2_000);
+        assert_eq!(timing.execution_phase_time_in_ms, 2_000);
+    }
 }

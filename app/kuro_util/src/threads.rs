@@ -151,6 +151,31 @@ pub fn check_stack_overflow() -> kuro_error::Result<()> {
     Ok(())
 }
 
+/// Returns a process-wide monotonic id for the calling OS thread.
+/// First thread to call gets `1`, the next `2`, etc.; subsequent
+/// calls from the same thread return the same value. `0` is the
+/// documented "not captured" sentinel used by code paths that
+/// synthesize events without a real thread context (test fixtures,
+/// etc.).
+///
+/// Used as the chrome trace `tid` for action events. This is exactly
+/// what `java.lang.Thread.getId()` does (a JVM-wide incrementing
+/// counter assigned at thread construction, not the OS tid), so
+/// Bazel's chrome traces and ours have matching semantics for the
+/// `tid` field. For remote actions Bazel records the
+/// *submitting/awaiting* thread (not the BB worker that ran the
+/// compute); the same falls out here because the tokio worker that
+/// polls the future to completion is what calls this function.
+pub fn thread_index() -> u64 {
+    use std::sync::atomic::AtomicU64;
+    use std::sync::atomic::Ordering;
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    thread_local! {
+        static INDEX: u64 = NEXT.fetch_add(1, Ordering::Relaxed);
+    }
+    INDEX.with(|i| *i)
+}
+
 #[must_use]
 pub struct IgnoreStackOverflowChecksForCurrentThread {
     prev: Option<ValidStackRange>,

@@ -6,6 +6,7 @@ repository = { workspace = true }
 version = "0.1.0"
 
 [dependencies]
+chrono = { workspace = true }
 flate2 = { workspace = true }
 futures = { workspace = true }
 prost = { workspace = true }

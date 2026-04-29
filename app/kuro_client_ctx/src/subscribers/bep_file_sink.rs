@@ -71,16 +71,20 @@ impl BepFileSubscriber {
 
         Ok(Some(Self {
             outputs,
+            stream_state: BepStreamState::with_invocation_id(ctx.invocation_id.clone()),
             ctx,
-            stream_state: BepStreamState::new(),
             saw_command_end: false,
         }))
     }
 
     fn write_event(&mut self, event: &kuro_data::BuckEvent) {
+        // See bep_bes_sink: kuro-side stats (critical path,
+        // BuildGraph node/edge counts, Command span timestamps) feed
+        // BuildMetrics but don't translate to BEP.
+        self.stream_state.observe_kuro_event(event);
         let bep_events = translate_buck_event(&self.ctx, event);
         for bep_event in bep_events {
-            self.stream_state.observe(&bep_event);
+            self.stream_state.observe(Some(event), &bep_event);
             self.write_bep(&bep_event);
         }
     }

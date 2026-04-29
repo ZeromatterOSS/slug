@@ -113,8 +113,8 @@ impl BesSubscriber {
 
         Ok(Some(Self {
             state: State::Pending(config),
+            stream_state: BepStreamState::with_invocation_id(ctx.invocation_id.clone()),
             ctx,
-            stream_state: BepStreamState::new(),
             saw_command_end: false,
             progress_seq: 0,
         }))
@@ -202,9 +202,14 @@ impl EventSubscriber for BesSubscriber {
             if is_command_end(event.event()) {
                 self.saw_command_end = true;
             }
-            let bep_events = translate_buck_event(&self.ctx, event.event());
+            let buck_event = event.event();
+            // Pull kuro-side data (BuildGraphInfo critical-path stats,
+            // Command span timestamps) before translating — those
+            // signals don't have BEP analogues but feed BuildMetrics.
+            self.stream_state.observe_kuro_event(buck_event);
+            let bep_events = translate_buck_event(&self.ctx, buck_event);
             for bep_event in bep_events {
-                self.stream_state.observe(&bep_event);
+                self.stream_state.observe(Some(buck_event), &bep_event);
                 if let Err(e) = sink.enqueue(bep_event).await {
                     tracing::warn!("BES sink enqueue failed: {e}");
                     self.state = State::Failed;
@@ -242,14 +247,32 @@ impl EventSubscriber for BesSubscriber {
         // BES backend's ByteStream service, then attach the resulting
         // URI to the BuildToolLogs event.
         if let State::Connected(sink) = &self.state {
-            if let Some(gz_bytes) = self.stream_state.build_profile_gz()
-                && let Some(uri) = sink.upload_blob_bytestream(gz_bytes).await
-                && let Some(tool_logs) = self.stream_state.build_tool_logs_event_with_uri(uri)
-            {
-                let _ = sink.enqueue(tool_logs).await;
+            if let Some(gz_bytes) = self.stream_state.build_profile_gz() {
+                let gz_size = gz_bytes.len();
+                tracing::debug!("BES finalize: uploading chrome trace ({gz_size} gz bytes)");
+                match sink.upload_blob_bytestream(gz_bytes).await {
+                    None => {
+                        tracing::warn!(
+                            "BES finalize: chrome trace bytestream upload failed; \
+                             BB Timing tab will stay blank"
+                        );
+                    }
+                    Some(uri) => {
+                        tracing::debug!("BES finalize: trace uploaded; URI = {uri}");
+                        if let Some(tool_logs) =
+                            self.stream_state.build_tool_logs_event_with_uri(uri)
+                            && let Err(e) = sink.enqueue(tool_logs).await
+                        {
+                            tracing::warn!("BES finalize: enqueue BuildToolLogs failed: {e}");
+                        }
+                    }
+                }
             }
             let metrics = self.stream_state.build_metrics_event();
-            let _ = sink.enqueue(metrics).await;
+            tracing::info!("BES finalize: enqueueing BuildMetrics");
+            if let Err(e) = sink.enqueue(metrics).await {
+                tracing::warn!("BES finalize: enqueue BuildMetrics failed: {e}");
+            }
         }
 
         if let State::Connected(sink) = &self.state

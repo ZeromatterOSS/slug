@@ -463,6 +463,15 @@ async fn build_action_inner(
             incremental_kind: incremental_kind.map(|k| k as i32),
             eligible_for_dedupe: is_eligible_for_dedupe as i32,
             expected_eligible_for_dedupe: is_expected_eligible_for_dedupe as i32,
+            // Plan 24 Phase 6 follow-up: capture which tokio worker
+            // thread polled this action's completion. Used as the
+            // chrome trace `tid` for BB's Timing tab. For remote
+            // actions this is the *submitting/awaiting* worker, not
+            // the BB executor that ran the compute — matching Bazel's
+            // behavior, where remote actions get the JVM thread that
+            // submitted+awaited the RE call.
+            local_thread_id: kuro_util::threads::thread_index(),
+            local_thread_name: std::thread::current().name().unwrap_or_default().to_owned(),
         }),
     )
 }

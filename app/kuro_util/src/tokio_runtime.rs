@@ -15,9 +15,22 @@ use crate::threads::on_thread_start;
 use crate::threads::on_thread_stop;
 
 pub fn new_tokio_runtime(thread_name: &str) -> Builder {
+    use std::sync::atomic::AtomicU64;
+    use std::sync::atomic::Ordering;
     let mut builder = Builder::new_multi_thread();
     builder.thread_stack_size(THREAD_DEFAULT_STACK_SIZE);
-    builder.thread_name(thread_name);
+    // Per-worker numbered names (`kuro-rt-0`, `kuro-rt-1`, …) instead
+    // of a single shared name. The chrome trace's lane labels read
+    // `std::thread::current().name()` so each lane shows the actual
+    // worker that ran the action — matching Bazel's `Thread.getName()`
+    // shape (e.g. "skyframe-evaluator-N") rather than a bare integer
+    // counter.
+    let prefix = thread_name.to_owned();
+    let counter = std::sync::Arc::new(AtomicU64::new(0));
+    builder.thread_name_fn(move || {
+        let n = counter.fetch_add(1, Ordering::Relaxed);
+        format!("{prefix}-{n}")
+    });
     builder.on_thread_start(on_thread_start);
     builder.on_thread_stop(on_thread_stop);
     builder.worker_threads(crate::threads::available_parallelism());
