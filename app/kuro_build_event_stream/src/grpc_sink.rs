@@ -214,28 +214,52 @@ impl BesSink {
         })
     }
 
-    /// Signal end-of-stream, then wait for the uploader task to flush within
-    /// `--bes_timeout`.
+    /// Signal end-of-stream and, depending on `upload_mode`, either wait
+    /// for the uploader task to flush or detach it.
+    ///
+    /// `WaitForUploadComplete` (default, matches Bazel): block on the
+    /// uploader's `JoinHandle` up to `--bes_timeout`. Guarantees BB has
+    /// the full event stream before the kuro process exits.
+    ///
+    /// `NoWait`: send the Finish marker so the request stream closes
+    /// cleanly, then drop the JoinHandle without awaiting. The task
+    /// continues running until the tokio runtime shuts down on
+    /// process exit; events already buffered may not finish uploading.
+    /// Mirrors Bazel's `--bes_upload_mode=nowait`.
+    ///
+    /// `FullyAsync` is treated as `NoWait` here. True async (uploader
+    /// surviving across client invocations) would require a persistent
+    /// daemon-side uploader; not implemented.
     pub async fn shutdown(&self) -> kuro_error::Result<()> {
         let _ = self.tx.send(StreamItem::Finish).await;
         let handle = self.upload_task.lock().await.take();
-        if let Some(h) = handle {
-            let timeout = self.config.timeout;
-            match tokio::time::timeout(timeout, h).await {
-                Ok(Ok(())) => Ok(()),
-                Ok(Err(e)) => {
-                    tracing::warn!("BES uploader join error: {e}");
-                    Ok(())
-                }
-                Err(_) => {
-                    tracing::warn!(
-                        "BES uploader timeout after {timeout:?}; dropping remaining events"
-                    );
-                    Ok(())
+        let Some(h) = handle else {
+            return Ok(());
+        };
+        match self.config.upload_mode {
+            UploadMode::WaitForUploadComplete => {
+                let timeout = self.config.timeout;
+                match tokio::time::timeout(timeout, h).await {
+                    Ok(Ok(())) => Ok(()),
+                    Ok(Err(e)) => {
+                        tracing::warn!("BES uploader join error: {e}");
+                        Ok(())
+                    }
+                    Err(_) => {
+                        tracing::warn!(
+                            "BES uploader timeout after {timeout:?}; \
+                             dropping remaining events"
+                        );
+                        Ok(())
+                    }
                 }
             }
-        } else {
-            Ok(())
+            UploadMode::NoWait | UploadMode::FullyAsync => {
+                // Drop the JoinHandle without awaiting. The task keeps
+                // running until the runtime shuts down on process exit.
+                drop(h);
+                Ok(())
+            }
         }
     }
 
@@ -410,13 +434,23 @@ where
     let drain_task = tokio::spawn(drain_responses(resp_stream.into_inner()));
 
     // Wait for the feeder to send the Finish marker / drain the channel.
+    let t_feeder = std::time::Instant::now();
     if let Err(e) = feeder_task.await {
         tracing::warn!("BES request feeder join error: {e}");
     }
+    tracing::info!(
+        "BES uploader PROFILE: feeder_task drained in {:?}",
+        t_feeder.elapsed()
+    );
 
+    let t_drain = std::time::Instant::now();
     if let Err(e) = drain_task.await {
         tracing::warn!("BES drain task join error: {e}");
     }
+    tracing::info!(
+        "BES uploader PROFILE: drain_task (server ACKs + stream close) in {:?}",
+        t_drain.elapsed()
+    );
 
     // Lifecycle: close invocation and build.
     // Without a populated `invocation_status`, BuildBuddy treats the
@@ -444,6 +478,7 @@ where
             },
         )),
     };
+    let t_attempt_finished = std::time::Instant::now();
     if let Err(e) = publish_lifecycle(&mut client, &cfg, attempt_finished, 2).await {
         tracing::warn!(
             "BES InvocationAttemptFinished rejected: code={:?} message={:?}",
@@ -451,6 +486,10 @@ where
             e.message(),
         );
     }
+    tracing::info!(
+        "BES uploader PROFILE: InvocationAttemptFinished in {:?}",
+        t_attempt_finished.elapsed()
+    );
 
     let build_finished = bes::BuildEvent {
         event_time: Some(now_timestamp()),
@@ -467,6 +506,7 @@ where
             },
         )),
     };
+    let t_build_finished = std::time::Instant::now();
     if let Err(e) = publish_lifecycle(&mut client, &cfg, build_finished, 2).await {
         tracing::warn!(
             "BES BuildFinished rejected: code={:?} message={:?}",
@@ -474,6 +514,10 @@ where
             e.message(),
         );
     }
+    tracing::info!(
+        "BES uploader PROFILE: BuildFinished in {:?}",
+        t_build_finished.elapsed()
+    );
 
     Ok(())
 }

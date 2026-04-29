@@ -221,6 +221,7 @@ impl EventSubscriber for BesSubscriber {
     }
 
     async fn finalize(&mut self) -> kuro_error::Result<()> {
+        let t_finalize_start = std::time::Instant::now();
         // No CommandEnd observed → invocation ended prematurely (Ctrl+C,
         // daemon crash, etc.). Synthesize an `Aborted` event so BuildBuddy
         // moves the invocation out of "still running" state.
@@ -247,9 +248,15 @@ impl EventSubscriber for BesSubscriber {
         // BES backend's ByteStream service, then attach the resulting
         // URI to the BuildToolLogs event.
         if let State::Connected(sink) = &self.state {
+            let t_trace_start = std::time::Instant::now();
+            let gz_size_bytes;
             if let Some(gz_bytes) = self.stream_state.build_profile_gz() {
-                let gz_size = gz_bytes.len();
-                tracing::debug!("BES finalize: uploading chrome trace ({gz_size} gz bytes)");
+                gz_size_bytes = gz_bytes.len();
+                tracing::info!(
+                    "BES finalize PROFILE: chrome trace gz_bytes={} build_phase=ms",
+                    gz_size_bytes
+                );
+                let t_upload = std::time::Instant::now();
                 match sink.upload_blob_bytestream(gz_bytes).await {
                     None => {
                         tracing::warn!(
@@ -258,7 +265,10 @@ impl EventSubscriber for BesSubscriber {
                         );
                     }
                     Some(uri) => {
-                        tracing::debug!("BES finalize: trace uploaded; URI = {uri}");
+                        tracing::info!(
+                            "BES finalize PROFILE: trace bytestream upload took {:?}",
+                            t_upload.elapsed()
+                        );
                         if let Some(tool_logs) =
                             self.stream_state.build_tool_logs_event_with_uri(uri)
                             && let Err(e) = sink.enqueue(tool_logs).await
@@ -267,19 +277,37 @@ impl EventSubscriber for BesSubscriber {
                         }
                     }
                 }
+            } else {
+                gz_size_bytes = 0;
             }
+            let _ = (t_trace_start, gz_size_bytes); // keep for debugging
+            let t_metrics_start = std::time::Instant::now();
             let metrics = self.stream_state.build_metrics_event();
-            tracing::info!("BES finalize: enqueueing BuildMetrics");
+            tracing::info!(
+                "BES finalize PROFILE: build_metrics_event() took {:?}, enqueueing BuildMetrics",
+                t_metrics_start.elapsed()
+            );
             if let Err(e) = sink.enqueue(metrics).await {
                 tracing::warn!("BES finalize: enqueue BuildMetrics failed: {e}");
             }
         }
 
-        if let State::Connected(sink) = &self.state
-            && let Err(e) = sink.shutdown().await
-        {
-            tracing::warn!("BES sink shutdown error: {e}");
+        if let State::Connected(sink) = &self.state {
+            let t_shutdown = std::time::Instant::now();
+            tracing::info!("BES finalize PROFILE: about to call sink.shutdown()");
+            if let Err(e) = sink.shutdown().await {
+                tracing::warn!("BES sink shutdown error: {e}");
+            }
+            tracing::info!(
+                "BES finalize PROFILE: sink.shutdown() took {:?} \
+                 (waits for BES queue + lifecycle)",
+                t_shutdown.elapsed()
+            );
         }
+        tracing::info!(
+            "BES finalize PROFILE: total finalize() = {:?}",
+            t_finalize_start.elapsed()
+        );
         Ok(())
     }
 }
