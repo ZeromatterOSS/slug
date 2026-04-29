@@ -165,14 +165,19 @@ pub struct ModuleExtensionResult {
 impl ModuleExtensionResult {
     /// Create a new extension result.
     ///
-    /// `root_module_name` is the name of the root module (from MODULE.bazel `module(name=...)`).
-    /// It's used as a fallback when the extension is declared by the root module.
+    /// `root_module_name` is the name of the root module (from MODULE.bazel
+    /// `module(name=…)`). It is required so canonical names use Bazel's
+    /// `_main` placeholder for the root module's own extensions; without it
+    /// the root module's declared name leaks into canonical names and they
+    /// disagree with the cells pre-computed in `pending_repo_cells.rs`.
     pub fn new(
         extension_id: Arc<str>,
         input_hash: String,
         generated_repo_specs: FxHashMap<String, RepoSpec>,
+        root_module_name: &str,
     ) -> Self {
-        let canonical_names = build_canonical_names(&extension_id, &generated_repo_specs);
+        let canonical_names =
+            build_canonical_names(&extension_id, &generated_repo_specs, root_module_name);
         Self {
             extension_id,
             input_hash,
@@ -423,6 +428,7 @@ impl Key for ModuleExtensionExecutionKey {
                                 self.extension_id.clone(),
                                 self.input_hash.to_string(),
                                 cached_specs,
+                                &self.root_module_name,
                             );
 
                             return Ok(Arc::new(result));
@@ -523,6 +529,7 @@ impl Key for ModuleExtensionExecutionKey {
             self.extension_id.clone(),
             self.input_hash.to_string(),
             output.generated_repo_specs.clone(),
+            &self.root_module_name,
         );
 
         tracing::info!(
@@ -623,17 +630,22 @@ fn sanitize_extension_id_for_path(extension_id: &str) -> String {
 
 /// Build canonical names for extension-generated repositories.
 ///
-/// Format: `_main+{extension_unique_name}+{internal_name}`
-/// (Bazel 9.0 uses `+` as the separator in canonical names)
+/// Format: `{owning_module}+{extension_unique_name}+{internal_name}`
+/// where `owning_module` is `_main` for extensions defined in the root module
+/// (Bazel 9 convention; see `extract_owning_module`) and the declared module
+/// name otherwise. The separator is `+`.
 ///
-/// The extension unique name is derived from the extension ID by extracting
-/// the extension name (after the `%` in the bzl label).
+/// `root_module_name` is the value of `module(name=…)` in the root MODULE.bazel
+/// — required so the root module's declared name (e.g., `llvm-project-overlay`)
+/// is canonicalized to `_main`, matching what `pending_repo_cells.rs` registers
+/// when it pre-computes the same cells from `use_repo()` declarations.
 pub fn build_canonical_names(
     extension_id: &str,
     specs: &FxHashMap<String, RepoSpec>,
+    root_module_name: &str,
 ) -> FxHashMap<String, String> {
     let ext_name = extract_extension_name(extension_id);
-    let owning_module = extract_owning_module(extension_id);
+    let owning_module = extract_owning_module(extension_id, root_module_name);
     specs
         .keys()
         .map(|internal| {
@@ -643,15 +655,29 @@ pub fn build_canonical_names(
         .collect()
 }
 
-/// Extract the owning module name from an extension ID.
+/// Extract the canonical owning-module prefix from an extension ID.
+///
+/// Bazel's canonical naming convention prefixes the *root* module's extension
+/// repos with the literal string `_main`, regardless of the name the root
+/// module declares in MODULE.bazel. Non-root modules use their declared name.
+/// `root_module_name` is the value of `module(name=…)` in the root MODULE.bazel
+/// (e.g., `llvm-project-overlay`); pass `""` if the build has no root module.
+///
+/// Without this substitution, the root module's own extension defined at
+/// `@<root_module>//ext.bzl` would be canonicalized as
+/// `<root_module>+ext+repo` while `pending_repo_cells.rs` (using the
+/// `_main`-rule) registers it as `_main+ext+repo`. The two paths point to
+/// different `bazel-external/...` directories and the build fails with
+/// "package not found" once the repo rule tries to read its own files.
 ///
 /// Extension ID formats:
 /// - `@bazel_features//private:extensions.bzl%version_extension` → `bazel_features`
 /// - `@@rules_cc//cc:extensions.bzl%cc_configure` → `rules_cc`
 /// - `//path:file.bzl%ext` → `_main` (root module, no repo prefix)
+/// - `@<root_module_name>//path:file.bzl%ext` → `_main` (root module via its declared name)
 ///
 /// Falls back to `_main` if the format doesn't match.
-pub fn extract_owning_module(extension_id: &str) -> String {
+pub fn extract_owning_module(extension_id: &str, root_module_name: &str) -> String {
     // Strip the extension name part (after %)
     let bzl_part = extension_id.split('%').next().unwrap_or(extension_id);
 
@@ -660,6 +686,13 @@ pub fn extract_owning_module(extension_id: &str) -> String {
     if let Some(pos) = stripped.find("//") {
         let module = &stripped[..pos];
         if !module.is_empty() {
+            // Map the root module's declared name back to Bazel's canonical
+            // `_main` placeholder so callers all agree on one canonical
+            // prefix per repo, no matter which spelling of the root module
+            // they observe in extension IDs / Starlark labels.
+            if !root_module_name.is_empty() && module == root_module_name {
+                return "_main".to_owned();
+            }
             return module.to_owned();
         }
     }
@@ -781,6 +814,7 @@ mod tests {
             Arc::from("@@rules_python//python/pip:pip.bzl%pip"),
             "sha256-abc123".to_owned(),
             specs,
+            "",
         );
 
         assert_eq!(
@@ -804,6 +838,7 @@ mod tests {
             Arc::from("@@module//path:ext.bzl%my_extension"),
             "hash".to_owned(),
             specs,
+            "",
         );
 
         assert_eq!(
@@ -826,6 +861,7 @@ mod tests {
             Arc::from("@@rules_python//pip:pip.bzl%pip"),
             "hash".to_owned(),
             specs,
+            "",
         );
 
         assert_eq!(
@@ -863,7 +899,7 @@ mod tests {
         specs.insert("numpy".to_owned(), RepoSpec::new("rule".to_owned()));
         specs.insert("pandas".to_owned(), RepoSpec::new("rule".to_owned()));
 
-        let names = build_canonical_names("@@rules_python//pip:pip.bzl%pip", &specs);
+        let names = build_canonical_names("@@rules_python//pip:pip.bzl%pip", &specs, "");
 
         assert_eq!(
             names.get("numpy"),
@@ -990,7 +1026,7 @@ mod tests {
         );
 
         let result =
-            ModuleExtensionResult::new(Arc::from("@@//ext.bzl%test"), "hash".to_owned(), specs);
+            ModuleExtensionResult::new(Arc::from("@@//ext.bzl%test"), "hash".to_owned(), specs, "");
 
         let spec = result.get_repo_spec("test_repo").unwrap();
         assert_eq!(
@@ -1008,7 +1044,7 @@ mod tests {
         specs.insert("c".to_owned(), RepoSpec::new("rule".to_owned()));
 
         let result =
-            ModuleExtensionResult::new(Arc::from("@@//ext.bzl%test"), "hash".to_owned(), specs);
+            ModuleExtensionResult::new(Arc::from("@@//ext.bzl%test"), "hash".to_owned(), specs, "");
 
         let mut names: Vec<_> = result.repo_names().collect();
         names.sort();

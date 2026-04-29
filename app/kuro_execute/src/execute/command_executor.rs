@@ -451,6 +451,88 @@ fn re_create_action(
 
     let action_and_blobs = action_and_blobs.build(&action);
 
+    // Diagnostic: emit per-field hashes of every Command sub-field
+    // (arguments, env, outputs, platform, cwd) so a run-vs-run diff can
+    // pinpoint exactly which sub-field is unstable across daemon restarts.
+    // Includes a sorted-outputs hash too — if outputs_hash differs but
+    // outputs_sorted_hash matches, the iteration order of an output map
+    // is non-deterministic.
+    {
+        use std::hash::Hasher as _;
+        let hash_strs = |strs: &[String]| -> u64 {
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            for s in strs {
+                h.write(s.as_bytes());
+                h.write_u8(0);
+            }
+            h.finish()
+        };
+        let last_output = command
+            .output_files
+            .last()
+            .or_else(|| command.output_directories.last())
+            .or_else(|| command.output_paths.last())
+            .cloned()
+            .unwrap_or_default();
+        let args_hash = hash_strs(&command.arguments);
+        let env_pairs: Vec<String> = command
+            .environment_variables
+            .iter()
+            .map(|e| format!("{}={}", e.name, e.value))
+            .collect();
+        let env_hash = hash_strs(&env_pairs);
+        let mut all_outputs: Vec<String> = command
+            .output_files
+            .iter()
+            .chain(command.output_directories.iter())
+            .chain(command.output_paths.iter())
+            .cloned()
+            .collect();
+        let outputs_hash = hash_strs(&all_outputs);
+        all_outputs.sort();
+        let outputs_sorted_hash = hash_strs(&all_outputs);
+        let platform_strs: Vec<String> = command
+            .platform
+            .as_ref()
+            .map(|p| {
+                p.properties
+                    .iter()
+                    .map(|kv| format!("{}={}", kv.name, kv.value))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let platform_hash = hash_strs(&platform_strs);
+        tracing::debug!(
+            target: "action_digest_debug",
+            "ACTION digest={} input_root={} cmd_first={} out_last={} \
+             args_hash={:016x} args_n={} env_hash={:016x} env_n={} \
+             outputs_hash={:016x} outputs_sorted_hash={:016x} outputs_n={} \
+             platform_hash={:016x} cwd={}",
+            action_and_blobs.action,
+            input_digest,
+            command.arguments.first().cloned().unwrap_or_default(),
+            last_output,
+            args_hash,
+            command.arguments.len(),
+            env_hash,
+            command.environment_variables.len(),
+            outputs_hash,
+            outputs_sorted_hash,
+            command.output_files.len()
+                + command.output_directories.len()
+                + command.output_paths.len(),
+            platform_hash,
+            command.working_directory,
+        );
+        // Dump every argument under a separate target so investigators
+        // can selectively turn on full-args logging without flooding
+        // every build. Pair with `action_digest_debug` to identify
+        // *which* action the args belong to (out_last is the join key).
+        for (i, arg) in command.arguments.iter().enumerate() {
+            tracing::trace!(target: "action_digest_debug_args", "{} ARG[{i}] {arg}", last_output);
+        }
+    }
+
     Ok(PreparedAction {
         action_and_blobs,
         #[allow(deprecated)]

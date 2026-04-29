@@ -108,6 +108,30 @@ async fn query_action_cache_and_download_result(
     )
     .await;
 
+    // Diagnostic for BB cache miss investigation: log every action-cache
+    // query with hit/miss/error outcome. Two builds with the same target
+    // should produce identical action digests; if a c_compile action has
+    // the same digest in both builds but the second one shows MISS, the
+    // BB cache evicted (not a kuro non-determinism bug).
+    {
+        let outcome = match &action_cache_response {
+            Ok(Some(_)) => "HIT",
+            Ok(None) => "MISS",
+            Err(_) => "ERR",
+        };
+        let cache_type_label: &str = match &cache_type {
+            CacheType::ActionCache => "ActionCache",
+            CacheType::RemoteDepFileCache(_) => "RemoteDepFileCache",
+        };
+        tracing::debug!(
+            target: "action_cache_query",
+            "QUERY digest={} cache_type={} outcome={}",
+            digest,
+            cache_type_label,
+            outcome,
+        );
+    }
+
     let identity = None; // TODO(#503): implement this
     if upload_all_actions {
         match re_client

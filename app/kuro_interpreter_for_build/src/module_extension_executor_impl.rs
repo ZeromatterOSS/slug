@@ -435,7 +435,11 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         // no inter-spoke dependencies.
         if !specs.is_empty() {
             let ext_name = kuro_bzlmod::extract_extension_name(&aggregated.extension_id);
-            let owning_module = kuro_bzlmod::extract_owning_module(&aggregated.extension_id);
+            // Pass `root_module_name` so the root module's declared name (e.g.
+            // `llvm-project-overlay`) is canonicalized to `_main`, matching
+            // what `pending_repo_cells.rs` registers for the same repo.
+            let owning_module =
+                kuro_bzlmod::extract_owning_module(&aggregated.extension_id, root_module_name);
 
             // Register all spoke cells in the dynamic registry up front so cell
             // resolution works even before any individual spoke is materialized.

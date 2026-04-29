@@ -477,10 +477,27 @@ pub(crate) async fn get_file_ops_delegate(
             // can find them when hub BUILD files reference them (e.g. @crates__tempfile).
             // Actual materialization happens lazily when the cell is first accessed —
             // Bazel-style on-demand fetch via DICE dedup, not upfront serial walk.
-            let ext_name = kuro_bzlmod::extract_extension_name(&setup.extension_id);
-            let owner_module = kuro_bzlmod::extract_owning_module(&setup.extension_id);
+            //
+            // Read the canonical names off `ext_result.canonical_names` (computed
+            // by `build_canonical_names` which knows the root module name) rather
+            // than re-deriving from `setup.extension_id` here. The latter route
+            // does not have access to the root module name and would emit
+            // `<root_module>+ext+repo` instead of `_main+ext+repo`, registering
+            // a duplicate cell at a different `bazel-external/` path that no
+            // materializer ever populates.
             for (internal_name, _spec) in ext_result.generated_repo_specs.iter() {
-                let canonical = format!("{}+{}+{}", owner_module, ext_name, internal_name);
+                let canonical = match ext_result.canonical_names.get(internal_name) {
+                    Some(c) => c.clone(),
+                    None => {
+                        tracing::warn!(
+                            "Extension '{}' result has spec for '{}' but no canonical \
+                             name; skipping dynamic cell registration",
+                            setup.extension_id,
+                            internal_name
+                        );
+                        continue;
+                    }
+                };
                 kuro_core::cells::register_dynamic_extension_cell(
                     canonical.clone(),
                     format!("bazel-external/{}", canonical),

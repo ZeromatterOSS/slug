@@ -115,6 +115,20 @@ use starlark::values::starlark_value;
 /// Populated when cc_common.compile() processes sources and strip_include_prefix,
 /// and when native cc_library stubs are created for external repos.
 /// Used by create_cc_compile_action to add -I flags.
+///
+/// FIXME: this is process-global mutable state outside DICE. Two problems:
+///   1. Insertion order is non-deterministic — analysis runs in parallel, so
+///      whichever cc_library's analysis task finishes first wins the slot.
+///      Without sorting on read, action digests vary across daemon restarts
+///      (compile commands embed `-idirafter <dir>` in the order returned here),
+///      which prevents BB action-cache hits across runs.
+///   2. The set never gets cleared — entries accumulate across builds in the
+///      same daemon, which is correct for "all paths possibly needed" but
+///      wrong for per-target reproducibility (an action's effective include
+///      list grows with every preceding build).
+/// `get_external_include_dirs` works around (1) by sorting; (2) is a deeper
+/// fix that requires threading per-action include dirs through DICE rather
+/// than reading from a side-channel singleton.
 static EXTERNAL_INCLUDE_DIRS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
 
 /// Register an include directory path for use in compile actions.
@@ -127,11 +141,18 @@ pub fn register_external_include_dir(include_dir: &str) {
     }
 }
 
-/// Get all registered external include directories.
+/// Get all registered external include directories, sorted lexicographically
+/// for deterministic ordering. The sort is what keeps compile commands
+/// (and thus RE action digests) stable across daemon restarts — see the
+/// FIXME on `EXTERNAL_INCLUDE_DIRS`.
 pub fn get_external_include_dirs() -> Vec<String> {
     EXTERNAL_INCLUDE_DIRS
         .lock()
-        .map(|dirs| dirs.clone())
+        .map(|dirs| {
+            let mut v = dirs.clone();
+            v.sort();
+            v
+        })
         .unwrap_or_default()
 }
 // ============================================================================

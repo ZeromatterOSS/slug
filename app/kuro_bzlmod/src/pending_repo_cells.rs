@@ -605,6 +605,7 @@ mod tests {
             Arc::from("@@rules_python//pip:pip.bzl%pip"),
             "sha256-test".to_owned(),
             specs,
+            "",
         )
     }
 
@@ -754,6 +755,7 @@ mod tests {
             Arc::from("@@rules_go//go:deps.bzl%go_deps"),
             "sha256-go".to_owned(),
             specs2,
+            "",
         );
         let defs2 = build_extension_cells(&result2).unwrap();
 
