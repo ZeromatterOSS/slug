@@ -40,7 +40,6 @@ use crate::interpreter::rule_defs::cc_common::ctx_cheat::CtxCheatArtifactStub;
 use crate::interpreter::rule_defs::cc_common::ctx_cheat::CtxCheatWithActions;
 use crate::interpreter::rule_defs::cc_common::feature_config::CcToolchainFeatures;
 use crate::interpreter::rule_defs::cc_common::feature_config::FeatureConfiguration;
-use crate::interpreter::rule_defs::cc_common::get_external_include_dirs;
 use crate::interpreter::rule_defs::cc_common::host::include_flag_for_dir_impl;
 use crate::interpreter::rule_defs::cc_common::host::is_msvc_compiler;
 use crate::interpreter::rule_defs::cc_common::host::is_windows_host;
@@ -65,7 +64,6 @@ use crate::interpreter::rule_defs::cc_common::providers::HeaderInfoStub;
 use crate::interpreter::rule_defs::cc_common::providers::LibraryToLinkGen;
 use crate::interpreter::rule_defs::cc_common::providers::LinkerInputStubGen;
 use crate::interpreter::rule_defs::cc_common::providers::LinkingContextWithInputsGen;
-use crate::interpreter::rule_defs::cc_common::register_external_include_dir;
 
 // ============================================================================
 // CcCommonInternal - Internal API returned by internal_DO_NOT_USE()
@@ -437,18 +435,19 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                     src_path_str
                 };
 
-            // For external repo sources with /src/ dir, add as include path
+            // For external repo sources with /src/ dir, add as include path.
+            // Per Plan 29: this is a per-target source-derived dir; we add it
+            // directly to this action's args_vec only — no global registry.
             if let Some(ext_idx) = effective_src_path.find("/src/") {
                 let inc_dir = &effective_src_path[..ext_idx + 5];
                 if seen_include_dirs.insert(inc_dir.to_string()) {
                     let flag = include_flag_for_dir_impl(inc_dir, msvc);
                     args_vec.push(heap.alloc_str(&flag).to_value());
                 }
-                register_external_include_dir(inc_dir);
             }
             // Also add "external/<repo>/" for direct includes and "external/" for
             // repo-name-prefixed includes (e.g., `#include "rules_cc/cc/..."` in
-            // rules_cc source files).
+            // rules_cc source files). Per Plan 29: per-target only.
             if effective_src_path.starts_with("external/") {
                 if let Some(second_slash) = effective_src_path[9..].find('/') {
                     let repo_dir = &effective_src_path[..9 + second_slash];
@@ -456,7 +455,6 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                         let flag = include_flag_for_dir_impl(repo_dir, msvc);
                         args_vec.push(heap.alloc_str(&flag).to_value());
                     }
-                    register_external_include_dir(repo_dir);
                 }
                 if seen_include_dirs.insert("external/".to_owned()) {
                     let ext_flag = if msvc {
@@ -466,31 +464,15 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                     };
                     args_vec.push(heap.alloc_str(ext_flag).to_value());
                 }
-                register_external_include_dir("external/");
             }
-            // Register source file's parent directory as an include path.
-            // Uses -idirafter (via include_flag_for_dir) for deep paths to avoid
-            // shadowing system headers.
-            if effective_src_path.starts_with("external/") {
-                if let Some(second_slash) = effective_src_path[9..].find('/') {
-                    let repo_end = 9 + second_slash;
-                    if let Some(last_slash) = effective_src_path.rfind('/') {
-                        let src_dir = &effective_src_path[..last_slash];
-                        let depth = src_dir[repo_end..].matches('/').count();
-                        if depth >= 1 && depth <= 3 {
-                            register_external_include_dir(src_dir);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Add include directories discovered during analysis
-        for include_dir in get_external_include_dirs() {
-            if seen_include_dirs.insert(include_dir.clone()) {
-                let flag = include_flag_for_dir_impl(&include_dir, msvc);
-                args_vec.push(heap.alloc_str(&flag).to_value());
-            }
+            // Note: prior code registered the source file's parent directory in
+            // a process-global include-dir registry so *other* targets' compile
+            // actions would also pick it up. That cross-target leak is the
+            // exact bug Plan 29 addresses — propagation between targets must
+            // go through `CcCompilationContext.includes` providers, not a
+            // shared mutex. The dir for THIS target's compile is already added
+            // above (as repo_dir / inc_dir), which covers what the target
+            // legitimately needs.
         }
 
         // Add preprocessor defines from cc_compilation_context
@@ -2014,12 +1996,13 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // the `-I` path that maps the include name to the file is
         // missing.
         //
-        // The `register_external_include_dir` calls retain the previous
-        // behavior — that registry is read by the older compile path at
-        // the top of this file (Buck-style cxx_library wiring). The new
-        // bit is appending `-I` / `-iquote` / `-isystem` flags to
-        // `extra_flags` so this `cc_common.compile` path actually emits
-        // them on the final compile command.
+        // Per Plan 29: include dirs from `compilation_contexts` (the
+        // CcCompilationContext from each dep's CcInfo) flow into this
+        // target's compile commands as `extra_flags` only — no global
+        // registry. Bazel's CcCompilationContext is `@Immutable`, every
+        // include-dir field is a `Depset<PathFragment>`, and propagation
+        // between targets is exclusively by depset transitivity. We
+        // match that here.
         if !compilation_contexts.is_none() {
             if let Ok(iter) = compilation_contexts.iterate(heap) {
                 for ctx in iter {
@@ -2039,7 +2022,6 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                 for elem in &elements {
                                     let dir = elem.to_str();
                                     if !dir.is_empty() {
-                                        register_external_include_dir(&dir);
                                         extra_flags.push(flag.to_string());
                                         extra_flags.push(dir.to_string());
                                     }
@@ -2124,7 +2106,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                             None
                         };
                     if let Some(dir) = include_dir_owned {
-                        register_external_include_dir(&dir);
+                        // Per Plan 29: strip_include_prefix dir flows to
+                        // dependents via this target's CcCompilationContext
+                        // .includes (merged in below at the depset
+                        // construction site). No global registry needed.
                         strip_include_dir = Some(dir);
                     }
                 }
@@ -2226,17 +2211,12 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                         .and_then(|v| v.unpack_str())
                         .unwrap_or("unknown.c");
 
-                    // Register include dirs derived from source path for cross-target use
-                    if src_path.starts_with("external/") {
-                        if let Some(second_slash) = src_path[9..].find('/') {
-                            let repo_dir = &src_path[..9 + second_slash];
-                            register_external_include_dir(repo_dir);
-                            // Also register <repo>/src/ if the source is under src/
-                            if let Some(src_idx) = src_path.find("/src/") {
-                                register_external_include_dir(&src_path[..src_idx + 5]);
-                            }
-                        }
-                    }
+                    // Per Plan 29: source-path-derived dirs (the per-target
+                    // `external/<repo>` and `<repo>/src/` heuristics) are
+                    // already added to the action's args_vec by
+                    // `create_cc_compile_action`'s per-source loop — no
+                    // need to register them globally for cross-target
+                    // visibility, which was the bug Plan 29 retired.
 
                     // Determine output filename (replace extension with .o)
                     let basename = src_path.rsplit('/').next().unwrap_or(src_path);
@@ -2454,11 +2434,11 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 }
             };
 
-        // If strip_include_prefix produced an include root, append it to the
-        // includes depset so that dependents consuming this target's CcInfo
-        // get the include path via compilation_contexts propagation (not
-        // just via the in-session global register_external_include_dir
-        // channel, which is unreliable when analyses interleave).
+        // If strip_include_prefix produced an include root, append it to
+        // the includes depset so that dependents consuming this target's
+        // CcInfo get the include path via standard CcCompilationContext
+        // propagation. This is the only correct cross-target propagation
+        // mechanism — see Plan 29 for the rationale.
         let includes = if let Some(ref dir) = strip_include_dir {
             let mut direct: Vec<Value<'v>> = vec![heap.alloc_str(dir).to_value()];
             let transitive: Vec<Value<'v>> = if includes.is_none() {

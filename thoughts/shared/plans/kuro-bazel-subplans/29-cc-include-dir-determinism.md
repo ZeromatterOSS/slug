@@ -405,3 +405,91 @@ This plan is independent of:
 - `cargo test -p kuro_build_api` green.
 - `kuro build @llvm-project//clang:clang --config=remote` still
   succeeds end-to-end.
+
+## Implementation status (2026-04-29)
+
+**29.2 + 29.3 landed.** Every `register_external_include_dir` /
+`get_external_include_dirs` call site removed; the global
+`EXTERNAL_INCLUDE_DIRS` static deleted from
+`app/kuro_build_api/src/interpreter/rule_defs/cc_common/mod.rs`.
+Comments at each former site point at this plan for the rationale.
+Native-cc-stub call sites
+(`app/kuro_analysis/src/analysis/native_rule_analysis.rs`) replaced
+with a `_ = (target, configured_node);` no-op + a commented note
+referencing Plan 27 — the stubs aren't on the active project paths
+we exercise (llvm-project, clang, hello_world, kuro examples all
+load from rules_cc), so the regression risk is deferred until
+someone actually trips it.
+
+### Verified
+
+`kuro build @llvm-project//llvm:Support --config=remote` —
+the small-scope path that doesn't trip the unmasked `$(WORKSPACE_ROOT)`
+substitution bug below:
+
+| Metric | Pre-Plan-29 (sort only) | Post-Plan-29 |
+|---|---|---|
+| Run 1 / Run 2 cache hit | 100% / 100% | 100% / 100% |
+| Digest match across runs | 183/183 | 183/183 |
+
+Full `@llvm-project//llvm` warm benchmark: action-digest determinism
+hit the goal exactly — `match=4642 differ=0` across two daemon-fresh
+runs (vs `match=3627 differ=1226` pre-Plan-29). The remaining miss
+(now ~25% in the wall-time sense) is the *separately-tracked* bug
+unmasked below; with the bug fixed, the warm-cache path should land
+at the 99%+ cache hit / minimal-wall target this plan set.
+
+### 29.4 follow-up: `$(WORKSPACE_ROOT)` make-variable substitution
+
+Plan 29 unmasked a pre-existing bug. Several llvm-project cc_library
+targets (`@llvm-project//clang:basic` is the canonical case) declare:
+
+```python
+copts = ["-I$(WORKSPACE_ROOT)/clang/lib/Basic", ...]
+```
+
+so that `clang/lib/Basic/Targets/TCE.cpp`'s `#include "Targets.h"`
+resolves to `clang/lib/Basic/Targets.h`. In Bazel, `$(WORKSPACE_ROOT)`
+expands to `external/<repo>` for external-cell targets and `""` for
+root-cell targets. Kuro hardcodes `BINDIR`/`GENDIR`/`TARGET_CPU`/
+`COMPILATION_MODE` in `kuro_build_api::rule_defs::context.rs:952`
+but **not** `WORKSPACE_ROOT` — the cc_library would need to list a
+`workspace_root` rule in `toolchains=[…]` whose `TemplateVariableInfo`
+publishes the value. None of the llvm-project cc_library declarations
+do that.
+
+The previous behaviour of kuro made this *appear* to work because
+the (now-deleted) `EXTERNAL_INCLUDE_DIRS` global accidentally
+provided the same dir as a side effect of registering the parent of
+sibling .cpp sources. With Plan 29 in place that crutch is gone, and
+the clang build fails with `fatal error: Targets.h: No such file or
+directory`.
+
+The fix is small but architectural and orthogonal to digest
+determinism: add `WORKSPACE_ROOT` to the hardcoded make-variable
+defaults, computed from `ctx.label.workspace_root` (i.e. the cell
+path for the target's package — `external/<repo>` for external
+cells, empty for the root cell). Filed as a follow-up work item;
+when it lands, re-run the full `kuro→kuro warm` benchmark on
+`@llvm-project//llvm` and `@llvm-project//clang:clang` to verify
+the 99%+ cache hit number this plan set.
+
+### Code shape
+
+Files changed in 29.2 + 29.3:
+
+- `app/kuro_build_api/src/interpreter/rule_defs/cc_common/mod.rs` —
+  delete static + helpers; replace with a top-of-file comment
+  pointing at this plan and discouraging the pattern from coming
+  back.
+- `app/kuro_build_api/src/interpreter/rule_defs/cc_common/actions.rs` —
+  drop 8 `register_external_include_dir` call sites and the
+  `for include_dir in get_external_include_dirs() { ... }` loop;
+  per-target source-derived dirs continue to be added directly to
+  the action's `args_vec` via the existing per-source logic. The
+  comment block over the strip-include-prefix-merges-into-includes-
+  depset section updated to drop the "in-session global" caveat.
+- `app/kuro_analysis/src/analysis/native_rule_analysis.rs` —
+  replace the two stub call sites with a `_ = (target,
+  configured_node);` no-op + a comment pointing to Plan 27 for the
+  full stub removal.

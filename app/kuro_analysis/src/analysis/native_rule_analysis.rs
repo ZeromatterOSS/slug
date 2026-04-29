@@ -853,53 +853,28 @@ fn create_cc_analysis_result(
     target: &ConfiguredTargetLabel,
     configured_node: Option<ConfiguredTargetNodeRef<'_>>,
 ) -> kuro_error::Result<AnalysisResult> {
-    // Register the repo root as an include directory for native cc_library stubs.
-    // This ensures that when other targets compile against this stub dep,
-    // headers from this repo can be found (e.g., "absl/base/macros.h" from abseil-cpp).
-    let cell_name = target.pkg().cell_name().as_str();
-    if !kuro_core::cells::is_root_cell_name(cell_name) {
-        let include_dir = format!("external/{}", cell_name);
-        kuro_build_api::interpreter::rule_defs::cc_common::register_external_include_dir(
-            &include_dir,
-        );
-    }
-
-    // Honour `strip_include_prefix`. Bazel convention: headers exposed by this
-    // cc_library can be `#include`d with `<strip_prefix>/` stripped. Compute
-    // the absolute include dir as `[external/<cell>/]<pkg>/<strip_prefix>` so
-    // dependents find `#include "<remainder>"` correctly. Without this,
-    // e.g. `@llvm-project//third-party/siphash:siphash` with
-    // `strip_include_prefix="include"` fails to expose
-    // `third-party/siphash/include` and Support's `#include "siphash/SipHash.h"`
-    // doesn't resolve. Only needed while `create_cc_analysis_result` stubs
-    // out the full cc_library analysis; once rules_cc's Starlark impl runs
-    // for these targets, `cc_common.compile` handles strip_include_prefix.
-    if let Some(node) = configured_node {
-        use kuro_node::attrs::configured_attr::ConfiguredAttr;
-        use kuro_node::attrs::inspect_options::AttrInspectOptions;
-        if let Some(attr) = node.get("strip_include_prefix", AttrInspectOptions::All) {
-            if let ConfiguredAttr::String(s) = &attr.value {
-                let trimmed = s.0.as_str().trim_start_matches('/');
-                if !trimmed.is_empty() {
-                    let pkg_path = target.pkg().cell_relative_path().as_str();
-                    let include_dir = if kuro_core::cells::is_root_cell_name(cell_name) {
-                        if pkg_path.is_empty() {
-                            trimmed.to_owned()
-                        } else {
-                            format!("{}/{}", pkg_path, trimmed)
-                        }
-                    } else if pkg_path.is_empty() {
-                        format!("external/{}/{}", cell_name, trimmed)
-                    } else {
-                        format!("external/{}/{}/{}", cell_name, pkg_path, trimmed)
-                    };
-                    kuro_build_api::interpreter::rule_defs::cc_common::register_external_include_dir(
-                        &include_dir,
-                    );
-                }
-            }
-        }
-    }
+    // (Plan 29) Native cc_library stubs previously registered
+    // `external/<cell>` and `<pkg>/<strip_include_prefix>` in a process-
+    // global include-dir registry so dependents of stubs would see those
+    // dirs in their compile commands. That registry has been retired
+    // (the global was the source of action-digest non-determinism across
+    // daemon restarts; see Plan 29 for the audit). Cross-target dir
+    // propagation now goes exclusively through
+    // `CcCompilationContext.includes` providers — but the stub returns
+    // `CcInfoInstanceStub` (no compilation_context), so dependents that
+    // *only* go through the native stub path will lose these dirs.
+    //
+    // For the projects this matters for in practice (llvm-project, clang,
+    // hello_world, kuro examples), every cc rule loads from rules_cc and
+    // the Starlark cc_library / cc_common.compile() path runs — the stub
+    // doesn't fire. The stub mostly fires for legacy Buck-style targets
+    // that aren't part of any active migration.
+    //
+    // Plan 27 (native-language-rule-removal) is the canonical home for
+    // the eventual full removal of these stubs. If a build that depends
+    // on the stub-supplied dirs surfaces, the fix is to populate a real
+    // `CcCompilationContextGen` here instead of `CcInfoInstanceStub`.
+    let _ = (target, configured_node); // intentionally unused: see comment above
 
     let heap = FrozenHeap::new();
 
