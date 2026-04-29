@@ -439,7 +439,67 @@ runs (vs `match=3627 differ=1226` pre-Plan-29). The remaining miss
 unmasked below; with the bug fixed, the warm-cache path should land
 at the 99%+ cache hit / minimal-wall target this plan set.
 
-### 29.4 partial fix + deeper unmasked bug: copts not applied at all
+### 29.4 fully landed (2026-04-29): WORKSPACE_ROOT + copts plumbing through compile_build_variables
+
+Two pre-existing bugs that the deleted `EXTERNAL_INCLUDE_DIRS` global had been
+incidentally masking:
+
+**(a) `WORKSPACE_ROOT` make-variable.** rules_cc cc_library declarations like
+`@llvm-project//clang:basic`'s `copts = ["-I$(WORKSPACE_ROOT)/clang/lib/Basic"]`
+require `$(WORKSPACE_ROOT)` to expand to `external/<cell>` for external-cell
+targets. Kuro hardcoded `BINDIR`/`GENDIR`/`TARGET_CPU`/`COMPILATION_MODE` in
+`kuro_build_api::rule_defs::context.rs` but not `WORKSPACE_ROOT`. Added it as
+a hardcoded built-in via a new `workspace_root_from_label` helper, plumbed
+into both the `ctx.var` attribute method and `ctx.expand_make_variables`.
+
+**(b) `compile_build_variables` was an unused parameter.** rules_cc 0.2.17
+Starlarkified its compile path: `cc/private/compile/compile.bzl::compile()`
+packs `user_compile_flags` (the post-`cc_helper.get_copts` expanded copts
+list), `include_paths`, `quote_include_paths`, etc. into a
+`compile_build_variables` struct and calls
+`cc_common.internal_DO_NOT_USE().create_cc_compile_action(..., compile_build_variables=…)`.
+Kuro's `create_cc_compile_action` accepted the parameter and **ignored it**
+— so for any cc_library that goes through the rules_cc 0.2.17 path (every
+modern Bazel-shape project), every copt was silently dropped from the
+compile command. The Plan 18.10.3 sort fix's pre-image build appeared to
+work because the deleted global registry was accidentally registering the
+parent dir of sibling `.cpp` sources, which happened to coincide with the
+include path the missing `-I$(WORKSPACE_ROOT)/...` copt would have
+produced. With the global gone, the broken-copts-handling bug became a
+hard build failure (`fatal error: Targets.h: No such file or directory`).
+
+The fix in `create_cc_compile_action` reads
+`compile_build_variables.user_compile_flags` (handling both
+struct-with-`.get_attr` and `Dict` shapes via the same `get_var` helper
+shape that `get_memory_inefficient_command_line` already uses) and
+appends each flag to `args_vec`. Mirrors what
+`get_memory_inefficient_command_line` does for the toolchain-feature-driven
+command-line synth path.
+
+Filed for follow-up but not required for closing this plan: the same
+`compile_build_variables` also has `include_paths`, `quote_include_paths`,
+`system_include_paths`, `external_include_paths`, and
+`preprocessor_defines`. Kuro's `create_cc_compile_action` already gets
+those from `cc_compilation_context.{includes, system_includes, …}` (the
+`Value<'v>` parameter, not `compile_build_variables`), so they're not
+silently dropped — but the rules_cc 0.2.17 contract puts them in
+`compile_build_variables` as the canonical source. A follow-up should
+either source them exclusively from there, or compare the two and fail
+loudly on divergence. For now they happen to agree.
+
+### Final benchmark (2026-04-29)
+
+`kuro→kuro warm` on `@llvm-project//llvm` (4853 actions):
+
+| Metric | Pre-Plan-29 (sort only) | Plan 29.2+29.3 only | Final (29.2 + 29.3 + 29.4) |
+|---|---|---|---|
+| Run 2 wall | 232s | (broken — copts unmasked) | **57.4s** |
+| Run 2 cache hit rate | 23% | n/a | **100%** (4852/4852) |
+| Digest match | 3627/4853 | 4642/4642 | **4853/4853** |
+
+Stated goal of plan: ≥99% kuro→kuro warm cache hit rate. **Achieved at 100%.**
+
+#### 29.4 follow-up legacy notes (kept for historical reference)
 
 **Partial fix landed (2026-04-29):** Added `WORKSPACE_ROOT` to kuro's
 hardcoded built-in make-variable defaults in

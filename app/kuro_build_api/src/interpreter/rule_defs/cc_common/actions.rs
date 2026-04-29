@@ -502,6 +502,75 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             }
         }
 
+        // (Plan 29.4 follow-up) Pull `user_compile_flags` out of the
+        // `compile_build_variables` struct rules_cc 0.2.17 hands us.
+        // rules_cc's Starlarkified compile path (`cc/private/compile/
+        // compile.bzl`) packs the cc_library `copts` (+ conlyopts /
+        // cxxopts, after `cc_helper.get_copts` make-variable expansion)
+        // into a `compile_build_variables` struct keyed by
+        // `user_compile_flags` and calls `cc_common.internal_DO_NOT_USE().
+        // create_cc_compile_action(..., compile_build_variables = ...)`.
+        // Before this, kuro's create_cc_compile_action accepted the
+        // parameter but ignored it — so for any cc_library going through
+        // the Starlarkified path, every copt was silently dropped from
+        // the compile command (`-DHAVE_VCS_VERSION_INC`, `-I$(WORKSPACE_
+        // ROOT)/clang/lib/Basic`, etc., on `@llvm-project//clang:basic`).
+        // Mirrors the get_var() helper in `get_memory_inefficient_command
+        // _line` that already reads this variable for the toolchain-
+        // feature-driven command-line synth.
+        if !compile_build_variables.is_none() {
+            let read_var = |key: &str| -> Option<Value<'v>> {
+                if let Ok(Some(v)) = compile_build_variables.get_attr(key, heap) {
+                    if !v.is_none() {
+                        return Some(v);
+                    }
+                }
+                if let Some(dict_ref) = DictRef::from_value(compile_build_variables) {
+                    if let Some(v) = dict_ref.get_str(key) {
+                        if !v.is_none() {
+                            return Some(v);
+                        }
+                    }
+                }
+                None
+            };
+            let mut collect_flags = |val: Value<'v>| -> Vec<String> {
+                let mut out = Vec::new();
+                // `to_list()` for depsets; falls through to plain iter for
+                // lists/tuples. Mirrors `iterate_value` in get_memory_
+                // inefficient_command_line.
+                if let Ok(Some(to_list)) = val.get_attr("to_list", heap) {
+                    if let Ok(listed) = eval.eval_function(to_list, &[], &[]) {
+                        if let Ok(iter) = listed.iterate(heap) {
+                            for f in iter {
+                                if let Some(s) = f.unpack_str() {
+                                    if !s.is_empty() {
+                                        out.push(s.to_owned());
+                                    }
+                                }
+                            }
+                            return out;
+                        }
+                    }
+                }
+                if let Ok(iter) = val.iterate(heap) {
+                    for f in iter {
+                        if let Some(s) = f.unpack_str() {
+                            if !s.is_empty() {
+                                out.push(s.to_owned());
+                            }
+                        }
+                    }
+                }
+                out
+            };
+            if let Some(ucf) = read_var("user_compile_flags") {
+                for s in collect_flags(ucf) {
+                    args_vec.push(heap.alloc_str(&s).to_value());
+                }
+            }
+        }
+
         // Add dependency file generation flags if dotd_file is specified
         if !dotd_file.is_none() {
             if msvc {
