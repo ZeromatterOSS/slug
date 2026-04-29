@@ -947,12 +947,14 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         // BINDIR and GENDIR are derived from the actual target's cell/configuration.
         let bin_dir = bin_dir_path_from_label(this.0.label);
         let comp_mode = compilation_mode_from_cfg(cfg_from_label(this.0.label));
+        let workspace_root = workspace_root_from_label(this.0.label);
         use starlark::values::dict::Dict;
         let entries: &[(&str, &str)] = &[
             ("BINDIR", bin_dir.as_str()),
             ("GENDIR", bin_dir.as_str()),
             ("TARGET_CPU", host_target_cpu()),
             ("COMPILATION_MODE", comp_mode.as_str()),
+            ("WORKSPACE_ROOT", workspace_root.as_str()),
             ("CC", host_cc_path()),
             ("CC_FLAGS", ""),
             (
@@ -1283,11 +1285,13 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         // User-provided substitutions take priority.
         let bin_dir = bin_dir_path_from_label(this.0.label);
         let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
+        let workspace_root = workspace_root_from_label(this.0.label);
         let builtins: &[(&str, &str)] = &[
             ("BINDIR", bin_dir.as_str()),
             ("GENDIR", bin_dir.as_str()),
             ("TARGET_CPU", host_target_cpu()),
             ("COMPILATION_MODE", comp_mode.as_str()),
+            ("WORKSPACE_ROOT", workspace_root.as_str()),
             ("CC", host_cc_path()),
             ("CC_FLAGS", ""),
             (
@@ -2075,6 +2079,39 @@ pub fn bin_dir_path_from_label(
         format!("buck-out/v2/gen/{}/{}", cell_name, cfg_hash)
     } else {
         "buck-out/v2/gen".to_owned()
+    }
+}
+
+/// Bazel's `$(WORKSPACE_ROOT)` make-variable: the path from the exec
+/// root to the workspace root that contains a target. For a target in
+/// the root cell this is the empty string; for a target in an external
+/// cell it is `external/<cell>`.
+///
+/// rules_cc cc_library declarations in real-world Bazel projects bake
+/// this into `copts`, e.g. `@llvm-project//clang:basic` carries
+/// `copts = ["-I$(WORKSPACE_ROOT)/clang/lib/Basic"]` so that
+/// `clang/lib/Basic/Targets/TCE.cpp`'s `#include "Targets.h"` resolves
+/// to a sibling file in `clang/lib/Basic/`. Bazel proper exposes
+/// `WORKSPACE_ROOT` through Bazel's `MAKE_VARIABLES` defaults; without
+/// hardcoding it here, `$(WORKSPACE_ROOT)` would survive copts
+/// substitution literally and the compile would fail to find the
+/// header. (Plan 29.4.)
+pub fn workspace_root_from_label(
+    label: Option<
+        starlark::values::ValueTyped<
+            '_,
+            kuro_interpreter::types::configured_providers_label::StarlarkConfiguredProvidersLabel,
+        >,
+    >,
+) -> String {
+    let Some(label) = label else {
+        return String::new();
+    };
+    let cell_name = label.label().target().pkg().cell_name().as_str();
+    if kuro_core::cells::is_root_cell_name(cell_name) {
+        String::new()
+    } else {
+        format!("external/{}", cell_name)
     }
 }
 

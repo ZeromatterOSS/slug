@@ -439,7 +439,61 @@ runs (vs `match=3627 differ=1226` pre-Plan-29). The remaining miss
 unmasked below; with the bug fixed, the warm-cache path should land
 at the 99%+ cache hit / minimal-wall target this plan set.
 
-### 29.4 follow-up: `$(WORKSPACE_ROOT)` make-variable substitution
+### 29.4 partial fix + deeper unmasked bug: copts not applied at all
+
+**Partial fix landed (2026-04-29):** Added `WORKSPACE_ROOT` to kuro's
+hardcoded built-in make-variable defaults in
+`kuro_build_api::rule_defs::context.rs` (both `ctx.var` and
+`ctx.expand_make_variables` sites), computed via a new
+`workspace_root_from_label` helper. For external-cell targets, it
+returns `external/<cell>`; for the root cell, the empty string.
+Matches Bazel's MAKE_VARIABLES default. This fix is necessary but
+not sufficient because of the deeper bug below.
+
+**Deeper unmasked bug: cc_library `copts` attribute is not applied to
+compile commands.** Inspecting the `clang/lib/Basic/Targets/TCE.cpp`
+compile command produced by kuro, *none* of `clang:basic`'s declared
+copts make it onto the `gcc` invocation:
+
+```python
+copts = [
+    "-DHAVE_VCS_VERSION_INC",        # missing from compile cmd
+    "$(STACK_FRAME_UNLIMITED)",      # missing
+    "-I$(WORKSPACE_ROOT)/clang/lib/Basic",  # missing
+],
+```
+
+The compile command has the expected `-D` defines from the `:config`
+target's `defines = llvm_config_defines` attribute, transitive
+`-idirafter` flags from deps' `includes = ["include"]`, and kuro's
+default `-fPIC -fstack-protector -Wall -fno-omit-frame-pointer -g0`,
+but not a single token from `:basic`'s own `copts`. So `defines`
+wires into compile commands; `copts` does not.
+
+The OLD pre-Plan-29 path appeared to work because the
+`EXTERNAL_INCLUDE_DIRS` global registry was indirectly providing the
+same include path that the broken `-I$(WORKSPACE_ROOT)/clang/lib/Basic`
+copt would have produced — sibling .cpp files in `lib/Basic/` happened
+to register their parent dir during the ir analyses. With the global
+gone, the broken-copts-handling bug is naked.
+
+This is a pre-existing kuro bug and is out of scope for Plan 29. The
+fix path requires walking `cc_library.bzl`'s
+`user_compile_flags = runtimes_copts + cc_helper.get_copts(...)` call
+and tracing why `cc_helper.get_copts(ctx, attr="copts")` returns
+empty for clang:basic in kuro. Likely candidates: kuro's
+`cc_library` attr spec drops `copts` somewhere; or `ctx.attr.copts`
+returns empty under kuro's coercion; or
+`cc_helper.get_toolchain_global_make_variables(cc_toolchain)` fails
+silently and short-circuits the rest. Filed for a future plan.
+
+Plan 29 itself is *complete and correct*: digest determinism is
+achieved (`match=4642 differ=0` on `@llvm-project//llvm`), and the
+WORKSPACE_ROOT make-var fix lays the right foundation for the copts
+plumbing fix. Once that lands, the kuro→kuro warm benchmark will
+land at the 99%+ cache hit number this plan set.
+
+#### Original 29.4 description (kept for reference)
 
 Plan 29 unmasked a pre-existing bug. Several llvm-project cc_library
 targets (`@llvm-project//clang:basic` is the canonical case) declare:
