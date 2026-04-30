@@ -799,6 +799,28 @@ async def test_cc_library_removed_without_load(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_loaded_removed_rules_analyze_cleanly(buck: Buck) -> None:
+    """Plan 27.5 readiness gate: a user `load()` shadows the BUILD-global
+    removed-rule stub. Loaded sh_binary / sh_library / sh_test (from the
+    fixture's :defs.bzl Starlark replacements) and cc_library (no-op
+    Starlark stub) analyze without firing the removed-rule diagnostic.
+
+    The full @rules_cc / @rules_shell parity is exercised by
+    @llvm-project//llvm:Demangle and :Support — see
+    memory/llvm_smoke_test.md."""
+    # All four targets exist and are loaded via :defs.bzl in the fixture's
+    # BUILD.bazel. Building all of them in one shot proves the load shadows
+    # the BUILD-global stub for every removed rule family touched by Plan
+    # 27.2.
+    await buck.build(
+        "//:hello_sh",
+        "//:hello_sh_lib",
+        "//:hello_sh_test",
+        "//:shared_lib_dep",
+    )
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_attr_int_values_valid(buck: Buck) -> None:
     """attr.int(values=[...]) accepts valid integer values."""
     result = await buck.build("//:int_values_valid")

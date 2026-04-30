@@ -57,7 +57,6 @@ use starlark::starlark_module;
 use starlark::values::Value;
 use starlark::values::dict::UnpackDictEntries;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
-use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
 
 use crate::attrs::coerce::attr_type::AttrTypeExt;

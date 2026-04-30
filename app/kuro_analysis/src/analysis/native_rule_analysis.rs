@@ -42,14 +42,8 @@ use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::Def
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::FrozenDefaultInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::external_runner_test_info::FrozenExternalRunnerTestInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::external_runner_test_info::create_frozen_sh_test_info;
-use kuro_build_api::interpreter::rule_defs::command_executor_config::StarlarkCommandExecutorConfig;
-use kuro_build_api::interpreter::rule_defs::provider::builtin::execution_platform_info::ExecutionPlatformInfoGen;
-use kuro_build_api::interpreter::rule_defs::provider::builtin::execution_platform_info::FrozenExecutionPlatformInfo;
-use kuro_build_api::interpreter::rule_defs::provider::builtin::execution_platform_registration_info::ExecutionPlatformRegistrationInfoGen;
-use kuro_build_api::interpreter::rule_defs::provider::builtin::execution_platform_registration_info::FrozenExecutionPlatformRegistrationInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::platform_info::FrozenPlatformInfo;
 use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
-use kuro_interpreter::types::target_label::StarlarkTargetLabel;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::deferred::key::DeferredHolderKey;
 use kuro_core::execution_types::executor_config::CommandExecutorConfig;
@@ -71,10 +65,8 @@ use kuro_node::rule_type::NativeRuleKind;
 use kuro_node::rule_type::RemovedNativeRule;
 use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
-use starlark::values::FrozenValueOfUnchecked;
 use starlark::values::FrozenValueTyped;
 use starlark::values::OwnedFrozenValue;
-use starlark::values::list::AllocList;
 use starlark::values::any_complex::StarlarkAnyComplex;
 use starlark_map::small_map::SmallMap;
 
@@ -488,34 +480,6 @@ fn collect_source_file_location_mappings_recursive(
                 vec![ArtifactGroup::Artifact(Artifact::from(source_artifact))],
             ));
         }
-        _ => {}
-    }
-}
-
-/// Collect ArtifactGroups from a CoercedAttr that may contain source files.
-/// Source file entries become `ArtifactGroup::Artifact(SourceArtifact)`.
-/// Label deps are NOT collected here (they come from dep_analysis instead).
-fn collect_artifact_groups_from_attr(
-    attr: &CoercedAttr,
-    pkg: &kuro_core::package::PackageLabel,
-    out: &mut Vec<ArtifactGroup>,
-) {
-    match attr {
-        CoercedAttr::List(ListLiteral(items)) => {
-            for item in items.iter() {
-                collect_artifact_groups_from_attr(item, pkg, out);
-            }
-        }
-        CoercedAttr::OneOf(inner, _) => {
-            collect_artifact_groups_from_attr(inner, pkg, out);
-        }
-        CoercedAttr::SourceFile(coerced_path) => {
-            for path in coerced_path.inputs() {
-                let source_artifact = SourceArtifact::new(SourcePath::new(pkg.dupe(), path.dupe()));
-                out.push(ArtifactGroup::Artifact(Artifact::from(source_artifact)));
-            }
-        }
-        // Label deps are resolved via dep_analysis, not here
         _ => {}
     }
 }

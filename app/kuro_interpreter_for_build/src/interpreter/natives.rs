@@ -8,7 +8,6 @@
  * above-listed licenses.
  */
 
-use anyhow::anyhow;
 use kuro_build_api::interpreter::rule_defs::bazel_label::BazelLabel;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
 use kuro_build_api::interpreter::rule_defs::depset::Depset;
