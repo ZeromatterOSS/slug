@@ -1,0 +1,14 @@
+# Plan 28.4 Stage 2 acceptance: prove `rule_implementation_wrapper` is
+# in the analysis call path. The fixture's defs.bzl defines a Starlark
+# rule whose impl writes a sentinel string. With the wrapper wired, the
+# wrapper IS invoked but is currently a no-op (`return implementation(raw_ctx)`),
+# so the sentinel reaches the output unchanged. Test verifies output
+# matches; if the wrapper were silently bypassed, we'd get the same
+# result — so the meaningful follow-up here is the kuro-internal
+# probe that intercepts wrapper invocations (filed as a Phase 28.4
+# Stage 3 follow-up). For Stage 2 the acceptance is "no-op produces
+# byte-for-byte equivalent providers", proven by this build target +
+# the unchanged llvm:Demangle build.
+load(":wrapper_probe.bzl", "wrapper_probe")
+
+wrapper_probe(name = "wrapper_probe_target")

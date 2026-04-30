@@ -1491,6 +1491,7 @@ pub fn promise_artifact_mappings<'v>(
 pub fn get_user_defined_rule_spec(
     module: FrozenModule,
     rule_type: &StarlarkRuleType,
+    builtins_module: Option<FrozenModule>,
 ) -> impl RuleSpec + use<> {
     struct Impl {
         module: FrozenModule,
@@ -1499,6 +1500,16 @@ pub fn get_user_defined_rule_spec(
         output_attr_names: Vec<String>,
         toolchain_types: Vec<(String, bool)>,
         exec_group_defs: Vec<(String, kuro_node::rule::ExecGroupDef)>,
+        /// Plan 28.4 Stage 2: bundled `@kuro_builtins//:exports.bzl`. If
+        /// it exposes a `rule_implementation_wrapper`, every Starlark
+        /// rule impl gets called as `wrapper(impl, ctx)` instead of
+        /// `impl(ctx)`. The wrapper is currently an identity no-op
+        /// (Phase 28.4 Stage 1 hook), so this is byte-for-byte
+        /// equivalent. Subsequent stages migrate `ctx`-method bodies
+        /// into the wrapper. None means @kuro_builtins isn't
+        /// registered in this workspace; analysis falls back to direct
+        /// invocation.
+        builtins_module: Option<FrozenModule>,
     }
 
     impl RuleSpec for Impl {
@@ -1525,7 +1536,19 @@ pub fn get_user_defined_rule_spec(
             }
             let _guard = CtxGuard;
 
-            let result = eval.eval_function(rule_impl.to_value(), &[ctx_val], &[]);
+            // Plan 28.4 Stage 2: route Starlark rule impl calls through
+            // the bundled `rule_implementation_wrapper(impl, ctx)`.
+            // Stage 1 / 28.3 ships a no-op wrapper, so this preserves
+            // byte-for-byte provider results. Subsequent stages can
+            // change the wrapper body to install a Starlark `ctx`
+            // facade and migrate `ctx.target_platform_has_constraint`
+            // / `ctx.runfiles` / `ctx.var` etc. without touching the
+            // analysis call site again.
+            let result = if let Some(wrapper) = self.lookup_rule_implementation_wrapper(eval)? {
+                eval.eval_function(wrapper, &[rule_impl.to_value(), ctx_val], &[])
+            } else {
+                eval.eval_function(rule_impl.to_value(), &[ctx_val], &[])
+            };
 
             Ok(result?)
         }
@@ -1554,6 +1577,26 @@ pub fn get_user_defined_rule_spec(
         }
     }
 
+    impl Impl {
+        /// Plan 28.4 Stage 2: look up `rule_implementation_wrapper` in
+        /// the bundled `@kuro_builtins//:exports.bzl`. Returns `None`
+        /// when the workspace doesn't have `@kuro_builtins` registered
+        /// (legacy non-bzlmod), or when the bundled module doesn't
+        /// expose the wrapper (e.g. test exports.bzl without the hook).
+        fn lookup_rule_implementation_wrapper<'v>(
+            &self,
+            eval: &mut Evaluator<'v, '_, '_>,
+        ) -> kuro_error::Result<Option<Value<'v>>> {
+            let Some(builtins) = &self.builtins_module else {
+                return Ok(None);
+            };
+            let owned = builtins
+                .get_option("rule_implementation_wrapper")
+                .map_err(|e| from_any_with_tag(e, kuro_error::ErrorTag::Tier0))?;
+            Ok(owned.map(|w| w.owned_value(eval.frozen_heap())))
+        }
+    }
+
     // Extract rule(outputs={...}) patterns, attr.output names, toolchain_types,
     // and exec_group_defs from the frozen callable.
     let (implicit_rule_outputs, output_attr_names, toolchain_types, exec_group_defs) =
@@ -1579,6 +1622,7 @@ pub fn get_user_defined_rule_spec(
         output_attr_names,
         toolchain_types,
         exec_group_defs,
+        builtins_module,
     }
 }
 

@@ -346,7 +346,61 @@ Do not start with:
   Starlark.
 - The moved behavior has a Bazel 9 parity citation.
 
-## Phase 28.4: Rule Implementation Wrapper
+## Phase 28.4: Rule Implementation Wrapper  [Stage 2 done 2026-04-30]
+
+### Status
+
+Stage 2 (the wiring) landed. Every Starlark rule impl is now called
+through `rule_implementation_wrapper(impl, ctx)` instead of
+`impl(ctx)`:
+
+- `kuro_analysis::analysis::calculation::get_kuro_builtins_module`
+  (new) loads `@kuro_builtins//:exports.bzl` via DICE. Returns
+  `None` for workspaces where the alias isn't registered, so the
+  fall-back to direct invocation is the no-prelude / no-bundled-cell
+  safety net.
+- `get_user_defined_rule_spec(module, rule_type, builtins_module)`
+  takes the optional builtins module and stashes it on `Impl`.
+- `Impl::lookup_rule_implementation_wrapper` reads
+  `rule_implementation_wrapper` from the bundled module via
+  `FrozenModule::get_option` and converts it into a `Value<'v>` on
+  the eval's frozen heap.
+- `Impl::invoke` now branches:
+  - wrapper present →
+    `eval.eval_function(wrapper, &[rule_impl, ctx], &[])`;
+  - wrapper absent (legacy/test workspaces) →
+    `eval.eval_function(rule_impl, &[ctx], &[])` (the original
+    direct call).
+
+Stage 1's wrapper body is a no-op identity function, so the call
+chain is byte-for-byte equivalent. Acceptance test
+`test_28_4_stage2_wrapper_passes_through` builds a Starlark rule
+that writes a sentinel string and verifies the sentinel reaches the
+output verbatim. `@llvm-project//llvm:Demangle` (and every other
+target that runs Starlark rules from `@rules_cc`) builds clean
+through the wrapper.
+
+### Remaining for Phase 28.4
+
+- **Stage 3+: per-method ctx migrations.** With the wrapper now in
+  the path, the Stage 3+ work is straightforward: replace the
+  wrapper body with a Starlark function that wraps `ctx` into a
+  facade exposing the migrated method (e.g.
+  `target_platform_has_constraint`, `runfiles`, `var`,
+  `expand_make_variables`) backed by Starlark, while delegating
+  unmigrated methods to the raw ctx. Each migration deletes the
+  corresponding Rust impl per Phase 28.7's discipline.
+- Aspects and subrules are not yet routed through their own
+  wrappers (`aspect_implementation_wrapper`,
+  `subrule_implementation_wrapper`). Tracked as a small follow-up;
+  the same pattern applies (additional `LoadFile`-resolved
+  wrappers + dispatch-site changes in
+  `kuro_analysis::analysis::aspect_calculation` and
+  `kuro_interpreter_for_build::subrule`).
+- Stack-trace fidelity for user errors when the wrapper is in the
+  path: needs deliberate inspection on Stage 3+ migrations (the
+  no-op wrapper is too thin to obscure frames). The plan-level
+  risk note is unchanged.
 
 ### Goal
 

@@ -816,6 +816,25 @@ async def test_28_2_kuro_builtins_visible_in_external_bzl(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_4_stage2_wrapper_passes_through(buck: Buck) -> None:
+    """Plan 28.4 Stage 2: every Starlark rule impl is now called as
+    `rule_implementation_wrapper(impl, ctx)`. Stage 1's wrapper is a
+    no-op (`return implementation(raw_ctx)`), so providers produced
+    by the rule must match what `impl(ctx)` would have returned
+    directly. This fixture writes a sentinel string and asserts it
+    reaches the output verbatim — broken if the wrapper drops or
+    mutates the result. The unchanged @llvm-project//llvm:Demangle
+    build is the broader regression net. See Plan 28.4 in
+    `thoughts/shared/plans/kuro-bazel-subplans/28-builtins-module-architecture.md`.
+    """
+    result = await buck.build("//wrapper_proof:wrapper_probe_target")
+    output = result.get_build_report().output_for_target(
+        "//wrapper_proof:wrapper_probe_target"
+    )
+    assert output.read_text().strip() == "wrapped-via-rule-implementation-wrapper-noop"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_28_3_export_contract_hides_unlisted_symbols(buck: Buck) -> None:
     """Plan 28.3: only names in `exported_toplevels` reach the consuming
     env. Symbols defined at the top level of `exports.bzl` but NOT

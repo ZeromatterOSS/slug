@@ -713,12 +713,62 @@ pub async fn get_loaded_module(
     Ok(module)
 }
 
+/// Plan 28.4: load `@kuro_builtins//:exports.bzl` via DICE so analysis
+/// can reach `rule_implementation_wrapper`. Returns `None` for
+/// workspaces where `@kuro_builtins` is not registered (legacy
+/// non-bzlmod projects without `[external_cells] kuro_builtins =
+/// bundled`); analysis falls back to direct impl invocation in that
+/// case.
+async fn get_kuro_builtins_module(
+    ctx: &mut DiceComputations<'_>,
+) -> kuro_error::Result<Option<starlark::environment::FrozenModule>> {
+    use kuro_core::bzl::ImportPath;
+    use kuro_core::cells::build_file_cell::BuildFileCell;
+    use kuro_core::cells::cell_path::CellPath;
+    use kuro_core::cells::paths::CellRelativePathBuf;
+
+    let cell_resolver = ctx.get_cell_resolver().await?;
+    let root_cell = cell_resolver.root_cell();
+    let alias_resolver = ctx.get_cell_alias_resolver(root_cell).await?;
+
+    // Cheap pre-check: if the alias isn't registered, skip the DICE
+    // round-trip entirely. Fresh kuro builds always register
+    // @kuro_builtins via `kuro_common::legacy_configs::cells`, but
+    // legacy and external-test-cell setups may not.
+    if alias_resolver.resolve("kuro_builtins").is_err() {
+        return Ok(None);
+    }
+
+    let kb_cell = match alias_resolver.resolve("kuro_builtins") {
+        Ok(c) => c,
+        Err(_) => return Ok(None),
+    };
+    let cell_path = CellPath::new(
+        kb_cell,
+        CellRelativePathBuf::unchecked_new("exports.bzl".to_owned()),
+    );
+    let import_path =
+        match ImportPath::new_with_build_file_cells(cell_path, BuildFileCell::new(root_cell)) {
+            Ok(p) => p,
+            Err(_) => return Ok(None),
+        };
+    match ctx.get_loaded_module_from_import_path(&import_path).await {
+        Ok(m) => Ok(Some(m.env().dupe())),
+        Err(_) => Ok(None),
+    }
+}
+
 pub async fn get_rule_spec(
     ctx: &mut DiceComputations<'_>,
     func: &StarlarkRuleType,
 ) -> kuro_error::Result<impl RuleSpec + use<>> {
     let module = get_loaded_module(ctx, func).await?;
-    Ok(get_user_defined_rule_spec(module.env().dupe(), func))
+    let builtins_module = get_kuro_builtins_module(ctx).await?;
+    Ok(get_user_defined_rule_spec(
+        module.env().dupe(),
+        func,
+        builtins_module,
+    ))
 }
 
 async fn get_analysis_result(
