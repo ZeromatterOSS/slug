@@ -134,6 +134,13 @@ stubs: their sole purpose is to print "add the load statement for
 `@rules_cc//...`" when a user writes `cc_library(...)` without the
 load.
 
+Detailed execution plan: [Plan 27: Native Language Rule
+Removal](./27-native-language-rule-removal.md). Plan 27 expands this
+phase to cover kuro's current `sh_*`, `execution_platform(s)`, and
+`cc_libc_top_alias` remnants, and requires a Bazel 9 source audit
+before deciding whether each symbol is an `EmptyRule`, absent, or
+private/internal.
+
 ### Changes
 
 - `app/kuro_node/src/rule_type.rs`: delete `NativeRuleKind::CcLibrary`,

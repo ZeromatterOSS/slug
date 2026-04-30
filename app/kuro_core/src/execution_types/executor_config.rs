@@ -494,6 +494,63 @@ mod tests {
         assert_eq!(merged.properties.len(), 3);
     }
 
+    /// Plan 24 Phase 9: chaining `merged_with` enforces the
+    /// platform → target → action precedence — the action-level
+    /// override wins on its keys; target-level wins on its keys; the
+    /// platform contributes the rest. Mirrors the three-layer compose
+    /// in `ActionsRegistry::finalize`.
+    #[test]
+    fn re_platform_fields_chained_merge_action_wins_over_target_wins_over_platform() {
+        let platform = RePlatformFields {
+            properties: Arc::new(SortedMap::from_iter([
+                ("OSFamily".to_owned(), "Linux".to_owned()),
+                (
+                    "container-image".to_owned(),
+                    "docker://platform:v0".to_owned(),
+                ),
+            ])),
+        };
+        let target_overrides: Vec<(String, String)> = vec![
+            (
+                "container-image".to_owned(),
+                "docker://target:v1".to_owned(),
+            ),
+            ("Arch".to_owned(), "x86_64".to_owned()),
+        ];
+        let action_overrides: Vec<(String, String)> = vec![
+            (
+                "container-image".to_owned(),
+                "docker://action:v2".to_owned(),
+            ),
+            ("dockerNetwork".to_owned(), "bridge".to_owned()),
+        ];
+
+        let after_target = platform.merged_with(target_overrides);
+        let after_action = after_target.merged_with(action_overrides);
+
+        // platform-only key survives both merges.
+        assert_eq!(
+            after_action.properties.get("OSFamily"),
+            Some(&"Linux".to_owned())
+        );
+        // target-only key contributed by middle layer survives action.
+        assert_eq!(
+            after_action.properties.get("Arch"),
+            Some(&"x86_64".to_owned())
+        );
+        // contested key — action wins.
+        assert_eq!(
+            after_action.properties.get("container-image"),
+            Some(&"docker://action:v2".to_owned())
+        );
+        // action-only key added by top layer.
+        assert_eq!(
+            after_action.properties.get("dockerNetwork"),
+            Some(&"bridge".to_owned())
+        );
+        assert_eq!(after_action.properties.len(), 4);
+    }
+
     #[test]
     fn re_platform_fields_merged_with_empty_overrides_is_clone() {
         let platform = RePlatformFields {

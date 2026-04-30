@@ -143,18 +143,24 @@ impl<'v> AnalysisRegistry<'v> {
             self_key,
             target_exec_properties,
             std::sync::Arc::from(Vec::<String>::new()),
+            std::sync::Arc::new(HashMap::new()),
         )
     }
 
-    /// Plan 24 Phase 4: variant that also accepts the rule's declared
-    /// exec_group names so `actions.run(exec_group=…)` can validate the
-    /// argument against the list. Empty when the rule didn't declare any
-    /// exec groups.
+    /// Plan 24 Phase 4 / Phase 8: variant that also accepts the rule's
+    /// declared exec_group names (so `actions.run(exec_group=…)` can
+    /// validate the argument against the list) and the per-named-group
+    /// resolved `ExecutionPlatformResolution` map (so an action that
+    /// names an exec group routes onto that group's resolved exec
+    /// platform's RE properties at registration time, instead of the
+    /// default group's). Both are empty when the rule didn't declare
+    /// any exec groups.
     pub fn new_from_owner_and_deferred_with_attrs(
         execution_platform: ExecutionPlatformResolution,
         self_key: DeferredHolderKey,
         target_exec_properties: std::sync::Arc<std::collections::BTreeMap<String, String>>,
         valid_exec_group_names: std::sync::Arc<[String]>,
+        group_platforms: std::sync::Arc<HashMap<String, ExecutionPlatformResolution>>,
     ) -> kuro_error::Result<Self> {
         Ok(AnalysisRegistry {
             actions: ActionsRegistry::new_with_attrs(
@@ -162,6 +168,7 @@ impl<'v> AnalysisRegistry<'v> {
                 execution_platform.dupe(),
                 target_exec_properties,
                 valid_exec_group_names,
+                group_platforms,
             ),
             anon_targets: (ANON_TARGET_REGISTRY_NEW.get()?)(PhantomData, execution_platform),
             analysis_value_storage: AnalysisValueStorage::new(self_key),
@@ -299,10 +306,16 @@ impl<'v> AnalysisRegistry<'v> {
         action: A,
         associated_value: Option<Value<'v>>,
         error_handler: Option<StarlarkCallable<'v>>,
+        exec_group_name: Option<String>,
+        action_exec_properties: Arc<std::collections::BTreeMap<String, String>>,
     ) -> kuro_error::Result<()> {
-        let id = self
-            .actions
-            .register(&self.analysis_value_storage.self_key, outputs, action)?;
+        let id = self.actions.register(
+            &self.analysis_value_storage.self_key,
+            outputs,
+            action,
+            exec_group_name,
+            action_exec_properties,
+        )?;
         self.analysis_value_storage
             .set_action_data(id, (associated_value, error_handler))?;
         Ok(())

@@ -78,13 +78,6 @@ pub struct BesSink {
     tx: mpsc::Sender<StreamItem>,
     upload_task: Arc<Mutex<Option<JoinHandle<()>>>>,
     config: BesConfig,
-    /// Channel used to talk to BES; reused for ByteStream uploads of
-    /// blobs (`command.profile.gz`) so BuildBuddy's Timing tab can
-    /// fetch them via `bytestream://…/blobs/<hash>/<size>` URIs.
-    /// Stored separately because cloning the channel is cheap whereas
-    /// the BES client itself wraps it with an interceptor and is not
-    /// reusable for another service.
-    channel: tonic::transport::Channel,
     interceptor: HeaderInterceptor,
 }
 
@@ -117,7 +110,7 @@ impl BesSink {
             )
         })?;
         let client = bes::publish_build_event_client::PublishBuildEventClient::with_interceptor(
-            channel.clone(),
+            channel,
             interceptor.clone(),
         );
 
@@ -133,7 +126,6 @@ impl BesSink {
             tx,
             upload_task: Arc::new(Mutex::new(Some(upload_task))),
             config,
-            channel,
             interceptor,
         })
     }
@@ -165,8 +157,27 @@ impl BesSink {
         let uuid = uuid::Uuid::new_v4();
         let resource_name = format!("uploads/{uuid}/blobs/{hash_hex}/{size}");
 
-        let mut client =
-            ByteStreamClient::with_interceptor(self.channel.clone(), self.interceptor.clone());
+        // ByteStream gets its own short-lived Channel rather than sharing
+        // the BES bidi stream's connection. A multi-MB profile upload on
+        // the same HTTP/2 connection competes for connection-level
+        // flow-control window with the streaming BEP events; on
+        // `wait_for_upload_complete` that compounds the post-build wait.
+        // The extra TCP+TLS handshake (~150 ms) overlaps with BES drain.
+        let endpoint = match build_endpoint(&self.config).await {
+            Ok(e) => e,
+            Err(e) => {
+                tracing::warn!("BES bytestream endpoint build failed: {e}");
+                return None;
+            }
+        };
+        let channel = match endpoint.connect().await {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!("BES bytestream channel connect failed: {e}");
+                return None;
+            }
+        };
+        let mut client = ByteStreamClient::with_interceptor(channel, self.interceptor.clone());
 
         // Stream a single chunk — `command.profile.gz` is small (≤
         // a few MB even for huge builds).
@@ -299,7 +310,19 @@ async fn build_endpoint(config: &BesConfig) -> kuro_error::Result<Endpoint> {
     // implemented in `BesSink::shutdown` via
     // `tokio::time::timeout(timeout, upload_task)` and doesn't need
     // any deadline on the gRPC stream itself.
-    let endpoint = endpoint.connect_timeout(Duration::from_secs(10));
+    // Flow-control + keepalive tuning. tonic defaults are conservative for
+    // a long-lived bidi stream pumping ~5k 1–2 KB events: the 64 KiB
+    // initial stream window forces a WINDOW_UPDATE roughly every 30–60
+    // events, and there is no HTTP/2 keepalive at all. Mirror the
+    // settings buck2's `re_grpc` uses for its long-lived streams.
+    let endpoint = endpoint
+        .connect_timeout(Duration::from_secs(10))
+        .http2_keep_alive_interval(Duration::from_secs(30))
+        .keep_alive_timeout(Duration::from_secs(20))
+        .keep_alive_while_idle(true)
+        .initial_stream_window_size(2 * 1024 * 1024)
+        .initial_connection_window_size(8 * 1024 * 1024)
+        .tcp_nodelay(true);
     let endpoint = if tls {
         endpoint
             .tls_config(ClientTlsConfig::new().with_webpki_roots())
@@ -356,25 +379,23 @@ async fn run_uploader<T>(
     rx: mpsc::Receiver<StreamItem>,
 ) -> Result<(), String>
 where
-    T: tonic::client::GrpcService<tonic::body::BoxBody>,
+    T: tonic::client::GrpcService<tonic::body::BoxBody> + Clone,
     T::Error: Into<tonic::codegen::StdError>,
     T::ResponseBody:
         tonic::codegen::Body<Data = tonic::codegen::Bytes> + std::marker::Send + 'static,
     <T::ResponseBody as tonic::codegen::Body>::Error:
         Into<tonic::codegen::StdError> + std::marker::Send,
 {
-    // Lifecycle: BuildEnqueued first.
+    // Lifecycle: BuildEnqueued + InvocationAttemptStarted in parallel.
+    // They are independent — different StreamIds, no ordering requirement
+    // between them on the BB ingest side — so we save a round-trip by
+    // sending them concurrently instead of awaiting BuildEnqueued first.
     let enqueue_event = bes::BuildEvent {
         event_time: Some(now_timestamp()),
         event: Some(bes::build_event::Event::BuildEnqueued(
             bes::build_event::BuildEnqueued { details: None },
         )),
     };
-    publish_lifecycle(&mut client, &cfg, enqueue_event, 1)
-        .await
-        .map_err(|e| format!("BuildEnqueued: {e}"))?;
-
-    // Lifecycle: InvocationAttemptStarted.
     let attempt_started = bes::BuildEvent {
         event_time: Some(now_timestamp()),
         event: Some(bes::build_event::Event::InvocationAttemptStarted(
@@ -384,9 +405,16 @@ where
             },
         )),
     };
-    publish_lifecycle(&mut client, &cfg, attempt_started, 1)
-        .await
-        .map_err(|e| format!("InvocationAttemptStarted: {e}"))?;
+    let mut client_enqueue = client.clone();
+    let mut client_attempt = client.clone();
+    let cfg_for_enqueue = cfg.clone();
+    let cfg_for_attempt = cfg.clone();
+    let (r_enqueue, r_attempt) = tokio::join!(
+        publish_lifecycle(&mut client_enqueue, &cfg_for_enqueue, enqueue_event, 1),
+        publish_lifecycle(&mut client_attempt, &cfg_for_attempt, attempt_started, 1),
+    );
+    r_enqueue.map_err(|e| format!("BuildEnqueued: {e}"))?;
+    r_attempt.map_err(|e| format!("InvocationAttemptStarted: {e}"))?;
 
     // Bidi stream: forward every BEP event as a `bazel_event` Any-packed payload.
     let (req_tx, req_rx) =
@@ -478,19 +506,6 @@ where
             },
         )),
     };
-    let t_attempt_finished = std::time::Instant::now();
-    if let Err(e) = publish_lifecycle(&mut client, &cfg, attempt_finished, 2).await {
-        tracing::warn!(
-            "BES InvocationAttemptFinished rejected: code={:?} message={:?}",
-            e.code(),
-            e.message(),
-        );
-    }
-    tracing::info!(
-        "BES uploader PROFILE: InvocationAttemptFinished in {:?}",
-        t_attempt_finished.elapsed()
-    );
-
     let build_finished = bes::BuildEvent {
         event_time: Some(now_timestamp()),
         event: Some(bes::build_event::Event::BuildFinished(
@@ -506,8 +521,28 @@ where
             },
         )),
     };
-    let t_build_finished = std::time::Instant::now();
-    if let Err(e) = publish_lifecycle(&mut client, &cfg, build_finished, 2).await {
+    let mut client_attempt_close = client.clone();
+    let mut client_build_close = client.clone();
+    let cfg_close_attempt = cfg.clone();
+    let cfg_close_build = cfg.clone();
+    let t_close = std::time::Instant::now();
+    let (r_attempt_close, r_build_close) = tokio::join!(
+        publish_lifecycle(
+            &mut client_attempt_close,
+            &cfg_close_attempt,
+            attempt_finished,
+            2
+        ),
+        publish_lifecycle(&mut client_build_close, &cfg_close_build, build_finished, 2),
+    );
+    if let Err(e) = r_attempt_close {
+        tracing::warn!(
+            "BES InvocationAttemptFinished rejected: code={:?} message={:?}",
+            e.code(),
+            e.message(),
+        );
+    }
+    if let Err(e) = r_build_close {
         tracing::warn!(
             "BES BuildFinished rejected: code={:?} message={:?}",
             e.code(),
@@ -515,8 +550,8 @@ where
         );
     }
     tracing::info!(
-        "BES uploader PROFILE: BuildFinished in {:?}",
-        t_build_finished.elapsed()
+        "BES uploader PROFILE: lifecycle close (parallel) in {:?}",
+        t_close.elapsed()
     );
 
     Ok(())

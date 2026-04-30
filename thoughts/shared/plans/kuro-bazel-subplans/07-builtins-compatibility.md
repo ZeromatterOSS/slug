@@ -118,9 +118,9 @@ functionality. The long-term goal is migrating them to Starlark:
 - [x] (Low priority) `starlark_doc_extract` (2026-02: implemented as native rule)
 
 **Phase 7a.4: Buck2-Heritage Rule Migration (future)**
-- [ ] Migrate cc_*/sh_* from native Rust to Starlark via rules_cc/rules_shell
-- [ ] Remove `execution_platform`/`execution_platforms` as BUILD rules (use MODULE.bazel `register_execution_platforms()`)
-- [ ] Remove `cc_libc_top_alias` (Buck2-specific)
+- [ ] Migrate cc_*/sh_* from native Rust to Starlark via rules_cc/rules_shell — detailed in [Plan 27](./27-native-language-rule-removal.md)
+- [ ] Remove `execution_platform`/`execution_platforms` as BUILD rules (use MODULE.bazel `register_execution_platforms()`) — detailed in [Plan 27](./27-native-language-rule-removal.md)
+- [ ] Remove `cc_libc_top_alias` (Buck2-specific unless Bazel 9 source audit proves otherwise) — detailed in [Plan 27](./27-native-language-rule-removal.md)
 
 ### Success Criteria (Phase 7a)
 

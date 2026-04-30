@@ -1,0 +1,54 @@
+load(":defs.bzl", "trivial_run")
+
+# Local OS constraint setting + values, so the test is self-contained
+# and doesn't depend on `@platforms//os` being materialized.
+constraint_setting(name = "os")
+
+constraint_value(
+    name = "linux",
+    constraint_setting = ":os",
+)
+
+constraint_value(
+    name = "darwin",
+    constraint_setting = ":os",
+)
+
+# Two candidate execution platforms. They're declared via `platform()`
+# so `--extra_execution_platforms` can register them and Plan 24
+# Phase 1's `load_platform_candidate` adapts them through PlatformInfo.
+platform(
+    name = "linux_platform",
+    constraint_values = [":linux"],
+)
+
+platform(
+    name = "darwin_platform",
+    constraint_values = [":darwin"],
+)
+
+# Target requires linux exec environment.
+trivial_run(
+    name = "needs_linux",
+    exec_compatible_with = [":linux"],
+)
+
+# Target requires darwin exec environment.
+trivial_run(
+    name = "needs_darwin",
+    exec_compatible_with = [":darwin"],
+)
+
+# A constraint value no platform satisfies — used by the Phase 5 test
+# to verify the resolver lists *all* skipped platforms in the error.
+constraint_setting(name = "kernel")
+
+constraint_value(
+    name = "fuchsia",
+    constraint_setting = ":kernel",
+)
+
+trivial_run(
+    name = "needs_fuchsia",
+    exec_compatible_with = [":fuchsia"],
+)

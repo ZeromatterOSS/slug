@@ -34,6 +34,7 @@ use watchman_client::prelude::FileType;
 
 use crate::file_watcher::FileWatcher;
 use crate::mergebase::Mergebase;
+use crate::notify::is_reserved_output_path;
 use crate::stats::FileWatcherStats;
 use crate::watchman::core::SyncableQuery;
 use crate::watchman::core::SyncableQueryProcessor;
@@ -109,6 +110,13 @@ impl WatchmanQueryProcessor {
         handler: &mut FileChangeTracker,
         stats: &mut FileWatcherStats,
     ) -> kuro_error::Result<()> {
+        // Skip events under build-system output dirs (kuro's `buck-out` and bazel's
+        // convenience symlinks). Mirrors the notify backend's filter so both backends
+        // ignore the same noise.
+        if is_reserved_output_path(path) {
+            return Ok(());
+        }
+
         let cell_path = self.cells.get_cell_path(path);
 
         let ignore = self

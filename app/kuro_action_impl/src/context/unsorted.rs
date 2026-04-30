@@ -483,6 +483,8 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
                             action,
                             Some(content.to_value()),
                             None,
+                            None,
+                            std::sync::Arc::new(std::collections::BTreeMap::new()),
                         )?;
                     }
                 }

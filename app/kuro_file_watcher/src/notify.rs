@@ -43,6 +43,32 @@ use crate::file_watcher::FileWatcher;
 use crate::mergebase::Mergebase;
 use crate::stats::FileWatcherStats;
 
+/// Path components reserved for build-system output. Any project-relative path
+/// containing one of these as a component is filtered out before reaching DICE
+/// invalidation.
+///
+/// `buck-out` is kuro's own output dir. The `bazel-*` entries are bazel's
+/// convenience symlinks (`bazel-bin`, `bazel-out`, `bazel-testlogs`,
+/// `bazel-bazel`, `bazel-external`). `install_filtered_watches` skips
+/// symlinks at install time so we do not recurse into the trees they point
+/// at, but some FS configurations still surface aliased events through
+/// other watches; the component filter catches those.
+const RESERVED_OUTPUT_COMPONENTS: &[&str] = &[
+    "buck-out",
+    "bazel-bin",
+    "bazel-out",
+    "bazel-testlogs",
+    "bazel-bazel",
+    "bazel-external",
+];
+
+pub(crate) fn is_reserved_output_path(
+    path: &kuro_core::fs::project_rel_path::ProjectRelativePath,
+) -> bool {
+    path.iter()
+        .any(|c| RESERVED_OUTPUT_COMPONENTS.contains(&c.as_str()))
+}
+
 fn ignore_event_kind(event_kind: &EventKind) -> bool {
     match event_kind {
         EventKind::Access(_) => true,
@@ -87,24 +113,13 @@ impl NotifyFileData {
             // It's not documented though.
             let path = root.relativize(AbsNormPath::new(&path)?)?;
 
-            // Ignore events whose path has a `buck-out` component. A prefix-only match misses
-            // events that arrive with an aliased path: notify 5.0's recursive inotify walker
-            // follows symlinks (`WalkDir::follow_links(true)` in notify's `inotify.rs`), so when
-            // any cell's materialized source (e.g. a bzlmod `local_path` override that resolves
-            // back through the project) contains a path that loops into the project root, the
-            // watcher ends up with duplicate watches at the aliased paths. Events from those
-            // duplicate watches arrive with paths like `bazel-external/<mod>/utils/bazel/buck-out/...`
-            // or `external/<cell>/.../buck-out/...`. Letting those through fires DICE invalidation
-            // on every kuro-written artifact and makes every rebuild behave like a cold build.
-            //
-            // `buck-out` is reserved by buck2/kuro — no legitimate source tree nests a directory by
-            // that name — so a component-match is safe.
-            //
-            // We do this in the notify-watcher, rather than a generic layer, as watchman users should
-            // configure to ignore buck-out, to reduce the number of events, rather than hiding them later.
-            if path.iter().any(|c| c.as_str() == "buck-out") {
-                // We don't want to event add them as ignored events, since they are super common
-                // and very boring
+            // Filter out events whose path includes a build-system output component (kuro's
+            // `buck-out` or any of bazel's convenience symlinks). When kuro shares a workspace
+            // with bazel — for instance the `@llvm-project//llvm:llvm` benchmark — every
+            // bazel-written artifact under `bazel-bin/` would otherwise look like a source change
+            // and force DICE re-evaluation on the next build, turning every warm-daemon rebuild
+            // into a cold one.
+            if is_reserved_output_path(&path) {
                 continue;
             }
 
@@ -429,5 +444,60 @@ impl FileWatcher for NotifyFileWatcher {
             },
         )
         .await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use kuro_core::fs::project_rel_path::ProjectRelativePath;
+
+    use super::is_reserved_output_path;
+
+    fn check(path: &str) -> bool {
+        is_reserved_output_path(ProjectRelativePath::unchecked_new(path))
+    }
+
+    #[test]
+    fn buck_out_at_root() {
+        assert!(check("buck-out/v2/foo"));
+    }
+
+    #[test]
+    fn buck_out_nested() {
+        assert!(check("external/cell/buck-out/foo"));
+    }
+
+    #[test]
+    fn bazel_bin_at_root() {
+        assert!(check("bazel-bin/llvm/llvm"));
+    }
+
+    #[test]
+    fn bazel_external_nested() {
+        assert!(check("bazel-external/+llvm_configure+/llvm/foo.cpp"));
+    }
+
+    #[test]
+    fn similar_named_source_not_filtered() {
+        assert!(!check("src/buckout-tool.rs"));
+        assert!(!check("src/bazel-binutils/foo.rs"));
+    }
+
+    #[test]
+    fn all_reserved_components_filtered() {
+        for c in [
+            "buck-out",
+            "bazel-bin",
+            "bazel-out",
+            "bazel-testlogs",
+            "bazel-bazel",
+            "bazel-external",
+        ] {
+            assert!(check(&format!("{c}/foo")), "expected {c} to be filtered");
+            assert!(
+                check(&format!("a/b/{c}/c")),
+                "expected nested {c} to be filtered"
+            );
+        }
     }
 }

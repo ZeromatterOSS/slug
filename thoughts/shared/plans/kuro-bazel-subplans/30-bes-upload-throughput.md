@@ -112,10 +112,60 @@ opens** and **how fast events flow into it during the build**.
   Mature, hyper-based, optimized for HTTP/2 streaming. No obvious
   newer-major version with breaking-perf wins.
 - **bufbuild/connect-rs (Connect protocol)**: Buf's "Connect" client
-  in Rust. **Archived 2024-06**, no longer maintained. Not a viable
-  replacement; even if it were, BB's BES endpoint speaks gRPC-on-HTTP/2
-  which connect-rs primarily serves over plain HTTP, so we'd lose
-  bidirectional streaming semantics. *Discard.*
+  in Rust. **Archived 2024-06**, no longer maintained. Even if it
+  weren't, BB's BES endpoint speaks gRPC-on-HTTP/2 which connect-rs
+  primarily serves over plain HTTP, so we'd lose bidirectional
+  streaming semantics. *Discard.*
+- **anthropics/connect-rust 0.3 + anthropics/buffa 0.3/0.4**
+  (`connectrpc` + `buffa` crates): the *actively developed* successor
+  to the bufbuild project, open-sourced March 2026 by Anthropic. The
+  pair is the structural analog of tonic+prost — connect-rust is the
+  transport layer (Tower service, hyper+h2, supports Connect, gRPC,
+  and gRPC-Web on both client and server, passes all 6,558 ConnectRPC
+  conformance tests; bidi over native gRPC-on-HTTP/2 works), and
+  buffa is the message codegen + runtime (owned `M` + zero-copy
+  `MView<'a>` view types, binary/JSON/text codecs). Public benchmark
+  shows 33% higher throughput than tonic+prost and 3.6% vs 9.6%
+  allocator CPU on a decode-heavy 22 KB-batch workload, attributed
+  to buffa's zero-copy view path avoiding per-string allocation on
+  decode. **However, not viable for the BES path today**, for four
+  stacked reasons:
+  1. **No prost mode in connect-rust.** It generates clients against
+     buffa view types only. There is no compatibility shim with
+     prost-generated `PublishBuildToolEventStreamRequest` / BEP
+     message types. Migrating BES would force a full buffa
+     regeneration of the BES + BEP + RE API schemas (hundreds of
+     messages), with no gradual interop period — `Option<Box<M>>`
+     becomes `MessageField<M>`, enums change from `i32` to
+     `EnumValue<T>`, well-known types lose primitive mappings,
+     encode/decode signatures differ. Anthropic's own
+     [prost migration guide](https://github.com/anthropics/buffa/blob/main/docs/migration-from-prost.md)
+     classifies the effort as "High."
+  2. **No HTTP/2 flow-control tunables exposed.** The h2 stack
+     underneath is the same crate tonic uses, but connect-rust does
+     not surface `initial_stream_window_size`,
+     `initial_connection_window_size`, `http2_keep_alive_interval`,
+     or `tcp_nodelay`. Tonic exposes all of these on
+     `Channel::from_shared(...)`. Since 30.2's whole premise is
+     turning those knobs, switching transport would *remove* the
+     lever we want to pull.
+  3. **Workload mismatch.** buffa's win is on decode-heavy paths
+     with large strings/bytes/nested fields. The BES uploader is the
+     opposite — small (1–2 KB) outbound messages, encode-only on the
+     client, bottlenecked on server-side per-event ACK latency on a
+     single bidi stream. The same hyper+h2 transport sits underneath
+     both libraries, so the wire-level streaming behaviour is
+     identical; the 33% number does not transfer to this workload.
+  4. **Pre-1.0, breaking churn.** connect-rust shipped 0.2.0 →
+     0.3.3 between 2026-03-17 and 2026-04-17, and the changelog
+     already advertises a breaking 0.4 with `ConnectError` /
+     handler-signature changes. buffa is at 0.4.0 (2026-04-27). Not
+     appropriate for a production RPC path that already works.
+
+  *Discard for BES specifically.* Worth re-evaluating if a future
+  kuro path is decode-heavy on the client (e.g., bulk
+  ActionResult fan-in from RE) — buffa's view types could plausibly
+  matter there. Out of scope for plan 30.
 - **grpcio (grpc-rs)**: Wraps C++ grpc-core. Higher per-call
   throughput in microbenchmarks, but adds a C++ dependency, has
   weaker async ergonomics, and Meta has been migrating away from it
@@ -125,10 +175,13 @@ opens** and **how fast events flow into it during the build**.
   messages, which is ~1% of our BES wall budget. *Out of scope.*
 
 So the substrate is fine. The win is in **how we *use* tonic**, not
-which library. The user's question about "buffa & connect-rust"
-correctly identifies a candidate replacement, but the candidate is
-not viable today and would not change the bottleneck even if it
-were — both gRPC clients hit the same single-stream BES protocol.
+which library. The candidate replacement (connect-rust 0.3 + buffa
+0.3/0.4) is real and actively developed — it just doesn't help
+*this* bottleneck: it sits on the same hyper+h2 transport, hides the
+flow-control knobs we want to tune, and would require a full
+schema-wide buffa migration before a single byte moved differently
+on the wire. Both gRPC clients hit the same single-stream BES
+protocol with the same per-event server ACK latency.
 
 ## Scope
 
@@ -214,7 +267,7 @@ separate Channels for exactly this reason.
 
 ## Phases
 
-### 30.1 Earlier stream open (single-task win)
+### 30.1 Earlier stream open (single-task win) — DONE 2026-04-29
 
 Open the BES connection + lifecycle handshake at `BesSubscriber::new`
 (equivalently: at the moment we know `--bes_backend` is set), not on
@@ -235,7 +288,7 @@ Test: instrument `BesSink::start` start/end timestamps, run hello_world
 build, verify stream-open completes before first action's
 `handle_events`.
 
-### 30.2 Tonic flow-control + per-service Channel
+### 30.2 Tonic flow-control + per-service Channel — DONE 2026-04-29
 
 Mirror buck2's re_grpc tunables on the BES `Channel`:
 
@@ -264,7 +317,11 @@ Test: re-run the full `@llvm-project//llvm` warm benchmark; expect
 1–2 s improvement in trace upload step + smoother streaming during
 build.
 
-### 30.3 Daemon-resident BES uploader (the big win)
+### 30.3 Daemon-resident BES uploader (the big win) — DEFERRED to plan 31.3
+
+> Plan 31 (`31-bazel-perf-parity.md`) takes ownership of the actual
+> landing of this phase. The scope here is preserved for archaeology;
+> see `31-bazel-perf-parity.md` §31.3 for the file-level changes.
 
 Move `BesSink` from the client process to the daemon process. The
 client emits BEP events to the daemon (already does, via the BuckEvent
@@ -319,7 +376,7 @@ without a daemon-resident uploader the client process exits anyway
 and the spawned task is killed. Plan 30.3 makes `FullyAsync` honor
 its name.
 
-### 30.5 Lifecycle handshake parallelization
+### 30.5 Lifecycle handshake parallelization — DONE 2026-04-29
 
 `run_uploader` opens the bidi stream only after `BuildEnqueued` and
 `InvocationAttemptStarted` complete. Make those concurrent:
@@ -390,8 +447,15 @@ disappears entirely from client wall, putting kuro at ~25 s vs bazel's
 
 - Not a tonic vs grpcio comparison: the substrate isn't the
   bottleneck.
-- Not a Connect / Connect-rs migration: the project is archived; the
-  protocol shift wouldn't help BES which is unambiguously gRPC.
+- Not a connect-rust / buffa migration. The newer
+  anthropics/connect-rust 0.3 + buffa 0.3 stack *does* speak gRPC-on-
+  HTTP/2 with bidi (so the old "wrong protocol" objection no longer
+  applies), but it (a) is hard-coupled to buffa-generated message
+  types with no prost interop, forcing a schema-wide migration of
+  BES+BEP+RE API protos for a workload that isn't decode-bound, (b)
+  doesn't expose the HTTP/2 flow-control knobs phase 30.2 needs to
+  tune, and (c) is pre-1.0 with breaking releases ~monthly. See the
+  Library / protocol substrate assessment for the full case.
 - Not a parallel-stream BES experiment: protocol forbids it.
 - Not changing the BEP event schema or which events we emit: those
   are correctness-driven by Plan 18.

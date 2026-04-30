@@ -47,7 +47,14 @@ fn create_dir_tree<'v>(
         OutputType::Directory,
         uses_experimental_content_based_path_hashing,
     )?;
-    this.register_action(indexset![output_artifact], action, None, None)?;
+    this.register_action(
+        indexset![output_artifact],
+        action,
+        None,
+        None,
+        None,
+        std::sync::Arc::new(std::collections::BTreeMap::new()),
+    )?;
 
     Ok(declaration.into_declared_artifact(unioned_associated_artifacts))
 }
@@ -78,6 +85,8 @@ fn copy_file_impl<'v>(
         UnregisteredCopyAction::new(artifact, copy),
         None,
         None,
+        None,
+        std::sync::Arc::new(std::collections::BTreeMap::new()),
     )?;
 
     Ok(declaration.into_declared_artifact(
@@ -197,7 +206,14 @@ pub(crate) fn analysis_actions_methods_copy(methods: &mut MethodsBuilder) {
                 let mut this = this.state()?;
                 let (declaration, output_artifact) =
                     this.get_or_declare_output(eval, output, OutputType::FileOrDirectory, None)?;
-                this.register_action(indexset![output_artifact], action, None, None)?;
+                this.register_action(
+                    indexset![output_artifact],
+                    action,
+                    None,
+                    None,
+                    None,
+                    std::sync::Arc::new(std::collections::BTreeMap::new()),
+                )?;
                 Ok(declaration
                     .into_declared_artifact(AssociatedArtifacts::new())
                     .to_value())

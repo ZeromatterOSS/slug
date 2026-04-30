@@ -348,6 +348,8 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
             ),
             Some(content.value),
             None,
+            None,
+            std::sync::Arc::new(std::collections::BTreeMap::new()),
         )?;
 
         // TODO(cjhopman): The with_inputs thing can go away once we have artifact dependencies (we'll still
@@ -529,6 +531,8 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
                 action,
                 Some(content_cli.to_value()),
                 None,
+                None,
+                std::sync::Arc::new(std::collections::BTreeMap::new()),
             )?;
 
             written_macro_files
@@ -559,6 +563,8 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
             action,
             Some(content_cli.to_value()),
             None,
+            None,
+            std::sync::Arc::new(std::collections::BTreeMap::new()),
         )?;
 
         if allow_args {
@@ -647,6 +653,8 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
             action,
             Some(content_cli.to_value()),
             None,
+            None,
+            std::sync::Arc::new(std::collections::BTreeMap::new()),
         )?;
 
         let value =
@@ -829,6 +837,8 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
             action,
             Some(content_cli.to_value()),
             None,
+            None,
+            std::sync::Arc::new(std::collections::BTreeMap::new()),
         )?;
 
         Ok(starlark::values::none::NoneType)
@@ -897,6 +907,8 @@ fn stub_transform_file<'v>(
         action,
         Some(content_cli.to_value()),
         None,
+        None,
+        std::sync::Arc::new(std::collections::BTreeMap::new()),
     )?;
     Ok(declaration.into_declared_artifact(AssociatedArtifacts::new()))
 }

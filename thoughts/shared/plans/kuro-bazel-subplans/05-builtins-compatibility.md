@@ -88,6 +88,15 @@ In Bazel 9.0, only **language-agnostic** rules are built-in. Language-specific r
 - [x] Platform/toolchain rules work for rules_cc toolchain resolution (via ToolchainsStub; rules_cc works end-to-end)
 - [x] Bazel BUILD files using native rules parse correctly
 
+### Follow-up: Buck2-Heritage Rule Removal
+
+The completed Phase 7a predates the stricter Bazel 9 parity rule for
+native language rules. Follow-up [Plan 27](./27-native-language-rule-removal.md)
+removes or quarantines the remaining Buck2-era native `cc_*`, `sh_*`,
+`execution_platform(s)`, and `cc_libc_top_alias` surfaces so loaded
+external `rules_*` Starlark implementations are the only language-rule
+path.
+
 ---
 
 ## Phase 7b: Bazel Global Functions

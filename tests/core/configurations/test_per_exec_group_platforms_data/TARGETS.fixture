@@ -1,0 +1,32 @@
+load(":defs.bzl", "two_groups")
+
+# Local OS constraint setting + values, mirroring the
+# test_extra_exec_platforms fixture so the test is self-contained.
+constraint_setting(name = "os")
+
+constraint_value(
+    name = "linux",
+    constraint_setting = ":os",
+)
+
+constraint_value(
+    name = "darwin",
+    constraint_setting = ":os",
+)
+
+# Two registered exec platforms with disjoint constraint values.
+# Each named exec_group's `exec_compatible_with` should select exactly
+# one of these — Plan 24 Phase 8 routing.
+platform(
+    name = "linux_platform",
+    constraint_values = [":linux"],
+)
+
+platform(
+    name = "darwin_platform",
+    constraint_values = [":darwin"],
+)
+
+# The rule's default exec group has no constraints, so any registered
+# candidate satisfies it — the resolver picks the first.
+two_groups(name = "fan")

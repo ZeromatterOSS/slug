@@ -18,13 +18,16 @@ use kuro_build_event_stream::translate::make_aborted;
 use kuro_build_event_stream::translate::make_progress;
 use kuro_build_event_stream::translate::translate_buck_event;
 use kuro_events::BuckEvent;
+use tokio::task::JoinHandle;
 
 use crate::common::CommonBuildConfigurationOptions;
 use crate::subscribers::subscriber::EventSubscriber;
 
-/// BES subscriber. Connects lazily on the first event so we can stay out of
-/// the synchronous `update_events_ctx` setup path; if the connection fails,
-/// the subscriber logs once and subsequent events become no-ops (BES upload
+/// BES subscriber. Connection is kicked off in the background at
+/// construction time so the TCP+TLS handshake and lifecycle handshake
+/// (`BuildEnqueued` / `InvocationAttemptStarted`) overlap with command
+/// setup instead of blocking the first event. If the connection fails the
+/// subscriber logs once and subsequent events become no-ops (BES upload
 /// failure never fails the build).
 pub struct BesSubscriber {
     state: State,
@@ -35,7 +38,9 @@ pub struct BesSubscriber {
 }
 
 enum State {
-    Pending(BesConfig),
+    /// Background `tokio::spawn` is racing the build to finish the BES
+    /// stream open. `ensure_connected` joins the handle on first use.
+    Connecting(JoinHandle<kuro_error::Result<BesSink>>),
     Connected(Arc<BesSink>),
     Failed,
 }
@@ -111,8 +116,14 @@ impl BesSubscriber {
             upload_mode,
         };
 
+        // Kick off connect + lifecycle handshake immediately so it
+        // overlaps with command setup. Without this, the first event
+        // pays ~500–800 ms of cold-start (TCP + TLS + HTTP/2 SETTINGS +
+        // two unary lifecycle RPCs) on the critical path.
+        let connect_task = tokio::spawn(BesSink::start(config));
+
         Ok(Some(Self {
-            state: State::Pending(config),
+            state: State::Connecting(connect_task),
             stream_state: BepStreamState::with_invocation_id(ctx.invocation_id.clone()),
             ctx,
             saw_command_end: false,
@@ -124,19 +135,23 @@ impl BesSubscriber {
         match &self.state {
             State::Connected(sink) => return Some(sink.clone()),
             State::Failed => return None,
-            State::Pending(_) => {}
+            State::Connecting(_) => {}
         }
-        let State::Pending(config) = std::mem::replace(&mut self.state, State::Failed) else {
+        let State::Connecting(handle) = std::mem::replace(&mut self.state, State::Failed) else {
             unreachable!();
         };
-        match BesSink::start(config).await {
-            Ok(sink) => {
+        match handle.await {
+            Ok(Ok(sink)) => {
                 let sink = Arc::new(sink);
                 self.state = State::Connected(sink.clone());
                 Some(sink)
             }
-            Err(e) => {
+            Ok(Err(e)) => {
                 tracing::warn!("BES sink connect failed: {e}. Upload disabled for this build.");
+                None
+            }
+            Err(e) => {
+                tracing::warn!("BES connect task panicked: {e}. Upload disabled for this build.");
                 None
             }
         }

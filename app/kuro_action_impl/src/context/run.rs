@@ -131,6 +131,47 @@ pub(crate) enum RunActionError {
         "Action is marked with `expect_eligible_for_dedupe` but input `{}` is not eligible for dedupe", .input
     )]
     ExpectEligibleForDedupeWithIneligibleInput { input: ArtifactGroup },
+    #[error(
+        "actions.run(exec_properties={{...}}): expected dict[string, string], but key `{key}` has non-string value `{value}` (type {ty})"
+    )]
+    ExecPropertiesNonStringValue {
+        key: String,
+        value: String,
+        ty: String,
+    },
+    #[error(
+        "actions.run(exec_properties={{...}}): expected dict[string, string], but got non-string key `{key}` (type {ty})"
+    )]
+    ExecPropertiesNonStringKey { key: String, ty: String },
+}
+
+/// Plan 24 Phase 9: coerce the `exec_properties` kwarg dict to a
+/// `BTreeMap<String, String>`. Returns an empty map for `None`/missing.
+/// Errors loudly when a key or value isn't a string — matches Bazel's
+/// `dict[string, string]` contract.
+fn coerce_action_exec_properties(
+    exec_properties: NoneOr<DictRef<'_>>,
+) -> kuro_error::Result<std::collections::BTreeMap<String, String>> {
+    let mut out = std::collections::BTreeMap::new();
+    if let NoneOr::Other(dict) = exec_properties {
+        for (k, v) in dict.iter() {
+            let key = k.unpack_str().ok_or_else(|| {
+                kuro_error::Error::from(RunActionError::ExecPropertiesNonStringKey {
+                    key: k.to_repr(),
+                    ty: k.get_type().to_owned(),
+                })
+            })?;
+            let value = v.unpack_str().ok_or_else(|| {
+                kuro_error::Error::from(RunActionError::ExecPropertiesNonStringValue {
+                    key: key.to_owned(),
+                    value: v.to_repr(),
+                    ty: v.get_type().to_owned(),
+                })
+            })?;
+            out.insert(key.to_owned(), value.to_owned());
+        }
+    }
+    Ok(out)
 }
 
 /// Convert a Bazel-style PascalCase mnemonic (e.g. "CppCompile") into a
@@ -380,6 +421,13 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneOr::None)] expect_eligible_for_dedupe: NoneOr<
             bool,
         >,
+        // Plan 24 Phase 9: per-action `exec_properties = {…}` kwarg.
+        // Layered on top of platform → target so the action's RE
+        // Platform message picks up keys overridden at the action grain
+        // (e.g. a single integration test action that needs a privileged
+        // container while the rest of the build uses the default).
+        // Bazel's spec: dict[string, string]; non-string values error.
+        #[starlark(require = named, default = NoneOr::None)] exec_properties: NoneOr<DictRef<'v>>,
     ) -> starlark::Result<NoneType> {
         if incremental_remote_outputs && !no_outputs_cleanup {
             // Precaution to make sure content-based paths are not involved.
@@ -854,13 +902,11 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             }
         }
 
-        // Plan 24 Phase 4: validate `exec_group=` against the rule's
-        // declared exec groups. Per-group platform routing (using the
-        // group's resolved exec platform for the action's RE Platform
-        // message) is deferred until per-group resolution is plumbed
-        // through ResolvedExecGroups; for now this is purely a
-        // user-error check that surfaces typos loudly.
-        if let NoneOr::Other(exec_group_value) = exec_group {
+        // Plan 24 Phase 4 + Phase 8: validate `exec_group=` against the
+        // rule's declared exec groups, and capture the validated name
+        // so the registry can rebase this action's RE Platform message
+        // on the named group's resolved platform at commit time.
+        let exec_group_name: Option<String> = if let NoneOr::Other(exec_group_value) = exec_group {
             if let Some(name) = exec_group_value.unpack_str() {
                 let registry = this.state()?;
                 let valid = registry.actions.valid_exec_group_names();
@@ -871,8 +917,19 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
                     })
                     .into());
                 }
+                Some(name.to_owned())
+            } else {
+                None
             }
-        }
+        } else {
+            None
+        };
+
+        // Plan 24 Phase 9: coerce `exec_properties = {…}` to a
+        // `BTreeMap<String, String>`. Bazel rejects non-string keys or
+        // values — surface the same error here rather than silently
+        // dropping or converting via `to_repr()`.
+        let action_exec_properties = coerce_action_exec_properties(exec_properties)?;
 
         // Ignore other Bazel-specific parameters that are not yet implemented.
         let _ = (
@@ -1019,6 +1076,8 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             action,
             Some(starlark_values),
             error_handler.into_option(),
+            exec_group_name,
+            Arc::new(action_exec_properties),
         )?;
         Ok(NoneType)
     }
@@ -1078,13 +1137,30 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             }
         }
 
-        let _ = (
-            input_manifests,
-            exec_group,
-            shadowed_action,
-            resource_set,
-            toolchain,
-        );
+        let _ = (input_manifests, shadowed_action, resource_set, toolchain);
+
+        // Plan 24 Phase 4 + Phase 8: validate `exec_group=` against the
+        // rule's declared groups and capture the name so per-group
+        // platform routing applies to run_shell actions too.
+        let exec_group_name: Option<String> = if let NoneOr::Other(exec_group_value) = exec_group {
+            if let Some(name) = exec_group_value.unpack_str() {
+                let registry = this.state()?;
+                let valid = registry.actions.valid_exec_group_names();
+                if !valid.iter().any(|v| v == name) {
+                    return Err(kuro_error::Error::from(RunActionError::UnknownExecGroup {
+                        requested: name.to_owned(),
+                        valid: valid.join(", "),
+                    })
+                    .into());
+                }
+                Some(name.to_owned())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         let heap = eval.heap();
 
         // Save progress_message string for later resolution (after outputs/inputs are processed)
@@ -1275,6 +1351,8 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
             action,
             Some(starlark_values),
             None,
+            exec_group_name,
+            Arc::new(std::collections::BTreeMap::new()),
         )?;
         Ok(NoneType)
     }

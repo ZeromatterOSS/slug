@@ -84,6 +84,8 @@ pub(crate) fn analysis_actions_methods_download(methods: &mut MethodsBuilder) {
             ),
             None,
             None,
+            None,
+            Arc::new(std::collections::BTreeMap::new()),
         )?;
 
         Ok(declaration.into_declared_artifact(AssociatedArtifacts::new()))
@@ -159,6 +161,8 @@ pub(crate) fn analysis_actions_methods_download(methods: &mut MethodsBuilder) {
             },
             None,
             None,
+            None, // exec_group_name (Plan 24 Phase 8)
+            Arc::new(std::collections::BTreeMap::new()),
         )?;
 
         Ok(output_value.into_declared_artifact(AssociatedArtifacts::new()))

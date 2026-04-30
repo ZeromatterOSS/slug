@@ -451,6 +451,19 @@ struct ActionToBeRegistered {
     key: ActionKey,
     outputs: IndexSet<BuildArtifact>,
     action: Box<dyn UnregisteredAction>,
+    /// Plan 24 Phase 8: name of the exec_group this action was registered
+    /// against (`actions.run(exec_group="<name>")`), if any. The registry's
+    /// finalize step uses this to look up the group's resolved exec
+    /// platform and rebase the action's RE Platform message on it.
+    /// `None` means the default group → use the registry's
+    /// `execution_platform` (the existing behavior).
+    exec_group_name: Option<String>,
+    /// Plan 24 Phase 9: per-action `exec_properties = {…}` kwarg
+    /// captured at registration time. Layered on top of the resolved
+    /// platform's `re_properties` and the target-level
+    /// `exec_properties` attribute (action wins on key collisions).
+    /// Empty for the common case where the kwarg was omitted.
+    action_exec_properties: std::sync::Arc<std::collections::BTreeMap<String, String>>,
 }
 
 impl ActionToBeRegistered {
@@ -458,16 +471,30 @@ impl ActionToBeRegistered {
         key: ActionKey,
         outputs: IndexSet<BuildArtifact>,
         a: A,
+        exec_group_name: Option<String>,
+        action_exec_properties: std::sync::Arc<std::collections::BTreeMap<String, String>>,
     ) -> Self {
         Self {
             key,
             outputs,
             action: Box::new(a),
+            exec_group_name,
+            action_exec_properties,
         }
     }
 
     pub(crate) fn key(&self) -> &ActionKey {
         &self.key
+    }
+
+    pub(crate) fn exec_group_name(&self) -> Option<&str> {
+        self.exec_group_name.as_deref()
+    }
+
+    pub(crate) fn action_exec_properties(
+        &self,
+    ) -> &std::sync::Arc<std::collections::BTreeMap<String, String>> {
+        &self.action_exec_properties
     }
 
     fn register(

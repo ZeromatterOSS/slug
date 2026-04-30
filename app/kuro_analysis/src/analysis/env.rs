@@ -43,6 +43,7 @@ use kuro_core::cells::name::CellName;
 use kuro_core::cells::paths::CellRelativePath;
 use kuro_core::deferred::base_deferred_key::BaseDeferredKey;
 use kuro_core::deferred::key::DeferredHolderKey;
+use kuro_core::execution_types::execution::ExecutionPlatform;
 use kuro_core::execution_types::execution::ExecutionPlatformResolution;
 use kuro_core::package::PackageLabel;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
@@ -66,6 +67,7 @@ use kuro_interpreter::types::rule::FROZEN_RULE_GET_IMPL;
 use kuro_interpreter_for_build::rule::FrozenStarlarkRuleCallable;
 use kuro_node::attrs::coerced_attr::CoercedAttr;
 use kuro_node::attrs::inspect_options::AttrInspectOptions;
+use kuro_node::execution::GetExecutionPlatforms;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
 use kuro_node::nodes::frontend::TargetGraphCalculation;
 use kuro_node::rule_type::NativeRuleKind;
@@ -925,20 +927,52 @@ async fn run_analysis_with_env_underlying(
         // Plan 24 Phase 4: extract the names of exec groups declared via
         // `rule(exec_groups={...})` so `actions.run(exec_group=…)` can
         // validate against the list. Empty for rules with no exec groups.
-        let valid_exec_group_names: Arc<[String]> = analysis_env
-            .rule_spec
-            .exec_group_defs()
-            .into_iter()
-            .map(|(name, _)| name)
+        let exec_group_defs = analysis_env.rule_spec.exec_group_defs();
+        let valid_exec_group_names: Arc<[String]> = exec_group_defs
+            .iter()
+            .map(|(name, _)| name.clone())
             .collect::<Vec<_>>()
             .into();
 
-        let registry = AnalysisRegistry::new_from_owner_and_deferred_with_attrs(
-            analysis_env.execution_platform.dupe(),
-            DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(node.label().dupe())),
-            target_exec_properties,
-            valid_exec_group_names,
-        )?;
+        // Plan 24 Phase 8: surface registered exec platform candidates to
+        // the multi-group resolver so each named exec_group can pick its
+        // own platform from the same candidate list `compute_execution_platforms`
+        // produced. Without this, every group would resolve against the host
+        // alone — `exec_compatible_with` constraints on a named group could
+        // never select between registered candidates.
+        //
+        // Skip `get_execution_platforms()` when the rule needs neither toolchain
+        // resolution nor named exec groups. `compute_execution_platforms`
+        // analyzes the `[build] execution_platforms = ...` target, whose own
+        // analysis (and that of its transitive deps — `platform()`,
+        // `constraint_value()`, etc.) re-enters this code path. Without the
+        // short-circuit, those rules deadlock waiting on the same DICE key
+        // they were dispatched from.
+        let needs_candidate_list =
+            !analysis_env.rule_spec.toolchain_types().is_empty() || !exec_group_defs.is_empty();
+        let registered_exec_platforms = if needs_candidate_list {
+            dice.get_execution_platforms().await?
+        } else {
+            None
+        };
+        let (candidate_constraints, candidate_by_label): (
+            Vec<crate::analysis::toolchain_resolution::PlatformConstraints>,
+            HashMap<String, ExecutionPlatform>,
+        ) = match registered_exec_platforms.as_ref() {
+            Some(eps) => {
+                let constraints = eps
+                    .candidates()
+                    .map(crate::analysis::toolchain_resolution::PlatformConstraints::from_execution_platform)
+                    .collect();
+                let by_label: HashMap<String, ExecutionPlatform> =
+                    eps.candidates().map(|p| (p.id(), p.dupe())).collect();
+                (constraints, by_label)
+            }
+            None => (
+                vec![crate::analysis::toolchain_resolution::PlatformConstraints::host_platform()],
+                HashMap::new(),
+            ),
+        };
 
         // Run toolchain resolution BEFORE entering the Starlark evaluator.
         // Note: ensure_registered_toolchains_loaded() is called from
@@ -948,9 +982,36 @@ async fn run_analysis_with_env_underlying(
         let (toolchain_resolution_result, exec_group_resolution_results) =
             resolve_toolchain_types(
                 analysis_env.rule_spec.toolchain_types(),
-                analysis_env.rule_spec.exec_group_defs(),
+                exec_group_defs,
                 node,
+                &candidate_constraints,
             );
+
+        // Plan 24 Phase 8: turn each named group's resolved exec_platform
+        // label into a full `ExecutionPlatformResolution` (carrying the
+        // executor config + RE properties) by looking it up in the
+        // registered candidate list. Default group is omitted — the
+        // existing `analysis_env.execution_platform` already covers it.
+        let group_platforms: HashMap<String, ExecutionPlatformResolution> =
+            exec_group_resolution_results
+                .iter()
+                .filter_map(|(name, result)| {
+                    candidate_by_label.get(&result.exec_platform).map(|plat| {
+                        (
+                            name.clone(),
+                            ExecutionPlatformResolution::new(Some(plat.dupe()), Vec::new()),
+                        )
+                    })
+                })
+                .collect();
+
+        let registry = AnalysisRegistry::new_from_owner_and_deferred_with_attrs(
+            analysis_env.execution_platform.dupe(),
+            DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(node.label().dupe())),
+            target_exec_properties,
+            valid_exec_group_names,
+            Arc::new(group_platforms),
+        )?;
 
         // Build ResolvedToolchains from the resolution result.
         // For each resolved toolchain type, analyze the impl target via DICE
@@ -1251,6 +1312,7 @@ fn resolve_toolchain_types(
     toolchain_types: Vec<(String, bool)>,
     exec_group_defs: Vec<(String, kuro_node::rule::ExecGroupDef)>,
     node: ConfiguredTargetNodeRef<'_>,
+    candidate_platforms: &[crate::analysis::toolchain_resolution::PlatformConstraints],
 ) -> (
     Option<crate::analysis::toolchain_resolution::ToolchainResolutionResult>,
     std::collections::HashMap<
@@ -1311,10 +1373,19 @@ fn resolve_toolchain_types(
         });
     }
 
-    let host = PlatformConstraints::host_platform();
-    let exec_platforms = vec![host.clone()];
+    // Plan 24 Phase 8: pass the registered candidate platforms (sourced from
+    // `compute_execution_platforms` at the call site) so per-group resolution
+    // sees the same list as default-group resolution does. `target_platform`
+    // stays as host — `target_compatible_with` filtering of toolchains is
+    // unchanged by Plan 24.
+    let target = PlatformConstraints::host_platform();
+    let candidates: Vec<PlatformConstraints> = if candidate_platforms.is_empty() {
+        vec![target.clone()]
+    } else {
+        candidate_platforms.to_vec()
+    };
 
-    match resolve_toolchains_multi_group(&requests, &host, &exec_platforms) {
+    match resolve_toolchains_multi_group(&requests, &target, &candidates) {
         Ok(multi_result) => {
             let default_result = multi_result.groups.get("default").cloned();
             if let Some(ref result) = default_result {

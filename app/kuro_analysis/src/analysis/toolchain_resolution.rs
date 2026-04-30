@@ -26,6 +26,8 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use kuro_core::execution_types::execution::ExecutionPlatform;
+
 use super::native_rule_analysis::DeclaredToolchainInfo;
 use super::native_rule_analysis::get_declared_toolchains;
 
@@ -108,6 +110,26 @@ impl PlatformConstraints {
         }
     }
 
+    /// Plan 24 Phase 8: build constraint set from a registered
+    /// `ExecutionPlatform`. The platform's `cfg()` carries the
+    /// `constraint_values` from its `platform()` rule (or the
+    /// `ExecutionPlatformInfo`'s `constraints` dict). Each constraint is
+    /// formatted as `<cell>//<pkg>:<name>` to match the form produced by
+    /// `extract_label_list_from_coerced_attr` for `exec_compatible_with`.
+    pub fn from_execution_platform(platform: &ExecutionPlatform) -> Self {
+        let label = platform.id();
+        let mut constraint_values = HashSet::new();
+        if let Ok(data) = platform.cfg().data() {
+            for (_key, value) in &data.constraints {
+                constraint_values.insert(value.0.target().to_string());
+            }
+        }
+        PlatformConstraints {
+            label,
+            constraint_values,
+        }
+    }
+
     /// Check if this platform satisfies all the given constraint requirements.
     ///
     /// Returns true if every constraint_value in `required` is present in this
@@ -160,11 +182,22 @@ pub fn resolve_toolchains(
     target_exec_constraints: &[String],
 ) -> Result<ToolchainResolutionResult, String> {
     if required_types.is_empty() {
-        // No toolchains needed — use first exec platform
+        // No toolchains needed — pick the first exec platform that
+        // satisfies the group's `exec_compatible_with`. Plan 24 Phase 8
+        // depends on this filter firing for groups whose only signal is
+        // the constraint set (e.g. a `link` group with no toolchains
+        // but `exec_compatible_with = ["@platforms//os:linux"]` must
+        // skip a darwin candidate listed first).
         let exec = exec_platforms
-            .first()
+            .iter()
+            .find(|p| p.satisfies(target_exec_constraints))
             .map(|p| p.label.clone())
-            .unwrap_or_else(|| "@local_config_platform//:host".to_owned());
+            .ok_or_else(|| {
+                format!(
+                    "No execution platform satisfies exec_compatible_with constraints {:?}",
+                    target_exec_constraints
+                )
+            })?;
         return Ok(ToolchainResolutionResult {
             exec_platform: exec,
             resolved_toolchains: HashMap::new(),
@@ -382,6 +415,66 @@ mod tests {
             normalize_constraint_label("platforms//os:linux"),
             "platforms//os:linux"
         );
+    }
+
+    /// Plan 24 Phase 8: per-group `exec_compatible_with` constraints
+    /// must select between registered candidate platforms — this is the
+    /// regression check that the "every group resolves against host
+    /// alone" gap (`env.rs:1314-1317` before Phase 8) is closed.
+    ///
+    /// Setup: two registered exec platforms (linux, darwin). Two exec
+    /// groups: `link` constrained to linux, `test` constrained to
+    /// darwin. The default group has no constraints.
+    ///
+    /// Expected: each group's `exec_platform` is the matching candidate.
+    #[test]
+    fn test_multi_group_resolution_picks_per_group_platform_by_constraint() {
+        let target_platform = PlatformConstraints::host_platform();
+        let linux_platform = PlatformConstraints {
+            label: "@platforms//exec:linux_x86_64".to_owned(),
+            constraint_values: HashSet::from([
+                "@platforms//os:linux".to_owned(),
+                "@platforms//cpu:x86_64".to_owned(),
+            ]),
+        };
+        let darwin_platform = PlatformConstraints {
+            label: "@platforms//exec:darwin_arm64".to_owned(),
+            constraint_values: HashSet::from([
+                "@platforms//os:osx".to_owned(),
+                "@platforms//cpu:aarch64".to_owned(),
+            ]),
+        };
+        // Order matters for first-match-wins — darwin first to prove
+        // the constraint filter picks linux for the link group rather
+        // than the position in the candidate list.
+        let exec_platforms = vec![darwin_platform.clone(), linux_platform.clone()];
+
+        let requests = vec![
+            ExecGroupResolutionRequest {
+                group_name: "default".to_owned(),
+                required_types: vec![],
+                exec_constraints: vec![],
+            },
+            ExecGroupResolutionRequest {
+                group_name: "link".to_owned(),
+                required_types: vec![],
+                exec_constraints: vec!["@platforms//os:linux".to_owned()],
+            },
+            ExecGroupResolutionRequest {
+                group_name: "test".to_owned(),
+                required_types: vec![],
+                exec_constraints: vec!["@platforms//os:osx".to_owned()],
+            },
+        ];
+
+        let result =
+            resolve_toolchains_multi_group(&requests, &target_platform, &exec_platforms).unwrap();
+        assert_eq!(
+            result.groups["default"].exec_platform,
+            darwin_platform.label
+        );
+        assert_eq!(result.groups["link"].exec_platform, linux_platform.label);
+        assert_eq!(result.groups["test"].exec_platform, darwin_platform.label);
     }
 
     #[test]

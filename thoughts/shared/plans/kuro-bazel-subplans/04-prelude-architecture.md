@@ -167,6 +167,14 @@ Per the architectural constraint discovered on 2026-01-28:
 **Conclusion**: These modules must remain as native Rust registrations in
 `app/kuro_build_api/src/interpreter/rule_defs/`.
 
+Follow-up: [Plan 28: Bazel Builtins Module
+Architecture](./28-builtins-module-architecture.md) revisits this
+constraint by adding a bundled builtins loader that can inject selected
+Starlark-defined values into external `.bzl` environments before user
+code evaluates. Until that loader exists, the conclusion above remains
+the operating constraint: external rulesets need Rust-registered native
+modules.
+
 ### Migration Strategy
 
 #### Step 1: Keep Action Primitives in Rust

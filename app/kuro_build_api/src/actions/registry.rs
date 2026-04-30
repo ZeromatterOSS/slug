@@ -78,6 +78,18 @@ pub struct ActionsRegistry<'v> {
     /// errors loudly with the valid names, matching Bazel's behavior.
     /// Empty for rules that didn't declare any exec groups.
     valid_exec_group_names: Arc<[String]>,
+    /// Plan 24 Phase 8: per-named-exec-group resolved
+    /// `ExecutionPlatformResolution`. When `actions.run(exec_group="<name>")`
+    /// commits, the action's RE Platform message base comes from this
+    /// map's entry for that name instead of `execution_platform` (the
+    /// default group's). Default-group actions (no `exec_group=`) keep
+    /// using `execution_platform`. Missing entries fall back to the
+    /// default — this happens when the registered candidate list is
+    /// empty (no `register_execution_platforms()` and no
+    /// `--extra_execution_platforms`), in which case every group
+    /// transparently shares the host fallback. The Phase 9 per-action
+    /// kwarg merges on top of whichever base was selected here.
+    group_platforms: Arc<HashMap<String, ExecutionPlatformResolution>>,
     claimed_output_paths: DirectoryBuilder<Option<FileSpan>, NoDigest>,
     /// Bazel-compat: map from path string → artifact so duplicate declare_file calls return same artifact.
     path_to_artifact: SmallMap<String, DeclaredArtifact<'v>>,
@@ -90,6 +102,7 @@ impl<'v> ActionsRegistry<'v> {
             execution_platform,
             Arc::new(std::collections::BTreeMap::new()),
             Arc::from(Vec::<String>::new()),
+            Arc::new(HashMap::new()),
         )
     }
 
@@ -103,6 +116,7 @@ impl<'v> ActionsRegistry<'v> {
             execution_platform,
             target_exec_properties,
             Arc::from(Vec::<String>::new()),
+            Arc::new(HashMap::new()),
         )
     }
 
@@ -111,6 +125,7 @@ impl<'v> ActionsRegistry<'v> {
         execution_platform: ExecutionPlatformResolution,
         target_exec_properties: Arc<std::collections::BTreeMap<String, String>>,
         valid_exec_group_names: Arc<[String]>,
+        group_platforms: Arc<HashMap<String, ExecutionPlatformResolution>>,
     ) -> Self {
         Self {
             owner,
@@ -120,6 +135,7 @@ impl<'v> ActionsRegistry<'v> {
             execution_platform,
             target_exec_properties,
             valid_exec_group_names,
+            group_platforms,
             claimed_output_paths: DirectoryBuilder::empty(),
             path_to_artifact: SmallMap::new(),
         }
@@ -260,12 +276,26 @@ impl<'v> ActionsRegistry<'v> {
         Ok(declared)
     }
 
-    /// Registers the supplied action
+    /// Registers the supplied action.
+    ///
+    /// `exec_group_name` is `Some("<name>")` when the action came from
+    /// `actions.run(exec_group="<name>")` (Plan 24 Phase 8). The
+    /// registry's finalize step uses it to rebase the action's RE
+    /// Platform message on the named group's resolved platform instead
+    /// of the default's. `None` for default-group actions.
+    ///
+    /// `action_exec_properties` carries the per-action `exec_properties`
+    /// kwarg dict (Plan 24 Phase 9). It layers on top of the platform's
+    /// `re_properties` and the target-level `exec_properties` attribute,
+    /// with action-level winning. Empty for actions that didn't pass the
+    /// kwarg (the common case).
     pub fn register<A: UnregisteredAction + 'static>(
         &mut self,
         self_key: &DeferredHolderKey,
         outputs: IndexSet<OutputArtifact>,
         action: A,
+        exec_group_name: Option<String>,
+        action_exec_properties: Arc<std::collections::BTreeMap<String, String>>,
     ) -> kuro_error::Result<ActionKey> {
         // Bazel-compat idempotency: rules_cc's `_compute_public_headers` runs
         // twice for targets with `strip_include_prefix` set (once for
@@ -322,8 +352,13 @@ impl<'v> ActionsRegistry<'v> {
             let bound = output.bind(key.dupe())?.as_base_artifact().dupe();
             bound_outputs.insert(bound);
         }
-        self.pending
-            .push(ActionToBeRegistered::new(key.dupe(), bound_outputs, action));
+        self.pending.push(ActionToBeRegistered::new(
+            key.dupe(),
+            bound_outputs,
+            action,
+            exec_group_name,
+            action_exec_properties,
+        ));
 
         Ok(key)
     }
@@ -352,6 +387,15 @@ impl<'v> ActionsRegistry<'v> {
             let mut observed_names: HashMap<Category, HashSet<String>> = HashMap::new();
             for a in self.pending.into_iter() {
                 let key = a.key().dupe();
+                // Plan 24 Phase 8: capture the action's exec_group name
+                // before consuming `a` via `register` — the resolved
+                // platform lookup below needs it to rebase the executor
+                // config on the named group's platform.
+                let exec_group_name: Option<String> = a.exec_group_name().map(str::to_owned);
+                // Plan 24 Phase 9: capture per-action exec_properties
+                // for the same reason — the merge below runs after `a`
+                // has been consumed.
+                let action_exec_properties = Arc::clone(a.action_exec_properties());
                 let (starlark_data, error_handler) =
                     analysis_value_fetcher.get_action_data(&key)?;
                 let action = a.register(starlark_data, error_handler)?;
@@ -394,14 +438,13 @@ impl<'v> ActionsRegistry<'v> {
                     }
                 }
 
-                let executor_config = if self.target_exec_properties.is_empty() {
-                    (*self.execution_platform.executor_config()?).dupe()
-                } else {
-                    merge_target_exec_properties_into_executor_config(
-                        self.execution_platform.executor_config()?,
-                        &self.target_exec_properties,
-                    )
-                };
+                let executor_config = select_action_executor_config(
+                    &self.execution_platform,
+                    &self.group_platforms,
+                    &self.target_exec_properties,
+                    &action_exec_properties,
+                    exec_group_name.as_deref(),
+                )?;
                 actions.insert(
                     key.dupe(),
                     Arc::new(RegisteredAction::new(key, action, executor_config)),
@@ -433,23 +476,62 @@ impl<'v> ActionsRegistry<'v> {
     }
 }
 
-/// Plan 24 Phase 2: rebuild a `CommandExecutorConfig` whose
-/// `re_properties` are the receiver's overlaid with the target's
-/// `exec_properties` dict (target wins on key collisions). For
-/// non-`RemoteEnabled` executors the input is returned unchanged —
-/// `re_properties` only exists on the remote-enabled variant, and a
-/// pure-local action has no RE Platform message to populate.
-fn merge_target_exec_properties_into_executor_config(
-    config: &Arc<CommandExecutorConfig>,
+/// Plan 24 Phase 8 + 9 + 2: choose the action's final
+/// `CommandExecutorConfig`.
+///
+/// Resolution rules — applied in this order:
+///
+/// 1. **Base.** Use the per-group platform's executor config when the
+///    action was registered with `exec_group="<name>"` *and* the
+///    rule's resolved `group_platforms` contains an entry for that
+///    name (Phase 8). Otherwise fall back to `default_platform` —
+///    this is what default-group actions and workspaces with no
+///    registered platforms see.
+/// 2. **Target overlay.** Layer the target's `exec_properties = {…}`
+///    attribute on top (Phase 2). Target keys win over the
+///    platform's contributing keys.
+/// 3. **Action overlay.** Layer the per-action `exec_properties`
+///    kwarg (Phase 9). Action keys win over the target's keys.
+///
+/// Empty overlays are no-ops. Non-`RemoteEnabled` executors pass
+/// through unchanged (no RE Platform message to mutate).
+pub(crate) fn select_action_executor_config(
+    default_platform: &ExecutionPlatformResolution,
+    group_platforms: &HashMap<String, ExecutionPlatformResolution>,
     target_exec_properties: &std::collections::BTreeMap<String, String>,
+    action_exec_properties: &std::collections::BTreeMap<String, String>,
+    exec_group_name: Option<&str>,
+) -> kuro_error::Result<Arc<CommandExecutorConfig>> {
+    let base_resolution: &ExecutionPlatformResolution = exec_group_name
+        .and_then(|name| group_platforms.get(name))
+        .unwrap_or(default_platform);
+    let mut executor_config = (*base_resolution.executor_config()?).dupe();
+    if !target_exec_properties.is_empty() {
+        executor_config = merge_exec_properties_overrides(&executor_config, target_exec_properties);
+    }
+    if !action_exec_properties.is_empty() {
+        executor_config = merge_exec_properties_overrides(&executor_config, action_exec_properties);
+    }
+    Ok(executor_config)
+}
+
+/// Plan 24 Phases 2 + 9: rebuild a `CommandExecutorConfig` whose
+/// `re_properties` are the receiver's overlaid with `overrides`
+/// (overrides win on key collisions). Used for both the target-level
+/// `exec_properties` attribute (Phase 2) and the per-action kwarg
+/// (Phase 9). For non-`RemoteEnabled` executors the input is returned
+/// unchanged — `re_properties` only exists on the remote-enabled
+/// variant, and a pure-local action has no RE Platform message to
+/// populate.
+fn merge_exec_properties_overrides(
+    config: &Arc<CommandExecutorConfig>,
+    overrides: &std::collections::BTreeMap<String, String>,
 ) -> Arc<CommandExecutorConfig> {
     match &config.executor {
         Executor::RemoteEnabled(opts) => {
-            let merged_re_properties = opts.re_properties.merged_with(
-                target_exec_properties
-                    .iter()
-                    .map(|(k, v)| (k.clone(), v.clone())),
-            );
+            let merged_re_properties = opts
+                .re_properties
+                .merged_with(overrides.iter().map(|(k, v)| (k.clone(), v.clone())));
             Arc::new(CommandExecutorConfig {
                 executor: Executor::RemoteEnabled(RemoteEnabledExecutorOptions {
                     re_properties: merged_re_properties,
@@ -459,6 +541,237 @@ fn merge_target_exec_properties_into_executor_config(
             })
         }
         _ => config.dupe(),
+    }
+}
+
+#[cfg(test)]
+mod select_action_executor_config_tests {
+    use std::collections::BTreeMap;
+    use std::sync::Arc;
+
+    use kuro_core::configuration::data::ConfigurationData;
+    use kuro_core::execution_types::execution::ExecutionPlatform;
+    use kuro_core::execution_types::execution::ExecutionPlatformResolution;
+    use kuro_core::execution_types::executor_config::CacheUploadBehavior;
+    use kuro_core::execution_types::executor_config::CommandExecutorConfig;
+    use kuro_core::execution_types::executor_config::CommandGenerationOptions;
+    use kuro_core::execution_types::executor_config::Executor;
+    use kuro_core::execution_types::executor_config::LocalExecutorOptions;
+    use kuro_core::execution_types::executor_config::PathSeparatorKind;
+    use kuro_core::execution_types::executor_config::RePlatformFields;
+    use kuro_core::execution_types::executor_config::RemoteEnabledExecutor;
+    use kuro_core::execution_types::executor_config::RemoteEnabledExecutorOptions;
+    use kuro_core::execution_types::executor_config::RemoteExecutorUseCase;
+    use kuro_core::target::label::label::TargetLabel;
+    use starlark_map::sorted_map::SortedMap;
+
+    use super::*;
+
+    fn re_executor_config_with_properties(
+        properties: &[(&str, &str)],
+    ) -> Arc<CommandExecutorConfig> {
+        let map: SortedMap<String, String> = properties
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect();
+        Arc::new(CommandExecutorConfig {
+            executor: Executor::RemoteEnabled(RemoteEnabledExecutorOptions {
+                executor: RemoteEnabledExecutor::Local(LocalExecutorOptions::default()),
+                re_properties: RePlatformFields {
+                    properties: Arc::new(map),
+                },
+                re_use_case: RemoteExecutorUseCase::kuro_default(),
+                re_action_key: None,
+                cache_upload_behavior: CacheUploadBehavior::Disabled,
+                remote_cache_enabled: false,
+                remote_dep_file_cache_enabled: false,
+                dependencies: Vec::new(),
+                custom_image: None,
+                meta_internal_extra_params: Default::default(),
+            }),
+            options: CommandGenerationOptions {
+                path_separator: PathSeparatorKind::Unix,
+                output_paths_behavior: Default::default(),
+                use_bazel_protocol_remote_persistent_workers: false,
+            },
+        })
+    }
+
+    fn platform_resolution_with_properties(
+        label: &str,
+        properties: &[(&str, &str)],
+    ) -> ExecutionPlatformResolution {
+        let target = TargetLabel::testing_parse(label);
+        let cfg = ConfigurationData::testing_new();
+        let executor_config = re_executor_config_with_properties(properties);
+        let platform = ExecutionPlatform::platform(target, cfg, executor_config);
+        ExecutionPlatformResolution::new(Some(platform), Vec::new())
+    }
+
+    fn re_properties(config: &CommandExecutorConfig) -> &SortedMap<String, String> {
+        match &config.executor {
+            Executor::RemoteEnabled(opts) => &opts.re_properties.properties,
+            other => panic!("expected RemoteEnabled executor, got {other:?}"),
+        }
+    }
+
+    /// Plan 24 Phase 8: an action registered with `exec_group="link"`
+    /// must pick the *link group's* platform's `re_properties`, not
+    /// the default group's. Regression check for the lookup at the
+    /// top of `select_action_executor_config`.
+    #[test]
+    fn per_group_platform_routing_picks_named_group_platform() {
+        let default = platform_resolution_with_properties(
+            "root//:default_platform",
+            &[("container-image", "docker://default:v0")],
+        );
+        let mut group_platforms = HashMap::new();
+        group_platforms.insert(
+            "link".to_owned(),
+            platform_resolution_with_properties(
+                "root//:link_platform",
+                &[("container-image", "docker://link:v0")],
+            ),
+        );
+        group_platforms.insert(
+            "test".to_owned(),
+            platform_resolution_with_properties(
+                "root//:test_platform",
+                &[("container-image", "docker://test:v0")],
+            ),
+        );
+        let target_props = BTreeMap::new();
+        let action_props = BTreeMap::new();
+
+        let link_config = select_action_executor_config(
+            &default,
+            &group_platforms,
+            &target_props,
+            &action_props,
+            Some("link"),
+        )
+        .unwrap();
+        let test_config = select_action_executor_config(
+            &default,
+            &group_platforms,
+            &target_props,
+            &action_props,
+            Some("test"),
+        )
+        .unwrap();
+        let default_config = select_action_executor_config(
+            &default,
+            &group_platforms,
+            &target_props,
+            &action_props,
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(
+            re_properties(&link_config).get("container-image"),
+            Some(&"docker://link:v0".to_owned())
+        );
+        assert_eq!(
+            re_properties(&test_config).get("container-image"),
+            Some(&"docker://test:v0".to_owned())
+        );
+        assert_eq!(
+            re_properties(&default_config).get("container-image"),
+            Some(&"docker://default:v0".to_owned())
+        );
+    }
+
+    /// Plan 24 Phase 8 fallback: when the rule didn't declare any
+    /// exec_groups (or `group_platforms` is empty for any other
+    /// reason), an action that names a group falls back to the
+    /// default platform — same as default-group actions. This is
+    /// what guarantees workspaces with no registered platforms keep
+    /// behaving exactly as before.
+    #[test]
+    fn unknown_exec_group_name_falls_back_to_default_platform() {
+        let default = platform_resolution_with_properties(
+            "root//:default_platform",
+            &[("OSFamily", "Linux")],
+        );
+        let group_platforms = HashMap::new();
+
+        let config = select_action_executor_config(
+            &default,
+            &group_platforms,
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            Some("link"),
+        )
+        .unwrap();
+
+        assert_eq!(
+            re_properties(&config).get("OSFamily"),
+            Some(&"Linux".to_owned())
+        );
+    }
+
+    /// Plan 24 Phases 2 + 8 + 9 composed: with both per-group and
+    /// per-action overrides in play, action wins on its keys, target
+    /// wins on its keys, and the per-group platform contributes the
+    /// rest. This is the assertion Phase 10 makes on the wire — done
+    /// here at the executor config grain so a regression in
+    /// `select_action_executor_config` fails CI without needing a
+    /// live BES backend.
+    #[test]
+    fn three_layer_compose_action_target_per_group_platform() {
+        let default = platform_resolution_with_properties(
+            "root//:default_platform",
+            &[("container-image", "docker://default:v0")],
+        );
+        let mut group_platforms = HashMap::new();
+        group_platforms.insert(
+            "link".to_owned(),
+            platform_resolution_with_properties(
+                "root//:link_platform",
+                &[
+                    ("container-image", "docker://link:v0"),
+                    ("OSFamily", "Linux"),
+                ],
+            ),
+        );
+
+        let mut target_props = BTreeMap::new();
+        target_props.insert("Arch".to_owned(), "x86_64".to_owned());
+        target_props.insert(
+            "container-image".to_owned(),
+            "docker://target:v1".to_owned(),
+        );
+
+        let mut action_props = BTreeMap::new();
+        action_props.insert(
+            "container-image".to_owned(),
+            "docker://action:v2".to_owned(),
+        );
+        action_props.insert("dockerNetwork".to_owned(), "bridge".to_owned());
+
+        let config = select_action_executor_config(
+            &default,
+            &group_platforms,
+            &target_props,
+            &action_props,
+            Some("link"),
+        )
+        .unwrap();
+        let props = re_properties(&config);
+
+        // platform-only key (came from link's platform) survives both layers
+        assert_eq!(props.get("OSFamily"), Some(&"Linux".to_owned()));
+        // target-only key contributed by middle layer survives action layer
+        assert_eq!(props.get("Arch"), Some(&"x86_64".to_owned()));
+        // contested key — action wins
+        assert_eq!(
+            props.get("container-image"),
+            Some(&"docker://action:v2".to_owned())
+        );
+        // action-only key added by top layer
+        assert_eq!(props.get("dockerNetwork"), Some(&"bridge".to_owned()));
+        assert_eq!(props.len(), 4);
     }
 }
 

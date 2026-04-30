@@ -176,7 +176,14 @@ fn synthesize_runfiles_tree<'v>(
 
     let tree_output = tree_artifact_obj.as_output();
     let mut registry = actions.state()?;
-    registry.register_action(indexset![tree_output], action, None, None)?;
+    registry.register_action(
+        indexset![tree_output],
+        action,
+        None,
+        None,
+        None,
+        std::sync::Arc::new(std::collections::BTreeMap::new()),
+    )?;
     drop(registry);
 
     let tree_declared = StarlarkDeclaredArtifact::new(loc.dupe(), tree_artifact_obj, unioned);
