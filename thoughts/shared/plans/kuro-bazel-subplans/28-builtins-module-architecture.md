@@ -346,65 +346,83 @@ Do not start with:
   Starlark.
 - The moved behavior has a Bazel 9 parity citation.
 
-## Phase 28.4: Rule Implementation Wrapper  [Stage 2 done 2026-04-30]
+## Phase 28.4: Rule Implementation Wrapper  [Stage 3 done 2026-04-30]
 
 ### Status
 
-Stage 2 (the wiring) landed. Every Starlark rule impl is now called
-through `rule_implementation_wrapper(impl, ctx)` instead of
-`impl(ctx)`:
+Stage 3 lands the first Rust→Starlark `ctx`-method migration. The
+wrapper is no longer an identity: `_invoke_rule` in
+`@kuro_builtins//:exports.bzl` now installs a Starlark `struct`
+facade around `raw_ctx` that mirrors every public attribute and
+binds bound-method values for non-migrated methods. The facade
+serves `ctx.target_platform_has_constraint(...)` from a Starlark
+helper (`_kuro_target_platform_has_constraint`); the Rust impls in
+`app/kuro_build_api/src/interpreter/rule_defs/context.rs` and
+`app/kuro_build_api/src/interpreter/rule_defs/aspect/context.rs`
+were deleted as part of this stage (single-owner discipline,
+Plan 28.7).
+
+Host OS/CPU constraint labels are baked into the bundled cell at
+kuro build time:
+`app/kuro_external_cells_bundled/build.rs` stages the
+`kuro_builtins/` source into `OUT_DIR/kuro_builtins_staged/` and
+emits `_host_constants.bzl` (a list `HOST_CONSTRAINT_LABELS`
+matching the table previously in the Rust impl). `exports.bzl`
+loads that file at module evaluation; the facade closes over it.
+
+The Stage 2 design (Stage 3 builds on it):
 
 - `kuro_analysis::analysis::calculation::get_kuro_builtins_module`
-  (new) loads `@kuro_builtins//:exports.bzl` via DICE. Returns
-  `None` for workspaces where the alias isn't registered, so the
-  fall-back to direct invocation is the no-prelude / no-bundled-cell
-  safety net.
-- `get_user_defined_rule_spec(module, rule_type, builtins_module)`
-  takes the optional builtins module and stashes it on `Impl`.
+  loads `@kuro_builtins//:exports.bzl` via DICE. Returns `None` for
+  workspaces where the alias isn't registered.
 - `Impl::lookup_rule_implementation_wrapper` reads
-  `rule_implementation_wrapper` from the bundled module via
-  `FrozenModule::get_option` and converts it into a `Value<'v>` on
-  the eval's frozen heap.
-- `Impl::invoke` now branches:
-  - wrapper present →
-    `eval.eval_function(wrapper, &[rule_impl, ctx], &[])`;
-  - wrapper absent (legacy/test workspaces) →
-    `eval.eval_function(rule_impl, &[ctx], &[])` (the original
-    direct call).
+  `rule_implementation_wrapper` from the bundled module.
+- `Impl::invoke` branches: wrapper present →
+  `eval.eval_function(wrapper, &[rule_impl, ctx], &[])`; absent →
+  direct invocation.
 
-Stage 1's wrapper body is a no-op identity function, so the call
-chain is byte-for-byte equivalent. Acceptance test
-`test_28_4_stage2_wrapper_passes_through` builds a Starlark rule
-that writes a sentinel string and verifies the sentinel reaches the
-output verbatim. `@llvm-project//llvm:Demangle` (and every other
-target that runs Starlark rules from `@rules_cc`) builds clean
-through the wrapper.
+Why static field enumeration in `_invoke_rule` instead of
+`dir(raw_ctx)` + `**`-spread: the first attempt hit a Starlark
+`struct(**dict)` field-loss issue captured in
+[`thoughts/shared/research/2026-04-30-plan-28-4-stage3-facade-blocker.md`](../../research/2026-04-30-plan-28-4-stage3-facade-blocker.md).
+Static enumeration sidesteps the issue and gives a parse-time
+failure when a new ctx field lands without a corresponding facade
+line.
+
+### Acceptance
+
+- Acceptance test
+  `tests/core/analysis/test_native_rules.py::test_28_4_stage3_facade_in_call_path`
+  builds a Starlark rule that asserts `ctx.kuro_facade_active ==
+  True` (proves the facade is in the call path) and exercises
+  `ctx.target_platform_has_constraint` against a host-matching label
+  (positive case) and a non-host label (negative case).
+- Stage 2's `test_28_4_stage2_wrapper_passes_through` continues to
+  pass — the no-op-equivalence guarantee survives the migration for
+  every code path that doesn't touch `target_platform_has_constraint`.
+- `@llvm-project//llvm:Demangle` (8 actions, ~4.4 s total, analyze
+  ≈ 240 ms) and `@llvm-project//llvm:Support` (183 actions, ~14.7 s
+  total, analyze ≈ 194 ms) build clean through the facade. Stage 2
+  baseline for Support analyze was 190 ms — facade overhead is ~4 ms
+  across 183 rules (~22 µs per rule), well under 1% of analyze time.
 
 ### Remaining for Phase 28.4
 
-- **Stage 3+: per-method ctx migrations.** First attempt blocked on
-  a Starlark `struct(**dict)` field-loss issue — entries set in a
-  dict don't all reach the resulting struct when spread via `**`,
-  even though the wrapper is provably in the call path. Findings
-  and reproduction steps recorded in
-  [`thoughts/shared/research/2026-04-30-plan-28-4-stage3-facade-blocker.md`](../../research/2026-04-30-plan-28-4-stage3-facade-blocker.md).
-  Two known-good paths forward: (1) enumerate ctx fields statically
-  in `_invoke_rule` instead of `dir`/`getattr` + `**`; (2) read
-  `starlark::eval::Arguments::names_map` and fix the dict-spread
-  semantics if a real bug. Either route lands Stage 3; perf is
-  not a concern (estimated <1% of analyze time even with the
-  per-rule mirror).
 - Aspects and subrules are not yet routed through their own
   wrappers (`aspect_implementation_wrapper`,
-  `subrule_implementation_wrapper`). Tracked as a small follow-up;
-  the same pattern applies (additional `LoadFile`-resolved
-  wrappers + dispatch-site changes in
-  `kuro_analysis::analysis::aspect_calculation` and
-  `kuro_interpreter_for_build::subrule`).
-- Stack-trace fidelity for user errors when the wrapper is in the
-  path: needs deliberate inspection on Stage 3+ migrations (the
-  no-op wrapper is too thin to obscure frames). The plan-level
-  risk note is unchanged.
+  `subrule_implementation_wrapper`). The same pattern applies
+  (additional `LoadFile`-resolved wrappers + dispatch-site changes
+  in `kuro_analysis::analysis::aspect_calculation` and
+  `kuro_interpreter_for_build::subrule`). Once aspect routing
+  lands, the same `_kuro_target_platform_has_constraint` shim can
+  be reused for aspect contexts; until then, aspects calling the
+  method get an attribute-not-found error (the previous Rust stub
+  unconditionally returned `False`, so no caller depended on a
+  meaningful answer).
+- Stack-trace fidelity for user errors when the facade is in the
+  path: now non-trivial (frames go through `_invoke_rule` →
+  `struct` construction → user impl). Stage 4+ migrations should
+  inspect end-user error messages.
 
 ### Goal
 

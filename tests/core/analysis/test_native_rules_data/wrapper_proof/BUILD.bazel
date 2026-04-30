@@ -1,3 +1,5 @@
+load(":facade_proof.bzl", "facade_proof")
+
 # Plan 28.4 Stage 2 acceptance: prove `rule_implementation_wrapper` is
 # in the analysis call path. The fixture's defs.bzl defines a Starlark
 # rule whose impl writes a sentinel string. With the wrapper wired, the
@@ -12,3 +14,5 @@
 load(":wrapper_probe.bzl", "wrapper_probe")
 
 wrapper_probe(name = "wrapper_probe_target")
+
+facade_proof(name = "facade_proof_target")

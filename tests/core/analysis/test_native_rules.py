@@ -835,6 +835,36 @@ async def test_28_4_stage2_wrapper_passes_through(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_4_stage3_facade_in_call_path(buck: Buck) -> None:
+    """Plan 28.4 Stage 3: the bundled `rule_implementation_wrapper`
+    installs a Starlark facade around `raw_ctx` and migrates
+    `target_platform_has_constraint` from Rust into the facade. Two
+    invariants verified by the fixture rule:
+
+      1. `ctx.kuro_facade_active == True` — the marker proves the
+         wrapper actually built a struct facade and passed it to the
+         user's impl. If the wrapper degenerated back to
+         `implementation(raw_ctx)`, the marker is missing and the
+         build fails.
+
+      2. `ctx.target_platform_has_constraint(...)` is served by the
+         Starlark closure in `_invoke_rule` (the Rust impl was deleted
+         as part of this stage — Plan 28.7 single-owner discipline).
+         The fixture pins a positive case (a host-matching OS label)
+         and a negative case (a non-host OS label) to guard the
+         migration's behaviour.
+
+    See Plan 28.4 in
+    `thoughts/shared/plans/kuro-bazel-subplans/28-builtins-module-architecture.md`.
+    """
+    result = await buck.build("//wrapper_proof:facade_proof_target")
+    output = result.get_build_report().output_for_target(
+        "//wrapper_proof:facade_proof_target"
+    )
+    assert output.read_text().strip() == "facade-proof-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_28_3_export_contract_hides_unlisted_symbols(buck: Buck) -> None:
     """Plan 28.3: only names in `exported_toplevels` reach the consuming
     env. Symbols defined at the top level of `exports.bzl` but NOT

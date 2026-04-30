@@ -299,14 +299,13 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
         Ok(heap.alloc(CtxDirRoot { path }))
     }
 
-    /// Whether the target platform has a given constraint.
-    fn target_platform_has_constraint<'v>(
-        this: RefAspectContext<'v>,
-        #[starlark(require = pos)] _constraint: Value<'v>,
-    ) -> starlark::Result<bool> {
-        let _ = this;
-        Ok(false)
-    }
+    // `target_platform_has_constraint` deleted in Plan 28.4 Stage 3 per
+    // the single-owner rule (Plan 28.7). Aspects don't yet flow through
+    // an `aspect_implementation_wrapper`; once they do (Stage 4+), the
+    // facade will install the same Starlark `_kuro_target_platform_has_constraint`
+    // shim that rule contexts already see. The previous Rust stub here
+    // unconditionally returned False, so aspects didn't depend on a
+    // working answer.
 
     /// Returns the build configuration object.
     #[starlark(attribute)]
