@@ -555,103 +555,10 @@ pub(crate) mod rule_defs {
     // removed-rule stubs further down (REMOVED_EXECUTION_PLATFORM_RULE /
     // REMOVED_EXECUTION_PLATFORMS_RULE).
 
-    /// Creates the AttributeSpec for native cc rules (cc_library, cc_binary, cc_test).
-    fn cc_rule_attributes() -> AttributeSpec {
-        let deps_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "Dependencies",
-            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
-        );
-
-        let srcs_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "Source files",
-            AttrType::list(AttrType::one_of(vec![
-                AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
-                AttrType::source(false),
-            ])),
-        );
-
-        let hdrs_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "Header files",
-            AttrType::list(AttrType::one_of(vec![
-                AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
-                AttrType::source(false),
-            ])),
-        );
-
-        let string_list_attr = |doc: &str| {
-            Attribute::new(
-                Some(Arc::new(CoercedAttr::List(
-                    ListLiteral(ArcSlice::default()),
-                ))),
-                doc,
-                AttrType::list(AttrType::string()),
-            )
-        };
-
-        AttributeSpec::from(
-            vec![
-                ("deps".to_owned(), deps_attr),
-                ("srcs".to_owned(), srcs_attr),
-                ("hdrs".to_owned(), hdrs_attr),
-                ("copts".to_owned(), string_list_attr("Compiler options")),
-                ("linkopts".to_owned(), string_list_attr("Linker options")),
-                (
-                    "defines".to_owned(),
-                    string_list_attr("Preprocessor defines"),
-                ),
-                (
-                    "local_defines".to_owned(),
-                    string_list_attr("Local preprocessor defines"),
-                ),
-                (
-                    "includes".to_owned(),
-                    string_list_attr("Include directories"),
-                ),
-            ],
-            false,
-            &RuleIncomingTransition::None,
-        )
-        .expect("cc rule attributes should be valid")
-    }
-
-    pub static CC_LIBRARY_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        make_native_rule(
-            cc_rule_attributes(),
-            NativeRuleKind::CcLibrary,
-            RuleKind::Normal,
-            false,
-            false,
-        )
-    });
-
-    pub static CC_BINARY_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        make_native_rule(
-            cc_rule_attributes(),
-            NativeRuleKind::CcBinary,
-            RuleKind::Normal,
-            false,
-            true,
-        )
-    });
-
-    pub static CC_TEST_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        make_native_rule(
-            cc_rule_attributes(),
-            NativeRuleKind::CcTest,
-            RuleKind::Normal,
-            true,
-            false,
-        )
-    });
+    // cc_library, cc_binary, cc_test, cc_import, cc_shared_library,
+    // cc_toolchain, cc_toolchain_suite are Bazel-9-removed. Their stubs
+    // live with the other removed-rule statics further down
+    // (REMOVED_CC_*_RULE).
 
     fn test_suite_attributes() -> AttributeSpec {
         // `tests` is an internal attribute (ID 8) with type AttrType::list(AttrType::label()).
@@ -783,244 +690,9 @@ pub(crate) mod rule_defs {
         )
     });
 
-    /// Attributes for cc_toolchain rule.
-    /// Accepts all_files (label dep), toolchain_config (label dep), toolchain_identifier (string),
-    /// and common attributes. Extra kwargs are silently accepted for forward compat.
-    fn cc_toolchain_attributes() -> AttributeSpec {
-        let all_files_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::None)),
-            "all_files",
-            AttrType::option(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
-        );
-        let toolchain_config_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::None)),
-            "toolchain_config",
-            AttrType::option(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
-        );
-        let toolchain_identifier_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::String(StringLiteral::default()))),
-            "toolchain_identifier",
-            AttrType::string(),
-        );
-
-        AttributeSpec::from(
-            vec![
-                ("all_files".to_owned(), all_files_attr),
-                ("toolchain_config".to_owned(), toolchain_config_attr),
-                ("toolchain_identifier".to_owned(), toolchain_identifier_attr),
-            ],
-            false,
-            &RuleIncomingTransition::None,
-        )
-        .expect("cc_toolchain attributes should be valid")
-    }
-
-    /// The Rule definition for cc_toolchain.
-    pub static CC_TOOLCHAIN_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: cc_toolchain_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::CcToolchain),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
-    });
-
-    /// Attributes for cc_toolchain_suite rule.
-    /// Accepts toolchains (dict of string to label).
-    fn cc_toolchain_suite_attributes() -> AttributeSpec {
-        let toolchains_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::None)),
-            "toolchains",
-            AttrType::option(AttrType::dict(
-                AttrType::string(),
-                AttrType::string(),
-                false,
-            )),
-        );
-
-        AttributeSpec::from(
-            vec![("toolchains".to_owned(), toolchains_attr)],
-            false,
-            &RuleIncomingTransition::None,
-        )
-        .expect("cc_toolchain_suite attributes should be valid")
-    }
-
-    /// The Rule definition for cc_toolchain_suite.
-    pub static CC_TOOLCHAIN_SUITE_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: cc_toolchain_suite_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::CcToolchainSuite),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
-    });
-
-    /// Attributes for cc_import rule.
-    /// cc_import provides a way to import prebuilt C/C++ libraries.
-    fn cc_import_attributes() -> AttributeSpec {
-        let static_library_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::None)),
-            "A prebuilt static library (.a or .lib)",
-            AttrType::option(AttrType::source(false)),
-        );
-        let shared_library_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::None)),
-            "A prebuilt shared library (.so, .dylib, or .dll)",
-            AttrType::option(AttrType::source(false)),
-        );
-        let interface_library_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::None)),
-            "An interface library for linking (.ifso or import .lib)",
-            AttrType::option(AttrType::source(false)),
-        );
-        let hdrs_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "Header files for this library",
-            AttrType::list(AttrType::source(false)),
-        );
-        let system_provided_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::Bool(BoolLiteral(false)))),
-            "If true, the shared library is provided by the system",
-            AttrType::bool(),
-        );
-        let alwayslink_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::Bool(BoolLiteral(false)))),
-            "If true, always link the static library",
-            AttrType::bool(),
-        );
-
-        AttributeSpec::from(
-            vec![
-                ("static_library".to_owned(), static_library_attr),
-                ("shared_library".to_owned(), shared_library_attr),
-                ("interface_library".to_owned(), interface_library_attr),
-                ("hdrs".to_owned(), hdrs_attr),
-                ("system_provided".to_owned(), system_provided_attr),
-                ("alwayslink".to_owned(), alwayslink_attr),
-            ],
-            false,
-            &RuleIncomingTransition::None,
-        )
-        .expect("cc_import attributes should be valid")
-    }
-
-    /// The Rule definition for cc_import.
-    pub static CC_IMPORT_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: cc_import_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::CcImport),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
-    });
-
-    /// Attributes for cc_shared_library rule.
-    /// cc_shared_library produces a shared library from cc_library dependencies.
-    fn cc_shared_library_attributes() -> AttributeSpec {
-        let deps_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "Direct dependencies to include in the shared library",
-            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
-        );
-        let exports_filter_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "Labels of targets whose symbols should be exported",
-            AttrType::list(AttrType::string()),
-        );
-        let dynamic_deps_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "Other cc_shared_library dependencies",
-            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
-        );
-        let roots_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "Root targets from which to start dependency collection",
-            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
-        );
-        let shared_lib_name_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::None)),
-            "Override output shared library name",
-            AttrType::option(AttrType::string()),
-        );
-        let user_link_flags_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "Additional linker flags",
-            AttrType::list(AttrType::string()),
-        );
-
-        AttributeSpec::from(
-            vec![
-                ("deps".to_owned(), deps_attr),
-                ("exports_filter".to_owned(), exports_filter_attr),
-                ("dynamic_deps".to_owned(), dynamic_deps_attr),
-                ("roots".to_owned(), roots_attr),
-                ("shared_lib_name".to_owned(), shared_lib_name_attr),
-                ("user_link_flags".to_owned(), user_link_flags_attr),
-            ],
-            false,
-            &RuleIncomingTransition::None,
-        )
-        .expect("cc_shared_library attributes should be valid")
-    }
-
-    /// The Rule definition for cc_shared_library.
-    pub static CC_SHARED_LIBRARY_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: cc_shared_library_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::CcSharedLibrary),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
-    });
+    // cc_toolchain, cc_toolchain_suite, cc_import, cc_shared_library are
+    // Bazel-9-removed. Their stubs live with the other removed-rule
+    // statics further down (REMOVED_CC_*_RULE).
 
     /// Empty `AttributeSpec` for removed-rule stubs. The rule accepts any
     /// `**kwargs` at load time without validating language-rule attrs, so
@@ -1060,6 +732,27 @@ pub(crate) mod rule_defs {
 
     pub static REMOVED_SH_LIBRARY_RULE: Lazy<Arc<Rule>> =
         Lazy::new(|| make_removed_rule(kuro_node::rule_type::RemovedNativeRule::ShLibrary));
+
+    pub static REMOVED_CC_LIBRARY_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_removed_rule(kuro_node::rule_type::RemovedNativeRule::CcLibrary));
+
+    pub static REMOVED_CC_BINARY_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_removed_rule(kuro_node::rule_type::RemovedNativeRule::CcBinary));
+
+    pub static REMOVED_CC_TEST_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_removed_rule(kuro_node::rule_type::RemovedNativeRule::CcTest));
+
+    pub static REMOVED_CC_IMPORT_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_removed_rule(kuro_node::rule_type::RemovedNativeRule::CcImport));
+
+    pub static REMOVED_CC_SHARED_LIBRARY_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_removed_rule(kuro_node::rule_type::RemovedNativeRule::CcSharedLibrary));
+
+    pub static REMOVED_CC_TOOLCHAIN_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_removed_rule(kuro_node::rule_type::RemovedNativeRule::CcToolchain));
+
+    pub static REMOVED_CC_TOOLCHAIN_SUITE_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_removed_rule(kuro_node::rule_type::RemovedNativeRule::CcToolchainSuite));
 
     /// Stub xcode_config rule for non-Apple platforms.
     /// Provides XcodeVersionConfig with dummy values so cc_toolchain_config.bzl
@@ -1187,59 +880,6 @@ pub(crate) fn create_native_target_node(
     ))
 }
 
-/// Helper to create a native cc target node (cc_library, cc_binary, cc_test).
-fn create_native_cc_target<'v>(
-    rule: Arc<Rule>,
-    name: &str,
-    srcs: Value<'v>,
-    hdrs: Value<'v>,
-    deps: Value<'v>,
-    visibility: Value<'v>,
-    eval: &mut Evaluator<'v, '_, '_>,
-) -> starlark::Result<NoneType> {
-    let internals = ModuleInternals::from_context(eval, "cc_rule")?;
-    let coercion_ctx = internals.attr_coercion_context();
-
-    let src_type = AttrType::list(AttrType::one_of(vec![
-        AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
-        AttrType::source(false),
-    ]));
-    let dep_type = AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY));
-
-    let empty_list = eval.heap().alloc(starlark::values::list::AllocList::EMPTY);
-    let srcs_val = if srcs.is_none() { empty_list } else { srcs };
-    let hdrs_val = if hdrs.is_none() { empty_list } else { hdrs };
-    let deps_val = if deps.is_none() { empty_list } else { deps };
-
-    let coerced_srcs = src_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, srcs_val)?;
-    let coerced_hdrs = src_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, hdrs_val)?;
-    let coerced_deps = dep_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, deps_val)?;
-
-    let empty_string_list = CoercedAttr::List(ListLiteral(kuro_util::arc_str::ArcSlice::default()));
-
-    let target_node = create_native_target_node(
-        rule,
-        internals.package(),
-        name,
-        vec![
-            ("deps".to_owned(), coerced_deps),
-            ("srcs".to_owned(), coerced_srcs),
-            ("hdrs".to_owned(), coerced_hdrs),
-            ("copts".to_owned(), empty_string_list.clone()),
-            ("linkopts".to_owned(), empty_string_list.clone()),
-            ("defines".to_owned(), empty_string_list.clone()),
-            ("local_defines".to_owned(), empty_string_list.clone()),
-            ("includes".to_owned(), empty_string_list),
-        ],
-        &extract_visibility_strings(visibility),
-        internals.attr_coercion_context(),
-        &internals.default_visibility(),
-    )?;
-
-    internals.record(target_node)?;
-    Ok(NoneType)
-}
-
 /// Helper for BUILD-global stubs of Bazel-9-removed rules.
 ///
 /// Accepts the rule name and arbitrary `**kwargs`, records a target node
@@ -1247,7 +887,7 @@ fn create_native_cc_target<'v>(
 /// Bazel-shaped diagnostic. Per Plan 27, removed rules must NOT validate
 /// language-rule attrs at load time, so this helper ignores the kwargs and
 /// passes an empty attribute list to `create_native_target_node`.
-fn register_removed_rule<'v>(
+pub(crate) fn register_removed_rule<'v>(
     rule: Arc<Rule>,
     rule_name: &str,
     target_name: &str,
@@ -2130,73 +1770,57 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         )
     }
 
-    /// Native cc_library rule stub for Bazel compatibility.
+    /// `cc_library` was removed in Bazel 9. Loaded as a stub so the
+    /// diagnostic surfaces during analysis. User
+    /// `load("@rules_cc//cc:defs.bzl", "cc_library")` shadows this stub.
     fn cc_library<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] hdrs: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
-        #[starlark(kwargs)] extra_kwargs: Value<'v>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _ = extra_kwargs;
-        create_native_cc_target(
-            rule_defs::CC_LIBRARY_RULE.clone(),
+        register_removed_rule(
+            rule_defs::REMOVED_CC_LIBRARY_RULE.clone(),
+            "cc_library",
             name,
-            srcs,
-            hdrs,
-            deps,
             visibility,
             eval,
         )
     }
 
-    /// Native cc_binary rule stub for Bazel compatibility.
+    /// `cc_binary` was removed in Bazel 9. See `cc_library`.
     fn cc_binary<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] hdrs: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
-        #[starlark(kwargs)] extra_kwargs: Value<'v>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _ = extra_kwargs;
-        create_native_cc_target(
-            rule_defs::CC_BINARY_RULE.clone(),
+        register_removed_rule(
+            rule_defs::REMOVED_CC_BINARY_RULE.clone(),
+            "cc_binary",
             name,
-            srcs,
-            hdrs,
-            deps,
             visibility,
             eval,
         )
     }
 
-    /// Native cc_test rule stub for Bazel compatibility.
+    /// `cc_test` was removed in Bazel 9. See `cc_library`.
     fn cc_test<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] hdrs: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
-        #[starlark(kwargs)] extra_kwargs: Value<'v>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _ = extra_kwargs;
-        create_native_cc_target(
-            rule_defs::CC_TEST_RULE.clone(),
+        register_removed_rule(
+            rule_defs::REMOVED_CC_TEST_RULE.clone(),
+            "cc_test",
             name,
-            srcs,
-            hdrs,
-            deps,
             visibility,
             eval,
         )
@@ -2591,167 +2215,40 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
-    /// Bazel's cc_import rule: imports a prebuilt C/C++ library.
-    ///
-    /// Creates a target that provides CcInfo from a prebuilt static or shared library.
-    /// Used for integrating pre-compiled libraries into the build graph.
-    ///
-    /// See: https://bazel.build/reference/be/c-cpp#cc_import
+    /// `cc_import` was removed in Bazel 9. See `cc_library`.
     fn cc_import<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        static_library: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        shared_library: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        interface_library: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] hdrs: Value<'v>,
-        #[starlark(require = named, default = false)] system_provided: bool,
-        #[starlark(require = named, default = false)] alwayslink: bool,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
         #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let internals = ModuleInternals::from_context(eval, "cc_import")?;
-        let coercion_ctx = internals.attr_coercion_context();
-
-        let mut attrs = Vec::new();
-
-        // Coerce optional source attributes
-        let opt_source_type = AttrType::option(AttrType::source(false));
-
-        if !static_library.is_none() {
-            let coerced =
-                opt_source_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, static_library)?;
-            attrs.push(("static_library".to_owned(), coerced));
-        }
-        if !shared_library.is_none() {
-            let coerced =
-                opt_source_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, shared_library)?;
-            attrs.push(("shared_library".to_owned(), coerced));
-        }
-        if !interface_library.is_none() {
-            let coerced =
-                opt_source_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, interface_library)?;
-            attrs.push(("interface_library".to_owned(), coerced));
-        }
-
-        // Coerce hdrs (list of sources)
-        let hdrs_type = AttrType::list(AttrType::source(false));
-        let hdrs_value = if hdrs.is_none() {
-            eval.heap().alloc(Vec::<Value>::new())
-        } else {
-            hdrs
-        };
-        let coerced_hdrs = hdrs_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, hdrs_value)?;
-        attrs.push(("hdrs".to_owned(), coerced_hdrs));
-
-        // Bool attributes
-        attrs.push((
-            "system_provided".to_owned(),
-            CoercedAttr::Bool(BoolLiteral(system_provided)),
-        ));
-        attrs.push((
-            "alwayslink".to_owned(),
-            CoercedAttr::Bool(BoolLiteral(alwayslink)),
-        ));
-
-        let target_node = create_native_target_node(
-            rule_defs::CC_IMPORT_RULE.clone(),
-            internals.package(),
+        register_removed_rule(
+            rule_defs::REMOVED_CC_IMPORT_RULE.clone(),
+            "cc_import",
             name,
-            attrs,
-            &extract_visibility_strings(visibility),
-            internals.attr_coercion_context(),
-            &internals.default_visibility(),
-        )?;
-
-        internals.record(target_node)?;
-        Ok(NoneType)
+            visibility,
+            eval,
+        )
     }
 
-    /// Creates a shared library from cc_library dependencies.
-    ///
-    /// `cc_shared_library` produces a shared library (.so, .dylib, .dll) that includes
-    /// all of its `deps` and their transitive dependencies, minus any dependencies
-    /// already provided by `dynamic_deps`.
-    ///
-    /// Example:
-    /// ```python
-    /// cc_shared_library(
-    ///     name = "my_shared_lib",
-    ///     deps = [":my_lib"],
-    ///     exports_filter = ["//my_package:__subpackages__"],
-    /// )
-    /// ```
-    ///
-    /// See: https://bazel.build/reference/be/c-cpp#cc_shared_library
+    /// `cc_shared_library` was removed in Bazel 9. See `cc_library`.
     fn cc_shared_library<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        exports_filter: UnpackListOrTuple<String>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        dynamic_deps: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] roots: Value<'v>,
-        #[starlark(require = named, default = NoneOr::None)] shared_lib_name: NoneOr<&str>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        user_link_flags: UnpackListOrTuple<String>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
         #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _ = (exports_filter, shared_lib_name, user_link_flags);
-        let internals = ModuleInternals::from_context(eval, "cc_shared_library")?;
-        let coercion_ctx = internals.attr_coercion_context();
-
-        let mut attrs = Vec::new();
-
-        // Coerce deps
-        let deps_type = AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY));
-        let deps_value = if deps.is_none() {
-            eval.heap().alloc(Vec::<Value>::new())
-        } else {
-            deps
-        };
-        let coerced_deps = deps_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, deps_value)?;
-        attrs.push(("deps".to_owned(), coerced_deps));
-
-        // Coerce dynamic_deps
-        let dynamic_deps_value = if dynamic_deps.is_none() {
-            eval.heap().alloc(Vec::<Value>::new())
-        } else {
-            dynamic_deps
-        };
-        let coerced_dynamic_deps =
-            deps_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, dynamic_deps_value)?;
-        attrs.push(("dynamic_deps".to_owned(), coerced_dynamic_deps));
-
-        // Coerce roots
-        let roots_value = if roots.is_none() {
-            eval.heap().alloc(Vec::<Value>::new())
-        } else {
-            roots
-        };
-        let coerced_roots = deps_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, roots_value)?;
-        attrs.push(("roots".to_owned(), coerced_roots));
-
-        let target_node = create_native_target_node(
-            rule_defs::CC_SHARED_LIBRARY_RULE.clone(),
-            internals.package(),
+        register_removed_rule(
+            rule_defs::REMOVED_CC_SHARED_LIBRARY_RULE.clone(),
+            "cc_shared_library",
             name,
-            attrs,
-            &extract_visibility_strings(visibility),
-            internals.attr_coercion_context(),
-            &internals.default_visibility(),
-        )?;
-
-        internals.record(target_node)?;
-        Ok(NoneType)
+            visibility,
+            eval,
+        )
     }
 
     /// `environment_group` was removed in Bazel 9. Loaded as a stub target so

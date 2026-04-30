@@ -157,19 +157,12 @@ pub fn analyze_native_rule(
         NativeRuleKind::PackageGroup => analyze_package_group(target),
         NativeRuleKind::Genrule => analyze_genrule(target, configured_node, dep_analysis),
         NativeRuleKind::Platform => analyze_platform(target, configured_node, dep_analysis),
-        NativeRuleKind::CcLibrary => create_cc_analysis_result(target, Some(configured_node)),
-        NativeRuleKind::CcBinary => create_cc_analysis_result(target, Some(configured_node)),
-        NativeRuleKind::CcTest => create_cc_analysis_result(target, Some(configured_node)),
         NativeRuleKind::TestSuite => analyze_test_suite(target, dep_analysis),
         NativeRuleKind::Toolchain => analyze_toolchain(target, configured_node, dep_analysis),
         NativeRuleKind::CcLibcTopAlias => create_minimal_analysis_result(target),
         NativeRuleKind::AnalysisTest => analyze_analysis_test(target),
         NativeRuleKind::Genquery => analyze_genquery(target),
         NativeRuleKind::StarlarkDocExtract => analyze_genquery(target), // stub: empty output file
-        NativeRuleKind::CcToolchain => create_minimal_analysis_result(target),
-        NativeRuleKind::CcToolchainSuite => create_minimal_analysis_result(target),
-        NativeRuleKind::CcImport => create_cc_analysis_result(target, Some(configured_node)),
-        NativeRuleKind::CcSharedLibrary => create_cc_analysis_result(target, Some(configured_node)),
         NativeRuleKind::XcodeConfig => analyze_xcode_config(target),
         NativeRuleKind::Removed(removed) => analyze_removed_rule(target, *removed),
     }
@@ -854,50 +847,6 @@ fn analyze_filegroup(
         DefaultInfoCallable::provider_id().dupe(),
         default_info.to_frozen_value(),
     )]);
-
-    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
-}
-
-/// Create an analysis result with DefaultInfo + CcInfo for native cc rules.
-fn create_cc_analysis_result(
-    target: &ConfiguredTargetLabel,
-    configured_node: Option<ConfiguredTargetNodeRef<'_>>,
-) -> kuro_error::Result<AnalysisResult> {
-    // (Plan 29) Native cc_library stubs previously registered
-    // `external/<cell>` and `<pkg>/<strip_include_prefix>` in a process-
-    // global include-dir registry so dependents of stubs would see those
-    // dirs in their compile commands. That registry has been retired
-    // (the global was the source of action-digest non-determinism across
-    // daemon restarts; see Plan 29 for the audit). Cross-target dir
-    // propagation now goes exclusively through
-    // `CcCompilationContext.includes` providers — but the stub returns
-    // `CcInfoInstanceStub` (no compilation_context), so dependents that
-    // *only* go through the native stub path will lose these dirs.
-    //
-    // For the projects this matters for in practice (llvm-project, clang,
-    // hello_world, kuro examples), every cc rule loads from rules_cc and
-    // the Starlark cc_library / cc_common.compile() path runs — the stub
-    // doesn't fire. The stub mostly fires for legacy Buck-style targets
-    // that aren't part of any active migration.
-    //
-    // Plan 27 (native-language-rule-removal) is the canonical home for
-    // the eventual full removal of these stubs. If a build that depends
-    // on the stub-supplied dirs surfaces, the fix is to populate a real
-    // `CcCompilationContextGen` here instead of `CcInfoInstanceStub`.
-    let _ = (target, configured_node); // intentionally unused: see comment above
-
-    let heap = FrozenHeap::new();
-
-    let default_info = FrozenDefaultInfo::testing_empty(&heap);
-    let cc_info = heap.alloc(CcInfoInstanceStub);
-
-    let providers = SmallMap::from_iter([
-        (
-            DefaultInfoCallable::provider_id().dupe(),
-            default_info.to_frozen_value(),
-        ),
-        (CcInfoProvider::provider_id().dupe(), cc_info),
-    ]);
 
     make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }

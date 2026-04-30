@@ -786,6 +786,19 @@ async def test_sh_binary_removed_without_load(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_cc_library_removed_without_load(buck: Buck) -> None:
+    """`cc_library(...)` without a load fails with the removed-rule
+    diagnostic. The diagnostic includes the `@rules_cc` load hint so
+    users see how to migrate. See Plan 27.2."""
+    with pytest.raises(Exception) as exc_info:
+        await buck.build("//cc_removed:noload_cc_library")
+    msg = str(exc_info.value)
+    assert "cc_library" in msg
+    assert "removed in Bazel 9" in msg
+    assert "@rules_cc" in msg
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_attr_int_values_valid(buck: Buck) -> None:
     """attr.int(values=[...]) accepts valid integer values."""
     result = await buck.build("//:int_values_valid")

@@ -1,0 +1,6 @@
+# Plan 27.2 negative test: native cc_library without a load() must fail
+# with the removed-rule diagnostic at analysis time. The corresponding
+# positive cases load cc_* from //:defs.bzl in the parent BUILD.bazel.
+cc_library(
+    name = "noload_cc_library",
+)

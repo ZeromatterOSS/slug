@@ -1307,3 +1307,52 @@ sh_test = rule(
         "env": attr.string_dict(default = {}),
     },
 )
+
+# Minimal Starlark replacements for the (now Bazel-9-removed) native cc_*
+# rules. The existing kuro tests (`test_cc_toolchain_registers_target`,
+# `test_cc_shared_library_builds`, etc.) only verify load-time / minimal
+# analysis behavior, so an empty-DefaultInfo stub is enough. Real cc_* are
+# in @rules_cc and exercised by the @llvm-project//llvm:Demangle smoke
+# build. See Plan 27.2.
+
+def _cc_noop_impl(ctx):
+    _ = ctx  # noqa: F841
+    return [DefaultInfo()]
+
+cc_library = rule(
+    implementation = _cc_noop_impl,
+    attrs = {
+        "srcs": attr.label_list(allow_files = True, default = []),
+        "hdrs": attr.label_list(allow_files = True, default = []),
+        "deps": attr.label_list(default = []),
+    },
+)
+
+cc_import = rule(
+    implementation = _cc_noop_impl,
+    attrs = {
+        "hdrs": attr.label_list(allow_files = True, default = []),
+        "alwayslink": attr.bool(default = False),
+    },
+)
+
+cc_shared_library = rule(
+    implementation = _cc_noop_impl,
+    attrs = {
+        "deps": attr.label_list(default = []),
+    },
+)
+
+cc_toolchain = rule(
+    implementation = _cc_noop_impl,
+    attrs = {
+        "toolchain_identifier": attr.string(default = ""),
+    },
+)
+
+cc_toolchain_suite = rule(
+    implementation = _cc_noop_impl,
+    attrs = {
+        "toolchains": attr.string_dict(default = {}),
+    },
+)

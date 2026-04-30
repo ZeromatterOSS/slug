@@ -424,58 +424,44 @@ pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
     /// See: https://bazel.build/reference/be/general#filegroup
     // Note: filegroup() is implemented in native_rules.rs as a proper native rule
 
-    /// Legacy cc_toolchain_suite rule (BUILD file version).
-    ///
-    /// This is a Bazel built-in native rule that was used before toolchain resolution.
-    /// In modern Bazel (and rules_cc 0.2.16+), this is deprecated in favor of toolchain()
-    /// rules, but native cc_toolchain_suite must still exist for backwards compatibility.
+    /// `cc_toolchain_suite` was removed in Bazel 9. Loaded as a stub so the
+    /// diagnostic surfaces during analysis. rules_cc 0.2.16's
+    /// `cc_toolchain_suite` wrapper still calls `native.cc_toolchain_suite`,
+    /// which means the diagnostic will reach users via that wrapper —
+    /// consistent with Bazel 9 behavior. See Plan 27.2.
     fn cc_toolchain_suite<'v>(
         #[starlark(require = named)] name: &str,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
-        #[starlark(kwargs)] _kwargs: Value<'v>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let internals = ModuleInternals::from_context(eval, "cc_toolchain_suite")?;
-        let target_node = crate::interpreter::native_rules::create_native_target_node(
-            crate::interpreter::native_rules::rule_defs::CC_TOOLCHAIN_SUITE_RULE.clone(),
-            internals.package(),
+        crate::interpreter::native_rules::register_removed_rule(
+            crate::interpreter::native_rules::rule_defs::REMOVED_CC_TOOLCHAIN_SUITE_RULE.clone(),
+            "cc_toolchain_suite",
             name,
-            vec![],
-            &crate::interpreter::native_rules::extract_visibility_strings(visibility),
-            internals.attr_coercion_context(),
-            &internals.default_visibility(),
-        )?;
-        internals.record(target_node)?;
-        Ok(NoneType)
+            visibility,
+            eval,
+        )
     }
 
-    /// Legacy cc_toolchain rule (BUILD file version).
-    ///
-    /// This is a Bazel built-in native rule for C++ toolchain definition.
-    /// In modern Bazel with rules_cc 0.2.16+, the pure Starlark cc_toolchain rule
-    /// is preferred, but native cc_toolchain must exist for backwards compatibility.
+    /// `cc_toolchain` was removed in Bazel 9. See `cc_toolchain_suite`.
     fn cc_toolchain<'v>(
         #[starlark(require = named)] name: &str,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
-        #[starlark(kwargs)] _kwargs: Value<'v>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let internals = ModuleInternals::from_context(eval, "cc_toolchain")?;
-        let target_node = crate::interpreter::native_rules::create_native_target_node(
-            crate::interpreter::native_rules::rule_defs::CC_TOOLCHAIN_RULE.clone(),
-            internals.package(),
+        crate::interpreter::native_rules::register_removed_rule(
+            crate::interpreter::native_rules::rule_defs::REMOVED_CC_TOOLCHAIN_RULE.clone(),
+            "cc_toolchain",
             name,
-            vec![],
-            &crate::interpreter::native_rules::extract_visibility_strings(visibility),
-            internals.attr_coercion_context(),
-            &internals.default_visibility(),
-        )?;
-        internals.record(target_node)?;
-        Ok(NoneType)
+            visibility,
+            eval,
+        )
     }
 
     /// Check if the target with `name` has already been defined,
@@ -519,59 +505,43 @@ pub(crate) fn register_module_natives(globals: &mut GlobalsBuilder) {
 /// ```
 #[starlark_module]
 fn bazel_native_module(registry: &mut GlobalsBuilder) {
-    /// Legacy native cc_toolchain_suite rule.
-    ///
-    /// This is a Bazel built-in native rule that was used before toolchain resolution.
-    /// In modern Bazel (and rules_cc 0.2.16+), this is deprecated in favor of toolchain()
-    /// rules, but the native.cc_toolchain_suite function must still exist for backwards
-    /// compatibility with the wrapper in rules_cc.
+    /// `native.cc_toolchain_suite` was removed in Bazel 9. Loaded as a stub
+    /// so the diagnostic surfaces during analysis. rules_cc 0.2.16's wrapper
+    /// calls this function, which means the diagnostic will reach users via
+    /// the wrapper — consistent with Bazel 9 behavior. See Plan 27.2.
     fn cc_toolchain_suite<'v>(
         #[starlark(require = named)] name: &str,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
-        #[starlark(kwargs)] _kwargs: Value<'v>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let internals = ModuleInternals::from_context(eval, "cc_toolchain_suite")?;
-        let target_node = crate::interpreter::native_rules::create_native_target_node(
-            crate::interpreter::native_rules::rule_defs::CC_TOOLCHAIN_SUITE_RULE.clone(),
-            internals.package(),
+        crate::interpreter::native_rules::register_removed_rule(
+            crate::interpreter::native_rules::rule_defs::REMOVED_CC_TOOLCHAIN_SUITE_RULE.clone(),
+            "cc_toolchain_suite",
             name,
-            vec![],
-            &crate::interpreter::native_rules::extract_visibility_strings(visibility),
-            internals.attr_coercion_context(),
-            &internals.default_visibility(),
-        )?;
-        internals.record(target_node)?;
-        Ok(NoneType)
+            visibility,
+            eval,
+        )
     }
 
-    /// Legacy native cc_toolchain rule.
-    ///
-    /// This is a Bazel built-in native rule for C++ toolchain definition.
-    /// In modern Bazel with rules_cc 0.2.16+, the pure Starlark cc_toolchain rule
-    /// is preferred, but native.cc_toolchain must exist for backwards compatibility.
+    /// `native.cc_toolchain` was removed in Bazel 9. See `native.cc_toolchain_suite`.
     fn cc_toolchain<'v>(
         #[starlark(require = named)] name: &str,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
-        #[starlark(kwargs)] _kwargs: Value<'v>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let internals = ModuleInternals::from_context(eval, "cc_toolchain")?;
-        let target_node = crate::interpreter::native_rules::create_native_target_node(
-            crate::interpreter::native_rules::rule_defs::CC_TOOLCHAIN_RULE.clone(),
-            internals.package(),
+        crate::interpreter::native_rules::register_removed_rule(
+            crate::interpreter::native_rules::rule_defs::REMOVED_CC_TOOLCHAIN_RULE.clone(),
+            "cc_toolchain",
             name,
-            vec![],
-            &crate::interpreter::native_rules::extract_visibility_strings(visibility),
-            internals.attr_coercion_context(),
-            &internals.default_visibility(),
-        )?;
-        internals.record(target_node)?;
-        Ok(NoneType)
+            visibility,
+            eval,
+        )
     }
     /// The `glob()` function specifies a set of files using patterns.
     /// Bazel-compatible: can be called as `native.glob()` from .bzl files.

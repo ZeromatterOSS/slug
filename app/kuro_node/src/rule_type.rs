@@ -80,6 +80,30 @@ pub enum RemovedNativeRule {
     /// Kuro tests use the nano_prelude Starlark `sh_library` instead.
     #[display("sh_library")]
     ShLibrary,
+    /// Bazel-removed C/C++ rule. Replacement is `@rules_cc//cc:defs.bzl`.
+    #[display("cc_library")]
+    CcLibrary,
+    /// Bazel-removed C/C++ rule. Replacement is `@rules_cc//cc:defs.bzl`.
+    #[display("cc_binary")]
+    CcBinary,
+    /// Bazel-removed C/C++ rule. Replacement is `@rules_cc//cc:defs.bzl`.
+    #[display("cc_test")]
+    CcTest,
+    /// Bazel-removed C/C++ rule. Replacement is `@rules_cc//cc:defs.bzl`.
+    #[display("cc_import")]
+    CcImport,
+    /// Bazel-removed C/C++ rule. Replacement is `@rules_cc//cc:defs.bzl`.
+    #[display("cc_shared_library")]
+    CcSharedLibrary,
+    /// Bazel-removed C/C++ rule. Replacement is `@rules_cc//cc:defs.bzl`.
+    #[display("cc_toolchain")]
+    CcToolchain,
+    /// Bazel-removed C/C++ rule. Replacement is `@rules_cc//cc:defs.bzl`.
+    /// Note: rules_cc 0.2.16 still wraps `native.cc_toolchain_suite`; the
+    /// stub is consistent with Bazel 9's load-OK / diagnostic-at-analysis
+    /// behavior, so the wrapper passes through cleanly.
+    #[display("cc_toolchain_suite")]
+    CcToolchainSuite,
 }
 
 impl RemovedNativeRule {
@@ -91,6 +115,13 @@ impl RemovedNativeRule {
             RemovedNativeRule::ShBinary => "sh_binary",
             RemovedNativeRule::ShTest => "sh_test",
             RemovedNativeRule::ShLibrary => "sh_library",
+            RemovedNativeRule::CcLibrary => "cc_library",
+            RemovedNativeRule::CcBinary => "cc_binary",
+            RemovedNativeRule::CcTest => "cc_test",
+            RemovedNativeRule::CcImport => "cc_import",
+            RemovedNativeRule::CcSharedLibrary => "cc_shared_library",
+            RemovedNativeRule::CcToolchain => "cc_toolchain",
+            RemovedNativeRule::CcToolchainSuite => "cc_toolchain_suite",
         }
     }
 
@@ -132,6 +163,18 @@ impl RemovedNativeRule {
                  following to your BUILD/bzl file:\n    \
                  load(\"@rules_shell//shell:sh_library.bzl\", \"sh_library\")"
             ),
+            RemovedNativeRule::CcLibrary
+            | RemovedNativeRule::CcBinary
+            | RemovedNativeRule::CcTest
+            | RemovedNativeRule::CcImport
+            | RemovedNativeRule::CcSharedLibrary
+            | RemovedNativeRule::CcToolchain
+            | RemovedNativeRule::CcToolchainSuite => format!(
+                "The {rule} rule has been removed in Bazel 9, add the \
+                 following to your BUILD/bzl file:\n    \
+                 load(\"@rules_cc//cc:defs.bzl\", \"{rule}\")",
+                rule = self.rule_name()
+            ),
         }
     }
 }
@@ -169,12 +212,6 @@ pub enum NativeRuleKind {
     Genrule,
     #[display("platform")]
     Platform,
-    #[display("cc_library")]
-    CcLibrary,
-    #[display("cc_binary")]
-    CcBinary,
-    #[display("cc_test")]
-    CcTest,
     #[display("test_suite")]
     TestSuite,
     #[display("toolchain")]
@@ -187,14 +224,6 @@ pub enum NativeRuleKind {
     Genquery,
     #[display("starlark_doc_extract")]
     StarlarkDocExtract,
-    #[display("cc_toolchain")]
-    CcToolchain,
-    #[display("cc_toolchain_suite")]
-    CcToolchainSuite,
-    #[display("cc_import")]
-    CcImport,
-    #[display("cc_shared_library")]
-    CcSharedLibrary,
     #[display("xcode_config")]
     XcodeConfig,
     /// A Bazel-9-removed rule. Loaded as a stub target and rejected during
@@ -216,19 +245,12 @@ impl NativeRuleKind {
             NativeRuleKind::PackageGroup => "package_group",
             NativeRuleKind::Genrule => "genrule",
             NativeRuleKind::Platform => "platform",
-            NativeRuleKind::CcLibrary => "cc_library",
-            NativeRuleKind::CcBinary => "cc_binary",
-            NativeRuleKind::CcTest => "cc_test",
             NativeRuleKind::TestSuite => "test_suite",
             NativeRuleKind::Toolchain => "toolchain",
             NativeRuleKind::CcLibcTopAlias => "cc_libc_top_alias",
             NativeRuleKind::AnalysisTest => "analysis_test",
             NativeRuleKind::Genquery => "genquery",
             NativeRuleKind::StarlarkDocExtract => "starlark_doc_extract",
-            NativeRuleKind::CcToolchain => "cc_toolchain",
-            NativeRuleKind::CcToolchainSuite => "cc_toolchain_suite",
-            NativeRuleKind::CcImport => "cc_import",
-            NativeRuleKind::CcSharedLibrary => "cc_shared_library",
             NativeRuleKind::XcodeConfig => "xcode_config",
             NativeRuleKind::Removed(removed) => removed.rule_name(),
         }
@@ -322,17 +344,6 @@ mod tests {
 
             // Apple-specific, tracked under a separate parity initiative.
             NativeRuleKind::XcodeConfig => "kuro_internal_apple",
-
-            // Bazel-9-removed but not yet converted to `Removed(...)`. Each
-            // entry here is a Plan 27.2 follow-up. Removing one without
-            // converting the rule to a stub will fail this test.
-            NativeRuleKind::CcLibrary
-            | NativeRuleKind::CcBinary
-            | NativeRuleKind::CcTest
-            | NativeRuleKind::CcImport
-            | NativeRuleKind::CcSharedLibrary
-            | NativeRuleKind::CcToolchain
-            | NativeRuleKind::CcToolchainSuite => "pending_removal_cc",
         }
     }
 
@@ -353,8 +364,8 @@ mod tests {
             "removed_stub"
         );
         assert_eq!(
-            parity_category(NativeRuleKind::CcLibrary),
-            "pending_removal_cc"
+            parity_category(NativeRuleKind::Removed(RemovedNativeRule::CcLibrary)),
+            "removed_stub"
         );
         assert_eq!(
             parity_category(NativeRuleKind::Removed(RemovedNativeRule::ShBinary)),
@@ -377,6 +388,13 @@ mod tests {
             RemovedNativeRule::ShBinary,
             RemovedNativeRule::ShTest,
             RemovedNativeRule::ShLibrary,
+            RemovedNativeRule::CcLibrary,
+            RemovedNativeRule::CcBinary,
+            RemovedNativeRule::CcTest,
+            RemovedNativeRule::CcImport,
+            RemovedNativeRule::CcSharedLibrary,
+            RemovedNativeRule::CcToolchain,
+            RemovedNativeRule::CcToolchainSuite,
         ] {
             let msg = kind.diagnostic_message();
             assert!(

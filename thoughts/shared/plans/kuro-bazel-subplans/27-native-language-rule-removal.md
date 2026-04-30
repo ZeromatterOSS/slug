@@ -235,7 +235,7 @@ applied to `execution_platform[s]` (23 fixtures, larger migration) and
 finally the `cc_*` / `sh_*` families (gated on rules_cc / rules_shell
 readiness per Phase 27.5).
 
-## Phase 27.2: Removed-Rule Stub Infrastructure  [partial — 6 rules done, 2026-04-30]
+## Phase 27.2: Removed-Rule Stub Infrastructure  [13 rules done, 2026-04-30]
 
 ### Status
 
@@ -244,6 +244,8 @@ Infrastructure landed; pattern applied to:
 - `environment_group`
 - `execution_platform`, `execution_platforms`
 - `sh_binary`, `sh_test`, `sh_library`
+- `cc_library`, `cc_binary`, `cc_test`, `cc_import`, `cc_shared_library`,
+  `cc_toolchain`, `cc_toolchain_suite`
 
 Specifics:
 
@@ -280,26 +282,10 @@ Specifics:
 
 ### Remaining for Phase 27.2
 
-`cc_*` rules — `cc_library`, `cc_binary`, `cc_test`, `cc_import`,
-`cc_shared_library`, `cc_toolchain`, `cc_toolchain_suite`. rules_cc
-0.2.16 has Starlark replacements for all of these (verified by reading
-`@rules_cc//cc/defs.bzl`); `cc_toolchain_suite` is a wrapper over
-`native.cc_toolchain_suite` consistent with Bazel 9's load-OK /
-diagnostic-at-analysis behavior, so removing the kuro native is safe.
+No more rules pending. Phase 27.2 is complete.
 
-Conversion pattern (mechanical):
-
-1. Add a `RemovedNativeRule::Cc<Name>` variant + diagnostic with the
-   correct `@rules_cc` load hint.
-2. Replace the existing `Lazy<Arc<Rule>>` static (in
-   `native_rules.rs`) with `make_removed_rule(...)`.
-3. Replace the BUILD-global function body with `register_removed_rule(...)`.
-4. Migrate fixtures that call the rule without a `load()`
-   (Phase 27.4) — ~36 cc_library, ~8 cc_binary, ~4 cc_test, ~5 cc_import,
-   1 cc_shared_library, 1 cc_toolchain, 1 cc_toolchain_suite.
-5. Drop `create_cc_analysis_result()` once all cc_* are stubs
-   (Phase 27.3).
-6. Audit `EXTERNAL_INCLUDE_DIRS` after deletion (Plan 27.3 acceptance).
+(`cc_libc_top_alias` stays as a true Bazel native rule per Phase 27.1
+inventory — used internally by `@rules_cc//cc:BUILD`.)
 
 ### Goal
 
