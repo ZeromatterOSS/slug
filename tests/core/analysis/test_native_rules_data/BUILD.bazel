@@ -1,12 +1,12 @@
-load(":defs.bzl", "actions_fail_test", "bool_flag", "build_config_test", "built_in_include_dirs_test", "capture_existing_rules", "cc_command_line_test", "cc_compilation_context_test", "cc_configure_features_test", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "cc_toolchain_config_info_test", "collect_files", "constraint_provider_test", "dir_ctx_files_rule", "do_nothing_binds_test", "do_nothing_test", "exec_groups_test", "executable_rule", "existing_rules_test", "files_to_run_test", "fragments_test", "initializer_test", "instrumented_files_empty_test", "instrumented_files_test", "int_values_test", "is_tool_configuration_test", "java_common_test", "java_toolchain_test", "macro_test", "merge_cc_infos_full_test", "merge_compilation_contexts_test", "new_file_test", "nonempty_deps_test", "nonempty_strings_test", "non_executable_rule", "provider_callable_test", "provides_valid_rule", "psi_test_rule", "resolve_command_test", "resolve_command_tools_test", "run_env_info", "select_value", "sibling_file", "split_attr_test", "stamp_file_info", "string_flag", "tokenize_test", "write_file_executable_test", "write_file_test", "write_list", "write_mnemonic_test")
+load(":defs.bzl", "actions_fail_test", "bool_flag", "build_config_test", "built_in_include_dirs_test", "capture_existing_rules", "cc_command_line_test", "cc_compilation_context_test", "cc_configure_features_test", "cc_link_test", "cc_linker_input_test", "cc_merge_infos_test", "cc_toolchain_config_info_test", "collect_files", "constraint_provider_test", "dir_ctx_files_rule", "do_nothing_binds_test", "do_nothing_test", "exec_groups_test", "executable_rule", "existing_rules_test", "files_to_run_test", "fragments_test", "initializer_test", "instrumented_files_empty_test", "instrumented_files_test", "int_values_test", "is_tool_configuration_test", "java_common_test", "java_toolchain_test", "macro_test", "merge_cc_infos_full_test", "merge_compilation_contexts_test", "new_file_test", "non_executable_rule", "nonempty_deps_test", "nonempty_strings_test", "provider_callable_test", "provides_valid_rule", "psi_test_rule", "resolve_command_test", "resolve_command_tools_test", "run_env_info", "select_value", "sh_binary", "sh_library", "sh_test", "sibling_file", "split_attr_test", "stamp_file_info", "string_flag", "tokenize_test", "write_file_executable_test", "write_file_test", "write_list", "write_mnemonic_test")
 
 # === filegroup tests ===
 
 filegroup(
     name = "source_files",
     srcs = [
-        "defs.bzl",
         "MODULE.bazel",
+        "defs.bzl",
     ],
 )
 
@@ -19,7 +19,10 @@ collect_files(
 
 write_list(
     name = "original",
-    items = ["hello", "world"],
+    items = [
+        "hello",
+        "world",
+    ],
 )
 
 alias(
@@ -148,7 +151,10 @@ genrule(
 
 genrule(
     name = "genrule_multi_outs",
-    outs = ["multi_a.txt", "multi_b.txt"],
+    outs = [
+        "multi_a.txt",
+        "multi_b.txt",
+    ],
     cmd = "echo 'a' > $(@D)/multi_a.txt && echo 'b' > $(@D)/multi_b.txt",
 )
 
@@ -285,8 +291,8 @@ sh_binary(
 genrule(
     name = "genrule_with_tool",
     outs = ["genrule_with_tool.txt"],
-    tools = [":echo_tool"],
     cmd = "bash $(location :echo_tool) > $@",
+    tools = [":echo_tool"],
 )
 
 # === select() with platform resolution ===
@@ -394,8 +400,8 @@ sh_binary(
 
 toolchain(
     name = "my_toolchain",
-    toolchain_type = ":my_toolchain_type",
     toolchain = ":my_toolchain_impl",
+    toolchain_type = ":my_toolchain_type",
 )
 
 # === package_group tests ===
@@ -565,8 +571,11 @@ cc_shared_library(
 
 environment_group(
     name = "jdk_versions",
-    environments = [":jdk8", ":jdk11"],
     defaults = [":jdk11"],
+    environments = [
+        ":jdk8",
+        ":jdk11",
+    ],
 )
 
 # === attr.int(values=[...]) tests ===
@@ -589,7 +598,10 @@ nonempty_deps_test(
 
 nonempty_strings_test(
     name = "nonempty_strings_valid",
-    items = ["hello", "world"],
+    items = [
+        "hello",
+        "world",
+    ],
 )
 
 # === rule(executable=True) tests ===
@@ -626,15 +638,15 @@ fragments_test(
 # stamp=0 (already int) should pass through unchanged; message should get INIT: prefix
 initializer_test(
     name = "initializer_prefix_test",
-    stamp = 0,
     message = "hello",
+    stamp = 0,
 )
 
 # stamp=True (bool) should be converted to stamp=1 (int) by the initializer
 initializer_test(
     name = "initializer_bool_to_int",
-    stamp = True,
     message = "hello",
+    stamp = True,
 )
 
 # === build configuration flag tests ===

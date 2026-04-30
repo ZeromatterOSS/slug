@@ -37,6 +37,105 @@ pub struct StarlarkRuleType {
     pub name: String,
 }
 
+/// A Bazel-9-removed native rule that kuro accepts at load time but rejects
+/// during analysis with a Bazel-shaped diagnostic. See
+/// `thoughts/shared/plans/kuro-bazel-subplans/27-native-language-rule-removal.md`.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Dupe,
+    derive_more::Display,
+    Eq,
+    PartialEq,
+    Hash,
+    Pagable,
+    Allocative
+)]
+pub enum RemovedNativeRule {
+    /// Bazel's environment-based constraint system, deprecated in Bazel 6
+    /// and removed entirely in Bazel 9. The replacement is the
+    /// platform/constraint/toolchain system (`constraint_setting`,
+    /// `constraint_value`, `platform`).
+    #[display("environment_group")]
+    EnvironmentGroup,
+    /// Buck2-only rule with no Bazel form. Bazel registers execution
+    /// platforms via `register_execution_platforms(...)` in
+    /// `MODULE.bazel` (or `--extra_execution_platforms` on the CLI).
+    #[display("execution_platform")]
+    ExecutionPlatform,
+    /// Buck2-only rule with no Bazel form. Same migration path as
+    /// `execution_platform`: use `register_execution_platforms(...)`.
+    #[display("execution_platforms")]
+    ExecutionPlatforms,
+    /// Bazel-removed shell rule. Replacement is `@rules_shell//shell:sh_binary.bzl`.
+    /// Kuro tests use the nano_prelude Starlark `sh_binary` instead.
+    #[display("sh_binary")]
+    ShBinary,
+    /// Bazel-removed shell rule. Replacement is `@rules_shell//shell:sh_test.bzl`.
+    /// Kuro tests use the nano_prelude Starlark `sh_test` instead.
+    #[display("sh_test")]
+    ShTest,
+    /// Bazel-removed shell rule. Replacement is `@rules_shell//shell:sh_library.bzl`.
+    /// Kuro tests use the nano_prelude Starlark `sh_library` instead.
+    #[display("sh_library")]
+    ShLibrary,
+}
+
+impl RemovedNativeRule {
+    pub fn rule_name(&self) -> &'static str {
+        match self {
+            RemovedNativeRule::EnvironmentGroup => "environment_group",
+            RemovedNativeRule::ExecutionPlatform => "execution_platform",
+            RemovedNativeRule::ExecutionPlatforms => "execution_platforms",
+            RemovedNativeRule::ShBinary => "sh_binary",
+            RemovedNativeRule::ShTest => "sh_test",
+            RemovedNativeRule::ShLibrary => "sh_library",
+        }
+    }
+
+    /// Bazel-shaped diagnostic for a removed rule. Callers append target
+    /// context using kuro's normal analysis-error formatting.
+    pub fn diagnostic_message(&self) -> String {
+        match self {
+            RemovedNativeRule::EnvironmentGroup => format!(
+                "The {rule} rule has been removed in Bazel 9. The \
+                 environment-based constraint system was deprecated in \
+                 favor of platforms and toolchains. Migrate to \
+                 constraint_setting() / constraint_value() and \
+                 target_compatible_with.",
+                rule = self.rule_name()
+            ),
+            RemovedNativeRule::ExecutionPlatform | RemovedNativeRule::ExecutionPlatforms => {
+                format!(
+                    "The {rule} rule is Buck2-specific and has been removed. \
+                     Bazel does not have this rule. Define platforms with \
+                     platform(...) and register them via \
+                     register_execution_platforms(\"//path:platform\") in \
+                     MODULE.bazel, or pass --extra_execution_platforms on \
+                     the command line.",
+                    rule = self.rule_name()
+                )
+            }
+            RemovedNativeRule::ShBinary => format!(
+                "The sh_binary rule has been removed in Bazel 9, add the \
+                 following to your BUILD/bzl file:\n    \
+                 load(\"@rules_shell//shell:sh_binary.bzl\", \"sh_binary\")"
+            ),
+            RemovedNativeRule::ShTest => format!(
+                "The sh_test rule has been removed in Bazel 9, add the \
+                 following to your BUILD/bzl file:\n    \
+                 load(\"@rules_shell//shell:sh_test.bzl\", \"sh_test\")"
+            ),
+            RemovedNativeRule::ShLibrary => format!(
+                "The sh_library rule has been removed in Bazel 9, add the \
+                 following to your BUILD/bzl file:\n    \
+                 load(\"@rules_shell//shell:sh_library.bzl\", \"sh_library\")"
+            ),
+        }
+    }
+}
+
 /// The type of native rule (built into Kuro, not defined in Starlark).
 #[derive(
     Debug,
@@ -80,22 +179,12 @@ pub enum NativeRuleKind {
     TestSuite,
     #[display("toolchain")]
     Toolchain,
-    #[display("sh_binary")]
-    ShBinary,
-    #[display("sh_test")]
-    ShTest,
-    #[display("sh_library")]
-    ShLibrary,
     #[display("cc_libc_top_alias")]
     CcLibcTopAlias,
     #[display("analysis_test")]
     AnalysisTest,
     #[display("genquery")]
     Genquery,
-    #[display("execution_platform")]
-    ExecutionPlatform,
-    #[display("execution_platforms")]
-    ExecutionPlatforms,
     #[display("starlark_doc_extract")]
     StarlarkDocExtract,
     #[display("cc_toolchain")]
@@ -106,10 +195,12 @@ pub enum NativeRuleKind {
     CcImport,
     #[display("cc_shared_library")]
     CcSharedLibrary,
-    #[display("environment_group")]
-    EnvironmentGroup,
     #[display("xcode_config")]
     XcodeConfig,
+    /// A Bazel-9-removed rule. Loaded as a stub target and rejected during
+    /// analysis with a Bazel-shaped diagnostic.
+    #[display("{}", _0)]
+    Removed(RemovedNativeRule),
 }
 
 impl NativeRuleKind {
@@ -130,21 +221,16 @@ impl NativeRuleKind {
             NativeRuleKind::CcTest => "cc_test",
             NativeRuleKind::TestSuite => "test_suite",
             NativeRuleKind::Toolchain => "toolchain",
-            NativeRuleKind::ShBinary => "sh_binary",
-            NativeRuleKind::ShTest => "sh_test",
-            NativeRuleKind::ShLibrary => "sh_library",
             NativeRuleKind::CcLibcTopAlias => "cc_libc_top_alias",
             NativeRuleKind::AnalysisTest => "analysis_test",
             NativeRuleKind::Genquery => "genquery",
-            NativeRuleKind::ExecutionPlatform => "execution_platform",
-            NativeRuleKind::ExecutionPlatforms => "execution_platforms",
             NativeRuleKind::StarlarkDocExtract => "starlark_doc_extract",
             NativeRuleKind::CcToolchain => "cc_toolchain",
             NativeRuleKind::CcToolchainSuite => "cc_toolchain_suite",
             NativeRuleKind::CcImport => "cc_import",
             NativeRuleKind::CcSharedLibrary => "cc_shared_library",
             NativeRuleKind::XcodeConfig => "xcode_config",
-            NativeRuleKind::EnvironmentGroup => "environment_group",
+            NativeRuleKind::Removed(removed) => removed.rule_name(),
         }
     }
 }
@@ -183,6 +269,8 @@ mod tests {
     use kuro_core::bzl::ImportPath;
 
     use crate::bzl_or_bxl_path::BzlOrBxlPath;
+    use crate::rule_type::NativeRuleKind;
+    use crate::rule_type::RemovedNativeRule;
     use crate::rule_type::StarlarkRuleType;
 
     #[test]
@@ -198,5 +286,105 @@ mod tests {
             }
             .to_string()
         );
+    }
+
+    /// Plan 27.6 guardrail: every `NativeRuleKind` variant must have a
+    /// known parity category. The exhaustive match below forces anyone
+    /// adding a new variant to declare whether it's a true Bazel 9 native
+    /// rule, a removed-rule stub, a kuro-internal helper, or pending
+    /// migration. Removing a `pending_removal_*` entry requires either
+    /// converting the rule to a `Removed(...)` stub (Phase 27.2 pattern)
+    /// or proving with a Bazel 9 source citation that the rule is a true
+    /// native rule.
+    fn parity_category(kind: NativeRuleKind) -> &'static str {
+        match kind {
+            // True Bazel 9 native rules — keep as native.
+            NativeRuleKind::Filegroup
+            | NativeRuleKind::ConstraintSetting
+            | NativeRuleKind::ConstraintValue
+            | NativeRuleKind::Alias
+            | NativeRuleKind::LabelFlag
+            | NativeRuleKind::ConfigSetting
+            | NativeRuleKind::ToolchainType
+            | NativeRuleKind::PackageGroup
+            | NativeRuleKind::Genrule
+            | NativeRuleKind::Platform
+            | NativeRuleKind::Toolchain
+            | NativeRuleKind::TestSuite
+            | NativeRuleKind::Genquery
+            | NativeRuleKind::CcLibcTopAlias => "true_native",
+
+            // Bazel-9-removed; stub records the diagnostic at analysis time.
+            NativeRuleKind::Removed(_) => "removed_stub",
+
+            // Kuro-internal helpers; not exposed as Bazel parity surface.
+            NativeRuleKind::AnalysisTest | NativeRuleKind::StarlarkDocExtract => "kuro_internal",
+
+            // Apple-specific, tracked under a separate parity initiative.
+            NativeRuleKind::XcodeConfig => "kuro_internal_apple",
+
+            // Bazel-9-removed but not yet converted to `Removed(...)`. Each
+            // entry here is a Plan 27.2 follow-up. Removing one without
+            // converting the rule to a stub will fail this test.
+            NativeRuleKind::CcLibrary
+            | NativeRuleKind::CcBinary
+            | NativeRuleKind::CcTest
+            | NativeRuleKind::CcImport
+            | NativeRuleKind::CcSharedLibrary
+            | NativeRuleKind::CcToolchain
+            | NativeRuleKind::CcToolchainSuite => "pending_removal_cc",
+        }
+    }
+
+    #[test]
+    fn native_rule_kinds_have_parity_category() {
+        // Spot-check categorizations. The real guardrail is the exhaustive
+        // match in `parity_category`: a new variant fails to compile until
+        // a category is assigned.
+        assert_eq!(parity_category(NativeRuleKind::Filegroup), "true_native");
+        assert_eq!(
+            parity_category(NativeRuleKind::Removed(RemovedNativeRule::EnvironmentGroup)),
+            "removed_stub"
+        );
+        assert_eq!(
+            parity_category(NativeRuleKind::Removed(
+                RemovedNativeRule::ExecutionPlatform
+            )),
+            "removed_stub"
+        );
+        assert_eq!(
+            parity_category(NativeRuleKind::CcLibrary),
+            "pending_removal_cc"
+        );
+        assert_eq!(
+            parity_category(NativeRuleKind::Removed(RemovedNativeRule::ShBinary)),
+            "removed_stub"
+        );
+        assert_eq!(
+            parity_category(NativeRuleKind::AnalysisTest),
+            "kuro_internal"
+        );
+    }
+
+    #[test]
+    fn removed_native_rule_diagnostics_mention_rule_name() {
+        // Every removed-rule diagnostic must mention the rule name so the
+        // user can locate the call site.
+        for kind in [
+            RemovedNativeRule::EnvironmentGroup,
+            RemovedNativeRule::ExecutionPlatform,
+            RemovedNativeRule::ExecutionPlatforms,
+            RemovedNativeRule::ShBinary,
+            RemovedNativeRule::ShTest,
+            RemovedNativeRule::ShLibrary,
+        ] {
+            let msg = kind.diagnostic_message();
+            assert!(
+                msg.contains(kind.rule_name()),
+                "diagnostic for {} missing rule name: {}",
+                kind.rule_name(),
+                msg
+            );
+        }
     }
 }

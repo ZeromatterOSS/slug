@@ -10,6 +10,12 @@ load("//:asserts.bzl", _asserts = "asserts")
 load("//:cfg_rules.bzl", _config_setting = "config_setting", _constraint_setting = "constraint_setting", _constraint_value = "constraint_value", _execution_platform = "execution_platform", _platform = "platform")
 load("//:execution_platforms.bzl", _execution_platforms = "execution_platforms")
 load(
+    "//:shell_rules.bzl",
+    _sh_binary = "sh_binary",
+    _sh_library = "sh_library",
+    _sh_test = "sh_test",
+)
+load(
     "//:stub_rules.bzl",
     _fail_build = "fail_build",
     _stub = "stub",
@@ -25,6 +31,9 @@ constraint_value = _constraint_value
 execution_platform = _execution_platform
 execution_platforms = _execution_platforms
 fail_build = _fail_build
+sh_binary = _sh_binary
+sh_library = _sh_library
+sh_test = _sh_test
 stub = _stub
 stub_toolchain = _stub_toolchain
 trivial_build = _trivial_build

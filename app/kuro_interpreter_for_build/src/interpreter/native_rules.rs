@@ -550,49 +550,10 @@ pub(crate) mod rule_defs {
         )
     });
 
-    pub static EXECUTION_PLATFORM_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        let platform_attr = Attribute::new(
-            None, // required, no default
-            "The platform target for this execution platform",
-            AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
-        );
-        let attributes = AttributeSpec::from(
-            vec![("platform".to_owned(), platform_attr)],
-            false,
-            &RuleIncomingTransition::None,
-        )
-        .expect("execution_platform attributes should be valid");
-        make_native_rule(
-            attributes,
-            NativeRuleKind::ExecutionPlatform,
-            RuleKind::Configuration,
-            false,
-            false,
-        )
-    });
-
-    pub static EXECUTION_PLATFORMS_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        let platforms_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "The list of execution platform targets",
-            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
-        );
-        let attributes = AttributeSpec::from(
-            vec![("platforms".to_owned(), platforms_attr)],
-            false,
-            &RuleIncomingTransition::None,
-        )
-        .expect("execution_platforms attributes should be valid");
-        make_native_rule(
-            attributes,
-            NativeRuleKind::ExecutionPlatforms,
-            RuleKind::Configuration,
-            false,
-            false,
-        )
-    });
+    // execution_platform and execution_platforms are Buck2-only removed
+    // rules. Their `Lazy<Arc<Rule>>` statics live with the other
+    // removed-rule stubs further down (REMOVED_EXECUTION_PLATFORM_RULE /
+    // REMOVED_EXECUTION_PLATFORMS_RULE).
 
     /// Creates the AttributeSpec for native cc rules (cc_library, cc_binary, cc_test).
     fn cc_rule_attributes() -> AttributeSpec {
@@ -711,80 +672,8 @@ pub(crate) mod rule_defs {
         )
     });
 
-    /// Creates the AttributeSpec for sh_binary / sh_test / sh_library.
-    /// These rules share the same attribute set: srcs, deps, data.
-    fn sh_rule_attributes() -> AttributeSpec {
-        let srcs_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "Shell script source files",
-            AttrType::list(AttrType::one_of(vec![
-                AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
-                AttrType::source(false),
-            ])),
-        );
-
-        let deps_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "Dependencies",
-            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY)),
-        );
-
-        let data_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "Data files available at runtime",
-            AttrType::list(AttrType::one_of(vec![
-                AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
-                AttrType::source(false),
-            ])),
-        );
-
-        AttributeSpec::from(
-            vec![
-                ("srcs".to_owned(), srcs_attr),
-                ("deps".to_owned(), deps_attr),
-                ("data".to_owned(), data_attr),
-            ],
-            false,
-            &RuleIncomingTransition::None,
-        )
-        .expect("sh rule attributes should be valid")
-    }
-
-    pub static SH_BINARY_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        make_native_rule(
-            sh_rule_attributes(),
-            NativeRuleKind::ShBinary,
-            RuleKind::Normal,
-            false,
-            true,
-        )
-    });
-
-    pub static SH_TEST_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        make_native_rule(
-            sh_rule_attributes(),
-            NativeRuleKind::ShTest,
-            RuleKind::Normal,
-            true,
-            false,
-        )
-    });
-
-    pub static SH_LIBRARY_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        make_native_rule(
-            sh_rule_attributes(),
-            NativeRuleKind::ShLibrary,
-            RuleKind::Normal,
-            false,
-            false,
-        )
-    });
+    // sh_binary, sh_test, sh_library are Bazel-9-removed. Their stubs live
+    // with the other removed-rule statics further down (REMOVED_SH_*_RULE).
 
     /// The Rule definition for cc_libc_top_alias.
     /// This is a Bazel internal rule used by rules_cc to alias the libc top directory.
@@ -1133,49 +1022,44 @@ pub(crate) mod rule_defs {
         })
     });
 
-    fn environment_group_attributes() -> AttributeSpec {
-        let environments_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "The environments in this group",
-            AttrType::list(AttrType::string()),
-        );
-        let defaults_attr = Attribute::new(
-            Some(Arc::new(CoercedAttr::List(
-                ListLiteral(ArcSlice::default()),
-            ))),
-            "The default environments from this group",
-            AttrType::list(AttrType::string()),
-        );
-        AttributeSpec::from(
-            vec![
-                ("environments".to_owned(), environments_attr),
-                ("defaults".to_owned(), defaults_attr),
-            ],
-            false,
-            &RuleIncomingTransition::None,
-        )
-        .expect("environment_group attributes should be valid")
+    /// Empty `AttributeSpec` for removed-rule stubs. The rule accepts any
+    /// `**kwargs` at load time without validating language-rule attrs, so
+    /// the removed-rule diagnostic in
+    /// `app/kuro_analysis/src/analysis/native_rule_analysis.rs` is the
+    /// observable error rather than an attr-validation failure. See Plan 27.
+    fn removed_rule_attributes() -> AttributeSpec {
+        AttributeSpec::from(vec![], false, &RuleIncomingTransition::None)
+            .expect("removed-rule stub attributes should be valid")
     }
 
-    pub static ENVIRONMENT_GROUP_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
-        Arc::new(Rule {
-            attributes: environment_group_attributes(),
-            rule_type: RuleType::Native(NativeRuleKind::EnvironmentGroup),
-            rule_kind: RuleKind::Normal,
-            cfg: RuleIncomingTransition::None,
-            uses_plugins: vec![],
-            is_test: false,
-            is_executable: false,
-            provides: vec![],
-            toolchain_types: vec![],
-            exec_group_defs: vec![],
-            fragments: vec![],
-            build_setting_type: None,
-            build_setting_is_flag: false,
-        })
+    fn make_removed_rule(kind: kuro_node::rule_type::RemovedNativeRule) -> Arc<Rule> {
+        make_native_rule(
+            removed_rule_attributes(),
+            NativeRuleKind::Removed(kind),
+            RuleKind::Normal,
+            false,
+            false,
+        )
+    }
+
+    pub static REMOVED_ENVIRONMENT_GROUP_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_removed_rule(kuro_node::rule_type::RemovedNativeRule::EnvironmentGroup));
+
+    pub static REMOVED_EXECUTION_PLATFORM_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_removed_rule(kuro_node::rule_type::RemovedNativeRule::ExecutionPlatform));
+
+    pub static REMOVED_EXECUTION_PLATFORMS_RULE: Lazy<Arc<Rule>> = Lazy::new(|| {
+        make_removed_rule(kuro_node::rule_type::RemovedNativeRule::ExecutionPlatforms)
     });
+
+    pub static REMOVED_SH_BINARY_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_removed_rule(kuro_node::rule_type::RemovedNativeRule::ShBinary));
+
+    pub static REMOVED_SH_TEST_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_removed_rule(kuro_node::rule_type::RemovedNativeRule::ShTest));
+
+    pub static REMOVED_SH_LIBRARY_RULE: Lazy<Arc<Rule>> =
+        Lazy::new(|| make_removed_rule(kuro_node::rule_type::RemovedNativeRule::ShLibrary));
 
     /// Stub xcode_config rule for non-Apple platforms.
     /// Provides XcodeVersionConfig with dummy values so cc_toolchain_config.bzl
@@ -1356,48 +1240,30 @@ fn create_native_cc_target<'v>(
     Ok(NoneType)
 }
 
-/// Helper to create a native sh_* target node (sh_binary, sh_test, sh_library).
-fn create_sh_target<'v>(
+/// Helper for BUILD-global stubs of Bazel-9-removed rules.
+///
+/// Accepts the rule name and arbitrary `**kwargs`, records a target node
+/// tagged with `NativeRuleKind::Removed(...)`, and lets analysis emit the
+/// Bazel-shaped diagnostic. Per Plan 27, removed rules must NOT validate
+/// language-rule attrs at load time, so this helper ignores the kwargs and
+/// passes an empty attribute list to `create_native_target_node`.
+fn register_removed_rule<'v>(
     rule: Arc<Rule>,
-    name: &str,
-    srcs: Value<'v>,
-    deps: Value<'v>,
+    rule_name: &str,
+    target_name: &str,
     visibility: Value<'v>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> starlark::Result<NoneType> {
-    let internals = ModuleInternals::from_context(eval, "sh_rule")?;
-    let coercion_ctx = internals.attr_coercion_context();
-
-    let src_type = AttrType::list(AttrType::one_of(vec![
-        AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
-        AttrType::source(false),
-    ]));
-    let dep_type = AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY));
-
-    let empty_list = eval.heap().alloc(starlark::values::list::AllocList::EMPTY);
-    let srcs_val = if srcs.is_none() { empty_list } else { srcs };
-    let deps_val = if deps.is_none() { empty_list } else { deps };
-
-    let coerced_srcs = src_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, srcs_val)?;
-    let coerced_deps = dep_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, deps_val)?;
-
+    let internals = ModuleInternals::from_context(eval, rule_name)?;
     let target_node = create_native_target_node(
         rule,
         internals.package(),
-        name,
-        vec![
-            ("srcs".to_owned(), coerced_srcs),
-            ("deps".to_owned(), coerced_deps),
-            (
-                "data".to_owned(),
-                CoercedAttr::List(ListLiteral(kuro_util::arc_str::ArcSlice::default())),
-            ),
-        ],
+        target_name,
+        vec![],
         &extract_visibility_strings(visibility),
         internals.attr_coercion_context(),
         &internals.default_visibility(),
     )?;
-
     internals.record(target_node)?;
     Ok(NoneType)
 }
@@ -2225,68 +2091,43 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
-    /// Native execution_platform rule.
+    /// `execution_platform` is Buck2-only and removed. Loaded as a stub so
+    /// the diagnostic surfaces during analysis, not at load time. User
+    /// `load("...", "execution_platform")` bindings shadow this stub.
+    /// See Plan 27.
     fn execution_platform<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] platform: Value<
-            'v,
-        >,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
-        #[starlark(kwargs)] _kwargs: Value<'v>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let internals = ModuleInternals::from_context(eval, "execution_platform")?;
-        let coercion_ctx = internals.attr_coercion_context();
-        let mut attrs = vec![];
-        if !platform.is_none() {
-            let dep_type = AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY);
-            let coerced = dep_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, platform)?;
-            attrs.push(("platform".to_owned(), coerced));
-        }
-        let target_node = create_native_target_node(
-            rule_defs::EXECUTION_PLATFORM_RULE.clone(),
-            internals.package(),
+        register_removed_rule(
+            rule_defs::REMOVED_EXECUTION_PLATFORM_RULE.clone(),
+            "execution_platform",
             name,
-            attrs,
-            &extract_visibility_strings(visibility),
-            internals.attr_coercion_context(),
-            &internals.default_visibility(),
-        )?;
-        internals.record(target_node)?;
-        Ok(NoneType)
+            visibility,
+            eval,
+        )
     }
 
-    /// Native execution_platforms rule.
+    /// `execution_platforms` is Buck2-only and removed. See `execution_platform`.
     fn execution_platforms<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        platforms: UnpackListOrTuple<Value<'v>>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
-        #[starlark(kwargs)] _kwargs: Value<'v>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let internals = ModuleInternals::from_context(eval, "execution_platforms")?;
-        let coercion_ctx = internals.attr_coercion_context();
-        let platforms_val = eval.heap().alloc(platforms.items);
-        let platforms_type =
-            AttrType::list(AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY));
-        let coerced_platforms =
-            platforms_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, platforms_val)?;
-        let target_node = create_native_target_node(
-            rule_defs::EXECUTION_PLATFORMS_RULE.clone(),
-            internals.package(),
+        register_removed_rule(
+            rule_defs::REMOVED_EXECUTION_PLATFORMS_RULE.clone(),
+            "execution_platforms",
             name,
-            vec![("platforms".to_owned(), coerced_platforms)],
-            &extract_visibility_strings(visibility),
-            internals.attr_coercion_context(),
-            &internals.default_visibility(),
-        )?;
-        internals.record(target_node)?;
-        Ok(NoneType)
+            visibility,
+            eval,
+        )
     }
 
     /// Native cc_library rule stub for Bazel compatibility.
@@ -2504,73 +2345,58 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
-    /// Bazel's sh_binary rule: creates a binary from shell scripts.
-    ///
-    /// See: https://bazel.build/reference/be/shell#sh_binary
+    /// `sh_binary` was removed in Bazel 9. Loaded as a stub so the
+    /// diagnostic surfaces during analysis. User
+    /// `load("@rules_shell//shell:sh_binary.bzl", "sh_binary")` shadows
+    /// this stub. See Plan 27.
     fn sh_binary<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
-        #[starlark(kwargs)] extra_kwargs: Value<'v>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _ = extra_kwargs;
-        create_sh_target(
-            rule_defs::SH_BINARY_RULE.clone(),
+        register_removed_rule(
+            rule_defs::REMOVED_SH_BINARY_RULE.clone(),
+            "sh_binary",
             name,
-            srcs,
-            deps,
             visibility,
             eval,
         )
     }
 
-    /// Bazel's sh_test rule: creates a test target from shell scripts.
-    ///
-    /// See: https://bazel.build/reference/be/shell#sh_test
+    /// `sh_test` was removed in Bazel 9. See `sh_binary`.
     fn sh_test<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
-        #[starlark(kwargs)] extra_kwargs: Value<'v>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _ = extra_kwargs;
-        create_sh_target(
-            rule_defs::SH_TEST_RULE.clone(),
+        register_removed_rule(
+            rule_defs::REMOVED_SH_TEST_RULE.clone(),
+            "sh_test",
             name,
-            srcs,
-            deps,
             visibility,
             eval,
         )
     }
 
-    /// Bazel's sh_library rule: creates a library from shell scripts.
-    ///
-    /// See: https://bazel.build/reference/be/shell#sh_library
+    /// `sh_library` was removed in Bazel 9. See `sh_binary`.
     fn sh_library<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] srcs: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] deps: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
-        #[starlark(kwargs)] extra_kwargs: Value<'v>,
+        #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _ = extra_kwargs;
-        create_sh_target(
-            rule_defs::SH_LIBRARY_RULE.clone(),
+        register_removed_rule(
+            rule_defs::REMOVED_SH_LIBRARY_RULE.clone(),
+            "sh_library",
             name,
-            srcs,
-            deps,
             visibility,
             eval,
         )
@@ -2928,61 +2754,24 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         Ok(NoneType)
     }
 
-    /// Declares a group of target environments and their defaults.
-    ///
-    /// Used by Bazel's environment-based constraint system (predates platforms).
-    ///
-    /// Example:
-    /// ```python
-    /// environment_group(
-    ///     name = "jdk",
-    ///     environments = [":jdk8", ":jdk11", ":jdk17"],
-    ///     defaults = [":jdk17"],
-    /// )
-    /// ```
-    ///
-    /// See: https://bazel.build/reference/be/general#environment_group
+    /// `environment_group` was removed in Bazel 9. Loaded as a stub target so
+    /// the diagnostic surfaces during analysis with full target context;
+    /// see Plan 27 (`thoughts/shared/plans/kuro-bazel-subplans/27-...md`).
     fn environment_group<'v>(
         #[starlark(require = named)] name: &str,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        environments: UnpackListOrTuple<String>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        defaults: UnpackListOrTuple<String>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
         #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let internals = ModuleInternals::from_context(eval, "environment_group")?;
-        let coercion_ctx = internals.attr_coercion_context();
-
-        let mut attrs = Vec::new();
-
-        // Coerce environments
-        let list_type = AttrType::list(AttrType::string());
-        let envs_value = eval.heap().alloc(environments.items);
-        let coerced_envs = list_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, envs_value)?;
-        attrs.push(("environments".to_owned(), coerced_envs));
-
-        // Coerce defaults
-        let defaults_value = eval.heap().alloc(defaults.items);
-        let coerced_defaults =
-            list_type.coerce(AttrIsConfigurable::Yes, coercion_ctx, defaults_value)?;
-        attrs.push(("defaults".to_owned(), coerced_defaults));
-
-        let target_node = create_native_target_node(
-            rule_defs::ENVIRONMENT_GROUP_RULE.clone(),
-            internals.package(),
+        register_removed_rule(
+            rule_defs::REMOVED_ENVIRONMENT_GROUP_RULE.clone(),
+            "environment_group",
             name,
-            attrs,
-            &extract_visibility_strings(visibility),
-            internals.attr_coercion_context(),
-            &internals.default_visibility(),
-        )?;
-
-        internals.record(target_node)?;
-        Ok(NoneType)
+            visibility,
+            eval,
+        )
     }
 
     /// Stub xcode_config rule for non-Apple platforms.

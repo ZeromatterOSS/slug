@@ -68,6 +68,7 @@ use kuro_node::attrs::configured_attr::ConfiguredAttr;
 use kuro_node::attrs::inspect_options::AttrInspectOptions;
 use kuro_node::nodes::configured::ConfiguredTargetNodeRef;
 use kuro_node::rule_type::NativeRuleKind;
+use kuro_node::rule_type::RemovedNativeRule;
 use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
 use starlark::values::FrozenValueOfUnchecked;
@@ -161,22 +162,31 @@ pub fn analyze_native_rule(
         NativeRuleKind::CcTest => create_cc_analysis_result(target, Some(configured_node)),
         NativeRuleKind::TestSuite => analyze_test_suite(target, dep_analysis),
         NativeRuleKind::Toolchain => analyze_toolchain(target, configured_node, dep_analysis),
-        NativeRuleKind::ShLibrary => analyze_sh_library(target, configured_node, dep_analysis),
-        NativeRuleKind::ShBinary => analyze_sh_binary(target, configured_node),
-        NativeRuleKind::ShTest => analyze_sh_test(target, configured_node),
         NativeRuleKind::CcLibcTopAlias => create_minimal_analysis_result(target),
         NativeRuleKind::AnalysisTest => analyze_analysis_test(target),
         NativeRuleKind::Genquery => analyze_genquery(target),
-        NativeRuleKind::ExecutionPlatform => analyze_execution_platform(target, dep_analysis),
-        NativeRuleKind::ExecutionPlatforms => analyze_execution_platforms(target, dep_analysis),
         NativeRuleKind::StarlarkDocExtract => analyze_genquery(target), // stub: empty output file
         NativeRuleKind::CcToolchain => create_minimal_analysis_result(target),
         NativeRuleKind::CcToolchainSuite => create_minimal_analysis_result(target),
         NativeRuleKind::CcImport => create_cc_analysis_result(target, Some(configured_node)),
         NativeRuleKind::CcSharedLibrary => create_cc_analysis_result(target, Some(configured_node)),
-        NativeRuleKind::EnvironmentGroup => create_minimal_analysis_result(target),
         NativeRuleKind::XcodeConfig => analyze_xcode_config(target),
+        NativeRuleKind::Removed(removed) => analyze_removed_rule(target, *removed),
     }
+}
+
+/// Analyze a Bazel-9-removed native rule. Returns a Bazel-shaped diagnostic.
+/// See Plan 27 (`thoughts/shared/plans/kuro-bazel-subplans/27-...md`).
+fn analyze_removed_rule(
+    target: &ConfiguredTargetLabel,
+    removed: RemovedNativeRule,
+) -> kuro_error::Result<AnalysisResult> {
+    Err(kuro_error::kuro_error!(
+        kuro_error::ErrorTag::Input,
+        "{message}\n  in target {target}",
+        message = removed.diagnostic_message(),
+        target = target,
+    ))
 }
 
 /// Analyze a genrule target.
@@ -983,55 +993,6 @@ fn analyze_platform(
     make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
-/// Analyze an `sh_library` target.
-///
-/// Returns DefaultInfo with all `srcs` source files as default_outputs.
-/// Behaves like filegroup but for shell scripts.
-fn analyze_sh_library(
-    target: &ConfiguredTargetLabel,
-    configured_node: ConfiguredTargetNodeRef<'_>,
-    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
-) -> kuro_error::Result<AnalysisResult> {
-    let heap = FrozenHeap::new();
-    let mut source_outputs: Vec<FrozenValue> = Vec::new();
-    let pkg = target.pkg();
-
-    if let Some(srcs_attr) = configured_node.get("srcs", AttrInspectOptions::All) {
-        collect_source_files_from_configured_attr(
-            &srcs_attr.value,
-            &pkg,
-            &heap,
-            &mut source_outputs,
-        );
-    }
-
-    // Also merge outputs from dep analysis
-    let mut all_outputs = source_outputs;
-    for (_dep_label, dep_result) in &dep_analysis {
-        if let Ok(providers_ref) = dep_result.providers() {
-            let collection: &FrozenProviderCollection = providers_ref.value().as_ref();
-            if let Some(default_info) = collection.builtin_provider::<FrozenDefaultInfo>() {
-                for artifact in default_info.default_outputs() {
-                    all_outputs.push(heap.alloc(artifact));
-                }
-            }
-        }
-    }
-
-    let default_info = if all_outputs.is_empty() {
-        FrozenDefaultInfo::testing_empty(&heap)
-    } else {
-        FrozenDefaultInfo::with_outputs(&heap, all_outputs)
-    };
-
-    let providers = SmallMap::from_iter([(
-        DefaultInfoCallable::provider_id().dupe(),
-        default_info.to_frozen_value(),
-    )]);
-
-    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
-}
-
 /// Analyze a `test_suite` target.
 ///
 /// A test_suite groups multiple test targets under a single label.
@@ -1043,91 +1004,6 @@ fn analyze_test_suite(
     _dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
 ) -> kuro_error::Result<AnalysisResult> {
     create_minimal_analysis_result(target)
-}
-
-/// Analyze an `sh_binary` target.
-///
-/// Returns DefaultInfo with the first source file as both a default output and the executable.
-/// The shell script is used directly as the executable (it must have +x bits set).
-fn analyze_sh_binary(
-    target: &ConfiguredTargetLabel,
-    configured_node: ConfiguredTargetNodeRef<'_>,
-) -> kuro_error::Result<AnalysisResult> {
-    let heap = FrozenHeap::new();
-    let pkg = target.pkg();
-    let mut source_outputs: Vec<FrozenValue> = Vec::new();
-
-    if let Some(srcs_attr) = configured_node.get("srcs", AttrInspectOptions::All) {
-        collect_source_files_from_configured_attr(
-            &srcs_attr.value,
-            &pkg,
-            &heap,
-            &mut source_outputs,
-        );
-    }
-
-    let default_info = if let Some(&first_src) = source_outputs.first() {
-        FrozenDefaultInfo::with_executable(&heap, first_src)
-    } else {
-        FrozenDefaultInfo::testing_empty(&heap)
-    };
-
-    let providers = SmallMap::from_iter([(
-        DefaultInfoCallable::provider_id().dupe(),
-        default_info.to_frozen_value(),
-    )]);
-
-    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
-}
-
-/// Analyze an `sh_test` target.
-///
-/// Like `sh_binary` but also includes `ExternalRunnerTestInfo` so that
-/// `kuro test //:foo_sh_test` works.
-fn analyze_sh_test(
-    target: &ConfiguredTargetLabel,
-    configured_node: ConfiguredTargetNodeRef<'_>,
-) -> kuro_error::Result<AnalysisResult> {
-    let heap = FrozenHeap::new();
-    let pkg = target.pkg();
-    let mut source_outputs: Vec<FrozenValue> = Vec::new();
-
-    if let Some(srcs_attr) = configured_node.get("srcs", AttrInspectOptions::All) {
-        collect_source_files_from_configured_attr(
-            &srcs_attr.value,
-            &pkg,
-            &heap,
-            &mut source_outputs,
-        );
-    }
-
-    let (default_info, test_command_fv) = if let Some(&first_src) = source_outputs.first() {
-        let di = FrozenDefaultInfo::with_executable(&heap, first_src);
-        // Command uses bash as interpreter so the script doesn't need +x bits.
-        let bash_str = heap.alloc("bash");
-        let cmd_list = heap.alloc(starlark::values::list::AllocList([bash_str, first_src]));
-        (di, cmd_list)
-    } else {
-        let di = FrozenDefaultInfo::testing_empty(&heap);
-        let empty_list = heap.alloc(starlark::values::list::AllocList::EMPTY);
-        (di, empty_list)
-    };
-
-    let test_info = create_frozen_sh_test_info(&heap, test_command_fv);
-    let test_info_fv = heap.alloc(test_info);
-
-    let providers = SmallMap::from_iter([
-        (
-            DefaultInfoCallable::provider_id().dupe(),
-            default_info.to_frozen_value(),
-        ),
-        (
-            FrozenExternalRunnerTestInfo::builtin_provider_id().dupe(),
-            test_info_fv,
-        ),
-    ]);
-
-    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Analyze an `analysis_test` target created by `testing.analysis_test()`.
@@ -1258,100 +1134,6 @@ fn make_native_analysis_result(
         num_declared_artifacts,
         None,
     ))
-}
-
-/// Analyze an execution_platform target.
-/// Returns DefaultInfo + ExecutionPlatformInfo derived from the `platform` dep.
-fn analyze_execution_platform(
-    target: &ConfiguredTargetLabel,
-    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
-) -> kuro_error::Result<AnalysisResult> {
-    let heap = FrozenHeap::new();
-
-    // Extract constraint data and exec_properties from the `platform` dep's PlatformInfo.
-    let mut constraint_pairs: Vec<(
-        kuro_core::target::label::label::TargetLabel,
-        kuro_core::provider::label::ProvidersLabel,
-    )> = Vec::new();
-    let mut exec_properties: Vec<(String, String)> = Vec::new();
-
-    for (_dep_label, dep_result) in &dep_analysis {
-        if let Ok(providers) = dep_result.providers() {
-            if let Some(platform_info) = providers.value().builtin_provider::<FrozenPlatformInfo>()
-            {
-                if let Ok(config_data) = platform_info.to_configuration() {
-                    if let Ok(data) = config_data.data() {
-                        for (ck, cv) in &data.constraints {
-                            constraint_pairs.push((ck.key.dupe(), cv.0.dupe()));
-                        }
-                    }
-                }
-                exec_properties = platform_info.exec_properties_entries();
-                break;
-            }
-        }
-    }
-
-    let default_info = FrozenDefaultInfo::testing_empty(&heap);
-
-    // Create ExecutionPlatformInfo from constraint data + exec_properties
-    let exec_platform_info = FrozenExecutionPlatformInfo::for_native_execution_platform(
-        target.unconfigured().dupe(),
-        &constraint_pairs,
-        &exec_properties,
-        &heap,
-    );
-
-    let mut providers = SmallMap::from_iter([(
-        DefaultInfoCallable::provider_id().dupe(),
-        default_info.to_frozen_value(),
-    )]);
-    providers.insert(
-        FrozenExecutionPlatformInfo::builtin_provider_id().dupe(),
-        exec_platform_info,
-    );
-
-    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
-}
-
-/// Analyze an execution_platforms target.
-/// Returns DefaultInfo + ExecutionPlatformRegistrationInfo with the actual platforms.
-fn analyze_execution_platforms(
-    target: &ConfiguredTargetLabel,
-    dep_analysis: Vec<(&ConfiguredTargetLabel, AnalysisResult)>,
-) -> kuro_error::Result<AnalysisResult> {
-    let heap = FrozenHeap::new();
-
-    let default_info = FrozenDefaultInfo::testing_empty(&heap);
-
-    // Collect ExecutionPlatformInfo frozen values from each dep by importing dep heaps
-    let mut platform_frozen_values: Vec<FrozenValue> = Vec::new();
-    for (_dep_label, dep_result) in &dep_analysis {
-        if let Ok(providers) = dep_result.providers() {
-            // Import dep heap into our heap so we can reference values from it
-            let imported = providers.add_heap_ref(&heap);
-            if let Some(typed) = imported.builtin_provider_value::<FrozenExecutionPlatformInfo>() {
-                platform_frozen_values.push(typed.to_frozen_value());
-            }
-        }
-    }
-
-    // Build ExecutionPlatformRegistrationInfo with the collected platforms
-    let registration_info = FrozenExecutionPlatformRegistrationInfo::create_with_platforms(
-        platform_frozen_values,
-        &heap,
-    );
-
-    let mut providers = SmallMap::from_iter([(
-        DefaultInfoCallable::provider_id().dupe(),
-        default_info.to_frozen_value(),
-    )]);
-    providers.insert(
-        FrozenExecutionPlatformRegistrationInfo::builtin_provider_id().dupe(),
-        registration_info,
-    );
-
-    make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
 }
 
 /// Analyze a toolchain() target.

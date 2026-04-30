@@ -1,12 +1,10 @@
 """Test rules for native_rules tests."""
 
-
 def _write_list_impl(ctx):
     """Writes a list of strings to an output file, one per line."""
     out = ctx.actions.declare_file(ctx.label.name + ".txt")
     ctx.actions.write(out, "\n".join(ctx.attr.items) + "\n")
     return [DefaultInfo(default_output = out)]
-
 
 write_list = rule(
     implementation = _write_list_impl,
@@ -14,7 +12,6 @@ write_list = rule(
         "items": attr.string_list(default = []),
     },
 )
-
 
 def _collect_files_impl(ctx):
     """Collects files from deps and writes their names to an output file."""
@@ -25,7 +22,6 @@ def _collect_files_impl(ctx):
     ctx.actions.write(out, "\n".join(sorted(names)) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 collect_files = rule(
     implementation = _collect_files_impl,
     attrs = {
@@ -33,13 +29,11 @@ collect_files = rule(
     },
 )
 
-
 def _select_value_impl(ctx):
     """Writes the selected string value to an output file."""
     out = ctx.actions.declare_file(ctx.label.name + ".txt")
     ctx.actions.write(out, ctx.attr.value + "\n")
     return [DefaultInfo(default_output = out)]
-
 
 select_value = rule(
     implementation = _select_value_impl,
@@ -48,12 +42,13 @@ select_value = rule(
     },
 )
 
-
 def _sibling_file_impl(ctx):
     """Declares a file relative to a sibling artifact's directory."""
+
     # First declare a file in a subdirectory
     original = ctx.actions.declare_file("subdir/" + ctx.label.name + "_original.txt")
     ctx.actions.write(original, "original\n")
+
     # Now declare a sibling file in the same directory
     sibling_out = ctx.actions.declare_file(ctx.label.name + "_sibling.txt", sibling = original)
     ctx.actions.write(sibling_out, "sibling\n")
@@ -62,12 +57,10 @@ def _sibling_file_impl(ctx):
         files = depset([original, sibling_out]),
     )]
 
-
 sibling_file = rule(
     implementation = _sibling_file_impl,
     attrs = {},
 )
-
 
 def _stamp_file_info_impl(ctx):
     """Tests that ctx.info_file and ctx.version_file return File-like objects."""
@@ -88,12 +81,10 @@ def _stamp_file_info_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 stamp_file_info = rule(
     implementation = _stamp_file_info_impl,
     attrs = {},
 )
-
 
 def _run_env_info_impl(ctx):
     """Tests that RunEnvironmentInfo returns a proper provider."""
@@ -110,15 +101,14 @@ def _run_env_info_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out), env_info]
 
-
 run_env_info = rule(
     implementation = _run_env_info_impl,
     attrs = {},
 )
 
-
 def _cc_configure_features_test_impl(ctx):
     """Tests that cc_common.configure_features() respects requested/unsupported features."""
+
     # Default configuration
     default_fc = cc_common.configure_features(cc_toolchain = None, ctx = ctx)
 
@@ -155,12 +145,10 @@ def _cc_configure_features_test_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 cc_configure_features_test = rule(
     implementation = _cc_configure_features_test_impl,
     attrs = {},
 )
-
 
 def _cc_linker_input_test_impl(ctx):
     """Tests that cc_common.create_linker_input() preserves user_link_flags."""
@@ -179,12 +167,10 @@ def _cc_linker_input_test_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 cc_linker_input_test = rule(
     implementation = _cc_linker_input_test_impl,
     attrs = {},
 )
-
 
 def _cc_link_test_impl(ctx):
     """Tests that cc_common.link() is callable and returns CcLinkingOutputs."""
@@ -205,12 +191,10 @@ def _cc_link_test_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 cc_link_test = rule(
     implementation = _cc_link_test_impl,
     attrs = {},
 )
-
 
 def _cc_compilation_context_test_impl(ctx):
     """Tests that cc_common.create_compilation_context() creates proper contexts."""
@@ -234,15 +218,14 @@ def _cc_compilation_context_test_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 cc_compilation_context_test = rule(
     implementation = _cc_compilation_context_test_impl,
     attrs = {},
 )
 
-
 def _cc_merge_infos_test_impl(ctx):
     """Tests that cc_common.merge_cc_infos() merges CcInfo providers."""
+
     # Create two CcInfo instances with compilation contexts
     comp_ctx1 = cc_common.create_compilation_context(
         headers = depset([]),
@@ -277,12 +260,10 @@ def _cc_merge_infos_test_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 cc_merge_infos_test = rule(
     implementation = _cc_merge_infos_test_impl,
     attrs = {},
 )
-
 
 def _existing_rules_test_impl(ctx):
     """Writes existing_rules info captured at load time."""
@@ -290,14 +271,12 @@ def _existing_rules_test_impl(ctx):
     ctx.actions.write(out, "\n".join(ctx.attr.items) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 existing_rules_test = rule(
     implementation = _existing_rules_test_impl,
     attrs = {
         "items": attr.string_list(default = []),
     },
 )
-
 
 def capture_existing_rules(name):
     """Macro that captures native.existing_rules() and writes the info."""
@@ -326,35 +305,29 @@ def capture_existing_rules(name):
         items = items,
     )
 
-
 # Verify that hasattr(native, "starlark_doc_extract") returns True
 # This is critical for rules_python IS_BAZEL_7_OR_HIGHER detection.
 HAS_STARLARK_DOC_EXTRACT = hasattr(native, "starlark_doc_extract")
 if not HAS_STARLARK_DOC_EXTRACT:
     fail("hasattr(native, 'starlark_doc_extract') must be True for Bazel 7+ compat")
 
-
 def _bool_setting_impl(ctx):
     """A boolean build setting (no output)."""
     return []
-
 
 bool_flag = rule(
     implementation = _bool_setting_impl,
     build_setting = config.bool(flag = True),
 )
 
-
 def _string_setting_impl(ctx):
     """A string build setting (no output)."""
     return []
-
 
 string_flag = rule(
     implementation = _string_setting_impl,
     build_setting = config.string(flag = True),
 )
-
 
 def _cc_command_line_test_impl(ctx):
     """Tests cc_common.get_tool_for_action() and get_memory_inefficient_command_line()."""
@@ -408,12 +381,10 @@ def _cc_command_line_test_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 cc_command_line_test = rule(
     implementation = _cc_command_line_test_impl,
     attrs = {},
 )
-
 
 def _java_common_test_impl(ctx):
     """Tests that java_common module is available and has expected attributes."""
@@ -458,12 +429,10 @@ def _java_common_test_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 java_common_test = rule(
     implementation = _java_common_test_impl,
     attrs = {},
 )
-
 
 def _int_values_test_impl(ctx):
     """Tests that attr.int(values=[...]) constraint works."""
@@ -478,9 +447,7 @@ int_values_test = rule(
     },
 )
 
-
 MyInfo = provider(fields = ["value"])
-
 
 def _provides_valid_impl(ctx):
     """A rule that declares and returns the required provider."""
@@ -488,13 +455,11 @@ def _provides_valid_impl(ctx):
     ctx.actions.write(out, "ok\n")
     return [DefaultInfo(default_output = out), MyInfo(value = "hello")]
 
-
 provides_valid_rule = rule(
     implementation = _provides_valid_impl,
     provides = [MyInfo],
     attrs = {},
 )
-
 
 def _provides_missing_impl(ctx):
     """A rule that declares MyInfo in provides but does NOT return it."""
@@ -502,13 +467,11 @@ def _provides_missing_impl(ctx):
     ctx.actions.write(out, "missing provider\n")
     return [DefaultInfo(default_output = out)]
 
-
 provides_missing_rule = rule(
     implementation = _provides_missing_impl,
     provides = [MyInfo],
     attrs = {},
 )
-
 
 def _executable_rule_impl(ctx):
     """Tests that rule(executable=True) provides ctx.outputs.executable."""
@@ -519,13 +482,11 @@ def _executable_rule_impl(ctx):
         executable = exe,
     )]
 
-
 executable_rule = rule(
     implementation = _executable_rule_impl,
     executable = True,
     attrs = {},
 )
-
 
 def _non_executable_rule_impl(ctx):
     """A rule without executable=True for comparison."""
@@ -533,20 +494,20 @@ def _non_executable_rule_impl(ctx):
     ctx.actions.write(out, "not executable\n")
     return [DefaultInfo(default_output = out)]
 
-
 non_executable_rule = rule(
     implementation = _non_executable_rule_impl,
     attrs = {},
 )
 
-
 def _exec_groups_test_impl(ctx):
     """Tests that rule(exec_groups={...}) is accepted and ctx.exec_groups works."""
     out = ctx.actions.declare_file(ctx.label.name + ".txt")
+
     # Access exec_groups dict
     eg = ctx.exec_groups
     has_compile = "compile" in eg
     has_link = "link" in eg
+
     # Access toolchains within an exec group
     compile_group = eg["compile"]
     has_toolchains = hasattr(compile_group, "toolchains")
@@ -558,7 +519,6 @@ def _exec_groups_test_impl(ctx):
     ]
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
-
 
 exec_groups_test = rule(
     implementation = _exec_groups_test_impl,
@@ -573,7 +533,6 @@ exec_groups_test = rule(
     attrs = {},
 )
 
-
 def _fragments_test_impl(ctx):
     """Tests that rule(fragments=[...]) is accepted and ctx.fragments works."""
     out = ctx.actions.declare_file(ctx.label.name + ".txt")
@@ -587,13 +546,11 @@ def _fragments_test_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 fragments_test = rule(
     implementation = _fragments_test_impl,
     fragments = ["cpp"],
     attrs = {},
 )
-
 
 def _nonempty_deps_test_impl(ctx):
     """Tests that allow_empty=False on label_list is enforced."""
@@ -602,7 +559,6 @@ def _nonempty_deps_test_impl(ctx):
     ctx.actions.write(out, ",".join(names) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 nonempty_deps_test = rule(
     implementation = _nonempty_deps_test_impl,
     attrs = {
@@ -610,13 +566,11 @@ nonempty_deps_test = rule(
     },
 )
 
-
 def _nonempty_strings_test_impl(ctx):
     """Tests that allow_empty=False on string_list is enforced."""
     out = ctx.actions.declare_file(ctx.label.name + ".txt")
     ctx.actions.write(out, ",".join(ctx.attr.items) + "\n")
     return [DefaultInfo(default_output = out)]
-
 
 nonempty_strings_test = rule(
     implementation = _nonempty_strings_test_impl,
@@ -625,14 +579,15 @@ nonempty_strings_test = rule(
     },
 )
 
-
 # === rule(initializer=...) test ===
 
 def _initializer_test_initializer(**kwargs):
     """Transforms attributes before target creation."""
+
     # Convert stamp bool -> int (like rules_cc cc_test does)
     if "stamp" in kwargs and type(kwargs["stamp"]) == type(True):
         kwargs["stamp"] = 1 if kwargs["stamp"] else 0
+
     # Add a prefix to the message if not already present
     if "message" in kwargs and not kwargs["message"].startswith("INIT:"):
         kwargs["message"] = "INIT:" + kwargs["message"]
@@ -657,7 +612,6 @@ initializer_test = rule(
     },
 )
 
-
 def _build_config_test_impl(ctx):
     """Writes build configuration values to an output file."""
     out = ctx.actions.declare_file(ctx.label.name + ".txt")
@@ -673,7 +627,6 @@ build_config_test = rule(
     implementation = _build_config_test_impl,
     attrs = {},
 )
-
 
 def _instrumented_files_test_impl(ctx):
     """Tests coverage_common.instrumented_files_info() with source files."""
@@ -699,7 +652,6 @@ def _instrumented_files_test_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 instrumented_files_test = rule(
     implementation = _instrumented_files_test_impl,
     attrs = {
@@ -707,7 +659,6 @@ instrumented_files_test = rule(
         "deps": attr.label_list(),
     },
 )
-
 
 def _instrumented_files_empty_test_impl(ctx):
     """Tests coverage_common.instrumented_files_info() with no args."""
@@ -722,12 +673,10 @@ def _instrumented_files_empty_test_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 instrumented_files_empty_test = rule(
     implementation = _instrumented_files_empty_test_impl,
     attrs = {},
 )
-
 
 # === is_tool_configuration test ===
 
@@ -743,12 +692,10 @@ def _is_tool_configuration_test_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 is_tool_configuration_test = rule(
     implementation = _is_tool_configuration_test_impl,
     attrs = {},
 )
-
 
 # === ctx.split_attr test ===
 
@@ -779,14 +726,12 @@ def _split_attr_test_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 split_attr_test = rule(
     implementation = _split_attr_test_impl,
     attrs = {
         "message": attr.string(default = "hello_split"),
     },
 )
-
 
 def _resolve_command_test_impl(ctx):
     """Tests ctx.resolve_command() returns a 3-tuple (inputs, command, input_manifests)."""
@@ -811,29 +756,27 @@ def _resolve_command_test_impl(ctx):
     ctx.actions.write(out, "resolve_command_ok")
     return [DefaultInfo(default_output = out)]
 
-
 resolve_command_test = rule(
     implementation = _resolve_command_test_impl,
     attrs = {},
 )
 
-
 def _new_file_test_impl(ctx):
     """Tests ctx.new_file() creates a declared artifact."""
     f = ctx.new_file(ctx.label.name + "_output.txt")
+
     # f should be a declared artifact that we can write to
     ctx.actions.write(f, "new_file_ok")
     return [DefaultInfo(default_output = f)]
-
 
 new_file_test = rule(
     implementation = _new_file_test_impl,
     attrs = {},
 )
 
-
 def _java_toolchain_test_impl(ctx):
     """Tests that Java toolchain stubs provide expected attributes."""
+
     # Test Java toolchain lookup
     java_tc_wrapper = ctx.toolchains["@rules_java//java:toolchain_type"]
     results = []
@@ -862,12 +805,10 @@ def _java_toolchain_test_impl(ctx):
     ctx.actions.write(out, "\n".join(results) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 java_toolchain_test = rule(
     implementation = _java_toolchain_test_impl,
     attrs = {},
 )
-
 
 def _constraint_provider_test_impl(ctx):
     """Tests that ConstraintSettingInfo and ConstraintValueInfo are callable."""
@@ -890,25 +831,22 @@ def _constraint_provider_test_impl(ctx):
     ctx.actions.write(out, "\n".join(results) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 constraint_provider_test = rule(
     implementation = _constraint_provider_test_impl,
     attrs = {},
 )
 
-
 def _actions_fail_test_impl(ctx):
     """Tests ctx.actions.fail() raises an error at analysis time."""
     ctx.actions.fail("unsupported platform")
+
     # Should not reach here
     return [DefaultInfo()]
-
 
 actions_fail_test = rule(
     implementation = _actions_fail_test_impl,
     attrs = {},
 )
-
 
 def _provider_callable_test_impl(ctx):
     """Tests that DebugPackageInfo and CcSharedLibraryInfo are callable providers."""
@@ -935,12 +873,10 @@ def _provider_callable_test_impl(ctx):
     ctx.actions.write(out, "\n".join(results) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 provider_callable_test = rule(
     implementation = _provider_callable_test_impl,
     attrs = {},
 )
-
 
 def _write_file_test_impl(ctx):
     """Tests ctx.actions.write_file() Bazel-compatible alias."""
@@ -950,12 +886,10 @@ def _write_file_test_impl(ctx):
     )
     return [DefaultInfo(default_output = out)]
 
-
 write_file_test = rule(
     implementation = _write_file_test_impl,
     attrs = {},
 )
-
 
 def _write_file_executable_test_impl(ctx):
     """Tests ctx.actions.write_file() with is_executable=True."""
@@ -966,12 +900,10 @@ def _write_file_executable_test_impl(ctx):
     )
     return [DefaultInfo(default_output = out)]
 
-
 write_file_executable_test = rule(
     implementation = _write_file_executable_test_impl,
     attrs = {},
 )
-
 
 def _do_nothing_test_impl(ctx):
     """Tests ctx.actions.do_nothing() binds outputs correctly."""
@@ -982,12 +914,10 @@ def _do_nothing_test_impl(ctx):
 
     return [DefaultInfo(default_output = out)]
 
-
 do_nothing_test = rule(
     implementation = _do_nothing_test_impl,
     attrs = {},
 )
-
 
 def _do_nothing_binds_test_impl(ctx):
     """Tests ctx.actions.do_nothing() actually binds the output artifact."""
@@ -1001,12 +931,10 @@ def _do_nothing_binds_test_impl(ctx):
 
     return [DefaultInfo(default_output = out)]
 
-
 do_nothing_binds_test = rule(
     implementation = _do_nothing_binds_test_impl,
     attrs = {},
 )
-
 
 def _cc_toolchain_config_info_test_impl(ctx):
     """Tests cc_common.create_cc_toolchain_config_info() creates a provider."""
@@ -1040,15 +968,14 @@ def _cc_toolchain_config_info_test_impl(ctx):
     ctx.actions.write(out, "cc_toolchain_config_info: ok\n")
     return [DefaultInfo(default_output = out)]
 
-
 cc_toolchain_config_info_test = rule(
     implementation = _cc_toolchain_config_info_test_impl,
     attrs = {},
 )
 
-
 def _tokenize_test_impl(ctx):
     """Tests ctx.tokenize() splits shell command strings."""
+
     # Test basic tokenization
     tokens = ctx.tokenize("hello world")
     if tokens != ["hello", "world"]:
@@ -1078,12 +1005,10 @@ def _tokenize_test_impl(ctx):
     ctx.actions.write(out, "tokenize: ok\n")
     return [DefaultInfo(default_output = out)]
 
-
 tokenize_test = rule(
     implementation = _tokenize_test_impl,
     attrs = {},
 )
-
 
 def _files_to_run_test_impl(ctx):
     """Tests DefaultInfo.files_to_run attribute."""
@@ -1107,7 +1032,6 @@ def _files_to_run_test_impl(ctx):
     ctx.actions.write(out, "files_to_run: ok\n")
     return [DefaultInfo(default_output = out)]
 
-
 files_to_run_test = rule(
     implementation = _files_to_run_test_impl,
     attrs = {
@@ -1115,9 +1039,9 @@ files_to_run_test = rule(
     },
 )
 
-
 def _merge_compilation_contexts_test_impl(ctx):
     """Test cc_common.merge_compilation_contexts()."""
+
     # Create two compilation contexts with different includes/defines
     ctx1 = cc_common.create_compilation_context(
         includes = depset(["inc1"]),
@@ -1159,12 +1083,10 @@ def _merge_compilation_contexts_test_impl(ctx):
     ctx.actions.write(out, "merge_compilation_contexts: ok\n")
     return [DefaultInfo(default_output = out)]
 
-
 merge_compilation_contexts_test = rule(
     implementation = _merge_compilation_contexts_test_impl,
     attrs = {},
 )
-
 
 def _built_in_include_dirs_test_impl(ctx):
     """Test cc_toolchain.built_in_include_directories attribute."""
@@ -1188,16 +1110,15 @@ def _built_in_include_dirs_test_impl(ctx):
     ctx.actions.write(out, "built_in_include_dirs: %s\n" % str(dirs))
     return [DefaultInfo(default_output = out)]
 
-
 built_in_include_dirs_test = rule(
     implementation = _built_in_include_dirs_test_impl,
     attrs = {},
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
 )
 
-
 def _merge_cc_infos_full_test_impl(ctx):
     """Test that merge_cc_infos preserves all include types."""
+
     # Create CcInfo with quote_includes and system_includes
     ctx1 = cc_common.create_compilation_context(
         quote_includes = depset(["qi_a"]),
@@ -1232,15 +1153,14 @@ def _merge_cc_infos_full_test_impl(ctx):
     ctx.actions.write(out, "merge_cc_infos_full: ok\n")
     return [DefaultInfo(default_output = out)]
 
-
 merge_cc_infos_full_test = rule(
     implementation = _merge_cc_infos_full_test_impl,
     attrs = {},
 )
 
-
 def _resolve_command_tools_test_impl(ctx):
     """Test ctx.resolve_command() with tools param collects tool files as inputs."""
+
     # Basic resolve_command without expansion
     inputs, command, manifests = ctx.resolve_command(command = "echo hello")
     if len(command) != 1:
@@ -1258,7 +1178,6 @@ def _resolve_command_tools_test_impl(ctx):
     ctx.actions.write(out, "resolve_command_tools: ok\n")
     return [DefaultInfo(default_output = out)]
 
-
 resolve_command_tools_test = rule(
     implementation = _resolve_command_tools_test_impl,
     attrs = {
@@ -1266,10 +1185,10 @@ resolve_command_tools_test = rule(
     },
 )
 
-
 def _write_mnemonic_test_impl(ctx):
     """Test actions.write() accepts mnemonic and execution_requirements params (Bazel 9)."""
     out = ctx.actions.declare_file(ctx.label.name + ".txt")
+
     # These params should be accepted without error
     ctx.actions.write(
         out,
@@ -1279,12 +1198,10 @@ def _write_mnemonic_test_impl(ctx):
     )
     return [DefaultInfo(default_output = out)]
 
-
 write_mnemonic_test = rule(
     implementation = _write_mnemonic_test_impl,
     attrs = {},
 )
-
 
 def _dir_ctx_files_impl(ctx):
     """Tests that dir(ctx.files) returns attribute names."""
@@ -1293,7 +1210,6 @@ def _dir_ctx_files_impl(ctx):
     ctx.actions.write(out, "\n".join(attrs) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 dir_ctx_files_rule = rule(
     implementation = _dir_ctx_files_impl,
     attrs = {
@@ -1301,7 +1217,6 @@ dir_ctx_files_rule = rule(
         "data": attr.label_list(allow_files = True, default = []),
     },
 )
-
 
 def _psi_test_impl(ctx):
     """Tests that PackageSpecificationInfo is callable and returns an instance."""
@@ -1314,12 +1229,10 @@ def _psi_test_impl(ctx):
     ctx.actions.write(out, "\n".join(lines) + "\n")
     return [DefaultInfo(default_output = out)]
 
-
 psi_test_rule = rule(
     implementation = _psi_test_impl,
     attrs = {},
 )
-
 
 def _macro_test_impl(name, greeting, visibility = None):
     """Implementation function for symbolic macro test."""
@@ -1330,10 +1243,67 @@ def _macro_test_impl(name, greeting, visibility = None):
         visibility = visibility,
     )
 
-
 macro_test = macro(
     implementation = _macro_test_impl,
     attrs = {
         "greeting": attr.string(default = "hello"),
+    },
+)
+
+# Starlark replacements for the (now Bazel-9-removed) native sh_binary,
+# sh_test, sh_library. Mirrors the deleted kuro `analyze_sh_*` semantics
+# so Plan 27.2 stub conversion does not regress these tests. Same shape as
+# `tests/e2e_util/nano_prelude/shell_rules.bzl`.
+
+def _sh_library_impl(ctx):
+    files = list(ctx.files.srcs)
+    for f in ctx.files.deps:
+        files.append(f)
+    return [DefaultInfo(default_outputs = files)]
+
+sh_library = rule(
+    implementation = _sh_library_impl,
+    attrs = {
+        "srcs": attr.label_list(allow_files = True, default = []),
+        "deps": attr.label_list(allow_files = True, default = []),
+        "data": attr.label_list(allow_files = True, default = []),
+    },
+)
+
+def _sh_binary_impl(ctx):
+    if not ctx.files.srcs:
+        return [DefaultInfo()]
+    first = ctx.files.srcs[0]
+    return [DefaultInfo(default_output = first)]
+
+sh_binary = rule(
+    implementation = _sh_binary_impl,
+    attrs = {
+        "srcs": attr.label_list(allow_files = True, default = []),
+        "deps": attr.label_list(allow_files = True, default = []),
+        "data": attr.label_list(allow_files = True, default = []),
+    },
+)
+
+def _sh_test_impl(ctx):
+    if not ctx.files.srcs:
+        return [
+            DefaultInfo(),
+            ExternalRunnerTestInfo(type = "sh", command = []),
+        ]
+    first = ctx.files.srcs[0]
+    return [
+        DefaultInfo(default_output = first),
+        ExternalRunnerTestInfo(type = "sh", command = ["bash", first]),
+    ]
+
+sh_test = rule(
+    implementation = _sh_test_impl,
+    test = True,
+    attrs = {
+        "srcs": attr.label_list(allow_files = True, default = []),
+        "deps": attr.label_list(allow_files = True, default = []),
+        "data": attr.label_list(allow_files = True, default = []),
+        "env": attr.string_dict(default = {}),
     },
 )

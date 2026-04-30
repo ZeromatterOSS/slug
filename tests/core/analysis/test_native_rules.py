@@ -762,9 +762,27 @@ async def test_cc_shared_library_builds(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
-async def test_environment_group_builds(buck: Buck) -> None:
-    """environment_group native rule can be parsed and analyzed."""
-    await buck.build("//:jdk_versions")
+async def test_environment_group_removed_in_bazel9(buck: Buck) -> None:
+    """environment_group is a Bazel-9-removed rule; loading succeeds but
+    analysis emits a Bazel-shaped removed-rule diagnostic. See Plan 27."""
+    with pytest.raises(Exception) as exc_info:
+        await buck.build("//:jdk_versions")
+    msg = str(exc_info.value)
+    assert "environment_group" in msg
+    assert "removed in Bazel 9" in msg
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_sh_binary_removed_without_load(buck: Buck) -> None:
+    """`sh_binary(...)` without a load fails with the removed-rule
+    diagnostic. The diagnostic includes the `@rules_shell` load hint so
+    users see how to migrate. See Plan 27.2."""
+    with pytest.raises(Exception) as exc_info:
+        await buck.build("//sh_removed:noload_sh_binary")
+    msg = str(exc_info.value)
+    assert "sh_binary" in msg
+    assert "removed in Bazel 9" in msg
+    assert "@rules_shell" in msg
 
 
 @buck_test(data_dir="test_native_rules_data")

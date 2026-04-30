@@ -1,0 +1,8 @@
+# Plan 27.2 negative test: native sh_binary without a load() must fail
+# with the removed-rule diagnostic at analysis time. The corresponding
+# positive test loads sh_binary from //:defs.bzl and lives in the parent
+# BUILD.bazel.
+sh_binary(
+    name = "noload_sh_binary",
+    srcs = ["script.sh"],
+)
