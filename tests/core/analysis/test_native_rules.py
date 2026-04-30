@@ -799,6 +799,23 @@ async def test_cc_library_removed_without_load(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_2_kuro_builtins_visible_in_external_bzl(buck: Buck) -> None:
+    """Plan 28.2 acceptance: a public symbol exported from
+    `@kuro_builtins//:exports.bzl` is visible in an external `.bzl` file
+    without an explicit `load()`. This fixture's MODULE.bazel does not
+    register a prelude, so the only injection path is the new
+    `bazel_builtins_autoload` (auto-registers `@kuro_builtins` as a
+    bundled cell + imports its public symbols into every env).
+    See `thoughts/shared/research/2026-04-30-plan-28-1-builtins-loader-spike.md`.
+    """
+    result = await buck.build("//:kuro_builtins_probe_target")
+    output = result.get_build_report().output_for_target(
+        "//:kuro_builtins_probe_target"
+    )
+    assert output.read_text().strip() == "kuro-28-2-loader-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_loaded_removed_rules_analyze_cleanly(buck: Buck) -> None:
     """Plan 27.5 readiness gate: a user `load()` shadows the BUILD-global
     removed-rule stub. Loaded sh_binary / sh_library / sh_test (from the

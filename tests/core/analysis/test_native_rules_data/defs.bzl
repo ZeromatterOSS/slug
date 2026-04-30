@@ -1,5 +1,22 @@
 """Test rules for native_rules tests."""
 
+# Plan 28.2 acceptance: `kuro_builtins_probe` is exported from
+# `@kuro_builtins//:exports.bzl` and auto-injected into every BUILD/.bzl
+# environment by `bazel_builtins_autoload`. This fixture's MODULE.bazel
+# does NOT register a prelude, so resolving the symbol here without a
+# load() proves that the loader works for Bazel-mode workspaces.
+_KURO_BUILTINS_OBSERVED = kuro_builtins_probe  # noqa: F821 — autoloaded
+
+def _kuro_builtins_probe_value_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, _KURO_BUILTINS_OBSERVED + "\n")
+    return [DefaultInfo(default_output = out)]
+
+kuro_builtins_probe_value = rule(
+    implementation = _kuro_builtins_probe_value_impl,
+    attrs = {},
+)
+
 def _write_list_impl(ctx):
     """Writes a list of strings to an output file, one per line."""
     out = ctx.actions.declare_file(ctx.label.name + ".txt")

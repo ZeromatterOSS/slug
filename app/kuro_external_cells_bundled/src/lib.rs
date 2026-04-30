@@ -55,6 +55,25 @@ const BAZEL_TOOLS: BundledCell = BundledCell {
     is_testing: false,
 };
 
+#[cfg(buck_build)]
+mod kuro_builtins {
+    include!("kuro_builtins/contents.rs");
+}
+
+#[cfg(not(buck_build))]
+mod kuro_builtins {
+    include!(concat!(env!("OUT_DIR"), "/kuro_builtins_include.rs"));
+}
+
+/// Plan 28 bundled-builtins cell. Ships `exports.bzl` whose public
+/// symbols are injected into every BUILD/`.bzl` file via the
+/// interpreter's `bazel_builtins_autoload`.
+const KURO_BUILTINS: BundledCell = BundledCell {
+    name: "kuro_builtins",
+    files: kuro_builtins::DATA,
+    is_testing: false,
+};
+
 #[cfg(not(buck_build))]
 mod local_config_platform {
     include!(concat!(
@@ -130,6 +149,7 @@ pub const fn get_bundled_data() -> &'static [BundledCell] {
     &[
         PRELUDE,
         BAZEL_TOOLS,
+        KURO_BUILTINS,
         LOCAL_CONFIG_PLATFORM,
         LOCAL_CONFIG_PYTHON,
         TEST_CELL,

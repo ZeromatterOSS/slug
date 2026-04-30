@@ -502,6 +502,18 @@ impl BuckConfigBasedCells {
                     tracing::info!("Auto-registered bundled cell: local_config_platform");
                 }
 
+                // Plan 28: auto-register @kuro_builtins for bzlmod projects.
+                // The cell ships exports.bzl whose public symbols are
+                // injected into every BUILD/.bzl by `bazel_builtins_autoload`.
+                let kb_name = CellName::unchecked_new("kuro_builtins")?;
+                if !cell_definitions.iter().any(|(n, _)| *n == kb_name) {
+                    let kb_path =
+                        CellRootPathBuf::new(ProjectRelativePath::new("kuro_builtins")?.to_owned());
+                    cell_definitions.push((kb_name, kb_path));
+                    bzlmod_bundled_cells.push(kb_name);
+                    tracing::info!("Auto-registered bundled cell: kuro_builtins");
+                }
+
                 // Auto-register @local_config_python for bzlmod projects that
                 // depend on rules_python. The bundled cell provides a host
                 // py_runtime + py_runtime_pair + toolchain() target so

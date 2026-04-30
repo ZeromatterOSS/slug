@@ -53,6 +53,21 @@ fn imp() -> io::Result<()> {
         std::fs::File::create(out_dir.join("bazel_tools_include.rs"))?,
     )?;
 
+    // Generate kuro_builtins bundled files (Plan 28). The @kuro_builtins
+    // cell ships an `exports.bzl` whose public symbols are auto-injected
+    // into every BUILD and `.bzl` file by the interpreter's
+    // `bazel_builtins_autoload`.
+    let kuro_builtins_path = project_root.join("kuro_builtins");
+    assert!(
+        kuro_builtins_path.join("exports.bzl").exists(),
+        "kuro_builtins/exports.bzl not found"
+    );
+    println!("cargo:rerun-if-changed={}", kuro_builtins_path.display());
+    write_include_file(
+        &kuro_builtins_path,
+        std::fs::File::create(out_dir.join("kuro_builtins_include.rs"))?,
+    )?;
+
     // Generate local_config_platform bundled files
     // This is a Bazel auto-generated repo providing HOST_CONSTRAINTS for the current platform.
     let local_config_platform_out = out_dir.join("local_config_platform_src");

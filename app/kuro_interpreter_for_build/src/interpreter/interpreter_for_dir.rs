@@ -167,6 +167,10 @@ pub(crate) struct InterpreterForDir {
     /// When set, cc_library/cc_binary/cc_test from rules_cc will be automatically
     /// imported into BUILD file environments, overriding native stubs.
     rules_cc_autoload: Option<OwnedStarlarkModulePath>,
+    /// Plan 28: autoload path for `@kuro_builtins//:exports.bzl`. Public
+    /// symbols from this bundled module are imported into every BUILD
+    /// and `.bzl` env regardless of prelude or workspace configuration.
+    bazel_builtins_autoload: Option<OwnedStarlarkModulePath>,
 }
 
 struct InterpreterLoadResolver {
@@ -339,6 +343,31 @@ impl InterpreterForDir {
             None
         };
 
+        // Plan 28: resolve the bundled `@kuro_builtins//:exports.bzl` once
+        // per InterpreterForDir. The cell is auto-registered by
+        // `kuro_common::legacy_configs::cells` for every bzlmod project,
+        // so the alias resolution below succeeds in every Bazel-mode
+        // workspace. For legacy non-bzlmod projects without
+        // `[external_cells] kuro_builtins = bundled` in `.buckconfig`,
+        // resolution returns None and the autoload is a no-op.
+        let bazel_builtins_autoload = cell_info
+            .cell_alias_resolver()
+            .resolve("kuro_builtins")
+            .ok()
+            .and_then(|_| {
+                parse_import(
+                    cell_info.cell_alias_resolver(),
+                    RelativeImports::Disallow,
+                    "@kuro_builtins//:exports.bzl",
+                )
+                .ok()
+                .and_then(|cell_path| {
+                    ImportPath::new_with_build_file_cells(cell_path, cell_info.name())
+                        .ok()
+                        .map(OwnedStarlarkModulePath::LoadFile)
+                })
+            });
+
         Ok(Self {
             global_state,
             cell_info,
@@ -348,6 +377,7 @@ impl InterpreterForDir {
             current_dir_with_allowed_relative_dirs,
             package_dir,
             rules_cc_autoload,
+            bazel_builtins_autoload,
         })
     }
 
@@ -368,6 +398,25 @@ impl InterpreterForDir {
             if let StarlarkPath::BuildFile(_) = starlark_path {
                 for (name, value) in prelude_env.extra_globals_from_prelude_for_buck_files()? {
                     env.set(name, value.to_value());
+                }
+            }
+        }
+
+        // Plan 28: import public symbols from `@kuro_builtins//:exports.bzl`.
+        // Skipped inside the kuro_builtins cell itself (an exports module
+        // can't import from itself). The matching `parse()` arm pushed
+        // this path into `implicit_imports`, so DICE has already loaded
+        // the module by the time we get here.
+        if let Some(OwnedStarlarkModulePath::LoadFile(builtins_path)) =
+            &self.bazel_builtins_autoload
+        {
+            let import_cell = starlark_path.path().cell();
+            if import_cell != builtins_path.path().cell() {
+                if let Some(builtins_env) = loaded_modules
+                    .map
+                    .get(&StarlarkModulePath::LoadFile(builtins_path))
+                {
+                    env.import_public_symbols(builtins_env.env());
                 }
             }
         }
@@ -513,6 +562,17 @@ impl InterpreterForDir {
         let mut implicit_imports = Vec::new();
         if let Some(i) = self.prelude_import(import) {
             implicit_imports.push(OwnedStarlarkModulePath::LoadFile(i.import_path().clone()));
+        }
+        // Plan 28: autoload @kuro_builtins for both BUILD and .bzl paths,
+        // EXCEPT inside the kuro_builtins cell itself (a bundled .bzl
+        // can't load itself). Fires for every cell and every file kind.
+        if let Some(OwnedStarlarkModulePath::LoadFile(ref builtins_path)) =
+            self.bazel_builtins_autoload
+        {
+            let import_cell = import.path().cell();
+            if import_cell != builtins_path.path().cell() {
+                implicit_imports.push(OwnedStarlarkModulePath::LoadFile(builtins_path.clone()));
+            }
         }
         if let StarlarkPath::BuildFile(build_file) = import {
             if let Some(i) = self.package_import(build_file) {

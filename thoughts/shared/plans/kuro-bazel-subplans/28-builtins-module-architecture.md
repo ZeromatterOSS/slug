@@ -193,7 +193,51 @@ required context without relying on the prelude-only injection path.
   not request it.
 - The prototype does not require workspace files or network access.
 
-## Phase 28.2: Bundled Builtins Loader
+## Phase 28.2: Bundled Builtins Loader  [DONE 2026-04-30]
+
+### Status
+
+Loader landed end-to-end:
+
+- New top-level `kuro_builtins/` directory ships an `exports.bzl`
+  entry-point (kept minimal — single probe symbol) plus an empty
+  `BUILD.bazel`.
+- `app/kuro_external_cells_bundled/build.rs` and `lib.rs` register the
+  contents as bundled cell `KURO_BUILTINS`. `get_bundled_data()`
+  returns it alongside `prelude` / `bazel_tools` /
+  `local_config_platform` / `local_config_python`.
+- `app/kuro_common/src/legacy_configs/cells.rs` auto-registers
+  `@kuro_builtins` for every bzlmod project (mirrors the Phase 17
+  `@local_config_platform` registration). Legacy non-bzlmod workspaces
+  can opt in via `[external_cells] kuro_builtins = bundled`.
+- `app/kuro_interpreter_for_build/src/interpreter/interpreter_for_dir.rs`:
+  - new `bazel_builtins_autoload: Option<OwnedStarlarkModulePath>`
+    field resolved unconditionally at `Self::new()` time;
+  - appended to `implicit_imports` for both BUILD and `.bzl` paths in
+    `parse()` (skipped inside the `kuro_builtins` cell itself);
+  - public symbols imported via `import_public_symbols(builtins_env)`
+    in `create_env()`, regardless of whether a prelude is registered.
+- Acceptance test
+  `tests/core/analysis/test_native_rules.py::test_28_2_kuro_builtins_visible_in_external_bzl`
+  (Bazel-mode fixture, no prelude) references `kuro_builtins_probe`
+  without a `load()` and gets `"kuro-28-2-loader-ok"` written to a
+  build artifact.
+- `@llvm-project//llvm:Demangle` builds clean post-Plan 28.2.
+
+### Remaining for Phase 28.2
+
+- The Plan 28.2 acceptance bullet about "rejecting loads outside the
+  builtins package" is satisfied for the autoload path (the
+  `same-cell` skip in `parse()` and `create_env()` prevents the
+  exports module from importing itself), but a *user* `load()` from
+  an external file into another file inside `@kuro_builtins` is not
+  yet sandboxed. Track as a follow-up — low priority while the
+  exports.bzl is the only file in the cell.
+- Digest-based DICE invalidation across daemon restarts: the loader
+  goes through the standard load resolver, so the bundled file's
+  contents are part of the normal incremental key; the explicit
+  per-builtins-file digest mentioned in the plan is not strictly
+  needed today.
 
 ### Goal
 
