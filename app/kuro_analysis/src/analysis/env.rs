@@ -1528,10 +1528,23 @@ pub fn get_user_defined_rule_spec(
             let ctx_bits: usize = unsafe { std::mem::transmute(ctx_val) };
             kuro_interpreter_for_build::subrule::set_current_rule_ctx_raw(ctx_bits);
 
+            // Plan 28.4 Stage 5: also stash the bundled
+            // `subrule_implementation_wrapper` for the duration of this
+            // rule's eval, so subrule invocations from inside the rule
+            // impl can route through the same Starlark facade. Same
+            // safety contract as the ctx slot.
+            if let Some(wrapper) = self.lookup_subrule_implementation_wrapper(eval)? {
+                let wrapper_bits: usize = unsafe { std::mem::transmute(wrapper) };
+                kuro_build_api::interpreter::rule_ctx_storage::set_current_subrule_wrapper_raw(
+                    wrapper_bits,
+                );
+            }
+
             struct CtxGuard;
             impl Drop for CtxGuard {
                 fn drop(&mut self) {
                     kuro_interpreter_for_build::subrule::clear_current_rule_ctx();
+                    kuro_build_api::interpreter::rule_ctx_storage::clear_current_subrule_wrapper();
                 }
             }
             let _guard = CtxGuard;
@@ -1587,11 +1600,29 @@ pub fn get_user_defined_rule_spec(
             &self,
             eval: &mut Evaluator<'v, '_, '_>,
         ) -> kuro_error::Result<Option<Value<'v>>> {
+            self.lookup_wrapper(eval, "rule_implementation_wrapper")
+        }
+
+        /// Plan 28.4 Stage 5: look up `subrule_implementation_wrapper`
+        /// in the bundled module. Same fallback semantics as the rule
+        /// wrapper.
+        fn lookup_subrule_implementation_wrapper<'v>(
+            &self,
+            eval: &mut Evaluator<'v, '_, '_>,
+        ) -> kuro_error::Result<Option<Value<'v>>> {
+            self.lookup_wrapper(eval, "subrule_implementation_wrapper")
+        }
+
+        fn lookup_wrapper<'v>(
+            &self,
+            eval: &mut Evaluator<'v, '_, '_>,
+            name: &str,
+        ) -> kuro_error::Result<Option<Value<'v>>> {
             let Some(builtins) = &self.builtins_module else {
                 return Ok(None);
             };
             let owned = builtins
-                .get_option("rule_implementation_wrapper")
+                .get_option(name)
                 .map_err(|e| from_any_with_tag(e, kuro_error::ErrorTag::Tier0))?;
             Ok(owned.map(|w| w.owned_value(eval.frozen_heap())))
         }

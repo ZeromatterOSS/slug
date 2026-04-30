@@ -82,6 +82,7 @@ use derive_more::Display;
 // (e.g. DefaultInfo) can also reach it without a dependency on this crate.
 pub use kuro_build_api::interpreter::rule_ctx_storage::clear_current_rule_ctx;
 pub use kuro_build_api::interpreter::rule_ctx_storage::get_current_rule_ctx;
+pub use kuro_build_api::interpreter::rule_ctx_storage::get_current_subrule_wrapper;
 pub use kuro_build_api::interpreter::rule_ctx_storage::set_current_rule_ctx_raw;
 use starlark::any::ProvidesStaticType;
 use starlark::docs::DocFunction;
@@ -369,9 +370,21 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkSubruleCallable {
                 }
                 heap.alloc(starlark::values::dict::AllocDict(sm.into_iter()))
             };
-            // Call implementation with [ctx] as positional args and kwargs dict
+            // Call implementation with [ctx] as positional args and kwargs dict.
+            //
+            // Plan 28.4 Stage 5: when @kuro_builtins exposes a
+            // `subrule_implementation_wrapper`, it is stashed in TLS by
+            // `RuleSpec::Impl::invoke` for the duration of the rule's
+            // eval. Route through it so the subrule's `ctx` carries the
+            // same Starlark facade the enclosing rule already sees;
+            // absent (legacy / no-bzlmod) → direct invocation.
             let impl_val: Value<'v> = self.implementation.to_value();
-            impl_val.invoke_pos_kwargs(&[ctx], Some(kwargs_dict_val), eval)
+            match get_current_subrule_wrapper() {
+                Some(wrapper) => {
+                    wrapper.invoke_pos_kwargs(&[impl_val, ctx], Some(kwargs_dict_val), eval)
+                }
+                None => impl_val.invoke_pos_kwargs(&[ctx], Some(kwargs_dict_val), eval),
+            }
         } else {
             // No ctx available - fall back to pass-through behavior
             self.implementation

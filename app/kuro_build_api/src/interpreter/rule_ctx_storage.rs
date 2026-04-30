@@ -23,6 +23,13 @@ use starlark::values::Value;
 
 thread_local! {
     static CURRENT_RULE_CTX: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+    /// Plan 28.4 Stage 5: subrule-wrapper `Value` for the current rule
+    /// analysis. Set alongside `CURRENT_RULE_CTX` so subrule invocations
+    /// can route through the bundled
+    /// `subrule_implementation_wrapper(impl, ctx, **kwargs)`. `None`
+    /// when @kuro_builtins isn't registered or doesn't expose the
+    /// hook — subrule.rs falls back to direct invocation.
+    static CURRENT_SUBRULE_WRAPPER: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
 }
 
 const _: () = assert!(std::mem::size_of::<Value<'_>>() == std::mem::size_of::<usize>());
@@ -53,5 +60,31 @@ pub fn get_current_rule_ctx<'v>() -> Option<Value<'v>> {
             // and the Value is alive on the evaluator's heap which outlives this call.
             unsafe { std::mem::transmute::<usize, Value<'v>>(bits) }
         })
+    })
+}
+
+/// Plan 28.4 Stage 5: stash the bundled `subrule_implementation_wrapper`
+/// alongside the current rule's ctx, so subrule invocations can route
+/// through the same Starlark facade rule contexts already see.
+///
+/// SAFETY: same contract as `set_current_rule_ctx_raw` — the caller
+/// must ensure the wrapper `Value` outlives any callers of
+/// `get_current_subrule_wrapper`.
+pub fn set_current_subrule_wrapper_raw(wrapper_bits: usize) {
+    CURRENT_SUBRULE_WRAPPER.with(|cell| cell.set(Some(wrapper_bits)));
+}
+
+/// Clear the current subrule wrapper after the rule's eval completes.
+pub fn clear_current_subrule_wrapper() {
+    CURRENT_SUBRULE_WRAPPER.with(|cell| cell.set(None));
+}
+
+/// Get the current subrule wrapper `Value` if one is registered.
+///
+/// SAFETY: same contract as `get_current_rule_ctx`.
+pub fn get_current_subrule_wrapper<'v>() -> Option<Value<'v>> {
+    CURRENT_SUBRULE_WRAPPER.with(|cell| {
+        cell.get()
+            .map(|bits| unsafe { std::mem::transmute::<usize, Value<'v>>(bits) })
     })
 }

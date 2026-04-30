@@ -93,11 +93,16 @@ def _kuro_target_platform_has_constraint(constraint_value):
 #
 # Adding a new ctx field anywhere in
 # `app/kuro_build_api/src/interpreter/rule_defs/context.rs` requires
-# adding a corresponding line below; the kuro_facade_drift_guard test
+# adding a corresponding line in `_make_rule_facade` below; the
+# kuro_facade_drift_guard test
 # (tests/core/analysis/test_native_rules.py) compares `dir(raw_ctx)`
 # against this list and fails loudly when they diverge.
-def _invoke_rule(implementation, raw_ctx):
-    return implementation(struct(
+#
+# `kind` distinguishes which wrapper produced the facade — Stage 5's
+# subrule wrapper reuses the same field set but tags itself
+# differently so acceptance tests can prove which dispatch path ran.
+def _make_rule_facade(raw_ctx, kind):
+    return struct(
         # ---- AnalysisContext attributes (#[starlark(attribute)]) ----
         attrs = raw_ctx.attrs,
         actions = raw_ctx.actions,
@@ -136,11 +141,29 @@ def _invoke_rule(implementation, raw_ctx):
         resolve_command = raw_ctx.resolve_command,
         new_file = raw_ctx.new_file,
         expand_location = raw_ctx.expand_location,
-        # ---- Stage 3 acceptance marker (kuro_*-prefixed). Used by the
-        #      facade-in-call-path test to assert the wrapper actually
-        #      installed a struct over raw_ctx. Not a Bazel builtin.
+        # ---- Acceptance markers (kuro_*-prefixed). Used by Stage 3/5
+        #      tests to prove which wrapper produced the facade. Not
+        #      Bazel builtins; not part of the rule-author contract.
         kuro_facade_active = True,
-    ))
+        kuro_facade_kind = kind,
+    )
+
+def _invoke_rule(implementation, raw_ctx):
+    return implementation(_make_rule_facade(raw_ctx, "rule"))
+
+# Plan 28.4 Stage 5: subrule-side wrapper. Subrules are invoked from
+# inside a rule impl; the dispatch site
+# (`app/kuro_interpreter_for_build/src/subrule.rs`) reaches the
+# wrapper via TLS set by `RuleSpec::Impl::invoke`. Subrule impls have
+# the shape `def _impl(ctx, **kwargs)`, so the wrapper signature is
+# `wrapper(impl, ctx, **kwargs)` — kwargs forward verbatim.
+#
+# Subrule contexts are the same `AnalysisContext` type as the
+# enclosing rule, so the facade shares `_make_rule_facade`. Only the
+# `kuro_facade_kind` tag differs so tests can confirm which dispatch
+# path produced the struct.
+def _invoke_subrule(implementation, raw_ctx, **kwargs):
+    return implementation(_make_rule_facade(raw_ctx, "subrule"), **kwargs)
 
 # Plan 28.4 Stage 4: aspect-side facade. Mirrors
 # `_invoke_rule` but for `AspectContext`. Aspect impls are called as
@@ -209,3 +232,9 @@ rule_implementation_wrapper = _invoke_rule
 # `aspect_calculation.rs::execute_aspect`; same not-exported semantics
 # as `rule_implementation_wrapper`.
 aspect_implementation_wrapper = _invoke_aspect
+
+# Phase 28.4 Stage 5 subrule-wrapper hook. Picked up by
+# `kuro_interpreter_for_build::subrule::FrozenStarlarkSubruleCallable::invoke`
+# via TLS set in `RuleSpec::Impl::invoke`. Same not-exported semantics
+# as the rule/aspect hooks.
+subrule_implementation_wrapper = _invoke_subrule

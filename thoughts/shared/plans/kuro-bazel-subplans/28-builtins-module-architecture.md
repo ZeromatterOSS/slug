@@ -346,7 +346,7 @@ Do not start with:
   Starlark.
 - The moved behavior has a Bazel 9 parity citation.
 
-## Phase 28.4: Rule Implementation Wrapper  [Stage 4 done 2026-04-30]
+## Phase 28.4: Rule Implementation Wrapper  [Stage 5 done 2026-04-30]
 
 ### Status
 
@@ -439,16 +439,50 @@ Stage 4 lands the aspect-side counterpart to Stage 3:
   the rule-only facade — under 2% of analyze time, well within
   noise for cold-cache analysis).
 
+### Stage 5 (subrules)
+
+Stage 5 closes the per-context-wrapper trio:
+
+- A second TLS slot in
+  `kuro_build_api::interpreter::rule_ctx_storage` carries the
+  bundled `subrule_implementation_wrapper` `Value` for the duration
+  of the enclosing rule's eval. `RuleSpec::Impl::invoke` sets it
+  alongside `CURRENT_RULE_CTX`; the same `Drop` guard clears both.
+- `FrozenStarlarkSubruleCallable::invoke` reads
+  `get_current_subrule_wrapper()` and routes through
+  `wrapper(impl, ctx, **kwargs)` when present; absent (legacy / no
+  bzlmod) → original `impl(ctx, **kwargs)` direct call.
+- `_invoke_subrule(implementation, raw_ctx, **kwargs)` in
+  `exports.bzl` builds the same `_make_rule_facade` struct rule
+  contexts get (subrules share `AnalysisContext`), tagging
+  `kuro_facade_kind = "subrule"` so acceptance tests can prove
+  which dispatch path produced the facade. Kwargs forward verbatim
+  via `**kwargs` spread to preserve the existing
+  named-arg-injection semantics.
+- `_invoke_rule` / `_invoke_aspect` / `_invoke_subrule` now share
+  `_make_rule_facade(raw_ctx, kind)`; `_make_rule_facade` is the
+  single point of truth for the AnalysisContext field set, so
+  adding a new ctx field is a one-line edit instead of a
+  three-place edit.
+- Acceptance test
+  `tests/core/analysis/test_native_rules.py::test_28_4_stage5_subrule_facade_in_call_path`
+  verifies the marker, the kind tag, the migrated method (Starlark
+  shim works inside subrules), and that a sentinel kwarg
+  round-trips through the wrapper.
+- LLVM Support cold analyze ≈ 207 ms with all three wrappers
+  installed (Stage 2 baseline: 190 ms; Stage 5 overhead: ~17 ms
+  across 183 rules ≈ 90 µs/rule, still well under 1% of analyze
+  time).
+
 ### Remaining for Phase 28.4
 
-- Subrules are not yet routed through their own wrapper
-  (`subrule_implementation_wrapper`). The same pattern applies
-  (`LoadFile`-resolved wrapper + dispatch-site changes in
-  `kuro_interpreter_for_build::subrule`).
 - Stack-trace fidelity for user errors when the facade is in the
-  path: frames now go through `_invoke_rule`/`_invoke_aspect` →
-  `struct` construction → user impl. Stage 4+ migrations should
-  inspect end-user error messages.
+  path: frames now go through `_invoke_rule` / `_invoke_aspect` /
+  `_invoke_subrule` → `struct` construction → user impl. Stage 4+
+  migrations should inspect end-user error messages, particularly
+  for the common `Object of type 'struct' has no attribute X` case
+  (no longer references `AnalysisContext` / `AspectContext` types
+  by name in the message).
 
 ### Goal
 

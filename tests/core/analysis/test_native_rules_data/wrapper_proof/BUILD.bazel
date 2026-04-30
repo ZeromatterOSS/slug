@@ -1,5 +1,6 @@
 load(":aspect_facade_proof.bzl", "aspect_facade_collector", "aspect_facade_leaf")
 load(":facade_proof.bzl", "facade_proof")
+load(":subrule_facade_proof.bzl", "subrule_facade_target")
 
 # Plan 28.4 Stage 2 acceptance: prove `rule_implementation_wrapper` is
 # in the analysis call path. The fixture's defs.bzl defines a Starlark
@@ -24,3 +25,5 @@ aspect_facade_collector(
     name = "aspect_facade_collector_target",
     deps = [":aspect_facade_leaf_target"],
 )
+
+subrule_facade_target(name = "subrule_facade_target")

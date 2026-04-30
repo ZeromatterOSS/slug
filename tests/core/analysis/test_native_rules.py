@@ -890,6 +890,33 @@ async def test_28_4_stage4_aspect_facade_in_call_path(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_4_stage5_subrule_facade_in_call_path(buck: Buck) -> None:
+    """Plan 28.4 Stage 5: subrule impls now flow through
+    `subrule_implementation_wrapper(impl, ctx, **kwargs)`. The wrapper
+    `Value` is stashed in TLS by `RuleSpec::Impl::invoke` for the
+    duration of the rule's eval and read by
+    `kuro_interpreter_for_build::subrule::FrozenStarlarkSubruleCallable::invoke`.
+
+    The fixture rule calls a subrule with a sentinel kwarg. Inside
+    the subrule impl we assert:
+
+      1. `ctx.kuro_facade_active == True` (facade in path);
+      2. `ctx.kuro_facade_kind == "subrule"` (subrule wrapper, not
+         the leaked rule wrapper);
+      3. `ctx.target_platform_has_constraint(...)` answers correctly
+         (Starlark shim works inside subrules too); and
+      4. the sentinel kwarg reaches the impl verbatim, proving
+         `_invoke_subrule(implementation, raw_ctx, **kwargs)`
+         forwards kwargs without dropping or rewriting.
+    """
+    result = await buck.build("//wrapper_proof:subrule_facade_target")
+    output = result.get_build_report().output_for_target(
+        "//wrapper_proof:subrule_facade_target"
+    )
+    assert output.read_text().strip() == "subrule-facade-proof-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_28_3_export_contract_hides_unlisted_symbols(buck: Buck) -> None:
     """Plan 28.3: only names in `exported_toplevels` reach the consuming
     env. Symbols defined at the top level of `exports.bzl` but NOT
