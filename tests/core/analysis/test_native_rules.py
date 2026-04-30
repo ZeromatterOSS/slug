@@ -816,6 +816,24 @@ async def test_28_2_kuro_builtins_visible_in_external_bzl(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_3_export_contract_hides_unlisted_symbols(buck: Buck) -> None:
+    """Plan 28.3: only names in `exported_toplevels` reach the consuming
+    env. Symbols defined at the top level of `exports.bzl` but NOT
+    listed in the dict (private helpers, the rule_implementation_wrapper
+    hook, etc.) must remain invisible to user `.bzl` files. Visibility
+    control lives in the bundled exports.bzl, not in the interpreter."""
+    with pytest.raises(Exception) as exc_info:
+        await buck.targets("//export_contract_hidden:test_export_contract_hidden")
+    msg = str(exc_info.value)
+    # `rule_implementation_wrapper` is defined at the top of exports.bzl
+    # but intentionally NOT in `exported_toplevels` (it's a Phase 28.4
+    # internal hook, not a user-visible builtin). Referencing it from
+    # an external .bzl must fail at parse time with "not found".
+    assert "rule_implementation_wrapper" in msg
+    assert "not found" in msg
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_loaded_removed_rules_analyze_cleanly(buck: Buck) -> None:
     """Plan 27.5 readiness gate: a user `load()` shadows the BUILD-global
     removed-rule stub. Loaded sh_binary / sh_library / sh_test (from the

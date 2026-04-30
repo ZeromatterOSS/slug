@@ -62,6 +62,7 @@ use starlark::environment::FrozenModule;
 use starlark::syntax::AstModule;
 use starlark::values::OwnedFrozenRef;
 use starlark::values::any_complex::StarlarkAnyComplex;
+use starlark::values::dict::DictRef;
 
 use crate::interpreter::buckconfig::BuckConfigsViewForStarlark;
 use crate::interpreter::build_context::BuildContext;
@@ -402,11 +403,17 @@ impl InterpreterForDir {
             }
         }
 
-        // Plan 28: import public symbols from `@kuro_builtins//:exports.bzl`.
+        // Plan 28: inject names from `@kuro_builtins//:exports.bzl`'s
+        // `exported_toplevels` dict into the consuming env.
         // Skipped inside the kuro_builtins cell itself (an exports module
         // can't import from itself). The matching `parse()` arm pushed
         // this path into `implicit_imports`, so DICE has already loaded
         // the module by the time we get here.
+        //
+        // Phase 28.3 reads from the explicit `exported_toplevels` dict
+        // rather than `import_public_symbols`. Visibility-control lives
+        // in the bundled `exports.bzl`, not in the interpreter — adding
+        // a top-level name is an explicit per-symbol decision.
         if let Some(OwnedStarlarkModulePath::LoadFile(builtins_path)) =
             &self.bazel_builtins_autoload
         {
@@ -416,7 +423,30 @@ impl InterpreterForDir {
                     .map
                     .get(&StarlarkModulePath::LoadFile(builtins_path))
                 {
-                    env.import_public_symbols(builtins_env.env());
+                    let frozen = builtins_env.env();
+                    let exports_value = frozen
+                        .get_option("exported_toplevels")
+                        .map_err(|e| from_any_with_tag(e, kuro_error::ErrorTag::Tier0))?;
+                    if let Some(exports_value) = exports_value {
+                        let value = exports_value.owned_value(env.frozen_heap());
+                        let dict = DictRef::from_value(value).with_internal_error(|| {
+                            format!(
+                                "@kuro_builtins exports.bzl `exported_toplevels` must be a \
+                                 dict, got: {}",
+                                value.get_type()
+                            )
+                        })?;
+                        for (k, v) in dict.iter() {
+                            let name = k.unpack_str().with_internal_error(|| {
+                                format!(
+                                    "@kuro_builtins exports.bzl `exported_toplevels` keys must \
+                                     be strings, got: {}",
+                                    k.get_type()
+                                )
+                            })?;
+                            env.set(name, v);
+                        }
+                    }
                 }
             }
         }

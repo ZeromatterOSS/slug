@@ -272,7 +272,47 @@ user workspace.
 - Existing BUILD files behave identically when the export dicts are
   empty.
 
-## Phase 28.3: Initial Low-Risk Starlark Exports
+## Phase 28.3: Initial Low-Risk Starlark Exports  [partial — export contract + 28.4 wrapper hook landed, 2026-04-30]
+
+### Status
+
+The export contract structure from this plan's "Export Contract"
+section is now real:
+
+- `kuro_builtins/exports.bzl` defines an explicit
+  `exported_toplevels` dict. Only entries listed there reach the
+  consuming env; private helpers (leading `_`) and other top-level
+  names (e.g. `rule_implementation_wrapper`) are intentionally
+  invisible to user `.bzl`/BUILD files.
+- `app/kuro_interpreter_for_build/src/interpreter/interpreter_for_dir.rs::create_env`
+  now reads `exported_toplevels` from the bundled module and copies
+  each `(name, value)` into the consuming env's bindings. Replaces
+  the Phase 28.2 `import_public_symbols` autoload, moving
+  visibility-control logic out of the interpreter and into the
+  bundled exports.bzl — anybody adding a name now writes it
+  explicitly in the dict.
+- Phase 28.4 hook in place: `rule_implementation_wrapper = _invoke_rule`
+  is defined at the top of `exports.bzl` (an identity wrapper),
+  intentionally NOT in `exported_toplevels` so user files cannot
+  reference it. Phase 28.4 Stage 2 will wire
+  `kuro_analysis::run_analysis` to call this wrapper and start
+  migrating ctx-method bodies.
+- New tests:
+  - `test_28_3_export_contract_hides_unlisted_symbols` —
+    references `rule_implementation_wrapper` from a fixture's
+    `defs.bzl` and asserts the load fails with
+    "Variable rule_implementation_wrapper not found".
+  - `test_28_2_kuro_builtins_visible_in_external_bzl` continues to
+    pass via the new dict-based path.
+
+### Remaining for Phase 28.3
+
+The plan's larger candidates (`runfiles` constructor body,
+`ctx.target_platform_has_constraint()`, `ctx.runfiles()`,
+`ctx.var` / `expand_make_variables`) all touch `ctx`-method
+dispatch and are blocked on Phase 28.4 Stage 2 wiring the rule
+wrapper through `kuro_analysis::run_analysis`. Once the wrapper
+fires, the per-method migration is a one-method-at-a-time exercise.
 
 ### Goal
 
