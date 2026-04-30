@@ -310,7 +310,7 @@ plan or an explicit decision that the stub is adequate. Organized by priority.
 | `ToolchainsStub` + 30 per-language stubs | `context.rs:2019` | Real toolchain resolution | Plan 11 |
 | `create_cc_compile_action` hardcoded compiler | `cc_common.rs:1400` | Real CC toolchain compiler path | Plan 11 |
 | `CtxCheat*` family (7 stubs) | `cc_common.rs:702` | Real `actions2ctx_cheat()` for rules_cc | Plan 11 (partially) |
-| `create_cc_analysis_result()` empty stubs | `native_rule_analysis.rs:1015` | Real CC rule analysis | Plan 27 |
+| ~~`create_cc_analysis_result()` empty stubs~~ | _deleted_ | _Resolved by Plan 27.3 (native cc_* rules are now removed-rule stubs; real cc_* analysis comes from `@rules_cc`)._ | ✅ done 2026-04-30 |
 | `analyze_genquery()` touch stub | `native_rule_analysis.rs:1360` | Real genquery execution | Needs plan |
 | `StampFile` stubs | `context.rs:4873` | Real build status stamping | Needs plan |
 

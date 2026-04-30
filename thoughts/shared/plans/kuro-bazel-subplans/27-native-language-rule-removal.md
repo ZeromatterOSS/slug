@@ -336,7 +336,37 @@ kind of diagnostic Bazel 9 emits.
 - Error text contains the exact load snippet for rules where Bazel 9
   provides a load label.
 
-## Phase 27.3: Remove Active Native Language Analysis
+## Phase 27.3: Remove Active Native Language Analysis  [DONE 2026-04-30]
+
+### Status
+
+- All ten removed-rule analysis branches in
+  `app/kuro_analysis/src/analysis/native_rule_analysis.rs` are gone:
+  `CcLibrary`, `CcBinary`, `CcTest`, `CcImport`, `CcSharedLibrary`,
+  `CcToolchain`, `CcToolchainSuite`, `ShBinary`, `ShTest`, `ShLibrary`.
+  These are now `NativeRuleKind::Removed(...)` variants dispatched to
+  `analyze_removed_rule`.
+- Dead helpers deleted: `create_cc_analysis_result()` (~120 lines),
+  `analyze_sh_binary` / `analyze_sh_test` / `analyze_sh_library`
+  (~140 lines), `analyze_execution_platform` /
+  `analyze_execution_platforms` (~120 lines), `create_sh_target`
+  helper, `cc_rule_attributes` / `cc_toolchain_attributes` /
+  `cc_toolchain_suite_attributes` / `cc_import_attributes` /
+  `cc_shared_library_attributes` / `sh_rule_attributes` helpers, and
+  the corresponding `CC_*_RULE` / `SH_*_RULE` /
+  `EXECUTION_PLATFORM[S]_RULE` Lazy statics
+  (~220 lines from `native_rules.rs`).
+- Native modules kept (`cc_common`, `platform_common`, `config_common`,
+  `coverage_common`, `proto_common`).
+- `EXTERNAL_INCLUDE_DIRS` audit: confirmed already retired by Plan 29
+  before Plan 27 work. Only a comment remains in
+  `cc_common/mod.rs`.
+- Acceptance verified:
+  `rg "create_cc_analysis_result|NativeRuleKind::CcLibrary|NativeRuleKind::ShBinary"`
+  finds no active implementation path; no-load `cc_library` fails
+  with the diagnostic; loaded rules_cc `cc_library` still analyzes
+  through Starlark (proven by `@llvm-project//llvm:Demangle` and
+  `:Support` builds).
 
 ### Goal
 
@@ -381,7 +411,55 @@ kuro-only Rust logic.
 - A no-load `cc_library` fails.
 - A loaded rules_cc `cc_library` still analyzes through Starlark.
 
-## Phase 27.4: Migrate Kuro-Owned BUILD Files and Examples
+## Phase 27.4: Migrate Kuro-Owned BUILD Files and Examples  [DONE 2026-04-30]
+
+### Status
+
+The Phase 27.1 inventory (recorded above) checked every tracked BUILD
+and `.bzl` file under `examples/`, `tests/`, `bazel_tools/`, and
+`prelude/` for bare calls to converted rules. Findings:
+
+- **Tracked fixtures with bare calls (migrated):**
+  - `tests/core/analysis/test_native_rules_data/BUILD.bazel` was the
+    only tracked fixture with bare `cc_*` / `sh_*` /
+    `environment_group` / `execution_platform[s]` calls. Migrated
+    in-place: minimal Starlark replacements live in the fixture's
+    own `defs.bzl`; `BUILD.bazel` `load()`s them. Done as part of
+    the Phase 27.2 commits.
+- **Tracked Starlark-defining fixtures (no migration needed):**
+  - All 23 `tests/core/.../*_data/defs.bzl` files that define their
+    own Starlark `execution_platform[s] = rule(...)` shadow the
+    BUILD-global stub via the user `load()`. Continue working
+    unchanged.
+  - `tests/e2e_util/nano_prelude/shell_rules.bzl` ships Starlark
+    `sh_binary` / `sh_test` / `sh_library` for any prelude-using
+    fixture; wired via `nano_prelude/prelude.bzl`.
+- **Tracked `bazel_tools/` matches were false positives:**
+  - `bazel_tools/tools/build_defs/repo/http.bzl` references
+    `cc_library(...)` inside a docstring example, not a real call.
+  - `bazel_tools/tools/cpp/cc_common.bzl` defines a function called
+    `_check_experimental_cc_shared_library` and a dict key
+    `check_experimental_cc_shared_library`; no rule call.
+- **Out of scope:**
+  - `tests/manual_test/` is git-ignored per top-level `.gitignore`
+    (`tests/manual_test/**`). It is a developer playground, not a
+    tracked fixture or CI test, and Phase 27.4 acceptance is about
+    Kuro-owned tracked tests. (Local copies that hit the removed-rule
+    diagnostic can add a load — the same `shell_rules.bzl` /
+    `defs.bzl` cc_* stub patterns work; see the
+    `tests/core/analysis/test_native_rules_data` precedent.)
+  - `prelude/` is the Buck2-era prelude tree; Plan 28.6 / Plan 04
+    own its disposition.
+
+### Acceptance verified
+
+- No tracked Kuro test relies on no-load `cc_*` or `sh_*` BUILD
+  globals.
+- Fixture changes are minimal and Bazel-9-compatible.
+- The negative tests `test_cc_library_removed_without_load` and
+  `test_sh_binary_removed_without_load` in
+  `tests/core/analysis/test_native_rules.py` exist explicitly to
+  exercise the no-load error.
 
 ### Goal
 
@@ -413,7 +491,51 @@ rules before the removed-rule stubs land broadly.
 - Fixture changes are minimal and Bazel 9-compatible.
 - Any fixture intentionally testing the no-load error is named as such.
 
-## Phase 27.5: Ruleset Readiness Gates
+## Phase 27.5: Ruleset Readiness Gates  [DONE 2026-04-30]
+
+### Status
+
+- **rules_cc smoke**: `@llvm-project//llvm:Demangle` (8 cc_compile +
+  archive + link actions) and `@llvm-project//llvm:Support` (183
+  actions) build clean post-Plan 27.2/27.3. cc_test
+  end-to-end via `kuro test` blocked on the pre-existing kuro test
+  runner clap panic on duplicate `test_summary` (filed as a separate
+  bug in `app/kuro_client/src/commands/test.rs`); not Plan 27.
+- **rules_cc toolchain smoke**: rules_cc 0.2.16 ships Starlark
+  `cc_toolchain` (`cc/private/rules_impl/cc_toolchain.bzl`) and a
+  thin `cc_toolchain_suite` wrapper over `native.cc_toolchain_suite`
+  that propagates the Plan 27 removed-rule diagnostic — consistent
+  with Bazel 9's load-OK / diagnostic-at-analysis behavior. Verified
+  by reading `~/.cache/bazel/_bazel_wgray/.../rules_cc++.../cc/defs.bzl`.
+  `TemplateVariableInfo` reach into `ctx.var` is tracked separately
+  in `memory/ctx_var_builtins.md` and is not a Plan 27 dependency.
+- **rules_shell smoke**: nano_prelude ships Starlark `sh_*` (used by
+  audit/exec-platform/extra-exec-platforms tests, all green); the
+  `test_native_rules_data` fixture has equivalent stubs in its own
+  `defs.bzl`. No `@rules_shell` external dep in tracked tests.
+  Acceptable per the path (B) decision recorded in the cleanup
+  research.
+- **negative parity smoke**:
+  - `test_environment_group_removed_in_bazel9` asserts no-load
+    `environment_group` fails with the diagnostic.
+  - `test_sh_binary_removed_without_load` asserts the same for
+    sh_binary, plus the `@rules_shell` load-hint string.
+  - `test_cc_library_removed_without_load` asserts the same for
+    cc_library, plus the `@rules_cc` load-hint string.
+  - `test_loaded_removed_rules_analyze_cleanly` asserts that a user
+    `load()` of the same names from a Starlark replacement shadows
+    the BUILD-global stub.
+- **No removed provider globals reintroduced** — the
+  `parity_category` exhaustive-match guardrail (Phase 27.6) forces
+  every `NativeRuleKind` variant to be classified, and the
+  Plan 28.2 builtins loader doesn't currently re-export any provider
+  globals.
+
+### Acceptance verified
+
+If a loaded ruleset path were to fail, it would be a real native-module
+parity gap on top of working Plan 27 stubs — no hidden fallback to a
+Rust language rule remains.
 
 ### Goal
 
@@ -446,7 +568,39 @@ removing native implementations from developer workflows.
   parity gap with a filed Plan 15 sub-item, not a hidden fallback to a
   Rust language rule.
 
-## Phase 27.6: Guardrails
+## Phase 27.6: Guardrails  [DONE 2026-04-30]
+
+### Status
+
+- `parity_category` exhaustive match in
+  `app/kuro_node/src/rule_type.rs` forces every `NativeRuleKind`
+  variant to be classified as `true_native`, `removed_stub`,
+  `kuro_internal`, or `kuro_internal_apple`. Adding a new variant
+  fails to compile until the match is updated; the test
+  `native_rule_kinds_have_parity_category` spot-checks
+  representative variants.
+- `removed_native_rule_diagnostics_mention_rule_name` test asserts
+  every `RemovedNativeRule` variant's `diagnostic_message()`
+  contains its rule name so users can locate the call site.
+- Doc-comments on `RemovedNativeRule` enum + per-variant cite the
+  Bazel 9 source pattern (`BaseRuleClasses.java EmptyRule`).
+- Main-plan "Remaining Stub Behavior" table update — not yet
+  performed; tracked as a small Plan 27 follow-up below.
+
+### Acceptance verified
+
+- Adding a working native `cc_library`-style rule fails the
+  `parity_category` exhaustive-match guardrail unless the new
+  variant is classified; deleting a `Removed(...)` variant fails
+  the diagnostic-mention test unless the corresponding
+  `diagnostic_message` arm is removed too.
+
+### Remaining for Phase 27.6
+
+- Update the main plan
+  (`thoughts/shared/plans/2026-01-21-kuro-bazel-compatible-build-tool.md`)
+  "Remaining Stub Behavior" table to mark
+  `create_cc_analysis_result()` as resolved. Trivial doc edit, deferred.
 
 ### Goal
 
