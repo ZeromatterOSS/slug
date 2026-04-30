@@ -133,7 +133,28 @@ Rules for the contract:
 - User `load()` bindings must be able to shadow BUILD globals the same
   way they do in Bazel.
 
-## Phase 28.1: Feasibility Spike and Environment Matrix
+## Phase 28.1: Feasibility Spike and Environment Matrix  [DONE 2026-04-30]
+
+### Status
+
+Spike landed. Findings + insertion-point analysis + Phase 28.2 design
+recorded in
+[`thoughts/shared/research/2026-04-30-plan-28-1-builtins-loader-spike.md`](../../research/2026-04-30-plan-28-1-builtins-loader-spike.md).
+
+Key empirical result: external `.bzl` files in Bazel-mode workspaces
+(no prelude registered, e.g. `tests/core/analysis/test_native_rules_data/`)
+do not see prelude-injected symbols. `prelude_import()` returns `None`
+when no prelude is configured, so `import_public_symbols` is never
+invoked. The only existing Starlark-symbol injection is
+`rules_cc_autoload`, which fires only for `BuildFile` paths.
+
+Insertion point identified:
+`app/kuro_interpreter_for_build/src/interpreter/interpreter_for_dir.rs`
+— extend the `rules_cc_autoload` pattern with a new
+`bazel_builtins_autoload` field that fires unconditionally for both
+BUILD and `.bzl` paths. Representation: a frozen Starlark module
+loaded via the normal load resolver, with public symbols copied via
+`import_public_symbols` (no new starlark-rust hooks).
 
 ### Goal
 
