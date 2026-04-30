@@ -346,7 +346,7 @@ Do not start with:
   Starlark.
 - The moved behavior has a Bazel 9 parity citation.
 
-## Phase 28.4: Rule Implementation Wrapper  [Stage 3 done 2026-04-30]
+## Phase 28.4: Rule Implementation Wrapper  [Stage 4 done 2026-04-30]
 
 ### Status
 
@@ -406,22 +406,48 @@ line.
   baseline for Support analyze was 190 ms — facade overhead is ~4 ms
   across 183 rules (~22 µs per rule), well under 1% of analyze time.
 
+### Stage 4 (aspects)
+
+Stage 4 lands the aspect-side counterpart to Stage 3:
+
+- `kuro_analysis::analysis::aspect_calculation::execute_aspect`
+  fetches `@kuro_builtins` via the now-`pub(crate)`
+  `super::calculation::get_kuro_builtins_module` and looks up
+  `aspect_implementation_wrapper`. Wrapper present →
+  `eval.eval_function(wrapper, &[impl, target, ctx], &[])`;
+  absent → original `impl(target, ctx)`.
+- `_invoke_aspect(implementation, target, raw_ctx)` in
+  `exports.bzl` mirrors `_invoke_rule` but for `AspectContext`
+  (smaller field set: no `attrs`, `outputs`, `executable`, etc.).
+  Reuses the same `_kuro_target_platform_has_constraint` shim, so
+  aspects now answer the question meaningfully where the previous
+  Rust stub returned `False` unconditionally.
+- `AspectContext.attr` accessor switched from raise-on-None to
+  `NoneOr` so the facade can mirror it eagerly (Starlark has no
+  try/except, so a raise here would crash for every attr-less
+  aspect — the common case). Aspects with no `attrs` declared see
+  `ctx.attr == None` instead of the previous error.
+- Acceptance test
+  `tests/core/analysis/test_native_rules.py::test_28_4_stage4_aspect_facade_in_call_path`
+  defines an aspect that stuffs facade observations into a
+  provider; the collector rule reads that provider and asserts
+  `ctx.kuro_facade_active == True`, `ctx.kuro_facade_kind ==
+  "aspect"`, plus positive/negative cases for
+  `target_platform_has_constraint` from inside the aspect.
+- `@llvm-project//llvm:Support` cold build with the aspect facade
+  installed: analyze ≈ 205 ms (Stage 3 was 194 ms; +~11 ms over
+  the rule-only facade — under 2% of analyze time, well within
+  noise for cold-cache analysis).
+
 ### Remaining for Phase 28.4
 
-- Aspects and subrules are not yet routed through their own
-  wrappers (`aspect_implementation_wrapper`,
-  `subrule_implementation_wrapper`). The same pattern applies
-  (additional `LoadFile`-resolved wrappers + dispatch-site changes
-  in `kuro_analysis::analysis::aspect_calculation` and
-  `kuro_interpreter_for_build::subrule`). Once aspect routing
-  lands, the same `_kuro_target_platform_has_constraint` shim can
-  be reused for aspect contexts; until then, aspects calling the
-  method get an attribute-not-found error (the previous Rust stub
-  unconditionally returned `False`, so no caller depended on a
-  meaningful answer).
+- Subrules are not yet routed through their own wrapper
+  (`subrule_implementation_wrapper`). The same pattern applies
+  (`LoadFile`-resolved wrapper + dispatch-site changes in
+  `kuro_interpreter_for_build::subrule`).
 - Stack-trace fidelity for user errors when the facade is in the
-  path: now non-trivial (frames go through `_invoke_rule` →
-  `struct` construction → user impl). Stage 4+ migrations should
+  path: frames now go through `_invoke_rule`/`_invoke_aspect` →
+  `struct` construction → user impl. Stage 4+ migrations should
   inspect end-user error messages.
 
 ### Goal

@@ -42,6 +42,7 @@ use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::ValueOfUnchecked;
 use starlark::values::ValueTyped;
+use starlark::values::none::NoneOr;
 use starlark::values::starlark_value;
 use starlark::values::structs::StructRef;
 use starlark::values::type_repr::StarlarkTypeRepr;
@@ -172,18 +173,20 @@ impl<'v> UnpackValue<'v> for RefAspectContext<'v> {
 /// Methods for AspectContext, accessed via `ctx.<method>`.
 #[starlark_module]
 fn aspect_context_methods(builder: &mut MethodsBuilder) {
-    /// Returns the aspect's own attributes as a Starlark struct.
-    ///
-    /// These are the attributes defined in the aspect's `attrs` parameter,
-    /// not the underlying rule's attributes.
+    /// Returns the aspect's own attributes as a Starlark struct, or
+    /// `None` when the aspect declared no `attrs`. Plan 28.4 Stage 4
+    /// switched this from a raise-on-None to a `NoneOr` so the
+    /// bundled aspect facade can mirror this field unconditionally
+    /// (Starlark has no try/except, so eager `raw_ctx.attr` access in
+    /// the facade would otherwise crash for attr-less aspects, which
+    /// is the common case). Aspects that declared `attrs` continue to
+    /// see a struct here; aspects that didn't see `None` rather than
+    /// the previous error.
     #[starlark(attribute)]
     fn attr<'v>(
         this: RefAspectContext<'v>,
-    ) -> starlark::Result<ValueOfUnchecked<'v, StructRef<'static>>> {
-        Ok(this
-            .0
-            .attrs
-            .buck_error_context("`attr` is not available when aspect has no attrs defined")?)
+    ) -> starlark::Result<NoneOr<ValueOfUnchecked<'v, StructRef<'static>>>> {
+        Ok(NoneOr::from_option(this.0.attrs))
     }
 
     /// Returns an `actions` value containing functions to define actual actions.

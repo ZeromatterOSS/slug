@@ -865,6 +865,31 @@ async def test_28_4_stage3_facade_in_call_path(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_4_stage4_aspect_facade_in_call_path(buck: Buck) -> None:
+    """Plan 28.4 Stage 4: aspect impls now flow through
+    `aspect_implementation_wrapper(impl, target, ctx)`. The bundled
+    wrapper installs a Starlark facade around the aspect's `raw_ctx`,
+    sets `ctx.kuro_facade_active = True` + `ctx.kuro_facade_kind =
+    "aspect"`, and reuses the same `_kuro_target_platform_has_constraint`
+    shim Stage 3 installed for rule contexts. The fixture aspect runs
+    on the leaf target (via `attr.label_list(aspects = [...])` on the
+    collector) and stuffs its observations into a provider; the
+    collector's rule impl then asserts every invariant before writing
+    its sentinel output.
+
+    The previous Rust aspect-side `target_platform_has_constraint` was
+    a stub returning `False` unconditionally — Stage 3 deleted it, so
+    a meaningful answer here doubly proves the Starlark shim is wired
+    in via the aspect facade and not via leftover Rust code.
+    """
+    result = await buck.build("//wrapper_proof:aspect_facade_collector_target")
+    output = result.get_build_report().output_for_target(
+        "//wrapper_proof:aspect_facade_collector_target"
+    )
+    assert output.read_text().strip() == "aspect-facade-proof-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_28_3_export_contract_hides_unlisted_symbols(buck: Buck) -> None:
     """Plan 28.3: only names in `exported_toplevels` reach the consuming
     env. Symbols defined at the top level of `exports.bzl` but NOT

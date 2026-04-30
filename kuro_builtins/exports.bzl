@@ -142,6 +142,49 @@ def _invoke_rule(implementation, raw_ctx):
         kuro_facade_active = True,
     ))
 
+# Plan 28.4 Stage 4: aspect-side facade. Mirrors
+# `_invoke_rule` but for `AspectContext`. Aspect impls are called as
+# `impl(target, ctx)` (two positional args) so the wrapper signature is
+# `wrapper(impl, target, raw_ctx)`. The dispatch site for aspects lives
+# in `app/kuro_analysis/src/analysis/aspect_calculation.rs` (see Stage 4
+# wiring in this commit).
+#
+# Field set is the AspectContext public surface in
+# `app/kuro_build_api/src/interpreter/rule_defs/aspect/context.rs`.
+# Smaller than rule context — no `attrs`, `outputs`, `executable`, etc.
+# `target_platform_has_constraint` was deleted in Stage 3 from the Rust
+# AspectContext too; here we install the same Starlark shim the rule
+# facade uses, which means aspects can now answer the question
+# meaningfully (instead of the previous unconditional `False`).
+def _invoke_aspect(implementation, target, raw_ctx):
+    return implementation(target, struct(
+        # ---- AspectContext attributes (#[starlark(attribute)]) ----
+        attr = raw_ctx.attr,
+        actions = raw_ctx.actions,
+        label = raw_ctx.label,
+        rule = raw_ctx.rule,
+        fragments = raw_ctx.fragments,
+        host_fragments = raw_ctx.host_fragments,
+        toolchains = raw_ctx.toolchains,
+        features = raw_ctx.features,
+        disabled_features = raw_ctx.disabled_features,
+        bin_dir = raw_ctx.bin_dir,
+        genfiles_dir = raw_ctx.genfiles_dir,
+        configuration = raw_ctx.configuration,
+        aspect_ids = raw_ctx.aspect_ids,
+        build_file_path = raw_ctx.build_file_path,
+        workspace_name = raw_ctx.workspace_name,
+        # ---- AspectContext methods served from Starlark ----
+        target_platform_has_constraint = _kuro_target_platform_has_constraint,
+        # ---- AspectContext methods passed through (bound to raw_ctx) ----
+        coverage_instrumented = raw_ctx.coverage_instrumented,
+        # ---- Stage 4 acceptance marker (kuro_*-prefixed). Same shape as
+        #      Stage 3's rule-facade marker but disambiguated so the
+        #      acceptance test can prove which wrapper ran.
+        kuro_facade_active = True,
+        kuro_facade_kind = "aspect",
+    ))
+
 # -----------------------------------------------------------------------
 # Plan 28 export contract.
 # -----------------------------------------------------------------------
@@ -161,3 +204,8 @@ exported_toplevels = {
 # Phase 28.4 wrapper hook. Not in `exported_toplevels` — analysis pulls
 # it directly via the bundled module, not via the user-visible env.
 rule_implementation_wrapper = _invoke_rule
+
+# Phase 28.4 Stage 4 aspect-wrapper hook. Picked up by
+# `aspect_calculation.rs::execute_aspect`; same not-exported semantics
+# as `rule_implementation_wrapper`.
+aspect_implementation_wrapper = _invoke_aspect

@@ -1,3 +1,4 @@
+load(":aspect_facade_proof.bzl", "aspect_facade_collector", "aspect_facade_leaf")
 load(":facade_proof.bzl", "facade_proof")
 
 # Plan 28.4 Stage 2 acceptance: prove `rule_implementation_wrapper` is
@@ -16,3 +17,10 @@ load(":wrapper_probe.bzl", "wrapper_probe")
 wrapper_probe(name = "wrapper_probe_target")
 
 facade_proof(name = "facade_proof_target")
+
+aspect_facade_leaf(name = "aspect_facade_leaf_target")
+
+aspect_facade_collector(
+    name = "aspect_facade_collector_target",
+    deps = [":aspect_facade_leaf_target"],
+)

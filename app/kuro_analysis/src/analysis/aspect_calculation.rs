@@ -144,6 +144,13 @@ impl Key for AspectKey {
         let dep_aspects =
             compute_dep_aspects(ctx, &self.target, &aspect, &self.aspect_type).await?;
 
+        // Plan 28.4 Stage 4: load @kuro_builtins so the aspect
+        // dispatch can reach `aspect_implementation_wrapper`. The
+        // round-trip is the same one rule analysis does in
+        // `super::calculation::get_rule_spec`. `None` for legacy
+        // workspaces without the bundled cell.
+        let builtins_module = super::calculation::get_kuro_builtins_module(ctx).await?;
+
         // 5. Execute aspect implementation function with shadow graph
         let (providers, analysis_result) = execute_aspect(
             ctx,
@@ -152,6 +159,7 @@ impl Key for AspectKey {
             &self.aspect_type,
             &target_result,
             dep_aspects,
+            builtins_module,
             cancellations,
         )
         .await?;
@@ -441,6 +449,7 @@ async fn execute_aspect(
     aspect_type: &Arc<StarlarkAspectType>,
     target_result: &AnalysisResult,
     dep_aspects: HashMap<ConfiguredTargetLabel, AspectValue>,
+    builtins_module: Option<starlark::environment::FrozenModule>,
     cancellations: &CancellationContext,
 ) -> kuro_error::Result<(
     kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue,
@@ -782,14 +791,32 @@ async fn execute_aspect(
                     target.dupe(),
                 ));
 
-                // Invoke aspect implementation: impl(target, ctx)
-                let result = eval
-                    .eval_function(
+                // Plan 28.4 Stage 4: route aspect impls through
+                // `aspect_implementation_wrapper(impl, target, ctx)`
+                // when @kuro_builtins exposes one. Mirrors Stage 2's
+                // dispatch in `super::env::Impl::invoke` for rules.
+                // Wrapper absent (no `@kuro_builtins` registered, or
+                // no aspect wrapper exposed) → direct invocation.
+                let wrapper_value = match &builtins_module {
+                    Some(module) => module
+                        .get_option("aspect_implementation_wrapper")
+                        .map_err(|e| from_any_with_tag(e, kuro_error::ErrorTag::Tier0))?
+                        .map(|w| w.owned_value(eval.frozen_heap())),
+                    None => None,
+                };
+                let result = match wrapper_value {
+                    Some(wrapper) => eval.eval_function(
+                        wrapper,
+                        &[aspect_impl.to_value(), target_val, ctx.to_value()],
+                        &[],
+                    ),
+                    None => eval.eval_function(
                         aspect_impl.to_value(),
                         &[target_val, ctx.to_value()],
                         &[],
-                    )
-                    .buck_error_context("Aspect implementation failed")?;
+                    ),
+                }
+                .buck_error_context("Aspect implementation failed")?;
 
                 // Validate and convert to ProviderCollection
                 let providers = ProviderCollection::try_from_aspect_value(result)?;

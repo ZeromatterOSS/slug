@@ -714,12 +714,14 @@ pub async fn get_loaded_module(
 }
 
 /// Plan 28.4: load `@kuro_builtins//:exports.bzl` via DICE so analysis
-/// can reach `rule_implementation_wrapper`. Returns `None` for
-/// workspaces where `@kuro_builtins` is not registered (legacy
-/// non-bzlmod projects without `[external_cells] kuro_builtins =
-/// bundled`); analysis falls back to direct impl invocation in that
-/// case.
-async fn get_kuro_builtins_module(
+/// can reach `rule_implementation_wrapper` (and Stage 4
+/// `aspect_implementation_wrapper`). Returns `None` for workspaces
+/// where `@kuro_builtins` is not registered (legacy non-bzlmod
+/// projects without `[external_cells] kuro_builtins = bundled`);
+/// analysis falls back to direct impl invocation in that case. Made
+/// `pub(crate)` so the aspect dispatch path
+/// (`super::aspect_calculation`) can reuse the same DICE round-trip.
+pub(crate) async fn get_kuro_builtins_module(
     ctx: &mut DiceComputations<'_>,
 ) -> kuro_error::Result<Option<starlark::environment::FrozenModule>> {
     use kuro_core::bzl::ImportPath;
