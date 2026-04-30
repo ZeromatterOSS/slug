@@ -382,14 +382,18 @@ through the wrapper.
 
 ### Remaining for Phase 28.4
 
-- **Stage 3+: per-method ctx migrations.** With the wrapper now in
-  the path, the Stage 3+ work is straightforward: replace the
-  wrapper body with a Starlark function that wraps `ctx` into a
-  facade exposing the migrated method (e.g.
-  `target_platform_has_constraint`, `runfiles`, `var`,
-  `expand_make_variables`) backed by Starlark, while delegating
-  unmigrated methods to the raw ctx. Each migration deletes the
-  corresponding Rust impl per Phase 28.7's discipline.
+- **Stage 3+: per-method ctx migrations.** First attempt blocked on
+  a Starlark `struct(**dict)` field-loss issue — entries set in a
+  dict don't all reach the resulting struct when spread via `**`,
+  even though the wrapper is provably in the call path. Findings
+  and reproduction steps recorded in
+  [`thoughts/shared/research/2026-04-30-plan-28-4-stage3-facade-blocker.md`](../../research/2026-04-30-plan-28-4-stage3-facade-blocker.md).
+  Two known-good paths forward: (1) enumerate ctx fields statically
+  in `_invoke_rule` instead of `dir`/`getattr` + `**`; (2) read
+  `starlark::eval::Arguments::names_map` and fix the dict-spread
+  semantics if a real bug. Either route lands Stage 3; perf is
+  not a concern (estimated <1% of analyze time even with the
+  per-rule mirror).
 - Aspects and subrules are not yet routed through their own
   wrappers (`aspect_implementation_wrapper`,
   `subrule_implementation_wrapper`). Tracked as a small follow-up;
