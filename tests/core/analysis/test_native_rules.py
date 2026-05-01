@@ -1040,6 +1040,28 @@ async def test_28_4_stage9_expand_make_variables_starlark(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_4_stage10_new_file_starlark(buck: Buck) -> None:
+    """Plan 28.4 Stage 10: `ctx.new_file` migrated from Rust to Starlark.
+    The Rust `fn new_file` in
+    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was
+    deleted; `_kuro_new_file` in `@kuro_builtins//:exports.bzl` now
+    serves both call shapes.
+
+    The fixture pins behavioural parity with the deleted impl:
+      - `ctx.new_file(filename)` returns a File with the expected
+        basename.
+      - `ctx.new_file(sibling, filename)` also returns a File with the
+        expected basename; the sibling is ignored, matching the Rust
+        impl byte-for-byte.
+    """
+    result = await buck.build("//wrapper_proof:new_file_proof_target")
+    output = result.get_build_report().output_for_target(
+        "//wrapper_proof:new_file_proof_target"
+    )
+    assert output.read_text().strip() == "new-file-proof-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_28_3_export_contract_hides_unlisted_symbols(buck: Buck) -> None:
     """Plan 28.3: only names in `exported_toplevels` reach the consuming
     env. Symbols defined at the top level of `exports.bzl` but NOT
