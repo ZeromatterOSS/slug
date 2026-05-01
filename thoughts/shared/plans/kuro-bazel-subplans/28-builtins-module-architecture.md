@@ -346,7 +346,7 @@ Do not start with:
   Starlark.
 - The moved behavior has a Bazel 9 parity citation.
 
-## Phase 28.4: Rule Implementation Wrapper  [Stage 7 done 2026-05-01]
+## Phase 28.4: Rule Implementation Wrapper  [Stage 8 done 2026-05-01]
 
 ### Status
 
@@ -535,6 +535,38 @@ outside quotes, all four double-quote escapable chars (`"`, `\`,
 drop, all five ASCII whitespace separators.
 
 LLVM Demangle smoke clean (8 actions, 5.1 s, analyze 214 ms).
+
+### Stage 8 (`ctx.coverage_instrumented` — global-state hook pattern)
+
+Stage 8 introduces the third migration pattern (after host-info-at-
+build-time in Stage 3 and facade-attr-via-closure in Stage 6):
+**runtime global-state access via a kuro-internal Starlark builtin**.
+The Rust impl in `context.rs` was deleted.
+
+- New module
+  `app/kuro_interpreter_for_build/src/interpreter/functions/kuro_runtime.rs`
+  registers `kuro_collect_code_coverage()` as an analysis-time
+  Starlark global. The function reads
+  `kuro_build_api::interpreter::rule_defs::build_config::get_collect_code_coverage()`,
+  the per-build `--collect_code_coverage` flag.
+- Wired via `register_kuro_runtime` in `register_analysis_natives`,
+  so the global is reachable at module-eval time of
+  `@kuro_builtins//:exports.bzl` and at every analysis call.
+- Naming: every global in this module is `kuro_*`-prefixed. End-user
+  code can technically call them (Starlark globals are flat) but the
+  contract is "internal to `@kuro_builtins`" — treat as private.
+  Future kuro-runtime hooks (e.g. `kuro_compilation_mode()` for the
+  upcoming `var` migration) follow the same naming.
+- `_kuro_coverage_instrumented(dep = None)` in `exports.bzl` reads
+  the flag and returns it, ignoring `dep` (matches the Rust impl,
+  which also ignored `dep`). When kuro grows per-target
+  instrumentation lists, the per-dep branch lands here.
+- Acceptance test
+  `tests/core/analysis/test_native_rules.py::test_28_4_stage8_coverage_instrumented_starlark`
+  verifies both call shapes (`()` and `(None)`) return the flag's
+  default `False` for a build without `--collect_code_coverage`.
+
+LLVM Demangle smoke clean (8 actions, 5.4 s, analyze 221 ms).
 
 ### Stack-trace fidelity (inspected 2026-04-30)
 

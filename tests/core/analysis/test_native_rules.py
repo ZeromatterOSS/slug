@@ -965,6 +965,30 @@ async def test_28_4_stage7_tokenize_starlark(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_4_stage8_coverage_instrumented_starlark(buck: Buck) -> None:
+    """Plan 28.4 Stage 8: `ctx.coverage_instrumented` migrated from
+    Rust to Starlark. Demonstrates the "global state hook" migration
+    pattern: the per-build `--collect_code_coverage` flag is exposed
+    via a kuro-internal Starlark global
+    (`kuro_collect_code_coverage()`) registered in
+    `app/kuro_interpreter_for_build/src/interpreter/functions/kuro_runtime.rs`,
+    and `_kuro_coverage_instrumented` in
+    `@kuro_builtins//:exports.bzl` reads it.
+
+    The Rust impl ignored both `this` and `dep` and unconditionally
+    returned the global flag. The migrated function preserves that:
+    `ctx.coverage_instrumented()` and `ctx.coverage_instrumented(None)`
+    must return the flag's default (`False`) for this build, since
+    no `--collect_code_coverage` is passed.
+    """
+    result = await buck.build("//wrapper_proof:coverage_instrumented_proof_target")
+    output = result.get_build_report().output_for_target(
+        "//wrapper_proof:coverage_instrumented_proof_target"
+    )
+    assert output.read_text().strip() == "coverage-instrumented-proof-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_28_3_export_contract_hides_unlisted_symbols(buck: Buck) -> None:
     """Plan 28.3: only names in `exported_toplevels` reach the consuming
     env. Symbols defined at the top level of `exports.bzl` but NOT

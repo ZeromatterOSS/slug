@@ -11,6 +11,7 @@
 pub(crate) mod dedupe;
 pub(crate) mod host_info;
 pub(crate) mod internals;
+pub(crate) mod kuro_runtime;
 pub(crate) mod load_symbols;
 pub(crate) mod path;
 pub(crate) mod read_config;

@@ -75,6 +75,23 @@ def _kuro_package_relative_label(raw_ctx, label_str):
     target = label_str[1:] if label_str.startswith(":") else label_str
     return Label("@" + cell + "//" + pkg + ":" + target)
 
+# Plan 28.4 Stage 8: Starlark replacement for the deleted Rust impl
+# of `ctx.coverage_instrumented` in
+# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`. Reads
+# the per-build `--collect_code_coverage` flag via a kuro-internal
+# Starlark global registered in
+# `app/kuro_interpreter_for_build/src/interpreter/functions/kuro_runtime.rs`.
+#
+# The previous Rust impl ignored both `this` and `dep` arguments —
+# it always returned the global flag — so the migrated function
+# preserves that behaviour. If kuro ever supports per-target
+# instrumentation lists, the per-dep branch will land here.
+# `dep` is accepted (Bazel signature parity) but ignored — the Rust
+# impl ignored it too. If/when kuro tracks per-target instrumentation
+# lists, branch on `dep != None` here.
+def _kuro_coverage_instrumented(dep = None):  # buildifier: disable=unused-variable
+    return kuro_collect_code_coverage()
+
 # Plan 28.4 Stage 7: Starlark replacement for the deleted Rust impl
 # of `ctx.tokenize` (and its `shell_tokenize` helper) in
 # `app/kuro_build_api/src/interpreter/rule_defs/context.rs`. Pure
@@ -253,8 +270,8 @@ def _make_rule_facade(raw_ctx, kind):
         target_platform_has_constraint = _kuro_target_platform_has_constraint,
         package_relative_label = _package_relative_label_bound,
         tokenize = _kuro_tokenize,
+        coverage_instrumented = _kuro_coverage_instrumented,
         # ---- AnalysisContext methods passed through (bound to raw_ctx) ----
-        coverage_instrumented = raw_ctx.coverage_instrumented,
         runfiles = raw_ctx.runfiles,
         expand_make_variables = raw_ctx.expand_make_variables,
         resolve_tools = raw_ctx.resolve_tools,

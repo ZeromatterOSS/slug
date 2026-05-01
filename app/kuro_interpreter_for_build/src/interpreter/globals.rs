@@ -32,6 +32,7 @@ use crate::attrs::attrs_global::register_attrs;
 use crate::interpreter::functions::dedupe::register_dedupe;
 use crate::interpreter::functions::host_info::register_host_info;
 use crate::interpreter::functions::internals::register_internals;
+use crate::interpreter::functions::kuro_runtime::register_kuro_runtime;
 use crate::interpreter::functions::load_symbols::register_load_symbols;
 use crate::interpreter::functions::path::register_path;
 use crate::interpreter::functions::read_config::register_read_config;
@@ -109,6 +110,9 @@ pub fn register_analysis_natives(builder: &mut GlobalsBuilder) {
     from_late_binding(&REGISTER_BUCK2_BUILD_API_GLOBALS, builder);
     register_promise(builder);
     from_late_binding(&REGISTER_BUCK2_ANON_TARGETS_GLOBALS, builder);
+    // Plan 28.4: kuro-internal hooks consumed by the bundled
+    // `@kuro_builtins//:exports.bzl`. Each name is `kuro_*`-prefixed.
+    register_kuro_runtime(builder);
 }
 
 pub fn register_bxl_natives(builder: &mut GlobalsBuilder) {

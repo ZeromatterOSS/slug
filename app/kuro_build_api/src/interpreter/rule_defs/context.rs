@@ -1093,18 +1093,12 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         Ok(heap.alloc(AllocList::EMPTY))
     }
 
-    /// Returns whether a target should be instrumented for coverage (Bazel-compatible).
-    ///
-    /// If dep is provided, returns whether that dependency is instrumented.
-    /// If dep is None, returns whether the current rule is instrumented.
-    #[allow(unused_variables)]
-    fn coverage_instrumented<'v>(
-        this: RefAnalysisContext,
-        #[starlark(default = NoneType)] dep: Value<'v>,
-    ) -> starlark::Result<bool> {
-        let _ = (this, dep);
-        Ok(crate::interpreter::rule_defs::build_config::get_collect_code_coverage())
-    }
+    // `coverage_instrumented` migrated to Starlark in Plan 28.4
+    // Stage 8. The bundled `_kuro_coverage_instrumented` reads the
+    // per-build flag via the `kuro_collect_code_coverage()` global
+    // registered in
+    // `kuro_interpreter_for_build::interpreter::functions::kuro_runtime`.
+    // Single-owner per Plan 28.7.
 
     // `tokenize` migrated to Starlark in Plan 28.4 Stage 7. The
     // bundled `_kuro_tokenize` in `@kuro_builtins//:exports.bzl`
