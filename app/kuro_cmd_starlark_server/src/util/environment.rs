@@ -71,7 +71,10 @@ impl Environment {
 
     pub(crate) async fn get_names(
         &self,
-        path_type: StarlarkFileType,
+        // Plan 28.6 PR 4: previously gated the prelude `native`-struct
+        // scrape on Buck file paths; that scrape is gone. Kept on the
+        // signature for callers that still pass it.
+        _path_type: StarlarkFileType,
         dice: &DiceTransaction,
     ) -> kuro_error::Result<HashSet<String>> {
         let mut dice = dice.clone();

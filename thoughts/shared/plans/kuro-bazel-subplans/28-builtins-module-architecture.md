@@ -1,4 +1,4 @@
-# Plan 28: Bazel Builtins Module Architecture
+# Plan 28: Bazel Builtins Module Architecture  [COMPLETE 2026-05-01]
 
 > **Main Plan**:
 > [2026-01-21-kuro-bazel-compatible-build-tool.md](../2026-01-21-kuro-bazel-compatible-build-tool.md)
@@ -8,6 +8,34 @@
 > - [Plan 05: Builtins Compatibility](./05-builtins-compatibility.md)
 > - [Plan 15: Bazel 9 Parity](./15-bazel-9-parity.md)
 > - [Plan 27: Native Language Rule Removal](./27-native-language-rule-removal.md)
+
+## Final Status (2026-05-01)
+
+All seven phases landed. The `@kuro_builtins` bundled cell is the
+single source of BUILD-global construction; the Buck2-era prelude
+pipeline is gone.
+
+| Phase | Status | Key commit(s) |
+|-------|--------|--------------|
+| 28.1 Feasibility spike | Done | research doc 2026-04-30 |
+| 28.2 Bundled builtins loader | Done | `d385e3c7` |
+| 28.3 Initial Starlark exports | Done | `cbf338c4` |
+| 28.4 Rule implementation wrapper | Done — 12 ctx methods migrated | Stages 1-14 (most recent: `eeb3404d`) |
+| 28.5 Native struct + BUILD global integration | Done | `f792a53c` |
+| 28.6 Buck2 prelude disposition | Done — 4 PRs | `71cb86bf`, `ffcdab40`, `7072e9bd`, `eaf0be62` |
+| 28.7 Migration discipline | Ongoing meta-rule | enforced per-stage |
+
+What survives in `prelude/`: a near-empty `prelude.bzl` (cell
+entry point), `BUCK`, `asserts.bzl`, six `utils/` files
+(source_listing, argfile, graph_utils, expect, type_defs), the
+`bxl/` extension namespace, and `toolchains/` (referenced by
+`kuro init` template strings — defer cleanup).
+
+Deferred follow-ups (all low priority):
+- Delete the `PreludePath` type and the `@prelude` cell registration.
+- Restrict or rename the `__kuro_builtins__` Rust namespace.
+- Delete `prelude/toolchains/` after `kuro init` migrates to
+  `rules_*` references.
 
 ## Scope
 

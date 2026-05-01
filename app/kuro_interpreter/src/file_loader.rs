@@ -8,20 +8,15 @@
  * above-listed licenses.
  */
 
-use std::iter;
 use std::sync::Arc;
 
 use allocative::Allocative;
 use derivative::Derivative;
 use dupe::Dupe;
-use either::Either;
 use kuro_core::bzl::ImportPath;
-use kuro_error::conversion::from_any_with_tag;
 use starlark::codemap::FileSpan;
 use starlark::environment::FrozenModule;
 use starlark::eval::FileLoader;
-use starlark::values::FrozenValue;
-use starlark::values::structs::FrozenStructRef;
 use starlark_map::ordered_map::OrderedMap;
 
 use crate::paths::module::OwnedStarlarkModulePath;

@@ -157,7 +157,10 @@ async fn get_builtin_globals_docs(dice_ctx: &mut DiceTransaction) -> kuro_error:
 
 async fn get_prelude_docs(
     ctx: &DiceTransaction,
-    existing_globals: &HashSet<&str>,
+    // Plan 28.6 PR 4: `existing_globals` was used by the deleted
+    // `native`-struct promotion path; kept on the signature for
+    // API stability but no longer consulted.
+    _existing_globals: &HashSet<&str>,
 ) -> kuro_error::Result<Option<(ImportPath, DocModule)>> {
     let ctx = &mut ctx.clone();
     let cell_resolver = ctx.get_cell_resolver().await?;
@@ -168,13 +171,7 @@ async fn get_prelude_docs(
 
     let module = ctx.get_loaded_module_from_import_path(import_path).await?;
     let frozen_module = module.env();
-    let mut module_docs = frozen_module.documentation();
-
-    // Plan 28.6 PR 4: prelude `native`-struct promotion removed.
-    // BUILD-file globals come from Rust top-level globals +
-    // bundled `@kuro_builtins` exports; the LSP doc layer no
-    // longer needs to scrape a `native` struct from the prelude
-    // module.
+    let module_docs = frozen_module.documentation();
 
     Ok(Some((import_path.clone(), module_docs)))
 }
