@@ -346,7 +346,7 @@ Do not start with:
   Starlark.
 - The moved behavior has a Bazel 9 parity citation.
 
-## Phase 28.4: Rule Implementation Wrapper  [Stage 9 done 2026-05-01]
+## Phase 28.4: Rule Implementation Wrapper  [Stages 10-14 done 2026-05-01 — all ctx-method migrations complete]
 
 ### Status
 
@@ -646,6 +646,99 @@ Acceptance:
   analyze 123 ms — *under* Stage 6's 156 ms; well within run-to-run
   noise, no regression).
 
+### Stages 10-14 (`new_file`, `resolve_tools`, `resolve_command`, `expand_location`, `runfiles`)
+
+Stages 10-14 ran as five parallel Sonnet agents in isolated git
+worktrees, then merged sequentially onto `main` with field-list
+conflict resolution in `_make_rule_facade`. Each stage follows the
+patterns landed in Stages 3-9; this section captures the
+per-method specifics.
+
+**Stage 10 — `ctx.new_file`** (commit `42eb7ada`). Trivial wrapper:
+the deprecated two-shape API (`new_file(filename)` and
+`new_file(sibling, filename)`) delegates to
+`raw_ctx.actions.declare_file(name)`. The sibling is ignored
+to match the deleted Rust impl byte-for-byte. No new
+kuro_runtime hooks needed.
+
+**Stage 11 — `ctx.resolve_tools`** (commit `17e5b499`). Pure
+Starlark: iterates `tools`, reads `dep[DefaultInfo].default_outputs`
+into a flat list, returns `(files_list, [])`. Top-level helper
+(no `raw_ctx` access), bound directly in the facade — Stage 7's
+pattern.
+
+**Stage 12 — `ctx.resolve_command`** (folded into commit `17e5b499`
+during the parallel-agent run). Composes Stages 11 and 13: collects
+inputs via inline `DefaultInfo.default_outputs` traversal, runs
+`$(location ...)` expansion via `_kuro_expand_location` (post-merge
+fix; the agent's draft used `raw_ctx.expand_location` which broke
+once Stage 13 deleted the Rust impl), and applies literal
+`$(KEY)` → `value` substitution from `make_variables`. `attribute`
+and `execution_requirements` accepted-and-ignored to match the
+deleted impl.
+
+**Stage 13 — `ctx.expand_location`** (commit `5bc986a6`). Largest
+single migration in 28.4: ~330 LOC of Rust deleted (the method body
+plus the free helper `expand_location_in_string`). Two new
+kuro_runtime hooks keep the unimplementable-in-Starlark pieces
+Rust-side:
+
+- `kuro_collect_location_pool(raw_ctx, targets)` — builds the
+  eager label→paths pool by walking `targets` plus the implicit
+  attrs struct (Dependency / artifact values from srcs / data /
+  tools attrs). Requires `StructRef::iter()` and
+  `downcast_ref::<Dependency / StarlarkArtifact /
+  StarlarkDeclaredArtifact>()`, none reachable from Starlark
+  without wider surface.
+- `kuro_lookup_output_path(raw_ctx, label_str)` — lazily resolves
+  `attr.output` / `attr.output_list` label strings to artifact
+  paths. Deferred so only the specific output attr containing the
+  query label triggers `CtxOutputs.declare_output` (calling it
+  eagerly for every string-typed attr would leave unbound
+  artifacts).
+
+The Starlark side handles eight verb forms (`location` / `locations`
+/ `execpath` / `execpaths` / `rootpath` / `rootpaths` /
+`rlocationpath` / `rlocationpaths`), the for-loop-with-cursor
+parser idiom from Stage 7, and the `_find_paths_for_label` matcher
+mirroring the deleted Rust `find_paths` closure (exact match,
+target-name fallback, path-suffix fallback). `short_paths=True` is
+accepted for Bazel signature parity but is a no-op (the Rust impl
+also did not differentiate path forms).
+
+**Stage 14 — `ctx.runfiles`** (commit `a06d3c2e`). Two new
+kuro_runtime hooks:
+- `kuro_create_runfiles(files, transitive_files, symlinks,
+  root_symlinks)` — delegates to the already-`pub`
+  `default_info::create_runfiles`.
+- `kuro_collect_runfiles_into(runfiles, attr_value, want_data)` —
+  delegates to the now-`pub`
+  `context::collect_runfiles_from_value`. Takes the attr value
+  pre-extracted by Starlark via `getattr(raw_ctx.attrs, name,
+  None)`, avoiding any AttrSet introspection on the Rust side.
+
+The Starlark side composes the base Runfiles via
+`kuro_create_runfiles`, then walks `deps` / `runtime_deps` /
+`data` attrs through `kuro_collect_runfiles_into` based on the
+`collect_default` / `collect_data` flags.
+
+Acceptance — all five stages:
+- `tests/core/analysis/test_native_rules.py` — five new tests
+  (`test_28_4_stage10_new_file_starlark` through
+  `test_28_4_stage14_runfiles_starlark`). Together with Stages
+  3-9, the suite is at 119 passing + 5 pre-existing toolchain
+  failures + 3 skip + 1 deselect.
+- LLVM Demangle smoke clean (8 actions, ~2 s, analyze ~270 ms).
+- LLVM Support smoke clean (183 actions, ~15 s, analyze ~75 ms
+  cold). Within run-to-run noise vs Stage 9's 123 ms.
+
+**Phase 28.4 status: complete.** The facade in
+`_make_rule_facade` now serves all twelve previously-Rust ctx
+methods from Starlark; the only remaining pass-throughs are
+attribute getters (`attrs`, `actions`, `label`, etc.) and the
+`build_setting_value` getter, all of which are pure data
+accessors with no migration value.
+
 ### Stack-trace fidelity (inspected 2026-04-30)
 
 End-user error messages with the facade installed, observed against
@@ -681,6 +774,9 @@ migrated that the cumulative typo cost justifies a custom Starlark
 type for the facade.
 
 ### Remaining for Phase 28.4
+
+All ctx-method migrations complete (Stages 3, 6-14). The only
+remaining bullet is a low-priority polish item:
 
 - (Optional) Custom Starlark type for the rule facade so missing-
   attribute errors say `Object of type 'AnalysisContext'` instead
