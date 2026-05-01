@@ -19,7 +19,6 @@ use crate::file_loader::LoadedModule;
 use crate::file_loader::ModuleDeps;
 use crate::paths::module::StarlarkModulePath;
 use crate::paths::package::PackageFilePath;
-use crate::prelude_path::PreludePath;
 
 #[async_trait]
 pub trait InterpreterCalculationImpl: Send + Sync + 'static {
@@ -43,11 +42,6 @@ pub trait InterpreterCalculationImpl: Send + Sync + 'static {
     ) -> kuro_error::Result<Option<(PackageFilePath, Vec<ImportPath>)>>;
 
     async fn global_env(&self, ctx: &mut DiceComputations<'_>) -> kuro_error::Result<Globals>;
-
-    async fn prelude_import(
-        &self,
-        ctx: &mut DiceComputations<'_>,
-    ) -> kuro_error::Result<Option<PreludePath>>;
 }
 
 pub static INTERPRETER_CALCULATION_IMPL: LateBinding<&'static dyn InterpreterCalculationImpl> =

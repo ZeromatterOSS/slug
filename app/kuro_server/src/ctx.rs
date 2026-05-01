@@ -107,7 +107,6 @@ use kuro_interpreter::extra::InterpreterHostArchitecture;
 use kuro_interpreter::extra::InterpreterHostPlatform;
 use kuro_interpreter::extra::xcode::XcodeVersionInfo;
 use kuro_interpreter::factory::SetProfileEventListener;
-use kuro_interpreter::prelude_path::prelude_path;
 use kuro_interpreter_for_build::interpreter::configuror::BuildInterpreterConfiguror;
 use kuro_interpreter_for_build::interpreter::cycles::LoadCycleDescriptor;
 use kuro_interpreter_for_build::interpreter::interpreter_setup::setup_interpreter;
@@ -648,7 +647,6 @@ impl DiceUpdater for DiceCommandUpdater<'_, '_> {
         let cell_resolver = cells_and_configs.cell_resolver;
 
         let configuror = BuildInterpreterConfiguror::new(
-            prelude_path(&cell_resolver)?,
             self.interpreter_platform,
             self.interpreter_architecture,
             self.interpreter_xcode_version.clone(),

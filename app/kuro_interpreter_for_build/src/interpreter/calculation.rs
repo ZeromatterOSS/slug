@@ -36,7 +36,6 @@ use kuro_interpreter::paths::module::StarlarkModulePath;
 use kuro_interpreter::paths::package::PackageFilePath;
 use kuro_interpreter::paths::path::OwnedStarlarkPath;
 use kuro_interpreter::paths::path::StarlarkPath;
-use kuro_interpreter::prelude_path::PreludePath;
 use kuro_node::metadata::key::MetadataKey;
 use kuro_node::nodes::eval_result::EvaluationResult;
 use kuro_node::nodes::frontend::TARGET_GRAPH_CALCULATION_IMPL;
@@ -231,18 +230,6 @@ impl InterpreterCalculationImpl for InterpreterCalculationInstance {
 
     async fn global_env(&self, ctx: &mut DiceComputations<'_>) -> kuro_error::Result<Globals> {
         Ok(ctx.get_global_interpreter_state().await?.globals().dupe())
-    }
-
-    async fn prelude_import(
-        &self,
-        ctx: &mut DiceComputations<'_>,
-    ) -> kuro_error::Result<Option<PreludePath>> {
-        Ok(ctx
-            .get_global_interpreter_state()
-            .await?
-            .configuror
-            .prelude_import()
-            .cloned())
     }
 }
 

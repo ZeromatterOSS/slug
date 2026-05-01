@@ -38,7 +38,6 @@ use kuro_interpreter::import_paths::ImplicitImportPaths;
 use kuro_interpreter::paths::module::OwnedStarlarkModulePath;
 use kuro_interpreter::paths::module::StarlarkModulePath;
 use kuro_interpreter::paths::path::StarlarkPath;
-use kuro_interpreter::prelude_path::PreludePath;
 use kuro_node::nodes::eval_result::EvaluationResult;
 use kuro_node::nodes::targets_map::TargetsMap;
 use kuro_node::super_package::SuperPackage;
@@ -61,7 +60,6 @@ pub struct Tester {
     root_config: LegacyBuckConfig,
     loaded_modules: LoadedModules,
     additional_globals: Vec<AdditionalGlobalsFn>,
-    prelude_path: Option<PreludePath>,
     current_dir_with_allowed_relative_dirs: Arc<CellPathWithAllowedRelativeDir>,
 }
 
@@ -157,7 +155,6 @@ impl Tester {
             root_config,
             loaded_modules: LoadedModules::default(),
             additional_globals: Vec::new(),
-            prelude_path: None,
             current_dir_with_allowed_relative_dirs: current_dir_with_allowed_relative_dirs.into(),
         })
     }
@@ -168,10 +165,6 @@ impl Tester {
     ) {
         self.additional_globals
             .push(AdditionalGlobalsFn(Arc::new(additional_globals)));
-    }
-
-    pub fn set_prelude(&mut self, prelude_import: ImportPath) {
-        self.prelude_path = Some(PreludePath::testing_new(prelude_import));
     }
 
     fn interpreter(&self) -> kuro_error::Result<Arc<InterpreterForDir>> {
@@ -192,7 +185,6 @@ impl Tester {
             Arc::new(GlobalInterpreterState::new(
                 self.cell_resolver.dupe(),
                 BuildInterpreterConfiguror::new(
-                    self.prelude_path.clone(),
                     InterpreterHostPlatform::Linux,
                     InterpreterHostArchitecture::X86_64,
                     None,

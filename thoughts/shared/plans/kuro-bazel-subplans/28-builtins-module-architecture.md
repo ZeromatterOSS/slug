@@ -1,4 +1,4 @@
-# Plan 28: Bazel Builtins Module Architecture  [COMPLETE 2026-05-01]
+# Plan 28: Bazel Builtins Module Architecture  [Phases 28.1-28.6 done 2026-05-01; follow-ups remaining]
 
 > **Main Plan**:
 > [2026-01-21-kuro-bazel-compatible-build-tool.md](../2026-01-21-kuro-bazel-compatible-build-tool.md)
@@ -31,8 +31,22 @@ entry point), `BUCK`, `asserts.bzl`, six `utils/` files
 `bxl/` extension namespace, and `toolchains/` (referenced by
 `kuro init` template strings — defer cleanup).
 
-Deferred follow-ups (all low priority):
-- Delete the `PreludePath` type and the `@prelude` cell registration.
+Deferred follow-ups:
+- ~~Delete the `PreludePath` type and the `@prelude` cell registration.~~
+  **Done 2026-05-01** (this session). Deleted
+  `app/kuro_interpreter/src/prelude_path.rs`, the
+  `prelude_import` field on `BuildInterpreterConfiguror`, the
+  same-named async trait method on `InterpreterCalculationImpl`,
+  the `is_prelude_path` rebind in `interpreter_for_dir.rs::parse`,
+  the `prelude_import` helper there, the prelude-cell typecheck
+  branch, and four downstream callers (`lsp.rs::get_prelude_docs`,
+  `cmd_starlark_server/util/environment.rs::Environment::prelude`,
+  `cmd_audit_server/prelude.rs`, `kuro_server/src/ctx.rs`). Also
+  removed the `prelude_is_included` test in
+  `kuro_interpreter_for_build_tests`. The `@prelude` cell is still
+  bundled (via `app/kuro_external_cells_bundled`) so explicit
+  `load("@prelude//utils:argfile.bzl", ...)` still resolves; what
+  went away is the legacy implicit-prelude path.
 - Restrict or rename the `__kuro_builtins__` Rust namespace.
 - Delete `prelude/toolchains/` after `kuro init` migrates to
   `rules_*` references.

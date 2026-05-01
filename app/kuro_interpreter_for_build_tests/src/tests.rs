@@ -61,7 +61,6 @@ pub(crate) async fn calculation(fs: &ProjectRootTemp) -> DiceTransaction {
     ctx.set_cell_resolver(resolver.dupe()).unwrap();
     ctx.set_interpreter_context(
         BuildInterpreterConfiguror::new(
-            None,
             InterpreterHostPlatform::Linux,
             InterpreterHostArchitecture::X86_64,
             None,

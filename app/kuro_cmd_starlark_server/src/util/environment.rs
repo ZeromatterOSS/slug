@@ -18,16 +18,12 @@ use kuro_interpreter::file_type::StarlarkFileType;
 use kuro_interpreter::import_paths::HasImportPaths;
 use kuro_interpreter::load_module::INTERPRETER_CALCULATION_IMPL;
 use kuro_interpreter::load_module::InterpreterCalculation;
-use kuro_interpreter::prelude_path::PreludePath;
 use starlark::environment::Globals;
 
 /// The environment in which a Starlark file is evaluated.
 pub(crate) struct Environment {
     /// The globals that are driven from Rust.
     pub(crate) globals: Globals,
-    /// The path to the prelude, if the prelude is loaded in this file.
-    /// Note that in a BUCK file the `native` value is also exploded into the top-level.
-    prelude: Option<PreludePath>,
     /// A path that is implicitly loaded as additional globals.
     preload: Option<ImportPath>,
 }
@@ -35,45 +31,27 @@ pub(crate) struct Environment {
 impl Environment {
     pub(crate) async fn new(
         cell: CellName,
-        path_type: StarlarkFileType,
+        // Plan 28 follow-up: prelude/PreludePath removed; the parameter
+        // stays on the signature for binary-API stability with callers
+        // that still pass `StarlarkFileType::Buck` etc.
+        _path_type: StarlarkFileType,
         dice: &mut DiceTransaction,
     ) -> kuro_error::Result<Environment> {
-        // Find the information from the globals
         let globals = INTERPRETER_CALCULATION_IMPL.get()?.global_env(dice).await?;
 
-        // Next grab the prelude, unless we are in the prelude cell and not a build file
-        let prelude = match INTERPRETER_CALCULATION_IMPL
-            .get()?
-            .prelude_import(dice)
-            .await?
-        {
-            Some(prelude)
-                if path_type == StarlarkFileType::Buck || prelude.import_path().cell() != cell =>
-            {
-                Some(prelude)
-            }
-            _ => None,
-        };
-
-        // Now grab the pre-load things
         let preload = dice
             .import_paths_for_cell(BuildFileCell::new(cell))
             .await?
             .root_import()
             .cloned();
 
-        Ok(Environment {
-            globals,
-            prelude,
-            preload,
-        })
+        Ok(Environment { globals, preload })
     }
 
     pub(crate) async fn get_names(
         &self,
-        // Plan 28.6 PR 4: previously gated the prelude `native`-struct
-        // scrape on Buck file paths; that scrape is gone. Kept on the
-        // signature for callers that still pass it.
+        // Plan 28 follow-up: parameter retained on the signature for
+        // binary-API stability after the prelude scrape was removed.
         _path_type: StarlarkFileType,
         dice: &DiceTransaction,
     ) -> kuro_error::Result<HashSet<String>> {
@@ -82,19 +60,6 @@ impl Environment {
 
         for x in self.globals.names() {
             names.insert(x.as_str().to_owned());
-        }
-
-        if let Some(prelude) = &self.prelude {
-            let m = dice
-                .get_loaded_module_from_import_path(prelude.import_path())
-                .await?;
-            for x in m.env().names() {
-                names.insert(x.as_str().to_owned());
-            }
-            // Plan 28.6 PR 4: prelude `native`-struct scrape removed.
-            // BUCK globals are top-level Rust globals + bundled
-            // `@kuro_builtins` exports; both are already covered by
-            // `m.env().names()` above, so no extra iteration needed.
         }
 
         if let Some(preload) = &self.preload {

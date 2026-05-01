@@ -315,51 +315,9 @@ fn test_root_import() {
     assert_eq!(vec!["hello"], target_names);
 }
 
-#[test]
-fn prelude_is_included() -> kuro_error::Result<()> {
-    let mut tester = Tester::new()?;
-    let prelude_path = ImportPath::testing_new("root//prelude:prelude.bzl");
-    tester.set_prelude(prelude_path.clone());
-
-    let prelude = tester.eval_import(&prelude_path, "some_var = 1", LoadedModules::default())?;
-    let mut loaded_modules = LoadedModules::default();
-    loaded_modules
-        .map
-        .insert(OwnedStarlarkModulePath::LoadFile(prelude_path), prelude);
-
-    // The prelude should be included in build files, and in .bzl files that are not in the
-    // prelude's package
-    let build_file = BuildFilePath::testing_new("root//prelude:TARGETS.v2");
-    assert!(
-        tester
-            .eval_build_file_with_loaded_modules(
-                &build_file,
-                "other_var = some_var",
-                loaded_modules.clone(),
-                PackageListing::testing_empty()
-            )
-            .is_ok(),
-        "build files in the prelude package should have access to the prelude"
-    );
-
-    let import = ImportPath::testing_new("root//not_prelude:sibling.bzl");
-    assert!(
-        tester
-            .eval_import(&import, "other_var = some_var", loaded_modules.clone())
-            .is_ok(),
-        ".bzl files not in the prelude package should have access to the prelude"
-    );
-
-    let import = ImportPath::testing_new("root//prelude:defs.bzl");
-    assert!(
-        tester
-            .eval_import(&import, "other_var = some_var", loaded_modules)
-            .is_err(),
-        "bzl files in the prelude package should NOT have access to the prelude"
-    );
-
-    Ok(())
-}
+// Plan 28 follow-up: `prelude_is_included` test removed — the
+// PreludePath machinery and `Tester::set_prelude` it exercised
+// are gone with the prelude pipeline.
 
 #[test]
 fn test_package_import() -> kuro_error::Result<()> {

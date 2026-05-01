@@ -50,7 +50,6 @@ use kuro_interpreter::allow_relative_paths::HasAllowRelativePaths;
 use kuro_interpreter::load_module::InterpreterCalculation;
 use kuro_interpreter::paths::module::OwnedStarlarkModulePath;
 use kuro_interpreter::paths::path::OwnedStarlarkPath;
-use kuro_interpreter::prelude_path::prelude_path;
 use kuro_interpreter_for_build::interpreter::dice_calculation_delegate::HasCalculationDelegate;
 use kuro_interpreter_for_build::interpreter::global_interpreter_state::HasGlobalInterpreterState;
 use kuro_interpreter_for_build::interpreter::interpreter_for_dir::ParseData;
@@ -136,13 +135,8 @@ impl DocsCacheManager {
         let cell_resolver = dice_ctx.get_cell_resolver().await?;
         builtin_docs.push((None, get_builtin_globals_docs(dice_ctx).await?));
 
-        let builtin_names = builtin_docs
-            .iter()
-            .flat_map(|(_, d)| d.members.keys().map(|s| s.as_str()))
-            .collect();
-        if let Some((import_path, docs)) = get_prelude_docs(dice_ctx, &builtin_names).await? {
-            builtin_docs.push((Some(import_path), docs));
-        }
+        // Plan 28 follow-up: prelude docs are no longer scraped — the
+        // prelude/PreludePath machinery has been removed.
         DocsCache::new(&builtin_docs, fs, &cell_resolver).await
     }
 }
@@ -153,27 +147,6 @@ async fn get_builtin_globals_docs(dice_ctx: &mut DiceTransaction) -> kuro_error:
         .await?
         .globals()
         .documentation())
-}
-
-async fn get_prelude_docs(
-    ctx: &DiceTransaction,
-    // Plan 28.6 PR 4: `existing_globals` was used by the deleted
-    // `native`-struct promotion path; kept on the signature for
-    // API stability but no longer consulted.
-    _existing_globals: &HashSet<&str>,
-) -> kuro_error::Result<Option<(ImportPath, DocModule)>> {
-    let ctx = &mut ctx.clone();
-    let cell_resolver = ctx.get_cell_resolver().await?;
-    let Some(prelude_path) = prelude_path(&cell_resolver)? else {
-        return Ok(None);
-    };
-    let import_path = prelude_path.import_path();
-
-    let module = ctx.get_loaded_module_from_import_path(import_path).await?;
-    let frozen_module = module.env();
-    let module_docs = frozen_module.documentation();
-
-    Ok(Some((import_path.clone(), module_docs)))
 }
 
 /// Store rendered starlark representations of Doc objects for builtin symbols,

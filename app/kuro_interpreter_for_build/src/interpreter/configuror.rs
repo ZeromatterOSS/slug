@@ -24,7 +24,6 @@ use kuro_interpreter::extra::xcode::XcodeVersionInfo;
 use kuro_interpreter::file_loader::LoadedModules;
 use kuro_interpreter::package_imports::ImplicitImport;
 use kuro_interpreter::paths::module::StarlarkModulePath;
-use kuro_interpreter::prelude_path::PreludePath;
 use kuro_node::super_package::SuperPackage;
 use starlark::environment::GlobalsBuilder;
 
@@ -59,14 +58,6 @@ impl PartialEq for AdditionalGlobalsFn {
 
 #[derive(Clone, Debug, PartialEq, Allocative)]
 pub struct BuildInterpreterConfiguror {
-    /// Path to prelude import (typically `prelude//:prelude.bzl`).
-    ///
-    /// It serves two purposes:
-    /// * It defines symbols imported into each file (e.g. rule definitions)
-    /// * Parent directory of prelude import (e.g. `prelude//`) is considered special:
-    ///   imports from that directory are evaluated with prelude cell context,
-    ///   not with caller cell context (see the comments in `resolve_load`)
-    prelude_import: Option<PreludePath>,
     host_info: HostInfo,
     record_target_call_stack: bool,
     skip_targets_with_duplicate_names: bool,
@@ -77,7 +68,6 @@ pub struct BuildInterpreterConfiguror {
 
 impl BuildInterpreterConfiguror {
     pub fn new(
-        prelude_import: Option<PreludePath>,
         host_platform: InterpreterHostPlatform,
         host_architecture: InterpreterHostArchitecture,
         host_xcode_version: Option<XcodeVersionInfo>,
@@ -87,7 +77,6 @@ impl BuildInterpreterConfiguror {
         global_target_interner: Arc<ConcurrentTargetLabelInterner>,
     ) -> kuro_error::Result<Arc<Self>> {
         Ok(Arc::new(Self {
-            prelude_import,
             host_info: HostInfo::new(host_platform, host_architecture, host_xcode_version),
             record_target_call_stack,
             skip_targets_with_duplicate_names,
@@ -155,9 +144,5 @@ impl BuildInterpreterConfiguror {
             package_listing,
             super_package,
         ))
-    }
-
-    pub fn prelude_import(&self) -> Option<&PreludePath> {
-        self.prelude_import.as_ref()
     }
 }

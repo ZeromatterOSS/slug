@@ -162,7 +162,6 @@ async fn test_analysis_calculation() -> kuro_error::Result<()> {
         &mut dice,
         resolver,
         BuildInterpreterConfiguror::new(
-            None,
             InterpreterHostPlatform::Linux,
             InterpreterHostArchitecture::X86_64,
             None,

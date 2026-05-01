@@ -49,7 +49,6 @@ use kuro_interpreter::paths::module::StarlarkModulePath;
 use kuro_interpreter::paths::package::PackageFilePath;
 use kuro_interpreter::paths::path::OwnedStarlarkPath;
 use kuro_interpreter::paths::path::StarlarkPath;
-use kuro_interpreter::prelude_path::PreludePath;
 use kuro_interpreter::print_handler::EventDispatcherPrintHandler;
 use kuro_interpreter::soft_error::KuroStarlarkSoftErrorHandler;
 use kuro_interpreter::starlark_profiler::data::StarlarkProfileDataAndStats;
@@ -254,23 +253,10 @@ impl LoadResolver for InterpreterLoadResolver {
             }
         }
 
-        // If importing from the prelude, then do not let that inherit the configuration. This
-        // ensures that if you define a UDR outside of the prelude's cell, it gets the same prelude
-        // as using the exported rules from the prelude would. This matters notably for identity
-        // checks in t-sets, which would fail if we had > 1 copy of the prelude.
-        if let Some(prelude_import) = self.config.global_state.configuror.prelude_import() {
-            if prelude_import.is_prelude_path(&path) {
-                if path.path().extension() == Some("json") {
-                    return Ok(OwnedStarlarkModulePath::JsonFile(
-                        ImportPath::new_same_cell(path)?,
-                    ));
-                } else {
-                    return Ok(OwnedStarlarkModulePath::LoadFile(
-                        ImportPath::new_same_cell(path)?,
-                    ));
-                }
-            }
-        }
+        // Plan 28 follow-up: the prelude same-cell-import rebind (so a
+        // UDR loaded from outside the prelude cell still saw the prelude
+        // through the prelude cell context) is gone with the
+        // PreludePath machinery.
         let import_path = ImportPath::new_with_build_file_cells(path, self.build_file_cell)?;
         Ok(match import_path.path().path().extension() {
             Some("json") => OwnedStarlarkModulePath::JsonFile(import_path),
@@ -319,30 +305,28 @@ impl InterpreterForDir {
         current_dir_with_allowed_relative_dirs: Arc<CellPathWithAllowedRelativeDir>,
         package_dir: Option<CellPath>,
     ) -> kuro_error::Result<Self> {
-        // In Bazel mode (no prelude), auto-load rules_cc for BUILD files so that
-        // native cc_library/cc_binary/cc_test calls use rules_cc's Starlark
-        // implementations instead of empty native stubs.
-        let rules_cc_autoload = if global_state.configuror.prelude_import().is_none() {
-            cell_info
-                .cell_alias_resolver()
-                .resolve("rules_cc")
+        // Plan 28 follow-up: prelude/PreludePath gone — rules_cc autoload
+        // is now unconditional. Auto-loads rules_cc for BUILD files so
+        // that native cc_library/cc_binary/cc_test calls resolve to
+        // rules_cc's Starlark implementations instead of empty native
+        // stubs.
+        let rules_cc_autoload = cell_info
+            .cell_alias_resolver()
+            .resolve("rules_cc")
+            .ok()
+            .and_then(|_| {
+                parse_import(
+                    cell_info.cell_alias_resolver(),
+                    RelativeImports::Disallow,
+                    "@rules_cc//cc:defs.bzl",
+                )
                 .ok()
-                .and_then(|_| {
-                    parse_import(
-                        cell_info.cell_alias_resolver(),
-                        RelativeImports::Disallow,
-                        "@rules_cc//cc:defs.bzl",
-                    )
-                    .ok()
-                    .and_then(|cell_path| {
-                        ImportPath::new_with_build_file_cells(cell_path, cell_info.name())
-                            .ok()
-                            .map(OwnedStarlarkModulePath::LoadFile)
-                    })
+                .and_then(|cell_path| {
+                    ImportPath::new_with_build_file_cells(cell_path, cell_info.name())
+                        .ok()
+                        .map(OwnedStarlarkModulePath::LoadFile)
                 })
-        } else {
-            None
-        };
+            });
 
         // Plan 28: resolve the bundled `@kuro_builtins//:exports.bzl` once
         // per InterpreterForDir. The cell is auto-registered by
@@ -388,22 +372,11 @@ impl InterpreterForDir {
         starlark_path: StarlarkPath<'_>,
         loaded_modules: &LoadedModules,
     ) -> kuro_error::Result<BuckStarlarkModule> {
-        // Plan 28.6 PR 4: prelude evaluation is no longer used to populate
-        // BUILD globals. Native rules (alias, filegroup, genrule, etc.) and
-        // every name in `__kuro_builtins__` are already top-level globals
-        // via `register_all_natives` in `globals.rs::base_globals`. The
-        // legacy `extra_globals_from_prelude_for_buck_files` scrape over
-        // `prelude/native.bzl`'s `native` struct was a Buck2-era duplication
-        // and has been removed.
-        //
-        // The `PreludePath` machinery (`configuror.prelude_import()`,
-        // `prelude_path.rs`) is intentionally retained: workspaces that
-        // register an `@prelude` cell still get it loaded into
-        // `loaded_modules`, and the path is needed for identity-stable
-        // imports during transitive-set checks (see the `is_prelude_path`
-        // arm in `parse()` above). Once no workspace registers a prelude
-        // cell, the type can go too.
-        let _ = self.prelude_import(starlark_path);
+        // Plan 28 follow-up: prelude/PreludePath machinery removed.
+        // BUILD globals come from `register_all_natives` in
+        // `globals.rs::base_globals` plus the bundled `@kuro_builtins`
+        // autoload below.
+        let _ = starlark_path;
 
         // Plan 28: inject names from `@kuro_builtins//:exports.bzl`'s
         // `exported_toplevels` dict into the consuming env.
@@ -571,27 +544,6 @@ impl InterpreterForDir {
         self.implicit_import_paths.root_import.clone()
     }
 
-    fn prelude_import(&self, import: StarlarkPath) -> Option<&PreludePath> {
-        let prelude_import = self.global_state.configuror.prelude_import();
-        if let Some(prelude_import) = prelude_import {
-            let import_path = import.path();
-
-            match import {
-                StarlarkPath::BuildFile(_)
-                | StarlarkPath::PackageFile(_)
-                | StarlarkPath::BxlFile(_) => return Some(prelude_import),
-                StarlarkPath::LoadFile(_) => {
-                    if !prelude_import.is_prelude_path(&import_path) {
-                        return Some(prelude_import);
-                    }
-                }
-                StarlarkPath::JsonFile(_) | StarlarkPath::TomlFile(_) => return None,
-            }
-        }
-
-        None
-    }
-
     /// Parses skylark code to an AST.
     pub(crate) fn parse(
         self: &Arc<Self>,
@@ -627,9 +579,6 @@ impl InterpreterForDir {
             }
         };
         let mut implicit_imports = Vec::new();
-        if let Some(i) = self.prelude_import(import) {
-            implicit_imports.push(OwnedStarlarkModulePath::LoadFile(i.import_path().clone()));
-        }
         // Plan 28: autoload @kuro_builtins for both BUILD and .bzl paths,
         // EXCEPT inside the kuro_builtins cell itself (a bundled .bzl
         // can't load itself). Fires for every cell and every file kind.
@@ -751,14 +700,7 @@ impl InterpreterForDir {
                 StarlarkModulePath::TomlFile(t) => PerFileTypeContext::Toml(t.clone()),
             };
             let typecheck = self.global_state.unstable_typecheck
-                || matches!(starlark_path, StarlarkModulePath::BxlFile(..))
-                || match self.global_state.configuror.prelude_import() {
-                    Some(prelude_import) => {
-                        prelude_import.prelude_cell()
-                            == self.cell_info.cell_alias_resolver().resolve_self()
-                    }
-                    None => false,
-                };
+                || matches!(starlark_path, StarlarkModulePath::BxlFile(..));
             let (finished_eval, _) = self.eval(
                 &env,
                 ast,
