@@ -346,7 +346,7 @@ Do not start with:
   Starlark.
 - The moved behavior has a Bazel 9 parity citation.
 
-## Phase 28.4: Rule Implementation Wrapper  [Stage 5 done 2026-04-30]
+## Phase 28.4: Rule Implementation Wrapper  [Stage 6 done 2026-05-01]
 
 ### Status
 
@@ -474,15 +474,74 @@ Stage 5 closes the per-context-wrapper trio:
   across 183 rules ≈ 90 µs/rule, still well under 1% of analyze
   time).
 
+### Stage 6 (`ctx.package_relative_label`)
+
+Stage 6 is the first Stage 4-style migration of a method that
+*depends* on facade attributes (rather than only on host info baked
+at build time). The Rust impl in `context.rs` was deleted.
+
+- `_kuro_package_relative_label(raw_ctx, label_str)` in
+  `exports.bzl` reads `raw_ctx.label.cell` / `.package` and
+  constructs the resolved label string. `Label(...)` performs
+  canonicalisation via `BazelLabel::parse`. Same input/output
+  contract as the Rust impl, including root-cell elision in
+  `BazelLabel`'s canonical form.
+- Bound via closure inside `_make_rule_facade`:
+  `_package_relative_label_bound(label_str)` captures `raw_ctx`
+  and forwards to the helper. Subsequent migrations of methods
+  that depend on `raw_ctx` follow this pattern (one closure per
+  facade construction, ≤ 1 µs per close).
+- Acceptance test
+  `tests/core/analysis/test_native_rules.py::test_28_4_stage6_package_relative_label_starlark`
+  exercises every branch (`bare_target`, `:target`,
+  `//pkg:target`, `@cell//pkg:target`) and pins the canonical
+  string by round-tripping through `Label()` itself — robust to
+  workspace-name canonicalisation rules.
+- LLVM Support cold analyze ≈ 156 ms (Stage 5 was 207 ms; Stage 2
+  baseline 190 ms). Within run-to-run noise — closure construction
+  and call cost are both negligible.
+
+### Stack-trace fidelity (inspected 2026-04-30)
+
+End-user error messages with the facade installed, observed against
+synthetic typo / wrong-arg fixtures:
+
+- **Source location is preserved.** Errors still pinpoint the exact
+  user-code line and column (`defs.bzl:5:9`, with caret-underlining
+  the offending expression). No regression from pre-Stage-3
+  behaviour.
+- **The wrapper frame is visible in tracebacks.** Every error
+  caused inside a user impl shows one extra frame, e.g.
+  `kuro_builtins/exports.bzl:152, in _invoke_rule` (or
+  `:_invoke_aspect`, `_invoke_subrule`). Mild noise for the user
+  but informative — points at the dispatch site if they need to
+  understand the call shape.
+- **Type-name regression on missing-attribute errors.** Before the
+  facade, a `ctx.typo` error said `Object of type
+  'AnalysisContext'` (or `'aspect_ctx'`). Through the facade it
+  says `Object of type 'struct'`. Source location and field name
+  are unchanged; only the type label is generic. Worth fixing
+  later by switching the facade from `struct()` to a kuro-internal
+  Starlark value type with a friendlier `TYPE` constant.
+- **Migrated-method errors expose internal names.** A wrong-arg
+  `ctx.target_platform_has_constraint()` call reports `Missing
+  parameter constraint_value for call to
+  kuro_builtins/exports.bzl._kuro_target_platform_has_constraint`.
+  Acceptable — the leading underscore tags it as internal and the
+  module path tells the user where to look. No fix needed.
+
+No critical regressions. The type-name issue is the only candidate
+for a follow-up; deferred until enough ctx fields/methods have
+migrated that the cumulative typo cost justifies a custom Starlark
+type for the facade.
+
 ### Remaining for Phase 28.4
 
-- Stack-trace fidelity for user errors when the facade is in the
-  path: frames now go through `_invoke_rule` / `_invoke_aspect` /
-  `_invoke_subrule` → `struct` construction → user impl. Stage 4+
-  migrations should inspect end-user error messages, particularly
-  for the common `Object of type 'struct' has no attribute X` case
-  (no longer references `AnalysisContext` / `AspectContext` types
-  by name in the message).
+- (Optional) Custom Starlark type for the rule facade so missing-
+  attribute errors say `Object of type 'AnalysisContext'` instead
+  of `'struct'`. Same shape as `struct()` but with a typed wrapper
+  Rust value carrying a `SmallMap<StringValue, Value>`. Low
+  priority — see "Stack-trace fidelity" above.
 
 ### Goal
 

@@ -1,5 +1,6 @@
 load(":aspect_facade_proof.bzl", "aspect_facade_collector", "aspect_facade_leaf")
 load(":facade_proof.bzl", "facade_proof")
+load(":package_relative_label_proof.bzl", "package_relative_label_proof")
 load(":subrule_facade_proof.bzl", "subrule_facade_target")
 
 # Plan 28.4 Stage 2 acceptance: prove `rule_implementation_wrapper` is
@@ -27,3 +28,5 @@ aspect_facade_collector(
 )
 
 subrule_facade_target(name = "subrule_facade_target")
+
+package_relative_label_proof(name = "package_relative_label_proof_target")

@@ -1286,40 +1286,12 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         Ok(result)
     }
 
-    /// Converts a string to a Label relative to the current package (Bazel-compatible).
-    ///
-    /// For example, `ctx.package_relative_label(":foo")` returns the Label for `:foo`
-    /// relative to the BUILD file's package.
-    fn package_relative_label<'v>(
-        this: RefAnalysisContext<'v>,
-        input: &str,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        // Get the current target's cell and package from ctx.label
-        let (cell_name, pkg_path) = if let Some(label) = this.0.label {
-            let tgt = label.label().target();
-            let cell = tgt.pkg().cell_name().as_str().to_owned();
-            let pkg = tgt.pkg().cell_relative_path().as_str().to_owned();
-            (cell, pkg)
-        } else {
-            // No label context (dynamic_output / BXL) — return input as-is
-            return Ok(heap.alloc(BazelLabel::parse(input)));
-        };
-
-        let resolved = if input.starts_with('@') {
-            // Already fully qualified
-            input.to_owned()
-        } else if input.starts_with("//") {
-            // Absolute within current cell
-            format!("@{}{}", cell_name, input)
-        } else {
-            // Relative (:target or bare target)
-            let target = input.strip_prefix(':').unwrap_or(input);
-            format!("@{}//{}:{}", cell_name, pkg_path, target)
-        };
-
-        Ok(heap.alloc(BazelLabel::parse(&resolved)))
-    }
+    // `package_relative_label` migrated to Starlark in Plan 28.4
+    // Stage 6. The bundled `_kuro_package_relative_label` in
+    // `@kuro_builtins//:exports.bzl` reads `raw_ctx.label.cell` /
+    // `.package`, constructs the resolved label string, and returns
+    // `Label(...)` (which calls `BazelLabel::parse` for canonical
+    // form). Single-owner per Plan 28.7.
 
     /// Resolves tools and returns (input files depset, runfiles manifests) tuple (Bazel-compatible).
     ///

@@ -50,6 +50,31 @@ _kuro_builtins_probe_value = "kuro-28-2-loader-ok"
 # host labels are baked at kuro build time by
 # `app/kuro_external_cells_bundled/build.rs::imp` and arrive here via
 # `_host_constants.bzl`.
+# Plan 28.4 Stage 6: Starlark replacement for the deleted Rust impl
+# of `ctx.package_relative_label` in
+# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`.
+# Resolves a label string against the BUILD file's package (the
+# target's package), distinct from the `Label()` builtin which
+# resolves against the *file* where it appears. Same input/output
+# contract as the previous Rust impl.
+#
+# When `raw_ctx.label` is `None` (dynamic_output / BXL contexts),
+# fall through to the file-cell-resolving `Label()` builtin — which
+# is what the old Rust path also did via `BazelLabel::parse(input)`.
+def _kuro_package_relative_label(raw_ctx, label_str):
+    label = raw_ctx.label
+    if label == None:
+        return Label(label_str)
+    cell = label.cell
+    pkg = label.package
+    if label_str.startswith("@"):
+        # Already fully qualified; pass through unchanged.
+        return Label(label_str)
+    if label_str.startswith("//"):
+        return Label("@" + cell + label_str)
+    target = label_str[1:] if label_str.startswith(":") else label_str
+    return Label("@" + cell + "//" + pkg + ":" + target)
+
 def _kuro_target_platform_has_constraint(constraint_value):
     # ConstraintValueInfo exposes the constraint's canonical label as
     # `.label`. Anything else (None, missing attr) maps to False, just
@@ -102,6 +127,12 @@ def _kuro_target_platform_has_constraint(constraint_value):
 # subrule wrapper reuses the same field set but tags itself
 # differently so acceptance tests can prove which dispatch path ran.
 def _make_rule_facade(raw_ctx, kind):
+    # Closure binding `raw_ctx` for `package_relative_label`, which
+    # needs to read `raw_ctx.label` at call time but takes only the
+    # label string from the user — mirrors the Rust impl's signature.
+    def _package_relative_label_bound(label_str):
+        return _kuro_package_relative_label(raw_ctx, label_str)
+
     return struct(
         # ---- AnalysisContext attributes (#[starlark(attribute)]) ----
         attrs = raw_ctx.attrs,
@@ -131,12 +162,12 @@ def _make_rule_facade(raw_ctx, kind):
         build_setting_value = raw_ctx.build_setting_value,
         # ---- AnalysisContext methods served from Starlark ----
         target_platform_has_constraint = _kuro_target_platform_has_constraint,
+        package_relative_label = _package_relative_label_bound,
         # ---- AnalysisContext methods passed through (bound to raw_ctx) ----
         coverage_instrumented = raw_ctx.coverage_instrumented,
         tokenize = raw_ctx.tokenize,
         runfiles = raw_ctx.runfiles,
         expand_make_variables = raw_ctx.expand_make_variables,
-        package_relative_label = raw_ctx.package_relative_label,
         resolve_tools = raw_ctx.resolve_tools,
         resolve_command = raw_ctx.resolve_command,
         new_file = raw_ctx.new_file,

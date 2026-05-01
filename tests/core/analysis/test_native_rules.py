@@ -917,6 +917,28 @@ async def test_28_4_stage5_subrule_facade_in_call_path(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_4_stage6_package_relative_label_starlark(buck: Buck) -> None:
+    """Plan 28.4 Stage 6: `ctx.package_relative_label` migrated from
+    Rust to Starlark. The Rust impl in
+    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was
+    deleted as part of this stage; the facade closure
+    `_kuro_package_relative_label` in `@kuro_builtins//:exports.bzl`
+    now serves the call.
+
+    The fixture exercises every branch of the previous Rust impl
+    (bare target, `:target`, absolute `//pkg:target`, fully-qualified
+    `@cell//...`) and pins the canonical Label string output. A
+    regression here means the Starlark migration diverged from the
+    Rust impl's input/output contract.
+    """
+    result = await buck.build("//wrapper_proof:package_relative_label_proof_target")
+    output = result.get_build_report().output_for_target(
+        "//wrapper_proof:package_relative_label_proof_target"
+    )
+    assert output.read_text().strip() == "package-relative-label-proof-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_28_3_export_contract_hides_unlisted_symbols(buck: Buck) -> None:
     """Plan 28.3: only names in `exported_toplevels` reach the consuming
     env. Symbols defined at the top level of `exports.bzl` but NOT
