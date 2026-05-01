@@ -27,13 +27,6 @@ use starlark_map::ordered_map::OrderedMap;
 use crate::paths::module::OwnedStarlarkModulePath;
 use crate::paths::module::StarlarkModulePath;
 
-#[derive(Debug, kuro_error::Error)]
-#[kuro(tag = Input)]
-enum FileLoaderError {
-    #[error("`native` in `prelude.bzl` must be a struct")]
-    NativeMustBeStruct,
-}
-
 #[derive(Default, Clone, Allocative, Debug)]
 pub struct LoadedModules {
     pub map: OrderedMap<OwnedStarlarkModulePath, LoadedModule>,
@@ -112,26 +105,12 @@ impl LoadedModule {
         &self.0.env
     }
 
-    /// Returned `FrozenValue` is owned by `self.0.env`.
-    pub fn extra_globals_from_prelude_for_buck_files(
-        &self,
-    ) -> kuro_error::Result<impl Iterator<Item = (&str, FrozenValue)> + '_> {
-        if let Some(native) = self
-            .0
-            .env
-            .get_option("native")
-            .map_err(|e| from_any_with_tag(e, kuro_error::ErrorTag::Tier0))?
-        {
-            unsafe {
-                match FrozenStructRef::<'static>::from_value(native.unchecked_frozen_value()) {
-                    Some(native) => Ok(Either::Left(native.iter().map(|(n, v)| (n.as_str(), v)))),
-                    None => Err(FileLoaderError::NativeMustBeStruct.into()),
-                }
-            }
-        } else {
-            Ok(Either::Right(iter::empty()))
-        }
-    }
+    // Plan 28.6 PR 4: `extra_globals_from_prelude_for_buck_files` removed.
+    // BUILD-file globals come directly from `register_all_natives` in
+    // `globals.rs::base_globals` (top-level Rust globals + the bundled
+    // `@kuro_builtins//:exports.bzl::exported_native` injection in
+    // `interpreter_for_dir.rs::create_env`). The Buck2-era prelude scrape
+    // over a `native` struct is no longer part of the BUILD-eval path.
 }
 
 pub struct InterpreterFileLoader {

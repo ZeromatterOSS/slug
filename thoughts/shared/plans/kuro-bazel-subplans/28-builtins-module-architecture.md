@@ -910,7 +910,83 @@ Starlark builtins.
 - `prelude/native.bzl` remains a thin compatibility file, not a growing
   second builtins registry.
 
-## Phase 28.6: Buck2 Prelude Machinery Disposition
+## Phase 28.6: Buck2 Prelude Machinery Disposition  [PRs 1-4 landed 2026-05-01]
+
+### Status
+
+Phase 28.6 ran as four PRs that together delete the Buck2-era prelude
+pipeline and route BUILD-global construction through `@kuro_builtins`.
+
+**PR 1** (commit `71cb86bf`): drop Tier-1 dead weight. 49 paths
+deleted: 6 placeholder dirs, 5 orphan content dirs, 6 standalone
+files, 31 dead language `decls/` files. No callers in active code.
+
+**PR 2** (commit `ffcdab40`): migrate `paths.bzl` and
+`utils/{utils,expect,type_defs,arglike,selects}.bzl` into
+`@kuro_builtins//`. New BUILD package
+`kuro_builtins/utils/`. Load paths inside the copies rewritten
+`@prelude//utils:X` → `@kuro_builtins//utils:X`. New test
+`test_28_6_kuro_builtins_helpers_loadable` proves the new
+namespace works.
+
+**PR 3** (commit `7072e9bd`): drop the dead prelude rule pipeline.
+Investigation surfaced that `prelude/rules.bzl::169` calls
+`load_symbols(rules)` but kuro stubs `load_symbols` as a no-op
+(see
+`app/kuro_interpreter_for_build/src/interpreter/functions/load_symbols.rs`).
+That means the entire `prelude_rule` → BUILD-callable chain does
+nothing in kuro — native rules (`alias`, `filegroup`, `genrule`,
+`sh_*`, `test_suite`, etc.) come from
+`app/kuro_analysis/src/analysis/native_rule_analysis.rs::NativeRuleKind`,
+not prelude. 114 files / 10,581 LOC deleted: rule impls,
+`prelude/decls/`, `configurations/`, `transitions/`, `cfg/`,
+`dist/`, `git/`, `http_archive/`, `zip_file/`, `user/`,
+platform stubs (`abi/`, `build_mode/`, `cpu/`, `os/`,
+`os_lookup/`, `platforms/`), debugging/, unix/, plus most of
+`utils/`.
+
+**PR 4** (commit pending in this session): cut the prelude-driven
+BUCK-globals scrape.
+- Stripped the `extra_globals_from_prelude_for_buck_files` block in
+  `interpreter_for_dir.rs::create_env`.
+- Deleted the `extra_globals_from_prelude_for_buck_files` method in
+  `file_loader.rs` and updated its two non-prelude callers
+  (`kuro_server/src/lsp.rs`, `kuro_cmd_starlark_server/src/util/environment.rs`)
+  to drop the now-redundant scrape.
+- Deleted `prelude/native.bzl` and `prelude/paths.bzl` (PR 2
+  migrated `paths.bzl` to `@kuro_builtins//`).
+- Reduced `prelude/prelude.bzl` to a license header + comment only.
+  The `PreludePath` machinery (`configuror.prelude_import()`,
+  `prelude_path.rs`) is intentionally retained — it's still needed
+  for identity-stable imports during transitive-set checks. Once no
+  workspace registers an `@prelude` cell, it can go too.
+
+What survives in `prelude/`:
+- `prelude.bzl`, `BUCK` (cell entry point, near-empty).
+- `asserts.bzl`, `utils/` (six files: source_listing, source_listing_impl,
+  argfile, graph_utils, expect, type_defs) — kept for `tests/e2e/`,
+  `examples/persistent_worker`, and `app/kuro_external_cells_bundled`.
+- `toolchains/` — referenced by `kuro init` template strings.
+- `bxl/` — Kuro extension namespace.
+
+LLVM Demangle smoke clean (8 actions, 1.5s). LLVM Support smoke clean
+(183 actions, 10.2s). 122 pass + 5 pre-existing toolchain failures + 3
+skip + 1 deselect on the analysis suite (unchanged from PR 2).
+
+### Remaining (low priority)
+
+- Delete `app/kuro_interpreter/src/prelude_path.rs` and the `PreludePath`
+  type. Requires unregistering `@prelude` from `MODULE.bazel` and removing
+  callers in `configuror.rs`, `interpreter_for_dir.rs::parse`, and the
+  load-resolver chain. Multi-file Rust refactor; defer until kuro init
+  templates also drop their `@prelude` references.
+- Restrict or delete the `__kuro_builtins__` namespace in
+  `globals.rs::base_globals`. Tests in
+  `app/kuro_interpreter_for_build_tests/src/interpreter.rs` use
+  `__kuro_builtins__.json.encode(...)` as a stable internal handle; those
+  must migrate first.
+- Delete `prelude/toolchains/` and update `kuro init` templates to point
+  at user-supplied `rules_*` toolchains instead.
 
 ### Goal
 

@@ -88,11 +88,10 @@ impl Environment {
             for x in m.env().names() {
                 names.insert(x.as_str().to_owned());
             }
-            if path_type == StarlarkFileType::Buck {
-                for (name, _value) in m.extra_globals_from_prelude_for_buck_files()? {
-                    names.insert(name.to_owned());
-                }
-            }
+            // Plan 28.6 PR 4: prelude `native`-struct scrape removed.
+            // BUCK globals are top-level Rust globals + bundled
+            // `@kuro_builtins` exports; both are already covered by
+            // `m.env().names()` above, so no extra iteration needed.
         }
 
         if let Some(preload) = &self.preload {

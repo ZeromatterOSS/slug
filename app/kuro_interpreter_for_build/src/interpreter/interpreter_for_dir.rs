@@ -388,20 +388,22 @@ impl InterpreterForDir {
         starlark_path: StarlarkPath<'_>,
         loaded_modules: &LoadedModules,
     ) -> kuro_error::Result<BuckStarlarkModule> {
-        if let Some(prelude_import) = self.prelude_import(starlark_path) {
-            let prelude_env = loaded_modules
-                .map
-                .get(&StarlarkModulePath::LoadFile(prelude_import.import_path()))
-                .with_internal_error(|| {
-                    format!("Should've had an env for the prelude import `{prelude_import}`",)
-                })?;
-            env.import_public_symbols(prelude_env.env());
-            if let StarlarkPath::BuildFile(_) = starlark_path {
-                for (name, value) in prelude_env.extra_globals_from_prelude_for_buck_files()? {
-                    env.set(name, value.to_value());
-                }
-            }
-        }
+        // Plan 28.6 PR 4: prelude evaluation is no longer used to populate
+        // BUILD globals. Native rules (alias, filegroup, genrule, etc.) and
+        // every name in `__kuro_builtins__` are already top-level globals
+        // via `register_all_natives` in `globals.rs::base_globals`. The
+        // legacy `extra_globals_from_prelude_for_buck_files` scrape over
+        // `prelude/native.bzl`'s `native` struct was a Buck2-era duplication
+        // and has been removed.
+        //
+        // The `PreludePath` machinery (`configuror.prelude_import()`,
+        // `prelude_path.rs`) is intentionally retained: workspaces that
+        // register an `@prelude` cell still get it loaded into
+        // `loaded_modules`, and the path is needed for identity-stable
+        // imports during transitive-set checks (see the `is_prelude_path`
+        // arm in `parse()` above). Once no workspace registers a prelude
+        // cell, the type can go too.
+        let _ = self.prelude_import(starlark_path);
 
         // Plan 28: inject names from `@kuro_builtins//:exports.bzl`'s
         // `exported_toplevels` dict into the consuming env.
