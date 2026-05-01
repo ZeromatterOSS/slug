@@ -65,9 +65,9 @@ mod kuro_builtins {
     include!(concat!(env!("OUT_DIR"), "/kuro_builtins_include.rs"));
 }
 
-/// Plan 28 bundled-builtins cell. Ships `exports.bzl` whose public
-/// symbols are injected into every BUILD/`.bzl` file via the
-/// interpreter's `bazel_builtins_autoload`.
+/// Bundled-builtins cell. Ships `exports.bzl` whose public symbols
+/// are injected into every BUILD/`.bzl` file via the interpreter's
+/// `bazel_builtins_autoload`.
 const KURO_BUILTINS: BundledCell = BundledCell {
     name: "kuro_builtins",
     files: kuro_builtins::DATA,

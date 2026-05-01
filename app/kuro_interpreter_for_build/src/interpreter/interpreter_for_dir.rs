@@ -167,9 +167,9 @@ pub(crate) struct InterpreterForDir {
     /// When set, cc_library/cc_binary/cc_test from rules_cc will be automatically
     /// imported into BUILD file environments, overriding native stubs.
     rules_cc_autoload: Option<OwnedStarlarkModulePath>,
-    /// Plan 28: autoload path for `@kuro_builtins//:exports.bzl`. Public
-    /// symbols from this bundled module are imported into every BUILD
-    /// and `.bzl` env regardless of prelude or workspace configuration.
+    /// Autoload path for `@kuro_builtins//:exports.bzl`. Public symbols
+    /// from this bundled module are imported into every BUILD and `.bzl`
+    /// env regardless of workspace configuration.
     bazel_builtins_autoload: Option<OwnedStarlarkModulePath>,
 }
 
@@ -253,10 +253,6 @@ impl LoadResolver for InterpreterLoadResolver {
             }
         }
 
-        // Plan 28 follow-up: the prelude same-cell-import rebind (so a
-        // UDR loaded from outside the prelude cell still saw the prelude
-        // through the prelude cell context) is gone with the
-        // PreludePath machinery.
         let import_path = ImportPath::new_with_build_file_cells(path, self.build_file_cell)?;
         Ok(match import_path.path().path().extension() {
             Some("json") => OwnedStarlarkModulePath::JsonFile(import_path),
@@ -305,11 +301,9 @@ impl InterpreterForDir {
         current_dir_with_allowed_relative_dirs: Arc<CellPathWithAllowedRelativeDir>,
         package_dir: Option<CellPath>,
     ) -> kuro_error::Result<Self> {
-        // Plan 28 follow-up: prelude/PreludePath gone — rules_cc autoload
-        // is now unconditional. Auto-loads rules_cc for BUILD files so
-        // that native cc_library/cc_binary/cc_test calls resolve to
-        // rules_cc's Starlark implementations instead of empty native
-        // stubs.
+        // Auto-load rules_cc for BUILD files so that cc_library /
+        // cc_binary / cc_test calls resolve to rules_cc's Starlark
+        // implementations instead of empty native stubs.
         let rules_cc_autoload = cell_info
             .cell_alias_resolver()
             .resolve("rules_cc")
@@ -328,13 +322,11 @@ impl InterpreterForDir {
                 })
             });
 
-        // Plan 28: resolve the bundled `@kuro_builtins//:exports.bzl` once
-        // per InterpreterForDir. The cell is auto-registered by
-        // `kuro_common::legacy_configs::cells` for every bzlmod project,
-        // so the alias resolution below succeeds in every Bazel-mode
-        // workspace. For legacy non-bzlmod projects without
-        // `[external_cells] kuro_builtins = bundled` in `.buckconfig`,
-        // resolution returns None and the autoload is a no-op.
+        // Resolve `@kuro_builtins//:exports.bzl` once per InterpreterForDir.
+        // The cell is auto-registered by
+        // `kuro_common::legacy_configs::cells` for every bzlmod project.
+        // Legacy non-bzlmod workspaces without `[external_cells]
+        // kuro_builtins = bundled` in `.buckconfig` skip the autoload.
         let bazel_builtins_autoload = cell_info
             .cell_alias_resolver()
             .resolve("kuro_builtins")
@@ -372,23 +364,13 @@ impl InterpreterForDir {
         starlark_path: StarlarkPath<'_>,
         loaded_modules: &LoadedModules,
     ) -> kuro_error::Result<BuckStarlarkModule> {
-        // Plan 28 follow-up: prelude/PreludePath machinery removed.
-        // BUILD globals come from `register_all_natives` in
-        // `globals.rs::base_globals` plus the bundled `@kuro_builtins`
-        // autoload below.
         let _ = starlark_path;
 
-        // Plan 28: inject names from `@kuro_builtins//:exports.bzl`'s
-        // `exported_toplevels` dict into the consuming env.
-        // Skipped inside the kuro_builtins cell itself (an exports module
-        // can't import from itself). The matching `parse()` arm pushed
-        // this path into `implicit_imports`, so DICE has already loaded
-        // the module by the time we get here.
-        //
-        // Phase 28.3 reads from the explicit `exported_toplevels` dict
-        // rather than `import_public_symbols`. Visibility-control lives
-        // in the bundled `exports.bzl`, not in the interpreter — adding
-        // a top-level name is an explicit per-symbol decision.
+        // Inject names from `@kuro_builtins//:exports.bzl::exported_toplevels`
+        // into the consuming env. Skipped inside the kuro_builtins cell
+        // itself (an exports module can't import from itself). The
+        // matching `parse()` arm pushed this path into `implicit_imports`,
+        // so DICE has already loaded the module by the time we get here.
         if let Some(OwnedStarlarkModulePath::LoadFile(builtins_path)) =
             &self.bazel_builtins_autoload
         {
@@ -423,15 +405,10 @@ impl InterpreterForDir {
                         }
                     }
 
-                    // Plan 28.5: BUCK-file-only globals from the bundled
-                    // module's `exported_native` dict. Mirrors
-                    // `prelude/native.bzl`'s `native` struct: members
-                    // become BUCK-file globals but stay invisible in
-                    // `.bzl` files. Injected AFTER the prelude's native
-                    // struct members and AFTER `exported_toplevels`, so a
-                    // name in `exported_native` wins on collision —
-                    // that's the migration path away from
-                    // `prelude/native.bzl` for Phase 28.6.
+                    // BUCK-file-only globals from `exported_native`: members
+                    // become BUCK globals but stay invisible in `.bzl`
+                    // files. Injected after `exported_toplevels` so a name
+                    // in `exported_native` wins on collision.
                     if let StarlarkPath::BuildFile(_) = starlark_path {
                         let exported_native_value = frozen
                             .get_option("exported_native")
@@ -579,9 +556,8 @@ impl InterpreterForDir {
             }
         };
         let mut implicit_imports = Vec::new();
-        // Plan 28: autoload @kuro_builtins for both BUILD and .bzl paths,
-        // EXCEPT inside the kuro_builtins cell itself (a bundled .bzl
-        // can't load itself). Fires for every cell and every file kind.
+        // Autoload @kuro_builtins for BUILD and .bzl paths, except inside
+        // the kuro_builtins cell itself (a bundled .bzl can't load itself).
         if let Some(OwnedStarlarkModulePath::LoadFile(ref builtins_path)) =
             self.bazel_builtins_autoload
         {

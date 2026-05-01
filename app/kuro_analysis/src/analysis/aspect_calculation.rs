@@ -144,11 +144,9 @@ impl Key for AspectKey {
         let dep_aspects =
             compute_dep_aspects(ctx, &self.target, &aspect, &self.aspect_type).await?;
 
-        // Plan 28.4 Stage 4: load @kuro_builtins so the aspect
-        // dispatch can reach `aspect_implementation_wrapper`. The
-        // round-trip is the same one rule analysis does in
-        // `super::calculation::get_rule_spec`. `None` for legacy
-        // workspaces without the bundled cell.
+        // Load @kuro_builtins so the aspect dispatch can reach
+        // `aspect_implementation_wrapper`. `None` for legacy workspaces
+        // without the bundled cell.
         let builtins_module = super::calculation::get_kuro_builtins_module(ctx).await?;
 
         // 5. Execute aspect implementation function with shadow graph
@@ -791,12 +789,11 @@ async fn execute_aspect(
                     target.dupe(),
                 ));
 
-                // Plan 28.4 Stage 4: route aspect impls through
+                // Route aspect impls through
                 // `aspect_implementation_wrapper(impl, target, ctx)`
-                // when @kuro_builtins exposes one. Mirrors Stage 2's
-                // dispatch in `super::env::Impl::invoke` for rules.
-                // Wrapper absent (no `@kuro_builtins` registered, or
-                // no aspect wrapper exposed) → direct invocation.
+                // when @kuro_builtins exposes one. Wrapper absent (no
+                // `@kuro_builtins` registered, or no aspect wrapper
+                // exposed) → direct invocation.
                 let wrapper_value = match &builtins_module {
                     Some(module) => module
                         .get_option("aspect_implementation_wrapper")

@@ -110,7 +110,7 @@ pub fn register_analysis_natives(builder: &mut GlobalsBuilder) {
     from_late_binding(&REGISTER_BUCK2_BUILD_API_GLOBALS, builder);
     register_promise(builder);
     from_late_binding(&REGISTER_BUCK2_ANON_TARGETS_GLOBALS, builder);
-    // Plan 28.4: kuro-internal hooks consumed by the bundled
+    // kuro-internal hooks consumed by the bundled
     // `@kuro_builtins//:exports.bzl`. Each name is `kuro_*`-prefixed.
     register_kuro_runtime(builder);
 }
@@ -169,9 +169,6 @@ pub(crate) fn base_globals() -> GlobalsBuilder {
     let mut global_env = GlobalsBuilder::standard().with(register_all_natives);
     global_env.namespace("__internal__", |x| {
         register_all_internals(x);
-    });
-    global_env.namespace("__kuro_builtins__", |x| {
-        register_all_natives(x);
     });
     global_env
 }

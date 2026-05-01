@@ -47,7 +47,18 @@ Deferred follow-ups:
   bundled (via `app/kuro_external_cells_bundled`) so explicit
   `load("@prelude//utils:argfile.bzl", ...)` still resolves; what
   went away is the legacy implicit-prelude path.
-- Restrict or rename the `__kuro_builtins__` Rust namespace.
+- ~~Restrict or rename the `__kuro_builtins__` Rust namespace.~~
+  **Done 2026-05-01**. Removed the `__kuro_builtins__` namespace
+  registration in `globals.rs::base_globals` (was a Buck2-era
+  duplicate of the top-level globals registered by
+  `register_all_natives`). Migrated the two unit tests in
+  `kuro_interpreter_for_build_tests/src/interpreter.rs` off
+  `__kuro_builtins__.X` references — they now exercise the
+  top-level versions directly. `__internal__` namespace retained
+  for kuro-private registrations. Same session: stripped ~90
+  gratuitous "Plan 28..." migration markers across 17 source
+  files (the plan history lives in git log + this doc, not in
+  inline comments).
 - Delete `prelude/toolchains/` after `kuro init` migrates to
   `rules_*` references.
 

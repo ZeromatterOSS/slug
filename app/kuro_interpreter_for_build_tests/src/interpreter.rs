@@ -315,10 +315,6 @@ fn test_root_import() {
     assert_eq!(vec!["hello"], target_names);
 }
 
-// Plan 28 follow-up: `prelude_is_included` test removed — the
-// PreludePath machinery and `Tester::set_prelude` it exercised
-// are gone with the prelude pipeline.
-
 #[test]
 fn test_package_import() -> kuro_error::Result<()> {
     let mut tester = Tester::with_cells(kuro_interpreter_for_build::interpreter::testing::cells(
@@ -398,12 +394,8 @@ fn eval() -> kuro_error::Result<()> {
             export_file = rule(impl=_impl, attrs = {})
 
             def test():
-                assert_eq("some/package", __kuro_builtins__.package_name())
-                assert_eq("@root", __kuro_builtins__.repository_name())
-
-                assert_eq(package_name(), __kuro_builtins__.package_name())
-                assert_eq(repository_name(), __kuro_builtins__.repository_name())
-
+                assert_eq("some/package", package_name())
+                assert_eq("@", repository_name())
                 assert_eq(package_name(), get_base_path())
 
                 export_file(name = "rule_name")
@@ -420,24 +412,26 @@ fn eval() -> kuro_error::Result<()> {
 
 #[test]
 fn test_builtins() -> kuro_error::Result<()> {
-    // Test that most things end up on __kuro_builtins__
+    // Public natives like `json.encode` live at the top level.
     run_simple_starlark_test(indoc!(
         r#"
             def test():
-                assert_eq(__kuro_builtins__.json.encode({}), "{}")
+                assert_eq(json.encode({}), "{}")
             "#
     ))?;
 
-    // But not internals
+    // Internals are reached via the `__internal__` namespace and must NOT
+    // appear at the top level. `kuro_fail` is registered in
+    // `register_all_internals` (kuro_interpreter_for_build::interpreter::functions::internals).
     let mut tester = Tester::new().unwrap();
     tester.run_starlark_test_expecting_error(
         indoc!(
             r#"
             def test():
-                __kuro_builtins__.kuro_fail("message")
+                kuro_fail("message")
             "#
         ),
-        "The attribute `kuro_fail` is not available",
+        "Variable `kuro_fail` not found",
     );
     Ok(())
 }

@@ -99,13 +99,6 @@ impl LoadedModule {
     pub fn env(&self) -> &FrozenModule {
         &self.0.env
     }
-
-    // Plan 28.6 PR 4: `extra_globals_from_prelude_for_buck_files` removed.
-    // BUILD-file globals come directly from `register_all_natives` in
-    // `globals.rs::base_globals` (top-level Rust globals + the bundled
-    // `@kuro_builtins//:exports.bzl::exported_native` injection in
-    // `interpreter_for_dir.rs::create_env`). The Buck2-era prelude scrape
-    // over a `native` struct is no longer part of the BUILD-eval path.
 }
 
 pub struct InterpreterFileLoader {

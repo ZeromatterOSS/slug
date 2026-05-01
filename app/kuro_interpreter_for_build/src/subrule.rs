@@ -372,12 +372,11 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkSubruleCallable {
             };
             // Call implementation with [ctx] as positional args and kwargs dict.
             //
-            // Plan 28.4 Stage 5: when @kuro_builtins exposes a
-            // `subrule_implementation_wrapper`, it is stashed in TLS by
-            // `RuleSpec::Impl::invoke` for the duration of the rule's
-            // eval. Route through it so the subrule's `ctx` carries the
-            // same Starlark facade the enclosing rule already sees;
-            // absent (legacy / no-bzlmod) → direct invocation.
+            // When @kuro_builtins exposes a `subrule_implementation_wrapper`,
+            // it is stashed in TLS by `RuleSpec::Impl::invoke` for the
+            // duration of the rule's eval. Route through it so the subrule's
+            // `ctx` carries the same Starlark facade the enclosing rule
+            // already sees; absent (legacy / no-bzlmod) → direct invocation.
             let impl_val: Value<'v> = self.implementation.to_value();
             match get_current_subrule_wrapper() {
                 Some(wrapper) => {

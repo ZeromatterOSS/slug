@@ -28,9 +28,9 @@ impl ServerAuditSubcommand for AuditPreludeCommand {
         mut stdout: PartialResultDispatcher<kuro_cli_proto::StdoutBytes>,
         _client_ctx: ClientContext,
     ) -> kuro_error::Result<()> {
-        // Plan 28 follow-up: prelude/PreludePath machinery removed. The
-        // prelude-env half of this audit command is gone; only the
-        // top-level globals env survives.
+        // Prints the top-level globals env. The prelude-env half of
+        // this audit command is gone; the prelude pipeline no longer
+        // exists.
         Ok(server_ctx
             .with_dice_ctx(|_server_ctx, mut ctx| async move {
                 let mut stdout = stdout.as_writer();

@@ -174,10 +174,10 @@ impl<'v> UnpackValue<'v> for RefAspectContext<'v> {
 #[starlark_module]
 fn aspect_context_methods(builder: &mut MethodsBuilder) {
     /// Returns the aspect's own attributes as a Starlark struct, or
-    /// `None` when the aspect declared no `attrs`. Plan 28.4 Stage 4
-    /// switched this from a raise-on-None to a `NoneOr` so the
-    /// bundled aspect facade can mirror this field unconditionally
-    /// (Starlark has no try/except, so eager `raw_ctx.attr` access in
+    /// `None` when the aspect declared no `attrs`. The bundled aspect
+    /// facade mirrors this field unconditionally — Starlark has no
+    /// try/except, so a raise here would crash for every attr-less
+    /// aspect (the common case). Eager `raw_ctx.attr` access in
     /// the facade would otherwise crash for attr-less aspects, which
     /// is the common case). Aspects that declared `attrs` continue to
     /// see a struct here; aspects that didn't see `None` rather than
@@ -302,13 +302,10 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
         Ok(heap.alloc(CtxDirRoot { path }))
     }
 
-    // `target_platform_has_constraint` deleted in Plan 28.4 Stage 3 per
-    // the single-owner rule (Plan 28.7). Aspects don't yet flow through
-    // an `aspect_implementation_wrapper`; once they do (Stage 4+), the
-    // facade will install the same Starlark `_kuro_target_platform_has_constraint`
-    // shim that rule contexts already see. The previous Rust stub here
-    // unconditionally returned False, so aspects didn't depend on a
-    // working answer.
+    // `target_platform_has_constraint` is served from the aspect facade
+    // installed by `_invoke_aspect` in `@kuro_builtins//:exports.bzl`,
+    // sharing the rule-side `_kuro_target_platform_has_constraint`
+    // shim.
 
     /// Returns the build configuration object.
     #[starlark(attribute)]

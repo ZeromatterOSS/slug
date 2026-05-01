@@ -31,9 +31,9 @@ pub(crate) struct Environment {
 impl Environment {
     pub(crate) async fn new(
         cell: CellName,
-        // Plan 28 follow-up: prelude/PreludePath removed; the parameter
-        // stays on the signature for binary-API stability with callers
-        // that still pass `StarlarkFileType::Buck` etc.
+        // Retained for binary-API stability with callers that still
+        // pass `StarlarkFileType::Buck` etc. — used to gate the
+        // prelude scrape, which is gone.
         _path_type: StarlarkFileType,
         dice: &mut DiceTransaction,
     ) -> kuro_error::Result<Environment> {
@@ -50,8 +50,8 @@ impl Environment {
 
     pub(crate) async fn get_names(
         &self,
-        // Plan 28 follow-up: parameter retained on the signature for
-        // binary-API stability after the prelude scrape was removed.
+        // Retained for binary-API stability after the prelude scrape
+        // was removed.
         _path_type: StarlarkFileType,
         dice: &DiceTransaction,
     ) -> kuro_error::Result<HashSet<String>> {

@@ -6,30 +6,32 @@
 # of this source tree. You may select, at your option, one of the
 # above-listed licenses.
 
-# Plan 28: Bundled Bazel-Compatible Builtins.
+# Bundled Bazel-Compatible Builtins.
 #
 # This file is the entry point of the @kuro_builtins bundled cell. The
 # kuro interpreter auto-loads it into every BUILD and `.bzl` evaluation
 # context (per `bazel_builtins_autoload` in
 # `app/kuro_interpreter_for_build/src/interpreter/interpreter_for_dir.rs`).
 #
-# The export contract follows Plan 28's design (mirrored after Bonanza's
+# The export contract (mirrored after Bonanza's
 # `builtins_core/exports.bzl`):
 #
 #   - `exported_toplevels`: symbols visible at the top level of every
 #     BUILD and `.bzl` file. Each entry must have a Bazel 9 parity
 #     citation (or a `_kuro_*` prefix indicating it is kuro-internal,
 #     e.g. probes for tests).
+#   - `exported_native`: BUCK-file-only globals (members are injected as
+#     BUCK globals but invisible in `.bzl` files; mirrors Bazel's
+#     `native` struct semantics).
 #   - `rule_implementation_wrapper` / `aspect_implementation_wrapper` /
-#     `subrule_implementation_wrapper`: identity wrappers that
-#     Phase 28.4 will route Starlark rule analysis through, so
-#     subsequent stages can move `ctx`-method bodies into Starlark
-#     without touching the Rust analysis call site again.
+#     `subrule_implementation_wrapper`: route Starlark rule/aspect/subrule
+#     analysis through `_make_rule_facade`, which installs a Starlark
+#     `ctx` facade so `ctx`-method bodies live in this file rather than
+#     in Rust.
 #
-# Adding a symbol here means committing to:
-#   1. A Bazel 9 parity citation (or `_kuro_*` naming).
-#   2. A single owner per Plan 28.7 (Rust primitive, Starlark export, or
-#      external ruleset — never two of the three).
+# Adding a symbol here means committing to a single owner: Rust
+# primitive, Starlark export, or external ruleset — never two of the
+# three.
 
 load(":_host_constants.bzl", "HOST_CONSTRAINT_LABELS")
 
@@ -37,30 +39,15 @@ load(":_host_constants.bzl", "HOST_CONSTRAINT_LABELS")
 # Private helpers (not exported, hidden by leading underscore).
 # -----------------------------------------------------------------------
 
-# Phase 28.2 probe symbol. Not a Bazel builtin — exists solely to verify
-# that the autoload mechanism reaches external `.bzl` files. Will be
-# removed once Phase 28.3 starts moving real compatibility logic.
+# Probe symbol. Not a Bazel builtin — exists solely to verify that the
+# autoload mechanism reaches external `.bzl` files.
 _kuro_builtins_probe_value = "kuro-28-2-loader-ok"
 
-# Plan 28.4 Stage 3: Starlark replacement for the deleted Rust impl in
-# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`. Until kuro
-# has a full target-platform constraint resolver (Plan 19 territory), we
-# answer `ctx.target_platform_has_constraint(c)` against the host's
-# OS/CPU labels, mirroring the previous Rust shortcut byte-for-byte. The
-# host labels are baked at kuro build time by
-# `app/kuro_external_cells_bundled/build.rs::imp` and arrive here via
-# `_host_constants.bzl`.
-# Plan 28.4 Stage 6: Starlark replacement for the deleted Rust impl
-# of `ctx.package_relative_label` in
-# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`.
-# Resolves a label string against the BUILD file's package (the
-# target's package), distinct from the `Label()` builtin which
-# resolves against the *file* where it appears. Same input/output
-# contract as the previous Rust impl.
-#
-# When `raw_ctx.label` is `None` (dynamic_output / BXL contexts),
-# fall through to the file-cell-resolving `Label()` builtin — which
-# is what the old Rust path also did via `BazelLabel::parse(input)`.
+# Resolves a label string against the BUILD file's package (the target's
+# package), distinct from the `Label()` builtin which resolves against
+# the *file* where it appears. When `raw_ctx.label` is `None`
+# (dynamic_output / BXL contexts), falls through to the
+# file-cell-resolving `Label()` builtin.
 def _kuro_package_relative_label(raw_ctx, label_str):
     label = raw_ctx.label
     if label == None:
@@ -75,31 +62,15 @@ def _kuro_package_relative_label(raw_ctx, label_str):
     target = label_str[1:] if label_str.startswith(":") else label_str
     return Label("@" + cell + "//" + pkg + ":" + target)
 
-# Plan 28.4 Stage 8: Starlark replacement for the deleted Rust impl
-# of `ctx.coverage_instrumented` in
-# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`. Reads
-# the per-build `--collect_code_coverage` flag via a kuro-internal
-# Starlark global registered in
-# `app/kuro_interpreter_for_build/src/interpreter/functions/kuro_runtime.rs`.
-#
-# The previous Rust impl ignored both `this` and `dep` arguments —
-# it always returned the global flag — so the migrated function
-# preserves that behaviour. If kuro ever supports per-target
-# instrumentation lists, the per-dep branch will land here.
-# `dep` is accepted (Bazel signature parity) but ignored — the Rust
-# impl ignored it too. If/when kuro tracks per-target instrumentation
-# lists, branch on `dep != None` here.
+# Returns the per-build `--collect_code_coverage` flag (via the
+# `kuro_collect_code_coverage` runtime global). `dep` is accepted for
+# Bazel signature parity but ignored; if kuro grows per-target
+# instrumentation lists, branch on `dep != None` here.
 def _kuro_coverage_instrumented(dep = None):  # buildifier: disable=unused-variable
     return kuro_collect_code_coverage()
 
-# Plan 28.4 Stage 7: Starlark replacement for the deleted Rust impl
-# of `ctx.tokenize` (and its `shell_tokenize` helper) in
-# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`. Pure
-# Bourne-shell tokenization — no facade-attr access, no host info,
-# no globals — so it sits as a top-level helper rather than a
-# closure inside `_make_rule_facade`.
-#
-# Behaviour mirrors the Rust impl byte-for-byte on ASCII input:
+# Bourne-shell tokenization for `ctx.tokenize`. Pure function — no
+# facade-attr access, no host info, no globals.
 #
 #   - Single-quoted strings: literal until closing `'`, no escapes.
 #   - Double-quoted strings: backslash escapes for `"`, `\`, `$`,
@@ -107,8 +78,7 @@ def _kuro_coverage_instrumented(dep = None):  # buildifier: disable=unused-varia
 #     input dropped silently.
 #   - Backslash outside quotes: consume next char literally;
 #     trailing `\` at end of input dropped silently.
-#   - ASCII whitespace splits tokens (matches Rust's
-#     `char::is_ascii_whitespace`: space, `\t`, `\n`, `\f` /
+#   - ASCII whitespace splits tokens (space, `\t`, `\n`, `\f` /
 #     `\x0c`, `\r`).
 #
 # Starlark has no `while` loops, so the iteration uses a for-loop
@@ -181,53 +151,29 @@ def _kuro_tokenize(option_string):
         tokens.append(current)
     return tokens
 
-# Plan 28.4 Stage 10: Starlark replacement for the deleted Rust impl of
-# `ctx.new_file` in
-# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`.
-#
 # `ctx.new_file` is a deprecated Bazel API with two call shapes:
 #   - `ctx.new_file(filename: str)` — declare a new file by name.
 #   - `ctx.new_file(sibling: File, filename: str)` — same, but the
-#     sibling is ignored (the Rust impl read only the filename string).
-#
-# The implementation delegates to `ctx.actions.declare_file`, which is
-# already a Starlark attribute on the actions struct. No new
-# `kuro_runtime` globals are needed. Single-owner per Plan 28.7.
+#     sibling is ignored.
 def _kuro_new_file(raw_ctx, file_or_sibling, filename):
     name = filename if filename != None else file_or_sibling
     if type(name) != "string":
         name = str(name)
     return raw_ctx.actions.declare_file(name)
 
-# Plan 28.4 Stage 9: Starlark replacement for the deleted Rust impls
-# of `ctx.var` and `ctx.expand_make_variables` in
-# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`. Both
-# methods read from the same `$(VAR)` substitution table; building
-# it here keeps the table in one place. Priority order, highest to
-# lowest, mirrors the deleted Rust impls (HashMap::entry().or_insert()):
+# `ctx.var` and `ctx.expand_make_variables` share the same `$(VAR)`
+# substitution table; building it here keeps the table in one place.
+# Priority order, highest to lowest:
 #
 #   1. User-provided `additional_substitutions` (only
 #      `expand_make_variables`; `var` skips this layer).
 #   2. Built-in Make variables (BINDIR, GENDIR, TARGET_CPU,
 #      COMPILATION_MODE, WORKSPACE_ROOT, CC, CC_FLAGS, JAVA,
 #      JAVA_RUNFILES, JAVABASE, ABI_GLIBC_VERSION, ABI,
-#      STACK_FRAME_UNLIMITED). The constants are kuro-internal —
-#      `STACK_FRAME_UNLIMITED` for instance is an llvm-project
-#      requirement (see memory/ctx_var_builtins.md).
-#   3. `TemplateVariableInfo` from each dep in `ctx.attrs.toolchains`
-#      (e.g. llvm-project's `workspace_root` rule publishes
-#      `WORKSPACE_ROOT` here; `cc_toolchain_provider_helper.bzl`
-#      publishes additional Make variables from rules_cc).
+#      STACK_FRAME_UNLIMITED). `STACK_FRAME_UNLIMITED` is an
+#      llvm-project requirement (see memory/ctx_var_builtins.md).
+#   3. `TemplateVariableInfo` from each dep in `ctx.attrs.toolchains`.
 #   4. `--define KEY=VALUE` flags (lowest priority).
-#
-# `BINDIR`/`GENDIR` are read from `raw_ctx.bin_dir.path` (already a
-# Starlark attribute on `CtxDirRoot`) and `WORKSPACE_ROOT` from
-# `raw_ctx.label.workspace_root` (already a Starlark attribute on
-# `StarlarkConfiguredProvidersLabel`); the cfg hash that `BINDIR`
-# embeds is hidden inside `bin_dir_path_from_label` on the Rust side.
-# Everything else dispatches through `kuro_*` runtime hooks
-# registered in
-# `app/kuro_interpreter_for_build/src/interpreter/functions/kuro_runtime.rs`.
 def _kuro_make_substitutions(raw_ctx):
     bin_dir = raw_ctx.bin_dir.path
     label = raw_ctx.label
@@ -242,20 +188,16 @@ def _kuro_make_substitutions(raw_ctx):
         "CC": kuro_host_cc_path(),
         "CC_FLAGS": "",
         # Bazel uses "java.exe" on Windows and "/usr/bin/java"
-        # elsewhere. Kuro is a Linux-first build for now; the
-        # branch here matches the deleted Rust impl byte-for-byte
-        # so a Windows kuro can land later without touching this
-        # file. (`kuro_host_cc_path` already uses the same OS
-        # discrimination via `std::env::consts::OS`.)
+        # elsewhere. Kuro is Linux-first; this matches Bazel for the
+        # only platform we currently care about.
         "JAVA": "/usr/bin/java",
         "JAVA_RUNFILES": "",
         "JAVABASE": "",
         "ABI_GLIBC_VERSION": "2.17",
         "ABI": "local",
-        # `STACK_FRAME_UNLIMITED` is normally seeded by rules_cc's
-        # cc_toolchain via TemplateVariableInfo; kuro's stub
-        # cc_toolchain doesn't publish that provider, so we ship
-        # the default here. See memory/ctx_var_builtins.md.
+        # Normally seeded by rules_cc's cc_toolchain via
+        # TemplateVariableInfo; kuro's stub cc_toolchain doesn't
+        # publish that provider, so ship the default here.
         "STACK_FRAME_UNLIMITED": "",
     }
 
@@ -281,26 +223,23 @@ def _kuro_make_substitutions(raw_ctx):
 def _kuro_var(raw_ctx):
     return _kuro_make_substitutions(raw_ctx)
 
-# Plan 28.4 Stage 9: parses `$(VAR)` patterns in `command` and
-# substitutes from the merged table. Mirrors the deleted Rust
-# impl's behaviour byte-for-byte:
+# Parses `$(VAR)` patterns in `command` and substitutes from the merged
+# table:
 #
-#   - User `additional_substitutions` (an optional dict) win over
-#     all other layers.
+#   - User `additional_substitutions` (an optional dict) win over all
+#     other layers.
 #   - Unresolved `$(VAR)` patterns are left in place verbatim.
-#   - Unbalanced `$(` (no closing `)`) is left in place verbatim
-#     and the scan continues after the `$(`.
-#   - The variable name is `.strip()`ed (matches Rust's `.trim()`)
-#     before lookup.
+#   - Unbalanced `$(` (no closing `)`) is left in place verbatim and
+#     the scan continues after the `$(`.
+#   - The variable name is `.strip()`ed before lookup.
 #
 # Starlark has no `while` loops, so the outer scan iterates a
-# `for _ in range(len(command) + 1)` budget and breaks when the
-# cursor reaches the end. Each iteration consumes at least one
-# character (or one whole `$(...)` pattern), so the bound is safe.
+# `for _ in range(len(command) + 1)` budget and breaks when the cursor
+# reaches the end. Each iteration consumes at least one character (or
+# one whole `$(...)` pattern), so the bound is safe.
 def _kuro_expand_make_variables(raw_ctx, attribute_name, command, additional_substitutions):
-    # `attribute_name` is accepted for Bazel signature parity (the
-    # Rust impl ignored it too — it was only ever used in error
-    # messages, none of which were ever emitted).
+    # `attribute_name` is accepted for Bazel signature parity but
+    # unused — error messages with it are never emitted today.
     _ = attribute_name  # buildifier: disable=unused-variable
 
     subs = {}
@@ -336,25 +275,16 @@ def _kuro_expand_make_variables(raw_ctx, attribute_name, command, additional_sub
         i = end + 1
     return result
 
-# Plan 28.4 Stage 14: Starlark replacement for the deleted Rust impl
-# of `ctx.runfiles` in
-# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`.
-#
 # Bazel API:
 #   ctx.runfiles(
 #       files=None, *, transitive_files=None, collect_default=False,
 #       collect_data=False, symlinks=None, root_symlinks=None,
 #   ) -> Runfiles
 #
-# Builds a Runfiles object from explicit `files` / `transitive_files` /
-# `symlinks` / `root_symlinks` via `kuro_create_runfiles`, then
-# optionally extends it by walking `deps` / `runtime_deps` / `data`
-# attrs via `kuro_collect_runfiles_into`. Both kuro_runtime globals keep
-# the Runfiles construction and dep-merging logic on the Rust side.
-#
-# `raw_ctx` is captured by the closure `_runfiles_bound` in
-# `_make_rule_facade` so the helper can read `raw_ctx.attrs` when
-# `collect_default` or `collect_data` is set.
+# Builds a Runfiles object via `kuro_create_runfiles`, then optionally
+# extends it by walking `deps` / `runtime_deps` / `data` attrs via
+# `kuro_collect_runfiles_into`. Both runtime globals keep the Runfiles
+# construction and dep-merging logic on the Rust side.
 def _kuro_runfiles(raw_ctx, files, transitive_files, collect_default, collect_data, symlinks, root_symlinks):
     rf = kuro_create_runfiles(files, transitive_files, symlinks, root_symlinks)
     if collect_default or collect_data:
@@ -373,19 +303,11 @@ def _kuro_runfiles(raw_ctx, files, transitive_files, collect_default, collect_da
                     rf = kuro_collect_runfiles_into(rf, v, True)
     return rf
 
-# Plan 28.4 Stage 11: Starlark replacement for the deleted Rust impl
-# of `ctx.resolve_tools` in
-# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`.
-#
 # Bazel API: `ctx.resolve_tools(*, tools=None) -> (list_of_files, [])`.
-# Iterates `tools` (a list of Dependency values), collects each dep's
-# `DefaultInfo.default_outputs` into a flat list, and returns a tuple
-# of `(files_list, empty_manifests_list)`. Kuro does not use runfiles
-# manifests, so the second element is always an empty list.
-#
-# `dep[DefaultInfo].default_outputs` is the canonical form used
-# throughout the prelude (see e.g. `prelude/artifacts.bzl`,
-# `prelude/utils/utils.bzl`, `prelude/command_alias.bzl`).
+# Iterates `tools` (Dependency values), collects each dep's
+# `DefaultInfo.default_outputs` into a flat list, and returns
+# `(files_list, [])`. Kuro does not use runfiles manifests; the second
+# tuple element is always empty.
 def _kuro_resolve_tools(tools = None):
     tool_files = []
     if tools != None:
@@ -394,10 +316,6 @@ def _kuro_resolve_tools(tools = None):
                 tool_files.extend(dep[DefaultInfo].default_outputs)
     return (tool_files, [])
 
-# Plan 28.4 Stage 12: Starlark replacement for the deleted Rust impl
-# of `ctx.resolve_command` in
-# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`.
-#
 # Deprecated Bazel API:
 #   ctx.resolve_command(
 #       *, command="", attribute=None, expand_locations=False,
@@ -405,15 +323,10 @@ def _kuro_resolve_tools(tools = None):
 #       execution_requirements=None,
 #   ) -> (inputs_list, command_list, manifests_list)
 #
-# Collects input files from `tools` and `label_dict` via
-# DefaultInfo.default_outputs, optionally runs $(location ...) expansion
-# via raw_ctx.expand_location, then applies literal $(KEY) → value
-# replacement for each entry in `make_variables`. Returns a 3-tuple
-# (inputs, [resolved_command], []) — the manifests list is always
-# empty because Kuro does not use runfiles manifests.
-#
-# `attribute` and `execution_requirements` are accepted and ignored,
-# matching the Rust impl's `let _ = (attribute, execution_requirements)`.
+# Collects input files from `tools` and `label_dict`, optionally runs
+# $(location ...) expansion, then applies literal `$(KEY)` → value
+# replacement from `make_variables`. `attribute` and
+# `execution_requirements` are accepted and ignored.
 def _kuro_resolve_command(
         raw_ctx,
         command,
@@ -423,7 +336,7 @@ def _kuro_resolve_command(
         tools,
         label_dict,
         execution_requirements):
-    _ = (attribute, execution_requirements)  # accepted, ignored — mirrors Rust impl
+    _ = (attribute, execution_requirements)  # accepted, ignored
 
     # Collect DefaultInfo.default_outputs from tools and label_dict.
     tool_files = []
@@ -448,34 +361,25 @@ def _kuro_resolve_command(
 
     return (tool_files, [resolved], [])
 
-# Plan 28.4 Stage 13: Starlark replacement for the deleted Rust impls
-# of `ctx.expand_location` and the free helper
-# `expand_location_in_string` in
-# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`.
+# `ctx.expand_location` Starlark impl. The label→paths pool lives
+# Rust-side via `kuro_collect_location_pool` because it needs
+# `StructRef::iter()` over the attrs struct plus `downcast_ref` type
+# discrimination over Dependency / StarlarkArtifact /
+# StarlarkDeclaredArtifact — none reachable from Starlark.
 #
-# The pool-building logic (targets list + implicit attrs walk) stayed
-# Rust-side via `kuro_collect_location_pool` because it requires
-# `StructRef::iter()` over the attrs struct and `downcast_ref` type
-# discrimination between Dependency, StarlarkArtifact, and
-# StarlarkDeclaredArtifact — none of which are reachable from Starlark
-# without a wider surface expansion than this stage justifies.
+# `kuro_lookup_output_path` resolves `attr.output` / `attr.output_list`
+# label strings lazily, preserving the deferred-declaration invariant:
+# only the specific output attribute whose string list contains the
+# query label triggers `CtxOutputs.declare_output`.
 #
-# The lazy output-attr path lookup (`attr.output` / `attr.output_list`
-# label resolution) also stayed Rust-side via `kuro_lookup_output_path`
-# to preserve the deferred-declaration invariant: only the specific
-# output attribute whose string list contains the query label triggers
-# `CtxOutputs.declare_output` — calling it eagerly for all string attrs
-# would leave unbound artifacts and fail analysis resolution.
-#
-# The parser (finding `$(location ...)`, `$(locations ...)`,
+# The parser (recognising `$(location ...)`, `$(locations ...)`,
 # `$(execpath ...)`, `$(execpaths ...)`, `$(rootpath ...)`,
 # `$(rootpaths ...)`, `$(rlocationpath ...)`, `$(rlocationpaths ...)`)
-# and the label-matching logic (`_find_paths_for_label`) both live
-# entirely in Starlark below.
+# and the label-matching logic (`_find_paths_for_label`) live in
+# Starlark.
 #
-# `short_paths=True` is accepted for Bazel signature parity; the Rust
-# impl did not differentiate path forms (all variants resolved to the
-# same full artifact path), so this flag is also a no-op here.
+# `short_paths=True` is accepted for Bazel signature parity but is a
+# no-op here (all path verbs resolve to the same full artifact path).
 
 def _find_paths_for_label(pool, label_str):
     # Try exact match, then target-name fallback, then path-suffix match.
@@ -512,8 +416,8 @@ def _kuro_expand_location(raw_ctx, input, targets, short_paths):
     targets_val = targets if targets != None else []
     pool = kuro_collect_location_pool(raw_ctx, targets_val)
 
-    # Parse and substitute $(verb label) patterns using the Stage 7/9
-    # for-loop-with-cursor idiom (Starlark has no `while`).
+    # Parse and substitute $(verb label) patterns using a
+    # for-loop-with-cursor (Starlark has no `while`).
     n = len(input)
     result = ""
     i = 0
@@ -613,10 +517,9 @@ def _kuro_target_platform_has_constraint(constraint_value):
             return True
     return False
 
-# Plan 28.4 Stage 3: install a Starlark facade around `raw_ctx` so
-# individual `ctx`-method bodies can move from Rust into Starlark
-# without touching the analysis call site. The facade is a `struct`
-# that mirrors every public field on the underlying `AnalysisContext`,
+# Install a Starlark facade around `raw_ctx` so `ctx`-method bodies
+# can live in this file rather than in Rust. The facade is a `struct`
+# mirroring every public field on the underlying `AnalysisContext`,
 # with the migrated methods replaced by Starlark closures.
 #
 # Two invariants this code relies on:
@@ -628,20 +531,17 @@ def _kuro_target_platform_has_constraint(constraint_value):
 #      `dynamic_output` or BXL" attribute paths are not reachable here.
 #
 #   2. Bound-method values returned by `raw_ctx.<method>` for
-#      non-migrated methods (e.g. `new_file`, `expand_location`)
-#      are first-class Starlark values that re-bind to `raw_ctx` when
-#      called. Storing them as struct fields preserves call semantics.
+#      non-migrated methods are first-class Starlark values that
+#      re-bind to `raw_ctx` when called. Storing them as struct fields
+#      preserves call semantics.
 #
-# Adding a new ctx field anywhere in
+# Adding a new ctx field in
 # `app/kuro_build_api/src/interpreter/rule_defs/context.rs` requires
-# adding a corresponding line in `_make_rule_facade` below; the
-# kuro_facade_drift_guard test
-# (tests/core/analysis/test_native_rules.py) compares `dir(raw_ctx)`
-# against this list and fails loudly when they diverge.
+# adding a corresponding line in `_make_rule_facade` below.
 #
-# `kind` distinguishes which wrapper produced the facade — Stage 5's
-# subrule wrapper reuses the same field set but tags itself
-# differently so acceptance tests can prove which dispatch path ran.
+# `kind` distinguishes which wrapper produced the facade (rule /
+# aspect / subrule) so acceptance tests can prove which dispatch path
+# ran.
 def _make_rule_facade(raw_ctx, kind):
     # Closure binding `raw_ctx` for `package_relative_label`, which
     # needs to read `raw_ctx.label` at call time but takes only the
@@ -649,13 +549,10 @@ def _make_rule_facade(raw_ctx, kind):
     def _package_relative_label_bound(label_str):
         return _kuro_package_relative_label(raw_ctx, label_str)
 
-    # Plan 28.4 Stage 9: closure binding `raw_ctx` for
-    # `expand_make_variables`. The substitution table reads
-    # `raw_ctx.bin_dir.path`, `raw_ctx.label.workspace_root`, and
-    # `raw_ctx.attrs.toolchains`; user-provided `additional_substitutions`
-    # is the only argument from the call site. Default is `None` to
-    # match Bazel's signature (which uses an empty dict default —
-    # treated identically here).
+    # The substitution table reads `raw_ctx.bin_dir.path`,
+    # `raw_ctx.label.workspace_root`, and `raw_ctx.attrs.toolchains`.
+    # `additional_substitutions` defaults to None to match Bazel's
+    # signature (Bazel uses an empty dict default — equivalent here).
     def _expand_make_variables_bound(attribute_name, command, additional_substitutions = None):
         return _kuro_expand_make_variables(
             raw_ctx,
@@ -664,10 +561,9 @@ def _make_rule_facade(raw_ctx, kind):
             additional_substitutions,
         )
 
-    # Plan 28.4 Stage 14: closure binding `raw_ctx` for `runfiles`.
-    # `raw_ctx` is captured so `_kuro_runfiles` can access `raw_ctx.attrs`
-    # when `collect_default` or `collect_data` is True. Signature matches
-    # Bazel's `ctx.runfiles`: `files` positional-or-keyword, the rest keyword-only.
+    # `_kuro_runfiles` reads `raw_ctx.attrs` when `collect_default` or
+    # `collect_data` is True. Signature matches Bazel's `ctx.runfiles`:
+    # `files` positional-or-keyword, the rest keyword-only.
     def _runfiles_bound(
             files = None,
             transitive_files = None,
@@ -685,10 +581,8 @@ def _make_rule_facade(raw_ctx, kind):
             root_symlinks,
         )
 
-    # Plan 28.4 Stage 12: closure binding `raw_ctx` for `resolve_command`.
-    # The helper needs `raw_ctx.expand_location` for the $(location ...)
-    # expansion step; all other args are forwarded verbatim. Signature
-    # matches Bazel's: all kwargs, all with defaults.
+    # `_kuro_resolve_command` needs raw_ctx for the $(location ...)
+    # expansion step. Signature matches Bazel's: all kwargs with defaults.
     def _resolve_command_bound(
             command = "",
             attribute = None,
@@ -708,16 +602,13 @@ def _make_rule_facade(raw_ctx, kind):
             execution_requirements,
         )
 
-    # Plan 28.4 Stage 10: closure binding `raw_ctx` for `new_file`.
-    # The deprecated two-shape API (`new_file(filename)` and
-    # `new_file(sibling, filename)`) is normalised here; the sibling is
-    # ignored to match the deleted Rust impl byte-for-byte.
+    # `_kuro_new_file` normalises the two-shape API
+    # (`new_file(filename)` and `new_file(sibling, filename)`); the
+    # sibling is ignored.
     def _new_file_bound(file_or_sibling, filename = None):
         return _kuro_new_file(raw_ctx, file_or_sibling, filename)
 
-    # Plan 28.4 Stage 13: closure binding `raw_ctx` for
-    # `expand_location`. Passes raw_ctx through to
-    # `_kuro_expand_location` so the two runtime hooks
+    # `_kuro_expand_location` takes raw_ctx so the two runtime hooks
     # (`kuro_collect_location_pool` and `kuro_lookup_output_path`) can
     # downcast it to `AnalysisContext` and access attrs / outputs.
     def _expand_location_bound(input, targets = None, short_paths = False):
@@ -762,9 +653,9 @@ def _make_rule_facade(raw_ctx, kind):
         resolve_tools = _kuro_resolve_tools,
         resolve_command = _resolve_command_bound,
         new_file = _new_file_bound,
-        # ---- Acceptance markers (kuro_*-prefixed). Used by Stage 3/5
-        #      tests to prove which wrapper produced the facade. Not
-        #      Bazel builtins; not part of the rule-author contract.
+        # ---- Acceptance markers (kuro_*-prefixed). Used by tests to
+        #      prove which wrapper produced the facade. Not Bazel
+        #      builtins; not part of the rule-author contract.
         kuro_facade_active = True,
         kuro_facade_kind = kind,
     )
@@ -772,34 +663,24 @@ def _make_rule_facade(raw_ctx, kind):
 def _invoke_rule(implementation, raw_ctx):
     return implementation(_make_rule_facade(raw_ctx, "rule"))
 
-# Plan 28.4 Stage 5: subrule-side wrapper. Subrules are invoked from
-# inside a rule impl; the dispatch site
-# (`app/kuro_interpreter_for_build/src/subrule.rs`) reaches the
-# wrapper via TLS set by `RuleSpec::Impl::invoke`. Subrule impls have
-# the shape `def _impl(ctx, **kwargs)`, so the wrapper signature is
-# `wrapper(impl, ctx, **kwargs)` — kwargs forward verbatim.
-#
-# Subrule contexts are the same `AnalysisContext` type as the
-# enclosing rule, so the facade shares `_make_rule_facade`. Only the
-# `kuro_facade_kind` tag differs so tests can confirm which dispatch
-# path produced the struct.
+# Subrule-side wrapper. Subrules are invoked from inside a rule impl;
+# the dispatch site (`app/kuro_interpreter_for_build/src/subrule.rs`)
+# reaches the wrapper via TLS set by `RuleSpec::Impl::invoke`. Subrule
+# impls have the shape `def _impl(ctx, **kwargs)`. Subrule contexts
+# are the same `AnalysisContext` type as the enclosing rule, so the
+# facade shares `_make_rule_facade`.
 def _invoke_subrule(implementation, raw_ctx, **kwargs):
     return implementation(_make_rule_facade(raw_ctx, "subrule"), **kwargs)
 
-# Plan 28.4 Stage 4: aspect-side facade. Mirrors
-# `_invoke_rule` but for `AspectContext`. Aspect impls are called as
-# `impl(target, ctx)` (two positional args) so the wrapper signature is
-# `wrapper(impl, target, raw_ctx)`. The dispatch site for aspects lives
-# in `app/kuro_analysis/src/analysis/aspect_calculation.rs` (see Stage 4
-# wiring in this commit).
+# Aspect-side facade. Mirrors `_invoke_rule` but for `AspectContext`.
+# Aspect impls are called as `impl(target, ctx)`. The dispatch site
+# lives in `app/kuro_analysis/src/analysis/aspect_calculation.rs`.
 #
-# Field set is the AspectContext public surface in
-# `app/kuro_build_api/src/interpreter/rule_defs/aspect/context.rs`.
-# Smaller than rule context — no `attrs`, `outputs`, `executable`, etc.
-# `target_platform_has_constraint` was deleted in Stage 3 from the Rust
-# AspectContext too; here we install the same Starlark shim the rule
-# facade uses, which means aspects can now answer the question
-# meaningfully (instead of the previous unconditional `False`).
+# AspectContext is smaller than rule context — no `attrs`, `outputs`,
+# `executable`, etc. The same Starlark
+# `_kuro_target_platform_has_constraint` shim rule contexts use is
+# installed here, so aspects answer the question meaningfully (the
+# previous Rust stub returned False unconditionally).
 def _invoke_aspect(implementation, target, raw_ctx):
     return implementation(target, struct(
         # ---- AspectContext attributes (#[starlark(attribute)]) ----
@@ -822,15 +703,15 @@ def _invoke_aspect(implementation, target, raw_ctx):
         target_platform_has_constraint = _kuro_target_platform_has_constraint,
         # ---- AspectContext methods passed through (bound to raw_ctx) ----
         coverage_instrumented = raw_ctx.coverage_instrumented,
-        # ---- Stage 4 acceptance marker (kuro_*-prefixed). Same shape as
-        #      Stage 3's rule-facade marker but disambiguated so the
-        #      acceptance test can prove which wrapper ran.
+        # ---- Acceptance marker (kuro_*-prefixed). Disambiguated so
+        #      acceptance tests can prove which wrapper produced the
+        #      facade.
         kuro_facade_active = True,
         kuro_facade_kind = "aspect",
     ))
 
 # -----------------------------------------------------------------------
-# Plan 28 export contract.
+# Export contract.
 # -----------------------------------------------------------------------
 
 # Symbols visible at the top level of every BUILD and `.bzl` file. The
@@ -839,48 +720,32 @@ def _invoke_aspect(implementation, target, raw_ctx):
 # Visibility-control lives here, not in the interpreter — adding a name
 # is an explicit decision in this file.
 exported_toplevels = {
-    # Phase 28.2 probe; kept under a `kuro_builtins_*` name to flag that
+    # Probe symbol; kept under a `kuro_builtins_*` name to flag that
     # it is not a Bazel builtin. Used by
     # `tests/core/analysis/test_native_rules.py::test_28_2_kuro_builtins_visible_in_external_bzl`.
     "kuro_builtins_probe": _kuro_builtins_probe_value,
 }
 
-# Plan 28.5: BUCK-file-only globals contributed by the bundled
-# builtins module. Members of this dict are injected into the
-# BUCK file env by `interpreter_for_dir.rs::create_env` AFTER the
-# prelude's `native` struct members, so a name in `exported_native`
-# wins over a same-named entry in `prelude/native.bzl`. NOT visible
-# in `.bzl` files — that's reserved for `exported_toplevels` above.
-#
-# Precedence in BUCK files (lowest to highest, last write wins):
-#   1. Rust primitives via `prelude/native.bzl`'s `native = struct(...)`.
-#   2. Entries in this `exported_native` dict.
-#   3. User `load()` bindings at the BUCK use site (Starlark scope wins).
-#
-# This is the `prelude/native.bzl` shrink path: as a name moves out
-# of the Rust `__kuro_builtins__` namespace into pure Starlark, it
-# leaves prelude's `native` struct and lands here. Phase 28.6 deletes
-# `prelude/native.bzl` and the `__kuro_builtins__`-scrape entirely
-# once all surviving names live here or in user `rules_*` modules.
+# BUCK-file-only globals. Members are injected as BUCK globals by
+# `interpreter_for_dir.rs::create_env` and stay invisible in `.bzl`
+# files (mirrors Bazel's `native` struct semantics). User `load()`
+# bindings at the BUCK use site shadow these via normal Starlark
+# scoping.
 exported_native = {
-    # Phase 28.5 probe — proves the BUCK-file-only injection path.
-    # `_kuro_*` prefix flags the symbol as kuro-internal, not a Bazel
-    # builtin. Used by `test_28_5_exported_native_visible_in_buck` and
+    # Probe — proves the BUCK-file-only injection path. `_kuro_*`
+    # prefix flags the symbol as kuro-internal, not a Bazel builtin.
+    # Used by `test_28_5_exported_native_visible_in_buck` and
     # `test_28_5_exported_native_hidden_in_bzl`.
     "_kuro_exported_native_probe": "kuro-28-5-exported-native-ok",
 }
 
-# Phase 28.4 wrapper hook. Not in `exported_toplevels` — analysis pulls
-# it directly via the bundled module, not via the user-visible env.
-rule_implementation_wrapper = _invoke_rule
-
-# Phase 28.4 Stage 4 aspect-wrapper hook. Picked up by
-# `aspect_calculation.rs::execute_aspect`; same not-exported semantics
-# as `rule_implementation_wrapper`.
-aspect_implementation_wrapper = _invoke_aspect
-
-# Phase 28.4 Stage 5 subrule-wrapper hook. Picked up by
+# Wrapper hooks. Not in `exported_toplevels` — analysis pulls them
+# directly via the bundled module, not via the user-visible env.
+# `rule_implementation_wrapper` is read by `RuleSpec::Impl::invoke`,
+# `aspect_implementation_wrapper` by `aspect_calculation.rs::execute_aspect`,
+# and `subrule_implementation_wrapper` by
 # `kuro_interpreter_for_build::subrule::FrozenStarlarkSubruleCallable::invoke`
-# via TLS set in `RuleSpec::Impl::invoke`. Same not-exported semantics
-# as the rule/aspect hooks.
+# (via TLS set in `RuleSpec::Impl::invoke`).
+rule_implementation_wrapper = _invoke_rule
+aspect_implementation_wrapper = _invoke_aspect
 subrule_implementation_wrapper = _invoke_subrule

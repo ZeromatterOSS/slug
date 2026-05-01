@@ -1500,15 +1500,13 @@ pub fn get_user_defined_rule_spec(
         output_attr_names: Vec<String>,
         toolchain_types: Vec<(String, bool)>,
         exec_group_defs: Vec<(String, kuro_node::rule::ExecGroupDef)>,
-        /// Plan 28.4 Stage 2: bundled `@kuro_builtins//:exports.bzl`. If
-        /// it exposes a `rule_implementation_wrapper`, every Starlark
-        /// rule impl gets called as `wrapper(impl, ctx)` instead of
-        /// `impl(ctx)`. The wrapper is currently an identity no-op
-        /// (Phase 28.4 Stage 1 hook), so this is byte-for-byte
-        /// equivalent. Subsequent stages migrate `ctx`-method bodies
-        /// into the wrapper. None means @kuro_builtins isn't
-        /// registered in this workspace; analysis falls back to direct
-        /// invocation.
+        /// Bundled `@kuro_builtins//:exports.bzl`. If it exposes a
+        /// `rule_implementation_wrapper`, every Starlark rule impl gets
+        /// called as `wrapper(impl, ctx)` instead of `impl(ctx)`. The
+        /// wrapper installs the Starlark `ctx` facade that serves the
+        /// migrated `ctx`-method bodies. None means @kuro_builtins
+        /// isn't registered in this workspace; analysis falls back to
+        /// direct invocation.
         builtins_module: Option<FrozenModule>,
     }
 
@@ -1528,11 +1526,10 @@ pub fn get_user_defined_rule_spec(
             let ctx_bits: usize = unsafe { std::mem::transmute(ctx_val) };
             kuro_interpreter_for_build::subrule::set_current_rule_ctx_raw(ctx_bits);
 
-            // Plan 28.4 Stage 5: also stash the bundled
-            // `subrule_implementation_wrapper` for the duration of this
-            // rule's eval, so subrule invocations from inside the rule
-            // impl can route through the same Starlark facade. Same
-            // safety contract as the ctx slot.
+            // Stash the bundled `subrule_implementation_wrapper` for
+            // the duration of this rule's eval so subrule invocations
+            // from inside the rule impl route through the same
+            // Starlark facade. Same safety contract as the ctx slot.
             if let Some(wrapper) = self.lookup_subrule_implementation_wrapper(eval)? {
                 let wrapper_bits: usize = unsafe { std::mem::transmute(wrapper) };
                 kuro_build_api::interpreter::rule_ctx_storage::set_current_subrule_wrapper_raw(
@@ -1549,14 +1546,11 @@ pub fn get_user_defined_rule_spec(
             }
             let _guard = CtxGuard;
 
-            // Plan 28.4 Stage 2: route Starlark rule impl calls through
-            // the bundled `rule_implementation_wrapper(impl, ctx)`.
-            // Stage 1 / 28.3 ships a no-op wrapper, so this preserves
-            // byte-for-byte provider results. Subsequent stages can
-            // change the wrapper body to install a Starlark `ctx`
-            // facade and migrate `ctx.target_platform_has_constraint`
-            // / `ctx.runfiles` / `ctx.var` etc. without touching the
-            // analysis call site again.
+            // Route Starlark rule impl calls through the bundled
+            // `rule_implementation_wrapper(impl, ctx)` when it's
+            // available. The wrapper installs a Starlark `ctx` facade
+            // that serves migrated `ctx`-method bodies (see
+            // `_make_rule_facade` in `@kuro_builtins//:exports.bzl`).
             let result = if let Some(wrapper) = self.lookup_rule_implementation_wrapper(eval)? {
                 eval.eval_function(wrapper, &[rule_impl.to_value(), ctx_val], &[])
             } else {
@@ -1591,11 +1585,11 @@ pub fn get_user_defined_rule_spec(
     }
 
     impl Impl {
-        /// Plan 28.4 Stage 2: look up `rule_implementation_wrapper` in
-        /// the bundled `@kuro_builtins//:exports.bzl`. Returns `None`
-        /// when the workspace doesn't have `@kuro_builtins` registered
-        /// (legacy non-bzlmod), or when the bundled module doesn't
-        /// expose the wrapper (e.g. test exports.bzl without the hook).
+        /// Look up `rule_implementation_wrapper` in the bundled
+        /// `@kuro_builtins//:exports.bzl`. Returns `None` when the
+        /// workspace doesn't have `@kuro_builtins` registered (legacy
+        /// non-bzlmod), or when the bundled module doesn't expose the
+        /// wrapper (e.g. test exports.bzl without the hook).
         fn lookup_rule_implementation_wrapper<'v>(
             &self,
             eval: &mut Evaluator<'v, '_, '_>,
@@ -1603,9 +1597,8 @@ pub fn get_user_defined_rule_spec(
             self.lookup_wrapper(eval, "rule_implementation_wrapper")
         }
 
-        /// Plan 28.4 Stage 5: look up `subrule_implementation_wrapper`
-        /// in the bundled module. Same fallback semantics as the rule
-        /// wrapper.
+        /// Look up `subrule_implementation_wrapper` in the bundled
+        /// module. Same fallback semantics as the rule wrapper.
         fn lookup_subrule_implementation_wrapper<'v>(
             &self,
             eval: &mut Evaluator<'v, '_, '_>,

@@ -928,20 +928,6 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         }))
     }
 
-    // `var` migrated to Starlark in Plan 28.4 Stage 9. The bundled
-    // `_kuro_var` in `@kuro_builtins//:exports.bzl` builds the
-    // `$(VAR)` substitution table by reading
-    // `raw_ctx.bin_dir.path` / `raw_ctx.label.workspace_root`
-    // directly and dispatching to kuro-internal Starlark globals
-    // (`kuro_host_target_cpu`, `kuro_host_cc_path`,
-    // `kuro_compilation_mode_for_label`,
-    // `kuro_collect_toolchains_template_vars`,
-    // `kuro_get_all_defines`) registered in
-    // `kuro_interpreter_for_build::interpreter::functions::kuro_runtime`.
-    // The merged table lives in `_kuro_make_substitutions` and is
-    // shared with `_kuro_expand_make_variables`. Single-owner per
-    // Plan 28.7.
-
     /// Returns the value of a build setting rule (Bazel-compatible).
     ///
     /// For rules declared with `build_setting = config.string()` or similar,
@@ -967,9 +953,8 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             })
             .unwrap_or(false);
 
-        // Resolve from the target's own ConfigurationData. This is where CLI
-        // overrides (Plan 19.4) and transition-produced overrides (Plan 19.2)
-        // land.
+        // Resolve from the target's own ConfigurationData (where CLI
+        // overrides and transition-produced overrides land).
         if let Some(label) = this.0.label {
             let target = label.label().target();
             let cfg = label.label().cfg();
@@ -986,8 +971,8 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
                 .and_then(|l| cfg.get_build_setting(&l).ok().flatten())
                 .map(|v| build_setting_value_to_starlark(v, heap));
 
-            // Fallback: the process-global starlark_flags store (pre-19.4 and
-            // any other path that wrote there, e.g. transition mirror-writes).
+            // Fallback: the process-global starlark_flags store, used by
+            // any path that wrote there (e.g. transition mirror-writes).
             let final_value = cfg_value.or_else(|| {
                 crate::interpreter::rule_defs::build_config::get_starlark_flag(&label_str).map(
                     |cli_value| match cli_value.as_str() {
@@ -1033,75 +1018,11 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         Ok(heap.alloc(AllocList::EMPTY))
     }
 
-    // `coverage_instrumented` migrated to Starlark in Plan 28.4
-    // Stage 8. The bundled `_kuro_coverage_instrumented` reads the
-    // per-build flag via the `kuro_collect_code_coverage()` global
-    // registered in
-    // `kuro_interpreter_for_build::interpreter::functions::kuro_runtime`.
-    // Single-owner per Plan 28.7.
-
-    // `tokenize` migrated to Starlark in Plan 28.4 Stage 7. The
-    // bundled `_kuro_tokenize` in `@kuro_builtins//:exports.bzl`
-    // (and the `shell_tokenize` helper, deleted at the bottom of
-    // this file) translated to Starlark byte-for-byte for ASCII
-    // input. Single-owner per Plan 28.7.
-
-    // `runfiles` migrated to Starlark in Plan 28.4 Stage 14.
-    // The bundled `_kuro_runfiles` in `@kuro_builtins//:exports.bzl`
-    // calls `kuro_create_runfiles` (for the base Runfiles object via
-    // `create_runfiles`) and `kuro_collect_runfiles_into` (for each
-    // `collect_default` / `collect_data` attr walk) — both registered
-    // as kuro_runtime globals in
-    // `app/kuro_interpreter_for_build/src/interpreter/functions/kuro_runtime.rs`.
-    // The public helper `collect_runfiles_from_value` (below) is the
-    // kuro_runtime entry point for the per-dep merging logic.
-
-    // `target_platform_has_constraint` migrated to Starlark in Plan 28.4
-    // Stage 3. The bundled `@kuro_builtins//:exports.bzl` installs a
-    // facade around the rule-impl `ctx` and serves the method from
-    // `_kuro_target_platform_has_constraint`. Host OS/CPU labels are
-    // baked at kuro build time by
-    // `app/kuro_external_cells_bundled/build.rs`.
-
-    // `expand_make_variables` migrated to Starlark in Plan 28.4
-    // Stage 9. The bundled `_kuro_expand_make_variables` in
-    // `@kuro_builtins//:exports.bzl` parses `$(VAR)` patterns and
-    // substitutes against the same merged table built by
-    // `_kuro_make_substitutions` (shared with `_kuro_var`). User
-    // `additional_substitutions` win over the builtin / toolchain /
-    // define layers, mirroring the deleted Rust impl's
-    // `entry().or_insert()` priority. Single-owner per Plan 28.7.
-
-    // `package_relative_label` migrated to Starlark in Plan 28.4
-    // Stage 6. The bundled `_kuro_package_relative_label` in
-    // `@kuro_builtins//:exports.bzl` reads `raw_ctx.label.cell` /
-    // `.package`, constructs the resolved label string, and returns
-    // `Label(...)` (which calls `BazelLabel::parse` for canonical
-    // form). Single-owner per Plan 28.7.
-
-    // `resolve_tools` migrated to Starlark in Plan 28.4 Stage 11. The
-    // bundled `_kuro_resolve_tools` in `@kuro_builtins//:exports.bzl`
-    // iterates `tools` (a list of Dependency values), collects each
-    // dep's `DefaultInfo.default_outputs` into a flat list, and returns
-    // `(files_list, [])`. Kuro does not use runfiles manifests, so the
-    // second element is always an empty list — identical to the deleted
-    // Rust impl. Single-owner per Plan 28.7.
-
-    // `resolve_command` migrated to Starlark in Plan 28.4 Stage 12.
-    // The bundled `_kuro_resolve_command` in
-    // `@kuro_builtins//:exports.bzl` collects DefaultInfo.default_outputs
-    // from `tools` and `label_dict`, runs `raw_ctx.expand_location` when
-    // `expand_locations=True`, and applies literal `$(KEY)` → value
-    // replacement from `make_variables`. Returns `(inputs, [command], [])`.
-    // `attribute` and `execution_requirements` are accepted and ignored,
-    // matching the deleted Rust impl. Single-owner per Plan 28.7.
-
-    // `new_file` migrated to Starlark in Plan 28.4 Stage 10. The bundled
-    // `_kuro_new_file` in `@kuro_builtins//:exports.bzl` now serves both
-    // call shapes (`new_file(filename)` and `new_file(sibling, filename)`),
-    // delegating to `ctx.actions.declare_file(name)`. The sibling is
-    // ignored, matching the deleted Rust impl byte-for-byte.
-    // Single-owner per Plan 28.7.
+    // `var`, `coverage_instrumented`, `tokenize`, `runfiles`,
+    // `target_platform_has_constraint`, `expand_make_variables`,
+    // `package_relative_label`, `resolve_tools`, `resolve_command`,
+    // and `new_file` are served from `@kuro_builtins//:exports.bzl`
+    // through the rule-context facade installed by `_invoke_rule`.
 
     /// Expands `$(location label)` and `$(locations label)` templates in the input string.
     ///
@@ -1114,18 +1035,13 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// The `targets` parameter is a list of Dependency objects (from ctx.attr.* values)
     /// that provide the pool of targets to look up. Labels are matched by their short form.
     #[allow(unused_variables)]
-    // Plan 28.4 Stage 13: `ctx.expand_location` migrated to Starlark.
-    // The Rust impl (pool-building + parser, ~330 LOC) was deleted;
-    // `_kuro_expand_location` in `@kuro_builtins//:exports.bzl` now
-    // serves the call via the facade. Two runtime hooks bridge the
-    // Rust-only logic:
+    // `expand_location` is served from `@kuro_builtins//:exports.bzl`
+    // through the facade. Two runtime hooks bridge the Rust-only logic:
     //   - `kuro_collect_location_pool` — builds the label→paths pool
-    //     (targets list + implicit attrs walk, same as the deleted impl).
+    //     (targets list + implicit attrs walk).
     //   - `kuro_lookup_output_path` — lazily resolves attr.output /
     //     attr.output_list labels to declared-artifact paths (deferred
     //     to avoid spurious unbound-artifact declarations).
-    // Both hooks are registered in
-    // `app/kuro_interpreter_for_build::interpreter::functions::kuro_runtime`.
     fn expand_location<'v>(
         this: RefAnalysisContext<'v>,
         input: &str,
@@ -1263,9 +1179,9 @@ fn expand_location_in_string<'v>(
     Ok(result)
 }
 
-/// Plan 28.4 Stage 13: pub entry point for the kuro-internal
-/// `kuro_collect_location_pool` Starlark global. Builds the label→paths
-/// pool used by `_kuro_expand_location` in `@kuro_builtins//:exports.bzl`.
+/// Pub entry point for the `kuro_collect_location_pool` Starlark
+/// global. Builds the label→paths pool used by `_kuro_expand_location`
+/// in `@kuro_builtins//:exports.bzl`.
 ///
 /// Returns a flat list of `[label_str, [path1, path2, ...]]` two-element
 /// Starlark lists. Pool entries come from two sources:
@@ -1396,8 +1312,8 @@ pub fn collect_location_pool_for_ctx<'v>(
     Ok(heap.alloc(AllocList(starlark_entries)))
 }
 
-/// Plan 28.4 Stage 13: pub entry point for the kuro-internal
-/// `kuro_lookup_output_path` Starlark global. Resolves a bare label
+/// Pub entry point for the `kuro_lookup_output_path` Starlark global.
+/// Resolves a bare label
 /// (e.g. `:generated_file`) to an output artifact path by scanning the
 /// rule's attrs for string-valued lists (attr.output / attr.output_list
 /// attrs), then calling `ctx.outputs.<attr_name>[idx]` lazily so that
@@ -1577,14 +1493,9 @@ fn compilation_mode_from_cfg(cfg: Option<&ConfigurationData>) -> String {
     crate::interpreter::rule_defs::build_config::get_compilation_mode()
 }
 
-/// Plan 28.4 Stage 9: pub entry point for the kuro-internal
-/// `kuro_compilation_mode_for_label` Starlark global (registered in
-/// `kuro_interpreter_for_build::interpreter::functions::kuro_runtime`).
-/// Takes the raw label `Value`, extracts its cfg, and runs the same
-/// `compilation_mode_from_cfg` resolution the deleted `ctx.var` /
-/// `ctx.expand_make_variables` Rust impls used. Hides the cfg hash
-/// from Starlark — exposing it would be a wider surface change than
-/// this stage justifies.
+/// Pub entry point for the `kuro_compilation_mode_for_label` Starlark
+/// global. Takes the raw label `Value`, extracts its cfg, and resolves
+/// `compilation_mode_from_cfg`. Hides the cfg hash from Starlark.
 pub fn compilation_mode_for_label_value(label: Value<'_>) -> String {
     let cfg = label
         .downcast_ref::<StarlarkConfiguredProvidersLabel>()
@@ -1689,13 +1600,10 @@ pub fn collect_toolchains_template_vars_from_list<'v>(
     out
 }
 
-/// Plan 28.4 Stage 14 kuro_runtime entry point.
-///
-/// Merges runfiles from a single attribute value (list of Dependency or a
-/// single Dependency) into `runfiles`. Called by `kuro_collect_runfiles_into`
-/// in `app/kuro_interpreter_for_build/src/interpreter/functions/kuro_runtime.rs`
-/// to serve `ctx.runfiles(collect_default=True/collect_data=True)` from
-/// Starlark.
+/// Merges runfiles from a single attribute value (list of Dependency
+/// or a single Dependency) into `runfiles`. Called by
+/// `kuro_collect_runfiles_into` to serve
+/// `ctx.runfiles(collect_default=True/collect_data=True)` from Starlark.
 pub fn collect_runfiles_from_value<'v>(
     value: Value<'v>,
     want_data: bool,
@@ -3176,7 +3084,3 @@ pub static ANALYSIS_ACTIONS_METHODS_ANON_TARGET: LateBinding<fn(&mut MethodsBuil
 pub(crate) fn init_analysis_context_ty() {
     AnalysisContextReprLate::init(AnalysisContext::starlark_type_repr());
 }
-
-// `shell_tokenize` migrated to Starlark in Plan 28.4 Stage 7 (see
-// `_kuro_tokenize` in `@kuro_builtins//:exports.bzl`). Sole caller
-// was the deleted `ctx.tokenize` Rust impl above.

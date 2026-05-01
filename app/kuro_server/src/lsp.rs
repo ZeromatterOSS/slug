@@ -134,9 +134,6 @@ impl DocsCacheManager {
 
         let cell_resolver = dice_ctx.get_cell_resolver().await?;
         builtin_docs.push((None, get_builtin_globals_docs(dice_ctx).await?));
-
-        // Plan 28 follow-up: prelude docs are no longer scraped — the
-        // prelude/PreludePath machinery has been removed.
         DocsCache::new(&builtin_docs, fs, &cell_resolver).await
     }
 }
