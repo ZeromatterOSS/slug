@@ -15,12 +15,9 @@ use std::str::FromStr;
 use allocative::Allocative;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
 use kuro_common::legacy_configs::key::BuckconfigKeyRef;
-use kuro_core::rollout_percentage::RolloutPercentage;
 
 static BUCK2_RE_CLIENT_CFG_SECTION: &str = "kuro_re_client";
 
-/// We put functions here that both things need to implement for code that isn't gated behind a
-/// fbcode_build or not(fbcode_build)
 pub trait RemoteExecutionStaticMetadataImpl: Sized {
     fn from_legacy_config(legacy_config: &LegacyBuckConfig) -> kuro_error::Result<Self>;
     fn cas_semaphore_size(&self) -> usize;
@@ -98,346 +95,31 @@ impl FromStr for CopyPolicy {
     }
 }
 
-#[allow(unused)]
-mod fbcode {
-    use kuro_common::legacy_configs::key::BuckconfigKeyRef;
+/// Metadata that doesn't change between executions.
+#[derive(Clone, Debug, Default, Allocative)]
+pub struct RemoteExecutionStaticMetadata(pub KuroOssReConfiguration);
 
-    use super::*;
-
-    /// Metadata that doesn't change between executions
-    #[derive(Clone, Debug, Default, Allocative)]
-    pub struct RemoteExecutionStaticMetadata {
-        // gRPC settings
-        pub cas_address: Option<String>,
-        pub cas_connection_count: i32,
-        pub shared_casd_cache_path: Option<String>,
-        pub legacy_shared_casd_mode: Option<String>,
-        pub shared_casd_mode_small_files: Option<CASdMode>,
-        pub shared_casd_mode_large_files: Option<CASdMode>,
-        pub shared_casd_cache_sync_wal_files_count: Option<u8>,
-        pub shared_casd_cache_sync_wal_file_max_size: Option<u64>,
-        pub shared_casd_cache_sync_max_batch_size: Option<u32>,
-        pub shared_casd_cache_sync_max_delay_ms: Option<u32>,
-        pub shared_casd_copy_policy: Option<CopyPolicy>,
-        pub shared_casd_address: Option<CASdAddress>,
-        pub shared_casd_use_tls: Option<bool>,
-        pub cas_client_label: Option<String>,
-        pub action_cache_address: Option<String>,
-        pub action_cache_connection_count: i32,
-        pub engine_address: Option<String>,
-        pub engine_connection_count: i32,
-        // End gRPC settings
-        pub verbose_logging: bool,
-
-        pub use_manifold_rich_client: bool,
-        pub use_zippy_rich_client: bool,
-        pub use_p2p: bool,
-
-        pub cas_thread_count: i32,
-        pub cas_thread_count_ratio: f32,
-
-        pub rich_client_channels_per_blob: Option<i32>,
-        pub rich_client_attempt_timeout_ms: Option<i32>,
-        pub rich_client_retries_count: Option<i32>,
-        pub force_enable_deduplicate_find_missing: Option<bool>,
-
-        pub features_config_path: Option<String>,
-        pub client_config_path: Option<String>,
-
-        // curl zeromatter
-        pub curl_reactor_max_number_of_retries: Option<i32>,
-        pub curl_reactor_connection_timeout_ms: Option<i32>,
-        pub curl_reactor_request_timeout_ms: Option<i32>,
-
-        // ttl management
-        pub minimal_blob_ttl_seconds: Option<i64>,
-        // When less than (X*100)% of TTL remains, refresh data in the store
-        pub remaining_ttl_fraction_refresh_threshold: Option<f32>,
-        // Adds a randomness to when refresh the TTL
-        pub remaining_ttl_random_extra_threshold: Option<f32>,
-
-        pub disable_fallocate: bool,
-        pub respect_file_symlinks: bool,
-
-        // Thrift settings
-        pub execution_concurrency_limit: i32,
-        pub engine_tier: Option<String>,
-        pub engine_host: Option<String>,
-        pub engine_port: Option<i32>,
-        // End Thrift settings
-        /// When set to True, allows for cancellation of RE downloads when futures are dropped
-        pub enable_download_cancellation: bool,
+impl RemoteExecutionStaticMetadataImpl for RemoteExecutionStaticMetadata {
+    fn from_legacy_config(legacy_config: &LegacyBuckConfig) -> kuro_error::Result<Self> {
+        Ok(Self(KuroOssReConfiguration::from_legacy_config(
+            legacy_config,
+        )?))
     }
 
-    impl RemoteExecutionStaticMetadataImpl for RemoteExecutionStaticMetadata {
-        fn from_legacy_config(legacy_config: &LegacyBuckConfig) -> kuro_error::Result<Self> {
-            Ok(Self {
-                cas_address: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "cas_address",
-                })?,
-                cas_connection_count: legacy_config
-                    .parse(BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "cas_connection_count",
-                    })?
-                    .unwrap_or(16),
-                shared_casd_cache_path: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "cas_shared_cache",
-                })?,
-                legacy_shared_casd_mode: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "cas_shared_cache_mode",
-                })?,
-                shared_casd_mode_small_files: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "cas_shared_cache_mode_small_files_v2",
-                })?,
-                shared_casd_mode_large_files: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "cas_shared_cache_mode_large_files_v2",
-                })?,
-                shared_casd_cache_sync_wal_files_count: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "cas_shared_cache_sync_wal_files_count_v2",
-                })?,
-                shared_casd_cache_sync_wal_file_max_size: legacy_config.parse(
-                    BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "cas_shared_cache_sync_wal_file_max_size_v2",
-                    },
-                )?,
-                shared_casd_cache_sync_max_batch_size: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "cas_shared_cache_sync_max_batch_size_v2",
-                })?,
-                shared_casd_cache_sync_max_delay_ms: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "cas_shared_cache_sync_max_delay_ms_v2",
-                })?,
-                shared_casd_copy_policy: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "cas_shared_cache_copy_policy_v2",
-                })?,
-                shared_casd_address: {
-                    let port_result = legacy_config.parse(BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "cas_shared_cache_port",
-                    });
-                    match port_result {
-                        Ok(Some(port)) => Some(port),
-                        _ => legacy_config.parse(BuckconfigKeyRef {
-                            section: BUCK2_RE_CLIENT_CFG_SECTION,
-                            property: "cas_shared_cache_address_v2",
-                        })?,
-                    }
-                },
-                shared_casd_use_tls: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "cas_shared_cache_tls",
-                })?,
-                cas_client_label: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "cas_client_label_v2",
-                })?,
-                action_cache_address: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "action_cache_address",
-                })?,
-                action_cache_connection_count: legacy_config
-                    .parse(BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "action_cache_connection_count",
-                    })?
-                    .unwrap_or(4),
-                engine_address: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "engine_address",
-                })?,
-                engine_connection_count: legacy_config
-                    .parse(BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "engine_connection_count",
-                    })?
-                    .unwrap_or(4),
-                verbose_logging: legacy_config
-                    .parse(BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "verbose_logging",
-                    })?
-                    .unwrap_or(false),
-                cas_thread_count: legacy_config
-                    .parse(BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "cas_thread_count",
-                    })?
-                    .unwrap_or(4),
-                cas_thread_count_ratio: legacy_config
-                    .parse(BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "cas_thread_count_ratio",
-                    })?
-                    .unwrap_or(0.0),
-                use_manifold_rich_client: legacy_config
-                    .parse(BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "use_manifold_rich_client_new",
-                    })?
-                    .unwrap_or(true),
-                use_zippy_rich_client: legacy_config
-                    .parse(BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "use_zippy_rich_client",
-                    })?
-                    .unwrap_or(false),
-                use_p2p: legacy_config
-                    .parse(BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "use_p2p",
-                    })?
-                    .unwrap_or(false),
-                rich_client_channels_per_blob: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "rich_client_channels_per_blob",
-                })?,
-                rich_client_attempt_timeout_ms: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "rich_client_attempt_timeout_ms",
-                })?,
-                rich_client_retries_count: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "rich_client_retries_count",
-                })?,
-                force_enable_deduplicate_find_missing: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "force_enable_deduplicate_find_missing",
-                })?,
-                features_config_path: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "features_config_path",
-                })?,
-                client_config_path: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "client_config_path",
-                })?,
-                curl_reactor_max_number_of_retries: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "curl_reactor_max_number_of_retries",
-                })?,
-                curl_reactor_connection_timeout_ms: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "curl_reactor_connection_timeout_ms",
-                })?,
-                curl_reactor_request_timeout_ms: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "curl_reactor_request_timeout_ms",
-                })?,
-                minimal_blob_ttl_seconds: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "minimal_blob_ttl_seconds",
-                })?,
-                disable_fallocate: legacy_config
-                    .parse::<RolloutPercentage>(BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "disable_fallocate",
-                    })?
-                    .unwrap_or(RolloutPercentage::never())
-                    .roll(),
-                remaining_ttl_fraction_refresh_threshold: legacy_config.parse(
-                    BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "remaining_ttl_fraction_refresh_threshold",
-                    },
-                )?,
-                remaining_ttl_random_extra_threshold: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "remaining_ttl_random_extra_threshold",
-                })?,
-                respect_file_symlinks: legacy_config
-                    .parse::<RolloutPercentage>(BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "respect_file_symlinks",
-                    })?
-                    .unwrap_or(RolloutPercentage::never())
-                    .roll(),
-                execution_concurrency_limit: legacy_config
-                    .parse(BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "execution_concurrency_limit",
-                    })?
-                    .unwrap_or(4000),
-                engine_tier: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "engine_tier",
-                })?,
-                engine_host: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "engine_host",
-                })?,
-                engine_port: legacy_config.parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "engine_port",
-                })?,
-                enable_download_cancellation: legacy_config
-                    .parse(BuckconfigKeyRef {
-                        section: BUCK2_RE_CLIENT_CFG_SECTION,
-                        property: "enable_download_cancellation",
-                    })?
-                    .unwrap_or(false),
-            })
-        }
+    fn cas_semaphore_size(&self) -> usize {
+        // FIXME: make this configurable?
+        1024
+    }
 
-        fn cas_semaphore_size(&self) -> usize {
-            self.cas_connection_count as usize * 30
-        }
+    fn is_re_configured(&self) -> bool {
+        self.0.engine_address.is_some()
+    }
 
-        fn is_re_configured(&self) -> bool {
-            self.engine_address.is_some()
-        }
-
-        fn default_exec_properties(&self) -> Vec<(String, String)> {
-            // Internal RE fbcode metadata doesn't expose a
-            // user-overridable platform-properties list; default keys
-            // come from the use_case configuration. Return empty so the
-            // caller falls through to legacy defaults.
-            Vec::new()
-        }
+    fn default_exec_properties(&self) -> Vec<(String, String)> {
+        self.0.default_exec_properties.clone()
     }
 }
 
-#[allow(unused)]
-mod not_fbcode {
-    use super::*;
-
-    /// Metadata that doesn't change between executions
-    #[derive(Clone, Debug, Default, Allocative)]
-    pub struct RemoteExecutionStaticMetadata(pub KuroOssReConfiguration);
-
-    impl RemoteExecutionStaticMetadataImpl for RemoteExecutionStaticMetadata {
-        fn from_legacy_config(legacy_config: &LegacyBuckConfig) -> kuro_error::Result<Self> {
-            Ok(Self(KuroOssReConfiguration::from_legacy_config(
-                legacy_config,
-            )?))
-        }
-
-        fn cas_semaphore_size(&self) -> usize {
-            // FIXME: make this configurable?
-            1024
-        }
-
-        fn is_re_configured(&self) -> bool {
-            self.0.engine_address.is_some()
-        }
-
-        fn default_exec_properties(&self) -> Vec<(String, String)> {
-            self.0.default_exec_properties.clone()
-        }
-    }
-}
-
-/// A configuration used only in our OSS builds. We still compile this always, which lets us
-/// gate less code behind fbcode_build.
 #[derive(Clone, Debug, Default, Allocative)]
 pub struct KuroOssReConfiguration {
     /// Address for RBE Content Addresable Storage service (including bytestream uploads service).
@@ -625,8 +307,3 @@ impl KuroOssReConfiguration {
         })
     }
 }
-
-#[cfg(fbcode_build)]
-pub use fbcode::RemoteExecutionStaticMetadata;
-#[cfg(not(fbcode_build))]
-pub use not_fbcode::RemoteExecutionStaticMetadata;
