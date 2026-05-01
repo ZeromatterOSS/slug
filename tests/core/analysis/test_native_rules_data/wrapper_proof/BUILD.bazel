@@ -1,9 +1,11 @@
 load(":aspect_facade_proof.bzl", "aspect_facade_collector", "aspect_facade_leaf")
 load(":coverage_instrumented_proof.bzl", "coverage_instrumented_proof")
+load(":expand_make_variables_proof.bzl", "expand_make_variables_proof")
 load(":facade_proof.bzl", "facade_proof")
 load(":package_relative_label_proof.bzl", "package_relative_label_proof")
 load(":subrule_facade_proof.bzl", "subrule_facade_target")
 load(":tokenize_proof.bzl", "tokenize_proof")
+load(":var_proof.bzl", "var_proof")
 
 # Plan 28.4 Stage 2 acceptance: prove `rule_implementation_wrapper` is
 # in the analysis call path. The fixture's defs.bzl defines a Starlark
@@ -36,3 +38,7 @@ package_relative_label_proof(name = "package_relative_label_proof_target")
 tokenize_proof(name = "tokenize_proof_target")
 
 coverage_instrumented_proof(name = "coverage_instrumented_proof_target")
+
+var_proof(name = "var_proof_target")
+
+expand_make_variables_proof(name = "expand_make_variables_proof_target")

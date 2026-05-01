@@ -346,7 +346,7 @@ Do not start with:
   Starlark.
 - The moved behavior has a Bazel 9 parity citation.
 
-## Phase 28.4: Rule Implementation Wrapper  [Stage 8 done 2026-05-01]
+## Phase 28.4: Rule Implementation Wrapper  [Stage 9 done 2026-05-01]
 
 ### Status
 
@@ -567,6 +567,84 @@ The Rust impl in `context.rs` was deleted.
   default `False` for a build without `--collect_code_coverage`.
 
 LLVM Demangle smoke clean (8 actions, 5.4 s, analyze 221 ms).
+
+### Stage 9 (`ctx.var` and `ctx.expand_make_variables` — pattern composition)
+
+Stage 9 is the largest single migration in Phase 28.4: two related
+methods that share the same `$(VAR)` substitution table. Both Rust
+impls in `context.rs` (~50 LOC for `var`, ~95 LOC for
+`expand_make_variables`) were deleted. The shared substitution
+table now lives in **one** Starlark function — `_kuro_make_substitutions`
+in `exports.bzl` — eliminating the duplication memory/ctx_var_builtins.md
+called out.
+
+This stage *composes* every pattern landed in Stages 3–8:
+
+- **Facade-attr access** (Stage 3): reads `raw_ctx.bin_dir.path` for
+  `BINDIR`/`GENDIR` and `raw_ctx.label.workspace_root` for
+  `WORKSPACE_ROOT`. Both already exist as Starlark attributes
+  (`CtxDirRoot.path`,
+  `StarlarkConfiguredProvidersLabel.workspace_root`) — no new Rust
+  hooks required for these.
+- **Facade-attr-via-closure** (Stage 6): `_expand_make_variables_bound`
+  closes over `raw_ctx` so the user-visible signature stays
+  `(attribute_name, command, additional_substitutions)` while the
+  table-building reaches into the context.
+- **Runtime global-state hook** (Stage 8):
+  `app/kuro_interpreter_for_build/src/interpreter/functions/kuro_runtime.rs`
+  gains four new globals — `kuro_host_target_cpu`,
+  `kuro_host_cc_path`, `kuro_get_all_defines`, and
+  `kuro_compilation_mode_for_label`. The first two delegate to the
+  still-`pub` `host_target_cpu()` / `host_cc_path()` helpers in
+  `context.rs` (still used by `cc_common`'s `ctx_cheat`).
+  `kuro_get_all_defines` allocates a Starlark dict from the
+  `BUILD_CONFIG` defines map. `kuro_compilation_mode_for_label`
+  takes the label `Value`, downcasts to
+  `StarlarkConfiguredProvidersLabel`, reads the cfg, and runs the
+  same `compilation_mode_from_cfg` resolution the deleted impls
+  used — keeping the cfg hash off the Starlark surface.
+- **TemplateVariableInfo provider lookup**: a fifth hook,
+  `kuro_collect_toolchains_template_vars`, takes the
+  `ctx.attrs.toolchains` list directly and walks it on the Rust
+  side (provider-id `Demand` lookups, `TemplateVariableInfoInstance`
+  downcasts). Doing this from Starlark would require exposing
+  `Provider in dep` and the instance's internal `variables` SmallMap
+  — a wider surface than this stage justifies. The existing private
+  helper was renamed to `collect_toolchains_template_vars_from_list`
+  and made `pub`.
+
+Priority order in `_kuro_make_substitutions` mirrors the deleted
+Rust impls byte-for-byte (HashMap `entry().or_insert()` semantics):
+
+1. User-provided `additional_substitutions` (only for
+   `expand_make_variables`).
+2. 13 builtin Make variables.
+3. `TemplateVariableInfo` from `ctx.attrs.toolchains` deps.
+4. `--define KEY=VALUE` flags.
+
+The `$(VAR)` parser in `_kuro_expand_make_variables` uses the same
+"for-loop with explicit cursor and break" idiom Stage 7 introduced
+for `_kuro_tokenize` (Starlark has no `while`). Each iteration
+consumes ≥ 1 character or a whole `$(...)` token; the iteration
+budget is `len(command) + 1`.
+
+Acceptance:
+
+- `tests/core/analysis/test_native_rules.py::test_28_4_stage9_var_starlark`
+  pins all 13 builtin keys (presence, string type), BINDIR/GENDIR
+  equal to `ctx.bin_dir.path`, WORKSPACE_ROOT equal to
+  `ctx.label.workspace_root`, and the constants ABI/ABI_GLIBC_VERSION/
+  CC_FLAGS/STACK_FRAME_UNLIMITED byte-identical to the Rust table.
+- `tests/core/analysis/test_native_rules.py::test_28_4_stage9_expand_make_variables_starlark`
+  pins user-subs-win priority, builtin resolution, unresolved
+  `$(VAR)` left verbatim, unbalanced `$(` left verbatim, multi-
+  substitution in one string, whitespace-stripping inside `$(...)`,
+  and `None` accepted for `additional_substitutions`.
+- `@llvm-project//llvm:Demangle` smoke clean (8 actions, 5.1 s,
+  analyze 221 ms — flat against Stage 8's 221 ms).
+  `@llvm-project//llvm:Support` smoke clean (183 actions, 15.2 s,
+  analyze 123 ms — *under* Stage 6's 156 ms; well within run-to-run
+  noise, no regression).
 
 ### Stack-trace fidelity (inspected 2026-04-30)
 

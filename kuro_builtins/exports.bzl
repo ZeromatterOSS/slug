@@ -181,6 +181,143 @@ def _kuro_tokenize(option_string):
         tokens.append(current)
     return tokens
 
+# Plan 28.4 Stage 9: Starlark replacement for the deleted Rust impls
+# of `ctx.var` and `ctx.expand_make_variables` in
+# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`. Both
+# methods read from the same `$(VAR)` substitution table; building
+# it here keeps the table in one place. Priority order, highest to
+# lowest, mirrors the deleted Rust impls (HashMap::entry().or_insert()):
+#
+#   1. User-provided `additional_substitutions` (only
+#      `expand_make_variables`; `var` skips this layer).
+#   2. Built-in Make variables (BINDIR, GENDIR, TARGET_CPU,
+#      COMPILATION_MODE, WORKSPACE_ROOT, CC, CC_FLAGS, JAVA,
+#      JAVA_RUNFILES, JAVABASE, ABI_GLIBC_VERSION, ABI,
+#      STACK_FRAME_UNLIMITED). The constants are kuro-internal —
+#      `STACK_FRAME_UNLIMITED` for instance is an llvm-project
+#      requirement (see memory/ctx_var_builtins.md).
+#   3. `TemplateVariableInfo` from each dep in `ctx.attrs.toolchains`
+#      (e.g. llvm-project's `workspace_root` rule publishes
+#      `WORKSPACE_ROOT` here; `cc_toolchain_provider_helper.bzl`
+#      publishes additional Make variables from rules_cc).
+#   4. `--define KEY=VALUE` flags (lowest priority).
+#
+# `BINDIR`/`GENDIR` are read from `raw_ctx.bin_dir.path` (already a
+# Starlark attribute on `CtxDirRoot`) and `WORKSPACE_ROOT` from
+# `raw_ctx.label.workspace_root` (already a Starlark attribute on
+# `StarlarkConfiguredProvidersLabel`); the cfg hash that `BINDIR`
+# embeds is hidden inside `bin_dir_path_from_label` on the Rust side.
+# Everything else dispatches through `kuro_*` runtime hooks
+# registered in
+# `app/kuro_interpreter_for_build/src/interpreter/functions/kuro_runtime.rs`.
+def _kuro_make_substitutions(raw_ctx):
+    bin_dir = raw_ctx.bin_dir.path
+    label = raw_ctx.label
+    workspace_root = label.workspace_root if label != None else ""
+
+    subs = {
+        "BINDIR": bin_dir,
+        "GENDIR": bin_dir,
+        "TARGET_CPU": kuro_host_target_cpu(),
+        "COMPILATION_MODE": kuro_compilation_mode_for_label(label),
+        "WORKSPACE_ROOT": workspace_root,
+        "CC": kuro_host_cc_path(),
+        "CC_FLAGS": "",
+        # Bazel uses "java.exe" on Windows and "/usr/bin/java"
+        # elsewhere. Kuro is a Linux-first build for now; the
+        # branch here matches the deleted Rust impl byte-for-byte
+        # so a Windows kuro can land later without touching this
+        # file. (`kuro_host_cc_path` already uses the same OS
+        # discrimination via `std::env::consts::OS`.)
+        "JAVA": "/usr/bin/java",
+        "JAVA_RUNFILES": "",
+        "JAVABASE": "",
+        "ABI_GLIBC_VERSION": "2.17",
+        "ABI": "local",
+        # `STACK_FRAME_UNLIMITED` is normally seeded by rules_cc's
+        # cc_toolchain via TemplateVariableInfo; kuro's stub
+        # cc_toolchain doesn't publish that provider, so we ship
+        # the default here. See memory/ctx_var_builtins.md.
+        "STACK_FRAME_UNLIMITED": "",
+    }
+
+    # `ctx.attrs.toolchains`: list of deps whose `TemplateVariableInfo`
+    # is exposed to the target. Mirrors Bazel's
+    # `RuleContext.getMakeVariables()`. Builtins win on collision.
+    attrs = raw_ctx.attrs
+    if attrs != None:
+        toolchains_attr = getattr(attrs, "toolchains", None)
+        if toolchains_attr != None:
+            for k, v in kuro_collect_toolchains_template_vars(toolchains_attr).items():
+                if k not in subs:
+                    subs[k] = v
+
+    # `--define KEY=VALUE` flags. Lowest priority — each builtin and
+    # each TemplateVariableInfo entry already wins on collision.
+    for k, v in kuro_get_all_defines().items():
+        if k not in subs:
+            subs[k] = v
+
+    return subs
+
+def _kuro_var(raw_ctx):
+    return _kuro_make_substitutions(raw_ctx)
+
+# Plan 28.4 Stage 9: parses `$(VAR)` patterns in `command` and
+# substitutes from the merged table. Mirrors the deleted Rust
+# impl's behaviour byte-for-byte:
+#
+#   - User `additional_substitutions` (an optional dict) win over
+#     all other layers.
+#   - Unresolved `$(VAR)` patterns are left in place verbatim.
+#   - Unbalanced `$(` (no closing `)`) is left in place verbatim
+#     and the scan continues after the `$(`.
+#   - The variable name is `.strip()`ed (matches Rust's `.trim()`)
+#     before lookup.
+#
+# Starlark has no `while` loops, so the outer scan iterates a
+# `for _ in range(len(command) + 1)` budget and breaks when the
+# cursor reaches the end. Each iteration consumes at least one
+# character (or one whole `$(...)` pattern), so the bound is safe.
+def _kuro_expand_make_variables(raw_ctx, attribute_name, command, additional_substitutions):
+    # `attribute_name` is accepted for Bazel signature parity (the
+    # Rust impl ignored it too — it was only ever used in error
+    # messages, none of which were ever emitted).
+    _ = attribute_name  # buildifier: disable=unused-variable
+
+    subs = {}
+    if additional_substitutions != None:
+        for k, v in additional_substitutions.items():
+            subs[k] = v
+    for k, v in _kuro_make_substitutions(raw_ctx).items():
+        if k not in subs:
+            subs[k] = v
+
+    n = len(command)
+    result = ""
+    i = 0
+    for _step in range(n + 1):
+        if i >= n:
+            break
+        start = command.find("$(", i)
+        if start < 0:
+            result += command[i:]
+            break
+        result += command[i:start]
+        end = command.find(")", start + 2)
+        if end < 0:
+            # Unbalanced `$(`: emit it literally and resume after.
+            result += "$("
+            i = start + 2
+            continue
+        name = command[start + 2:end].strip()
+        if name in subs:
+            result += subs[name]
+        else:
+            result += command[start:end + 1]
+        i = end + 1
+    return result
+
 def _kuro_target_platform_has_constraint(constraint_value):
     # ConstraintValueInfo exposes the constraint's canonical label as
     # `.label`. Anything else (None, missing attr) maps to False, just
@@ -239,6 +376,21 @@ def _make_rule_facade(raw_ctx, kind):
     def _package_relative_label_bound(label_str):
         return _kuro_package_relative_label(raw_ctx, label_str)
 
+    # Plan 28.4 Stage 9: closure binding `raw_ctx` for
+    # `expand_make_variables`. The substitution table reads
+    # `raw_ctx.bin_dir.path`, `raw_ctx.label.workspace_root`, and
+    # `raw_ctx.attrs.toolchains`; user-provided `additional_substitutions`
+    # is the only argument from the call site. Default is `None` to
+    # match Bazel's signature (which uses an empty dict default —
+    # treated identically here).
+    def _expand_make_variables_bound(attribute_name, command, additional_substitutions = None):
+        return _kuro_expand_make_variables(
+            raw_ctx,
+            attribute_name,
+            command,
+            additional_substitutions,
+        )
+
     return struct(
         # ---- AnalysisContext attributes (#[starlark(attribute)]) ----
         attrs = raw_ctx.attrs,
@@ -264,16 +416,16 @@ def _make_rule_facade(raw_ctx, kind):
         version_file = raw_ctx.version_file,
         info_file = raw_ctx.info_file,
         exec_groups = raw_ctx.exec_groups,
-        var = raw_ctx.var,
+        var = _kuro_var(raw_ctx),
         build_setting_value = raw_ctx.build_setting_value,
         # ---- AnalysisContext methods served from Starlark ----
         target_platform_has_constraint = _kuro_target_platform_has_constraint,
         package_relative_label = _package_relative_label_bound,
         tokenize = _kuro_tokenize,
         coverage_instrumented = _kuro_coverage_instrumented,
+        expand_make_variables = _expand_make_variables_bound,
         # ---- AnalysisContext methods passed through (bound to raw_ctx) ----
         runfiles = raw_ctx.runfiles,
-        expand_make_variables = raw_ctx.expand_make_variables,
         resolve_tools = raw_ctx.resolve_tools,
         resolve_command = raw_ctx.resolve_command,
         new_file = raw_ctx.new_file,

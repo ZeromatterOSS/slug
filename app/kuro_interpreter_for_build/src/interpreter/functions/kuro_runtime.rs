@@ -23,6 +23,9 @@
 
 use starlark::environment::GlobalsBuilder;
 use starlark::starlark_module;
+use starlark::values::Heap;
+use starlark::values::Value;
+use starlark::values::dict::AllocDict;
 
 #[starlark_module]
 pub(crate) fn register_kuro_runtime(builder: &mut GlobalsBuilder) {
@@ -35,5 +38,66 @@ pub(crate) fn register_kuro_runtime(builder: &mut GlobalsBuilder) {
     /// — same default (`false`), same per-build setter.
     fn kuro_collect_code_coverage() -> starlark::Result<bool> {
         Ok(kuro_build_api::interpreter::rule_defs::build_config::get_collect_code_coverage())
+    }
+
+    /// Plan 28.4 Stage 9: returns the Bazel CPU identifier for the
+    /// host platform (e.g. "k8" for linux/x86_64). Consumed by
+    /// `_kuro_make_substitutions` in `@kuro_builtins//:exports.bzl`
+    /// to populate the `TARGET_CPU` Make variable. Mirrors
+    /// `kuro_build_api::interpreter::rule_defs::context::host_target_cpu`
+    /// (which is still used by `cc_common`'s ctx_cheat path).
+    fn kuro_host_target_cpu() -> starlark::Result<String> {
+        Ok(kuro_build_api::interpreter::rule_defs::context::host_target_cpu().to_owned())
+    }
+
+    /// Plan 28.4 Stage 9: returns the default C compiler path for the
+    /// host platform. Consumed by `_kuro_make_substitutions` to
+    /// populate the `CC` Make variable.
+    fn kuro_host_cc_path() -> starlark::Result<String> {
+        Ok(kuro_build_api::interpreter::rule_defs::context::host_cc_path().to_owned())
+    }
+
+    /// Plan 28.4 Stage 9: returns the per-build `--define KEY=VALUE`
+    /// entries as a Starlark dict. Consumed by
+    /// `_kuro_make_substitutions` as the lowest-priority layer of
+    /// the `$(VAR)` substitution table. Mirrors
+    /// `build_config::get_all_defines`.
+    fn kuro_get_all_defines<'v>(heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let map = kuro_build_api::interpreter::rule_defs::build_config::get_all_defines();
+        let entries: Vec<(String, String)> = map.into_iter().collect();
+        Ok(heap.alloc(AllocDict(entries)))
+    }
+
+    /// Plan 28.4 Stage 9: resolves `COMPILATION_MODE` for the given
+    /// configured target label. Reads the cfg's
+    /// `@bazel_tools//tools/cpp:compilation_mode` build setting (the
+    /// Plan 19.4 path) and falls back to the process-global
+    /// `BUILD_CONFIG` entry when the cfg does not carry the setting
+    /// (BXL top-level, anonymous targets). The cfg hash is not
+    /// reachable from Starlark today, so this hook keeps the cfg
+    /// lookup on the Rust side and returns just the resolved string.
+    fn kuro_compilation_mode_for_label<'v>(label: Value<'v>) -> starlark::Result<String> {
+        Ok(
+            kuro_build_api::interpreter::rule_defs::context::compilation_mode_for_label_value(
+                label,
+            ),
+        )
+    }
+
+    /// Plan 28.4 Stage 9: gathers `TemplateVariableInfo` variables
+    /// from each dep in a `toolchains` attribute list. Returns a
+    /// dict ready to merge into the `$(VAR)` substitution table.
+    /// Mirrors Bazel's `RuleContext.getMakeVariables()` — keeping
+    /// the provider-id lookup on the Rust side avoids exposing the
+    /// `Provider in dep` operator and the instance's internal
+    /// `variables` SmallMap to user `.bzl` files.
+    fn kuro_collect_toolchains_template_vars<'v>(
+        toolchains: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let pairs = kuro_build_api::interpreter::rule_defs::context::collect_toolchains_template_vars_from_list(
+            toolchains,
+        );
+        Ok(heap.alloc(AllocDict(pairs)))
     }
 }

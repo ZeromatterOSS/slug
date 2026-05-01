@@ -928,79 +928,19 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         }))
     }
 
-    /// Make variable access (Bazel-compatible).
-    ///
-    /// Returns a dict-like object providing access to Make variables.
-    /// Common variables include:
-    /// - `BINDIR`: Binary output directory
-    /// - `GENDIR`: Generated files directory
-    /// - `TARGET_CPU`: Target CPU architecture
-    /// - `COMPILATION_MODE`: Current compilation mode (fastbuild, dbg, opt)
-    ///
-    /// Example:
-    /// ```python
-    /// bin_dir = ctx.var["BINDIR"]
-    /// ```
-    #[starlark(attribute)]
-    fn var<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        // Return an actual Dict so that dict(ctx.var) and iteration work correctly.
-        // BINDIR and GENDIR are derived from the actual target's cell/configuration.
-        let bin_dir = bin_dir_path_from_label(this.0.label);
-        let comp_mode = compilation_mode_from_cfg(cfg_from_label(this.0.label));
-        let workspace_root = workspace_root_from_label(this.0.label);
-        use starlark::values::dict::Dict;
-        let entries: &[(&str, &str)] = &[
-            ("BINDIR", bin_dir.as_str()),
-            ("GENDIR", bin_dir.as_str()),
-            ("TARGET_CPU", host_target_cpu()),
-            ("COMPILATION_MODE", comp_mode.as_str()),
-            ("WORKSPACE_ROOT", workspace_root.as_str()),
-            ("CC", host_cc_path()),
-            ("CC_FLAGS", ""),
-            (
-                "JAVA",
-                if cfg!(windows) {
-                    "java.exe"
-                } else {
-                    "/usr/bin/java"
-                },
-            ),
-            ("JAVA_RUNFILES", ""),
-            ("JAVABASE", ""),
-            ("ABI_GLIBC_VERSION", "2.17"),
-            ("ABI", "local"),
-            // Seeded by rules_cc's cc_toolchain via TemplateVariableInfo +
-            // cc_toolchain_provider_helper.bzl `_additional_make_variables`.
-            // Kuro's cc_toolchain is a native stub that does not publish
-            // TemplateVariableInfo, so we provide the default here.
-            ("STACK_FRAME_UNLIMITED", ""),
-        ];
-        let mut map: SmallMap<Value, Value> = SmallMap::new();
-        for (k, v) in entries {
-            let key = heap.alloc_str(k).to_value();
-            let val = heap.alloc_str(v).to_value();
-            map.insert_hashed(key.get_hashed().unwrap(), val);
-        }
-        // Merge --define KEY=VALUE entries into ctx.var
-        for (k, v) in crate::interpreter::rule_defs::build_config::get_all_defines() {
-            let key = heap.alloc_str(&k).to_value();
-            let val = heap.alloc_str(&v).to_value();
-            map.insert_hashed(key.get_hashed().unwrap(), val);
-        }
-        // Merge TemplateVariableInfo from each `ctx.attr.toolchains` dep.
-        // Mirrors Bazel's RuleContext.getMakeVariables() where
-        // `toolchains = [...]` on a target lists deps whose TemplateVariableInfo
-        // variables are exposed as `$(VAR)` in copts/cmd/genrule etc.
-        // Example: llvm-project's `workspace_root` rule publishes
-        // `TemplateVariableInfo({"WORKSPACE_ROOT": ctx.label.workspace_root})`,
-        // and cc_library targets list it in `toolchains=[":workspace_root"]`.
-        for (k, v) in collect_toolchains_template_vars(this.0.attrs, heap) {
-            let key = heap.alloc_str(&k).to_value();
-            let val = heap.alloc_str(&v).to_value();
-            map.insert_hashed(key.get_hashed().unwrap(), val);
-        }
-        Ok(heap.alloc(Dict::new(map)))
-    }
+    // `var` migrated to Starlark in Plan 28.4 Stage 9. The bundled
+    // `_kuro_var` in `@kuro_builtins//:exports.bzl` builds the
+    // `$(VAR)` substitution table by reading
+    // `raw_ctx.bin_dir.path` / `raw_ctx.label.workspace_root`
+    // directly and dispatching to kuro-internal Starlark globals
+    // (`kuro_host_target_cpu`, `kuro_host_cc_path`,
+    // `kuro_compilation_mode_for_label`,
+    // `kuro_collect_toolchains_template_vars`,
+    // `kuro_get_all_defines`) registered in
+    // `kuro_interpreter_for_build::interpreter::functions::kuro_runtime`.
+    // The merged table lives in `_kuro_make_substitutions` and is
+    // shared with `_kuro_expand_make_variables`. Single-owner per
+    // Plan 28.7.
 
     /// Returns the value of a build setting rule (Bazel-compatible).
     ///
@@ -1165,111 +1105,14 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     // baked at kuro build time by
     // `app/kuro_external_cells_bundled/build.rs`.
 
-    /// Expands Make variables and additional substitutions in a string (Bazel-compatible).
-    ///
-    /// This is a deprecated Bazel API that expands `$(VAR)` and `$(execpath ...)` patterns.
-    /// Still used by some rules (e.g., rules_python for import path expansion).
-    ///
-    /// Parameters:
-    /// - `attribute_name`: Name of the attribute (for error messages only)
-    /// - `command`: The string to expand
-    /// - `additional_substitutions`: Extra `$(VAR)` substitutions as a dict
-    #[allow(unused_variables)]
-    fn expand_make_variables<'v>(
-        this: RefAnalysisContext<'v>,
-        attribute_name: &str,
-        command: &str,
-        additional_substitutions: Value<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<String> {
-        use starlark::values::dict::DictRef;
-        let _ = (attribute_name, heap);
-
-        // Build substitution map from additional_substitutions (user-provided overrides)
-        let mut substitutions: std::collections::HashMap<String, String> =
-            std::collections::HashMap::new();
-
-        if let Some(subs_dict) = DictRef::from_value(additional_substitutions) {
-            for (k, v) in subs_dict.iter() {
-                if let (Some(key), Some(val)) = (k.unpack_str(), v.unpack_str()) {
-                    substitutions.insert(key.to_owned(), val.to_owned());
-                }
-            }
-        }
-
-        // Add built-in Make variables (BINDIR, GENDIR, CC, etc.) as fallbacks.
-        // User-provided substitutions take priority.
-        let bin_dir = bin_dir_path_from_label(this.0.label);
-        let comp_mode = crate::interpreter::rule_defs::build_config::get_compilation_mode();
-        let workspace_root = workspace_root_from_label(this.0.label);
-        let builtins: &[(&str, &str)] = &[
-            ("BINDIR", bin_dir.as_str()),
-            ("GENDIR", bin_dir.as_str()),
-            ("TARGET_CPU", host_target_cpu()),
-            ("COMPILATION_MODE", comp_mode.as_str()),
-            ("WORKSPACE_ROOT", workspace_root.as_str()),
-            ("CC", host_cc_path()),
-            ("CC_FLAGS", ""),
-            (
-                "JAVA",
-                if cfg!(windows) {
-                    "java.exe"
-                } else {
-                    "/usr/bin/java"
-                },
-            ),
-            ("JAVA_RUNFILES", ""),
-            ("JAVABASE", ""),
-            ("ABI_GLIBC_VERSION", "2.17"),
-            ("ABI", "local"),
-            ("STACK_FRAME_UNLIMITED", ""),
-        ];
-        for (k, v) in builtins {
-            substitutions
-                .entry(k.to_string())
-                .or_insert_with(|| v.to_string());
-        }
-
-        // Merge TemplateVariableInfo from `ctx.attr.toolchains` deps. Same
-        // priority rule as builtins: user-provided substitutions win. See
-        // `ctx.var` above for the motivation.
-        for (k, v) in collect_toolchains_template_vars(this.0.attrs, heap) {
-            substitutions.entry(k).or_insert(v);
-        }
-
-        // Merge --define KEY=VALUE entries (lowest priority, after user subs and builtins)
-        for (k, v) in crate::interpreter::rule_defs::build_config::get_all_defines() {
-            substitutions.entry(k).or_insert(v);
-        }
-
-        // Expand $(VAR) patterns using the substitutions
-        let mut result = String::with_capacity(command.len());
-        let mut remaining = command;
-        while let Some(start) = remaining.find("$(") {
-            result.push_str(&remaining[..start]);
-            remaining = &remaining[start..];
-
-            if let Some(end) = remaining.find(')') {
-                let inner = remaining[2..end].trim();
-                let after = &remaining[end + 1..];
-
-                if let Some(val) = substitutions.get(inner) {
-                    result.push_str(val);
-                } else {
-                    // Leave unresolved $(VAR) patterns as-is
-                    result.push_str(&remaining[..end + 1]);
-                }
-                remaining = after;
-            } else {
-                // No closing paren - leave as-is
-                result.push_str("$(");
-                remaining = &remaining[2..];
-            }
-        }
-        result.push_str(remaining);
-
-        Ok(result)
-    }
+    // `expand_make_variables` migrated to Starlark in Plan 28.4
+    // Stage 9. The bundled `_kuro_expand_make_variables` in
+    // `@kuro_builtins//:exports.bzl` parses `$(VAR)` patterns and
+    // substitutes against the same merged table built by
+    // `_kuro_make_substitutions` (shared with `_kuro_var`). User
+    // `additional_substitutions` win over the builtin / toolchain /
+    // define layers, mirroring the deleted Rust impl's
+    // `entry().or_insert()` priority. Single-owner per Plan 28.7.
 
     // `package_relative_label` migrated to Starlark in Plan 28.4
     // Stage 6. The bundled `_kuro_package_relative_label` in
@@ -2017,8 +1860,6 @@ fn cfg_from_label<'v>(
         >,
     >,
 ) -> Option<&'v ConfigurationData> {
-    // `ValueTyped<'v, T>` dereferences to `&'v T`, so `.label().cfg()` yields
-    // a `&'v ConfigurationData` tied to the Starlark heap's lifetime.
     let typed = label?;
     let starlark_label: &'v StarlarkConfiguredProvidersLabel = typed.as_ref();
     Some(starlark_label.label().cfg())
@@ -2038,6 +1879,21 @@ fn compilation_mode_from_cfg(cfg: Option<&ConfigurationData>) -> String {
         }
     }
     crate::interpreter::rule_defs::build_config::get_compilation_mode()
+}
+
+/// Plan 28.4 Stage 9: pub entry point for the kuro-internal
+/// `kuro_compilation_mode_for_label` Starlark global (registered in
+/// `kuro_interpreter_for_build::interpreter::functions::kuro_runtime`).
+/// Takes the raw label `Value`, extracts its cfg, and runs the same
+/// `compilation_mode_from_cfg` resolution the deleted `ctx.var` /
+/// `ctx.expand_make_variables` Rust impls used. Hides the cfg hash
+/// from Starlark — exposing it would be a wider surface change than
+/// this stage justifies.
+pub fn compilation_mode_for_label_value(label: Value<'_>) -> String {
+    let cfg = label
+        .downcast_ref::<StarlarkConfiguredProvidersLabel>()
+        .map(|l| l.label().cfg());
+    compilation_mode_from_cfg(cfg)
 }
 
 /// Converts a typed `BuildSettingValue` into the Starlark representation used
@@ -2095,11 +1951,8 @@ pub fn host_cc_path() -> &'static str {
 /// providers are exposed to the target. `TemplateVariableInfo` is the
 /// provider that carries Make-variable definitions, most commonly from
 /// LLVM-style `workspace_root` rules or from a project's `make_variables.bzl`.
-fn collect_toolchains_template_vars<'v>(
-    attrs: Option<
-        starlark::values::ValueOfUnchecked<'v, starlark::values::structs::StructRef<'static>>,
-    >,
-    heap: Heap<'v>,
+pub fn collect_toolchains_template_vars_from_list<'v>(
+    toolchains_val: Value<'v>,
 ) -> Vec<(String, String)> {
     use starlark::values::list::ListRef;
 
@@ -2108,14 +1961,6 @@ fn collect_toolchains_template_vars<'v>(
     use crate::interpreter::rule_defs::provider::dependency::Dependency;
     use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
 
-    let Some(attrs) = attrs else {
-        return Vec::new();
-    };
-    let attrs_val = attrs.get().to_value();
-    let toolchains_val = match attrs_val.get_attr("toolchains", heap) {
-        Ok(Some(v)) => v,
-        _ => return Vec::new(),
-    };
     let Some(list) = ListRef::from_value(toolchains_val) else {
         return Vec::new();
     };

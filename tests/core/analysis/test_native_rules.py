@@ -989,6 +989,57 @@ async def test_28_4_stage8_coverage_instrumented_starlark(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_4_stage9_var_starlark(buck: Buck) -> None:
+    """Plan 28.4 Stage 9: `ctx.var` migrated from Rust to Starlark.
+    The Rust `#[starlark(attribute)] fn var` in
+    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was
+    deleted; `_kuro_var` (sharing `_kuro_make_substitutions` with
+    `_kuro_expand_make_variables`) in `@kuro_builtins//:exports.bzl`
+    now serves the field.
+
+    The fixture pins:
+      - All 13 builtin keys (BINDIR through STACK_FRAME_UNLIMITED)
+        present and string-typed.
+      - BINDIR/GENDIR mirror `ctx.bin_dir.path` (the facade reads
+        the same Rust-side `CtxDirRoot` value the deleted impl did).
+      - WORKSPACE_ROOT mirrors `ctx.label.workspace_root`.
+      - Pinned constant strings (ABI, ABI_GLIBC_VERSION, CC_FLAGS,
+        STACK_FRAME_UNLIMITED) match the Rust impl byte-for-byte.
+      - `ctx.var.items()` works (the impl returns an actual dict).
+    """
+    result = await buck.build("//wrapper_proof:var_proof_target")
+    output = result.get_build_report().output_for_target(
+        "//wrapper_proof:var_proof_target"
+    )
+    assert output.read_text().strip() == "var-proof-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_28_4_stage9_expand_make_variables_starlark(buck: Buck) -> None:
+    """Plan 28.4 Stage 9: `ctx.expand_make_variables` migrated from
+    Rust to Starlark. The Rust `fn expand_make_variables` in
+    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was
+    deleted; `_kuro_expand_make_variables` in
+    `@kuro_builtins//:exports.bzl` now serves the call.
+
+    The fixture pins behavioural parity with the deleted impl:
+      - User-provided `additional_substitutions` win over builtins.
+      - Builtins resolve when not overridden.
+      - Unresolved `$(VAR)` patterns survive verbatim.
+      - Unbalanced `$(` (no closing `)`) survives verbatim and the
+        scan continues past it.
+      - Multiple substitutions in one string all expand.
+      - Whitespace inside `$(...)` is stripped (Rust `.trim()`).
+      - `None` for `additional_substitutions` is accepted.
+    """
+    result = await buck.build("//wrapper_proof:expand_make_variables_proof_target")
+    output = result.get_build_report().output_for_target(
+        "//wrapper_proof:expand_make_variables_proof_target"
+    )
+    assert output.read_text().strip() == "expand-make-variables-proof-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_28_3_export_contract_hides_unlisted_symbols(buck: Buck) -> None:
     """Plan 28.3: only names in `exported_toplevels` reach the consuming
     env. Symbols defined at the top level of `exports.bzl` but NOT
