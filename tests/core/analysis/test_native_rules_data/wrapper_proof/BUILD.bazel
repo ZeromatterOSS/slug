@@ -1,5 +1,6 @@
 load(":aspect_facade_proof.bzl", "aspect_facade_collector", "aspect_facade_leaf")
 load(":coverage_instrumented_proof.bzl", "coverage_instrumented_proof")
+load(":expand_location_proof.bzl", "expand_location_proof")
 load(":expand_make_variables_proof.bzl", "expand_make_variables_proof")
 load(":facade_proof.bzl", "facade_proof")
 load(":package_relative_label_proof.bzl", "package_relative_label_proof")
@@ -42,3 +43,5 @@ coverage_instrumented_proof(name = "coverage_instrumented_proof_target")
 var_proof(name = "var_proof_target")
 
 expand_make_variables_proof(name = "expand_make_variables_proof_target")
+
+expand_location_proof(name = "expand_location_proof_target")

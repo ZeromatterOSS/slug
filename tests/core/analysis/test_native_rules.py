@@ -1040,6 +1040,31 @@ async def test_28_4_stage9_expand_make_variables_starlark(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_4_stage13_expand_location_starlark(buck: Buck) -> None:
+    """Plan 28.4 Stage 13: `ctx.expand_location` migrated from Rust to
+    Starlark. The ~330-LOC Rust impl (pool-building + parser) in
+    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was
+    replaced by a stub; `_kuro_expand_location` in
+    `@kuro_builtins//:exports.bzl` now serves the call, backed by
+    the `kuro_collect_location_pool` and `kuro_lookup_output_path`
+    runtime hooks.
+
+    The fixture pins behavioural parity with the deleted impl:
+      - $(location :dep) resolves to the dep's first output path.
+      - $(locations :dep) joins all output paths with " ".
+      - $(execpath :dep) and $(rootpath :dep) resolve identically.
+      - Unresolved $(location :missing) survives verbatim.
+      - Plain strings with no $(...) pass through unchanged.
+      - Multiple substitutions in one string all expand.
+    """
+    result = await buck.build("//wrapper_proof:expand_location_proof_target")
+    output = result.get_build_report().output_for_target(
+        "//wrapper_proof:expand_location_proof_target"
+    )
+    assert output.read_text().strip() == "expand-location-proof-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_28_3_export_contract_hides_unlisted_symbols(buck: Buck) -> None:
     """Plan 28.3: only names in `exported_toplevels` reach the consuming
     env. Symbols defined at the top level of `exports.bzl` but NOT

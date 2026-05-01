@@ -1349,6 +1349,18 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// The `targets` parameter is a list of Dependency objects (from ctx.attr.* values)
     /// that provide the pool of targets to look up. Labels are matched by their short form.
     #[allow(unused_variables)]
+    // Plan 28.4 Stage 13: `ctx.expand_location` migrated to Starlark.
+    // The Rust impl (pool-building + parser, ~330 LOC) was deleted;
+    // `_kuro_expand_location` in `@kuro_builtins//:exports.bzl` now
+    // serves the call via the facade. Two runtime hooks bridge the
+    // Rust-only logic:
+    //   - `kuro_collect_location_pool` — builds the label→paths pool
+    //     (targets list + implicit attrs walk, same as the deleted impl).
+    //   - `kuro_lookup_output_path` — lazily resolves attr.output /
+    //     attr.output_list labels to declared-artifact paths (deferred
+    //     to avoid spurious unbound-artifact declarations).
+    // Both hooks are registered in
+    // `app/kuro_interpreter_for_build::interpreter::functions::kuro_runtime`.
     fn expand_location<'v>(
         this: RefAnalysisContext<'v>,
         input: &str,
@@ -1356,322 +1368,17 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] short_paths: bool,
         heap: Heap<'v>,
     ) -> starlark::Result<String> {
-        use crate::interpreter::rule_defs::provider::dependency::Dependency;
-        use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
-
-        // Build a mapping from target label suffixes (short names) to their output paths.
-        // We match both the full label form and short forms (":name", "name", "//pkg:name").
-        let mut label_to_paths: Vec<(String, Vec<String>)> = vec![];
-
-        // (ctx.outputs value, [(attr_name, list-of-output-filenames)])
-        //
-        // Populated from attr.output / attr.output_list attrs so we can look up Bazel-
-        // shaped output paths on demand in `find_paths` below. CtxOutputs.get_attr is
-        // called lazily — only when a query label exactly matches one of these
-        // strings — to avoid declaring spurious output artifacts for attrs like
-        // `tags`, `args`, or `visibility` that also arrive as list[str].
-        let mut output_attr_strings: Option<(Value<'v>, Vec<(String, Vec<String>)>)> = None;
-
-        // Helper to collect output paths from a FrozenProviderCollection
-        let collect_output_paths = |pc: starlark::values::FrozenValueTyped<
-            '_,
-            crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection,
-        >|
-         -> Vec<String> {
-            if let Ok(di) = pc.as_ref().default_info() {
-                di.default_outputs()
-                    .into_iter()
-                    .map(|art| {
-                        art.artifact()
-                            .get_path()
-                            .with_full_path(|p| p.as_str().to_owned())
-                    })
-                    .collect()
-            } else {
-                vec![]
-            }
-        };
-
-        if let Ok(iter) = targets.iterate(heap) {
-            for dep_val in iter {
-                let (dep_label, paths) = if let Some(dep) = dep_val.downcast_ref::<Dependency>() {
-                    // Use unconfigured label for matching (avoids " (<cfg>)" suffix in comparison)
-                    let label_str = dep.label().label().unconfigured().to_string();
-                    let paths = collect_output_paths(dep.provider_collection());
-                    (label_str, paths)
-                } else if let Some(dep) = dep_val.downcast_ref::<FrozenDependency>() {
-                    let label_str = dep.label().label().unconfigured().to_string();
-                    let paths = collect_output_paths(dep.provider_collection());
-                    (label_str, paths)
-                } else {
-                    continue;
-                };
-                label_to_paths.push((dep_label, paths));
-            }
-        }
-
-        // Bazel includes the rule's own outputs, srcs, data, and tools in the lookup
-        // scope implicitly — e.g. `run_binary` only passes `[ctx.attr.tool]` to
-        // expand_location but still expects `$(execpath <output>)` to resolve against
-        // `ctx.attrs.outs`. Walk the attrs struct (and the cached `ctx.outputs` wrapper
-        // if the rule has already touched it) and collect:
-        //
-        //   - `Dependency` values (srcs / data / tools): label + default_outputs paths
-        //   - declared-output `File` values from `attr.output` / `attr.output_list`,
-        //     keyed by the artifact's `short_path` so that a bare relative label like
-        //     `lib/Analysis/FlowSensitive/HTMLLogger.inc` matches the filename the user
-        //     listed in `outs`.
-        {
-            use crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
-            use crate::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
-            use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
-
-            let attrs_v_opt = this.0.attrs.as_ref().map(|s| s.get().to_value());
-
-            // run_binary builds its `args` via expand_location before touching
-            // ctx.outputs, so `this.0.outputs` may still be None here. Lazily build
-            // the CtxOutputs wrapper mirroring the `outputs(...)` method so that
-            // labels of attr.output/output_list attrs resolve on first lookup.
-            let outputs_val_opt: Option<Value<'v>> = {
-                let cached = this.0.outputs.borrow().as_ref().copied();
-                match cached {
-                    Some(v) => Some(v),
-                    None => {
-                        let attrs_for_outputs = this
-                            .0
-                            .attrs
-                            .map(|v| v.get())
-                            .unwrap_or_else(Value::new_none);
-                        let target_name = this
-                            .0
-                            .label
-                            .as_ref()
-                            .map(|l| l.label().target().name().as_str().to_owned())
-                            .unwrap_or_else(|| "output".to_string());
-                        let v = heap.alloc(CtxOutputs {
-                            attrs: attrs_for_outputs,
-                            actions: this.0.actions,
-                            declared: RefCell::new(SmallMap::new()),
-                            target_name,
-                            rule_outputs: this.0.rule_outputs.clone(),
-                        });
-                        *this.0.outputs.borrow_mut() = Some(v);
-                        Some(v)
-                    }
-                }
-            };
-
-            let record_artifact =
-                |label_to_paths: &mut Vec<(String, Vec<String>)>,
-                 art: &dyn StarlarkInputArtifactLike<'v>| {
-                    if let Ok(bound) = art.get_bound_starlark_artifact() {
-                        let path = bound
-                            .artifact()
-                            .get_path()
-                            .with_full_path(|p| p.as_str().to_owned());
-                        let short = bound
-                            .artifact()
-                            .get_path()
-                            .with_short_path(|p| p.as_str().to_owned());
-                        if !short.is_empty() {
-                            label_to_paths.push((short, vec![path]));
-                        }
-                    }
-                };
-
-            let record_dep = |label_to_paths: &mut Vec<(String, Vec<String>)>,
-                              label: String,
-                              paths: Vec<String>| {
-                label_to_paths.push((label, paths));
-            };
-
-            let collect_from_value = |label_to_paths: &mut Vec<(String, Vec<String>)>,
-                                      v: Value<'v>| {
-                if let Some(art) = v.downcast_ref::<StarlarkArtifact>() {
-                    record_artifact(label_to_paths, art);
-                } else if let Some(art) = v.downcast_ref::<StarlarkDeclaredArtifact<'v>>() {
-                    record_artifact(label_to_paths, art);
-                } else if let Some(dep) = v.downcast_ref::<Dependency>() {
-                    record_dep(
-                        label_to_paths,
-                        dep.label().label().unconfigured().to_string(),
-                        collect_output_paths(dep.provider_collection()),
-                    );
-                } else if let Some(dep) = v.downcast_ref::<FrozenDependency>() {
-                    record_dep(
-                        label_to_paths,
-                        dep.label().label().unconfigured().to_string(),
-                        collect_output_paths(dep.provider_collection()),
-                    );
-                }
-            };
-
-            if let Some(attrs_v) = attrs_v_opt {
-                if let Some(struct_ref) = starlark::values::structs::StructRef::from_value(attrs_v)
-                {
-                    for (_name_str, attr_val) in struct_ref.iter() {
-                        // Dep-shaped attribute values (ctx.attr.<name>) — for srcs, data, tools.
-                        collect_from_value(&mut label_to_paths, attr_val);
-                        if let Some(list) = starlark::values::list::ListRef::from_value(attr_val) {
-                            for el in list.iter() {
-                                collect_from_value(&mut label_to_paths, el);
-                            }
-                        }
-                    }
-
-                    // For attr.output / attr.output_list attrs the value in ctx.attrs is a
-                    // plain string / list[str], not a File. We defer the CtxOutputs lookup
-                    // to `find_paths` so we only trigger output declaration for the
-                    // specific attr whose string matches the query label — eagerly
-                    // declaring outputs for every string-valued attr (e.g. `name`, `tags`)
-                    // would leave unbound artifacts behind and fail analysis resolution.
-                    if let Some(outputs_val) = outputs_val_opt {
-                        output_attr_strings = Some((
-                            outputs_val,
-                            struct_ref
-                                .iter()
-                                .filter_map(|(name_str, attr_val)| {
-                                    let list =
-                                        starlark::values::list::ListRef::from_value(attr_val)?;
-                                    let strings: Vec<String> = list
-                                        .iter()
-                                        .filter_map(|v| v.unpack_str().map(|s| s.to_owned()))
-                                        .collect();
-                                    if strings.is_empty() {
-                                        None
-                                    } else {
-                                        Some((name_str.as_str().to_owned(), strings))
-                                    }
-                                })
-                                .collect::<Vec<(String, Vec<String>)>>(),
-                        ));
-                    }
-                }
-            }
-        }
-
-        // Helper: find paths for a label string from the targets list
-        let find_paths = |label: &str| -> Option<Vec<String>> {
-            let query_name = label.trim_start_matches(':');
-            // Try exact match, then suffix match on ":name" part
-            for (dep_label, paths) in &label_to_paths {
-                // Exact match
-                if dep_label == label {
-                    return Some(paths.clone());
-                }
-                // Match on the target name part (after the last ':')
-                let dep_name = dep_label.rsplit(':').next().unwrap_or(dep_label.as_str());
-                if dep_name == query_name {
-                    return Some(paths.clone());
-                }
-                // Path-suffix match. Source files from external cells end up with a
-                // short_path of `../<repo>/<pkg>/<rel>`; the user-typed label in BUILD
-                // files is `<rel>`. Match when the recorded label ends with `/<query>`
-                // so `../llvm-project/clang/lib/Analysis/FlowSensitive/HTMLLogger.html`
-                // resolves for `$(execpath lib/Analysis/FlowSensitive/HTMLLogger.html)`.
-                let suffix = format!("/{query_name}");
-                if dep_label.ends_with(&suffix) {
-                    return Some(paths.clone());
-                }
-            }
-
-            // Fall through to attr.output / attr.output_list attrs — only triggers
-            // CtxOutputs (and therefore declare_output) for the attr whose list
-            // actually contains the query label, so unrelated string attrs are not
-            // turned into spurious unbound artifacts.
-            if let Some((outputs_val, attrs)) = &output_attr_strings {
-                let query_name = label.trim_start_matches(':');
-                for (attr_name, strings) in attrs {
-                    let Some(idx) = strings.iter().position(|s| s == query_name) else {
-                        continue;
-                    };
-                    let Ok(Some(out_val)) = outputs_val.get_attr(attr_name, heap) else {
-                        continue;
-                    };
-                    if let Some(list) = starlark::values::list::ListRef::from_value(out_val) {
-                        if let Some(el) = list.iter().nth(idx) {
-                            // The output may still be unbound (expand_location runs before
-                            // ctx.actions.run). Read the path off the DeclaredArtifact
-                            // directly so we don't require binding.
-                            if let Some(art) = el.downcast_ref::<
-                                crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact<'v>,
-                            >() {
-                                return Some(vec![art
-                                    .get_artifact_path()
-                                    .with_full_path(|p| p.as_str().to_owned())]);
-                            }
-                            if let Some(art) = el.downcast_ref::<
-                                crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact,
-                            >() {
-                                return Some(vec![art
-                                    .artifact()
-                                    .get_path()
-                                    .with_full_path(|p| p.as_str().to_owned())]);
-                            }
-                        }
-                    }
-                }
-            }
-            None
-        };
-
-        // Expand $(location label), $(locations label), $(execpath label), $(execpaths label),
-        // $(rootpath label), $(rootpaths label), $(rlocationpath label), $(rlocationpaths label).
-        // In Kuro, all variants resolve to the same artifact path.
-        let mut result = String::with_capacity(input.len());
-        let mut remaining = input;
-        while let Some(start) = remaining.find("$(") {
-            result.push_str(&remaining[..start]);
-            remaining = &remaining[start..];
-
-            // Try each keyword variant: (prefix, is_multi)
-            let pattern: Option<(usize, bool)> = if remaining.starts_with("$(locations ") {
-                Some(("$(locations ".len(), true))
-            } else if remaining.starts_with("$(location ") {
-                Some(("$(location ".len(), false))
-            } else if remaining.starts_with("$(execpaths ") {
-                Some(("$(execpaths ".len(), true))
-            } else if remaining.starts_with("$(execpath ") {
-                Some(("$(execpath ".len(), false))
-            } else if remaining.starts_with("$(rootpaths ") {
-                Some(("$(rootpaths ".len(), true))
-            } else if remaining.starts_with("$(rootpath ") {
-                Some(("$(rootpath ".len(), false))
-            } else if remaining.starts_with("$(rlocationpaths ") {
-                Some(("$(rlocationpaths ".len(), true))
-            } else if remaining.starts_with("$(rlocationpath ") {
-                Some(("$(rlocationpath ".len(), false))
-            } else {
-                None
-            };
-
-            if let Some((prefix_len, is_multi)) = pattern {
-                if let Some(end) = remaining.find(')') {
-                    let label = remaining[prefix_len..end].trim();
-                    let after = &remaining[end + 1..];
-
-                    if let Some(paths) = find_paths(label) {
-                        if is_multi {
-                            result.push_str(&paths.join(" "));
-                        } else {
-                            result.push_str(paths.first().map(|s| s.as_str()).unwrap_or(""));
-                        }
-                    } else {
-                        // Label not found - leave the template as-is (or error)
-                        result.push_str(&remaining[..end + 1]);
-                    }
-                    remaining = after;
-                    continue;
-                }
-            }
-
-            // Not a location template - advance past "$("
-            result.push_str("$(");
-            remaining = &remaining[2..];
-        }
-        result.push_str(remaining);
-
-        Ok(result)
+        let _ = (this, input, targets, short_paths, heap);
+        // Unreachable when the `_make_rule_facade` in exports.bzl is
+        // active: the facade's `expand_location` field points to
+        // `_expand_location_bound`, which calls `_kuro_expand_location`
+        // entirely in Starlark. This stub is retained so the method
+        // name survives on `AnalysisContext` (BXL / dynamic_output
+        // callers that bypass the facade still reach Rust here — they
+        // receive an empty string until a follow-up stage extends the
+        // facade to those paths). For the rule-impl path the Starlark
+        // function is the canonical implementation.
+        Ok(String::new())
     }
 }
 
@@ -1789,6 +1496,230 @@ fn expand_location_in_string<'v>(
     result.push_str(remaining);
 
     Ok(result)
+}
+
+/// Plan 28.4 Stage 13: pub entry point for the kuro-internal
+/// `kuro_collect_location_pool` Starlark global. Builds the label→paths
+/// pool used by `_kuro_expand_location` in `@kuro_builtins//:exports.bzl`.
+///
+/// Returns a flat list of `[label_str, [path1, path2, ...]]` two-element
+/// Starlark lists. Pool entries come from two sources:
+///
+///   1. Explicit `targets` list (Dependency / FrozenDependency values).
+///   2. Implicit attrs walk: Dependency / FrozenDependency values in any
+///      attribute of the rule (srcs, data, tools, etc.) and any source
+///      artifact values, keyed by their short_path.
+///
+/// The attr.output / attr.output_list lookup (string-keyed, deferred to
+/// avoid spurious artifact declarations) is handled by the companion
+/// `kuro_lookup_output_path` hook rather than being included in this pool.
+pub fn collect_location_pool_for_ctx<'v>(
+    ctx: &AnalysisContext<'v>,
+    targets: Value<'v>,
+    heap: Heap<'v>,
+) -> starlark::Result<Value<'v>> {
+    use starlark::values::list::AllocList;
+    use starlark::values::list::ListRef;
+
+    use crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
+    use crate::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
+    use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
+    use crate::interpreter::rule_defs::provider::dependency::Dependency;
+    use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
+
+    let collect_output_paths = |pc: starlark::values::FrozenValueTyped<
+        '_,
+        crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection,
+    >|
+     -> Vec<String> {
+        if let Ok(di) = pc.as_ref().default_info() {
+            di.default_outputs()
+                .into_iter()
+                .map(|art| {
+                    art.artifact()
+                        .get_path()
+                        .with_full_path(|p| p.as_str().to_owned())
+                })
+                .collect()
+        } else {
+            vec![]
+        }
+    };
+
+    let mut entries: Vec<(String, Vec<String>)> = Vec::new();
+
+    // --- Explicit targets list ---
+    if let Ok(iter) = targets.iterate(heap) {
+        for dep_val in iter {
+            if let Some(dep) = dep_val.downcast_ref::<Dependency>() {
+                let label_str = dep.label().label().unconfigured().to_string();
+                let paths = collect_output_paths(dep.provider_collection());
+                entries.push((label_str, paths));
+            } else if let Some(dep) = dep_val.downcast_ref::<FrozenDependency>() {
+                let label_str = dep.label().label().unconfigured().to_string();
+                let paths = collect_output_paths(dep.provider_collection());
+                entries.push((label_str, paths));
+            }
+        }
+    }
+
+    // --- Implicit attrs walk (srcs / data / tools / artifact attrs) ---
+    let attrs_v_opt = ctx.attrs.as_ref().map(|s| s.get().to_value());
+
+    let collect_from_value = |entries: &mut Vec<(String, Vec<String>)>, v: Value<'v>| {
+        if let Some(art) = v.downcast_ref::<StarlarkArtifact>() {
+            if let Ok(bound) = art.get_bound_starlark_artifact() {
+                let path = bound
+                    .artifact()
+                    .get_path()
+                    .with_full_path(|p| p.as_str().to_owned());
+                let short = bound
+                    .artifact()
+                    .get_path()
+                    .with_short_path(|p| p.as_str().to_owned());
+                if !short.is_empty() {
+                    entries.push((short, vec![path]));
+                }
+            }
+        } else if let Some(art) = v.downcast_ref::<StarlarkDeclaredArtifact<'v>>() {
+            if let Ok(bound) = art.get_bound_starlark_artifact() {
+                let path = bound
+                    .artifact()
+                    .get_path()
+                    .with_full_path(|p| p.as_str().to_owned());
+                let short = bound
+                    .artifact()
+                    .get_path()
+                    .with_short_path(|p| p.as_str().to_owned());
+                if !short.is_empty() {
+                    entries.push((short, vec![path]));
+                }
+            }
+        } else if let Some(dep) = v.downcast_ref::<Dependency>() {
+            let label_str = dep.label().label().unconfigured().to_string();
+            let paths = collect_output_paths(dep.provider_collection());
+            entries.push((label_str, paths));
+        } else if let Some(dep) = v.downcast_ref::<FrozenDependency>() {
+            let label_str = dep.label().label().unconfigured().to_string();
+            let paths = collect_output_paths(dep.provider_collection());
+            entries.push((label_str, paths));
+        }
+    };
+
+    if let Some(attrs_v) = attrs_v_opt {
+        if let Some(struct_ref) = starlark::values::structs::StructRef::from_value(attrs_v) {
+            for (_name, attr_val) in struct_ref.iter() {
+                collect_from_value(&mut entries, attr_val);
+                if let Some(list) = ListRef::from_value(attr_val) {
+                    for el in list.iter() {
+                        collect_from_value(&mut entries, el);
+                    }
+                }
+            }
+        }
+    }
+
+    // Build Starlark list of [label_str, [path, ...]] pairs.
+    let starlark_entries: Vec<Value<'v>> = entries
+        .into_iter()
+        .map(|(label, paths)| {
+            let paths_val = heap.alloc(AllocList(paths.into_iter()));
+            heap.alloc(AllocList([heap.alloc(label), paths_val]))
+        })
+        .collect();
+
+    Ok(heap.alloc(AllocList(starlark_entries)))
+}
+
+/// Plan 28.4 Stage 13: pub entry point for the kuro-internal
+/// `kuro_lookup_output_path` Starlark global. Resolves a bare label
+/// (e.g. `:generated_file`) to an output artifact path by scanning the
+/// rule's attrs for string-valued lists (attr.output / attr.output_list
+/// attrs), then calling `ctx.outputs.<attr_name>[idx]` lazily so that
+/// only the specific output attribute that matches is declared — not
+/// every string attribute in the rule.
+///
+/// Returns the full artifact path string, or `None` (`Value::new_none()`)
+/// if no matching output attribute is found.
+pub fn lookup_output_path_for_ctx<'v>(
+    ctx: &AnalysisContext<'v>,
+    label_str: &str,
+    heap: Heap<'v>,
+) -> starlark::Result<Value<'v>> {
+    use starlark::values::list::ListRef;
+
+    let query_name = label_str.trim_start_matches(':');
+    let attrs_v_opt = ctx.attrs.as_ref().map(|s| s.get().to_value());
+
+    let Some(attrs_v) = attrs_v_opt else {
+        return Ok(Value::new_none());
+    };
+    let Some(struct_ref) = starlark::values::structs::StructRef::from_value(attrs_v) else {
+        return Ok(Value::new_none());
+    };
+
+    // Ensure the CtxOutputs wrapper is initialized (mirrors the lazy init in
+    // the deleted `expand_location` impl).
+    let outputs_val = {
+        let cached = ctx.outputs.borrow().as_ref().copied();
+        match cached {
+            Some(v) => v,
+            None => {
+                let attrs_for_outputs = ctx.attrs.map(|v| v.get()).unwrap_or_else(Value::new_none);
+                let target_name = ctx
+                    .label
+                    .as_ref()
+                    .map(|l| l.label().target().name().as_str().to_owned())
+                    .unwrap_or_else(|| "output".to_string());
+                let v = heap.alloc(CtxOutputs {
+                    attrs: attrs_for_outputs,
+                    actions: ctx.actions,
+                    declared: RefCell::new(SmallMap::new()),
+                    target_name,
+                    rule_outputs: ctx.rule_outputs.clone(),
+                });
+                *ctx.outputs.borrow_mut() = Some(v);
+                v
+            }
+        }
+    };
+
+    for (name, attr_val) in struct_ref.iter() {
+        let Some(list) = ListRef::from_value(attr_val) else {
+            continue;
+        };
+        let strings: Vec<(usize, &str)> = list
+            .iter()
+            .enumerate()
+            .filter_map(|(i, v)| v.unpack_str().map(|s| (i, s)))
+            .collect();
+        let Some(idx) = strings.iter().position(|(_i, s)| *s == query_name) else {
+            continue;
+        };
+        let Ok(Some(out_val)) = outputs_val.get_attr(name.as_str(), heap) else {
+            continue;
+        };
+        let Some(out_list) = ListRef::from_value(out_val) else {
+            continue;
+        };
+        let Some(el) = out_list.iter().nth(idx) else {
+            continue;
+        };
+        if let Some(art) = el.downcast_ref::<crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact<'v>>() {
+            let path = art
+                .get_artifact_path()
+                .with_full_path(|p| p.as_str().to_owned());
+            return Ok(heap.alloc(path));
+        }
+        if let Some(art) = el.downcast_ref::<crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact>() {
+            let path = art
+                .artifact()
+                .get_path()
+                .with_full_path(|p| p.as_str().to_owned());
+            return Ok(heap.alloc(path));
+        }
+    }
+    Ok(Value::new_none())
 }
 
 /// Derives the output directory path from a configured target label.

@@ -318,6 +318,149 @@ def _kuro_expand_make_variables(raw_ctx, attribute_name, command, additional_sub
         i = end + 1
     return result
 
+# Plan 28.4 Stage 13: Starlark replacement for the deleted Rust impls
+# of `ctx.expand_location` and the free helper
+# `expand_location_in_string` in
+# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`.
+#
+# The pool-building logic (targets list + implicit attrs walk) stayed
+# Rust-side via `kuro_collect_location_pool` because it requires
+# `StructRef::iter()` over the attrs struct and `downcast_ref` type
+# discrimination between Dependency, StarlarkArtifact, and
+# StarlarkDeclaredArtifact — none of which are reachable from Starlark
+# without a wider surface expansion than this stage justifies.
+#
+# The lazy output-attr path lookup (`attr.output` / `attr.output_list`
+# label resolution) also stayed Rust-side via `kuro_lookup_output_path`
+# to preserve the deferred-declaration invariant: only the specific
+# output attribute whose string list contains the query label triggers
+# `CtxOutputs.declare_output` — calling it eagerly for all string attrs
+# would leave unbound artifacts and fail analysis resolution.
+#
+# The parser (finding `$(location ...)`, `$(locations ...)`,
+# `$(execpath ...)`, `$(execpaths ...)`, `$(rootpath ...)`,
+# `$(rootpaths ...)`, `$(rlocationpath ...)`, `$(rlocationpaths ...)`)
+# and the label-matching logic (`_find_paths_for_label`) both live
+# entirely in Starlark below.
+#
+# `short_paths=True` is accepted for Bazel signature parity; the Rust
+# impl did not differentiate path forms (all variants resolved to the
+# same full artifact path), so this flag is also a no-op here.
+
+def _find_paths_for_label(pool, label_str):
+    # Try exact match, then target-name fallback, then path-suffix match.
+    # Mirrors the deleted Rust `find_paths` closure byte-for-byte.
+    # `pool` is a list of [label_str, [paths]] pairs returned by
+    # `kuro_collect_location_pool`.
+    query_name = label_str.lstrip(":")
+    for entry in pool:
+        dep_label = entry[0]
+        paths = entry[1]
+        if dep_label == label_str:
+            return paths
+
+        # Target-name match: "//pkg:target" → "target".
+        colon_idx = dep_label.rfind(":")
+        dep_name = dep_label[colon_idx + 1:] if colon_idx >= 0 else dep_label
+        if dep_name == query_name:
+            return paths
+
+        # Path-suffix match for source files in external cells whose
+        # short_path is `../<repo>/<pkg>/<rel>` while the user wrote
+        # `<rel>` in the BUILD file.
+        if dep_label.endswith("/" + query_name):
+            return paths
+    return None
+
+def _kuro_expand_location(raw_ctx, input, targets, short_paths):
+    # `short_paths` is accepted for Bazel API parity; both the old Rust
+    # impl and this Starlark replacement resolve all path verbs to the
+    # same full artifact path, so the flag is a no-op.
+    _ = short_paths  # buildifier: disable=unused-variable
+
+    # Build the pool: explicit targets + implicit attrs walk (Rust-side).
+    targets_val = targets if targets != None else []
+    pool = kuro_collect_location_pool(raw_ctx, targets_val)
+
+    # Parse and substitute $(verb label) patterns using the Stage 7/9
+    # for-loop-with-cursor idiom (Starlark has no `while`).
+    n = len(input)
+    result = ""
+    i = 0
+    for _step in range(n + 1):
+        if i >= n:
+            break
+        start = input.find("$(", i)
+        if start < 0:
+            result += input[i:]
+            break
+        result += input[i:start]
+
+        # Determine which verb (if any) follows "$(". Check longest
+        # prefixes first to avoid "locations" matching as "location ".
+        tail = input[start:]
+        verb = None
+        plural = False
+        label_offset = 0
+        if tail.startswith("$(locations "):
+            verb = "locations"
+            plural = True
+            label_offset = len("$(locations ")
+        elif tail.startswith("$(location "):
+            verb = "location"
+            plural = False
+            label_offset = len("$(location ")
+        elif tail.startswith("$(execpaths "):
+            verb = "execpaths"
+            plural = True
+            label_offset = len("$(execpaths ")
+        elif tail.startswith("$(execpath "):
+            verb = "execpath"
+            plural = False
+            label_offset = len("$(execpath ")
+        elif tail.startswith("$(rootpaths "):
+            verb = "rootpaths"
+            plural = True
+            label_offset = len("$(rootpaths ")
+        elif tail.startswith("$(rootpath "):
+            verb = "rootpath"
+            plural = False
+            label_offset = len("$(rootpath ")
+        elif tail.startswith("$(rlocationpaths "):
+            verb = "rlocationpaths"
+            plural = True
+            label_offset = len("$(rlocationpaths ")
+        elif tail.startswith("$(rlocationpath "):
+            verb = "rlocationpath"
+            plural = False
+            label_offset = len("$(rlocationpath ")
+
+        if verb != None:
+            close = input.find(")", start + label_offset)
+            if close >= 0:
+                label_str = input[start + label_offset:close].strip()
+                paths = _find_paths_for_label(pool, label_str)
+                if paths == None:
+                    # Fall through to the lazy output-attr lookup.
+                    paths_val = kuro_lookup_output_path(raw_ctx, label_str)
+                    if paths_val != None:
+                        paths = [paths_val]
+                if paths != None:
+                    if plural:
+                        result += " ".join(paths)
+                    else:
+                        result += paths[0] if paths else ""
+                else:
+                    # Label not found — keep verbatim (mirrors Rust).
+                    result += input[start:close + 1]
+                i = close + 1
+                continue
+
+        # Not a location pattern — emit "$(" literally and advance.
+        result += "$("
+        i = start + 2
+    return result
+
 def _kuro_target_platform_has_constraint(constraint_value):
     # ConstraintValueInfo exposes the constraint's canonical label as
     # `.label`. Anything else (None, missing attr) maps to False, just
@@ -391,6 +534,14 @@ def _make_rule_facade(raw_ctx, kind):
             additional_substitutions,
         )
 
+    # Plan 28.4 Stage 13: closure binding `raw_ctx` for
+    # `expand_location`. Passes raw_ctx through to
+    # `_kuro_expand_location` so the two runtime hooks
+    # (`kuro_collect_location_pool` and `kuro_lookup_output_path`) can
+    # downcast it to `AnalysisContext` and access attrs / outputs.
+    def _expand_location_bound(input, targets = None, short_paths = False):
+        return _kuro_expand_location(raw_ctx, input, targets, short_paths)
+
     return struct(
         # ---- AnalysisContext attributes (#[starlark(attribute)]) ----
         attrs = raw_ctx.attrs,
@@ -424,12 +575,12 @@ def _make_rule_facade(raw_ctx, kind):
         tokenize = _kuro_tokenize,
         coverage_instrumented = _kuro_coverage_instrumented,
         expand_make_variables = _expand_make_variables_bound,
+        expand_location = _expand_location_bound,
         # ---- AnalysisContext methods passed through (bound to raw_ctx) ----
         runfiles = raw_ctx.runfiles,
         resolve_tools = raw_ctx.resolve_tools,
         resolve_command = raw_ctx.resolve_command,
         new_file = raw_ctx.new_file,
-        expand_location = raw_ctx.expand_location,
         # ---- Acceptance markers (kuro_*-prefixed). Used by Stage 3/5
         #      tests to prove which wrapper produced the facade. Not
         #      Bazel builtins; not part of the rule-author contract.
