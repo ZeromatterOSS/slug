@@ -1,0 +1,6 @@
+# Empty BUILD file for the @kuro_builtins/utils package. Holds
+# Bazel-shaped Starlark helpers (utils.bzl, expect.bzl, type_defs.bzl,
+# arglike.bzl, selects.bzl) imported by user `.bzl` files via
+# `load("@kuro_builtins//utils:expect.bzl", "expect")` etc. Plan 28.6
+# PR 2 — these used to live in `prelude/utils/` and are migrated here
+# as the bundled cell takes over BUILD-global construction.

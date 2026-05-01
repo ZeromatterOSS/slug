@@ -1155,6 +1155,21 @@ async def test_28_4_stage13_expand_location_starlark(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_6_kuro_builtins_helpers_loadable(buck: Buck) -> None:
+    """Plan 28.6 PR 2: helpers (paths, utils/expect, utils/type_defs,
+    utils/utils) migrated from `@prelude//` into `@kuro_builtins//`.
+    The fixture loads from the new namespace, exercises common
+    methods at module-eval time (paths.basename / dirname / join,
+    flatten, value_or, is_string, is_list), and writes a sentinel
+    if every assertion passes."""
+    result = await buck.build("//kuro_builtins_helpers:kuro_builtins_helpers_proof_target")
+    output = result.get_build_report().output_for_target(
+        "//kuro_builtins_helpers:kuro_builtins_helpers_proof_target"
+    )
+    assert output.read_text().strip() == "kuro-builtins-helpers-proof-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_28_5_exported_native_visible_in_buck(buck: Buck) -> None:
     """Plan 28.5: a member of `@kuro_builtins//:exports.bzl::exported_native`
     becomes a BUCK-file global. The fixture's BUILD.bazel uses
