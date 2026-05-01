@@ -383,7 +383,25 @@ test fixtures)**:
 - `kuro audit cell` (or equivalent) reports the same cell topology
   pre/post-migration for each active workspace.
 
-### Phase 35.4: `.bazelignore` adoption (active workspaces)  [~½ day]
+### Phase 35.4: `.bazelignore` adoption (active workspaces)  [~½ day]  ✅ COMPLETE 2026-05-01
+
+**Notes**:
+- New module `kuro_common::ignores::bazelignore` parses
+  `.bazelignore` (one path per line, `#` comment, blank skipped) into the
+  comma-separated spec `IgnoreSet::from_ignore_spec` already consumes.
+  3 unit tests cover the format.
+- Interpreter ignores wired in `app/kuro_common/src/ignores/all_cells.rs`:
+  `.bazelignore` (read via `DiceFileComputations::read_file_if_exists`)
+  takes precedence; falls back to `[project] ignore` during the
+  deprecation window.
+- File-watcher ignores wired in `app/kuro_server/src/daemon/state.rs`:
+  same precedence, reads via `kuro_fs::fs_util::read_to_string_if_exists`
+  at daemon startup.
+- Root `./.bazelignore` created with the 4 paths previously listed in
+  `[project] ignore`. `[project]` section removed from `./.buckconfig`.
+- Verified no active-workspace `.buckconfig` contains `[project]`,
+  `package_boundary_exceptions`, or `watchman_merge_base`.
+
 
 #### Goal
 

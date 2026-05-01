@@ -9,12 +9,5 @@ root = gh_facebook_kuro
 internal_cell = fbcode
 stripped_root_dirs = kuro
 
-[project]
-ignore = \
-    app/kuro_explain, \
-    app_dep_graph_rules, \
-    examples, \
-    integrations/rust-project/tests
-
 [rust]
 default_edition = 2024

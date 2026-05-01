@@ -394,19 +394,39 @@ impl DaemonState {
             let static_metadata = Arc::new(static_metadata);
 
             let mut ignore_specs: HashMap<CellName, IgnoreSet> = HashMap::new();
-            for (cell, _) in cells.cells() {
-                let config = legacy_cells.parse_single_cell(cell, &fs).await?;
+            for (cell, instance) in cells.cells() {
+                // .bazelignore (Bazel-compat) takes precedence over the
+                // legacy [project] ignore key. Read the file at the cell
+                // root if present.
+                let bazelignore_rel =
+                    instance
+                        .path()
+                        .join(kuro_core::cells::paths::CellRelativePath::unchecked_new(
+                            ".bazelignore",
+                        ));
+                let bazelignore_abs = fs.resolve(&bazelignore_rel);
+                let bazelignore_spec = kuro_fs::fs_util::read_to_string_if_exists(&bazelignore_abs)
+                    .ok()
+                    .flatten()
+                    .map(|content| kuro_common::ignores::bazelignore::parse_bazelignore(&content));
+
+                let spec_string;
+                let ignore_str = if let Some(s) = bazelignore_spec.as_deref() {
+                    s
+                } else {
+                    let config = legacy_cells.parse_single_cell(cell, &fs).await?;
+                    spec_string = config
+                        .get(BuckconfigKeyRef {
+                            section: "project",
+                            property: "ignore",
+                        })
+                        .unwrap_or("")
+                        .to_owned();
+                    spec_string.as_str()
+                };
                 ignore_specs.insert(
                     cell,
-                    IgnoreSet::from_ignore_spec(
-                        config
-                            .get(BuckconfigKeyRef {
-                                section: "project",
-                                property: "ignore",
-                            })
-                            .unwrap_or(""),
-                        cells.is_root_cell(cell),
-                    )?,
+                    IgnoreSet::from_ignore_spec(ignore_str, cells.is_root_cell(cell))?,
                 );
             }
 
