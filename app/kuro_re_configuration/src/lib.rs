@@ -130,50 +130,42 @@ pub struct KuroOssReConfiguration {
     pub action_cache_address: Option<String>,
     /// Whether to use TLS to interact with remote execution.
     pub tls: bool,
-    /// Path to a CA certificates bundle. This must be PEM-encoded. If none is set, a default
-    /// bundle will be used.
-    ///
-    /// This can contain environment variables using shell interpolation syntax (i.e. $VAR). They
-    /// will be substituted before using the value.
+    /// Path to a CA certificates bundle (PEM). Bazel-compat:
+    /// `--tls_certificate`. Read by `remote_execution/oss/re_grpc`.
     pub tls_ca_certs: Option<String>,
-    /// Path to a client certificate (and intermediate chain), as well as its associated private
-    /// key. This must be PEM-encoded.
-    ///
-    /// This can contain environment variables using shell interpolation syntax (i.e. $VAR). They
-    /// will be substituted before using the value.
+    /// Path to a client certificate (PEM). Bazel-compat:
+    /// `--tls_client_certificate`.
     pub tls_client_cert: Option<String>,
-    /// HTTP headers to inject in all requests to RE. This is a comma-separated list of `Header:
-    /// Value` pairs. Minimal validation of those headers is done here.
-    ///
-    /// This can contain environment variables using shell interpolation syntax (i.e. $VAR). They
-    /// will be substituted before using the value.
+    /// HTTP headers to inject in all requests to RE. Bazel-compat:
+    /// `--remote_header=K=V` (repeated).
     pub http_headers: Vec<HttpHeader>,
     /// Whether to query capabilities from the RBE backend.
     pub capabilities: Option<bool>,
-    /// The instance name to use in requests.
+    /// The instance name to use in requests. Bazel-compat:
+    /// `--remote_instance_name`.
     pub instance_name: Option<String>,
-    /// Use the Meta version of the request metadata
+    /// Use the Meta version of the request metadata. Read by re_grpc
+    /// for the Meta-internal RE backend used by
+    /// `examples/remote_execution/internal/`.
     pub use_fbcode_metadata: bool,
-    /// The max size for a GRPC message to be decoded.
+    /// gRPC max-decoded-message-size. Kuro-specific knob.
     pub max_decoding_message_size: Option<usize>,
-    /// The max cumulative blob size for `Read` and `BatchReadBlobs` methods.
+    /// gRPC `BatchReadBlobs` cumulative-blob-size cap. Kuro-specific knob.
     pub max_total_batch_size: Option<usize>,
-    /// Maximum number of concurrent upload requests for each action.
+    /// Per-action upload concurrency. Kuro-specific knob.
     pub max_concurrent_uploads_per_action: Option<usize>,
-    /// Time that digests are assumed to live in CAS after being touched.
+    /// CAS TTL hint in seconds. Kuro-specific knob.
     pub cas_ttl_secs: Option<i64>,
-    /// Interval in seconds for HTTP/2 ping frames to detect stale connections.
+    /// HTTP/2 ping interval. Kuro-specific knob.
     pub grpc_keepalive_time_secs: Option<u64>,
-    /// Timeout in seconds for receiving HTTP/2 ping acknowledgement.
+    /// HTTP/2 ping ack timeout. Kuro-specific knob.
     pub grpc_keepalive_timeout_secs: Option<u64>,
-    /// Whether to send HTTP/2 pings when connection is idle.
+    /// Send HTTP/2 pings while idle. Kuro-specific knob.
     pub grpc_keepalive_while_idle: Option<bool>,
     /// Default `(key, value)` properties to attach to every remote
-    /// action's `Platform` message. Sourced from
-    /// `--remote_default_exec_properties=KEY=VALUE` (CLI) or
-    /// `[kuro_re_client] default_exec_properties = ...` (buckconfig).
-    /// Bazel uses this to steer RBE worker selection (e.g.
-    /// `container-image=...`, `OSFamily=Linux`).
+    /// action's `Platform` message. Populated from
+    /// `--remote_default_exec_properties=KEY=VALUE` via the daemon
+    /// startup-config overlay (Plan 25.3.E).
     pub default_exec_properties: Vec<(String, String)>,
 }
 
@@ -204,106 +196,40 @@ impl FromStr for HttpHeader {
 
 impl KuroOssReConfiguration {
     pub fn from_legacy_config(legacy_config: &LegacyBuckConfig) -> kuro_error::Result<Self> {
-        // this is used for all three services by default, if given; if one of
-        // them has an explicit address given as well though, use that instead
-        let default_address: Option<String> = legacy_config.parse(BuckconfigKeyRef {
-            section: BUCK2_RE_CLIENT_CFG_SECTION,
-            property: "address",
-        })?;
-
+        macro_rules! key {
+            ($property:literal) => {
+                BuckconfigKeyRef {
+                    section: BUCK2_RE_CLIENT_CFG_SECTION,
+                    property: $property,
+                }
+            };
+        }
         Ok(Self {
-            cas_address: legacy_config
-                .parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "cas_address",
-                })?
-                .or(default_address.clone()),
-            engine_address: legacy_config
-                .parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "engine_address",
-                })?
-                .or(default_address.clone()),
-            action_cache_address: legacy_config
-                .parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "action_cache_address",
-                })?
-                .or(default_address),
-            tls: legacy_config
-                .parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "tls",
-                })?
-                .unwrap_or(true),
-            tls_ca_certs: legacy_config.parse(BuckconfigKeyRef {
-                section: BUCK2_RE_CLIENT_CFG_SECTION,
-                property: "tls_ca_certs",
-            })?,
-            tls_client_cert: legacy_config.parse(BuckconfigKeyRef {
-                section: BUCK2_RE_CLIENT_CFG_SECTION,
-                property: "tls_client_cert",
-            })?,
+            cas_address: legacy_config.parse(key!("cas_address"))?,
+            engine_address: legacy_config.parse(key!("engine_address"))?,
+            action_cache_address: legacy_config.parse(key!("action_cache_address"))?,
+            tls: legacy_config.parse(key!("tls"))?.unwrap_or(true),
+            tls_ca_certs: legacy_config.parse(key!("tls_ca_certs"))?,
+            tls_client_cert: legacy_config.parse(key!("tls_client_cert"))?,
             http_headers: legacy_config
-                .parse_list(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "http_headers",
-                })?
-                .unwrap_or_default(), // Empty list is as good None.
-            capabilities: legacy_config.parse(BuckconfigKeyRef {
-                section: BUCK2_RE_CLIENT_CFG_SECTION,
-                property: "capabilities",
-            })?,
-            instance_name: legacy_config.parse(BuckconfigKeyRef {
-                section: BUCK2_RE_CLIENT_CFG_SECTION,
-                property: "instance_name",
-            })?,
+                .parse_list(key!("http_headers"))?
+                .unwrap_or_default(),
+            capabilities: legacy_config.parse(key!("capabilities"))?,
+            instance_name: legacy_config.parse(key!("instance_name"))?,
             use_fbcode_metadata: legacy_config
-                .parse(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "use_fbcode_metadata",
-                })?
+                .parse(key!("use_fbcode_metadata"))?
                 .unwrap_or(false),
-            max_decoding_message_size: legacy_config.parse(BuckconfigKeyRef {
-                section: BUCK2_RE_CLIENT_CFG_SECTION,
-                property: "max_decoding_message_size",
-            })?,
-            max_total_batch_size: legacy_config.parse(BuckconfigKeyRef {
-                section: BUCK2_RE_CLIENT_CFG_SECTION,
-                property: "max_total_batch_size",
-            })?,
-            max_concurrent_uploads_per_action: legacy_config.parse(BuckconfigKeyRef {
-                section: BUCK2_RE_CLIENT_CFG_SECTION,
-                property: "max_concurrent_uploads_per_action",
-            })?,
-            cas_ttl_secs: legacy_config.parse(BuckconfigKeyRef {
-                section: BUCK2_RE_CLIENT_CFG_SECTION,
-                property: "cas_ttl_secs",
-            })?,
-            grpc_keepalive_time_secs: legacy_config.parse(BuckconfigKeyRef {
-                section: BUCK2_RE_CLIENT_CFG_SECTION,
-                property: "grpc_keepalive_time_secs",
-            })?,
-            grpc_keepalive_timeout_secs: legacy_config.parse(BuckconfigKeyRef {
-                section: BUCK2_RE_CLIENT_CFG_SECTION,
-                property: "grpc_keepalive_timeout_secs",
-            })?,
-            grpc_keepalive_while_idle: legacy_config.parse(BuckconfigKeyRef {
-                section: BUCK2_RE_CLIENT_CFG_SECTION,
-                property: "grpc_keepalive_while_idle",
-            })?,
-            default_exec_properties: legacy_config
-                .parse_list::<String>(BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: "default_exec_properties",
-                })?
-                .unwrap_or_default()
-                .into_iter()
-                .filter_map(|kv| {
-                    let (k, v) = kv.split_once('=')?;
-                    Some((k.to_owned(), v.to_owned()))
-                })
-                .collect(),
+            max_decoding_message_size: legacy_config.parse(key!("max_decoding_message_size"))?,
+            max_total_batch_size: legacy_config.parse(key!("max_total_batch_size"))?,
+            max_concurrent_uploads_per_action: legacy_config
+                .parse(key!("max_concurrent_uploads_per_action"))?,
+            cas_ttl_secs: legacy_config.parse(key!("cas_ttl_secs"))?,
+            grpc_keepalive_time_secs: legacy_config.parse(key!("grpc_keepalive_time_secs"))?,
+            grpc_keepalive_timeout_secs: legacy_config
+                .parse(key!("grpc_keepalive_timeout_secs"))?,
+            grpc_keepalive_while_idle: legacy_config.parse(key!("grpc_keepalive_while_idle"))?,
+            // CLI-flag-only; populated by the daemon startup-config overlay.
+            default_exec_properties: Vec::new(),
         })
     }
 }
