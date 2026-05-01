@@ -181,6 +181,24 @@ def _kuro_tokenize(option_string):
         tokens.append(current)
     return tokens
 
+# Plan 28.4 Stage 10: Starlark replacement for the deleted Rust impl of
+# `ctx.new_file` in
+# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`.
+#
+# `ctx.new_file` is a deprecated Bazel API with two call shapes:
+#   - `ctx.new_file(filename: str)` — declare a new file by name.
+#   - `ctx.new_file(sibling: File, filename: str)` — same, but the
+#     sibling is ignored (the Rust impl read only the filename string).
+#
+# The implementation delegates to `ctx.actions.declare_file`, which is
+# already a Starlark attribute on the actions struct. No new
+# `kuro_runtime` globals are needed. Single-owner per Plan 28.7.
+def _kuro_new_file(raw_ctx, file_or_sibling, filename):
+    name = filename if filename != None else file_or_sibling
+    if type(name) != "string":
+        name = str(name)
+    return raw_ctx.actions.declare_file(name)
+
 # Plan 28.4 Stage 9: Starlark replacement for the deleted Rust impls
 # of `ctx.var` and `ctx.expand_make_variables` in
 # `app/kuro_build_api/src/interpreter/rule_defs/context.rs`. Both
@@ -547,6 +565,13 @@ def _make_rule_facade(raw_ctx, kind):
             execution_requirements,
         )
 
+    # Plan 28.4 Stage 10: closure binding `raw_ctx` for `new_file`.
+    # The deprecated two-shape API (`new_file(filename)` and
+    # `new_file(sibling, filename)`) is normalised here; the sibling is
+    # ignored to match the deleted Rust impl byte-for-byte.
+    def _new_file_bound(file_or_sibling, filename = None):
+        return _kuro_new_file(raw_ctx, file_or_sibling, filename)
+
     return struct(
         # ---- AnalysisContext attributes (#[starlark(attribute)]) ----
         attrs = raw_ctx.attrs,
@@ -584,7 +609,7 @@ def _make_rule_facade(raw_ctx, kind):
         runfiles = _runfiles_bound,
         resolve_tools = _kuro_resolve_tools,
         resolve_command = _resolve_command_bound,
-        new_file = raw_ctx.new_file,
+        new_file = _new_file_bound,
         expand_location = raw_ctx.expand_location,
         # ---- Acceptance markers (kuro_*-prefixed). Used by Stage 3/5
         #      tests to prove which wrapper produced the facade. Not

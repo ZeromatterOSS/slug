@@ -1096,61 +1096,12 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     // `attribute` and `execution_requirements` are accepted and ignored,
     // matching the deleted Rust impl. Single-owner per Plan 28.7.
 
-    /// Creates a new file (deprecated Bazel API).
-    ///
-    /// This is equivalent to `ctx.actions.declare_file()`. The deprecated form is
-    /// `ctx.new_file(filename)` or `ctx.new_file(sibling, filename)`.
-    #[allow(unused_variables)]
-    fn new_file<'v>(
-        this: RefAnalysisContext<'v>,
-        #[starlark(require = pos)] file_or_sibling: Value<'v>,
-        #[starlark(require = pos, default = NoneType)] filename: Value<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        use kuro_core::fs::buck_out_path::BuckOutPathKind;
-        use kuro_execute::execute::request::OutputType;
-
-        use crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
-        use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
-
-        // If filename is provided, file_or_sibling is a sibling File
-        // Otherwise, file_or_sibling is the filename string
-        let name = if filename.is_none() {
-            file_or_sibling
-                .unpack_str()
-                .unwrap_or(&file_or_sibling.to_str())
-                .to_owned()
-        } else {
-            filename
-                .unpack_str()
-                .unwrap_or(&filename.to_str())
-                .to_owned()
-        };
-
-        // Delegate to ctx.actions.declare_file via the registry
-        let to_err = |e: kuro_error::Error| -> starlark::Error {
-            starlark::Error::new_other(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                e.to_string(),
-            ))
-        };
-        let mut state = this.0.actions.state().map_err(to_err)?;
-        let artifact = state
-            .declare_output(
-                None,
-                &name,
-                OutputType::File,
-                None,
-                BuckOutPathKind::default(),
-                heap,
-            )
-            .map_err(to_err)?;
-        Ok(heap.alloc(StarlarkDeclaredArtifact::new(
-            None,
-            artifact,
-            AssociatedArtifacts::new(),
-        )))
-    }
+    // `new_file` migrated to Starlark in Plan 28.4 Stage 10. The bundled
+    // `_kuro_new_file` in `@kuro_builtins//:exports.bzl` now serves both
+    // call shapes (`new_file(filename)` and `new_file(sibling, filename)`),
+    // delegating to `ctx.actions.declare_file(name)`. The sibling is
+    // ignored, matching the deleted Rust impl byte-for-byte.
+    // Single-owner per Plan 28.7.
 
     /// Expands `$(location label)` and `$(locations label)` templates in the input string.
     ///

@@ -2,6 +2,7 @@ load(":aspect_facade_proof.bzl", "aspect_facade_collector", "aspect_facade_leaf"
 load(":coverage_instrumented_proof.bzl", "coverage_instrumented_proof")
 load(":expand_make_variables_proof.bzl", "expand_make_variables_proof")
 load(":facade_proof.bzl", "facade_proof")
+load(":new_file_proof.bzl", "new_file_proof")
 load(":package_relative_label_proof.bzl", "package_relative_label_proof")
 load(":resolve_command_proof.bzl", "resolve_command_leaf", "resolve_command_proof")
 load(":resolve_tools_proof.bzl", "resolve_tools_leaf", "resolve_tools_proof")
@@ -69,3 +70,5 @@ runfiles_proof(
     name = "runfiles_proof_target",
     deps = [":runfiles_leaf_target"],
 )
+
+new_file_proof(name = "new_file_proof_target")
