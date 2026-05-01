@@ -1046,57 +1046,15 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     // this file) translated to Starlark byte-for-byte for ASCII
     // input. Single-owner per Plan 28.7.
 
-    /// Creates a runfiles object (Bazel-compatible).
-    ///
-    /// Returns a runfiles object that can be merged with other runfiles.
-    #[allow(unused_variables)]
-    fn runfiles<'v>(
-        this: RefAnalysisContext<'v>,
-        #[starlark(default = starlark::values::none::NoneType)] files: Value<'v>,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        transitive_files: Value<'v>,
-        #[starlark(require = named, default = false)] collect_default: bool,
-        #[starlark(require = named, default = false)] collect_data: bool,
-        #[starlark(require = named, default = starlark::values::none::NoneType)] symlinks: Value<
-            'v,
-        >,
-        #[starlark(require = named, default = starlark::values::none::NoneType)]
-        root_symlinks: Value<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        let mut runfiles =
-            crate::interpreter::rule_defs::provider::builtin::default_info::create_runfiles(
-                heap,
-                files,
-                transitive_files,
-                symlinks,
-                root_symlinks,
-            )?;
-
-        if collect_default || collect_data {
-            let Some(attrs) = this.0.attrs else {
-                return Ok(runfiles);
-            };
-            let attrs = attrs.get().to_value();
-
-            let mut collect_attr = |name: &str, want_data: bool| -> starlark::Result<()> {
-                if let Some(value) = attrs.get_attr(name, heap).ok().flatten() {
-                    collect_runfiles_from_value(value, want_data, heap, &mut runfiles)?;
-                }
-                Ok(())
-            };
-
-            if collect_default {
-                collect_attr("deps", false)?;
-                collect_attr("runtime_deps", false)?;
-            }
-            if collect_data {
-                collect_attr("data", true)?;
-            }
-        }
-
-        Ok(runfiles)
-    }
+    // `runfiles` migrated to Starlark in Plan 28.4 Stage 14.
+    // The bundled `_kuro_runfiles` in `@kuro_builtins//:exports.bzl`
+    // calls `kuro_create_runfiles` (for the base Runfiles object via
+    // `create_runfiles`) and `kuro_collect_runfiles_into` (for each
+    // `collect_default` / `collect_data` attr walk) — both registered
+    // as kuro_runtime globals in
+    // `app/kuro_interpreter_for_build/src/interpreter/functions/kuro_runtime.rs`.
+    // The public helper `collect_runfiles_from_value` (below) is the
+    // kuro_runtime entry point for the per-dep merging logic.
 
     // `target_platform_has_constraint` migrated to Starlark in Plan 28.4
     // Stage 3. The bundled `@kuro_builtins//:exports.bzl` installs a
@@ -1121,166 +1079,22 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     // `Label(...)` (which calls `BazelLabel::parse` for canonical
     // form). Single-owner per Plan 28.7.
 
-    /// Resolves tools and returns (input files depset, runfiles manifests) tuple (Bazel-compatible).
-    ///
-    /// This is used by rules to collect all files needed to run specified tools.
-    /// Returns a tuple of (depset of files, list of runfiles manifests).
-    #[allow(unused_variables)]
-    fn resolve_tools<'v>(
-        this: RefAnalysisContext<'v>,
-        #[starlark(require = named, default = NoneType)] tools: Value<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        use starlark::values::list::AllocList;
+    // `resolve_tools` migrated to Starlark in Plan 28.4 Stage 11. The
+    // bundled `_kuro_resolve_tools` in `@kuro_builtins//:exports.bzl`
+    // iterates `tools` (a list of Dependency values), collects each
+    // dep's `DefaultInfo.default_outputs` into a flat list, and returns
+    // `(files_list, [])`. Kuro does not use runfiles manifests, so the
+    // second element is always an empty list — identical to the deleted
+    // Rust impl. Single-owner per Plan 28.7.
 
-        use crate::interpreter::rule_defs::provider::dependency::Dependency;
-        use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
-        let _ = this;
-
-        // Collect all DefaultInfo default outputs from the tool dependencies.
-        // In Bazel, ctx.resolve_tools() returns (depset_of_files, runfiles_manifests).
-        // We collect the files from DefaultInfo.default_outputs and
-        // FilesToRunProvider (executable + runfiles manifest if present).
-        let mut tool_files: Vec<Value<'v>> = Vec::new();
-
-        let collect_tool_files = |pc: starlark::values::FrozenValueTyped<
-            '_,
-            crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection,
-        >,
-                                  files: &mut Vec<Value<'v>>| {
-            if let Ok(di) = pc.as_ref().default_info() {
-                for art in di.default_outputs() {
-                    files.push(heap.alloc(art));
-                }
-            }
-        };
-
-        if let Ok(iter) = tools.iterate(heap) {
-            for tool_val in iter {
-                if let Some(dep) = tool_val.downcast_ref::<Dependency>() {
-                    collect_tool_files(dep.provider_collection(), &mut tool_files);
-                } else if let Some(dep) = tool_val.downcast_ref::<FrozenDependency>() {
-                    collect_tool_files(dep.provider_collection(), &mut tool_files);
-                }
-            }
-        }
-
-        let files_list = heap.alloc(AllocList(tool_files));
-        let empty_manifests = heap.alloc(AllocList::EMPTY);
-        Ok(heap.alloc((files_list, empty_manifests)))
-    }
-
-    /// Resolves a command to be executed (deprecated Bazel API).
-    ///
-    /// Returns a tuple of `(inputs, command, input_manifests)` where:
-    /// - `inputs`: list of input files needed by the command
-    /// - `command`: list of resolved command strings
-    /// - `input_manifests`: list of runfiles manifests
-    ///
-    /// This is a deprecated Bazel API. Prefer `ctx.resolve_tools()` + `ctx.expand_location()`.
-    #[allow(unused_variables)]
-    fn resolve_command<'v>(
-        this: RefAnalysisContext<'v>,
-        #[starlark(require = named, default = "")] command: &str,
-        #[starlark(require = named, default = NoneType)] attribute: Value<'v>,
-        #[starlark(require = named, default = false)] expand_locations: bool,
-        #[starlark(require = named, default = NoneType)] make_variables: Value<'v>,
-        #[starlark(require = named, default = NoneType)] tools: Value<'v>,
-        #[starlark(require = named, default = NoneType)] label_dict: Value<'v>,
-        #[starlark(require = named, default = NoneType)] execution_requirements: Value<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        use starlark::values::list::AllocList;
-
-        use crate::interpreter::rule_defs::provider::dependency::Dependency;
-        use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
-
-        let _ = (attribute, execution_requirements);
-
-        // Collect tool files as inputs
-        let mut tool_files: Vec<Value<'v>> = Vec::new();
-        let collect_files = |pc: starlark::values::FrozenValueTyped<
-            '_,
-            crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection,
-        >,
-                             files: &mut Vec<Value<'v>>| {
-            if let Ok(di) = pc.as_ref().default_info() {
-                for art in di.default_outputs() {
-                    files.push(heap.alloc(art));
-                }
-            }
-        };
-
-        // Collect files from tools parameter
-        if !tools.is_none() {
-            if let Ok(iter) = tools.iterate(heap) {
-                for tool_val in iter {
-                    if let Some(dep) = tool_val.downcast_ref::<Dependency>() {
-                        collect_files(dep.provider_collection(), &mut tool_files);
-                    } else if let Some(dep) = tool_val.downcast_ref::<FrozenDependency>() {
-                        collect_files(dep.provider_collection(), &mut tool_files);
-                    }
-                }
-            }
-        }
-
-        // Collect files from label_dict parameter
-        if !label_dict.is_none() {
-            if let Ok(iter) = label_dict.iterate(heap) {
-                for dep_val in iter {
-                    if let Some(dep) = dep_val.downcast_ref::<Dependency>() {
-                        collect_files(dep.provider_collection(), &mut tool_files);
-                    } else if let Some(dep) = dep_val.downcast_ref::<FrozenDependency>() {
-                        collect_files(dep.provider_collection(), &mut tool_files);
-                    }
-                }
-            }
-        }
-
-        // Expand $(location ...) in command string if requested
-        let mut resolved_command = if expand_locations && !command.is_empty() {
-            // Build combined targets list from tools + label_dict for location expansion
-            let mut all_targets: Vec<Value<'v>> = Vec::new();
-            if !tools.is_none() {
-                if let Ok(iter) = tools.iterate(heap) {
-                    all_targets.extend(iter);
-                }
-            }
-            if !label_dict.is_none() {
-                if let Ok(iter) = label_dict.iterate(heap) {
-                    all_targets.extend(iter);
-                }
-            }
-            let targets_list = heap.alloc(all_targets);
-            // Use the existing expand_location logic
-            expand_location_in_string(command, targets_list, heap)?
-        } else {
-            command.to_owned()
-        };
-
-        // Expand $(VAR) make variables in command string
-        if !make_variables.is_none() {
-            if let Ok(iter) = make_variables.iterate(heap) {
-                for key_val in iter {
-                    if let Some(key) = key_val.unpack_str() {
-                        if let Ok(val) = make_variables.at(key_val, heap) {
-                            if let Some(val_str) = val.unpack_str() {
-                                let pattern = format!("$({})", key);
-                                resolved_command = resolved_command.replace(&pattern, val_str);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let inputs = heap.alloc(AllocList(tool_files));
-        let cmd_list = heap.alloc(AllocList(vec![
-            heap.alloc_str(&resolved_command).to_value(),
-        ]));
-        let manifests = heap.alloc(AllocList::EMPTY);
-        Ok(heap.alloc((inputs, cmd_list, manifests)))
-    }
+    // `resolve_command` migrated to Starlark in Plan 28.4 Stage 12.
+    // The bundled `_kuro_resolve_command` in
+    // `@kuro_builtins//:exports.bzl` collects DefaultInfo.default_outputs
+    // from `tools` and `label_dict`, runs `raw_ctx.expand_location` when
+    // `expand_locations=True`, and applies literal `$(KEY)` → value
+    // replacement from `make_variables`. Returns `(inputs, [command], [])`.
+    // `attribute` and `execution_requirements` are accepted and ignored,
+    // matching the deleted Rust impl. Single-owner per Plan 28.7.
 
     /// Creates a new file (deprecated Bazel API).
     ///
@@ -1993,7 +1807,14 @@ pub fn collect_toolchains_template_vars_from_list<'v>(
     out
 }
 
-fn collect_runfiles_from_value<'v>(
+/// Plan 28.4 Stage 14 kuro_runtime entry point.
+///
+/// Merges runfiles from a single attribute value (list of Dependency or a
+/// single Dependency) into `runfiles`. Called by `kuro_collect_runfiles_into`
+/// in `app/kuro_interpreter_for_build/src/interpreter/functions/kuro_runtime.rs`
+/// to serve `ctx.runfiles(collect_default=True/collect_data=True)` from
+/// Starlark.
+pub fn collect_runfiles_from_value<'v>(
     value: Value<'v>,
     want_data: bool,
     heap: Heap<'v>,

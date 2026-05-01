@@ -318,6 +318,118 @@ def _kuro_expand_make_variables(raw_ctx, attribute_name, command, additional_sub
         i = end + 1
     return result
 
+# Plan 28.4 Stage 14: Starlark replacement for the deleted Rust impl
+# of `ctx.runfiles` in
+# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`.
+#
+# Bazel API:
+#   ctx.runfiles(
+#       files=None, *, transitive_files=None, collect_default=False,
+#       collect_data=False, symlinks=None, root_symlinks=None,
+#   ) -> Runfiles
+#
+# Builds a Runfiles object from explicit `files` / `transitive_files` /
+# `symlinks` / `root_symlinks` via `kuro_create_runfiles`, then
+# optionally extends it by walking `deps` / `runtime_deps` / `data`
+# attrs via `kuro_collect_runfiles_into`. Both kuro_runtime globals keep
+# the Runfiles construction and dep-merging logic on the Rust side.
+#
+# `raw_ctx` is captured by the closure `_runfiles_bound` in
+# `_make_rule_facade` so the helper can read `raw_ctx.attrs` when
+# `collect_default` or `collect_data` is set.
+def _kuro_runfiles(raw_ctx, files, transitive_files, collect_default, collect_data, symlinks, root_symlinks):
+    rf = kuro_create_runfiles(files, transitive_files, symlinks, root_symlinks)
+    if collect_default or collect_data:
+        attrs = raw_ctx.attrs
+        if attrs != None:
+            if collect_default:
+                v = getattr(attrs, "deps", None)
+                if v != None:
+                    rf = kuro_collect_runfiles_into(rf, v, False)
+                v = getattr(attrs, "runtime_deps", None)
+                if v != None:
+                    rf = kuro_collect_runfiles_into(rf, v, False)
+            if collect_data:
+                v = getattr(attrs, "data", None)
+                if v != None:
+                    rf = kuro_collect_runfiles_into(rf, v, True)
+    return rf
+
+# Plan 28.4 Stage 11: Starlark replacement for the deleted Rust impl
+# of `ctx.resolve_tools` in
+# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`.
+#
+# Bazel API: `ctx.resolve_tools(*, tools=None) -> (list_of_files, [])`.
+# Iterates `tools` (a list of Dependency values), collects each dep's
+# `DefaultInfo.default_outputs` into a flat list, and returns a tuple
+# of `(files_list, empty_manifests_list)`. Kuro does not use runfiles
+# manifests, so the second element is always an empty list.
+#
+# `dep[DefaultInfo].default_outputs` is the canonical form used
+# throughout the prelude (see e.g. `prelude/artifacts.bzl`,
+# `prelude/utils/utils.bzl`, `prelude/command_alias.bzl`).
+def _kuro_resolve_tools(tools = None):
+    tool_files = []
+    if tools != None:
+        for dep in tools:
+            if DefaultInfo in dep:
+                tool_files.extend(dep[DefaultInfo].default_outputs)
+    return (tool_files, [])
+
+# Plan 28.4 Stage 12: Starlark replacement for the deleted Rust impl
+# of `ctx.resolve_command` in
+# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`.
+#
+# Deprecated Bazel API:
+#   ctx.resolve_command(
+#       *, command="", attribute=None, expand_locations=False,
+#       make_variables=None, tools=None, label_dict=None,
+#       execution_requirements=None,
+#   ) -> (inputs_list, command_list, manifests_list)
+#
+# Collects input files from `tools` and `label_dict` via
+# DefaultInfo.default_outputs, optionally runs $(location ...) expansion
+# via raw_ctx.expand_location, then applies literal $(KEY) → value
+# replacement for each entry in `make_variables`. Returns a 3-tuple
+# (inputs, [resolved_command], []) — the manifests list is always
+# empty because Kuro does not use runfiles manifests.
+#
+# `attribute` and `execution_requirements` are accepted and ignored,
+# matching the Rust impl's `let _ = (attribute, execution_requirements)`.
+def _kuro_resolve_command(
+        raw_ctx,
+        command,
+        attribute,
+        expand_locations,
+        make_variables,
+        tools,
+        label_dict,
+        execution_requirements):
+    _ = (attribute, execution_requirements)  # accepted, ignored — mirrors Rust impl
+
+    # Collect DefaultInfo.default_outputs from tools and label_dict.
+    tool_files = []
+    all_targets = []
+    for dep in (tools or []):
+        all_targets.append(dep)
+        if DefaultInfo in dep:
+            tool_files.extend(dep[DefaultInfo].default_outputs)
+    for dep in (label_dict or []):
+        all_targets.append(dep)
+        if DefaultInfo in dep:
+            tool_files.extend(dep[DefaultInfo].default_outputs)
+
+    resolved = command
+    if expand_locations and command:
+        resolved = raw_ctx.expand_location(resolved, targets = all_targets)
+
+    if make_variables != None:
+        for key, val in make_variables.items():
+            if type(val) == "string":
+                resolved = resolved.replace("$(" + key + ")", val)
+
+    return (tool_files, [resolved], [])
+
 def _kuro_target_platform_has_constraint(constraint_value):
     # ConstraintValueInfo exposes the constraint's canonical label as
     # `.label`. Anything else (None, missing attr) maps to False, just
@@ -355,7 +467,7 @@ def _kuro_target_platform_has_constraint(constraint_value):
 #      `dynamic_output` or BXL" attribute paths are not reachable here.
 #
 #   2. Bound-method values returned by `raw_ctx.<method>` for
-#      non-migrated methods (e.g. `runfiles`, `expand_make_variables`)
+#      non-migrated methods (e.g. `new_file`, `expand_location`)
 #      are first-class Starlark values that re-bind to `raw_ctx` when
 #      called. Storing them as struct fields preserves call semantics.
 #
@@ -389,6 +501,50 @@ def _make_rule_facade(raw_ctx, kind):
             attribute_name,
             command,
             additional_substitutions,
+        )
+
+    # Plan 28.4 Stage 14: closure binding `raw_ctx` for `runfiles`.
+    # `raw_ctx` is captured so `_kuro_runfiles` can access `raw_ctx.attrs`
+    # when `collect_default` or `collect_data` is True. Signature matches
+    # Bazel's `ctx.runfiles`: `files` positional-or-keyword, the rest keyword-only.
+    def _runfiles_bound(
+            files = None,
+            transitive_files = None,
+            collect_default = False,
+            collect_data = False,
+            symlinks = None,
+            root_symlinks = None):
+        return _kuro_runfiles(
+            raw_ctx,
+            files,
+            transitive_files,
+            collect_default,
+            collect_data,
+            symlinks,
+            root_symlinks,
+        )
+
+    # Plan 28.4 Stage 12: closure binding `raw_ctx` for `resolve_command`.
+    # The helper needs `raw_ctx.expand_location` for the $(location ...)
+    # expansion step; all other args are forwarded verbatim. Signature
+    # matches Bazel's: all kwargs, all with defaults.
+    def _resolve_command_bound(
+            command = "",
+            attribute = None,
+            expand_locations = False,
+            make_variables = None,
+            tools = None,
+            label_dict = None,
+            execution_requirements = None):
+        return _kuro_resolve_command(
+            raw_ctx,
+            command,
+            attribute,
+            expand_locations,
+            make_variables,
+            tools,
+            label_dict,
+            execution_requirements,
         )
 
     return struct(
@@ -425,9 +581,9 @@ def _make_rule_facade(raw_ctx, kind):
         coverage_instrumented = _kuro_coverage_instrumented,
         expand_make_variables = _expand_make_variables_bound,
         # ---- AnalysisContext methods passed through (bound to raw_ctx) ----
-        runfiles = raw_ctx.runfiles,
-        resolve_tools = raw_ctx.resolve_tools,
-        resolve_command = raw_ctx.resolve_command,
+        runfiles = _runfiles_bound,
+        resolve_tools = _kuro_resolve_tools,
+        resolve_command = _resolve_command_bound,
         new_file = raw_ctx.new_file,
         expand_location = raw_ctx.expand_location,
         # ---- Acceptance markers (kuro_*-prefixed). Used by Stage 3/5

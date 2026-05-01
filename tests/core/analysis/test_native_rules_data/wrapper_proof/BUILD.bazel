@@ -3,6 +3,9 @@ load(":coverage_instrumented_proof.bzl", "coverage_instrumented_proof")
 load(":expand_make_variables_proof.bzl", "expand_make_variables_proof")
 load(":facade_proof.bzl", "facade_proof")
 load(":package_relative_label_proof.bzl", "package_relative_label_proof")
+load(":resolve_command_proof.bzl", "resolve_command_leaf", "resolve_command_proof")
+load(":resolve_tools_proof.bzl", "resolve_tools_leaf", "resolve_tools_proof")
+load(":runfiles_proof.bzl", "runfiles_leaf", "runfiles_proof")
 load(":subrule_facade_proof.bzl", "subrule_facade_target")
 load(":tokenize_proof.bzl", "tokenize_proof")
 load(":var_proof.bzl", "var_proof")
@@ -42,3 +45,27 @@ coverage_instrumented_proof(name = "coverage_instrumented_proof_target")
 var_proof(name = "var_proof_target")
 
 expand_make_variables_proof(name = "expand_make_variables_proof_target")
+
+resolve_tools_leaf(name = "resolve_tools_leaf_target")
+
+resolve_tools_proof(
+    name = "resolve_tools_proof_target",
+    tools = [":resolve_tools_leaf_target"],
+)
+
+resolve_command_leaf(name = "resolve_command_leaf_tool")
+
+resolve_command_leaf(name = "resolve_command_leaf_label")
+
+resolve_command_proof(
+    name = "resolve_command_proof_target",
+    label_dep = ":resolve_command_leaf_label",
+    tool_dep = ":resolve_command_leaf_tool",
+)
+
+runfiles_leaf(name = "runfiles_leaf_target")
+
+runfiles_proof(
+    name = "runfiles_proof_target",
+    deps = [":runfiles_leaf_target"],
+)

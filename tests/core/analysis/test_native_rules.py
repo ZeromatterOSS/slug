@@ -1040,6 +1040,74 @@ async def test_28_4_stage9_expand_make_variables_starlark(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_4_stage11_resolve_tools_starlark(buck: Buck) -> None:
+    """Plan 28.4 Stage 11: `ctx.resolve_tools` migrated from Rust to
+    Starlark. The Rust `fn resolve_tools` in
+    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was
+    deleted; `_kuro_resolve_tools` in `@kuro_builtins//:exports.bzl`
+    now serves the call.
+
+    The fixture pins:
+      - Return value is a 2-tuple.
+      - First element is a list of File objects.
+      - Second element is an empty list (no runfiles manifests).
+      - File count matches the number of outputs from the leaf deps
+        (one dep with two outputs → two files).
+    """
+    result = await buck.build("//wrapper_proof:resolve_tools_proof_target")
+    output = result.get_build_report().output_for_target(
+        "//wrapper_proof:resolve_tools_proof_target"
+    )
+    assert output.read_text().strip() == "resolve-tools-proof-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_28_4_stage12_resolve_command_starlark(buck: Buck) -> None:
+    """Plan 28.4 Stage 12: `ctx.resolve_command` migrated from Rust to
+    Starlark. The Rust `fn resolve_command` in
+    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was
+    deleted; `_kuro_resolve_command` (bound as `_resolve_command_bound`
+    in `_make_rule_facade`) in `@kuro_builtins//:exports.bzl` now
+    serves the call.
+
+    The fixture pins:
+      - Return value is a 3-tuple.
+      - inputs contains files from both `tools` and `label_dict` deps
+        (two leaf targets → at least 2 input files).
+      - command_list is a single-element list whose string has $(KEY)
+        replaced by "VALUE" and $(location ...) expanded away.
+      - manifests is an empty list.
+    """
+    result = await buck.build("//wrapper_proof:resolve_command_proof_target")
+    output = result.get_build_report().output_for_target(
+        "//wrapper_proof:resolve_command_proof_target"
+    )
+    assert output.read_text().strip() == "resolve-command-proof-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_28_4_stage14_runfiles_starlark(buck: Buck) -> None:
+    """Plan 28.4 Stage 14: `ctx.runfiles` migrated from Rust to Starlark.
+    The Rust `fn runfiles` in
+    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` was deleted;
+    `_kuro_runfiles` (bound as `_runfiles_bound` in `_make_rule_facade`) in
+    `@kuro_builtins//:exports.bzl` now serves the call via two kuro_runtime
+    globals: `kuro_create_runfiles` and `kuro_collect_runfiles_into`.
+
+    The fixture pins:
+      - `ctx.runfiles()` (no args) returns a non-None Runfiles value.
+      - `ctx.runfiles(files=[f])` returns a non-None Runfiles value.
+      - `ctx.runfiles(transitive_files=depset([f]))` returns non-None.
+      - `ctx.runfiles(files=[f], collect_default=True)` returns non-None.
+    """
+    result = await buck.build("//wrapper_proof:runfiles_proof_target")
+    output = result.get_build_report().output_for_target(
+        "//wrapper_proof:runfiles_proof_target"
+    )
+    assert output.read_text().strip() == "runfiles-proof-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_28_3_export_contract_hides_unlisted_symbols(buck: Buck) -> None:
     """Plan 28.3: only names in `exported_toplevels` reach the consuming
     env. Symbols defined at the top level of `exports.bzl` but NOT
