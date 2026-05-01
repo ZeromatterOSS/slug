@@ -134,21 +134,6 @@ fn initialize_buckconfig(repo_root: &AbsPath, _prelude: bool, git: bool) -> kuro
     Ok(())
 }
 
-fn initialize_toolchains_build(repo_root: &AbsPath) -> kuro_error::Result<()> {
-    std::fs::write(
-        repo_root.join("BUILD.bazel"),
-        r#"
-load("@prelude//toolchains:demo.bzl", "system_demo_toolchains")
-
-# All the default toolchains, suitable for a quick demo or early prototyping.
-# Most real projects should copy/paste the implementation to configure them.
-system_demo_toolchains()
-"#
-        .trim(),
-    )?;
-    Ok(())
-}
-
 fn initialize_root_build(repo_root: &AbsPath, prelude: bool) -> kuro_error::Result<()> {
     let mut build = std::fs::File::create(repo_root.join("BUILD.bazel"))?;
 
@@ -242,11 +227,9 @@ mod tests {
         let tempdir_path = AbsPath::new(tempdir_path)?;
         fs_util::create_dir_all(tempdir_path)?;
 
-        // no git, with prelude
         set_up_project(tempdir_path, false, true)?;
         assert!(tempdir_path.join(".buckconfig").exists());
-        assert!(tempdir_path.join("toolchains").exists());
-        assert!(tempdir_path.join("toolchains/BUILD.bazel").exists());
+        assert!(tempdir_path.join("MODULE.bazel").exists());
         assert!(tempdir_path.join("BUILD.bazel").exists());
         Ok(())
     }
@@ -263,10 +246,11 @@ mod tests {
         let gitignore_path = tempdir_path.join(".gitignore");
         assert!(gitignore_path.exists());
         let actual = fs_util::read_to_string(&gitignore_path)?;
-        let expected = "/buck-out\n";
+        let expected = "/buck-out\n/bazel-external\n/bazel-bin\n/bazel-testlogs\n";
         assert_eq!(actual, expected);
 
-        // If an empty .buckconfig exists (this is the case we would hit after running `git init`), add `buck-out`
+        // If an empty .gitignore exists (this is the case we would hit after running `git init`),
+        // add the build-output dirs.
         fs_util::write(&gitignore_path, "")?;
         set_up_gitignore(tempdir_path)?;
         assert!(gitignore_path.exists());
@@ -284,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    fn test_buckconfig_generation_with_prelude() -> kuro_error::Result<()> {
+    fn test_buckconfig_generation_with_git() -> kuro_error::Result<()> {
         let tempdir = tempfile::tempdir()?;
         let tempdir_path = tempdir.path();
         let tempdir_path = AbsPath::new(tempdir_path)?;
@@ -293,36 +277,7 @@ mod tests {
         let buckconfig_path = tempdir_path.join(".buckconfig");
         initialize_buckconfig(tempdir_path, true, true)?;
         let actual_buckconfig = fs_util::read_to_string(buckconfig_path)?;
-        let expected_buckconfig = "[cells]
-  root = .
-  prelude = prelude
-  toolchains = toolchains
-  none = none
-
-[cell_aliases]
-  config = prelude
-  ovr_config = prelude
-  fbcode = none
-  fbsource = none
-  fbcode_macros = none
-  buck = none
-
-# Uses a copy of the prelude bundled with the kuro binary. You can alternatively delete this
-# section and vendor a copy of the prelude to the `prelude` directory of your project.
-[external_cells]
-  prelude = bundled
-
-[parser]
-  target_platform_detector_spec = target:root//...->prelude//platforms:default \\
-    target:prelude//...->prelude//platforms:default \\
-    target:toolchains//...->prelude//platforms:default
-
-[build]
-  execution_platforms = prelude//platforms:default
-
-[project]
-  ignore = .git
-";
+        let expected_buckconfig = "[cells]\n  root = .\n\n[project]\n  ignore = .git\n";
         assert_eq!(actual_buckconfig, expected_buckconfig);
         Ok(())
     }
@@ -355,14 +310,7 @@ mod tests {
         let build_path = tempdir_path.join("BUILD.bazel");
         initialize_root_build(tempdir_path, true)?;
         let actual_build = fs_util::read_to_string(build_path)?;
-        let expected_build = "# A list of available rules and their signatures can be found here: https://kuro.build/docs/prelude/globals/
-
-genrule(
-    name = \"hello_world\",
-    outs = [\"out.txt\"],
-    cmd = \"echo BUILT BY KURO> $@\",
-)
-";
+        let expected_build = "# Kuro build file - compatible with Bazel syntax\n# See: https://bazel.build/concepts/build-files\n\ngenrule(\n    name = \"hello_world\",\n    outs = [\"out.txt\"],\n    cmd = \"echo 'Built by Kuro!' > $@\",\n)\n";
         assert_eq!(actual_build, expected_build);
         Ok(())
     }

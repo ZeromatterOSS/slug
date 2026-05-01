@@ -1,4 +1,4 @@
-# Plan 28: Bazel Builtins Module Architecture  [Phases 28.1-28.6 done 2026-05-01; follow-ups remaining]
+# Plan 28: Bazel Builtins Module Architecture  [COMPLETE 2026-05-01]
 
 > **Main Plan**:
 > [2026-01-21-kuro-bazel-compatible-build-tool.md](../2026-01-21-kuro-bazel-compatible-build-tool.md)
@@ -59,8 +59,18 @@ Deferred follow-ups:
   gratuitous "Plan 28..." migration markers across 17 source
   files (the plan history lives in git log + this doc, not in
   inline comments).
-- Delete `prelude/toolchains/` after `kuro init` migrates to
-  `rules_*` references.
+- ~~Delete `prelude/toolchains/` after `kuro init` migrates to
+  `rules_*` references.~~ **Done 2026-05-01**. Investigation
+  surfaced that `initialize_toolchains_build` in
+  `app/kuro_client/src/commands/init.rs` was never called — pure
+  dead code with stale tests asserting paths the actual code
+  never produces. Deleted the dead function and `prelude/toolchains/`
+  (33 `.bzl` files plus subtree assets); fixed three pre-existing
+  broken init tests so they match what `kuro init` actually
+  generates (just `.buckconfig`, `MODULE.bazel`, `BUILD.bazel`,
+  no toolchain scaffolding). The bundled `@prelude` cell still
+  ships `asserts.bzl`, `utils/`, and `bxl/` for explicit user
+  loads.
 
 ## Scope
 
