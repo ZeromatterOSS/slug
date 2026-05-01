@@ -151,13 +151,21 @@ mod tests {
 
         let cells = BuckConfigBasedCells::testing_parse_with_file_ops(&mut file_ops, &[]).await?;
 
-        // Default buildfiles are BUILD.bazel, BUILD (Bazel-compatible)
+        // Default buildfiles are BUILD.bazel, BUILD (Bazel-compatible).
+        // BUCK is NOT in the default list — Plan 35.2 retired the Buck-shaped
+        // naming opt-in; the only place BUCK is honored now is via an explicit
+        // [buildfile] name = BUCK,... in a workspace's own .buckconfig.
         let config = cells
             .parse_single_cell_with_file_ops(CellName::testing_new("root"), &mut file_ops)
             .await?;
+        let default_buildfiles = parse_buildfile_name(&config)?;
         assert_eq!(
             vec!["BUILD.bazel", "BUILD"],
-            parse_buildfile_name(&config)?.map(|f| f.as_str()),
+            default_buildfiles.map(|f| f.as_str()),
+        );
+        assert!(
+            !default_buildfiles.iter().any(|f| f.as_str() == "BUCK"),
+            "BUCK must not be in the default buildfile list",
         );
 
         // Custom buildfile names are used directly (no .v2 suffix added)

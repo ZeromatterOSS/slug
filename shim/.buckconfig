@@ -7,10 +7,9 @@
 
 [buildfile]
 # see <https://github.com/facebook/kuro/pull/956> -- this helps us make
-# error messages when the user doesn't run "reindeer" much more obvious,
-# because the default BUCK file just errors out. We then make reindeer generate
-# BUCK.reindeer to override that.
-name = BUCK.reindeer,BUCK
+# error messages when the user doesn't run "reindeer" much more obvious.
+# We then make reindeer generate BUCK.reindeer to override the default.
+name = BUCK.reindeer,BUILD.bazel
 
 [cells]
 gh_facebook_kuro_shims_meta = .
