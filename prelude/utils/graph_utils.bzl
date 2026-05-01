@@ -6,7 +6,7 @@
 # of this source tree. You may select, at your option, one of the
 # above-listed licenses.
 
-load("@prelude//utils:expect.bzl", "expect")
+load("@kuro_builtins//utils:expect.bzl", "expect")
 
 def pre_order_traversal(
         graph: dict[typing.Any, list[typing.Any]],
