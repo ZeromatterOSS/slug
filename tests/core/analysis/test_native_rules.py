@@ -939,6 +939,32 @@ async def test_28_4_stage6_package_relative_label_starlark(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_4_stage7_tokenize_starlark(buck: Buck) -> None:
+    """Plan 28.4 Stage 7: `ctx.tokenize` migrated from Rust to
+    Starlark. The Rust impl + its `shell_tokenize` helper in
+    `app/kuro_build_api/src/interpreter/rule_defs/context.rs` were
+    deleted; `_kuro_tokenize` in `@kuro_builtins//:exports.bzl` now
+    serves the call.
+
+    The pre-existing `test_tokenize` covers the basic shapes
+    (unquoted, single-quoted, double-quoted, empty, multi-whitespace)
+    and continues to pass through the Starlark impl. This test pins
+    the edge cases the Rust impl handled but the basic test does
+    not exercise: backslash escapes inside and outside quotes, all
+    four escapable double-quote chars (``\"``, ``\\``, ``$``, `` ` ``),
+    non-escapable char after backslash inside quotes (literal `\\`
+    survives, next char NOT consumed — Rust quirk preserved),
+    trailing `\\` dropped, all five ASCII whitespace forms as
+    separators (space, `\\t`, `\\n`, `\\f`, `\\r`).
+    """
+    result = await buck.build("//wrapper_proof:tokenize_proof_target")
+    output = result.get_build_report().output_for_target(
+        "//wrapper_proof:tokenize_proof_target"
+    )
+    assert output.read_text().strip() == "tokenize-proof-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_28_3_export_contract_hides_unlisted_symbols(buck: Buck) -> None:
     """Plan 28.3: only names in `exported_toplevels` reach the consuming
     env. Symbols defined at the top level of `exports.bzl` but NOT

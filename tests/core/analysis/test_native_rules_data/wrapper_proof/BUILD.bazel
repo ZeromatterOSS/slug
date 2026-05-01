@@ -2,6 +2,7 @@ load(":aspect_facade_proof.bzl", "aspect_facade_collector", "aspect_facade_leaf"
 load(":facade_proof.bzl", "facade_proof")
 load(":package_relative_label_proof.bzl", "package_relative_label_proof")
 load(":subrule_facade_proof.bzl", "subrule_facade_target")
+load(":tokenize_proof.bzl", "tokenize_proof")
 
 # Plan 28.4 Stage 2 acceptance: prove `rule_implementation_wrapper` is
 # in the analysis call path. The fixture's defs.bzl defines a Starlark
@@ -30,3 +31,5 @@ aspect_facade_collector(
 subrule_facade_target(name = "subrule_facade_target")
 
 package_relative_label_proof(name = "package_relative_label_proof_target")
+
+tokenize_proof(name = "tokenize_proof_target")

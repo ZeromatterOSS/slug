@@ -346,7 +346,7 @@ Do not start with:
   Starlark.
 - The moved behavior has a Bazel 9 parity citation.
 
-## Phase 28.4: Rule Implementation Wrapper  [Stage 6 done 2026-05-01]
+## Phase 28.4: Rule Implementation Wrapper  [Stage 7 done 2026-05-01]
 
 ### Status
 
@@ -500,6 +500,41 @@ at build time). The Rust impl in `context.rs` was deleted.
 - LLVM Support cold analyze ≈ 156 ms (Stage 5 was 207 ms; Stage 2
   baseline 190 ms). Within run-to-run noise — closure construction
   and call cost are both negligible.
+
+### Stage 7 (`ctx.tokenize`)
+
+Stage 7 migrates a *pure-function* method — no facade attrs, no
+host info, no globals. The Rust impl plus its 60-line
+`shell_tokenize` helper in `context.rs` were deleted; the
+top-level `_kuro_tokenize` in `exports.bzl` mirrors the algorithm
+byte-for-byte for ASCII input. Bound directly into the facade
+without a closure (same pattern as
+`_kuro_target_platform_has_constraint`).
+
+Translation notes:
+
+- Starlark has no `while` loops, so the iteration uses two
+  for-loops bounded by `range(n + 1)` with explicit `i`
+  advancement and `break` on `i >= n`. Each step consumes ≥ 1
+  input character so the bound is safe.
+- Whitespace set matches Rust's `char::is_ascii_whitespace`:
+  space, `\t`, `\n`, `\f` (`\x0c`), `\r`. Vertical tab `\v` is
+  NOT whitespace per Rust's definition.
+- Non-escapable backslash inside double quotes preserves the
+  literal `\\` and does not consume the next char (Rust quirk
+  that we preserve on purpose).
+- Trailing `\\` at end of input (inside or outside quotes) drops
+  silently, matching Rust.
+
+Acceptance: pre-existing `test_tokenize` (basic shapes, single/
+double-quoted, empty, multi-whitespace) keeps passing through the
+Starlark impl. New `test_28_4_stage7_tokenize_starlark` pins the
+edge cases the basic test missed: backslash escapes inside and
+outside quotes, all four double-quote escapable chars (`"`, `\`,
+`$`, `` ` ``), non-escapable backslash quirk, trailing backslash
+drop, all five ASCII whitespace separators.
+
+LLVM Demangle smoke clean (8 actions, 5.1 s, analyze 214 ms).
 
 ### Stack-trace fidelity (inspected 2026-04-30)
 

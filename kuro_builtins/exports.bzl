@@ -75,6 +75,95 @@ def _kuro_package_relative_label(raw_ctx, label_str):
     target = label_str[1:] if label_str.startswith(":") else label_str
     return Label("@" + cell + "//" + pkg + ":" + target)
 
+# Plan 28.4 Stage 7: Starlark replacement for the deleted Rust impl
+# of `ctx.tokenize` (and its `shell_tokenize` helper) in
+# `app/kuro_build_api/src/interpreter/rule_defs/context.rs`. Pure
+# Bourne-shell tokenization — no facade-attr access, no host info,
+# no globals — so it sits as a top-level helper rather than a
+# closure inside `_make_rule_facade`.
+#
+# Behaviour mirrors the Rust impl byte-for-byte on ASCII input:
+#
+#   - Single-quoted strings: literal until closing `'`, no escapes.
+#   - Double-quoted strings: backslash escapes for `"`, `\`, `$`,
+#     `` ` ``; all other characters literal; trailing `\` at end of
+#     input dropped silently.
+#   - Backslash outside quotes: consume next char literally;
+#     trailing `\` at end of input dropped silently.
+#   - ASCII whitespace splits tokens (matches Rust's
+#     `char::is_ascii_whitespace`: space, `\t`, `\n`, `\f` /
+#     `\x0c`, `\r`).
+#
+# Starlark has no `while` loops, so the iteration uses a for-loop
+# over `range(n + 1)` with explicit `i` advancement and `break`
+# when `i >= n`. Each outer step consumes at least one input
+# character, so the bound is safe.
+def _kuro_tokenize(option_string):
+    tokens = []
+    current = ""
+    in_token = False
+    n = len(option_string)
+    i = 0
+
+    for _step in range(n + 1):
+        if i >= n:
+            break
+        c = option_string[i]
+        i += 1
+
+        if c == "'":
+            in_token = True
+            for _step2 in range(n + 1):
+                if i >= n:
+                    break
+                c2 = option_string[i]
+                i += 1
+                if c2 == "'":
+                    break
+                current += c2
+        elif c == "\"":
+            in_token = True
+            for _step2 in range(n + 1):
+                if i >= n:
+                    break
+                c2 = option_string[i]
+                i += 1
+                if c2 == "\"":
+                    break
+                if c2 == "\\":
+                    if i < n:
+                        nxt = option_string[i]
+                        if nxt == "\"" or nxt == "\\" or nxt == "$" or nxt == "`":
+                            current += nxt
+                            i += 1
+                        else:
+                            # Non-escapable: keep literal `\`; the
+                            # outer iter handles `nxt` next round.
+                            current += "\\"
+
+                    # i >= n: drop `\` silently (matches Rust).
+                else:
+                    current += c2
+        elif c == "\\":
+            in_token = True
+            if i < n:
+                current += option_string[i]
+                i += 1
+
+            # i >= n: drop trailing `\` silently.
+        elif c == " " or c == "\t" or c == "\n" or c == "\x0c" or c == "\r":
+            if in_token:
+                tokens.append(current)
+                current = ""
+                in_token = False
+        else:
+            in_token = True
+            current += c
+
+    if in_token or current:
+        tokens.append(current)
+    return tokens
+
 def _kuro_target_platform_has_constraint(constraint_value):
     # ConstraintValueInfo exposes the constraint's canonical label as
     # `.label`. Anything else (None, missing attr) maps to False, just
@@ -163,9 +252,9 @@ def _make_rule_facade(raw_ctx, kind):
         # ---- AnalysisContext methods served from Starlark ----
         target_platform_has_constraint = _kuro_target_platform_has_constraint,
         package_relative_label = _package_relative_label_bound,
+        tokenize = _kuro_tokenize,
         # ---- AnalysisContext methods passed through (bound to raw_ctx) ----
         coverage_instrumented = raw_ctx.coverage_instrumented,
-        tokenize = raw_ctx.tokenize,
         runfiles = raw_ctx.runfiles,
         expand_make_variables = raw_ctx.expand_make_variables,
         resolve_tools = raw_ctx.resolve_tools,
