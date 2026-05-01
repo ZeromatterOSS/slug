@@ -298,6 +298,8 @@ The detailed implementation is split into focused sub-plans:
 | [30-bes-upload-throughput.md](./kuro-bazel-subplans/30-bes-upload-throughput.md)                     | Close the BES-upload performance gap to bazel on warm `@llvm-project//llvm` (57 s kuro vs 50 s bazel; profiling pinpointed 23 s post-build BES drain wait as the entire delta). Earlier stream open, tonic flow-control tuning, daemon-resident uploader, parallel lifecycle handshakes. Substrate (tonic / prost) is fine; Connect-rs and grpcio are not viable replacements. | **30.1 + 30.2 + 30.5 done 2026-04-29** (warm wall 57.4 s → 14.81 s, post-build wait 23.2 s → ~2.9 s); 30.3 deferred to plan 31.3; 30.4 done |
 | [31-bazel-perf-parity.md](./kuro-bazel-subplans/31-bazel-perf-parity.md)                             | Successor to plan 30. Close the remaining kuro-vs-bazel gaps on warm-RE `@llvm-project//llvm:llvm` (cold-daemon 14.81 s vs 5.92 s; warm-daemon 5.72 s vs 1.03 s). Persistent on-disk action cache (the structural cold-daemon win), file-watcher filter for bazel convenience symlinks (the structural warm-daemon win), daemon-resident BES uploader (delivers plan 30 §30.3). Target: close ≥80% of each gap. | **Not Started** |
 | [32-local-overhead-parity.md](./kuro-bazel-subplans/32-local-overhead-parity.md)                     | Capture the 2026-04-30 `@llvm-project//llvm:Support` local-build overhead profile and close the remaining local/no-op gaps: fake external-action harness, queue-wait vs setup split, warm no-op CLI/client overhead, and local executor saturation. Baseline: Kuro exposed cold overhead 3.33 s vs Bazel 5.65 s, but Kuro warm CLI wall 0.87 s vs Bazel 0.46 s and action parallelism 13.54 vs 14.43. | **Not Started** |
+| [33-dynamic-dependency-discovery.md](./kuro-bazel-subplans/33-dynamic-dependency-discovery.md)       | Add a generic DICE-backed discovery substrate for Kuro-specific dynamic dependencies: C++20 modules, proto imports, Go/Haskell imports, Cargo.toml/rules_rs-style manifest discovery, and future scanner-driven rules. Preserves Bazel-compatible rule behavior by making discovery explicit opt-in, then tracks correctness, hermeticity, remote execution, sandboxing, caching, and performance guardrails. | **Not Started** |
+| [34-sandboxed-execution-strategy.md](./kuro-bazel-subplans/34-sandboxed-execution-strategy.md)       | Production sandboxed local execution strategy: fail-closed filesystem isolation, undeclared input/write detection, final output overlap claims, Linux Landlock/namespace backends, network policy, and second-tier Windows AppContainer support. Supersedes the current `pre_exec` prototype as the strict strategy. | **Not Started** |
 
 ### Remaining Stub Behavior
 
@@ -349,6 +351,7 @@ plan or an explicit decision that the stub is adequate. Organized by priority.
 - [rules_cc Native Requirements](../research/2026-01-26-rules-cc-native-requirements.md) - What Kuro must provide for rules_cc (Bazel 9.0+)
 - [Sync Extension Executor Architecture Analysis](../research/2026-02-18-sync-extension-executor-architecture-analysis.md) - Comparison of Kuro's sync executor vs Bazel/Buck2 approaches
 - Native → Starlark Migration: Each rules\_\* repo's version detection is documented inline in [07-rules-integration.md](./kuro-bazel-subplans/07-rules-integration.md#bazel-90-native--starlark-migration-architecture)
+- [Sandboxed Execution Strategy](./kuro-bazel-subplans/34-sandboxed-execution-strategy.md) - Rust and OS sandboxing research plus implementation plan for strict local action isolation
 
 ---
 
@@ -440,7 +443,7 @@ Quick reference to all phases and their locations:
 | 17    | Platform Support                   | [x] Functional (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; MSVC auto-detection; CcToolchainInfoStub per-platform; --copt/--cxxopt/--linkopt/--strip/--features flags; execution_requirements; PlatformFragment/JavaFragment/AppleFragment/CoverageFragment; 60+ common Bazel CLI flags accepted; package_group visibility resolution; 2026-03-12) |
 | 18    | Query Commands + Test Runner       | [x] Functional (deps, rdeps, allpaths, somepath, kind, attr, filter, buildfiles, tests; --output=label/json/build/graph; kuro test //... runs 4 tests; kuro version/shutdown/fetch Bazel-compat commands; ctx.workspace_name/build_file_path attrs; 2026-03-12) |
 
-### Real-World Compatibility and Bazel 9 Follow-ups (Phases 19-32) — NEXT
+### Real-World Compatibility and Bazel 9 Follow-ups (Phases 19-34) — NEXT
 
 | Phase | Title                                  | Sub-Plan | Status          |
 | ----- | -------------------------------------- | -------- | --------------- |
@@ -458,6 +461,8 @@ Quick reference to all phases and their locations:
 | 30    | BES Upload Throughput                  | [30-bes-upload-throughput.md](./kuro-bazel-subplans/30-bes-upload-throughput.md) | [ ] 30.1+30.2+30.4+30.5 done; 30.3 deferred to 31.3 |
 | 31    | Bazel Perf Parity (warm-RE)            | [31-bazel-perf-parity.md](./kuro-bazel-subplans/31-bazel-perf-parity.md) | [ ] Not Started |
 | 32    | Local Overhead Parity                  | [32-local-overhead-parity.md](./kuro-bazel-subplans/32-local-overhead-parity.md) | [ ] Not Started |
+| 33    | Generic Dynamic Dependency Discovery   | [33-dynamic-dependency-discovery.md](./kuro-bazel-subplans/33-dynamic-dependency-discovery.md) | [ ] Not Started |
+| 34    | Sandboxed Execution Strategy           | [34-sandboxed-execution-strategy.md](./kuro-bazel-subplans/34-sandboxed-execution-strategy.md) | [ ] Not Started |
 
 ---
 

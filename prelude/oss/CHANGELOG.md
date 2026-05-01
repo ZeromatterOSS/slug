@@ -1,3 +1,0 @@
-# Kuro Prelude
-
-- Initial version.
