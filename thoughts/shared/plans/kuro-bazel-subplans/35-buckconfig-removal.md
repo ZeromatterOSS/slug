@@ -430,38 +430,73 @@ become `.bazelrc` flags or get dropped. Test fixtures unaffected.
 
 ### Phase 35.5: Runtime knobs → `.bazelrc` (active workspaces)  [~2-3 days]
 
-#### Goal
+#### Goal (revised 2026-05-01)
 
-Drain every remaining active-workspace `.buckconfig` section into `.bazelrc`
-flags or hardcoded defaults. Test fixtures handled in 35.6.
+**Directive**: every Buck2-era flag not actively set in this repo's
+`.buckconfig` files is dead code and gets deleted; flags that have a
+Bazel equivalent get renamed to the Bazel name; flags actively used in
+this repo with no Bazel equivalent get a `--kuro_*` flag.
 
-#### Work
+This dramatically narrows the original scope. Most of the 194 distinct
+`(section, property)` pairs in `BuckconfigKeyRef` consumer code are
+Buck2-internal knobs that no `.buckconfig` in this repo sets. They go
+away wholesale, simplifying the daemon-side wiring.
 
-1. For each `[kuro*]` and `[build]` / `[parser]` / `[log]` / `[sandbox]` /
-   `[test]` / `[ui]` / `[http]` / `[client]` key from the audit:
-   - If a CLI flag already exists, use it.
-   - If not, add a `--kuro_<key>` flag (or Bazel-compatible name) at the
-     same precedence as the existing config read.
-   - Update the `BuckconfigKeyRef` consumer to read the flag value first,
-     fall through to the `.buckconfig` value during the deprecation window,
-     then drop the fallback.
-2. Add a workspace-default `.bazelrc` to the kuro root with the moved
-   defaults (e.g. `build --kuro_starlark_max_callstack_size=512`).
-3. Examples/tests with non-default knobs (e.g.
-   `examples/vscode/.buckconfig` has `[kuro_re_client]` for a local RE
-   server) get their own `.bazelrc`.
-4. Drop the migrated sections from every `.buckconfig`.
+#### Disposition rule per consumer
 
-#### Acceptance
+For each `BuckconfigKeyRef { section, property }` call site:
 
-- Every `.bazelrc` flag introduced has a help string and a documented
-  default.
+1. **Delete** if no active-workspace `.buckconfig` in the kuro repo sets
+   this `(section, property)`. The consumer code path (and its default
+   value) is dead. Either remove the lookup entirely (returning the
+   compile-time default) or delete the surrounding feature.
+2. **Rename to Bazel-compat flag** if the key *is* set in an active
+   `.buckconfig` AND Bazel has a similar flag (e.g.
+   `kuro_re_client.engine_address` → `--remote_executor`,
+   `kuro.digest_algorithms` → `--digest_function`, etc.).
+3. **`--kuro_*` flag** only if the key is set AND there is no Bazel
+   equivalent. Expected to be a small minority.
+
+#### Drain plan (per consumer file)
+
+Process consumers in descending key-count order, deleting dead lookups
+and renaming live ones:
+
+1. `app/kuro_re_configuration/src/lib.rs` (~80 keys, all
+   `[kuro_re_client]`) — most are Meta-internal RE knobs with no live
+   `.buckconfig` source. Delete the dead ones; rename live ones
+   (`engine_address`, `action_cache_address`, `cas_address`, `tls`,
+   `tls_client_cert`, `tls_ca_certs`, `instance_name`, `http_headers`,
+   `capabilities`, `use_fbcode_metadata`) to Bazel-compat CLI flags.
+2. `app/kuro_server/src/ctx.rs` — `[kuro]`, `[build]`, `[ui]`, `[scuba]`,
+   `[log]`, `[client]` keys.
+3. `app/kuro_server/src/daemon/state.rs` — `[kuro]`, `[build]`,
+   `[project]` (already covered by 35.4).
+4. `app/kuro_common/src/init.rs` — `[http]`, `[kuro_system_warning]`.
+5. `app/kuro_file_watcher/src/{file_watcher,watchman/interface,edenfs/interface}.rs` —
+   `[kuro]`, `[project]` (.bazelignore-covered).
+6. Smaller consumers: `kuro_test/src/command.rs` (`[test]`),
+   `kuro_interpreter/src/{factory,allow_relative_paths,import_paths}.rs`,
+   `kuro_interpreter_for_build/src/interpreter/{buckconfig,interpreter_for_dir}.rs`,
+   `kuro_build_api/src/{configure_dice,materialize,build/build_report,artifact_groups/calculation}.rs`,
+   `kuro_execute_impl/src/materializers/deferred/clean_stale.rs`,
+   `kuro_configured/src/{nodes,target_platform_resolution}.rs`,
+   `kuro_node/src/execution.rs`,
+   `kuro_server_commands/src/build.rs`.
+
+#### Acceptance (revised)
+
+- Every `BuckconfigKeyRef` call site outside `legacy_configs/` is
+  classified: deleted (key was dead) or renamed to a Bazel-compat CLI
+  flag, or kept as `--kuro_*` (rare).
+- Every `.bazelrc` flag introduced/renamed has a help string and a
+  documented default.
 - No active-workspace `.buckconfig` contains any `[kuro*]`, `[build]`,
   `[parser]`, `[log]`, `[sandbox]`, `[test]`, `[ui]`, `[http]`, or
   `[client]` section. (Test fixtures may still — handled in 35.6.)
-- Behaviour is preserved: targeted regression tests for the most-used
-  knobs (`max_concurrent_requests`, `digest_algorithms`,
-  `execution_platforms`).
+- Behaviour is preserved for the renamed-flag knobs: targeted regression
+  for `digest_algorithms` (→ `--digest_function`), `execution_platforms`
+  (→ `--platforms`), and the live RE-client knobs.
 
 ### Phase 35.6a: Test fixture + stale example classification + disposition  [~2-3 days]
 
@@ -714,6 +749,24 @@ For each phase:
   @llvm-project//llvm:Demangle`). Demangle is the lightweight smoke; LLVM
   Support (~183 actions) is the heavier check at the end of Phase 35.5
   and 35.6b.
+
+## Follow-ups (tracked TODOs)
+
+- [ ] **Delete `use_fbcode_metadata` and all Meta-internal-only code paths**
+      (added 2026-05-01). The `KuroOssReConfiguration::use_fbcode_metadata`
+      field is set only by `examples/remote_execution/internal/.buckconfig`
+      against a Meta-internal RE backend; OSS users have no use for it.
+      Scope:
+      - Drop the field + `[kuro_re_client] use_fbcode_metadata` parse in
+        `app/kuro_re_configuration/src/lib.rs`.
+      - Drop the consumer at `remote_execution/oss/re_grpc/src/client.rs:441`
+        and any branches that fork on it.
+      - Delete `examples/remote_execution/internal/` entirely (it's the
+        Meta-internal RE example; bucket-(A) candidate for Phase 35.6a's
+        stale-example sweep).
+      - Audit `app/kuro_execute/src/re/client.rs` (and similar)
+        for `#[cfg(fbcode_build)]` blocks that exclusively serve the
+        Meta-internal path; delete those that have no OSS counterpart.
 
 ## Out of Scope
 
