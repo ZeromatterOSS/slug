@@ -1,0 +1,45 @@
+ start_offset      total    waiting       user  potential kind name category identifier execution_kind
+            0      65292          0          0          0 buckd_command_init    
+        65292         36          0          0          0 file-watcher-wait    
+        65328      70775          0          0          0 other-command-start-overhead    
+       136104          0      10460          0          0 waiting    
+       146564     291671                291671     291671 listing llvm-project//llvm   
+       438236          0    1228702          0          0 waiting    
+      1666939     138363                138363     138363 load llvm-project//llvm   
+      1805303          0      84899          0          0 waiting for_deps   
+      1890203          0      80860          0          0 waiting    
+      1971063       1073                  1073        415 load platforms//os   
+      1972425          0                     0          0 configure_target    
+      1972425          0     710762          0          0 waiting    
+      2683187        116                   116        116 analysis platforms//os:os (<unbound>)   
+      2683375         34                    34         34 analysis platforms//os:linux (<unbound>)   
+      2683410          0          5          0          0 waiting for_deps   
+      2683477        103                   103        103 analysis local_config_platform//:host (<unbound>)   
+      2683581          0     264335          0          0 waiting for_deps   
+      2948639          0                     0          0 configure_target    
+      2948639          0      17050          0          0 waiting    
+      2965689         38                    38         38 analysis bazel_tools//tools/osx:current_xcode_config (local_config_platform//:host#ffb6fe5c7480b5e7)   
+      2965855       6849                  6849       3163 analysis local_config_cc//:local (local_config_platform//:host#ffb6fe5c7480b5e7)   
+      2972929       3552                  3552       3163 analysis local_config_cc//:cc-compiler-k8 (local_config_platform//:host#ffb6fe5c7480b5e7)   
+      2976481      16747                121109       5995 analysis llvm-project//llvm:config (local_config_platform//:host#ffb6fe5c7480b5e7)   
+      2993513       4891                  4891       4891 analysis llvm-project//llvm:Demangle (local_config_platform//:host#ffb6fe5c7480b5e7)   
+      2998819      45043                 45043      45043 analysis llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)   
+      3043863          0      10774          0          0 waiting    
+      3054637        476                   375        139 action llvm-project//llvm:generate_vcs_revision (local_config_platform//:host#ffb6fe5c7480b5e7) write include/llvm/Support/VCSRevision.h ACTION_EXECUTION_KIND_SIMPLE
+      3055114          0       7042          0          0 waiting for_deps   
+      3062157          0      26209          0          0 waiting    
+      3088366          0          0          0          0 waiting preparing_action   
+      3088366          0          0          0          0 waiting checking_caches   
+      3088366          0          0          0          0 waiting local_queued   
+      3088366          0          0          0          0 waiting materializing_inputs   
+      3088366    5605789               3066737     476668 action llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7) c_compile external/llvm-project/llvm/lib/Support/OptimizedStructLayout.cpp.pic ACTION_EXECUTION_KIND_LOCAL
+      8694156          0    3774793          0          0 waiting for_deps   
+     12469386          0          0          0          0 waiting preparing_action   
+     12469386          0          0          0          0 waiting checking_caches   
+     12469386          0          0          0          0 waiting local_queued   
+     12469386          0          0          0          0 waiting materializing_inputs   
+     12469386     439847                368689     231137 action llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7) cpp_link libSupport.so ACTION_EXECUTION_KIND_LOCAL
+     12909489          0         56          0          0 waiting materializer_prepare   
+     12909546          0          7          0          0 waiting materializer_stage2   
+     12909575        212                   212        212 materialization llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)  libSupport.so 
+     12910225       2005          0          0          0 compute-critical-path    

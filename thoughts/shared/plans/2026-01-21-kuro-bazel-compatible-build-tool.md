@@ -297,6 +297,7 @@ The detailed implementation is split into focused sub-plans:
 | [29-cc-include-dir-determinism.md](./kuro-bazel-subplans/29-cc-include-dir-determinism.md)           | Retire the `EXTERNAL_INCLUDE_DIRS` process-global mutable registry in cc_common; route every `-I` / `-iquote` / `-isystem` / `-idirafter` flag through `CcCompilationContext` providers (matches Bazel + Bonanza). Closes the remaining 25% BB action-cache miss rate from Plan 18.10.3 — the global's *set membership* still races with parallel action prep even after the sort fix. Target: kuro→kuro warm = 99%+ cache hit on `@llvm-project//llvm`. | **Complete** (29.2 + 29.3 + 29.4 landed; full llvm warm = 100% cache hit, 57s wall, digest match=4853/4853; copts now plumbed through `compile_build_variables.user_compile_flags` + `WORKSPACE_ROOT` hardcoded) |
 | [30-bes-upload-throughput.md](./kuro-bazel-subplans/30-bes-upload-throughput.md)                     | Close the BES-upload performance gap to bazel on warm `@llvm-project//llvm` (57 s kuro vs 50 s bazel; profiling pinpointed 23 s post-build BES drain wait as the entire delta). Earlier stream open, tonic flow-control tuning, daemon-resident uploader, parallel lifecycle handshakes. Substrate (tonic / prost) is fine; Connect-rs and grpcio are not viable replacements. | **30.1 + 30.2 + 30.5 done 2026-04-29** (warm wall 57.4 s → 14.81 s, post-build wait 23.2 s → ~2.9 s); 30.3 deferred to plan 31.3; 30.4 done |
 | [31-bazel-perf-parity.md](./kuro-bazel-subplans/31-bazel-perf-parity.md)                             | Successor to plan 30. Close the remaining kuro-vs-bazel gaps on warm-RE `@llvm-project//llvm:llvm` (cold-daemon 14.81 s vs 5.92 s; warm-daemon 5.72 s vs 1.03 s). Persistent on-disk action cache (the structural cold-daemon win), file-watcher filter for bazel convenience symlinks (the structural warm-daemon win), daemon-resident BES uploader (delivers plan 30 §30.3). Target: close ≥80% of each gap. | **Not Started** |
+| [32-local-overhead-parity.md](./kuro-bazel-subplans/32-local-overhead-parity.md)                     | Capture the 2026-04-30 `@llvm-project//llvm:Support` local-build overhead profile and close the remaining local/no-op gaps: fake external-action harness, queue-wait vs setup split, warm no-op CLI/client overhead, and local executor saturation. Baseline: Kuro exposed cold overhead 3.33 s vs Bazel 5.65 s, but Kuro warm CLI wall 0.87 s vs Bazel 0.46 s and action parallelism 13.54 vs 14.43. | **Not Started** |
 
 ### Remaining Stub Behavior
 
@@ -439,7 +440,7 @@ Quick reference to all phases and their locations:
 | 17    | Platform Support                   | [x] Functional (Linux+Windows+macOS: @local_config_platform//:host auto-generated with host OS/CPU; CC toolchain config platform-aware; MSVC auto-detection; CcToolchainInfoStub per-platform; --copt/--cxxopt/--linkopt/--strip/--features flags; execution_requirements; PlatformFragment/JavaFragment/AppleFragment/CoverageFragment; 60+ common Bazel CLI flags accepted; package_group visibility resolution; 2026-03-12) |
 | 18    | Query Commands + Test Runner       | [x] Functional (deps, rdeps, allpaths, somepath, kind, attr, filter, buildfiles, tests; --output=label/json/build/graph; kuro test //... runs 4 tests; kuro version/shutdown/fetch Bazel-compat commands; ctx.workspace_name/build_file_path attrs; 2026-03-12) |
 
-### Real-World Compatibility and Bazel 9 Follow-ups (Phases 19-28) — NEXT
+### Real-World Compatibility and Bazel 9 Follow-ups (Phases 19-32) — NEXT
 
 | Phase | Title                                  | Sub-Plan | Status          |
 | ----- | -------------------------------------- | -------- | --------------- |
@@ -456,6 +457,7 @@ Quick reference to all phases and their locations:
 | 29    | cc Include-Dir Determinism             | [29-cc-include-dir-determinism.md](./kuro-bazel-subplans/29-cc-include-dir-determinism.md) | [x] Complete |
 | 30    | BES Upload Throughput                  | [30-bes-upload-throughput.md](./kuro-bazel-subplans/30-bes-upload-throughput.md) | [ ] 30.1+30.2+30.4+30.5 done; 30.3 deferred to 31.3 |
 | 31    | Bazel Perf Parity (warm-RE)            | [31-bazel-perf-parity.md](./kuro-bazel-subplans/31-bazel-perf-parity.md) | [ ] Not Started |
+| 32    | Local Overhead Parity                  | [32-local-overhead-parity.md](./kuro-bazel-subplans/32-local-overhead-parity.md) | [ ] Not Started |
 
 ---
 

@@ -1,0 +1,24 @@
+ start_offset      total    waiting       user  potential kind name category identifier execution_kind
+            0      91865          0          0          0 buckd_command_init    
+        91865         26          0          0          0 file-watcher-wait    
+        91892      92793          0          0          0 other-command-start-overhead    
+       184685          0       1592          0          0 waiting    
+       186278        193                   193            analysis local_config_platform//:host (<unbound>)   
+       186472          0       6866          0          0 waiting    
+       193339          0                     0            configure_target    
+       193339          0       2884          0          0 waiting    
+       196223         40                    40            analysis bazel_tools//tools/osx:current_xcode_config (local_config_platform//:host#ffb6fe5c7480b5e7)   
+       196340       4915                  4915            analysis local_config_cc//:local (local_config_platform//:host#ffb6fe5c7480b5e7)   
+       201473       2195                  2195            analysis local_config_cc//:cc-compiler-k8 (local_config_platform//:host#ffb6fe5c7480b5e7)   
+       203668       6060                 16445            analysis llvm-project//llvm:config (local_config_platform//:host#ffb6fe5c7480b5e7)   
+       209957       4834                  4834            analysis llvm-project//llvm:Demangle (local_config_platform//:host#ffb6fe5c7480b5e7)   
+       215456      35039                 35039            analysis llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)   
+       250496          0      20936          0          0 waiting    
+       271432       2802                    81            action llvm-project//llvm:targets_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7) write include/llvm/Config/Targets.def ACTION_EXECUTION_KIND_SIMPLE
+       274235          0      20597          0          0 waiting    
+       294832       2325                     0            action llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7) c_compile external/llvm-project/llvm/lib/Support/raw_ostream_proxy.cpp.pic ACTION_EXECUTION_KIND_LOCAL_ACTION_CACHE
+       297345       2277                     0            action llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7) cpp_link libSupport.so ACTION_EXECUTION_KIND_LOCAL_ACTION_CACHE
+       299920          0          4          0          0 waiting materializer_prepare   
+       299925          0          0          0          0 waiting materializer_stage2   
+       299928         32                    32            materialization llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)  libSupport.so 
+       300207        958          0          0          0 compute-critical-path    

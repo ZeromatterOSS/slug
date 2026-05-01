@@ -1,0 +1,78 @@
+Showing summary from: /var/mnt/dev/kuro/target/debug/kuro build --local-only --event-log /var/mnt/dev/kuro/benchmarks/2026-04-30-support-profile/llvm-project_llvm_Support/cold-daemon-default-01/build.pb.zst @llvm-project//llvm:Support
+build ID: 699fafc1-8ba4-44c3-b3a0-bea6368bad18
+
+Build Summary
+- Duration: 12.9s
+- Targets Analyzed: 18
+- Has Local Changes: unknown
+
+Actions
+- Local actions: 173
+- Remote actions: 0
+- Cached actions: 10
+- Other actions: 10
+
+File & Data
+  (Network transfer uses compression, file materialized shows uncompressed sizes)
+- Files materialized: 344
+- Total materialized: 75MiB
+- Total uploaded: 0B
+- Total downloaded: 78KiB
+  - RE downloaded: 78KiB
+  - HTTP downloaded: 0B
+
+Network
+- Download Speed
+  - Average:  40KiB/s
+  - Peak:  77KiB/s
+- Upload Speed
+  - Average:  18KiB/s
+  - Peak:  35KiB/s
+
+Resource Usage
+- Peak process memory: 1.5GiB /  62GiB
+- Peak used disk space: 1665GiB / 1833GiB
+
+
+Build Rollup
+- Load: 2.8s
+- Analyze: 175ms
+- Execute: 9.9s
+- Materialize: 9.6s
+- Total wall: 12.9s
+- Critical path: 4.2s
+- Slowest path: 2.7s
+- Peak in-flight actions: 181
+- Action count: 193
+- Graph: 481 nodes, 3342 edges, 3 action-graph
+
+By mnemonic
+  category                    count   cached       exec      queue       crit        p50        p95        p99
+  c_compile                     181       10      2m09s     10m39s       3.1s      591ms       1.8s       2.5s
+  cpp_link                        1        0      368ms       71ms      368ms      368ms      368ms      368ms
+  cpp_archive                     1        0      137ms       75ms         0s      137ms      137ms      137ms
+
+Slowest actions
+        3.1s  c_compile  external/llvm-project/llvm/lib/Support/OptimizedStructLayout.cpp.pic
+        2.6s  c_compile  external/llvm-project/llvm/lib/Support/FileCollector.cpp.pic
+        2.5s  c_compile  external/llvm-project/llvm/lib/Support/APFixedPoint.cpp.pic
+        2.2s  c_compile  external/llvm-project/llvm/lib/Support/CommandLine.cpp.pic
+        2.0s  c_compile  external/llvm-project/llvm/lib/Support/YAMLParser.cpp.pic
+        2.0s  c_compile  external/llvm-project/llvm/lib/Support/VirtualFileSystem.cpp.pic
+        2.0s  c_compile  external/llvm-project/llvm/lib/Support/LSP/Protocol.cpp.pic
+        1.9s  c_compile  external/llvm-project/llvm/lib/Support/BalancedPartitioning.cpp.pic
+        1.8s  c_compile  external/llvm-project/llvm/lib/Support/APFloat.cpp.pic
+        1.8s  c_compile  external/llvm-project/llvm/lib/Support/ScopedPrinter.cpp.pic
+
+Slowest analyses
+       121ms  //llvm-project//llvm:config (local_config_platform//:host#ffb6fe5c7480b5e7)
+       115ms  //llvm-project//third-party/siphash:siphash (local_config_platform//:host#ffb6fe5c7480b5e7)
+        44ms  //llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)
+         6ms  //local_config_cc//:local (local_config_platform//:host#ffb6fe5c7480b5e7)
+         4ms  //llvm-project//llvm:Demangle (local_config_platform//:host#ffb6fe5c7480b5e7)
+         3ms  //local_config_cc//:cc-compiler-k8 (local_config_platform//:host#ffb6fe5c7480b5e7)
+         3ms  //llvm-project//llvm:generate_static_extension_registry (local_config_platform//:host#ffb6fe5c7480b5e7)
+         3ms  //llvm-project//llvm:abi_breaking_h_gen (local_config_platform//:host#ffb6fe5c7480b5e7)
+         3ms  //llvm-project//llvm:targets_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)
+         3ms  //llvm-project//llvm:generate_vcs_revision (local_config_platform//:host#ffb6fe5c7480b5e7)
+

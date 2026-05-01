@@ -1,0 +1,68 @@
+{
+  "command_wall_us": 12911006,
+  "exposed_non_external_wall_us": 3331117,
+  "external_actions_local_only": {
+    "count": 173,
+    "exec_sum_us": 129750149,
+    "outer_sum_us": 766873366,
+    "overhead_sum_us": 637123217,
+    "pre_exec_sum_us": 636440879,
+    "post_exec_sum_us": 682338,
+    "input_materialization_sum_us": 189520,
+    "hashing_sum_us": 180438,
+    "hashed_artifacts_sum": 344,
+    "overhead_p50_us": 3404031,
+    "overhead_p95_us": 7384796,
+    "overhead_p99_us": 7880114,
+    "overhead_max": {
+      "identifier": "external/llvm-project/llvm/lib/Support/CodeGenCoverage.cpp.pic",
+      "category": "c_compile",
+      "overhead_us": 7883645,
+      "pre_exec_us": 7881024,
+      "post_exec_us": 2621,
+      "exec_us": 874191,
+      "outer_us": 8757836
+    },
+    "pre_exec_p50_us": 3401778,
+    "pre_exec_p95_us": 7379127,
+    "pre_exec_p99_us": 7877697,
+    "post_exec_p50_us": 2924,
+    "post_exec_p95_us": 8391,
+    "input_materialization_p50_us": 610,
+    "input_materialization_p95_us": 3692,
+    "hashing_p50_us": 436,
+    "hashing_p95_us": 3341,
+    "first_process_start_offset_us": 3250719,
+    "last_process_end_offset_us": 12887517,
+    "process_union_wall_us": 9579889,
+    "process_peak_parallelism": 16,
+    "avg_parallelism_over_process_union": 13.54401381894926
+  },
+  "graph": {
+    "nodes": 481,
+    "edges": 3342
+  },
+  "path_lower_bounds": {
+    "critical_duration_us": 4186963,
+    "critical_external_action_duration_us": 3435426,
+    "critical_without_external_us": 751537,
+    "slowest_duration_us": 2684170,
+    "slowest_external_action_duration_us": 2363651,
+    "slowest_without_external_us": 320519,
+    "top_level_targets": [
+      {
+        "target": {
+          "label": {
+            "package": "llvm-project//llvm",
+            "name": "Support"
+          },
+          "configuration": {
+            "full_name": "local_config_platform//:host#ffb6fe5c7480b5e7"
+          },
+          "execution_configuration": null
+        },
+        "duration_us": 4048643
+      }
+    ]
+  }
+}

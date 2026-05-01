@@ -1,0 +1,52 @@
+{
+  "cold_real_actions_discounted": {
+    "kuro": {
+      "cli_wall_s": 13.86,
+      "daemon_wall_s": 12.911006,
+      "external_action_union_s": 9.579889,
+      "exposed_non_external_daemon_s": 3.331117,
+      "first_process_start_s": 3.250719,
+      "action_sum_s": 129.750149,
+      "action_peak_parallelism": 16,
+      "action_avg_parallelism": 13.54401381894926,
+      "graph_nodes": 481,
+      "graph_edges": 3342,
+      "critical_without_external_s": 0.751537
+    },
+    "bazel": {
+      "cli_wall_s": 19.02,
+      "server_wall_s": 16.683,
+      "external_action_union_s": 11.036134,
+      "exposed_non_external_server_s": 5.646866,
+      "first_action_start_s": 5.505,
+      "analysis_s": 1.968,
+      "action_sum_s": 159.270351,
+      "action_peak_parallelism": 16,
+      "action_avg_parallelism": 14.431715943282313,
+      "action_count": 290,
+      "skyframe_nodes": 16192,
+      "critical_path_s": 3.997274025
+    }
+  },
+  "warm_noop_rebuild": {
+    "kuro": {
+      "cli_wall_s": 0.87,
+      "daemon_wall_s": 0.299735,
+      "analyze_s": 0.060295,
+      "execute_s": 0.02873,
+      "critical_path_s": 0.271387,
+      "action_count": 193,
+      "graph_nodes": 286,
+      "graph_edges": 3027
+    },
+    "bazel": {
+      "cli_wall_s": 0.46,
+      "server_wall_s": 0.412,
+      "analysis_s": 0.081,
+      "execution_s": 0.015,
+      "critical_path_s": 0.009823227,
+      "action_count": 290,
+      "skyframe_nodes": 16192
+    }
+  }
+}

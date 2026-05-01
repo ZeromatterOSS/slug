@@ -25,7 +25,9 @@ use starlark::environment::GlobalsBuilder;
 use starlark::starlark_module;
 use starlark::values::Heap;
 use starlark::values::Value;
+use starlark::values::ValueLike;
 use starlark::values::dict::AllocDict;
+use starlark::values::list::AllocList;
 
 #[starlark_module]
 pub(crate) fn register_kuro_runtime(builder: &mut GlobalsBuilder) {
@@ -145,5 +147,55 @@ pub(crate) fn register_kuro_runtime(builder: &mut GlobalsBuilder) {
             &mut runfiles,
         )?;
         Ok(runfiles)
+    }
+
+    /// Plan 28.4 Stage 13: builds the label→paths pool consumed by
+    /// `_kuro_expand_location` in `@kuro_builtins//:exports.bzl`.
+    ///
+    /// Iterates `targets` (the explicit list passed to
+    /// `ctx.expand_location`) and the implicit attrs struct of
+    /// `raw_ctx` (Dependency / artifact values from srcs / data /
+    /// tools attrs), collecting `[label_str, [path1, ...]]` entries.
+    /// Output-typed attrs (whose values are plain strings in ctx.attrs)
+    /// are intentionally excluded — their lookup is deferred to
+    /// `kuro_lookup_output_path` to avoid spurious artifact
+    /// declarations.
+    fn kuro_collect_location_pool<'v>(
+        raw_ctx: Value<'v>,
+        targets: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        use kuro_build_api::interpreter::rule_defs::context::AnalysisContext;
+        let Some(ctx) = raw_ctx.downcast_ref::<AnalysisContext<'v>>() else {
+            return Ok(heap.alloc(AllocList(Vec::<Value<'v>>::new())));
+        };
+        kuro_build_api::interpreter::rule_defs::context::collect_location_pool_for_ctx(
+            ctx, targets, heap,
+        )
+    }
+
+    /// Plan 28.4 Stage 13: lazily resolves an attr.output /
+    /// attr.output_list label string to an artifact path. Called by
+    /// `_kuro_expand_location` in `@kuro_builtins//:exports.bzl` when
+    /// the pool built by `kuro_collect_location_pool` yields no match
+    /// for the query label. Deferring this lookup avoids declaring
+    /// unbound artifacts for every string-valued attribute (e.g.
+    /// `name`, `tags`) — only the specific attr that actually contains
+    /// the query label triggers an artifact declaration via CtxOutputs.
+    ///
+    /// Returns the full artifact path as a string, or `None` when no
+    /// output attr matches `label_str`.
+    fn kuro_lookup_output_path<'v>(
+        raw_ctx: Value<'v>,
+        label_str: &str,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        use kuro_build_api::interpreter::rule_defs::context::AnalysisContext;
+        let Some(ctx) = raw_ctx.downcast_ref::<AnalysisContext<'v>>() else {
+            return Ok(Value::new_none());
+        };
+        kuro_build_api::interpreter::rule_defs::context::lookup_output_path_for_ctx(
+            ctx, label_str, heap,
+        )
     }
 }

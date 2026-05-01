@@ -1,5 +1,6 @@
 load(":aspect_facade_proof.bzl", "aspect_facade_collector", "aspect_facade_leaf")
 load(":coverage_instrumented_proof.bzl", "coverage_instrumented_proof")
+load(":expand_location_proof.bzl", "expand_location_proof")
 load(":expand_make_variables_proof.bzl", "expand_make_variables_proof")
 load(":facade_proof.bzl", "facade_proof")
 load(":new_file_proof.bzl", "new_file_proof")
@@ -72,3 +73,5 @@ runfiles_proof(
 )
 
 new_file_proof(name = "new_file_proof_target")
+
+expand_location_proof(name = "expand_location_proof_target")

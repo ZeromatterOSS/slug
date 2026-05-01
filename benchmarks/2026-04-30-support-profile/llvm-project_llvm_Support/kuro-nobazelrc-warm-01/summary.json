@@ -1,0 +1,155 @@
+{
+  "action_graph_size": 3,
+  "analyze_wall_us": 189574,
+  "by_mnemonic": [
+    {
+      "cached": 0,
+      "category": "cpp_archive",
+      "count": 1,
+      "critical_wall_us": 0,
+      "p50_us": 0,
+      "p95_us": 0,
+      "p99_us": 0,
+      "total_queue_us": 3118,
+      "total_wall_us": 0
+    },
+    {
+      "cached": 0,
+      "category": "c_compile",
+      "count": 181,
+      "critical_wall_us": 88858,
+      "p50_us": 0,
+      "p95_us": 0,
+      "p99_us": 0,
+      "total_queue_us": 5532723,
+      "total_wall_us": 0
+    },
+    {
+      "cached": 0,
+      "category": "cpp_link",
+      "count": 1,
+      "critical_wall_us": 4737,
+      "p50_us": 0,
+      "p95_us": 0,
+      "p99_us": 0,
+      "total_queue_us": 4687,
+      "total_wall_us": 0
+    }
+  ],
+  "cache_hit_pct": 100.0,
+  "critical_path_wall_us": 1125349,
+  "execute_wall_us": 198516,
+  "load_wall_us": 0,
+  "materialize_wall_us": 587,
+  "num_dice_edges": 3027,
+  "num_dice_nodes": 286,
+  "peak_in_flight_actions": 97,
+  "slowest_actions": [
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/CSKYAttributes.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/AArch64BuildAttributes.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/TrieRawHashMap.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/Twine.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/DAGDeltaAlgorithm.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/CSKYAttributeParser.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/ELFAttrParserExtended.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/Signposts.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/CommandLine.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/NativeFormatting.cpp.pic",
+      "wall_us": 0
+    }
+  ],
+  "slowest_analyses": [
+    {
+      "target": "//llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 138026
+    },
+    {
+      "target": "//llvm-project//third-party/siphash:siphash (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 31993
+    },
+    {
+      "target": "//llvm-project//llvm:config (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 24105
+    },
+    {
+      "target": "//llvm-project//llvm:Demangle (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 10296
+    },
+    {
+      "target": "//llvm-project//third-party:zstd (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 9583
+    },
+    {
+      "target": "//llvm-project//llvm:target_mca_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 8861
+    },
+    {
+      "target": "//llvm-project//llvm:targets_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 8827
+    },
+    {
+      "target": "//llvm-project//llvm:target_exegesis_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 8472
+    },
+    {
+      "target": "//llvm-project//llvm:asm_parsers_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 8291
+    },
+    {
+      "target": "//llvm-project//llvm:abi_breaking_h_gen (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 8005
+    }
+  ],
+  "slowest_path_wall_us": 1044327,
+  "total_action_count": 193,
+  "total_wall_us": 1426592,
+  "trace_id": "f8566898-0443-4240-b152-6c9f9f0a62a3"
+}

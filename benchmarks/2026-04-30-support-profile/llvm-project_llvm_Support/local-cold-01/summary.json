@@ -1,0 +1,155 @@
+{
+  "action_graph_size": 3,
+  "analyze_wall_us": 97527,
+  "by_mnemonic": [
+    {
+      "cached": 10,
+      "category": "c_compile",
+      "count": 181,
+      "critical_wall_us": 5111285,
+      "p50_us": 1206565,
+      "p95_us": 2586565,
+      "p99_us": 4052412,
+      "total_queue_us": 1073805119,
+      "total_wall_us": 226907996
+    },
+    {
+      "cached": 0,
+      "category": "cpp_link",
+      "count": 1,
+      "critical_wall_us": 372378,
+      "p50_us": 372378,
+      "p95_us": 372378,
+      "p99_us": 372378,
+      "total_queue_us": 263411,
+      "total_wall_us": 372378
+    },
+    {
+      "cached": 0,
+      "category": "cpp_archive",
+      "count": 1,
+      "critical_wall_us": 0,
+      "p50_us": 135321,
+      "p95_us": 135321,
+      "p99_us": 135321,
+      "total_queue_us": 282907,
+      "total_wall_us": 135321
+    }
+  ],
+  "cache_hit_pct": 5.0,
+  "critical_path_wall_us": 5744307,
+  "execute_wall_us": 15768718,
+  "load_wall_us": 0,
+  "materialize_wall_us": 15560116,
+  "num_dice_edges": 3027,
+  "num_dice_nodes": 286,
+  "peak_in_flight_actions": 181,
+  "slowest_actions": [
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/CommandLine.cpp.pic",
+      "wall_us": 5111285
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/VirtualFileSystem.cpp.pic",
+      "wall_us": 4683031
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/LSP/Protocol.cpp.pic",
+      "wall_us": 4052412
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/LSP/Transport.cpp.pic",
+      "wall_us": 4003467
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/SpecialCaseList.cpp.pic",
+      "wall_us": 3699384
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/Signals.cpp.pic",
+      "wall_us": 3382926
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/APFloat.cpp.pic",
+      "wall_us": 3074998
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/ScopedPrinter.cpp.pic",
+      "wall_us": 3036397
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/CodeGenCoverage.cpp.pic",
+      "wall_us": 2761027
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/FileUtilities.cpp.pic",
+      "wall_us": 2586565
+    }
+  ],
+  "slowest_analyses": [
+    {
+      "target": "//llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 58968
+    },
+    {
+      "target": "//llvm-project//third-party/siphash:siphash (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 26017
+    },
+    {
+      "target": "//llvm-project//llvm:config (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 24287
+    },
+    {
+      "target": "//llvm-project//llvm:Demangle (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 9614
+    },
+    {
+      "target": "//local_config_cc//:local (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 3629
+    },
+    {
+      "target": "//llvm-project//third-party:zstd (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 2862
+    },
+    {
+      "target": "//local_config_cc//:cc-compiler-k8 (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 2730
+    },
+    {
+      "target": "//llvm-project//llvm:abi_breaking_h_gen (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 2645
+    },
+    {
+      "target": "//llvm-project//third-party:zlib (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 1977
+    },
+    {
+      "target": "//bazel_tools//tools/build_defs/build_info:cc_build_info (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 1840
+    }
+  ],
+  "slowest_path_wall_us": 2305649,
+  "total_action_count": 193,
+  "total_wall_us": 16051353,
+  "trace_id": "50426b06-286c-41eb-be56-276a2f37b5da"
+}

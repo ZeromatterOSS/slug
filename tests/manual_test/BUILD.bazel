@@ -1,21 +1,91 @@
 # Test for Phase 8d - Aspect shadow graph propagation
 # Uses collect_aspect which tries to access dep[CollectNamesInfo] from dependencies
 
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+# =============================================================================
+# Phase 15: bazel_skylib integration test
+# Verifies that bazel_skylib loads and its rules work correctly.
+# =============================================================================
+load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
+load("@protobuf//bazel:py_proto_library.bzl", "py_proto_library")
+
+# =============================================================================
+# Phase 8f/8g: rules_cc loading and instantiation test
+# Provider access now works (Phase 6). Next blocker: implicit attributes
+# (_def_parser has computed default function).
+# =============================================================================
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+
+# =============================================================================
+# Phase 13b: rules_oci integration test
+# =============================================================================
+load("@rules_oci//oci:defs.bzl", "oci_image")
+
+# =============================================================================
+# Phase 13: rules_pkg integration test
+# =============================================================================
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+
+# =============================================================================
+# Phase 11: rules_python integration test
+# =============================================================================
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+
+# =============================================================================
+# Phase 10: rules_rust integration test
+# =============================================================================
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_test")
+
+# =============================================================================
+# Phase 7a: sh_binary/sh_test/sh_library test
+#
+# Plan 27.2/27.4: native sh_* rules are Bazel-9-removed; load Starlark
+# replacements from the local //:shell_rules.bzl. (Manual_test doesn't
+# depend on @rules_shell.)
+# =============================================================================
+load("//:shell_rules.bzl", "sh_binary", "sh_library", "sh_test")
+
+# Debug wrapper to trace cc_binary all_deps issue
+load(":debug_cc_binary.bzl", "debug_cc_binary")
+load(":debug_cc_library.bzl", "debug_cc_library")
 load(":test_aspect_8c.bzl", "test_rule")
+load(":test_aspect_8e.bzl", "rule_with_test_info", "rule_without_test_info", "top_rule")
+
+# =============================================================================
+# Phase 6: Provider Access Semantics test
+# Test that DefaultInfo in artifact and artifact[DefaultInfo] work correctly.
+# =============================================================================
+load(":test_provider_access.bzl", "test_bazel_label_list", "test_provider_access")
 
 # Create a dependency chain: c -> b -> a
 test_rule(name = "a")
-test_rule(name = "b", deps = [":a"])
-test_rule(name = "c", deps = [":b"])
+
+test_rule(
+    name = "b",
+    deps = [":a"],
+)
+
+test_rule(
+    name = "c",
+    deps = [":b"],
+)
 
 # Create a wider dependency graph (diamond): d -> [b, c]
-test_rule(name = "d", deps = [":b", ":c"])
+test_rule(
+    name = "d",
+    deps = [
+        ":b",
+        ":c",
+    ],
+)
 
 # =============================================================================
 # Phase 8e: required_aspect_providers filtering tests
 # =============================================================================
-
-load(":test_aspect_8e.bzl", "rule_with_test_info", "rule_without_test_info", "top_rule")
 
 # Target with TestInfo - aspect SHOULD apply
 rule_with_test_info(name = "has_info")
@@ -27,23 +97,23 @@ rule_without_test_info(name = "no_info")
 # Expected: aspect visits :has_info but NOT :no_info
 top_rule(
     name = "top_8e",
-    deps = [":has_info", ":no_info"],
+    deps = [
+        ":has_info",
+        ":no_info",
+    ],
 )
 
 # Chain: has_info2 -> has_info
 # Expected: aspect visits both (both have TestInfo)
-rule_with_test_info(name = "has_info2", deps = [":has_info"])
+rule_with_test_info(
+    name = "has_info2",
+    deps = [":has_info"],
+)
 
 top_rule(
     name = "top_chain_8e",
     deps = [":has_info2"],
 )
-
-# =============================================================================
-# Phase 6: Provider Access Semantics test
-# Test that DefaultInfo in artifact and artifact[DefaultInfo] work correctly.
-# =============================================================================
-load(":test_provider_access.bzl", "test_provider_access", "test_bazel_label_list")
 
 test_provider_access(
     name = "test_provider_access",
@@ -55,14 +125,6 @@ test_bazel_label_list(
     name = "test_bazel_label_list",
     srcs = ["hello.c"],
 )
-
-# =============================================================================
-# Phase 8f/8g: rules_cc loading and instantiation test
-# Provider access now works (Phase 6). Next blocker: implicit attributes
-# (_def_parser has computed default function).
-# =============================================================================
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_binary")
-load(":debug_cc_library.bzl", "debug_cc_library")
 
 cc_library(
     name = "hello_lib",
@@ -81,33 +143,25 @@ debug_cc_library(
     srcs = ["hello.c"],
 )
 
-# Debug wrapper to trace cc_binary all_deps issue
-load(":debug_cc_binary.bzl", "debug_cc_binary")
-
 debug_cc_binary(
     name = "debug_hello_bin",
     deps = [":hello_lib"],
 )
 
-# =============================================================================
-# Phase 9: cc_test for testing kuro test command
-# =============================================================================
-load("@rules_cc//cc:defs.bzl", "cc_test")
-
 cc_test(
     name = "hello_test",
     srcs = ["hello_test.c"],
-    deps = [":hello_lib"],
     linkstatic = True,
     tags = ["small"],
+    deps = [":hello_lib"],
 )
 
 # Test dynamic linking (linkstatic=False is cc_test default)
 cc_test(
     name = "hello_test_dynamic",
     srcs = ["hello_test.c"],
-    deps = [":hello_lib"],
     linkstatic = False,
+    deps = [":hello_lib"],
 )
 
 # =============================================================================
@@ -116,8 +170,16 @@ cc_test(
 
 # Define constraint_setting and constraint_value for testing config_setting
 constraint_setting(name = "test_os")
-constraint_value(name = "test_linux", constraint_setting = ":test_os")
-constraint_value(name = "test_macos", constraint_setting = ":test_os")
+
+constraint_value(
+    name = "test_linux",
+    constraint_setting = ":test_os",
+)
+
+constraint_value(
+    name = "test_macos",
+    constraint_setting = ":test_os",
+)
 
 # Define a config_setting that matches when test_linux is active
 config_setting(
@@ -154,11 +216,6 @@ filegroup(
     }),
 )
 
-# =============================================================================
-# Phase 10: rules_rust integration test
-# =============================================================================
-load("@rules_rust//rust:defs.bzl", "rust_library", "rust_binary", "rust_test")
-
 rust_library(
     name = "hello_rust_lib",
     srcs = ["lib.rs"],
@@ -168,8 +225,8 @@ rust_library(
 rust_binary(
     name = "hello_rust_bin",
     srcs = ["main.rs"],
-    deps = [":hello_rust_lib"],
     edition = "2021",
+    deps = [":hello_rust_lib"],
 )
 
 rust_test(
@@ -177,11 +234,6 @@ rust_test(
     srcs = ["lib.rs"],
     edition = "2021",
 )
-
-# =============================================================================
-# Phase 11: rules_python integration test
-# =============================================================================
-load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 py_library(
     name = "hello_py_lib",
@@ -213,36 +265,27 @@ cc_binary(
     name = "protoc_with_python",
     srcs = ["protoc_with_python_main.cc"],
     deps = [
-        "@protobuf//src/google/protobuf/compiler:command_line_interface",
-        "@protobuf//src/google/protobuf/compiler/python:python",
         "@abseil-cpp//absl/log:initialize",
         "@protobuf//src/google/protobuf:port",
+        "@protobuf//src/google/protobuf/compiler:command_line_interface",
+        "@protobuf//src/google/protobuf/compiler/python",
     ],
 )
-
-load("@protobuf//bazel:proto_library.bzl", "proto_library")
 
 proto_library(
     name = "hello_proto",
     srcs = ["hello.proto"],
 )
 
-load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 cc_proto_library(
     name = "hello_cc_proto",
     deps = [":hello_proto"],
 )
 
-load("@protobuf//bazel:py_proto_library.bzl", "py_proto_library")
 py_proto_library(
     name = "hello_py_proto",
     deps = [":hello_proto"],
 )
-
-# =============================================================================
-# Phase 13: rules_pkg integration test
-# =============================================================================
-load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 
 pkg_tar(
     name = "hello_bin_tar",
@@ -250,19 +293,13 @@ pkg_tar(
     package_dir = "/usr/local/bin",
 )
 
-# =============================================================================
-# Phase 13b: rules_oci integration test
-# =============================================================================
-load("@rules_oci//oci:defs.bzl", "oci_image")
-
 oci_image(
     name = "hello_bin_image",
-    tars = [":hello_bin_tar"],
+    architecture = "amd64",
     entrypoint = ["/usr/local/bin/hello_bin"],
     os = "linux",
-    architecture = "amd64",
+    tars = [":hello_bin_tar"],
 )
-
 
 # =============================================================================
 # repository_rule / repository_ctx test - Phase 5
@@ -298,9 +335,6 @@ genrule(
     cmd = "echo 'location=$(location :hello_genrule_cp) execpath=$(execpath :hello_genrule_cp)' > $(OUTS)",
 )
 
-# =============================================================================
-# Phase 7a: sh_binary/sh_test/sh_library test
-# =============================================================================
 sh_binary(
     name = "hello_sh",
     srcs = ["hello.sh"],
@@ -344,9 +378,9 @@ test_suite(
     name = "all_tests",
     tests = [
         ":all_cc_tests",
-        ":hello_sh_test",
-        ":hello_rust_test",
         ":hello_py_test",
+        ":hello_rust_test",
+        ":hello_sh_test",
     ],
 )
 
@@ -355,8 +389,8 @@ test_suite(
 cc_binary(
     name = "manual_only_binary",
     srcs = ["main.c"],
-    deps = [":hello_lib"],
     tags = ["manual"],
+    deps = [":hello_lib"],
 )
 
 # =============================================================================
@@ -403,13 +437,6 @@ genrule(
     }),
 )
 
-# =============================================================================
-# Phase 15: bazel_skylib integration test
-# Verifies that bazel_skylib loads and its rules work correctly.
-# =============================================================================
-load("@bazel_skylib//rules:copy_file.bzl", "copy_file")
-load("@bazel_skylib//rules:write_file.bzl", "write_file")
-
 write_file(
     name = "skylib_write_test",
     out = "skylib_written.txt",
@@ -421,8 +448,6 @@ copy_file(
     src = ":skylib_write_test",
     out = "skylib_copied.txt",
 )
-
-load("@bazel_skylib//lib:selects.bzl", "selects")
 
 # Test selects.config_setting_group for OR conditions
 selects.config_setting_group(

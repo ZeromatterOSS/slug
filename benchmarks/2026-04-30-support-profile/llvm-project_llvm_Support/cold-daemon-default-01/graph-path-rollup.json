@@ -1,0 +1,152 @@
+{
+  "graph": {
+    "nodes": 481,
+    "edges": 3342
+  },
+  "critical": {
+    "len": 44,
+    "sum_duration_us": 4186963,
+    "sum_total_us": 6692912,
+    "sum_user_us": 4048855,
+    "sum_noncritical_us": 6215954,
+    "by_kind": [
+      {
+        "kind": "ActionExecution",
+        "count": 3,
+        "duration_us": 3435801,
+        "total_us": 6046112,
+        "user_us": 3435801,
+        "noncritical_us": 0
+      },
+      {
+        "kind": "Analysis",
+        "count": 9,
+        "duration_us": 181735,
+        "total_us": 77373,
+        "user_us": 181735,
+        "noncritical_us": 0
+      },
+      {
+        "kind": "ComputeCriticalPath",
+        "count": 1,
+        "duration_us": 2005,
+        "total_us": 2005,
+        "user_us": 0,
+        "noncritical_us": 0
+      },
+      {
+        "kind": "FinalMaterialization",
+        "count": 1,
+        "duration_us": 212,
+        "total_us": 212,
+        "user_us": 212,
+        "noncritical_us": 0
+      },
+      {
+        "kind": "GenericEntry",
+        "count": 5,
+        "duration_us": 136103,
+        "total_us": 136103,
+        "user_us": 0,
+        "noncritical_us": 0
+      },
+      {
+        "kind": "Listing",
+        "count": 1,
+        "duration_us": 291671,
+        "total_us": 291671,
+        "user_us": 291671,
+        "noncritical_us": 0
+      },
+      {
+        "kind": "Load",
+        "count": 2,
+        "duration_us": 139436,
+        "total_us": 139436,
+        "user_us": 139436,
+        "noncritical_us": 0
+      },
+      {
+        "kind": "Waiting",
+        "count": 22,
+        "duration_us": 0,
+        "total_us": 0,
+        "user_us": 0,
+        "noncritical_us": 6215954
+      }
+    ]
+  },
+  "slowest": {
+    "len": 32,
+    "sum_duration_us": 2684170,
+    "sum_total_us": 10035785,
+    "sum_user_us": 2545849,
+    "sum_noncritical_us": 2873541,
+    "by_kind": [
+      {
+        "kind": "ActionExecution",
+        "count": 3,
+        "duration_us": 2363835,
+        "total_us": 9819812,
+        "user_us": 2363651,
+        "noncritical_us": 0
+      },
+      {
+        "kind": "Analysis",
+        "count": 6,
+        "duration_us": 181482,
+        "total_us": 77120,
+        "user_us": 181482,
+        "noncritical_us": 0
+      },
+      {
+        "kind": "ComputeCriticalPath",
+        "count": 1,
+        "duration_us": 2034,
+        "total_us": 2034,
+        "user_us": 0,
+        "noncritical_us": 0
+      },
+      {
+        "kind": "FinalMaterialization",
+        "count": 1,
+        "duration_us": 212,
+        "total_us": 212,
+        "user_us": 212,
+        "noncritical_us": 0
+      },
+      {
+        "kind": "GenericEntry",
+        "count": 4,
+        "duration_us": 136103,
+        "total_us": 136103,
+        "user_us": 0,
+        "noncritical_us": 0
+      },
+      {
+        "kind": "Listing",
+        "count": 1,
+        "duration_us": 28,
+        "total_us": 28,
+        "user_us": 28,
+        "noncritical_us": 0
+      },
+      {
+        "kind": "Load",
+        "count": 1,
+        "duration_us": 476,
+        "total_us": 476,
+        "user_us": 476,
+        "noncritical_us": 0
+      },
+      {
+        "kind": "Waiting",
+        "count": 15,
+        "duration_us": 0,
+        "total_us": 0,
+        "user_us": 0,
+        "noncritical_us": 2873541
+      }
+    ]
+  }
+}

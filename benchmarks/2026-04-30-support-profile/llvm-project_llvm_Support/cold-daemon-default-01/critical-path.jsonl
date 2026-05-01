@@ -1,0 +1,44 @@
+{"kind":"buckd_command_init","total_duration":65292,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":0,"start_offset":0}
+{"kind":"file-watcher-wait","total_duration":36,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":0,"start_offset":65292}
+{"kind":"other-command-start-overhead","total_duration":70775,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":0,"start_offset":65328}
+{"kind":"waiting","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":10460,"start_offset":136104}
+{"kind":"listing","name":"llvm-project//llvm","total_duration":291671,"user_duration":291671,"potential_improvement_duration":291671,"non_critical_path_time":null,"start_offset":146564}
+{"kind":"waiting","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":1228702,"start_offset":438236}
+{"kind":"load","name":"llvm-project//llvm","total_duration":138363,"user_duration":138363,"potential_improvement_duration":138363,"non_critical_path_time":null,"start_offset":1666939}
+{"kind":"waiting","name":"for_deps","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":84899,"start_offset":1805303}
+{"kind":"waiting","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":80860,"start_offset":1890203}
+{"kind":"load","name":"platforms//os","total_duration":1073,"user_duration":1073,"potential_improvement_duration":415,"non_critical_path_time":null,"start_offset":1971063}
+{"kind":"configure_target","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":null,"start_offset":1972425}
+{"kind":"waiting","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":710762,"start_offset":1972425}
+{"kind":"analysis","name":"platforms//os:os (<unbound>)","total_duration":116,"user_duration":116,"potential_improvement_duration":116,"non_critical_path_time":null,"start_offset":2683187}
+{"kind":"analysis","name":"platforms//os:linux (<unbound>)","total_duration":34,"user_duration":34,"potential_improvement_duration":34,"non_critical_path_time":null,"start_offset":2683375}
+{"kind":"waiting","name":"for_deps","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":5,"start_offset":2683410}
+{"kind":"analysis","name":"local_config_platform//:host (<unbound>)","total_duration":103,"user_duration":103,"potential_improvement_duration":103,"non_critical_path_time":null,"start_offset":2683477}
+{"kind":"waiting","name":"for_deps","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":264335,"start_offset":2683581}
+{"kind":"configure_target","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":null,"start_offset":2948639}
+{"kind":"waiting","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":17050,"start_offset":2948639}
+{"kind":"analysis","name":"bazel_tools//tools/osx:current_xcode_config (local_config_platform//:host#ffb6fe5c7480b5e7)","total_duration":38,"user_duration":38,"potential_improvement_duration":38,"non_critical_path_time":null,"start_offset":2965689}
+{"kind":"analysis","name":"local_config_cc//:local (local_config_platform//:host#ffb6fe5c7480b5e7)","total_duration":6849,"user_duration":6849,"potential_improvement_duration":3163,"non_critical_path_time":null,"start_offset":2965855}
+{"kind":"analysis","name":"local_config_cc//:cc-compiler-k8 (local_config_platform//:host#ffb6fe5c7480b5e7)","total_duration":3552,"user_duration":3552,"potential_improvement_duration":3163,"non_critical_path_time":null,"start_offset":2972929}
+{"kind":"analysis","name":"llvm-project//llvm:config (local_config_platform//:host#ffb6fe5c7480b5e7)","total_duration":16747,"user_duration":121109,"potential_improvement_duration":5995,"non_critical_path_time":null,"start_offset":2976481}
+{"kind":"analysis","name":"llvm-project//llvm:Demangle (local_config_platform//:host#ffb6fe5c7480b5e7)","total_duration":4891,"user_duration":4891,"potential_improvement_duration":4891,"non_critical_path_time":null,"start_offset":2993513}
+{"kind":"analysis","name":"llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)","total_duration":45043,"user_duration":45043,"potential_improvement_duration":45043,"non_critical_path_time":null,"start_offset":2998819}
+{"kind":"waiting","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":10774,"start_offset":3043863}
+{"kind":"action","name":"llvm-project//llvm:generate_vcs_revision (local_config_platform//:host#ffb6fe5c7480b5e7)","category":"write","identifier":"include/llvm/Support/VCSRevision.h","execution_kind":"ACTION_EXECUTION_KIND_SIMPLE","total_duration":476,"user_duration":375,"potential_improvement_duration":139,"non_critical_path_time":null,"start_offset":3054637}
+{"kind":"waiting","name":"for_deps","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":7042,"start_offset":3055114}
+{"kind":"waiting","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":26209,"start_offset":3062157}
+{"kind":"waiting","name":"preparing_action","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":0,"start_offset":3088366}
+{"kind":"waiting","name":"checking_caches","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":0,"start_offset":3088366}
+{"kind":"waiting","name":"local_queued","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":0,"start_offset":3088366}
+{"kind":"waiting","name":"materializing_inputs","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":0,"start_offset":3088366}
+{"kind":"action","name":"llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)","category":"c_compile","identifier":"external/llvm-project/llvm/lib/Support/OptimizedStructLayout.cpp.pic","execution_kind":"ACTION_EXECUTION_KIND_LOCAL","total_duration":5605789,"user_duration":3066737,"potential_improvement_duration":476668,"non_critical_path_time":null,"start_offset":3088366}
+{"kind":"waiting","name":"for_deps","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":3774793,"start_offset":8694156}
+{"kind":"waiting","name":"preparing_action","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":0,"start_offset":12469386}
+{"kind":"waiting","name":"checking_caches","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":0,"start_offset":12469386}
+{"kind":"waiting","name":"local_queued","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":0,"start_offset":12469386}
+{"kind":"waiting","name":"materializing_inputs","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":0,"start_offset":12469386}
+{"kind":"action","name":"llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)","category":"cpp_link","identifier":"libSupport.so","execution_kind":"ACTION_EXECUTION_KIND_LOCAL","total_duration":439847,"user_duration":368689,"potential_improvement_duration":231137,"non_critical_path_time":null,"start_offset":12469386}
+{"kind":"waiting","name":"materializer_prepare","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":56,"start_offset":12909489}
+{"kind":"waiting","name":"materializer_stage2","total_duration":0,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":7,"start_offset":12909546}
+{"kind":"materialization","name":"llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)","identifier":"libSupport.so","total_duration":212,"user_duration":212,"potential_improvement_duration":212,"non_critical_path_time":null,"start_offset":12909575}
+{"kind":"compute-critical-path","total_duration":2005,"user_duration":0,"potential_improvement_duration":0,"non_critical_path_time":0,"start_offset":12910225}

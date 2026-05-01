@@ -1,0 +1,35 @@
+ start_offset      total    waiting       user  potential kind name category identifier execution_kind
+            0      96227          0          0          0 buckd_command_init    
+        96227         46          0          0          0 file-watcher-wait    
+        96274      61482          0          0          0 other-command-start-overhead    
+       157756          0       2183          0          0 waiting    
+       159940        196                   196        196 analysis local_config_platform//:host (<unbound>)   
+       160136          0       8163          0          0 waiting    
+       168299          0                     0          0 configure_target    
+       168299          0       2662          0          0 waiting    
+       170962         37                    37         37 analysis bazel_tools//tools/osx:current_xcode_config (local_config_platform//:host#ffb6fe5c7480b5e7)   
+       171130       4419                  4419       2433 analysis local_config_cc//:local (local_config_platform//:host#ffb6fe5c7480b5e7)   
+       175759       2920                  2920       2920 analysis local_config_cc//:cc-compiler-k8 (local_config_platform//:host#ffb6fe5c7480b5e7)   
+       178680      12193                 24359       7973 analysis llvm-project//llvm:config (local_config_platform//:host#ffb6fe5c7480b5e7)   
+       191186       9738                  9738       7973 analysis llvm-project//llvm:Demangle (local_config_platform//:host#ffb6fe5c7480b5e7)   
+       200924          0       1090          0          0 waiting    
+       202014      59120                 59120      59120 analysis llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)   
+       261134          0      19179          0          0 waiting    
+       280314        424                     0        237 action llvm-project//third-party/siphash:siphash (local_config_platform//:host#ffb6fe5c7480b5e7) copy external/llvm-project/third-party/siphash/_virtual_includes/siphash/siphash/SipHash.h ACTION_EXECUTION_KIND_SIMPLE
+       280738          0       1178          0          0 waiting for_deps   
+       281916          0      11675          0          0 waiting    
+       293592          0          0          0          0 waiting preparing_action   
+       293592          0          0          0          0 waiting checking_caches   
+       293592          0          0          0          0 waiting local_queued   
+       293592          0          0          0          0 waiting materializing_inputs   
+       293592   10561931               5111285     428254 action llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7) c_compile external/llvm-project/llvm/lib/Support/CommandLine.cpp.pic ACTION_EXECUTION_KIND_LOCAL
+     10855523          0    4556967          0          0 waiting for_deps   
+     15413232          0          0          0          0 waiting preparing_action   
+     15413232          0          0          0          0 waiting checking_caches   
+     15413232          0          0          0          0 waiting local_queued   
+     15413232          0          0          0          0 waiting materializing_inputs   
+     15413232     635837                372378     237020 action llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7) cpp_link libSupport.so ACTION_EXECUTION_KIND_LOCAL
+     16049563          0         68          0          0 waiting materializer_prepare   
+     16049632          0          8          0          0 waiting materializer_stage2   
+     16049681        151                   151        151 materialization llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)  libSupport.so 
+     16050330       1525          0          0          0 compute-critical-path    

@@ -1,0 +1,155 @@
+{
+  "action_graph_size": 3,
+  "analyze_wall_us": 60295,
+  "by_mnemonic": [
+    {
+      "cached": 0,
+      "category": "cpp_archive",
+      "count": 1,
+      "critical_wall_us": 0,
+      "p50_us": 0,
+      "p95_us": 0,
+      "p99_us": 0,
+      "total_queue_us": 2117,
+      "total_wall_us": 0
+    },
+    {
+      "cached": 0,
+      "category": "c_compile",
+      "count": 181,
+      "critical_wall_us": 17740,
+      "p50_us": 0,
+      "p95_us": 0,
+      "p99_us": 0,
+      "total_queue_us": 468747,
+      "total_wall_us": 0
+    },
+    {
+      "cached": 0,
+      "category": "cpp_link",
+      "count": 1,
+      "critical_wall_us": 2277,
+      "p50_us": 0,
+      "p95_us": 0,
+      "p99_us": 0,
+      "total_queue_us": 2255,
+      "total_wall_us": 0
+    }
+  ],
+  "cache_hit_pct": 100.0,
+  "critical_path_wall_us": 271387,
+  "execute_wall_us": 28730,
+  "load_wall_us": 0,
+  "materialize_wall_us": 58,
+  "num_dice_edges": 3027,
+  "num_dice_nodes": 286,
+  "peak_in_flight_actions": 41,
+  "slowest_actions": [
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/APSInt.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/LineIterator.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/AMDGPUMetadata.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/ARMBuildAttributes.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/raw_socket_stream.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/Valgrind.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/VersionTuple.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/UnicodeNameToCodepointGenerated.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/LEB128.cpp.pic",
+      "wall_us": 0
+    },
+    {
+      "cached": false,
+      "category": "c_compile",
+      "identifier": "external/llvm-project/llvm/lib/Support/LSP/Logging.cpp.pic",
+      "wall_us": 0
+    }
+  ],
+  "slowest_analyses": [
+    {
+      "target": "//llvm-project//llvm:Support (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 34960
+    },
+    {
+      "target": "//llvm-project//llvm:config (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 16373
+    },
+    {
+      "target": "//llvm-project//third-party/siphash:siphash (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 15667
+    },
+    {
+      "target": "//local_config_cc//:local (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 4796
+    },
+    {
+      "target": "//llvm-project//llvm:Demangle (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 4751
+    },
+    {
+      "target": "//llvm-project//llvm:targets_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 2784
+    },
+    {
+      "target": "//llvm-project//llvm:disassemblers_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 2574
+    },
+    {
+      "target": "//llvm-project//llvm:target_exegesis_def_gen (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 2557
+    },
+    {
+      "target": "//llvm-project//llvm:abi_breaking_h_gen (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 2369
+    },
+    {
+      "target": "//llvm-project//third-party:zstd (local_config_platform//:host#ffb6fe5c7480b5e7)",
+      "wall_us": 2323
+    }
+  ],
+  "slowest_path_wall_us": 254018,
+  "total_action_count": 193,
+  "total_wall_us": 299735,
+  "trace_id": "0186c32f-6e91-421c-8cc0-2779ca1d5386"
+}
