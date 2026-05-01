@@ -1155,6 +1155,35 @@ async def test_28_4_stage13_expand_location_starlark(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_native_rules_data")
+async def test_28_5_exported_native_visible_in_buck(buck: Buck) -> None:
+    """Plan 28.5: a member of `@kuro_builtins//:exports.bzl::exported_native`
+    becomes a BUCK-file global. The fixture's BUILD.bazel uses
+    `_kuro_exported_native_probe` directly (without `load()`); the rule
+    captures it and writes the value to a file. The string in the
+    output must match the value in `exported_native`.
+    """
+    result = await buck.build("//:exported_native_probe_target")
+    output = result.get_build_report().output_for_target(
+        "//:exported_native_probe_target"
+    )
+    assert output.read_text().strip() == "kuro-28-5-exported-native-ok"
+
+
+@buck_test(data_dir="test_native_rules_data")
+async def test_28_5_exported_native_hidden_in_bzl(buck: Buck) -> None:
+    """Plan 28.5: members of `exported_native` are BUCK-file-only —
+    referencing one from a `.bzl` file must fail at parse time. This
+    is the dual of `test_28_5_exported_native_visible_in_buck`: the
+    same name resolves in BUCK but not in `.bzl`. Mirrors Bazel's
+    `native` struct semantics."""
+    with pytest.raises(Exception) as exc_info:
+        await buck.targets("//exported_native_hidden:test_exported_native_hidden")
+    msg = str(exc_info.value)
+    assert "_kuro_exported_native_probe" in msg
+    assert "not found" in msg
+
+
+@buck_test(data_dir="test_native_rules_data")
 async def test_28_3_export_contract_hides_unlisted_symbols(buck: Buck) -> None:
     """Plan 28.3: only names in `exported_toplevels` reach the consuming
     env. Symbols defined at the top level of `exports.bzl` but NOT

@@ -829,7 +829,56 @@ incrementally.
 - Aspects and subrules either use the same wrapper model or are
   explicitly documented as follow-ups.
 
-## Phase 28.5: Native Struct and BUILD Global Integration
+## Phase 28.5: Native Struct and BUILD Global Integration  [foundational path landed 2026-05-01]
+
+### Status
+
+The BUCK-file injection path is wired. `@kuro_builtins//:exports.bzl`
+now exposes a second dict, `exported_native`, alongside
+`exported_toplevels`. Members of `exported_native` become BUCK-file
+globals via `interpreter_for_dir.rs::create_env`'s new injection
+block, which runs only when `starlark_path` is a `BuildFile`. The
+new path runs **after** the existing `exported_toplevels` injection
+and **after** the prelude's `extra_globals_from_prelude_for_buck_files`,
+so a name in `exported_native` wins on collision — that's the
+migration ramp for moving symbols out of `prelude/native.bzl` /
+`__kuro_builtins__` in Phase 28.6.
+
+Precedence in BUCK files (lowest to highest, last-write wins):
+
+1. Rust primitives via `prelude/native.bzl`'s `native = struct(...)`
+   scrape of `__kuro_builtins__`.
+2. `@kuro_builtins//:exports.bzl::exported_native` entries.
+3. User `load()` bindings at the use site (Starlark scope rules
+   take care of this).
+
+The probe entry `_kuro_exported_native_probe` in `exported_native`
+proves both halves:
+
+- `tests/core/analysis/test_native_rules.py::test_28_5_exported_native_visible_in_buck`
+  — uses the symbol in BUCK without `load()`; rule output equals the
+  expected value.
+- `tests/core/analysis/test_native_rules.py::test_28_5_exported_native_hidden_in_bzl`
+  — references the symbol from a fixture `.bzl` file; load fails
+  with "Variable _kuro_exported_native_probe not found".
+
+LLVM Demangle smoke clean (8 actions, 2.0 s, analyze ~150 ms). No
+regression on the broader analysis suite (121 pass + 5 pre-existing
+toolchain failures + 3 skip + 1 deselect).
+
+### Remaining for Phase 28.5
+
+- A real migration that uses the new `exported_native` injection
+  path. The simplest candidate is a BUCK-only macro that currently
+  lives in `prelude/rules_impl.bzl` and is exposed indirectly
+  through `__kuro_builtins__`. Pick one as a worked example before
+  Phase 28.6 starts the bulk inventory + disposition.
+- A regression guard: a CI test (or fixture) that fails when a name
+  appears in BOTH `prelude/native.bzl`'s `native` struct and
+  `exported_native`. Today the precedence rule says
+  `exported_native` wins, but we want a loud signal during the
+  Phase 28.6 migration so a name in transition doesn't silently
+  flip implementation midway.
 
 ### Goal
 

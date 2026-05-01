@@ -845,6 +845,31 @@ exported_toplevels = {
     "kuro_builtins_probe": _kuro_builtins_probe_value,
 }
 
+# Plan 28.5: BUCK-file-only globals contributed by the bundled
+# builtins module. Members of this dict are injected into the
+# BUCK file env by `interpreter_for_dir.rs::create_env` AFTER the
+# prelude's `native` struct members, so a name in `exported_native`
+# wins over a same-named entry in `prelude/native.bzl`. NOT visible
+# in `.bzl` files — that's reserved for `exported_toplevels` above.
+#
+# Precedence in BUCK files (lowest to highest, last write wins):
+#   1. Rust primitives via `prelude/native.bzl`'s `native = struct(...)`.
+#   2. Entries in this `exported_native` dict.
+#   3. User `load()` bindings at the BUCK use site (Starlark scope wins).
+#
+# This is the `prelude/native.bzl` shrink path: as a name moves out
+# of the Rust `__kuro_builtins__` namespace into pure Starlark, it
+# leaves prelude's `native` struct and lands here. Phase 28.6 deletes
+# `prelude/native.bzl` and the `__kuro_builtins__`-scrape entirely
+# once all surviving names live here or in user `rules_*` modules.
+exported_native = {
+    # Phase 28.5 probe — proves the BUCK-file-only injection path.
+    # `_kuro_*` prefix flags the symbol as kuro-internal, not a Bazel
+    # builtin. Used by `test_28_5_exported_native_visible_in_buck` and
+    # `test_28_5_exported_native_hidden_in_bzl`.
+    "_kuro_exported_native_probe": "kuro-28-5-exported-native-ok",
+}
+
 # Phase 28.4 wrapper hook. Not in `exported_toplevels` — analysis pulls
 # it directly via the bundled module, not via the user-visible env.
 rule_implementation_wrapper = _invoke_rule

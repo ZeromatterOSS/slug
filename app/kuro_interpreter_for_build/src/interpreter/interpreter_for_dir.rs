@@ -447,6 +447,41 @@ impl InterpreterForDir {
                             env.set(name, v);
                         }
                     }
+
+                    // Plan 28.5: BUCK-file-only globals from the bundled
+                    // module's `exported_native` dict. Mirrors
+                    // `prelude/native.bzl`'s `native` struct: members
+                    // become BUCK-file globals but stay invisible in
+                    // `.bzl` files. Injected AFTER the prelude's native
+                    // struct members and AFTER `exported_toplevels`, so a
+                    // name in `exported_native` wins on collision —
+                    // that's the migration path away from
+                    // `prelude/native.bzl` for Phase 28.6.
+                    if let StarlarkPath::BuildFile(_) = starlark_path {
+                        let exported_native_value = frozen
+                            .get_option("exported_native")
+                            .map_err(|e| from_any_with_tag(e, kuro_error::ErrorTag::Tier0))?;
+                        if let Some(exported_native_value) = exported_native_value {
+                            let value = exported_native_value.owned_value(env.frozen_heap());
+                            let dict = DictRef::from_value(value).with_internal_error(|| {
+                                format!(
+                                    "@kuro_builtins exports.bzl `exported_native` must be a \
+                                     dict, got: {}",
+                                    value.get_type()
+                                )
+                            })?;
+                            for (k, v) in dict.iter() {
+                                let name = k.unpack_str().with_internal_error(|| {
+                                    format!(
+                                        "@kuro_builtins exports.bzl `exported_native` keys must \
+                                         be strings, got: {}",
+                                        k.get_type()
+                                    )
+                                })?;
+                                env.set(name, v);
+                            }
+                        }
+                    }
                 }
             }
         }

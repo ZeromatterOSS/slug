@@ -808,3 +808,13 @@ capture_existing_rules(name = "existing_rules_check")
 
 # === Plan 28.2: @kuro_builtins probe visible in external .bzl ===
 kuro_builtins_probe_value(name = "kuro_builtins_probe_target")
+
+# === Plan 28.5: @kuro_builtins exported_native member visible in BUCK ===
+# `_kuro_exported_native_probe` is in `exported_native` (not
+# `exported_toplevels`), so it MUST be reachable as a BUCK-file
+# global here but invisible in `.bzl` files. The negative-visibility
+# half lives at `exported_native_hidden/`.
+write_list(
+    name = "exported_native_probe_target",
+    items = [_kuro_exported_native_probe],  # noqa: F821 — Plan 28.5 BUCK global
+)
