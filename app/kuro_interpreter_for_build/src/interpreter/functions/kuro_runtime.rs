@@ -100,4 +100,50 @@ pub(crate) fn register_kuro_runtime(builder: &mut GlobalsBuilder) {
         );
         Ok(heap.alloc(AllocDict(pairs)))
     }
+
+    /// Plan 28.4 Stage 14: constructs a base Runfiles object from
+    /// explicit `files`, `transitive_files`, `symlinks`, and
+    /// `root_symlinks` args. Delegates to `create_runfiles` in
+    /// `kuro_build_api::interpreter::rule_defs::provider::builtin::default_info`,
+    /// which is already pub. Consumed by `_kuro_runfiles` in
+    /// `@kuro_builtins//:exports.bzl`.
+    fn kuro_create_runfiles<'v>(
+        files: Value<'v>,
+        transitive_files: Value<'v>,
+        symlinks: Value<'v>,
+        root_symlinks: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(
+            kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::create_runfiles(
+                heap,
+                files,
+                transitive_files,
+                symlinks,
+                root_symlinks,
+            )?,
+        )
+    }
+
+    /// Plan 28.4 Stage 14: merges runfiles from a single attribute
+    /// value (list of Dependency or a single Dependency) into `runfiles`
+    /// and returns the updated Runfiles value. `want_data` selects
+    /// `data_runfiles` vs `default_runfiles` on each dep's DefaultInfo.
+    /// Delegates to the now-pub `collect_runfiles_from_value` in
+    /// `kuro_build_api::interpreter::rule_defs::context`. Consumed by
+    /// `_kuro_runfiles` in `@kuro_builtins//:exports.bzl`.
+    fn kuro_collect_runfiles_into<'v>(
+        mut runfiles: Value<'v>,
+        attr_value: Value<'v>,
+        want_data: bool,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        kuro_build_api::interpreter::rule_defs::context::collect_runfiles_from_value(
+            attr_value,
+            want_data,
+            heap,
+            &mut runfiles,
+        )?;
+        Ok(runfiles)
+    }
 }
