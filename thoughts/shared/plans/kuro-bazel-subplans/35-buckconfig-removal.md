@@ -428,13 +428,13 @@ become `.bazelrc` flags or get dropped. Test fixtures unaffected.
 - No active-workspace `.buckconfig` has a `[project]` section. (Test
   fixtures may still — handled in 35.6.)
 
-### Phase 35.5: Runtime knobs → `.bazelrc` (active workspaces)  [~2-3 days]  ⚠️ DRAIN COMPLETE 2026-05-04, RENAME PHASE IN PROGRESS
+### Phase 35.5: Runtime knobs → `.bazelrc` (active workspaces)  [~2-3 days]  ✅ COMPLETE 2026-05-04
 
-**Rename phase — IN PROGRESS 2026-05-04**:
+**Rename phase — DONE 2026-05-04**:
 - Step (a): `--digest_function` rename + buildbuddy/engflow migration. ✅ commit `885384f5`.
 - Step (b): `[kuro_re_client]` → `--remote_executor`/`--remote_header`/`--remote_instance_name`/`--tls_client_certificate` plus URL-scheme TLS detection. 5 examples migrated (vscode, buildbarn, buildbuddy, engflow, nativelink). End-to-end BuildBuddy RE smoke from `llvm-project/utils/bazel --config=remote` clean (8 actions, all remote). ✅ commit `33ebcc97`.
-- Step (c): `[parser] target_platform_detector_spec` and `[build] execution_platforms` migration. See "Step (c) design" below.
-- Step (d): `[kuro] file_watcher` → `--kuro_file_watcher`. Trivial; not yet started.
+- Step (c): `[parser] target_platform_detector_spec` → `--platforms`; `[build] execution_platforms` → `--extra_execution_platforms`. 12 example workspaces migrated; 5 example platform rules refactored (drop the `ExecutionPlatformRegistrationInfo` wrapper). ✅ commit `8754686d`.
+- Step (d): `[kuro] file_watcher` → `--kuro_file_watcher`. Field added to `DaemonStartupConfig` so a flag change forces a daemon restart; `FileWatcher::new` takes the value via an explicit `watcher_override: Option<&str>` param. 2 examples migrated (`toolchains/{go,python}_toolchain`).
 
 #### Step (c) design (2026-05-04)
 

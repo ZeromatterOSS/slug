@@ -531,6 +531,7 @@ impl DaemonState {
                 root_config,
                 cells.dupe(),
                 ignore_specs,
+                init_ctx.daemon_startup_config.file_watcher.as_deref(),
             )
             .with_buck_error_context(|| {
                 format!(

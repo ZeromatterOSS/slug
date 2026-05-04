@@ -477,6 +477,20 @@ pub struct CommonBuildConfigurationOptions {
     )]
     pub digest_function: Option<String>,
 
+    /// File-watcher backend (kuro-specific; no Bazel equivalent).
+    ///
+    /// One of `watchman`, `notify`, `fs_hash_crawler` (or `edenfs` on
+    /// Meta-internal builds). Threaded through to
+    /// `DaemonStartupConfig::file_watcher`. Default: `watchman` on
+    /// Meta-internal builds, `notify` in OSS.
+    #[clap(
+        long = "kuro-file-watcher",
+        alias = "kuro_file_watcher",
+        hide = true,
+        value_name = "BACKEND"
+    )]
+    pub kuro_file_watcher: Option<String>,
+
     /// Spawn strategy (Bazel compatibility, accepted but ignored).
     #[clap(
         long = "spawn-strategy",
@@ -1405,6 +1419,7 @@ impl CommonBuildConfigurationOptions {
             remote_instance_name: None,
             tls_client_certificate: None,
             digest_function: None,
+            kuro_file_watcher: None,
             spawn_strategy: None,
             dynamic_local_strategy: vec![],
             dynamic_remote_strategy: vec![],
@@ -1522,6 +1537,7 @@ impl CommonBuildConfigurationOptions {
             remote_instance_name: None,
             tls_client_certificate: None,
             digest_function: None,
+            kuro_file_watcher: None,
             spawn_strategy: None,
             dynamic_local_strategy: vec![],
             dynamic_remote_strategy: vec![],

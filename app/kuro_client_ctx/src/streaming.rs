@@ -252,6 +252,14 @@ impl<T: StreamingCommand> BuckSubcommand for T {
                 {
                     req.daemon_startup_config.digest_algorithms = Some(digest.to_owned());
                 }
+                if let Some(watcher) = self
+                    .build_config_opts()
+                    .kuro_file_watcher
+                    .as_deref()
+                    .filter(|s| !s.is_empty())
+                {
+                    req.daemon_startup_config.file_watcher = Some(watcher.to_owned());
+                }
                 BuckdConnectConstraints::Constraints(req)
             };
             let buckd = match ctx.start_in_process_daemon.take() {

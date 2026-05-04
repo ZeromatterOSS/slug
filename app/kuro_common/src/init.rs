@@ -290,6 +290,12 @@ pub struct DaemonStartupConfig {
     pub source_digest_algorithm: Option<String>,
     pub paranoid: bool,
     pub materializations: Option<String>,
+    /// File-watcher backend (`watchman`, `notify`, `fs_hash_crawler`,
+    /// `edenfs`). Sourced from `--kuro_file_watcher`. `None` means
+    /// "use the host default" (`watchman` on Meta-internal builds,
+    /// `notify` in OSS).
+    #[serde(default)]
+    pub file_watcher: Option<String>,
     pub http: HttpConfig,
     pub resource_control: ResourceControlConfig,
     pub log_download_method: LogDownloadMethod,
@@ -371,6 +377,7 @@ impl DaemonStartupConfig {
             source_digest_algorithm: None,
             paranoid: false, // Setup later in ImmediateConfig
             materializations: None,
+            file_watcher: None,
             http: HttpConfig::default(),
             resource_control: ResourceControlConfig::default_or_from_env()?,
             log_download_method,
@@ -397,6 +404,7 @@ impl DaemonStartupConfig {
             source_digest_algorithm: None,
             paranoid: false,
             materializations: None,
+            file_watcher: None,
             http: HttpConfig::default(),
             resource_control: ResourceControlConfig::testing_default(),
             log_download_method: if cfg!(fbcode_build) {

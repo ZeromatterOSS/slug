@@ -16,7 +16,6 @@ use async_trait::async_trait;
 use dice::DiceTransactionUpdater;
 use kuro_common::ignores::ignore_set::IgnoreSet;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_core::cells::CellResolver;
 use kuro_core::cells::name::CellName;
 use kuro_core::fs::project::ProjectRoot;
@@ -51,6 +50,7 @@ impl dyn FileWatcher {
         root_config: &LegacyBuckConfig,
         cells: CellResolver,
         ignore_specs: HashMap<CellName, IgnoreSet>,
+        watcher_override: Option<&str>,
     ) -> kuro_error::Result<Arc<dyn FileWatcher>> {
         #[cfg(fbcode_build)]
         let default = if detect_eden::is_eden(project_root.root().to_path_buf())? {
@@ -64,12 +64,10 @@ impl dyn FileWatcher {
 
         let _allow_unused = fb;
 
-        let watcher_conf = root_config
-            .get(BuckconfigKeyRef {
-                section: "kuro",
-                property: "file_watcher",
-            })
-            .unwrap_or(default);
+        // `--kuro_file_watcher` (threaded through
+        // `DaemonStartupConfig::file_watcher`) wins; otherwise use the
+        // host default.
+        let watcher_conf = watcher_override.unwrap_or(default);
 
         let watcher_conf = if let "edenfs" = watcher_conf {
             #[cfg(fbcode_build)]
