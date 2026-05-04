@@ -1,0 +1,37 @@
+load("//rules:rules.bzl", "foo_binary")
+
+foo_binary(
+    name = "the_binary",
+    srcs = [
+        "BUILD.bazel",
+    ],
+    cmd = [
+        "$(exe //:bin)",
+        "$(location //:data)",
+    ],
+    deps = [
+        "//lib:lib1",
+        "//lib:lib2",
+        "//lib:lib3",
+    ],
+)
+
+foo_binary(
+    name = "the_binary_with_dir_srcs",
+    srcs = [
+        "kind",
+    ],
+    cmd = [
+        "$(exe //:bin)",
+        "$(location //:data)",
+    ],
+    deps = [
+        "//lib:lib1",
+        "//lib:lib2",
+        "//lib:lib3",
+    ],
+)
+
+platform(
+    name = "platform",
+)

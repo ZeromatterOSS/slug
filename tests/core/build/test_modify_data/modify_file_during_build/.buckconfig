@@ -4,8 +4,5 @@
 [cells]
   root = .
 
-[buildfile]
-  name=TARGETS.fixture
-
 [kuro]
   materializations = deferred

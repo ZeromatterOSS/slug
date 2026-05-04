@@ -307,7 +307,7 @@ fn cquery_methods(builder: &mut MethodsBuilder) {
     /// Sample usage:
     /// ```python
     /// def _owner_impl(ctx):
-    ///     owner = ctx.cquery().owner("bin/TARGETS.fixture", "foo//target/universe/...")
+    ///     owner = ctx.cquery().owner("bin/BUILD.bazel", "foo//target/universe/...")
     ///     ctx.output.print(owner)
     /// ```
     fn owner<'v>(

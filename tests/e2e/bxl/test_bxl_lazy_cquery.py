@@ -18,7 +18,7 @@ async def test_cquery_eval(buck: Buck) -> None:
         "//bxl:lazy_cquery.bxl:eval_query_test",
     )
 
-    assert "TARGETS.fixture" in result.stdout
+    assert "BUILD.bazel" in result.stdout
 
 
 @buck_test(inplace=False, data_dir="bxl/simple")

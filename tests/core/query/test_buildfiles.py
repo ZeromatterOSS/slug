@@ -41,12 +41,12 @@ async def test_allbuildfiles(buck: Buck) -> None:
     out4.sort()
 
     # verify loads
-    expected1 = ["load/TARGETS.fixture", "load/a.bzl", "load/a.json"]
+    expected1 = ["load/BUILD.bazel", "load/a.bzl", "load/a.json"]
     assert out1 == expected1
 
     # verify transitive loads
     expected2 = [
-        "transitive_load/TARGETS.fixture",
+        "transitive_load/BUILD.bazel",
         "transitive_load/b.bzl",
         "transitive_load/c.bzl",
         "transitive_load/c.json",
@@ -62,7 +62,7 @@ async def test_allbuildfiles(buck: Buck) -> None:
 
 @buck_test()
 async def test_rbuildfiles(buck: Buck) -> None:
-    target_file = "transitive_load/TARGETS.fixture"
+    target_file = "transitive_load/BUILD.bazel"
     out1 = (
         await buck.uquery(f"rbuildfiles({target_file}, transitive_load/c.bzl)")
     ).stdout

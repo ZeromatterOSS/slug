@@ -57,7 +57,7 @@ async def test_debug_filestatus(buck: Buck) -> None:
     # Start the server.
     await buck.uquery("root//:")
     # FIXME(JakobDegen): `.` is an error
-    output = await buck.debug("file-status", "TARGETS.fixture")
+    output = await buck.debug("file-status", "BUILD.bazel")
     assert "No mismatches detected" in output.stderr
 
 

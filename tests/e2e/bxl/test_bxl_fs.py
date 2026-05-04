@@ -38,7 +38,7 @@ async def test_bxl_fs_list(buck: Buck) -> None:
     )
 
     assert result.stdout.splitlines() == [
-        "root//bin/TARGETS.fixture",
+        "root//bin/BUILD.bazel",
         "root//bin/kind",
     ]
 
@@ -47,7 +47,7 @@ async def test_bxl_fs_list(buck: Buck) -> None:
     )
 
     assert result.stdout.splitlines() == [
-        "root//bin/TARGETS.fixture",
+        "root//bin/BUILD.bazel",
         "root//bin/kind",
     ]
 
@@ -56,7 +56,7 @@ async def test_bxl_fs_list(buck: Buck) -> None:
     )
 
     assert result.stdout.splitlines() == [
-        "root//bin/kind/TARGETS.fixture",
+        "root//bin/kind/BUILD.bazel",
         "root//bin/kind/rules.bzl",
     ]
 
@@ -65,7 +65,7 @@ async def test_bxl_fs_list(buck: Buck) -> None:
     )
 
     assert result.stdout.splitlines() == [
-        "root//bin/kind/TARGETS.fixture",
+        "root//bin/kind/BUILD.bazel",
         "root//bin/kind/rules.bzl",
     ]
 
@@ -80,7 +80,7 @@ async def test_bxl_fs_list(buck: Buck) -> None:
     result = await buck.bxl("//bxl:fs.bxl:list_cell_path")
 
     expected_output = [
-        "root//bin/TARGETS.fixture",
+        "root//bin/BUILD.bazel",
         "root//bin/kind",
     ]
 
@@ -110,7 +110,7 @@ async def test_bxl_fs_project_rel_path(buck: Buck) -> None:
     result = await buck.bxl("//bxl:fs.bxl:project_rel_path")
 
     assert result.stdout.splitlines() == [
-        "bin/kind/TARGETS.fixture",
+        "bin/kind/BUILD.bazel",
         "bin/kind/rules.bzl",
     ]
 
@@ -125,7 +125,7 @@ async def test_bxl_fs_abs_path_unsafe(buck: Buck) -> None:
     result = await buck.bxl("//bxl:fs.bxl:abs_path_unsafe")
 
     assert result.stdout.splitlines() == [
-        str(buck.cwd / "bin/kind/TARGETS.fixture"),
+        str(buck.cwd / "bin/kind/BUILD.bazel"),
         str(buck.cwd / "bin/kind/rules.bzl"),
     ]
 

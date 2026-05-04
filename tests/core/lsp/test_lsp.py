@@ -82,8 +82,8 @@ async def test_lints_on_open(buck: Buck) -> None:
 
 @buck_test()
 async def test_goto_definition(buck: Buck) -> None:
-    src_targets_path = Path("dir/TARGETS.fixture")
-    dest_targets_path = Path("cell/sub/TARGETS.fixture")
+    src_targets_path = Path("dir/BUILD.bazel")
+    dest_targets_path = Path("cell/sub/BUILD.bazel")
     dest_bzl_path = Path("cell/sub/defs.bzl")
 
     src_targets = fixture(buck, src_targets_path)

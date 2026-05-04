@@ -21,7 +21,7 @@ def _replace_hash(s: str) -> str:
 @buck_test(data_dir="simple")
 async def test_query_owner(buck: Buck) -> None:
     result = await buck.cquery(
-        "--target-universe=root//bin:the_binary", """owner(bin/TARGETS.fixture)"""
+        "--target-universe=root//bin:the_binary", """owner(bin/BUILD.bazel)"""
     )
     assert (
         _replace_hash(result.stdout)

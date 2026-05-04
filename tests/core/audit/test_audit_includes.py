@@ -32,20 +32,20 @@ def _includes(output: BuckResult) -> list[str]:
 async def test_audit_includes(buck: Buck, tmp_path: Path) -> None:
     expected_includes = ["example.json", "incl.bzl", "prelude.bzl"]
     # Using project relative path.
-    output = await buck.audit("includes", "TARGETS.fixture")
+    output = await buck.audit("includes", "BUILD.bazel")
     assert _includes(output) == expected_includes
 
     # Using project relative path when in a subdirectory.
-    await buck.audit("includes", "TARGETS.fixture", rel_cwd=Path("dir"))
+    await buck.audit("includes", "BUILD.bazel", rel_cwd=Path("dir"))
     assert _includes(output) == expected_includes
 
     # Using absolute path.
-    output = await buck.audit("includes", f"{buck.cwd}/TARGETS.fixture")
+    output = await buck.audit("includes", f"{buck.cwd}/BUILD.bazel")
     assert _includes(output) == expected_includes
 
     if os.name != "nt":
         # Create symlink to the project root in a temporary directory.
         (tmp_path / "symlink").symlink_to(buck.cwd)
 
-        output = await buck.audit("includes", f"{tmp_path}/symlink/TARGETS.fixture")
+        output = await buck.audit("includes", f"{tmp_path}/symlink/BUILD.bazel")
         assert _includes(output) == expected_includes

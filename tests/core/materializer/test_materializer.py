@@ -32,7 +32,7 @@ def replace_in_file(old: str, new: str, file: Path, encoding: str = "utf-8") -> 
 async def test_modify_input_source(buck: Buck) -> None:
     await buck.build("//:urandom_dep")
 
-    targets_file = buck.cwd / "TARGETS.fixture"
+    targets_file = buck.cwd / "BUILD.bazel"
 
     # Change the label in Targets.
     replace_in_file("__NOT_A_REAL_LABEL__", "buck2_test_local_exec", file=targets_file)

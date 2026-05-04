@@ -555,7 +555,7 @@ async def test_re_dep_file_uploads_different_key(buck: Buck) -> None:
     target = "root//:dep_files"
     untagged_file1 = buck.cwd / "untagged.1"
     assert untagged_file1.exists()
-    targets_file = buck.cwd / "TARGETS.fixture"
+    targets_file = buck.cwd / "BUILD.bazel"
     assert targets_file.exists()
 
     target = [

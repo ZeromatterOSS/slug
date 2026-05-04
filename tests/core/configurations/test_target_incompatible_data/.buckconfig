@@ -7,8 +7,5 @@
 [external_cells]
   prelude = bundled
 
-[buildfile]
-  name = TARGETS.fixture
-
 [build]
   execution_platforms = //exec_dep:execution_platforms

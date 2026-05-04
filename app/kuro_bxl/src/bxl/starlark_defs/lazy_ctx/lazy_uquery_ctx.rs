@@ -266,7 +266,7 @@ fn lazy_uquery_methods(builder: &mut MethodsBuilder) {
     ///
     /// Example:
     /// ```python
-    /// res = ctx.lazy.uquery().owner("bin/TARGETS.fixture").catch().resolve()
+    /// res = ctx.lazy.uquery().owner("bin/BUILD.bazel").catch().resolve()
     /// res = ctx.lazy.uquery().owner(["bin/TARGET", "bin/kind"]).catch().resolve()
     /// ```
     fn owner<'v>(
@@ -282,7 +282,7 @@ fn lazy_uquery_methods(builder: &mut MethodsBuilder) {
     ///
     /// Example:
     /// ```python
-    /// res = ctx.lazy.uquery().targets_in_buildfile("bin/TARGETS.fixture").catch().resolve()
+    /// res = ctx.lazy.uquery().targets_in_buildfile("bin/BUILD.bazel").catch().resolve()
     /// res = ctx.lazy.uquery().targets_in_buildfile(["bin/TARGETS", "lib/TARGETS"]).catch().resolve()
     /// ```
     fn targets_in_buildfile<'v>(

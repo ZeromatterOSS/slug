@@ -22,7 +22,7 @@ async def test_imports(buck: Buck) -> None:
     found = 0
     for x in xs:
         if "buck.imports" in x:
-            if x["buck.file"] == "root//TARGETS.fixture":
+            if x["buck.file"] == "root//BUILD.bazel":
                 assert x["buck.package"] == "root//"
                 assert x["buck.imports"] == ["prelude//prelude.bzl", "root//a.bzl"]
                 found += 1

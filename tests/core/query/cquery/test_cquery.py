@@ -31,7 +31,7 @@ def _replace_hash(s: str) -> str:
 @buck_test(data_dir="unsorted")
 async def test_query_inputs(buck: Buck) -> None:
     result = await buck.cquery("""inputs(set(root//bin:the_binary //lib:file1))""")
-    assert result.stdout == "bin/TARGETS.fixture\n"
+    assert result.stdout == "bin/BUILD.bazel\n"
 
 
 @buck_test(data_dir="unsorted")
@@ -123,17 +123,17 @@ async def test_attributes(buck: Buck) -> None:
                 "root//:bin (root//platforms:platform1#<HASH>)",
             ],
             "buck.execution_platform": "<legacy_global_exec_platform>",
-            "buck.package": "root//bin:TARGETS.fixture",
+            "buck.package": "root//bin:BUILD.bazel",
             "buck.plugins": {},
             "buck.target_configuration": "root//platforms:platform1#<HASH>",
             "buck.type": "_foo_binary",
             "buck.oncall": None,
-            "srcs": ["root//bin/TARGETS.fixture"],
+            "srcs": ["root//bin/BUILD.bazel"],
         },
         "root//lib:file1 (root//platforms:platform1#<HASH>)": {
             "buck.deps": [],
             "buck.execution_platform": "<legacy_global_exec_platform>",
-            "buck.package": "root//lib:TARGETS.fixture",
+            "buck.package": "root//lib:BUILD.bazel",
             "buck.plugins": {},
             "buck.target_configuration": "root//platforms:platform1#<HASH>",
             "buck.type": "_foo_genrule",
@@ -164,7 +164,7 @@ async def test_multi_query(buck: Buck) -> None:
 @buck_test(data_dir="unsorted")
 async def test_query_attrfilter(buck: Buck) -> None:
     out = await buck.uquery(
-        "attrfilter(buck.package, 'root//bin:TARGETS.fixture',root//bin:the_binary)"
+        "attrfilter(buck.package, 'root//bin:BUILD.bazel',root//bin:the_binary)"
     )
     assert out.stdout.strip() == "root//bin:the_binary"
 

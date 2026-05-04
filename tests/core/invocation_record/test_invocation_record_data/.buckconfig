@@ -5,7 +5,5 @@
     root = .
 [repository_aliases]
     prelude = root
-[buildfile]
-    name = TARGETS.fixture
 [kuro]
   materializations = deferred

@@ -105,7 +105,7 @@ async def test_attr_coercion(buck: Buck, tmp_path: Path) -> None:
             "--unstable-write-invocation-record",
             str(record_path),
         ),
-        stderr_regex="evaluating build file: `root//attr_coercion:TARGETS.fixture",
+        stderr_regex="evaluating build file: `root//attr_coercion:BUILD.bazel",
     )
     record = read_invocation_record(record_path)
     errors = record["errors"]
@@ -123,7 +123,7 @@ async def test_buck2_fail(buck: Buck, tmp_path: Path) -> None:
             "--unstable-write-invocation-record",
             str(record_path),
         ),
-        stderr_regex="evaluating build file: `root//buck2_fail:TARGETS.fixture`",
+        stderr_regex="evaluating build file: `root//buck2_fail:BUILD.bazel`",
     )
     record = read_invocation_record(record_path)
     errors = record["errors"]
@@ -145,7 +145,7 @@ async def test_starlark_fail_error_categorization(buck: Buck, tmp_path: Path) ->
             "--unstable-write-invocation-record",
             str(record_path),
         ),
-        stderr_regex="evaluating build file: `root//starlark_fail:TARGETS.fixture`",
+        stderr_regex="evaluating build file: `root//starlark_fail:BUILD.bazel`",
     )
     record = read_invocation_record(record_path)
     errors = record["errors"]
@@ -206,7 +206,7 @@ async def test_targets_error_categorization(buck: Buck, tmp_path: Path) -> None:
             "--unstable-write-invocation-record",
             str(record_path),
         ),
-        stderr_regex="evaluating build file: `root//starlark_fail:TARGETS.fixture`",
+        stderr_regex="evaluating build file: `root//starlark_fail:BUILD.bazel`",
     )
     record = read_invocation_record(record_path)
     errors = record["errors"]
@@ -463,7 +463,7 @@ async def test_daemon_startup_error(buck: Buck, tmp_path: Path) -> None:
     skip_for_os=["windows"],
 )
 async def test_eden_io_error_tagging(buck: Buck, tmp_path: Path) -> None:
-    targets_file = buck.cwd / "TARGETS.fixture"
+    targets_file = buck.cwd / "BUILD.bazel"
 
     # remove file read permissions during test execution, test setup will fail if permissions are set on any fixture earlier
     targets_file.chmod(0o000)

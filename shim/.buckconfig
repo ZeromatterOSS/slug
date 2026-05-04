@@ -5,12 +5,6 @@
 # License, Version 2.0 found in the LICENSE-APACHE file in the root directory
 # of this source tree.
 
-[buildfile]
-# see <https://github.com/facebook/kuro/pull/956> -- this helps us make
-# error messages when the user doesn't run "reindeer" much more obvious.
-# We then make reindeer generate BUCK.reindeer to override the default.
-name = BUCK.reindeer,BUILD.bazel
-
 [cells]
 gh_facebook_kuro_shims_meta = .
 

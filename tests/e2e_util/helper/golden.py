@@ -218,7 +218,7 @@ def sanitize_stacktrace(s: str) -> str:
 
 
 # Build report errors can change based on minor test changes such as
-# 1. Adding a target in TARGETS.fixture
+# 1. Adding a target in BUILD.bazel
 # 2. Line number changing due to code moving around
 # Sanitize so that we only check the important bits of the error message
 def sanitize_build_report_error(s: str) -> str:
@@ -226,7 +226,7 @@ def sanitize_build_report_error(s: str) -> str:
     s = re.sub(
         r"Error running analysis for.*\"", 'Error running analysis for <IRRELEVANT>"', s
     )
-    # Simplify the Unknown target error (Can change due to number of targets in TARGETS.fixture)
+    # Simplify the Unknown target error (Can change due to number of targets in BUILD.bazel)
     s = re.sub(
         r"Unknown target `.*` from package .*\"",
         'Unknown target `<TARGET>` from package <IRRELEVANT>"',

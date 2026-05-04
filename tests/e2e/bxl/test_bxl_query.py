@@ -67,7 +67,7 @@ async def test_cquery_inputs(buck: Buck) -> None:
         "//bxl:cquery.bxl:inputs_test",
     )
 
-    assert "TARGETS.fixture" in result.stdout
+    assert "BUILD.bazel" in result.stdout
     assert "bxl.FileSet" in result.stdout
     assert "1" in result.stdout
 
@@ -313,7 +313,7 @@ async def test_uquery_inputs(buck: Buck) -> None:
         "//bxl:uquery.bxl:inputs_test",
     )
 
-    assert "TARGETS.fixture" in result.stdout
+    assert "BUILD.bazel" in result.stdout
 
 
 @buck_test(inplace=False, data_dir="bxl/simple")
@@ -322,7 +322,7 @@ async def test_uquery_lazy_inputs(buck: Buck) -> None:
         "//bxl:uquery.bxl:lazy_inputs_test",
     )
 
-    assert "TARGETS.fixture" in result.stdout
+    assert "BUILD.bazel" in result.stdout
 
 
 @buck_test(inplace=False, data_dir="bxl/simple")
@@ -518,7 +518,7 @@ async def test_uquery_eval(buck: Buck) -> None:
     result = await buck.bxl(
         "//bxl/uquery.bxl:eval_query_test",
     )
-    assert result.stdout == "[root//bin/TARGETS.fixture]\n"
+    assert result.stdout == "[root//bin/BUILD.bazel]\n"
 
     result = await buck.bxl(
         "//bxl/uquery.bxl:eval_query_with_query_args",
@@ -530,7 +530,7 @@ async def test_uquery_lazy_eval(buck: Buck) -> None:
     result = await buck.bxl(
         "//bxl/uquery.bxl:lazy_eval_query_test",
     )
-    assert result.stdout == "[root//bin/TARGETS.fixture]\n"
+    assert result.stdout == "[root//bin/BUILD.bazel]\n"
 
     result = await buck.bxl(
         "//bxl/uquery.bxl:lazy_eval_query_with_query_args",
@@ -551,7 +551,7 @@ async def test_cquery_eval(buck: Buck) -> None:
         "//bxl:cquery.bxl:eval_query_test",
     )
 
-    assert "TARGETS.fixture" in result.stdout
+    assert "BUILD.bazel" in result.stdout
 
     result = await buck.bxl(
         "//bxl/cquery.bxl:eval_query_with_query_args",

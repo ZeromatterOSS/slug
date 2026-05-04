@@ -6,5 +6,3 @@ root = .
 prelude = prelude
 [kuro]
 dice = modern
-[buildfile]
-name = TARGETS.fixture

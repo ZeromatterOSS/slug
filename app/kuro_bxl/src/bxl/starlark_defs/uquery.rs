@@ -435,7 +435,7 @@ fn uquery_methods(builder: &mut MethodsBuilder) {
     /// Sample usage:
     /// ```python
     /// def _owner_impl(ctx):
-    ///     owner = ctx.uquery().owner("bin/TARGETS.fixture")
+    ///     owner = ctx.uquery().owner("bin/BUILD.bazel")
     ///     ctx.output.print(owner)
     /// ```
     fn owner<'v>(
@@ -464,7 +464,7 @@ fn uquery_methods(builder: &mut MethodsBuilder) {
     /// Usage:
     /// ```python
     /// def _targets_in_buildfile_impl(ctx):
-    ///     targets = ctx.uquery().targets_in_buildfile("bin/TARGETS.fixture")
+    ///     targets = ctx.uquery().targets_in_buildfile("bin/BUILD.bazel")
     ///     ctx.output.print(targets)
     /// ```
     ///

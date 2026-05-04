@@ -11,8 +11,5 @@
 [external_cells]
   nano_prelude = bundled
 
-[buildfile]
-  name = TARGETS.fixture
-
 [kuro]
   create_unhashed_links = true

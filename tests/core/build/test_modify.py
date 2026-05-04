@@ -26,7 +26,7 @@ async def test_modify_genrule(buck: Buck) -> None:
     assert Path(output).read_text() == "HELLO\n"
 
     # Change "HELLO" in TARGETS to "GOODBYE"
-    with fileinput.input(buck.cwd / "TARGETS.fixture", inplace=True) as f:
+    with fileinput.input(buck.cwd / "BUILD.bazel", inplace=True) as f:
         for line in f:
             print(line.replace("HELLO", "GOODBYE"), end="")
 

@@ -1,4 +1,0 @@
-stub(
-    name = "t",
-    srcs = ["TARGETS.fixture"],
-)

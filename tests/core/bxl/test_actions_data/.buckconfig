@@ -11,9 +11,6 @@
 [external_cells]
   nano_prelude = bundled
 
-[buildfile]
-  name=TARGETS.fixture
-
 [kuro]
   materializations = deferred
   enable_local_caching_of_re_artifacts = true
