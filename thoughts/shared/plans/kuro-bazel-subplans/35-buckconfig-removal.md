@@ -428,7 +428,60 @@ become `.bazelrc` flags or get dropped. Test fixtures unaffected.
 - No active-workspace `.buckconfig` has a `[project]` section. (Test
   fixtures may still — handled in 35.6.)
 
-### Phase 35.5: Runtime knobs → `.bazelrc` (active workspaces)  [~2-3 days]
+### Phase 35.5: Runtime knobs → `.bazelrc` (active workspaces)  [~2-3 days]  ⚠️ DRAIN COMPLETE 2026-05-04, RENAME PHASE DEFERRED
+
+**Drain (delete dead lookups) — DONE 2026-05-04**:
+- `init.rs`: 39 → 6 lookups (kept `digest_algorithms` + `[kuro_re_client]` snapshot)
+- `kuro_re_configuration/lib.rs`: 17 → 7 (kept addresses, tls, headers, instance_name);
+  deleted `examples/remote_execution/internal/`, `use_fbcode_metadata`, and the
+  Meta-internal `with_re_metadata` branch in `re_grpc/client.rs`
+- `kuro_server/ctx.rs`: 25 → 0
+- `kuro_server/daemon/state.rs`: 17 → 0
+- Smaller consumers (one big batch): kuro_server_commands/build.rs,
+  execute_impl/clean_stale.rs, daemon/disk_state.rs, daemon/forkserver.rs,
+  file_watcher/{watchman,edenfs}/interface.rs, configured/nodes.rs,
+  interpreter/{import_paths,factory,allow_relative_paths}.rs,
+  interpreter_for_build/interpreter/interpreter_for_dir.rs,
+  common/{package_boundary,ignores/all_cells}.rs, build_api/configure_dice.rs,
+  build_api/materialize.rs, build_api/build/build_report.rs,
+  build_api/artifact_groups/calculation.rs, kuro_test/command.rs
+
+**Rename phase — DEFERRED**:
+The remaining live `BuckconfigKeyRef` call sites outside `legacy_configs/`:
+- `init.rs::DaemonStartupConfig::new`: `[kuro] digest_algorithms` (3 examples
+  set it → `--digest_function` Bazel flag)
+- `init.rs::ReConfigSnapshot::from_config`: 5 `[kuro_re_client]` keys
+  (5 examples set them → `--remote_executor`/`--remote_header`/
+  `--remote_instance_name`/`--tls_client_certificate`)
+- `kuro_re_configuration/lib.rs::KuroOssReConfiguration::from_legacy_config`:
+  same 5 keys (read at daemon startup; overlaid by ReConfigSnapshot)
+- `kuro_node/execution.rs::EXECUTION_PLATFORMS_BUCKCONFIG`:
+  `[build] execution_platforms` (9 examples → `--platforms`)
+- `kuro_configured/target_platform_resolution.rs`:
+  `[parser] target_platform_detector_spec` (12 setters → `--platforms`)
+- `kuro_file_watcher/file_watcher.rs`: `[kuro] file_watcher` (2 examples →
+  `--kuro_file_watcher`)
+- `kuro_common/buildfiles.rs`: `[buildfile] name` (shim, examples/bxl_tutorial),
+  `[buildfile] extra_for_test` (test fixtures only — bucket-(B) candidate
+  for 35.6a)
+
+Doing this rename right requires:
+1. Adding the new CLI flags to `app/kuro_client_ctx/src/bazelrc.rs` /
+   `CommonBuildConfigurationOptions` with help strings + defaults.
+2. Threading per-invocation overrides into `DaemonStartupConfig` and
+   the daemon-restart constraint (RE config already does this via
+   `apply_re_config_overlay` — same pattern needed for the others).
+3. Rewriting the 14+ example `.buckconfig` files to a sibling `.bazelrc`.
+4. Per-example smoke validation — CI gates only `examples/with_prelude`,
+   so the validation surface is small but every other example is
+   currently a write-only artifact.
+
+This is substantively different work from the dead-code drain (config
+migration + CLI plumbing + example validation, not just code deletion).
+Tracked as a follow-up; resume when ready to coordinate code + config
+migration together.
+
+
 
 #### Goal (revised 2026-05-01)
 
