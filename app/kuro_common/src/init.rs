@@ -43,86 +43,34 @@ impl Timeout {
     }
 }
 
-#[derive(
-    Allocative,
-    Clone,
-    Debug,
-    Default,
-    Serialize,
-    Deserialize,
-    PartialEq,
-    Eq
-)]
+#[derive(Allocative, Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HttpConfig {
-    connect_timeout_ms: Option<u64>,
-    read_timeout_ms: Option<u64>,
-    write_timeout_ms: Option<u64>,
     pub http2: bool,
     pub max_redirects: Option<usize>,
     pub max_concurrent_requests: Option<usize>,
 }
 
-impl HttpConfig {
-    pub fn from_config(config: &LegacyBuckConfig) -> kuro_error::Result<Self> {
-        let connect_timeout_ms = config.parse(BuckconfigKeyRef {
-            section: "http",
-            property: "connect_timeout_ms",
-        })?;
-        let read_timeout_ms = config.parse(BuckconfigKeyRef {
-            section: "http",
-            property: "read_timeout_ms",
-        })?;
-        let write_timeout_ms = config.parse(BuckconfigKeyRef {
-            section: "http",
-            property: "write_timeout_ms",
-        })?;
-        let max_redirects = config.parse(BuckconfigKeyRef {
-            section: "http",
-            property: "max_redirects",
-        })?;
-        let http2 = config
-            .parse(BuckconfigKeyRef {
-                section: "http",
-                property: "http2",
-            })?
-            .unwrap_or(true);
-        let max_concurrent_requests = config.parse(BuckconfigKeyRef {
-            section: "http",
-            property: "max_concurrent_requests",
-        })?;
-
-        Ok(Self {
-            connect_timeout_ms,
-            read_timeout_ms,
-            write_timeout_ms,
-            max_redirects,
-            http2,
-            max_concurrent_requests,
-        })
-    }
-
-    pub fn connect_timeout(&self) -> Timeout {
-        match self.connect_timeout_ms.map(Duration::from_millis) {
-            Some(Duration::ZERO) => Timeout::NoTimeout,
-            Some(value) => Timeout::Value(value),
-            None => Timeout::Default,
+impl Default for HttpConfig {
+    fn default() -> Self {
+        Self {
+            http2: true,
+            max_redirects: None,
+            max_concurrent_requests: None,
         }
+    }
+}
+
+impl HttpConfig {
+    pub fn connect_timeout(&self) -> Timeout {
+        Timeout::Default
     }
 
     pub fn read_timeout(&self) -> Timeout {
-        match self.read_timeout_ms.map(Duration::from_millis) {
-            Some(Duration::ZERO) => Timeout::NoTimeout,
-            Some(value) => Timeout::Value(value),
-            None => Timeout::Default,
-        }
+        Timeout::Default
     }
 
     pub fn write_timeout(&self) -> Timeout {
-        match self.write_timeout_ms.map(Duration::from_millis) {
-            Some(Duration::ZERO) => Timeout::NoTimeout,
-            Some(value) => Timeout::Value(value),
-            None => Timeout::Default,
-        }
+        Timeout::Default
     }
 }
 
@@ -163,46 +111,6 @@ pub struct SystemWarningConfig {
 }
 
 impl SystemWarningConfig {
-    pub fn from_config(config: &LegacyBuckConfig) -> kuro_error::Result<Self> {
-        let memory_pressure_threshold_percent = config.parse(BuckconfigKeyRef {
-            section: "kuro_system_warning",
-            property: "memory_pressure_threshold_percent",
-        })?;
-        let remaining_disk_space_threshold_gb = config.parse(BuckconfigKeyRef {
-            section: "kuro_system_warning",
-            property: "remaining_disk_space_threshold_gb",
-        })?;
-        let min_re_download_bytes_threshold = config.parse(BuckconfigKeyRef {
-            section: "kuro_system_warning",
-            property: "min_re_download_bytes_threshold",
-        })?;
-        let avg_re_download_bytes_per_sec_threshold = config.parse(BuckconfigKeyRef {
-            section: "kuro_system_warning",
-            property: "avg_re_download_bytes_per_sec_threshold",
-        })?;
-        let optin_vpn_check_targets_regex = config.parse(BuckconfigKeyRef {
-            section: "kuro_health_check",
-            property: "optin_vpn_check_targets_regex",
-        })?;
-        let enable_stable_revision_check = config.parse(BuckconfigKeyRef {
-            section: "kuro_health_check",
-            property: "enable_stable_revision_check",
-        })?;
-        let enable_health_check_process_isolation = config.parse(BuckconfigKeyRef {
-            section: "kuro_health_check",
-            property: "enable_health_check_process_isolation",
-        })?;
-        Ok(Self {
-            memory_pressure_threshold_percent,
-            remaining_disk_space_threshold_gb,
-            min_re_download_bytes_threshold,
-            avg_re_download_bytes_per_sec_threshold,
-            optin_vpn_check_targets_regex,
-            enable_stable_revision_check,
-            enable_health_check_process_isolation,
-        })
-    }
-
     pub fn serialize(&self) -> kuro_error::Result<String> {
         serde_json::to_string(&self).buck_error_context("Error serializing SystemWarningConfig")
     }
@@ -247,7 +155,7 @@ pub struct ResourceControlConfig {
 
 impl ResourceControlConfig {
     pub fn testing_default() -> Self {
-        Self::from_config(&LegacyBuckConfig::empty()).unwrap()
+        Self::default_or_from_env().unwrap()
     }
 }
 
@@ -310,80 +218,24 @@ impl FromStr for ResourceControlStatus {
     }
 }
 
-/// The current version of the resource control algorithm. Say you have some important change to the
-/// algo that fixes a bug. Incrementing this to `N + 1` and setting the
-/// `kuro_resource_control.enable_suspension_if_min_algo_version` buckconfig to `N + 1` enables
-/// suspension only if your bug fix is actually included in the version of buck in use
-const RESOURCE_CONTROL_ALGO_VERSION: u32 = 3;
-
 impl ResourceControlConfig {
-    pub fn from_config(config: &LegacyBuckConfig) -> kuro_error::Result<Self> {
+    pub fn default_or_from_env() -> kuro_error::Result<Self> {
         if let Some(env_conf) = kuro_env!(
             "BUCK2_TEST_RESOURCE_CONTROL_CONFIG",
             applicability = testing,
         )? {
             Self::deserialize(env_conf)
         } else {
-            let status = config
-                .parse(BuckconfigKeyRef {
-                    section: "kuro_resource_control",
-                    property: "status",
-                })?
-                .unwrap_or(ResourceControlStatus::Off);
-            let memory_max = config.parse(BuckconfigKeyRef {
-                section: "kuro_resource_control",
-                property: "memory_max",
-            })?;
-            let memory_high = config.parse(BuckconfigKeyRef {
-                section: "kuro_resource_control",
-                property: "memory_high",
-            })?;
-            let memory_max_per_action = config.parse(BuckconfigKeyRef {
-                section: "kuro_resource_control",
-                property: "memory_max_per_action",
-            })?;
-            let memory_high_per_action = config.parse(BuckconfigKeyRef {
-                section: "kuro_resource_control",
-                property: "memory_high_per_action",
-            })?;
-            let memory_high_action_cgroup_pool = config.parse(BuckconfigKeyRef {
-                section: "kuro_resource_control",
-                property: "memory_high_action_cgroup_pool",
-            })?;
-            let memory_pressure_threshold_percent = config
-                .parse(BuckconfigKeyRef {
-                    section: "kuro_resource_control",
-                    property: "memory_pressure_threshold_percent",
-                })?
-                .unwrap_or(10);
-            let enable_suspension = config.parse(BuckconfigKeyRef {
-                section: "kuro_resource_control",
-                property: "enable_suspension",
-            })?;
-            let enable_suspension_if_min_algo_version: Option<u32> =
-                config.parse(BuckconfigKeyRef {
-                    section: "kuro_resource_control",
-                    property: "enable_suspension_if_min_algo_version",
-                })?;
-            let enable_suspension = enable_suspension.unwrap_or(false)
-                || enable_suspension_if_min_algo_version
-                    .is_some_and(|min_version| RESOURCE_CONTROL_ALGO_VERSION >= min_version);
-            let preferred_action_suspend_strategy = config
-                .parse(BuckconfigKeyRef {
-                    section: "kuro_resource_control",
-                    property: "preferred_action_suspend_strategy",
-                })?
-                .unwrap_or(ActionSuspendStrategy::KillAndRetry);
             Ok(Self {
-                status,
-                memory_max,
-                memory_high,
-                memory_max_per_action,
-                memory_high_per_action,
-                memory_high_action_cgroup_pool,
-                memory_pressure_threshold_percent,
-                enable_suspension,
-                preferred_action_suspend_strategy,
+                status: ResourceControlStatus::Off,
+                memory_max: None,
+                memory_high: None,
+                memory_max_per_action: None,
+                memory_high_per_action: None,
+                memory_high_action_cgroup_pool: None,
+                memory_pressure_threshold_percent: 10,
+                enable_suspension: false,
+                preferred_action_suspend_strategy: ActionSuspendStrategy::KillAndRetry,
             })
         }
     }
@@ -418,25 +270,6 @@ pub enum LogDownloadMethod {
 pub struct HealthCheckConfig {
     pub enable_health_checks: bool,
     pub disabled_health_check_names: Option<String>,
-}
-
-impl HealthCheckConfig {
-    pub fn from_config(config: &LegacyBuckConfig) -> kuro_error::Result<Self> {
-        let enable_health_checks = config.parse(BuckconfigKeyRef {
-            section: "kuro_health_check",
-            property: "enable_health_checks",
-        })?;
-        let disabled_health_check_names = config.parse(BuckconfigKeyRef {
-            section: "kuro_health_check",
-            property: "disabled_health_check_names",
-        })?;
-
-        Ok(Self {
-            // TODO(rajneeshl): When the rollout is successful, change this to default to true.
-            enable_health_checks: enable_health_checks.unwrap_or(false),
-            disabled_health_check_names,
-        })
-    }
 }
 
 /// Configurations that are used at startup by the daemon. Those are actually read by the client,
@@ -557,90 +390,29 @@ impl ReConfigSnapshot {
 
 impl DaemonStartupConfig {
     pub fn new(config: &LegacyBuckConfig) -> kuro_error::Result<Self> {
-        // Intepreted client side because we need the value here.
-
-        let log_download_method = {
-            // Determine the log download method to use. Only default to
-            // manifold in fbcode contexts, or when specifically asked.
-            let use_manifold_default = cfg!(fbcode_build);
-            let use_manifold = config
-                .parse(BuckconfigKeyRef {
-                    section: "kuro",
-                    property: "log_use_manifold",
-                })?
-                .unwrap_or(use_manifold_default);
-
-            if use_manifold {
-                Ok(LogDownloadMethod::Manifold)
-            } else {
-                let log_url = config.get(BuckconfigKeyRef {
-                    section: "kuro",
-                    property: "log_url",
-                });
-                if let Some(log_url) = log_url {
-                    if log_url.is_empty() {
-                        Err(kuro_error::kuro_error!(
-                            kuro_error::ErrorTag::Input,
-                            "log_url is empty, but log_use_manifold is false"
-                        ))
-                    } else {
-                        Ok(LogDownloadMethod::Curl(log_url.to_owned()))
-                    }
-                } else {
-                    Ok(LogDownloadMethod::None)
-                }
-            }
-        }?;
+        let log_download_method = if cfg!(fbcode_build) {
+            LogDownloadMethod::Manifold
+        } else {
+            LogDownloadMethod::None
+        };
 
         Ok(Self {
-            num_tokio_workers: config
-                .parse(BuckconfigKeyRef {
-                    section: "build",
-                    property: "num_tokio_workers",
-                })
-                .unwrap_or(Some(0)),
-            daemon_buster: config
-                .get(BuckconfigKeyRef {
-                    section: "buck2",
-                    property: "daemon_buster",
-                })
-                .or_else(|| {
-                    config.get(BuckconfigKeyRef {
-                        section: "kuro",
-                        property: "daemon_buster",
-                    })
-                })
-                .map(ToOwned::to_owned),
+            num_tokio_workers: None,
+            daemon_buster: None,
             digest_algorithms: config
                 .get(BuckconfigKeyRef {
                     section: "kuro",
                     property: "digest_algorithms",
                 })
                 .map(ToOwned::to_owned),
-            source_digest_algorithm: config
-                .get(BuckconfigKeyRef {
-                    section: "kuro",
-                    property: "source_digest_algorithm",
-                })
-                .map(ToOwned::to_owned),
+            source_digest_algorithm: None,
             paranoid: false, // Setup later in ImmediateConfig
-            materializations: config
-                .get(BuckconfigKeyRef {
-                    section: "kuro",
-                    property: "materializations",
-                })
-                .map(ToOwned::to_owned),
-            http: HttpConfig::from_config(config)?,
-            resource_control: ResourceControlConfig::from_config(config)?,
+            materializations: None,
+            http: HttpConfig::default(),
+            resource_control: ResourceControlConfig::default_or_from_env()?,
             log_download_method,
-            health_check_config: HealthCheckConfig::from_config(config)?,
-            retained_event_logs: config
-                .get(BuckconfigKeyRef {
-                    section: "kuro",
-                    property: "retained_event_logs",
-                })
-                .and_then(|s| s.parse::<usize>().ok())
-                .unwrap_or(DEFAULT_RETAINED_EVENT_LOGS),
+            health_check_config: HealthCheckConfig::default(),
+            retained_event_logs: DEFAULT_RETAINED_EVENT_LOGS,
             re_config: ReConfigSnapshot::from_config(config)?,
         })
     }

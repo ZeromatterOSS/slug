@@ -702,7 +702,7 @@ impl DaemonState {
                 format!("action-freezing-enabled:{}", action_freezing_enabled),
                 format!("has-cgroup:{}", memory_tracker.is_some()),
             ];
-            let system_warning_config = SystemWarningConfig::from_config(root_config)?;
+            let system_warning_config = SystemWarningConfig::default();
 
             // Kick off an initial sync eagerly. This gets Watchamn to start watching the path we care
             // about (potentially kicking off an initial crawl).
