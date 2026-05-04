@@ -1,3 +1,6 @@
+# Bucket-C fixture (Plan 35.6a). Uses kuro-specific knobs not yet
+# migrated to CLI flags. See thoughts/shared/research/2026-05-04-fixture-bucket-classification.md
+
 [cells]
   root = .
   cell1 = cell1
