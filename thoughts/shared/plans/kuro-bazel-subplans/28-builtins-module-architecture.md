@@ -67,10 +67,10 @@ Deferred follow-ups:
   never produces. Deleted the dead function and `prelude/toolchains/`
   (33 `.bzl` files plus subtree assets); fixed three pre-existing
   broken init tests so they match what `kuro init` actually
-  generates (just `.buckconfig`, `MODULE.bazel`, `BUILD.bazel`,
-  no toolchain scaffolding). The bundled `@prelude` cell still
-  ships `asserts.bzl`, `utils/`, and `bxl/` for explicit user
-  loads.
+  generates. (Plan 35.7 finished the scaffolding: `kuro init` now
+  produces `MODULE.bazel`, `BUILD.bazel`, and `.bazelignore` — no
+  `.buckconfig`.) The bundled `@prelude` cell still ships
+  `asserts.bzl`, `utils/`, and `bxl/` for explicit user loads.
 
 ## Scope
 

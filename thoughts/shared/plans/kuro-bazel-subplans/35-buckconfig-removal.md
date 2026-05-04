@@ -776,7 +776,14 @@ Remove `app/kuro_common/src/legacy_configs/` once nothing reads from
 - The deprecation warning fires for any user workspace that still ships
   a `.buckconfig`.
 
-### Phase 35.7: Migration docs + kuro init templates  [~½ day]
+### Phase 35.7: Migration docs + kuro init templates  [~½ day]  ✅ COMPLETE 2026-05-04
+
+**Outputs**:
+- `kuro init` template rewritten in `45dfe16a` (Phase 35.6b commit): scaffolds `MODULE.bazel`, `BUILD.bazel`, `.bazelignore` instead of `.buckconfig` + `BUCK`. The "leave existing project alone" guard now keys on `MODULE.bazel`.
+- Migration guide at [`thoughts/shared/docs/2026-05-04-buckconfig-to-bazel-migration.md`](../../docs/2026-05-04-buckconfig-to-bazel-migration.md) — covers every Phase-35.1-audit knob with before/after diffs.
+- Cross-references updated: main plan (Plan 35 marked complete + linked to migration guide), Plan 04 (prelude `.buckconfig` annotated as vestigial bundled-cell artifact, `BUCK` → `BUILD.bazel`), Plan 28 (`kuro init` description updated to match the new scaffold).
+- Examples cross-checked: 16 `examples/**/.buckconfig` files migrated to `MODULE.bazel`; 20 deleted entirely; 3 retained for non-cell content (hello_world / bzlmod_local_test comments, android/demoapp `[alias]` section that is itself reachable only via dead code paths).
+
 
 #### Goal
 

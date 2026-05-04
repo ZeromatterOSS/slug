@@ -356,8 +356,12 @@ prelude/
 │   └── *.bzl            # BXL support
 ├── decls/
 │   └── common.bzl       # Common declarations
-├── .buckconfig          # Prelude cell config
-└── BUCK                 # Prelude package
+├── .buckconfig          # vestigial; one line `[repositories] prelude = .`
+│                        # (kept only because the bundled-cell loader
+│                        # embeds the file verbatim — see Plan 35.6b
+│                        # `parser-deletion-plan` § Bundled cells)
+└── BUILD.bazel          # Prelude package
+                         # (Plan 35.2: `BUCK` → `BUILD.bazel` rename)
 ```
 
 ---
