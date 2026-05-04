@@ -324,6 +324,59 @@ impl LegacyBuckConfig {
         Ok(Self(Arc::new(ConfigData { values })))
     }
 
+    /// Build a config from already-resolved CLI flag overrides only.
+    ///
+    /// Like `from_overrides_only` but accepts `ResolvedConfigFlag` values that
+    /// have already been parsed from the raw `section.key=value` string.
+    /// File-type `ResolvedLegacyConfigArg` variants are silently skipped.
+    pub(crate) fn from_resolved_flags(
+        args: &[crate::legacy_configs::args::ResolvedLegacyConfigArg],
+    ) -> Self {
+        use std::collections::BTreeMap;
+
+        let mut sections: BTreeMap<String, std::collections::BTreeMap<String, ConfigValue>> =
+            BTreeMap::new();
+
+        for arg in args {
+            let flag = match arg {
+                crate::legacy_configs::args::ResolvedLegacyConfigArg::Flag(f) => f,
+                _ => continue, // skip File variants
+            };
+            let s = &flag.section;
+            let k = &flag.key;
+            if let Some(v) = &flag.value {
+                let value = ConfigValue {
+                    raw_value: v.clone(),
+                    resolved_value: ResolvedValue::Literal,
+                    source: Location::CommandLineArgument,
+                };
+                sections
+                    .entry(s.clone())
+                    .or_default()
+                    .insert(k.clone(), value);
+            } else {
+                // None value means this config is unset.
+                if let Some(section) = sections.get_mut(s.as_str()) {
+                    section.remove(k.as_str());
+                }
+            }
+        }
+
+        let values = sections
+            .into_iter()
+            .map(|(s, v)| {
+                (
+                    s,
+                    LegacyBuckConfigSection {
+                        values: v.into_iter().collect(),
+                    },
+                )
+            })
+            .collect();
+
+        Self(Arc::new(ConfigData { values }))
+    }
+
     pub fn filter_values<F>(&self, filter: F) -> Self
     where
         F: Fn(&BuckconfigKeyRef) -> bool,
