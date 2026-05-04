@@ -244,6 +244,86 @@ impl LegacyBuckConfig {
         }))
     }
 
+    /// Build a config from CLI `-c section.key=value` overrides only.
+    ///
+    /// This is the Q1=B constructor: no `.buckconfig` file parsing is performed.
+    /// All values are stored with `ResolvedValue::Literal` so `as_str()` works
+    /// immediately (no `$(config ...)` interpolation, which does not apply to
+    /// CLI flags).
+    pub fn from_overrides_only(
+        args: &[kuro_cli_proto::ConfigOverride],
+    ) -> kuro_error::Result<Self> {
+        use std::collections::BTreeMap;
+
+        use kuro_cli_proto::config_override::ConfigType;
+
+        let mut sections: BTreeMap<String, std::collections::BTreeMap<String, ConfigValue>> =
+            BTreeMap::new();
+
+        for arg in args {
+            let config_type = ConfigType::try_from(arg.config_type).map_err(|_| {
+                kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Unknown ConfigType enum value `{}` in config override",
+                    arg.config_type
+                )
+            })?;
+            if config_type != ConfigType::Value {
+                // Skip --config-file args; they are not read from disk in this path.
+                continue;
+            }
+            let raw = &arg.config_override;
+            let (sk, v) = raw.split_once('=').ok_or_else(|| {
+                kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Could not find equals sign (`=`) in config override `{}`",
+                    raw
+                )
+            })?;
+            let (s, k) = sk.split_once('.').ok_or_else(|| {
+                kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Could not find section separator (`.`) in config override `{}`",
+                    raw
+                )
+            })?;
+            let s = s.trim_start();
+            if s.is_empty() || k.is_empty() {
+                continue;
+            }
+            if v.is_empty() {
+                // Empty value means unset: remove the key if it exists.
+                if let Some(section) = sections.get_mut(s) {
+                    section.remove(k);
+                }
+            } else {
+                let value = ConfigValue {
+                    raw_value: v.to_owned(),
+                    resolved_value: ResolvedValue::Literal,
+                    source: Location::CommandLineArgument,
+                };
+                sections
+                    .entry(s.to_owned())
+                    .or_default()
+                    .insert(k.to_owned(), value);
+            }
+        }
+
+        let values = sections
+            .into_iter()
+            .map(|(s, v)| {
+                (
+                    s,
+                    LegacyBuckConfigSection {
+                        values: v.into_iter().collect(),
+                    },
+                )
+            })
+            .collect();
+
+        Ok(Self(Arc::new(ConfigData { values })))
+    }
+
     pub fn filter_values<F>(&self, filter: F) -> Self
     where
         F: Fn(&BuckconfigKeyRef) -> bool,
@@ -854,6 +934,58 @@ pub(crate) mod tests {
         let config = parse_with_config_args(&[("config", indoc!(r#""#))], "config", &config_args)?;
         assert_config_value(&config, "apple", "key", "foo//value1");
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_overrides_only_basic() -> kuro_error::Result<()> {
+        let args = vec![
+            ConfigOverride::flag_no_cell("section.key=value"),
+            ConfigOverride::flag_no_cell("section.other=hello"),
+            ConfigOverride::flag_no_cell("other.x=42"),
+        ];
+        let config = LegacyBuckConfig::from_overrides_only(&args)?;
+        assert_config_value(&config, "section", "key", "value");
+        assert_config_value(&config, "section", "other", "hello");
+        assert_config_value(&config, "other", "x", "42");
+        // Location must be CommandLineArgument
+        let v = config.get_section("section").unwrap().get("key").unwrap();
+        assert_eq!(v.location(), LegacyBuckConfigLocation::CommandLineArgument);
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_overrides_only_last_wins() -> kuro_error::Result<()> {
+        let args = vec![
+            ConfigOverride::flag_no_cell("section.key=first"),
+            ConfigOverride::flag_no_cell("section.key=second"),
+        ];
+        let config = LegacyBuckConfig::from_overrides_only(&args)?;
+        assert_config_value(&config, "section", "key", "second");
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_overrides_only_empty_value_unsets() -> kuro_error::Result<()> {
+        let args = vec![
+            ConfigOverride::flag_no_cell("section.key=value"),
+            ConfigOverride::flag_no_cell("section.key="),
+        ];
+        let config = LegacyBuckConfig::from_overrides_only(&args)?;
+        assert_config_value_is_empty(&config, "section", "key");
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_overrides_only_skips_file_args() -> kuro_error::Result<()> {
+        use kuro_core::cells::cell_root_path::CellRootPathBuf;
+        let args = vec![
+            ConfigOverride::flag_no_cell("section.key=value"),
+            ConfigOverride::file("some-config-file", Some(CellRootPathBuf::testing_new(""))),
+        ];
+        // File args are skipped; no panic/error
+        let config = LegacyBuckConfig::from_overrides_only(&args)?;
+        assert_config_value(&config, "section", "key", "value");
         Ok(())
     }
 }
