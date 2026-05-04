@@ -121,16 +121,18 @@ fn exec_impl(
     set_up_project(&absolute, git, !cmd.no_prelude)
 }
 
-fn initialize_buckconfig(repo_root: &AbsPath, _prelude: bool, git: bool) -> kuro_error::Result<()> {
-    let mut buckconfig = std::fs::File::create(repo_root.join(".buckconfig"))?;
-    writeln!(buckconfig, "[cells]")?;
-    writeln!(buckconfig, "  root = .")?;
+fn initialize_module_bazel(repo_root: &AbsPath) -> kuro_error::Result<()> {
+    let mut module = std::fs::File::create(repo_root.join("MODULE.bazel"))?;
+    writeln!(module, "module(name = \"root\")")?;
+    Ok(())
+}
 
-    if git {
-        writeln!(buckconfig)?;
-        writeln!(buckconfig, "[project]")?;
-        writeln!(buckconfig, "  ignore = .git")?;
+fn initialize_bazelignore(repo_root: &AbsPath, git: bool) -> kuro_error::Result<()> {
+    if !git {
+        return Ok(());
     }
+    let mut bazelignore = std::fs::File::create(repo_root.join(".bazelignore"))?;
+    writeln!(bazelignore, ".git")?;
     Ok(())
 }
 
@@ -167,11 +169,6 @@ fn set_up_buckroot(repo_root: &AbsPath) -> kuro_error::Result<()> {
     Ok(())
 }
 
-fn initialize_module_bazel(repo_root: &AbsPath) -> kuro_error::Result<()> {
-    fs_util::write(repo_root.join("MODULE.bazel"), "module(name = \"root\")\n")?;
-    Ok(())
-}
-
 fn set_up_project(repo_root: &AbsPath, git: bool, prelude: bool) -> kuro_error::Result<()> {
     set_up_buckroot(repo_root)?;
 
@@ -190,20 +187,18 @@ fn set_up_project(repo_root: &AbsPath, git: bool, prelude: bool) -> kuro_error::
         set_up_gitignore(repo_root)?;
     }
 
-    // If the project already contains a .buckconfig, leave it alone
-    if repo_root.join(".buckconfig").exists() {
+    // If MODULE.bazel already exists, leave the project alone — the user has
+    // already initialized it (manually or via a previous `kuro init`).
+    if repo_root.join("MODULE.bazel").exists() {
         kuro_client_ctx::println!(
-            ".buckconfig already exists, not overwriting and not generating toolchains"
+            "MODULE.bazel already exists, not overwriting and not generating toolchains"
         )?;
         return Ok(());
     }
 
-    initialize_buckconfig(repo_root, prelude, git)?;
-    // Generate MODULE.bazel to enable bzlmod mode
-    if !repo_root.join("MODULE.bazel").exists() {
-        initialize_module_bazel(repo_root)?;
-    }
-    // Create BUILD.bazel if neither BUILD.bazel nor BUILD exists
+    initialize_module_bazel(repo_root)?;
+    initialize_bazelignore(repo_root, git)?;
+    // Create BUILD.bazel if neither BUILD.bazel nor BUILD exists.
     if !repo_root.join("BUILD.bazel").exists() && !repo_root.join("BUILD").exists() {
         initialize_root_build(repo_root, prelude)?;
     }
@@ -215,7 +210,7 @@ mod tests {
     use kuro_fs::fs_util;
     use kuro_fs::paths::abs_path::AbsPath;
 
-    use crate::commands::init::initialize_buckconfig;
+    use crate::commands::init::initialize_bazelignore;
     use crate::commands::init::initialize_root_build;
     use crate::commands::init::set_up_gitignore;
     use crate::commands::init::set_up_project;
@@ -228,7 +223,7 @@ mod tests {
         fs_util::create_dir_all(tempdir_path)?;
 
         set_up_project(tempdir_path, false, true)?;
-        assert!(tempdir_path.join(".buckconfig").exists());
+        assert!(!tempdir_path.join(".buckconfig").exists());
         assert!(tempdir_path.join("MODULE.bazel").exists());
         assert!(tempdir_path.join("BUILD.bazel").exists());
         Ok(())
@@ -257,7 +252,7 @@ mod tests {
         let actual = fs_util::read_to_string(&gitignore_path)?;
         assert_eq!(actual, expected);
 
-        // If a non-empty.buckconfig exists, don't touch it
+        // If a non-empty .gitignore exists, don't touch it
         fs_util::write(&gitignore_path, "foo\nbar\n")?;
         set_up_gitignore(tempdir_path)?;
         assert!(gitignore_path.exists());
@@ -268,35 +263,27 @@ mod tests {
     }
 
     #[test]
-    fn test_buckconfig_generation_with_git() -> kuro_error::Result<()> {
+    fn test_bazelignore_generated_with_git() -> kuro_error::Result<()> {
         let tempdir = tempfile::tempdir()?;
         let tempdir_path = tempdir.path();
         let tempdir_path = AbsPath::new(tempdir_path)?;
         fs_util::create_dir_all(tempdir_path)?;
 
-        let buckconfig_path = tempdir_path.join(".buckconfig");
-        initialize_buckconfig(tempdir_path, true, true)?;
-        let actual_buckconfig = fs_util::read_to_string(buckconfig_path)?;
-        let expected_buckconfig = "[cells]\n  root = .\n\n[project]\n  ignore = .git\n";
-        assert_eq!(actual_buckconfig, expected_buckconfig);
+        initialize_bazelignore(tempdir_path, true)?;
+        let actual = fs_util::read_to_string(tempdir_path.join(".bazelignore"))?;
+        assert_eq!(actual, ".git\n");
         Ok(())
     }
 
     #[test]
-    fn test_buckconfig_generation_without_prelude() -> kuro_error::Result<()> {
+    fn test_bazelignore_skipped_without_git() -> kuro_error::Result<()> {
         let tempdir = tempfile::tempdir()?;
         let tempdir_path = tempdir.path();
         let tempdir_path = AbsPath::new(tempdir_path)?;
         fs_util::create_dir_all(tempdir_path)?;
 
-        let buckconfig_path = tempdir_path.join(".buckconfig");
-        initialize_buckconfig(tempdir_path, false, false)?;
-        let actual_buckconfig = fs_util::read_to_string(buckconfig_path)?;
-        let expected_buckconfig = "[cells]
-  root = .
-";
-        assert_eq!(actual_buckconfig, expected_buckconfig);
-
+        initialize_bazelignore(tempdir_path, false)?;
+        assert!(!tempdir_path.join(".bazelignore").exists());
         Ok(())
     }
 

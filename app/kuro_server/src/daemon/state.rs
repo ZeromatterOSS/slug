@@ -288,6 +288,20 @@ impl DaemonState {
         rt.spawn(async move {
             let fs = paths.project_root().clone();
 
+            // Plan 35.6b deprecation pointer: warn loudly on the first
+            // daemon startup that observes a workspace `.buckconfig`,
+            // since that file no longer drives any kuro behaviour
+            // (cells live in MODULE.bazel, runtime knobs in `.bazelrc`).
+            // The check is one stat() — ignore errors silently.
+            if fs.root().as_path().join(".buckconfig").exists() {
+                tracing::warn!(
+                    "Detected `.buckconfig` in workspace root `{}`. \
+                     Kuro no longer reads `.buckconfig` (Plan 35); the file is dead. \
+                     Migrate cells to `MODULE.bazel` and runtime flags to `.bazelrc`.",
+                    fs.root()
+                );
+            }
+
             tracing::info!("Reading config...");
             let legacy_cells = BuckConfigBasedCells::parse_with_config_args(&fs, &[]).await?;
 
