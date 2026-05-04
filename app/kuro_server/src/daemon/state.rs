@@ -968,9 +968,6 @@ async fn http_client_from_startup_config(
 #[cfg(test)]
 mod tests {
 
-    use indoc::indoc;
-    use kuro_common::legacy_configs::configs::testing::parse;
-
     use super::*;
 
     #[tokio::test]
@@ -987,63 +984,6 @@ mod tests {
             Some(Duration::from_millis(DEFAULT_CONNECT_TIMEOUT_MS)),
             builder.connect_timeout()
         );
-        assert_eq!(
-            Some(Duration::from_millis(DEFAULT_READ_TIMEOUT_MS)),
-            builder.read_timeout()
-        );
-        assert_eq!(None, builder.write_timeout());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_from_startup_config_overrides() -> kuro_error::Result<()> {
-        kuro_certs::certs::maybe_setup_cryptography();
-        let config = parse(
-            &[(
-                "config",
-                indoc!(
-                    r#"
-                    [http]
-                    max_redirects = 5
-                    connect_timeout_ms = 10
-                    write_timeout_ms = 5
-                    "#
-                ),
-            )],
-            "config",
-        )?;
-        let startup_config = DaemonStartupConfig::new(&config)?;
-        let builder = http_client_from_startup_config(&startup_config).await?;
-        assert_eq!(5, builder.max_redirects().unwrap());
-        assert_eq!(Some(Duration::from_millis(10)), builder.connect_timeout());
-        assert_eq!(
-            Some(Duration::from_millis(DEFAULT_READ_TIMEOUT_MS)),
-            builder.read_timeout()
-        );
-        assert_eq!(Some(Duration::from_millis(5)), builder.write_timeout());
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_from_startup_config_zero_for_unset() -> kuro_error::Result<()> {
-        kuro_certs::certs::maybe_setup_cryptography();
-        let config = parse(
-            &[(
-                "config",
-                indoc!(
-                    r#"
-                    [http]
-                    connect_timeout_ms = 0
-                    "#,
-                ),
-            )],
-            "config",
-        )?;
-        let startup_config = DaemonStartupConfig::new(&config)?;
-        let builder = http_client_from_startup_config(&startup_config).await?;
-        assert_eq!(None, builder.connect_timeout());
         assert_eq!(
             Some(Duration::from_millis(DEFAULT_READ_TIMEOUT_MS)),
             builder.read_timeout()

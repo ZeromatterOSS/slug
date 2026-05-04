@@ -14,7 +14,6 @@ use indoc::indoc;
 use kuro_build_api::interpreter::rule_defs::provider::registration::register_builtin_providers;
 use kuro_common::legacy_configs::cells::BuckConfigBasedCells;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
-use kuro_common::legacy_configs::configs::testing::TestConfigParserFileOps;
 use kuro_common::package_listing::listing::PackageListing;
 use kuro_common::package_listing::listing::testing::PackageListingExt;
 use kuro_core::build_file_path::BuildFilePath;
@@ -177,24 +176,11 @@ fn test_eval_build_file() {
 }
 
 fn cells() -> CellsData {
+    // Q1=B: cell layout comes from MODULE.bazel only; legacy .buckconfig [cells]
+    // parsing has been removed.  In tests there is no project root, so we get
+    // the trivial single-cell resolver (root only).
     let BuckConfigBasedCells { cell_resolver, .. } =
-        futures::executor::block_on(BuckConfigBasedCells::testing_parse_with_file_ops(
-            &mut TestConfigParserFileOps::new(&[(
-                ".buckconfig",
-                indoc!(
-                    r#"
-                    [cells]
-                        root = .
-                        cell1 = project/cell1
-                        cell2 = project/cell2
-                        xalias2 = project/cell2
-                    "#
-                ),
-            )])
-            .unwrap(),
-            &[],
-        ))
-        .unwrap();
+        futures::executor::block_on(BuckConfigBasedCells::testing_parse(&[])).unwrap();
     (
         cell_resolver.root_cell_cell_alias_resolver().dupe(),
         cell_resolver,

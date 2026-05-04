@@ -10,7 +10,6 @@
 
 use std::collections::BTreeSet;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::io::BufWriter;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -66,7 +65,6 @@ use kuro_common::io::trace::TracingIoProvider;
 use kuro_common::legacy_configs::cells::BuckConfigBasedCells;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
 use kuro_common::legacy_configs::dice::HasInjectedLegacyConfigs;
-use kuro_common::legacy_configs::file_ops::ConfigPath;
 use kuro_configured::cycle::ConfiguredGraphCycleDescriptor;
 use kuro_core::execution_types::executor_config::CommandExecutorConfig;
 use kuro_core::execution_types::executor_config::RemoteExecutorUseCase;
@@ -92,7 +90,6 @@ use kuro_execute::re::output_trees_download_config::OutputTreesDownloadConfig;
 use kuro_execute_impl::executors::worker::WorkerPool;
 use kuro_execute_impl::low_pass_filter::LowPassFilter;
 use kuro_file_watcher::mergebase::SetMergebase;
-use kuro_fs::fs_util;
 use kuro_fs::paths::abs_norm_path::AbsNormPath;
 use kuro_fs::paths::abs_norm_path::AbsNormPathBuf;
 use kuro_fs::paths::file_name::FileName;
@@ -538,7 +535,6 @@ impl ServerCommandContext<'_> {
         )
         .await?;
 
-        self.report_traced_config_paths(&new_configs.config_paths)?;
         if self.reuse_current_config {
             if dice_ctx
                 .is_injected_external_buckconfig_data_key_set()
@@ -565,7 +561,6 @@ impl ServerCommandContext<'_> {
                 Ok(BuckConfigBasedCells {
                     cell_resolver: new_configs.cell_resolver,
                     root_config: new_configs.root_config,
-                    config_paths: HashSet::new(),
                     external_data: (*dice_ctx.get_injected_external_buckconfig_data().await?)
                         .clone(),
                     is_bzlmod: new_configs.is_bzlmod,
@@ -581,23 +576,6 @@ impl ServerCommandContext<'_> {
         } else {
             Ok(new_configs)
         }
-    }
-
-    fn report_traced_config_paths(&self, paths: &HashSet<ConfigPath>) -> kuro_error::Result<()> {
-        if let Some(tracing_provider) = TracingIoProvider::from_io(&*self.base_context.daemon.io) {
-            for config_path in paths {
-                match config_path {
-                    ConfigPath::Global(p) => {
-                        // FIXME(JakobDegen): This is wrong, since we might fail to add symlinks that we depend on.
-                        let p = fs_util::canonicalize(p)?;
-                        tracing_provider.add_external_path(p)
-                    }
-                    ConfigPath::Project(p) => tracing_provider.add_project_path(p.clone()),
-                }
-            }
-        }
-
-        Ok(())
     }
 }
 

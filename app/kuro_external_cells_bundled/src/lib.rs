@@ -171,15 +171,7 @@ mod tests {
     #[test]
     fn test_bundled_prelude_data() {
         let c = super::PRELUDE;
-        // Make sure there's a buckconfig
-        assert!(c.files.iter().any(|file| {
-            file.path == ".buckconfig"
-                && std::str::from_utf8(file.contents)
-                    .unwrap()
-                    .contains("prelude = .")
-        }));
-
-        // And that there's at least 50 files with a reasonable amount of data
+        // Check that there's at least 50 files with a reasonable amount of data
         assert!(
             c.files
                 .iter()
