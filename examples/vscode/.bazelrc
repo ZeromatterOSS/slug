@@ -1,2 +1,4 @@
 build --remote_executor=grpc://localhost:8980
 build --remote_instance_name=fuse
+build --platforms=root//kuro_utils/platforms:windows_debug
+build --extra_execution_platforms=root//kuro_utils/platforms:default

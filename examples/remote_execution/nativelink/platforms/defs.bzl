@@ -29,6 +29,6 @@ def _platforms(ctx):
         ),
     )
 
-    return [DefaultInfo(), ExecutionPlatformRegistrationInfo(platforms = [platform])]
+    return [DefaultInfo(), platform]
 
 platforms = rule(attrs = {}, impl = _platforms)

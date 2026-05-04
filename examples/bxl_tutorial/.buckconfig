@@ -5,6 +5,3 @@ name=TARGETS.fixture
 root = .
 prelude = prelude
 config = config
-
-[build]
-  execution_platforms = root//platforms:platforms

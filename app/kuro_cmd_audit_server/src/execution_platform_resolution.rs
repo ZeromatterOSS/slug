@@ -14,7 +14,6 @@ use async_trait::async_trait;
 use indent_write::io::IndentWriter;
 use kuro_cli_proto::ClientContext;
 use kuro_cmd_audit_client::execution_platform_resolution::AuditExecutionPlatformResolutionCommand;
-use kuro_node::execution::EXECUTION_PLATFORMS_BUCKCONFIG;
 use kuro_node::execution::GetExecutionPlatforms;
 use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
 use kuro_server_ctx::ctx::ServerCommandContextTrait;
@@ -48,7 +47,7 @@ impl ServerAuditSubcommand for AuditExecutionPlatformResolutionCommand {
                     None => {
                         writeln!(
                             stdout,
-                            "Execution platforms are not configured: {EXECUTION_PLATFORMS_BUCKCONFIG} unset"
+                            "Execution platforms are not configured: pass `--extra_execution_platforms=<label>` or call `register_execution_platforms()` from MODULE.bazel"
                         )?;
                         writeln!(stdout, "Using legacy execution platform")?;
                     }

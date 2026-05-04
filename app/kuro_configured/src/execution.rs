@@ -12,12 +12,16 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use async_trait::async_trait;
+use derive_more::Display;
+use dice::DiceComputations;
+use dice::Key;
+use dice_futures::cancellation::CancellationContext;
+use dupe::Dupe;
+use futures::future::FutureExt;
+use itertools::Itertools;
 use kuro_build_api::actions::execute::dice_data::HasFallbackExecutorConfig;
 use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
-use kuro_build_api::interpreter::rule_defs::provider::builtin::constraint_value_info::FrozenConstraintValueInfo;
-use kuro_build_api::interpreter::rule_defs::provider::builtin::execution_platform_registration_info::FrozenExecutionPlatformRegistrationInfo;
 use kuro_common::dice::cells::HasCellResolver;
-use kuro_common::legacy_configs::dice::HasLegacyConfigs;
 use kuro_core::configuration::compatibility::MaybeCompatible;
 use kuro_core::configuration::data::ConfigurationData;
 use kuro_core::configuration::pair::ConfigurationNoExec;
@@ -32,7 +36,6 @@ use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_core::target::target_configured_target_label::TargetConfiguredTargetLabel;
 use kuro_error::BuckErrorContext;
-use dice_futures::cancellation::CancellationContext;
 use kuro_node::attrs::configuration_context::AttrConfigurationContext;
 use kuro_node::attrs::configuration_context::AttrConfigurationContextImpl;
 use kuro_node::attrs::inspect_options::AttrInspectOptions;
@@ -40,28 +43,21 @@ use kuro_node::attrs::spec::internal::EXEC_COMPATIBLE_WITH_ATTRIBUTE;
 use kuro_node::configuration::calculation::CellNameForConfigurationResolution;
 use kuro_node::configuration::resolved::ConfigurationSettingKey;
 use kuro_node::configuration::resolved::MatchedConfigurationSettingKeysWithCfg;
+use kuro_node::execution::GET_EXECUTION_PLATFORMS;
 use kuro_node::execution::GetExecutionPlatforms;
 use kuro_node::execution::GetExecutionPlatformsImpl;
-use kuro_node::execution::EXECUTION_PLATFORMS_BUCKCONFIG;
-use kuro_node::execution::GET_EXECUTION_PLATFORMS;
 use kuro_node::nodes::configured::ConfiguredTargetNode;
 use kuro_node::nodes::configured_frontend::ConfiguredTargetNodeCalculation;
 use kuro_node::nodes::frontend::TargetGraphCalculation;
 use kuro_node::nodes::unconfigured::TargetNodeRef;
-use derive_more::Display;
-use futures::future::FutureExt;
-use dice::DiceComputations;
-use dice::Key;
-use dupe::Dupe;
-use itertools::Itertools;
 use starlark_map::ordered_map::OrderedMap;
 
-use crate::configuration::get_matched_cfg_keys;
 use crate::configuration::compute_platform_cfgs;
+use crate::configuration::get_matched_cfg_keys;
 use crate::configuration::get_matched_cfg_keys_for_node;
-use crate::nodes::gather_deps;
 use crate::nodes::GatheredDeps;
 use crate::nodes::LookingUpConfiguredNodeContext;
+use crate::nodes::gather_deps;
 
 #[derive(Debug, kuro_error::Error)]
 #[kuro(input)]
@@ -70,12 +66,6 @@ enum ExecutionPlatformComputationError {
     ToolchainDepMissingPlatform(ConfigurationData),
     #[error("Target `{0}` has a transition_dep, which is not permitted on a toolchain rule")]
     ToolchainTransitionDep(TargetLabel),
-    #[error(
-        "Expected `{0}` to provide a `ExecutionPlatformRegistrationInfo` as it's configured as the `build.execution_platforms` value."
-    )]
-    MissingExecutionPlatformRegistrationInfo(TargetLabel),
-    #[error("Expected `{0}` (exec_marker_constraint) to provide a `ConstraintValueInfo` provider.")]
-    MissingConstraintValueInfo(ProvidersLabel),
 }
 
 /// DICE injected key for the `--extra_execution_platforms` flag.
@@ -700,11 +690,8 @@ async fn compute_execution_platforms(
     let cli_extras: Arc<[String]> = ctx.compute(&ExtraExecutionPlatformsKey).await?;
     let cli_extras: Vec<String> = cli_extras.iter().cloned().collect();
     let module_registrations = kuro_bzlmod::get_registered_execution_platforms();
-    let buckconfig_label = ctx
-        .get_legacy_config_property(root_cell, EXECUTION_PLATFORMS_BUCKCONFIG)
-        .await?;
 
-    if cli_extras.is_empty() && module_registrations.is_empty() && buckconfig_label.is_none() {
+    if cli_extras.is_empty() && module_registrations.is_empty() {
         return Ok(None);
     }
 
@@ -725,70 +712,16 @@ async fn compute_execution_platforms(
         }
     }
 
-    let mut buckconfig_fallback: Option<ExecutionPlatformFallback> = None;
-    if let Some(value) = buckconfig_label {
-        let target = TargetLabel::parse(&value, root_cell, &cells, &alias_resolver)?;
-        let providers = ctx
-            .get_configuration_analysis_result(&ProvidersLabel::default_for(target.dupe()))
-            .await?;
-        if let Some(reg) = providers
-            .provider_collection()
-            .builtin_provider::<FrozenExecutionPlatformRegistrationInfo>()
-        {
-            let marker_constraint = if let Some(marker_str) = reg.exec_marker_constraint() {
-                let marker_label =
-                    ProvidersLabel::parse(marker_str, root_cell, &cells, &alias_resolver)?;
-                let marker_providers = ctx.get_configuration_analysis_result(&marker_label).await?;
-                let constraint_value_info = marker_providers
-                    .provider_collection()
-                    .builtin_provider::<FrozenConstraintValueInfo>()
-                    .ok_or_else(|| {
-                        kuro_error::Error::from(
-                            ExecutionPlatformComputationError::MissingConstraintValueInfo(
-                                marker_label.dupe(),
-                            ),
-                        )
-                    })?;
-                Some(constraint_value_info.to_constraint_key_value())
-            } else {
-                None
-            };
-            for platform in reg.platforms()? {
-                platforms
-                    .push(platform.to_execution_platform_with_marker(marker_constraint.as_ref())?);
-            }
-            buckconfig_fallback = Some(reg.fallback()?);
-            display_target = Some(target);
-        } else if let Some(p) = load_platform_candidate(ctx, &value).boxed().await? {
-            platforms.push(p);
-            if display_target.is_none() {
-                display_target = Some(target);
-            }
-        } else {
-            return Err(kuro_error::Error::from(
-                ExecutionPlatformComputationError::MissingExecutionPlatformRegistrationInfo(target),
-            ));
-        }
-    }
-
     if platforms.is_empty() {
         return Ok(None);
     }
 
     let display_target = display_target
         .internal_error("compute_execution_platforms produced platforms with no display target")?;
-    let fallback = match (
-        buckconfig_fallback,
-        cli_extras.is_empty(),
-        module_registrations.is_empty(),
-    ) {
-        // Only the legacy buckconfig contributed → honor its fallback.
-        (Some(f), true, true) => f,
-        // CLI/MODULE registrations are present → use Bazel's "no
-        // compatible platform → error" semantics so misconfigurations
-        // surface loudly instead of silently routing to the host.
-        _ => ExecutionPlatformFallback::Error,
-    };
+    // CLI/MODULE registrations are the only source — use Bazel's "no
+    // compatible platform → error" semantics so misconfigurations
+    // surface loudly instead of silently routing to the host.
+    let fallback = ExecutionPlatformFallback::Error;
 
     Ok(Some(Arc::new(ExecutionPlatformsData::new(
         display_target,

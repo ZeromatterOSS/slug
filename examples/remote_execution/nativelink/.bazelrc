@@ -1,2 +1,3 @@
 build --remote_executor=grpc://localhost:50051
 build --remote_instance_name=main
+build --extra_execution_platforms=root//platforms:platforms

@@ -1,0 +1,2 @@
+build --platforms=prelude//platforms:default
+build --extra_execution_platforms=prelude//platforms:default

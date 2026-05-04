@@ -12,10 +12,3 @@ buck = none
 
 [external_cells]
   prelude = bundled
-
-
-[parser]
-target_platform_detector_spec = target:root//...->root//kuro_utils/platforms:windows_debug
-
-[build]
-execution_platforms = root//kuro_utils/platforms:default

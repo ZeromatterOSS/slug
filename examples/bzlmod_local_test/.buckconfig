@@ -1,7 +1,3 @@
-# Minimal configuration for bzlmod local path override testing
+# Minimal configuration for bzlmod local path override testing.
 # This project tests local_path_override() functionality.
 # Cell registration is in MODULE.bazel.
-
-[parser]
-# Disable target platform detection since we're using minimal toolchains
-target_platform_detector_spec =

@@ -13,6 +13,3 @@ fbsource = none
 
 [external_cells]
   prelude = bundled
-
-[parser]
-target_platform_detector_spec = target://...->prelude//platforms:default

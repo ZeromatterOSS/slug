@@ -1,3 +1,4 @@
 build --digest_function=SHA256
 build --remote_executor=$BUILDBUDDY_ENDPOINT
 build --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY
+build --extra_execution_platforms=root//platforms:platforms

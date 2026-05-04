@@ -1,0 +1,1 @@
+build --extra_execution_platforms=root//platforms:platforms

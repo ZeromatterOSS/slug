@@ -39,6 +39,3 @@ toolchains = gh_facebook_kuro_shims_meta
 
 [external_cells]
 # prelude = bundled  # DISABLED: Phase 8c-interim
-
-[parser]
-target_platform_detector_spec = target:root//...->prelude//platforms:default target:shim//...->prelude//platforms:default

@@ -3,3 +3,4 @@ build --digest_function=SHA256
 # ENGFLOW_CERTIFICATE: path to a PEM client certificate
 build --remote_executor=$ENGFLOW_ENDPOINT
 build --tls_client_certificate=$ENGFLOW_CERTIFICATE
+build --extra_execution_platforms=root//platforms:platforms

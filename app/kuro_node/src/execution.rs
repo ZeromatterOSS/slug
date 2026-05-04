@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use dice::DiceComputations;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_core::execution_types::execution::ExecutionPlatformResolution;
 use kuro_core::execution_types::execution_platforms::ExecutionPlatforms;
 use kuro_core::target::label::label::TargetLabel;
@@ -21,11 +20,6 @@ use kuro_util::late_binding::LateBinding;
 
 use crate::configuration::calculation::CellNameForConfigurationResolution;
 use crate::configuration::resolved::ConfigurationSettingKey;
-
-pub const EXECUTION_PLATFORMS_BUCKCONFIG: BuckconfigKeyRef = BuckconfigKeyRef {
-    section: "build",
-    property: "execution_platforms",
-};
 
 #[async_trait]
 pub trait GetExecutionPlatformsImpl: 'static + Send + Sync {

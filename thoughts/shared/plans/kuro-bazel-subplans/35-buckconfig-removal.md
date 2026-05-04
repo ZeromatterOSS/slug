@@ -428,7 +428,77 @@ become `.bazelrc` flags or get dropped. Test fixtures unaffected.
 - No active-workspace `.buckconfig` has a `[project]` section. (Test
   fixtures may still — handled in 35.6.)
 
-### Phase 35.5: Runtime knobs → `.bazelrc` (active workspaces)  [~2-3 days]  ⚠️ DRAIN COMPLETE 2026-05-04, RENAME PHASE DEFERRED
+### Phase 35.5: Runtime knobs → `.bazelrc` (active workspaces)  [~2-3 days]  ⚠️ DRAIN COMPLETE 2026-05-04, RENAME PHASE IN PROGRESS
+
+**Rename phase — IN PROGRESS 2026-05-04**:
+- Step (a): `--digest_function` rename + buildbuddy/engflow migration. ✅ commit `885384f5`.
+- Step (b): `[kuro_re_client]` → `--remote_executor`/`--remote_header`/`--remote_instance_name`/`--tls_client_certificate` plus URL-scheme TLS detection. 5 examples migrated (vscode, buildbarn, buildbuddy, engflow, nativelink). End-to-end BuildBuddy RE smoke from `llvm-project/utils/bazel --config=remote` clean (8 actions, all remote). ✅ commit `33ebcc97`.
+- Step (c): `[parser] target_platform_detector_spec` and `[build] execution_platforms` migration. See "Step (c) design" below.
+- Step (d): `[kuro] file_watcher` → `--kuro_file_watcher`. Trivial; not yet started.
+
+#### Step (c) design (2026-05-04)
+
+**`--platforms` (target platform default)**
+
+`[parser] target_platform_detector_spec` was a per-pattern routing
+mechanism (`target:root//...->prelude//platforms:default`) used as a
+workspace-wide default target platform. Bazel has no per-pattern
+mapping — it has `--platforms`, which sets the platform of top-level
+CLI targets and propagates to deps via configuration inheritance. Every
+detector spec in this repo's active examples uses a single mapping
+(`target:root//...->X` or `target://...->X`); no per-pattern routing
+is in use. The Bazel-equivalent migration is therefore:
+
+1. Drop the `BuckconfigKeyRef` parse in
+   `kuro_configured::target_platform_resolution::get_target_platform_detector`;
+   stub it to return an empty `TargetPlatformDetector`. The struct
+   stays in place (used by `node.get_default_target_platform()`
+   resolution path, which is unaffected) but its only feed becomes
+   bzlmod-side registrations once those exist.
+2. Each migrated example gets a `.bazelrc` line `build --platforms=X`,
+   where `X` is the previous mapping target. The CLI flag is the
+   already-shipped `--target-platforms` aliased to `--platforms` in
+   `app/kuro_client_ctx/src/common/target_cfg.rs`. It threads through
+   `GlobalCfgOptions.target_platform` and is consumed at the top of
+   `get_configured_target` (line 216 of
+   `target_platform_resolution.rs`), which already takes precedence
+   over `node.get_default_target_platform()` and the (now empty)
+   detector. Deps inherit the configuration, matching Bazel.
+3. Empty detector specs (e.g. `bzlmod_local_test`) become "no
+   `--platforms` line" — same effective behavior.
+4. Multi-mapping cases that all resolve to the same target (e.g.
+   `shim` listing both `target:root//...->X` and `target:shim//...->X`)
+   collapse to a single `--platforms=X`.
+
+**`--extra_execution_platforms` (registered exec platforms)**
+
+`[build] execution_platforms` accepts a single registration target
+that returns `ExecutionPlatformRegistrationInfo(platforms = [...])`.
+The CLI flag `--extra_execution_platforms` (already shipped, wired
+through `ExtraExecutionPlatformsKey` in
+`kuro_configured::execution`) accepts individual platform labels.
+Every kuro example wraps a single platform in the registration rule,
+so refactor the rule to return the `ExecutionPlatformInfo` directly
+(drop the wrapper) and point the CLI flag at the same label:
+
+1. Each `examples/**/platforms/defs.bzl` (currently a `platforms`
+   rule returning `[DefaultInfo(), ExecutionPlatformRegistrationInfo(platforms = [platform])]`)
+   becomes `[DefaultInfo(), platform]`.
+2. Drop the `BuckconfigKeyRef` parse in
+   `kuro_configured::execution::compute_execution_platforms` (the
+   buckconfig-as-registration-target branch, ~line 728-762). The
+   `--extra_execution_platforms` candidate path handles the migrated
+   shape via the existing `load_platform_candidate`'s
+   `FrozenExecutionPlatformInfo` branch.
+3. Each example's `.buckconfig [build] execution_platforms = X`
+   becomes a `.bazelrc` line `build --extra_execution_platforms=X`.
+
+**Acceptance for step (c)**: every active-workspace `.buckconfig`
+without a `[parser]` or `[build]` section; `cargo build -p kuro`
+clean; LLVM Demangle + LLVM Support smoke clean; pytest analysis
+baseline 122/5/3/1; per-example smoke via `kuro audit cell` (offline)
+and `kuro build //...` (where buildable) for the 9 migrated examples.
+
 
 **Drain (delete dead lookups) — DONE 2026-05-04**:
 - `init.rs`: 39 → 6 lookups (kept `digest_algorithms` + `[kuro_re_client]` snapshot)

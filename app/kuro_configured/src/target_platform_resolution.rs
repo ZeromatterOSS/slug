@@ -10,16 +10,10 @@
 
 use std::sync::Arc;
 
-use allocative::Allocative;
 use async_trait::async_trait;
-use derive_more::Display;
 use dice::DiceComputations;
-use dice::Key;
-use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use kuro_common::dice::cells::HasCellResolver;
-use kuro_common::legacy_configs::dice::HasLegacyConfigs;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_core::cells::name::CellName;
 use kuro_core::cells::paths::CellRelativePath;
 use kuro_core::configuration::build_setting::BuildSettingLabel;
@@ -45,59 +39,17 @@ use crate::configuration::get_platform_configuration;
 use crate::execution::get_execution_platform_toolchain_dep;
 
 async fn get_target_platform_detector(
-    ctx: &mut DiceComputations<'_>,
+    _ctx: &mut DiceComputations<'_>,
 ) -> kuro_error::Result<Arc<TargetPlatformDetector>> {
-    // This requires a bit of computation so cache it on the graph.
-    // TODO(cjhopman): Should we construct this (and similar buckconfig-derived objects) as part of the buck config itself?
-    #[derive(Clone, Display, Debug, Dupe, Eq, Hash, PartialEq, Allocative)]
-    #[display("TargetPlatformDetectorKey")]
-    struct TargetPlatformDetectorKey;
-
-    #[async_trait]
-    impl Key for TargetPlatformDetectorKey {
-        type Value = kuro_error::Result<Arc<TargetPlatformDetector>>;
-        async fn compute(
-            &self,
-            ctx: &mut DiceComputations,
-            _cancellation: &CancellationContext,
-        ) -> Self::Value {
-            // We get this off the root cell's config. It's not clear that that's the appropriate way to do it, but its the easiest to get working at FB.
-            // TODO(cjhopman): Consider revisiting that approach.
-            let resolver = ctx.get_cell_resolver().await?;
-            let root_cell = resolver.root_cell();
-            let cell_alias_resolver = ctx.get_cell_alias_resolver(root_cell).await?;
-
-            Ok(Arc::new(
-                match ctx
-                    .get_legacy_config_property(
-                        root_cell,
-                        BuckconfigKeyRef {
-                            section: "parser",
-                            property: "target_platform_detector_spec",
-                        },
-                    )
-                    .await?
-                {
-                    None => TargetPlatformDetector::empty(),
-                    Some(spec) => TargetPlatformDetector::parse_spec(
-                        &spec,
-                        root_cell,
-                        &resolver,
-                        &cell_alias_resolver,
-                    )?,
-                },
-            ))
-        }
-
-        fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-            match (x, y) {
-                (Ok(x), Ok(y)) => x == y,
-                _ => false,
-            }
-        }
-    }
-
-    ctx.compute(&TargetPlatformDetectorKey).await?
+    // `[parser] target_platform_detector_spec` is no longer parsed.
+    // The Bazel-equivalent workspace default is `--platforms=X`
+    // (already plumbed via `GlobalCfgOptions.target_platform`), which
+    // takes precedence over this fallback in `get_configured_target`
+    // and propagates to deps via configuration inheritance. The empty
+    // detector lets the host-platform fallback below run when the
+    // user supplies neither `--platforms` nor a per-target
+    // `default_target_platform`.
+    Ok(Arc::new(TargetPlatformDetector::empty()))
 }
 
 async fn get_default_platform(
