@@ -9,7 +9,6 @@
  */
 
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -37,12 +36,9 @@ use kuro_core::cells::external::GitObjectFormat;
 use kuro_core::cells::name::CellName;
 use kuro_core::fs::project::ProjectRoot;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
-use kuro_core::kuro_env;
 use kuro_error::BuckErrorContext;
 use kuro_fs::fs_util;
 use kuro_fs::paths::RelativePath;
-use kuro_fs::paths::abs_path::AbsPath;
-use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 
 use crate::dice::cells::HasCellResolver;
 use crate::dice::data::HasIoProvider;
@@ -55,16 +51,7 @@ use crate::legacy_configs::cells_symlinks::cleanup_stale_symlinks;
 use crate::legacy_configs::cells_symlinks::ensure_symlink;
 use crate::legacy_configs::configs::LegacyBuckConfig;
 use crate::legacy_configs::dice::HasInjectedLegacyConfigs;
-use crate::legacy_configs::file_ops::ConfigParserFileOps;
-use crate::legacy_configs::file_ops::ConfigPath;
-use crate::legacy_configs::file_ops::DefaultConfigParserFileOps;
-use crate::legacy_configs::file_ops::DiceConfigFileOps;
-use crate::legacy_configs::file_ops::push_all_files_from_a_directory;
 use crate::legacy_configs::key::BuckconfigKeyRef;
-use crate::legacy_configs::path::DEFAULT_EXTERNAL_CONFIG_SOURCES;
-use crate::legacy_configs::path::DEFAULT_PROJECT_CONFIG_SOURCES;
-use crate::legacy_configs::path::ExternalConfigSource;
-use crate::legacy_configs::path::ProjectConfigSource;
 
 /// Bundled toolchain labels auto-injected when `rules_python` is in the
 /// module graph but the root module didn't register a py3 toolchain.
@@ -168,7 +155,6 @@ impl ExternalBuckconfigData {
 pub struct BuckConfigBasedCells {
     pub cell_resolver: CellResolver,
     pub root_config: LegacyBuckConfig,
-    pub config_paths: HashSet<ConfigPath>,
     pub external_data: ExternalBuckconfigData,
     /// True when MODULE.bazel is present - all cell resolution is done via bzlmod.
     /// Per-cell .buckconfig [repository_aliases] sections are ignored in this mode.
@@ -199,21 +185,7 @@ impl BuckConfigBasedCells {
     /// possible.
     pub async fn get_cell_alias_resolver_for_cwd_fast(
         &self,
-        project_fs: &ProjectRoot,
-        cwd: &ProjectRelativePath,
-    ) -> kuro_error::Result<CellAliasResolver> {
-        self.get_cell_alias_resolver_for_cwd_fast_with_file_ops(
-            &mut DefaultConfigParserFileOps {
-                project_fs: project_fs.dupe(),
-            },
-            cwd,
-        )
-        .await
-    }
-
-    pub(crate) async fn get_cell_alias_resolver_for_cwd_fast_with_file_ops(
-        &self,
-        _file_ops: &mut dyn ConfigParserFileOps,
+        _project_fs: &ProjectRoot,
         cwd: &ProjectRelativePath,
     ) -> kuro_error::Result<CellAliasResolver> {
         let cell_name = self.cell_resolver.find(cwd);
@@ -240,54 +212,26 @@ impl BuckConfigBasedCells {
         project_fs: &ProjectRoot,
         config_args: &[kuro_cli_proto::ConfigOverride],
     ) -> kuro_error::Result<Self> {
-        Self::parse_with_file_ops_and_options(
-            &mut DefaultConfigParserFileOps {
-                project_fs: project_fs.dupe(),
-            },
-            config_args,
-            false, /* follow includes */
-            Some(project_fs),
-        )
-        .await
+        Self::parse_with_file_ops_and_options_inner(config_args, Some(project_fs))
+            .await
+            .buck_error_context("Parsing cells")
     }
 
-    pub async fn testing_parse_with_file_ops(
-        file_ops: &mut dyn ConfigParserFileOps,
+    /// Testing entry point: equivalent to `parse_with_config_args` with no project root.
+    pub async fn testing_parse(
         config_args: &[kuro_cli_proto::ConfigOverride],
     ) -> kuro_error::Result<Self> {
-        Self::parse_with_file_ops_and_options(
-            file_ops,
-            config_args,
-            true, /* follow includes */
-            None, /* project_fs for bzlmod */
-        )
-        .await
-    }
-
-    async fn parse_with_file_ops_and_options(
-        file_ops: &mut dyn ConfigParserFileOps,
-        config_args: &[kuro_cli_proto::ConfigOverride],
-        follow_includes: bool,
-        project_fs: Option<&ProjectRoot>,
-    ) -> kuro_error::Result<Self> {
-        Self::parse_with_file_ops_and_options_inner(
-            file_ops,
-            config_args,
-            follow_includes,
-            project_fs,
-        )
-        .await
-        .buck_error_context("Parsing cells")
+        Self::parse_with_file_ops_and_options_inner(config_args, None)
+            .await
+            .buck_error_context("Parsing cells")
     }
 
     async fn parse_with_file_ops_and_options_inner(
-        file_ops: &mut dyn ConfigParserFileOps,
         config_args: &[kuro_cli_proto::ConfigOverride],
-        _follow_includes: bool,
         project_fs: Option<&ProjectRoot>,
     ) -> kuro_error::Result<Self> {
-        // NOTE: This will _not_ perform IO unless it needs to (File-type args).
-        let processed_config_args = resolve_config_args(config_args, file_ops).await?;
+        // Q1=B: only CLI -c flag args are processed; no file I/O.
+        let processed_config_args = resolve_config_args(config_args).await?;
 
         let root_path = CellRootPathBuf::new(ProjectRelativePath::empty().to_owned());
 
@@ -487,7 +431,6 @@ impl BuckConfigBasedCells {
         Ok(Self {
             cell_resolver,
             root_config,
-            config_paths: HashSet::new(),
             external_data: ExternalBuckconfigData {
                 args: processed_config_args,
             },
@@ -1350,52 +1293,32 @@ impl BuckConfigBasedCells {
 
     pub(crate) async fn parse_single_cell_with_dice(
         ctx: &mut DiceComputations<'_>,
-        cell_path: &CellRootPath,
+        _cell_path: &CellRootPath,
     ) -> kuro_error::Result<LegacyBuckConfig> {
-        let resolver = ctx.get_cell_resolver().await?;
-        let io_provider = ctx.global_data().get_io_provider();
-        let project_fs = io_provider.project_root();
         let external_data = ctx.get_injected_external_buckconfig_data().await?;
-
-        let mut file_ops = DiceConfigFileOps::new(ctx, project_fs, &resolver);
-
-        Self::parse_single_cell_with_file_ops_inner(&external_data, &mut file_ops, cell_path).await
+        // Q1=B: all cells return the same CLI-flag-only config.
+        Ok(LegacyBuckConfig::from_resolved_flags(&external_data.args))
     }
 
     pub async fn parse_single_cell(
         &self,
-        cell: CellName,
-        project_fs: &ProjectRoot,
+        _cell: CellName,
+        _project_fs: &ProjectRoot,
     ) -> kuro_error::Result<LegacyBuckConfig> {
-        self.parse_single_cell_with_file_ops(
-            cell,
-            &mut DefaultConfigParserFileOps {
-                project_fs: project_fs.dupe(),
-            },
-        )
-        .await
+        // Q1=B: all cells return the same CLI-flag-only config.
+        Ok(LegacyBuckConfig::from_resolved_flags(
+            &self.external_data.args,
+        ))
     }
 
     pub(crate) async fn parse_single_cell_with_file_ops(
         &self,
-        cell: CellName,
-        file_ops: &mut dyn ConfigParserFileOps,
+        _cell: CellName,
     ) -> kuro_error::Result<LegacyBuckConfig> {
-        Self::parse_single_cell_with_file_ops_inner(
-            &self.external_data,
-            file_ops,
-            self.cell_resolver.get(cell)?.path(),
-        )
-        .await
-    }
-
-    async fn parse_single_cell_with_file_ops_inner(
-        external_data: &ExternalBuckconfigData,
-        _file_ops: &mut dyn ConfigParserFileOps,
-        _cell_path: &CellRootPath,
-    ) -> kuro_error::Result<LegacyBuckConfig> {
-        // Q1=B: all cells share the same CLI-flag-only config; no .buckconfig files are read.
-        Ok(LegacyBuckConfig::from_resolved_flags(&external_data.args))
+        // Q1=B: all cells return the same CLI-flag-only config.
+        Ok(LegacyBuckConfig::from_resolved_flags(
+            &self.external_data.args,
+        ))
     }
 
     fn parse_external_cell_origin(
@@ -1450,100 +1373,6 @@ impl BuckConfigBasedCells {
             Err(ExternalCellOriginParseError::Unknown(value.to_owned()).into())
         }
     }
-}
-
-async fn get_external_buckconfig_paths(
-    file_ops: &mut dyn ConfigParserFileOps,
-) -> kuro_error::Result<Vec<ConfigPath>> {
-    let skip_default_external_config = kuro_env!(
-        "BUCK2_TEST_SKIP_DEFAULT_EXTERNAL_CONFIG",
-        bool,
-        applicability = testing
-    )?;
-
-    let mut buckconfig_paths: Vec<ConfigPath> = Vec::new();
-
-    if !skip_default_external_config {
-        for buckconfig in DEFAULT_EXTERNAL_CONFIG_SOURCES {
-            match buckconfig {
-                ExternalConfigSource::UserFile(file) => {
-                    let home_dir = dirs::home_dir();
-                    if let Some(home_dir_path) = home_dir {
-                        let buckconfig_path = ForwardRelativePath::new(file)?;
-                        buckconfig_paths.push(ConfigPath::Global(
-                            AbsPath::new(&home_dir_path)?.join(buckconfig_path.as_str()),
-                        ));
-                    }
-                }
-                ExternalConfigSource::UserFolder(folder) => {
-                    let home_dir = dirs::home_dir();
-                    if let Some(home_dir_path) = home_dir {
-                        let buckconfig_path = ForwardRelativePath::new(folder)?;
-                        let buckconfig_folder_abs_path =
-                            AbsPath::new(&home_dir_path)?.join(buckconfig_path.as_str());
-                        push_all_files_from_a_directory(
-                            &mut buckconfig_paths,
-                            &ConfigPath::Global(buckconfig_folder_abs_path),
-                            file_ops,
-                        )
-                        .await?;
-                    }
-                }
-                ExternalConfigSource::GlobalFile(file) => {
-                    buckconfig_paths.push(ConfigPath::Global(AbsPath::new(*file)?.to_owned()));
-                }
-                ExternalConfigSource::GlobalFolder(folder) => {
-                    let buckconfig_folder_abs_path = AbsPath::new(*folder)?.to_owned();
-                    push_all_files_from_a_directory(
-                        &mut buckconfig_paths,
-                        &ConfigPath::Global(buckconfig_folder_abs_path),
-                        file_ops,
-                    )
-                    .await?;
-                }
-            }
-        }
-    }
-
-    let extra_external_config =
-        kuro_env!("BUCK2_TEST_EXTRA_EXTERNAL_CONFIG", applicability = testing)?;
-
-    if let Some(f) = extra_external_config {
-        buckconfig_paths.push(ConfigPath::Global(AbsPath::new(f)?.to_owned()));
-    }
-
-    Ok(buckconfig_paths)
-}
-
-async fn get_project_buckconfig_paths(
-    path: &CellRootPath,
-    file_ops: &mut dyn ConfigParserFileOps,
-) -> kuro_error::Result<Vec<ConfigPath>> {
-    let mut buckconfig_paths: Vec<ConfigPath> = Vec::new();
-
-    for buckconfig in DEFAULT_PROJECT_CONFIG_SOURCES {
-        match buckconfig {
-            ProjectConfigSource::CellRelativeFile(file) => {
-                let buckconfig_path = ForwardRelativePath::new(file)?;
-                buckconfig_paths.push(ConfigPath::Project(
-                    path.as_project_relative_path().join(buckconfig_path),
-                ));
-            }
-            ProjectConfigSource::CellRelativeFolder(folder) => {
-                let buckconfig_folder_path = ForwardRelativePath::new(folder)?;
-                let buckconfig_folder_path =
-                    path.as_project_relative_path().join(buckconfig_folder_path);
-                push_all_files_from_a_directory(
-                    &mut buckconfig_paths,
-                    &ConfigPath::Project(buckconfig_folder_path),
-                    file_ops,
-                )
-                .await?;
-            }
-        }
-    }
-
-    Ok(buckconfig_paths)
 }
 
 /// Extract the repo name from a toolchain/platform label.

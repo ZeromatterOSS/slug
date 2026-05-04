@@ -18,8 +18,5 @@ pub mod cells;
 mod cells_symlinks;
 pub mod configs;
 pub mod dice;
-pub mod file_ops;
 pub mod key;
-mod parser;
-pub(crate) mod path;
 pub mod view;

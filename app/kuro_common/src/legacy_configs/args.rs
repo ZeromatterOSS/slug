@@ -16,7 +16,6 @@ use kuro_error::BuckErrorContext;
 use crate::legacy_configs::configs::ConfigArgumentParseError;
 use crate::legacy_configs::configs::ConfigSectionAndKey;
 use crate::legacy_configs::configs::parse_config_section_and_key;
-use crate::legacy_configs::file_ops::ConfigParserFileOps;
 
 /// Representation of a processed config arg, namely after file path resolution has been performed.
 ///
@@ -63,7 +62,6 @@ fn resolve_config_flag_arg(
 
 pub(crate) async fn resolve_config_args(
     args: &[ConfigOverride],
-    _file_ops: &mut dyn ConfigParserFileOps,
 ) -> kuro_error::Result<Vec<ResolvedLegacyConfigArg>> {
     let mut resolved_args = Vec::new();
 
