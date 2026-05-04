@@ -1,0 +1,1 @@
+build --digest_function=SHA256

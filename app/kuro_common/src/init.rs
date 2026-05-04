@@ -399,12 +399,10 @@ impl DaemonStartupConfig {
         Ok(Self {
             num_tokio_workers: None,
             daemon_buster: None,
-            digest_algorithms: config
-                .get(BuckconfigKeyRef {
-                    section: "kuro",
-                    property: "digest_algorithms",
-                })
-                .map(ToOwned::to_owned),
+            // `[kuro] digest_algorithms` is dead — the user-facing knob
+            // is `--digest_function`, layered onto this field at
+            // constraint-check time in `streaming.rs::exec_impl`.
+            digest_algorithms: None,
             source_digest_algorithm: None,
             paranoid: false, // Setup later in ImmediateConfig
             materializations: None,

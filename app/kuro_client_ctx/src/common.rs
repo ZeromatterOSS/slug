@@ -436,6 +436,21 @@ pub struct CommonBuildConfigurationOptions {
     )]
     pub remote_default_exec_properties: Vec<String>,
 
+    /// Digest function used by the daemon's CAS / action cache (Bazel
+    /// `--digest_function`).
+    ///
+    /// Accepts a comma-separated list (kuro extension; first entry is the
+    /// preferred algorithm). Recognised values include `SHA1`, `SHA256`,
+    /// `BLAKE3`. Threaded through to `DaemonStartupConfig::digest_algorithms`,
+    /// so a change here forces a daemon restart via the constraint check.
+    #[clap(
+        long = "digest-function",
+        alias = "digest_function",
+        hide = true,
+        value_name = "ALGO"
+    )]
+    pub digest_function: Option<String>,
+
     /// Spawn strategy (Bazel compatibility, accepted but ignored).
     #[clap(
         long = "spawn-strategy",
@@ -1354,6 +1369,7 @@ impl CommonBuildConfigurationOptions {
             remote_cache: None,
             remote_retries: None,
             remote_default_exec_properties: Vec::new(),
+            digest_function: None,
             spawn_strategy: None,
             dynamic_local_strategy: vec![],
             dynamic_remote_strategy: vec![],
@@ -1468,6 +1484,7 @@ impl CommonBuildConfigurationOptions {
             remote_cache: None,
             remote_retries: None,
             remote_default_exec_properties: Vec::new(),
+            digest_function: None,
             spawn_strategy: None,
             dynamic_local_strategy: vec![],
             dynamic_remote_strategy: vec![],

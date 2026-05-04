@@ -18,11 +18,11 @@ cas_address          = $ENGFLOW_ENDPOINT
 tls_client_cert      = $ENGFLOW_CERTIFICATE
 ```
 
-Additionally, set the `digest_algorithm` config to `SHA256`.
+Additionally, EngFlow requires the `SHA256` digest function. Set it via
+`.bazelrc`:
 
-```ini
-[kuro]
-digest_algorithms = SHA256
+```
+build --digest_function=SHA256
 ```
 
 ### Relevant configs in `ExecutionPlatformInfo`

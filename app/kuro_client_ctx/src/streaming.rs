@@ -240,6 +240,18 @@ impl<T: StreamingCommand> BuckSubcommand for T {
                     req.daemon_startup_config.re_config =
                         merge_re_config(&req.daemon_startup_config.re_config, &cli_re);
                 }
+                // `--digest_function` overrides the daemon's startup digest
+                // algorithm. Layered here (rather than during config parse)
+                // so the constraint check sees the change and restarts a
+                // daemon running with the wrong digest.
+                if let Some(digest) = self
+                    .build_config_opts()
+                    .digest_function
+                    .as_deref()
+                    .filter(|s| !s.is_empty())
+                {
+                    req.daemon_startup_config.digest_algorithms = Some(digest.to_owned());
+                }
                 BuckdConnectConstraints::Constraints(req)
             };
             let buckd = match ctx.start_in_process_daemon.take() {

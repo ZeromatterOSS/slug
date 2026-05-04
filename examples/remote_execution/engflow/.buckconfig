@@ -1,10 +1,6 @@
 [cells]
 root = .
 
-[kuro]
-# Adjust as needed.
-digest_algorithms = SHA256
-
 [kuro_re_client]
 # Adjust as needed
 # ENGFLOW_ENDPOINT: an address to EngFlow

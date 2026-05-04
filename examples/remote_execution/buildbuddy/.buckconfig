@@ -1,9 +1,6 @@
 [cells]
 root = .
 
-[kuro]
-digest_algorithms = SHA256
-
 [kuro_re_client]
 engine_address = $BUILDBUDDY_ENDPOINT
 action_cache_address = $BUILDBUDDY_ENDPOINT
