@@ -14,7 +14,6 @@ use std::collections::HashSet;
 use std::io::BufWriter;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use std::time::Duration;
 use std::time::Instant;
 
 use allocative::Allocative;
@@ -68,7 +67,6 @@ use kuro_common::legacy_configs::cells::BuckConfigBasedCells;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
 use kuro_common::legacy_configs::dice::HasInjectedLegacyConfigs;
 use kuro_common::legacy_configs::file_ops::ConfigPath;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_configured::cycle::ConfiguredGraphCycleDescriptor;
 use kuro_core::execution_types::executor_config::CommandExecutorConfig;
 use kuro_core::execution_types::executor_config::RemoteExecutorUseCase;
@@ -79,9 +77,7 @@ use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
 use kuro_core::pattern::pattern::ParsedPattern;
 use kuro_core::pattern::pattern::ParsedPatternWithModifiers;
 use kuro_core::pattern::pattern_type::ConfiguredProvidersPatternExtra;
-use kuro_core::rollout_percentage::RolloutPercentage;
 use kuro_core::target::label::interner::ConcurrentTargetLabelInterner;
-use kuro_directory::directory::dashmap_directory_interner::DashMapDirectoryInterner;
 use kuro_events::dispatch::EventDispatcher;
 use kuro_events::metadata;
 use kuro_events::schedule_type::SandcastleScheduleType;
@@ -721,86 +717,23 @@ impl DiceCommandUpdater<'_, '_> {
         &self,
         root_config: &LegacyBuckConfig,
     ) -> kuro_error::Result<UserComputationData> {
-        let config_threads = root_config
-            .parse(BuckconfigKeyRef {
-                section: "build",
-                property: "threads",
-            })?
-            .unwrap_or(0);
-
         let concurrency = self
             .concurrency
-            .or_else(|| parse_concurrency(config_threads))
             .unwrap_or_else(kuro_util::threads::available_parallelism_fresh);
 
-        if let Some(max_lines) = root_config.parse(BuckconfigKeyRef {
-            section: "ui",
-            property: "thread_line_limit",
-        })? {
-            self.cmd_ctx
-                .events()
-                .instant_event(kuro_data::ConsolePreferences { max_lines });
-        }
+        let enable_miniperf = true;
+        let log_action_keys = true;
+        let log_configured_graph_size = false;
+        let persistent_worker_shutdown_timeout_s = Some(10);
 
-        let enable_miniperf = root_config
-            .parse::<RolloutPercentage>(BuckconfigKeyRef {
-                section: "kuro",
-                property: "miniperf2",
-            })?
-            .unwrap_or_else(RolloutPercentage::always)
-            .roll();
-
-        let log_action_keys = root_config
-            .parse::<RolloutPercentage>(BuckconfigKeyRef {
-                section: "kuro",
-                property: "log_action_keys",
-            })?
-            .unwrap_or_else(RolloutPercentage::always)
-            .roll();
-
-        let log_configured_graph_size = root_config
-            .parse::<bool>(BuckconfigKeyRef {
-                section: "kuro",
-                property: "log_configured_graph_size",
-            })?
-            .unwrap_or(false);
-
-        let persistent_worker_shutdown_timeout_s = root_config
-            .parse::<u32>(BuckconfigKeyRef {
-                section: "build",
-                property: "persistent_worker_shutdown_timeout_s",
-            })?
-            .or(Some(10));
-
-        let re_cancel_on_estimated_queue_time_exceeds = root_config
-            .parse::<u64>(BuckconfigKeyRef {
-                section: "build",
-                property: "remote_execution_cancel_on_estimated_queue_time_exceeds_s",
-            })?
-            .map(Duration::from_secs);
-        let re_fallback_on_estimated_queue_time_exceeds = root_config
-            .parse::<u64>(BuckconfigKeyRef {
-                section: "build",
-                property: "remote_execution_fallback_on_estimated_queue_time_exceeds_s",
-            })?
-            .map(Duration::from_secs);
-
-        let sandbox_enabled_from_config = root_config
-            .parse::<bool>(BuckconfigKeyRef {
-                section: "sandbox",
-                property: "enabled",
-            })?
-            .unwrap_or(false);
-        // CLI flag (--sandbox/--nosandbox) overrides buckconfig setting.
-        let sandbox_enabled = self
-            .sandbox_cli_override
-            .unwrap_or(sandbox_enabled_from_config);
+        // CLI flag (--sandbox/--nosandbox) is the only source for sandbox enablement.
+        let sandbox_enabled = self.sandbox_cli_override.unwrap_or(false);
 
         let executor_global_knobs = ExecutorGlobalKnobs {
             enable_miniperf,
             log_action_keys,
-            re_cancel_on_estimated_queue_time_exceeds,
-            re_fallback_on_estimated_queue_time_exceeds,
+            re_cancel_on_estimated_queue_time_exceeds: None,
+            re_fallback_on_estimated_queue_time_exceeds: None,
             sandbox_enabled,
         };
 
@@ -820,83 +753,14 @@ impl DiceCommandUpdater<'_, '_> {
             self.cmd_ctx.base_context.daemon.memory_tracker.is_some(),
         ));
 
-        let cycle_detector = if root_config
-            .parse::<bool>(BuckconfigKeyRef {
-                section: "build",
-                property: "lazy_cycle_detector",
-            })?
-            .unwrap_or(true)
-        {
-            Some(create_cycle_detector())
-        } else {
-            None
-        };
+        let cycle_detector = Some(create_cycle_detector());
         let has_cycle_detector = cycle_detector.is_some();
 
-        let mut run_action_knobs = self.run_action_knobs.dupe();
-        run_action_knobs.use_network_action_output_cache |= root_config
-            .parse::<bool>(BuckconfigKeyRef {
-                section: "kuro",
-                property: "use_network_action_output_cache",
-            })?
-            .unwrap_or(false);
-        run_action_knobs.default_allow_cache_upload |= root_config
-            .parse::<bool>(BuckconfigKeyRef {
-                section: "kuro",
-                property: "default_allow_cache_upload",
-            })?
-            .unwrap_or(false);
+        let run_action_knobs = self.run_action_knobs.dupe();
 
-        if root_config
-            .parse::<bool>(BuckconfigKeyRef {
-                section: "kuro",
-                property: "share_action_paths",
-            })?
-            .unwrap_or(false)
-        {
-            run_action_knobs.action_paths_interner = Some(DashMapDirectoryInterner::new());
-        }
+        let output_trees_download_config = OutputTreesDownloadConfig::new(None, true);
 
-        run_action_knobs.deduplicate_get_digests_ttl_calls |= root_config
-            .parse::<bool>(BuckconfigKeyRef {
-                section: "kuro",
-                property: "deduplicate_get_digests_ttl_calls",
-            })?
-            .unwrap_or(false);
-
-        run_action_knobs.re_outputs_required |= root_config
-            .parse::<bool>(BuckconfigKeyRef {
-                section: "kuro",
-                property: "re_outputs_required",
-            })?
-            .unwrap_or(false);
-
-        let output_trees_download_semaphore_size = root_config.parse::<u32>(BuckconfigKeyRef {
-            section: "kuro",
-            property: "output_trees_download_semaphore_size",
-        })?;
-
-        let fingerprint_re_output_trees_eagerly = root_config
-            .parse::<bool>(BuckconfigKeyRef {
-                section: "kuro",
-                property: "fingerprint_re_output_trees_eagerly",
-            })?
-            .unwrap_or(true);
-
-        let output_trees_download_config = OutputTreesDownloadConfig::new(
-            output_trees_download_semaphore_size,
-            fingerprint_re_output_trees_eagerly,
-        );
-
-        _ = kuro_core::faster_directories::VALUE.store(
-            root_config
-                .parse::<bool>(BuckconfigKeyRef {
-                    section: "kuro",
-                    property: "faster_directories",
-                })?
-                .unwrap_or(true),
-            std::sync::atomic::Ordering::Relaxed,
-        );
+        _ = kuro_core::faster_directories::VALUE.store(true, std::sync::atomic::Ordering::Relaxed);
 
         let mut data = UserComputationData {
             data,
@@ -909,17 +773,9 @@ impl DiceCommandUpdater<'_, '_> {
 
         let worker_pool = Arc::new(WorkerPool::new(persistent_worker_shutdown_timeout_s));
 
-        let critical_path_backend = root_config
-            .parse(BuckconfigKeyRef {
-                section: "kuro",
-                property: "critical_path_backend2",
-            })?
-            .unwrap_or(CriticalPathBackendName::LongestPathGraph);
+        let critical_path_backend = CriticalPathBackendName::LongestPathGraph;
 
-        let override_use_case = root_config.parse::<RemoteExecutorUseCase>(BuckconfigKeyRef {
-            section: "kuro_re_client",
-            property: "override_use_case",
-        })?;
+        let override_use_case: Option<RemoteExecutorUseCase> = None;
 
         set_fallback_executor_config(&mut data.data, self.executor_config.dupe());
         // This client is only used in places that do not use the RE use case specified in the executor config.
@@ -1003,80 +859,11 @@ impl DiceCommandUpdater<'_, '_> {
 
 struct ConfigMetadataHolder(HashMap<String, String>);
 
-fn collect_config_metadata_into(config: &LegacyBuckConfig, data: &mut UserComputationData) {
+fn collect_config_metadata_into(_config: &LegacyBuckConfig, data: &mut UserComputationData) {
     // Facebook only: metadata collection for Scribe writes
     facebook_only();
 
-    fn add_config(
-        map: &mut HashMap<String, String>,
-        cfg: &LegacyBuckConfig,
-        key: BuckconfigKeyRef<'static>,
-        field_name: &'static str,
-    ) {
-        if let Some(value) = cfg.get(key) {
-            map.insert(field_name.to_owned(), value.to_owned());
-        }
-    }
-
-    fn extract_scuba_defaults(
-        config: &LegacyBuckConfig,
-    ) -> Option<serde_json::Map<String, serde_json::Value>> {
-        let config = config.get(BuckconfigKeyRef {
-            section: "scuba",
-            property: "defaults",
-        })?;
-        let unescaped_config = shlex::split(config)?.join("");
-        let sample_json: serde_json::Value = serde_json::from_str(&unescaped_config).ok()?;
-        sample_json.get("normals")?.as_object().cloned()
-    }
-
     let mut metadata = HashMap::new();
-
-    add_config(
-        &mut metadata,
-        &config,
-        BuckconfigKeyRef {
-            section: "log",
-            property: "repository",
-        },
-        "repository",
-    );
-
-    // Buck1 honors a configuration field, `scuba.defaults`, by drawing values from the configuration value and
-    // inserting them verbatim into Scuba samples. Kuro doesn't write to Scuba in the same way that Buck1
-    // does, but metadata in this function indirectly makes its way to Scuba, so it makes sense to respect at
-    // least some of the data within it.
-    //
-    // The configuration field is expected to be the canonical JSON representation for a Scuba sample, which is
-    // to say something like this:
-    // ```
-    // {
-    //   "normals": { "key": "value" },
-    //   "ints": { "key": 0 },
-    // }
-    // ```
-    //
-    // TODO(swgillespie) - This only covers the normals since Kuro's event protocol only allows for string
-    // metadata. Depending on what sort of things we're missing by dropping int default columns, we might want
-    // to consider adding support to the protocol for integer metadata.
-
-    if let Some(normals_obj) = extract_scuba_defaults(&config) {
-        for (key, value) in normals_obj.iter() {
-            if let Some(value) = value.as_str() {
-                metadata.insert(key.clone(), value.to_owned());
-            }
-        }
-    }
-
-    add_config(
-        &mut metadata,
-        &config,
-        BuckconfigKeyRef {
-            section: "client",
-            property: "id",
-        },
-        "client",
-    );
 
     if let Ok(schedule_type) = SandcastleScheduleType::new() {
         if let Some(schedule_type_str) = schedule_type.as_str() {
