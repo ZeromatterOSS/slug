@@ -17,8 +17,6 @@ use kuro_common::dice::data::SetIoProvider;
 use kuro_common::io::IoProvider;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
 use kuro_common::legacy_configs::dice::SetLegacyConfigs;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
-use kuro_core::rollout_percentage::RolloutPercentage;
 use kuro_execute::digest_config::DigestConfig;
 use kuro_execute::digest_config::SetDigestConfig;
 
@@ -31,37 +29,15 @@ use crate::build::detailed_aggregated_metrics::events::start_detailed_aggregated
 pub async fn configure_dice_for_buck(
     io: Arc<dyn IoProvider>,
     digest_config: DigestConfig,
-    root_config: Option<&LegacyBuckConfig>,
+    _root_config: Option<&LegacyBuckConfig>,
     detect_cycles: Option<DetectCycles>,
 ) -> kuro_error::Result<Arc<Dice>> {
-    let detect_cycles = detect_cycles.map_or_else(
-        || {
-            root_config
-                .and_then(|c| {
-                    c.parse::<DetectCycles>(BuckconfigKeyRef {
-                        section: "kuro",
-                        property: "detect_cycles",
-                    })
-                    .transpose()
-                })
-                .unwrap_or(Ok(DetectCycles::Enabled))
-        },
-        Ok,
-    )?;
+    let detect_cycles = detect_cycles.unwrap_or(DetectCycles::Enabled);
 
     let mut dice = Dice::builder();
     dice.set_io_provider(io);
     dice.set_digest_config(digest_config);
-    let invalidation_tracking_enabled = match root_config {
-        Some(c) => c
-            .parse::<RolloutPercentage>(BuckconfigKeyRef {
-                section: "buck2",
-                property: "invalidation_tracking_enabled",
-            })?
-            .is_some_and(|v| v.roll()),
-        None => false,
-    };
-    dice.set_invalidation_tracking_config(invalidation_tracking_enabled);
+    dice.set_invalidation_tracking_config(false);
 
     dice.set_detailed_aggregated_metrics_event_handler(Some(
         start_detailed_aggregated_metrics_state_tracker(),

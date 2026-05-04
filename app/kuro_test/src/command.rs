@@ -53,8 +53,6 @@ use kuro_cli_proto::TestResponse;
 use kuro_cli_proto::representative_config_flag;
 use kuro_common::dice::cells::HasCellResolver;
 use kuro_common::events::HasEvents;
-use kuro_common::legacy_configs::dice::HasLegacyConfigs;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_common::liveliness_observer::LivelinessGuard;
 use kuro_common::liveliness_observer::LivelinessObserver;
 use kuro_common::liveliness_observer::LivelinessObserverExt;
@@ -374,18 +372,7 @@ async fn test(
     )
     .await?;
 
-    // Get the test runner from the config. Note that we use a different key from v1 since the API
-    // is completely different, so there is not expectation that the same binary works for both.
-    let test_executor_config = ctx
-        .get_legacy_config_property(
-            cell_resolver.root_cell(),
-            BuckconfigKeyRef {
-                section: "test",
-                property: "v2_test_executor",
-            },
-        )
-        .await?
-        .filter(|s| !s.is_empty());
+    let test_executor_config: Option<Arc<str>> = None;
 
     let (test_executor, test_executor_args) = match test_executor_config {
         Some(config) => {

@@ -14,8 +14,6 @@ use std::sync::Arc;
 use allocative::Allocative;
 use kuro_common::invocation_paths::InvocationPaths;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
-use kuro_core::rollout_percentage::RolloutPercentage;
 use kuro_error::BuckErrorContext;
 use kuro_events::daemon_id::DaemonId;
 use kuro_execute::digest_config::DigestConfig;
@@ -42,20 +40,14 @@ pub struct DiskStateOptions {
 
 impl DiskStateOptions {
     pub fn new(
-        root_config: &LegacyBuckConfig,
+        _root_config: &LegacyBuckConfig,
         materialization_method: MaterializationMethod,
     ) -> kuro_error::Result<Self> {
+        // sqlite materializer state requires deferred materializer.
         let sqlite_materializer_state = matches!(
-            // We can only enable materializer state on sqlite if you use deferred materializer
             materialization_method,
             MaterializationMethod::Deferred | MaterializationMethod::DeferredSkipFinalArtifacts
-        ) && root_config
-            .parse::<RolloutPercentage>(BuckconfigKeyRef {
-                section: "kuro",
-                property: "sqlite_materializer_state",
-            })?
-            .unwrap_or_else(RolloutPercentage::always)
-            .roll();
+        );
         Ok(Self {
             sqlite_materializer_state,
         })
@@ -63,9 +55,7 @@ impl DiskStateOptions {
 }
 
 fn sqlite_db_setup_metadata_and_versions(
-    root_config: &LegacyBuckConfig,
     schema_version: String,
-    version_config: &str,
     deferred_materializer_config: Option<&DeferredMaterializerConfigs>,
     daemon_id: &DaemonId,
 ) -> kuro_error::Result<(HashMap<String, String>, HashMap<String, String>)> {
@@ -80,12 +70,6 @@ fn sqlite_db_setup_metadata_and_versions(
         );
     }
 
-    if let Some(buckconfig_version) = root_config.parse(BuckconfigKeyRef {
-        section: "kuro",
-        property: version_config,
-    })? {
-        versions.insert("buckconfig_version".to_owned(), buckconfig_version);
-    }
     if let Some(hostname) = metadata.get("hostname") {
         versions.insert("hostname".to_owned(), hostname.to_owned());
     }
@@ -115,10 +99,9 @@ pub(crate) async fn maybe_initialize_materializer_sqlite_db(
         return Ok((None, None));
     }
 
+    let _ = root_config;
     let (metadata, versions) = sqlite_db_setup_metadata_and_versions(
-        root_config,
         MATERIALIZER_DB_SCHEMA_VERSION.to_string(),
-        "sqlite_materializer_state_version",
         Some(deferred_materializer_configs),
         daemon_id,
     )?;
@@ -146,31 +129,12 @@ pub(crate) async fn maybe_initialize_materializer_sqlite_db(
 pub(crate) async fn maybe_initialize_incremental_sqlite_db(
     paths: InvocationPaths,
     io_executor: Arc<dyn BlockingExecutor>,
-    root_config: &LegacyBuckConfig,
+    _root_config: &LegacyBuckConfig,
     daemon_id: &DaemonId,
 ) -> kuro_error::Result<IncrementalDbState> {
-    // Rolling it out by default, but giving an option to disable in case something goes horribly wrong
-    if !root_config
-        .parse(BuckconfigKeyRef {
-            section: "kuro",
-            property: "sqlite_incremental_state",
-        })?
-        .unwrap_or(true)
-    {
-        // When sqlite incremental state is disabled, we should always delete the db to
-        // prevent futures invocations from potentially using stale entries
-        io_executor
-            .execute_io_inline(|| {
-                fs_util::remove_all(paths.incremental_state_path()).map_err(kuro_error::Error::from)
-            })
-            .await?;
-        return Ok(IncrementalDbState::db_disabled());
-    }
-
+    let _ = paths.incremental_state_path();
     let (metadata, versions) = sqlite_db_setup_metadata_and_versions(
-        root_config,
         INCREMENTAL_DB_SCHEMA_VERSION.to_string(),
-        "sqlite_incremental_state_version",
         None,
         daemon_id,
     )?;

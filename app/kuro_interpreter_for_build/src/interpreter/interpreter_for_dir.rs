@@ -20,8 +20,6 @@ use allocative::Allocative;
 use dice::CancellationContext;
 use dupe::Dupe;
 use gazebo::prelude::*;
-use kuro_common::legacy_configs::configs::LegacyBuckConfig;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_common::package_listing::listing::PackageListing;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::bxl::BxlFilePath;
@@ -779,17 +777,7 @@ impl InterpreterForDir {
                 package_boundary_exception,
                 &loaded_modules,
             )?;
-            let buckconfig_key = BuckconfigKeyRef {
-                section: "kuro",
-                property: "check_starlark_peak_memory",
-            };
-            let starlark_peak_mem_config_enabled = LegacyBuckConfig::parse_value(
-                buckconfig_key,
-                buckconfigs
-                    .read_root_cell_config(buckconfig_key)?
-                    .as_deref(),
-            )?
-            .unwrap_or(false);
+            let starlark_peak_mem_config_enabled = false;
 
             let (finished_eval, eval_result) = self.eval(
                 &env,

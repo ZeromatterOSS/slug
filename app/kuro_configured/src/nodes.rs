@@ -1450,39 +1450,8 @@ async fn get_dep_only_incompatible_custom_soft_error(
             mut ctx: &mut DiceComputations,
             _cancellation: &CancellationContext,
         ) -> Self::Value {
-            let cell_resolver = ctx.get_cell_resolver().await?;
-            let root_cell = cell_resolver.root_cell();
-            let alias_resolver = ctx.get_cell_alias_resolver(root_cell).await?;
-            let root_conf = ctx.get_legacy_root_config_on_dice().await?;
-            // Check "buck2" section first (for Buck2 compatibility), then "kuro" section
-            let target = root_conf.view(&mut ctx).parse::<String>(BuckconfigKeyRef {
-                section: "buck2",
-                property: "dep_only_incompatible_info",
-            })?;
-            let target = if let Some(t) = target {
-                Some(t)
-            } else {
-                root_conf.view(&mut ctx).parse::<String>(BuckconfigKeyRef {
-                    section: "kuro",
-                    property: "dep_only_incompatible_info",
-                })?
-            };
-            let Some(target) = target else {
-                return Ok(None);
-            };
-            let target =
-                ProvidersLabel::parse(&target, root_cell.dupe(), &cell_resolver, &alias_resolver)?;
-            let providers = ctx.get_configuration_analysis_result(&target).await?;
-            let dep_only_incompatible_info = providers
-                .provider_collection()
-                .builtin_provider::<FrozenDepOnlyIncompatibleInfo>()
-                .unwrap();
-            let result = dep_only_incompatible_info.custom_soft_errors(
-                root_cell,
-                &cell_resolver,
-                &alias_resolver,
-            )?;
-            Ok(Some(Arc::new(result)))
+            let _ = ctx;
+            Ok(None)
         }
 
         fn equality(x: &Self::Value, y: &Self::Value) -> bool {

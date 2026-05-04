@@ -26,13 +26,11 @@ use kuro_build_api::build::BuildEvent;
 use kuro_build_api::build::BuildEventConsumer;
 use kuro_build_api::build::BuildTargetResult;
 use kuro_build_api::build::ConfiguredBuildEventVariant;
-use kuro_build_api::build::HasCreateUnhashedSymlinkLock;
 use kuro_build_api::build::ProvidersToBuild;
 use kuro_build_api::build::build_report::build_report_opts;
 use kuro_build_api::build::build_report::initialize_streaming_build_report;
 use kuro_build_api::build::build_report::stream_build_report;
 use kuro_build_api::build::build_report::write_build_report;
-use kuro_build_api::build::detailed_aggregated_metrics::dice::HasDetailedAggregatedMetrics;
 use kuro_build_api::build::detailed_aggregated_metrics::types::DetailedAggregatedMetrics;
 use kuro_build_api::build::graph_properties::GraphPropertiesOptions;
 use kuro_build_api::materialize::MaterializationAndUploadContext;
@@ -42,8 +40,6 @@ use kuro_cli_proto::build_request::Materializations;
 use kuro_cli_proto::build_request::Uploads;
 use kuro_cli_proto::build_request::build_providers::Action as BuildProviderAction;
 use kuro_common::dice::cells::HasCellResolver;
-use kuro_common::legacy_configs::dice::HasLegacyConfigs;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_common::liveliness_observer::LivelinessObserver;
 use kuro_common::liveliness_observer::TimeoutLivelinessObserver;
 use kuro_common::pattern::parse_from_cli::parse_patterns_with_modifiers_from_cli_args;
@@ -61,11 +57,8 @@ use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::provider::label::ProvidersName;
 use kuro_core::target::label::label::TargetLabel;
 use kuro_data::BuildResult;
-use kuro_data::ToProtoMessage;
 use kuro_error::BuckErrorContext;
 use kuro_events::dispatch::console_message;
-use kuro_events::dispatch::instant_event;
-use kuro_events::dispatch::span_async;
 use kuro_node::configured_universe::CqueryUniverse;
 use kuro_node::load_patterns::MissingTargetBehavior;
 use kuro_node::nodes::frontend::TargetGraphCalculation;
@@ -81,10 +74,8 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::build::result_report::ResultReporter;
 use crate::build::result_report::ResultReporterOptions;
-use crate::build::unhashed_outputs::create_unhashed_outputs;
 
 mod result_report;
-mod unhashed_outputs;
 
 pub(crate) async fn build_command(
     ctx: &dyn ServerCommandContextTrait,
@@ -207,80 +198,7 @@ async fn build(
         .with_buck_error_context(|| "Invalid final_artifact_uploads")
         .unwrap();
 
-    let want_configured_graph_size = ctx
-        .parse_legacy_config_property(
-            cell_resolver.root_cell(),
-            BuckconfigKeyRef {
-                section: "buck2",
-                property: "log_configured_graph_size",
-            },
-        )
-        .await?
-        .unwrap_or_default();
-
-    let want_configured_graph_sketch = ctx
-        .parse_legacy_config_property(
-            cell_resolver.root_cell(),
-            BuckconfigKeyRef {
-                section: "buck2",
-                property: "log_configured_graph_sketch",
-            },
-        )
-        .await?
-        .unwrap_or_default();
-
-    let want_total_configured_graph_sketch = ctx
-        .parse_legacy_config_property(
-            cell_resolver.root_cell(),
-            BuckconfigKeyRef {
-                section: "buck2",
-                property: "log_total_configured_graph_sketch",
-            },
-        )
-        .await?
-        .unwrap_or_default();
-
-    let want_configured_graph_unconfigured_sketch = ctx
-        .parse_legacy_config_property(
-            cell_resolver.root_cell(),
-            BuckconfigKeyRef {
-                section: "buck2",
-                property: "log_configured_graph_unconfigured_sketch",
-            },
-        )
-        .await?
-        .unwrap_or_default();
-
-    let want_total_configured_graph_unconfigured_sketch = ctx
-        .parse_legacy_config_property(
-            cell_resolver.root_cell(),
-            BuckconfigKeyRef {
-                section: "buck2",
-                property: "log_total_configured_graph_unconfigured_sketch",
-            },
-        )
-        .await?
-        .unwrap_or_default();
-
-    let want_total_per_configuration_sketch = ctx
-        .parse_legacy_config_property(
-            cell_resolver.root_cell(),
-            BuckconfigKeyRef {
-                section: "buck2",
-                property: "log_total_per_configuration_sketch",
-            },
-        )
-        .await?
-        .unwrap_or_default();
-
-    let graph_properties = GraphPropertiesOptions {
-        configured_graph_size: want_configured_graph_size,
-        configured_graph_sketch: want_configured_graph_sketch,
-        configured_graph_unconfigured_sketch: want_configured_graph_unconfigured_sketch,
-        total_configured_graph_sketch: want_total_configured_graph_sketch,
-        total_configured_graph_unconfigured_sketch: want_total_configured_graph_unconfigured_sketch,
-        total_per_configuration_sketch: want_total_per_configuration_sketch,
-    };
+    let graph_properties = GraphPropertiesOptions::default();
 
     let (streaming_build_result_tx, streaming_build_result_rx) =
         tokio::sync::mpsc::unbounded_channel();
@@ -323,25 +241,7 @@ async fn build(
     )
     .await?;
 
-    let want_detailed_metrics = ctx
-        .parse_legacy_config_property(
-            cell_resolver.root_cell(),
-            BuckconfigKeyRef {
-                section: "buck2",
-                property: "detailed_aggregated_metrics",
-            },
-        )
-        .await?
-        .unwrap_or_default();
-
-    let detailed_metrics = if want_detailed_metrics {
-        let events = ctx.take_per_build_events()?;
-        let metrics = ctx.compute_detailed_metrics(events).await?;
-        instant_event(metrics.as_proto());
-        Some(metrics)
-    } else {
-        None
-    };
+    let detailed_metrics: Option<_> = None;
 
     send_target_cfg_event(
         server_ctx.events(),
@@ -525,33 +425,7 @@ async fn process_build_result(
         provider_artifacts.extend(&mut outputs);
     }
 
-    let should_create_unhashed_links = ctx
-        .parse_legacy_config_property(
-            cell_resolver.root_cell(),
-            BuckconfigKeyRef {
-                section: "kuro",
-                property: "create_unhashed_links",
-            },
-        )
-        .await?;
-
-    if should_create_unhashed_links.unwrap_or(false) {
-        span_async(kuro_data::CreateOutputSymlinksStart {}, async {
-            let lock = ctx
-                .per_transaction_data()
-                .get_create_unhashed_symlink_lock();
-            let _guard = lock.lock().await;
-            let res = create_unhashed_outputs(provider_artifacts, &artifact_fs, fs);
-
-            let created = match res.as_ref() {
-                Ok(n) => *n,
-                Err(..) => 0,
-            };
-            (res, kuro_data::CreateOutputSymlinksEnd { created })
-        })
-        .await?;
-    }
-
+    let _ = provider_artifacts;
     let build_targets = result_reports.build_targets;
     let errors = result_reports
         .build_errors

@@ -13,8 +13,6 @@ use std::sync::Arc;
 use dice::DiceComputations;
 use dice::UserComputationData;
 use dupe::Dupe;
-use kuro_common::legacy_configs::dice::HasLegacyConfigs;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_error::conversion::from_any_with_tag;
 use starlark::environment::FrozenModule;
 use starlark::environment::Module;
@@ -102,22 +100,10 @@ impl StarlarkEvaluatorProvider {
     ) -> kuro_error::Result<StarlarkEvaluatorProvider> {
         let profile_mode = ctx.get_starlark_profiler_mode(&eval_kind).await?;
 
-        let root_buckconfig = ctx.get_legacy_root_config_on_dice().await?;
         let profile_listener = ctx.get_profile_event_listener().cloned();
 
-        let starlark_max_callstack_size =
-            root_buckconfig.view(ctx).parse::<usize>(BuckconfigKeyRef {
-                section: "kuro",
-                property: "starlark_max_callstack_size",
-            })?;
-
-        let starlark_enable_cancellation = root_buckconfig
-            .view(ctx)
-            .parse::<bool>(BuckconfigKeyRef {
-                section: "kuro",
-                property: "starlark_enable_cancellation",
-            })?
-            .unwrap_or(false);
+        let starlark_max_callstack_size: Option<usize> = None;
+        let starlark_enable_cancellation = false;
 
         let debugger_handle = ctx.get_starlark_debugger_handle();
         let debugger = match debugger_handle {

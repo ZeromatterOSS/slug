@@ -19,8 +19,6 @@ use kuro_core::cells::paths::CellRelativePath;
 use crate::dice::cells::HasCellResolver;
 use crate::file_ops::dice::DiceFileComputations;
 use crate::ignores::file_ignores::CellFileIgnores;
-use crate::legacy_configs::dice::HasLegacyConfigs;
-use crate::legacy_configs::key::BuckconfigKeyRef;
 
 /// Read `<cell_root>/.bazelignore` (via DICE) and convert it to the
 /// comma-separated ignore-spec string that `IgnoreSet::from_ignore_spec`
@@ -57,28 +55,8 @@ impl HasCellFileIgnores for DiceComputations<'_> {
         let cells = self.get_cell_resolver().await?;
         let instance = cells.get(cell_name)?;
 
-        // .bazelignore (Bazel-compat) takes precedence; fall back to the
-        // legacy [project] ignore key during the deprecation window.
         let ignore_spec_owned = read_bazelignore_spec(self, cell_name).await?;
-        let ignore_spec_str = if let Some(s) = ignore_spec_owned.as_deref() {
-            s
-        } else {
-            let config = self.get_legacy_config_on_dice(cell_name).await?;
-            let legacy = config.lookup(
-                self,
-                BuckconfigKeyRef {
-                    section: "project",
-                    property: "ignore",
-                },
-            )?;
-            // Hoist the borrow: legacy is `Option<Arc<String>>`; promote to
-            // an owned String so we have a single lifetime.
-            return Ok(Arc::new(CellFileIgnores::new_for_interpreter(
-                legacy.as_ref().map_or("", |s| &**s),
-                instance.nested_cells().clone(),
-                cells.is_root_cell(cell_name),
-            )?));
-        };
+        let ignore_spec_str = ignore_spec_owned.as_deref().unwrap_or("");
 
         Ok(Arc::new(CellFileIgnores::new_for_interpreter(
             ignore_spec_str,

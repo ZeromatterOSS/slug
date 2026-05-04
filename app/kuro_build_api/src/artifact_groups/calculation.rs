@@ -27,12 +27,9 @@ use kuro_artifact::artifact::artifact_type::ArtifactKind;
 use kuro_artifact::artifact::artifact_type::BaseArtifactKind;
 use kuro_artifact::artifact::build_artifact::BuildArtifact;
 use kuro_artifact::artifact::source_artifact::SourceArtifact;
-use kuro_common::dice::cells::HasCellResolver;
 use kuro_common::file_ops::dice::DiceFileComputations;
 use kuro_common::file_ops::metadata::RawPathMetadata;
 use kuro_common::file_ops::metadata::RawSymlink;
-use kuro_common::legacy_configs::dice::HasLegacyConfigs;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_common::package_listing::dice::DicePackageListingResolver;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::cells::cell_path::CellPath;
@@ -512,17 +509,7 @@ async fn path_artifact_value(
         } => {
             // TODO (T126181780): This should have a limit on recursion.
             let target_artifact_value = path_artifact_value(ctx, target.dupe(), label).await?;
-            let root_cell = ctx.get_cell_resolver().await?.root_cell();
-            let use_correct_source_symlink_reading = ctx
-                .parse_legacy_config_property(
-                    root_cell,
-                    BuckconfigKeyRef {
-                        section: "kuro",
-                        property: "use_correct_source_symlink_reading",
-                    },
-                )
-                .await?
-                .unwrap_or(true);
+            let use_correct_source_symlink_reading = true;
             // In the case where this is a source artifact like `dir/link/foo`, where the symlink is
             // actually at `link`, `ArtifactValue` doesn't have a representation for the kind of
             // thing that'd require, so we read through the symlink instead. We could enhance

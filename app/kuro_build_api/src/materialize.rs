@@ -21,9 +21,6 @@ use kuro_build_signals::env::WaitingCategory;
 use kuro_build_signals::env::WaitingData;
 use kuro_cli_proto::build_request::Materializations;
 use kuro_cli_proto::build_request::Uploads;
-use kuro_common::legacy_configs::dice::HasLegacyConfigs;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
-use kuro_common::legacy_configs::view::LegacyBuckConfigView;
 use kuro_core::execution_types::executor_config::RemoteExecutorUseCase;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
 use kuro_error::BuckErrorContext;
@@ -177,19 +174,7 @@ async fn ensure_uploaded(
         kuro_execute::directory::insert_artifact(&mut dir, path, &value)?;
     }
     let dir = dir.fingerprint(digest_config.as_directory_serializer());
-    let re_use_case = ctx
-        .get_legacy_root_config_on_dice()
-        .await
-        .and_then(|cfg| {
-            cfg.view(ctx).get(BuckconfigKeyRef {
-                section: "build",
-                property: "default_remote_execution_use_case",
-            })
-        })
-        .ok()
-        .flatten()
-        .map(|v| RemoteExecutorUseCase::new((*v).to_owned()))
-        .unwrap_or_else(RemoteExecutorUseCase::kuro_default);
+    let re_use_case = RemoteExecutorUseCase::kuro_default();
     ctx.per_transaction_data()
         .get_re_client()
         .with_use_case(re_use_case)

@@ -17,11 +17,9 @@ use dice::DiceTransactionUpdater;
 use kuro_common::file_ops::dice::FileChangeTracker;
 use kuro_common::ignores::ignore_set::IgnoreSet;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_core::cells::CellResolver;
 use kuro_core::cells::name::CellName;
 use kuro_core::fs::project_rel_path::ProjectRelativePath;
-use kuro_core::rollout_percentage::RolloutPercentage;
 use kuro_error::BuckErrorContext;
 use kuro_events::dispatch::span_async;
 use kuro_fs::paths::abs_norm_path::AbsNormPath;
@@ -357,37 +355,12 @@ impl WatchmanFileWatcher {
         cells: CellResolver,
         ignore_specs: HashMap<CellName, IgnoreSet>,
     ) -> kuro_error::Result<Self> {
-        let watchman_merge_base = root_config
-            .get(BuckconfigKeyRef {
-                section: "project",
-                property: "watchman_merge_base",
-            })
-            .map(|s| s.to_owned());
-
-        let empty_on_fresh_instance = if watchman_merge_base.is_some() {
-            // double negative here because we'd prefer that rollout changes config value from false->true.
-            !root_config
-                .parse::<RolloutPercentage>(BuckconfigKeyRef {
-                    section: "kuro",
-                    property: "disable_watchman_empty_on_fresh_instance",
-                })?
-                .unwrap_or_else(RolloutPercentage::never)
-                .roll()
-        } else {
-            // When not using scm-aware queries, fresh instances would list every file in
-            // the repo. That's a lot and not very useful.
-            // TODO(cjhopman): If we find we get a lot of value from the invalidation tracking that
-            // getting changed files since branch point gives us, we could try to get a better
-            // approach here for the non scm-aware case.
-            true
-        };
-
-        let report_global_rev = root_config
-            .parse::<bool>(BuckconfigKeyRef {
-                section: "kuro",
-                property: "watchman_report_global_rev",
-            })?
-            .unwrap_or(false);
+        let _ = root_config;
+        let watchman_merge_base: Option<String> = None;
+        // When not using scm-aware queries, fresh instances would list every file in
+        // the repo. That's a lot and not very useful.
+        let empty_on_fresh_instance = true;
+        let report_global_rev = false;
 
         let query = SyncableQuery::new(
             Connector::new(),

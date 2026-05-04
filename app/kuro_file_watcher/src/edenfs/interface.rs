@@ -27,7 +27,6 @@ use fbinit::FacebookInit;
 use kuro_common::file_ops::dice::FileChangeTracker;
 use kuro_common::ignores::ignore_set::IgnoreSet;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_core::cells::CellResolver;
 use kuro_core::cells::name::CellName;
 use kuro_core::fs::project::ProjectRoot;
@@ -125,12 +124,8 @@ impl EdenFsFileWatcher {
             .to_owned();
         let project_root = manager.get_proj_relative_path().to_owned();
 
-        let mergebase_with = root_config
-            .get(BuckconfigKeyRef {
-                section: "project",
-                property: "watchman_merge_base",
-            })
-            .map(|s| s.to_owned());
+        let _ = root_config;
+        let mergebase_with: Option<String> = None;
 
         Ok(Self {
             manager,

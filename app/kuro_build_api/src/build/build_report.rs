@@ -35,8 +35,6 @@ use kuro_artifact::artifact::artifact_dump::ExternalSymlinkInfo;
 use kuro_artifact::artifact::artifact_dump::FileInfo;
 use kuro_artifact::artifact::artifact_dump::SymlinkInfo;
 use kuro_cli_proto::CommonBuildOptions;
-use kuro_common::legacy_configs::dice::HasLegacyConfigs;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_core::cells::CellResolver;
 use kuro_core::configuration::compatibility::MaybeCompatible;
 use kuro_core::configuration::data::ConfigurationData;
@@ -1048,18 +1046,10 @@ pub async fn build_report_opts<'a>(
     build_opts: &CommonBuildOptions,
     graph_properties_opts: GraphPropertiesOptions,
 ) -> kuro_error::Result<BuildReportOpts> {
+    let _ = (ctx, cell_resolver);
     let esto = &build_opts.unstable_build_report_filename;
     let build_report_opts = BuildReportOpts {
-        print_unconfigured_section: ctx
-            .parse_legacy_config_property(
-                cell_resolver.root_cell(),
-                BuckconfigKeyRef {
-                    section: "build_report",
-                    property: "print_unconfigured_section",
-                },
-            )
-            .await?
-            .unwrap_or(true),
+        print_unconfigured_section: true,
         unstable_include_failures_build_report: build_opts.unstable_include_failures_build_report,
         unstable_include_package_project_relative_paths: build_opts
             .unstable_include_package_project_relative_paths,

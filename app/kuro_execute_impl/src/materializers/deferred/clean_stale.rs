@@ -21,7 +21,6 @@ use futures::FutureExt;
 use futures::future::BoxFuture;
 use kuro_common::file_ops::metadata::FileType;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_common::liveliness_observer::LivelinessGuard;
 use kuro_common::liveliness_observer::LivelinessObserverSync;
 use kuro_core::fs::project::ProjectRoot;
@@ -630,66 +629,7 @@ pub struct CleanStaleConfig {
 }
 
 impl CleanStaleConfig {
-    pub fn from_buck_config(root_config: &LegacyBuckConfig) -> kuro_error::Result<Option<Self>> {
-        let clean_stale_enabled = root_config
-            .parse(BuckconfigKeyRef {
-                section: "kuro",
-                property: "clean_stale_enabled",
-            })?
-            .unwrap_or(false);
-        let clean_stale_artifact_ttl_hours = root_config
-            .parse(BuckconfigKeyRef {
-                section: "kuro",
-                property: "clean_stale_artifact_ttl_hours",
-            })?
-            .unwrap_or(24.0 * 7.0);
-        let clean_stale_period_hours = root_config
-            .parse(BuckconfigKeyRef {
-                section: "kuro",
-                property: "clean_stale_period_hours",
-            })?
-            .unwrap_or(24.0);
-        let clean_stale_start_offset_hours = root_config
-            .parse(BuckconfigKeyRef {
-                section: "kuro",
-                property: "clean_stale_start_offset_hours",
-            })?
-            .unwrap_or(12.0);
-        let clean_stale_dry_run = root_config
-            .parse(BuckconfigKeyRef {
-                section: "kuro",
-                property: "clean_stale_dry_run",
-            })?
-            .unwrap_or(false);
-        let decreased_ttl_hours: Option<f64> = root_config.parse(BuckconfigKeyRef {
-            section: "kuro",
-            property: "clean_stale_low_disk_artifact_ttl_hours",
-        })?;
-        let decreased_ttl_hours_disk_threshold = root_config.parse(BuckconfigKeyRef {
-            section: "kuro",
-            property: "clean_stale_low_disk_threshold",
-        })?;
-
-        let secs_in_hour = 60.0 * 60.0;
-        let clean_stale_config = if clean_stale_enabled {
-            Some(Self {
-                clean_period: std::time::Duration::from_secs_f64(
-                    secs_in_hour * clean_stale_period_hours,
-                ),
-                artifact_ttl: std::time::Duration::from_secs_f64(
-                    secs_in_hour * clean_stale_artifact_ttl_hours,
-                ),
-                start_offset: std::time::Duration::from_secs_f64(
-                    secs_in_hour * clean_stale_start_offset_hours,
-                ),
-                decreased_ttl_hours: decreased_ttl_hours
-                    .map(|hours| std::time::Duration::from_secs_f64(secs_in_hour * hours)),
-                decreased_ttl_hours_disk_threshold,
-                dry_run: clean_stale_dry_run,
-            })
-        } else {
-            None
-        };
-        Ok(clean_stale_config)
+    pub fn from_buck_config(_root_config: &LegacyBuckConfig) -> kuro_error::Result<Option<Self>> {
+        Ok(None)
     }
 }

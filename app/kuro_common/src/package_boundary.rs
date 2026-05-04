@@ -28,9 +28,6 @@ use kuro_fs::paths::forward_rel_path::ForwardRelativePath;
 use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 use ref_cast::RefCast;
 
-use crate::legacy_configs::dice::HasLegacyConfigs;
-use crate::legacy_configs::key::BuckconfigKeyRef;
-
 #[derive(PartialEq, Allocative)]
 pub struct PackageBoundaryExceptions(HashMap<CellName, CellPackageBoundaryExceptions>);
 
@@ -105,23 +102,10 @@ impl Key for CellPackageBoundaryExceptionsKey {
 
     async fn compute(
         &self,
-        ctx: &mut DiceComputations,
+        _ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let s = ctx
-            .get_legacy_config_property(
-                self.0,
-                BuckconfigKeyRef {
-                    section: "project",
-                    property: "package_boundary_exceptions",
-                },
-            )
-            .await?;
-        if let Some(s) = s {
-            Ok(Some(Arc::new(CellPackageBoundaryExceptions::new(&s)?)))
-        } else {
-            Ok(None)
-        }
+        Ok(None)
     }
 
     fn validity(x: &Self::Value) -> bool {
