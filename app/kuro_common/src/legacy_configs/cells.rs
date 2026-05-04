@@ -55,17 +55,14 @@ use crate::legacy_configs::cells_symlinks::cleanup_stale_symlinks;
 use crate::legacy_configs::cells_symlinks::ensure_symlink;
 use crate::legacy_configs::configs::LegacyBuckConfig;
 use crate::legacy_configs::dice::HasInjectedLegacyConfigs;
-use crate::legacy_configs::file_ops::ConfigDirEntry;
 use crate::legacy_configs::file_ops::ConfigParserFileOps;
 use crate::legacy_configs::file_ops::ConfigPath;
 use crate::legacy_configs::file_ops::DefaultConfigParserFileOps;
 use crate::legacy_configs::file_ops::DiceConfigFileOps;
 use crate::legacy_configs::file_ops::push_all_files_from_a_directory;
 use crate::legacy_configs::key::BuckconfigKeyRef;
-use crate::legacy_configs::parser::LegacyConfigParser;
 use crate::legacy_configs::path::DEFAULT_EXTERNAL_CONFIG_SOURCES;
 use crate::legacy_configs::path::DEFAULT_PROJECT_CONFIG_SOURCES;
-use crate::legacy_configs::path::DOT_BUCKCONFIG_LOCAL;
 use crate::legacy_configs::path::ExternalConfigSource;
 use crate::legacy_configs::path::ProjectConfigSource;
 
@@ -112,29 +109,17 @@ fn toolchains_include_bundled_python(toolchain_labels: &[String]) -> bool {
 
 /// Buckconfigs can partially be loaded from within dice. However, some parts of what makes up the
 /// buckconfig comes from outside the buildgraph, and this type represents those parts.
+///
+/// Q1=B: no .buckconfig files are parsed; only CLI -c flag overrides are stored here.
 #[derive(Clone, PartialEq, Eq, Allocative)]
 pub struct ExternalBuckconfigData {
-    // The result of parsing the buckconfigs coming from either global (e.g. /etc/buckconfig.d) or
-    // user (e.g. ~/.buckconfig.d or $home_dir/.buckconfig.local) files/dirs outside of the repo
-    // The order matters here and reflects the same order these are processed in buck, see
-    // https://fburl.com/code/8ue78p1j
-    external_path_configs: Vec<ExternalPathBuckconfigData>,
-    // The result of parsing the buckconfigs coming from command line args (e.g. --config or --config-file)
+    // The result of processing command-line config args (e.g. --config key=value)
     args: Vec<ResolvedLegacyConfigArg>,
-}
-
-#[derive(PartialEq, Eq, Allocative, Clone)]
-pub struct ExternalPathBuckconfigData {
-    pub(crate) parse_state: LegacyConfigParser,
-    pub(crate) origin_path: ConfigPath,
 }
 
 impl ExternalBuckconfigData {
     pub fn testing_default() -> Self {
-        Self {
-            external_path_configs: Vec::new(),
-            args: Vec::new(),
-        }
+        Self { args: Vec::new() }
     }
 
     pub fn filter_values<F>(self, filter: F) -> Self
@@ -142,14 +127,6 @@ impl ExternalBuckconfigData {
         F: Fn(&BuckconfigKeyRef) -> bool,
     {
         Self {
-            external_path_configs: self
-                .external_path_configs
-                .into_iter()
-                .map(|o| ExternalPathBuckconfigData {
-                    parse_state: o.parse_state.filter_values(&filter),
-                    origin_path: o.origin_path,
-                })
-                .collect(),
             args: self
                 .args
                 .into_iter()
@@ -167,71 +144,15 @@ impl ExternalBuckconfigData {
         }
     }
 
-    async fn get_local_config_components(
-        project_root: &ProjectRoot,
-    ) -> Vec<kuro_data::BuckconfigComponent> {
-        use kuro_data::buckconfig_component::Data::GlobalExternalConfigFile;
-        let file_ops = &mut DefaultConfigParserFileOps {
-            project_fs: project_root.dupe(),
-        };
-        let mut local_config_components = Vec::new();
-        if let Ok(legacy_cells) =
-            BuckConfigBasedCells::parse_with_config_args(&project_root, &[]).await
-        {
-            let path = ForwardRelativePath::new(DOT_BUCKCONFIG_LOCAL).expect(
-                "Internal error: .buckconfig.local should always be a valid forward relative path",
-            );
-            for (_cell, cell_instance) in legacy_cells.cell_resolver.cells() {
-                let relative_path = cell_instance.path().as_project_relative_path().join(path);
-                let origin_path = relative_path.to_string();
-                let local_config = ConfigPath::Project(relative_path);
-
-                let mut parser = LegacyConfigParser::new();
-                if parser
-                    .parse_file(&local_config, None, true, file_ops)
-                    .await
-                    .is_ok()
-                {
-                    let values = parser.to_proto_external_config_values(false);
-                    if values.is_empty() {
-                        // Don't create an empty component for cells with non-existing .buckconfig.local
-                        continue;
-                    }
-                    local_config_components.push(kuro_data::BuckconfigComponent {
-                        data: Some(GlobalExternalConfigFile(kuro_data::GlobalExternalConfig {
-                            values,
-                            origin_path,
-                        })),
-                    });
-                }
-            }
-        }
-        local_config_components
-    }
-
+    /// Serialize CLI config overrides for DICE invalidation tracking.
+    ///
+    /// Q1=B: .buckconfig file components are no longer collected; only CLI -c args
+    /// are serialized. The `project_root` parameter is retained for API compatibility.
     pub async fn get_buckconfig_components(
         &self,
-        project_root: &ProjectRoot,
+        _project_root: &ProjectRoot,
     ) -> Vec<kuro_data::BuckconfigComponent> {
-        use kuro_data::buckconfig_component::Data::GlobalExternalConfigFile;
-        let mut res: Vec<kuro_data::BuckconfigComponent> = self
-            .external_path_configs
-            .clone()
-            .into_iter()
-            .map(|o| {
-                let external_file = kuro_data::GlobalExternalConfig {
-                    values: o.parse_state.to_proto_external_config_values(false),
-                    origin_path: o.origin_path.to_string(),
-                };
-                kuro_data::BuckconfigComponent {
-                    data: Some(GlobalExternalConfigFile(external_file)),
-                }
-            })
-            .collect();
-
-        res.extend(Self::get_local_config_components(project_root).await);
-        res.extend(to_proto_config_args(&self.args));
-        res
+        to_proto_config_args(&self.args)
     }
 }
 
@@ -568,7 +489,6 @@ impl BuckConfigBasedCells {
             root_config,
             config_paths: HashSet::new(),
             external_data: ExternalBuckconfigData {
-                external_path_configs: Vec::new(),
                 args: processed_config_args,
             },
             is_bzlmod: has_module_bazel,
@@ -1625,7 +1545,6 @@ async fn get_project_buckconfig_paths(
 
     Ok(buckconfig_paths)
 }
-
 
 /// Extract the repo name from a toolchain/platform label.
 /// E.g., "@local_config_cc_toolchains//:all" → "local_config_cc_toolchains"

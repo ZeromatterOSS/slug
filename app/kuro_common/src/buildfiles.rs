@@ -103,89 +103,48 @@ impl HasBuildfiles for DiceComputations<'_> {
 #[cfg(test)]
 mod tests {
     use gazebo::prelude::SliceExt;
-    use indoc::indoc;
-    use kuro_core::cells::name::CellName;
+    use kuro_cli_proto::ConfigOverride;
 
     use crate::buildfiles::parse_buildfile_name;
-    use crate::legacy_configs::cells::BuckConfigBasedCells;
-    use crate::legacy_configs::configs::testing::TestConfigParserFileOps;
+    use crate::legacy_configs::configs::LegacyBuckConfig;
 
-    #[tokio::test]
-    async fn test_buildfiles() -> kuro_error::Result<()> {
-        let mut file_ops = TestConfigParserFileOps::new(&[
-            (
-                ".buckconfig",
-                indoc!(
-                    r#"
-                            [cells]
-                                root = .
-                                other = other/
-                                third_party = third_party/
-                        "#
-                ),
-            ),
-            (
-                "other/.buckconfig",
-                indoc!(
-                    r#"
-                            [cells]
-                                other = .
-                            [buildfile]
-                                name = TARGETS
-                                extra_for_test = TARGETS.test
-                        "#
-                ),
-            ),
-            (
-                "third_party/.buckconfig",
-                indoc!(
-                    r#"
-                            [cells]
-                                third_party = .
-                            [buildfile]
-                                name = BUILD.bazel,BUILD
-                        "#
-                ),
-            ),
-        ])?;
-
-        let cells = BuckConfigBasedCells::testing_parse_with_file_ops(&mut file_ops, &[]).await?;
-
-        // Default buildfiles are BUILD.bazel, BUILD (Bazel-compatible).
-        // BUCK is NOT in the default list — Plan 35.2 retired the Buck-shaped
-        // naming opt-in; the only place BUCK is honored now is via an explicit
-        // [buildfile] name = BUCK,... in a workspace's own .buckconfig.
-        let config = cells
-            .parse_single_cell_with_file_ops(CellName::testing_new("root"), &mut file_ops)
-            .await?;
-        let default_buildfiles = parse_buildfile_name(&config)?;
-        assert_eq!(
-            vec!["BUILD.bazel", "BUILD"],
-            default_buildfiles.map(|f| f.as_str()),
-        );
+    #[test]
+    fn test_buildfiles_defaults() -> kuro_error::Result<()> {
+        // No [buildfile] override → Bazel-compatible defaults.
+        let config = LegacyBuckConfig::empty();
+        let buildfiles = parse_buildfile_name(&config)?;
+        assert_eq!(vec!["BUILD.bazel", "BUILD"], buildfiles.map(|f| f.as_str()));
         assert!(
-            !default_buildfiles.iter().any(|f| f.as_str() == "BUCK"),
+            !buildfiles.iter().any(|f| f.as_str() == "BUCK"),
             "BUCK must not be in the default buildfile list",
         );
+        Ok(())
+    }
 
-        // Custom buildfile names are used directly (no .v2 suffix added)
-        let config = cells
-            .parse_single_cell_with_file_ops(CellName::testing_new("other"), &mut file_ops)
-            .await?;
+    #[test]
+    fn test_buildfiles_custom_name() -> kuro_error::Result<()> {
+        // [buildfile] name=TARGETS via CLI override
+        let config = LegacyBuckConfig::from_overrides_only(&[
+            ConfigOverride::flag_no_cell("buildfile.name=TARGETS"),
+            ConfigOverride::flag_no_cell("buildfile.extra_for_test=TARGETS.test"),
+        ])?;
         assert_eq!(
             vec!["TARGETS", "TARGETS.test"],
             parse_buildfile_name(&config)?.map(|f| f.as_str()),
         );
+        Ok(())
+    }
 
-        // Explicit list in config
-        let config = cells
-            .parse_single_cell_with_file_ops(CellName::testing_new("third_party"), &mut file_ops)
-            .await?;
+    #[test]
+    fn test_buildfiles_comma_list() -> kuro_error::Result<()> {
+        // Comma-separated list in [buildfile] name
+        let config = LegacyBuckConfig::from_overrides_only(&[ConfigOverride::flag_no_cell(
+            "buildfile.name=BUILD.bazel,BUILD",
+        )])?;
         assert_eq!(
             vec!["BUILD.bazel", "BUILD"],
             parse_buildfile_name(&config)?.map(|f| f.as_str()),
         );
-
         Ok(())
     }
 }

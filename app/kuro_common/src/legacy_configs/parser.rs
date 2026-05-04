@@ -24,7 +24,6 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use starlark_map::sorted_map::SortedMap;
 
-use super::cells::ExternalPathBuckconfigData;
 use crate::legacy_configs::args::ResolvedConfigFlag;
 use crate::legacy_configs::configs::ConfigArgumentParseError;
 use crate::legacy_configs::configs::ConfigData;
@@ -213,13 +212,6 @@ impl LegacyConfigParser {
             })
             .flatten()
             .collect()
-    }
-    pub(crate) fn combine(external_path_configs: Vec<ExternalPathBuckconfigData>) -> Self {
-        let mut parser = LegacyConfigParser::new();
-        external_path_configs
-            .into_iter()
-            .for_each(|o| parser.join(&o.parse_state));
-        parser
     }
 }
 

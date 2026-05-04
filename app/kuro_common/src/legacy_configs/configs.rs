@@ -8,27 +8,17 @@
  * above-listed licenses.
  */
 
-use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Display;
-use std::io::BufRead;
 use std::sync::Arc;
 
 use allocative::Allocative;
 use dupe::Dupe;
 use kuro_cli_proto::ConfigOverride;
-use kuro_core::cells::cell_root_path::CellRootPath;
-use kuro_core::fs::project_rel_path::ProjectRelativePath;
 use pagable::Pagable;
 use starlark_map::sorted_map::SortedMap;
 
-use super::cells::ExternalPathBuckconfigData;
-use crate::legacy_configs::args::ResolvedConfigFile;
-use crate::legacy_configs::args::ResolvedLegacyConfigArg;
-use crate::legacy_configs::file_ops::ConfigParserFileOps;
-use crate::legacy_configs::file_ops::ConfigPath;
 use crate::legacy_configs::key::BuckconfigKeyRef;
-use crate::legacy_configs::parser::LegacyConfigParser;
 
 #[derive(Clone, Dupe, Debug, Allocative, Pagable)]
 pub struct LegacyBuckConfig(pub(crate) Arc<ConfigData>);
@@ -401,170 +391,39 @@ impl LegacyBuckConfig {
             .collect();
         Self(Arc::new(ConfigData { values }))
     }
-
-    pub(crate) async fn start_parse_for_external_files(
-        config_paths: &[ConfigPath],
-        file_ops: &mut dyn ConfigParserFileOps,
-        follow_includes: bool,
-    ) -> kuro_error::Result<Vec<ExternalPathBuckconfigData>> {
-        let mut external_path_configs = Vec::new();
-        for main_config_file in config_paths {
-            let mut parser = LegacyConfigParser::new();
-            parser
-                .parse_file(&main_config_file, None, follow_includes, file_ops)
-                .await?;
-            external_path_configs.push(ExternalPathBuckconfigData {
-                origin_path: main_config_file.clone(),
-                parse_state: parser,
-            });
-        }
-        Ok(external_path_configs)
-    }
-
-    pub(crate) async fn finish_parse(
-        external_path_configs: Vec<ExternalPathBuckconfigData>,
-        main_config_files: &[ConfigPath],
-        current_cell: &CellRootPath,
-        file_ops: &mut dyn ConfigParserFileOps,
-        config_args: &[ResolvedLegacyConfigArg],
-        follow_includes: bool,
-    ) -> kuro_error::Result<Self> {
-        let mut parser = LegacyConfigParser::combine(external_path_configs);
-        for main_config_file in main_config_files {
-            parser
-                .parse_file(&main_config_file, None, follow_includes, file_ops)
-                .await?;
-        }
-
-        for config_arg in config_args {
-            match config_arg {
-                ResolvedLegacyConfigArg::Flag(config_value) => {
-                    parser.apply_config_arg(config_value, current_cell)?
-                }
-                ResolvedLegacyConfigArg::File(ResolvedConfigFile::Project(path)) => {
-                    parser
-                        .parse_file(
-                            &ConfigPath::Project(path.to_owned()),
-                            Some(Location::CommandLineArgument),
-                            follow_includes,
-                            file_ops,
-                        )
-                        .await?
-                }
-                ResolvedLegacyConfigArg::File(ResolvedConfigFile::Global(other)) => {
-                    parser.join(&other.parser)
-                }
-            };
-        }
-
-        parser.finish()
-    }
 }
 
 pub mod testing {
-    use std::cmp::min;
-
-    use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
-
     use super::*;
-    use crate::legacy_configs::args::resolve_config_args;
-    use crate::legacy_configs::file_ops::ConfigDirEntry;
 
-    pub fn parse(data: &[(&str, &str)], path: &str) -> kuro_error::Result<LegacyBuckConfig> {
-        parse_with_config_args(data, path, &[])
+    /// Build a `LegacyBuckConfig` from CLI config overrides only (no file data).
+    ///
+    /// Q1=B replacement for the old `parse(file_data, path)` helper. The `data`
+    /// and `path` parameters are accepted but ignored so that call sites that
+    /// haven't been migrated still compile; they should be removed over time.
+    #[allow(unused_variables)]
+    pub fn parse(_data: &[(&str, &str)], _path: &str) -> kuro_error::Result<LegacyBuckConfig> {
+        Ok(LegacyBuckConfig::empty())
     }
 
+    /// Build a `LegacyBuckConfig` from CLI config overrides only.
+    ///
+    /// The `data` and `cell_path` parameters are ignored; only `config_args` is used.
+    #[allow(unused_variables)]
     pub fn parse_with_config_args(
-        data: &[(&str, &str)],
-        cell_path: &str,
+        _data: &[(&str, &str)],
+        _cell_path: &str,
         config_args: &[ConfigOverride],
     ) -> kuro_error::Result<LegacyBuckConfig> {
-        let mut file_ops = TestConfigParserFileOps::new(data)?;
-        let path = ProjectRelativePath::new(cell_path)?;
-        futures::executor::block_on(async {
-            // As long as people don't pass config files, making up values here is ok
-            let processed_config_args = resolve_config_args(config_args, &mut file_ops).await?;
-            LegacyBuckConfig::finish_parse(
-                Vec::new(),
-                &[ConfigPath::Project(path.to_owned())],
-                CellRootPath::new(ProjectRelativePath::empty()),
-                &mut file_ops,
-                &processed_config_args,
-                true,
-            )
-            .await
-        })
-    }
-
-    pub struct TestConfigParserFileOps {
-        data: HashMap<ProjectRelativePathBuf, String>,
-    }
-
-    impl TestConfigParserFileOps {
-        pub fn new(data: &[(&str, &str)]) -> kuro_error::Result<Self> {
-            let mut holder_data = HashMap::new();
-            for (file, content) in data {
-                holder_data.insert(
-                    ProjectRelativePath::new(*file)?.to_owned(),
-                    (*content).to_owned(),
-                );
-            }
-            Ok(TestConfigParserFileOps { data: holder_data })
-        }
-    }
-
-    #[async_trait::async_trait]
-    #[allow(private_interfaces)]
-    impl ConfigParserFileOps for TestConfigParserFileOps {
-        async fn read_file_lines_if_exists(
-            &mut self,
-            path: &ConfigPath,
-        ) -> kuro_error::Result<Option<Vec<String>>> {
-            let ConfigPath::Project(path) = path else {
-                return Ok(None);
-            };
-            let Some(content) = self.data.get(path) else {
-                return Ok(None);
-            };
-            // Need a Read implementation that owns the bytes.
-            struct StringReader(Vec<u8>, usize);
-            impl std::io::Read for StringReader {
-                fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
-                    let remaining = self.0.len() - self.1;
-                    let to_return = min(remaining, buf.len());
-                    buf[..to_return].clone_from_slice(&self.0[self.1..self.1 + to_return]);
-                    self.1 += to_return;
-                    Ok(to_return)
-                }
-            }
-            let file = std::io::BufReader::new(StringReader(content.to_owned().into_bytes(), 0));
-
-            Ok(Some(
-                file.lines()
-                    .into_iter()
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(kuro_error::Error::from)?,
-            ))
-        }
-
-        async fn read_dir(
-            &mut self,
-            _path: &ConfigPath,
-        ) -> kuro_error::Result<Vec<ConfigDirEntry>> {
-            // This is only used for listing files in `buckconfig.d` directories, which we can just
-            // say are always empty in tests
-            Ok(Vec::new())
-        }
+        LegacyBuckConfig::from_overrides_only(config_args)
     }
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use indoc::indoc;
     use itertools::Itertools;
     use kuro_core::cells::cell_root_path::CellRootPathBuf;
 
-    use super::testing::*;
     use super::*;
     use crate::legacy_configs::key::BuckconfigKeyRef;
 
@@ -603,7 +462,11 @@ pub(crate) mod tests {
         }
     }
 
-    fn assert_config_value_is_empty(config: &LegacyBuckConfig, section: &str, key: &str) {
+    pub(crate) fn assert_config_value_is_empty(
+        config: &LegacyBuckConfig,
+        section: &str,
+        key: &str,
+    ) {
         match config.get_section(section) {
             Some(values) => match values.get(key) {
                 Some(v) => {
@@ -621,307 +484,50 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_simple() -> kuro_error::Result<()> {
-        let config = parse(
-            &[(
-                "config",
-                indoc!(
-                    r#"
-            [section]
-                int = 1
-                string = hello
-                multiline = hello \
-                            world\
-                            !
-
-                # this is a comment
-                commented = okay
-
-            [new_section]
-                overridden = 1
-
-            [another_section]
-                some_val = 2
-
-            [new_section]
-                reopened = ok
-                # override overridden
-                overridden = 3
-
-                    # note trailing whitespace
-                    [bad_formatting]
-
-            value                 =             1
-        "#
-                ),
-            )],
-            "config",
-        )?;
-
-        assert_eq!(
-            None,
-            config.get(BuckconfigKeyRef {
-                section: "section",
-                property: "missing"
-            })
-        );
-        assert_eq!(
-            None,
-            config.get(BuckconfigKeyRef {
-                section: "missing",
-                property: "int"
-            })
-        );
-        assert_config_value(&config, "section", "int", "1");
-        assert_config_value(&config, "section", "string", "hello");
-        // Note that lines are all trimmed, so leading whitespace after a newline is
-        // dropped.
-        assert_config_value(&config, "section", "multiline", "hello world!");
-        assert_config_value(&config, "section", "commented", "okay");
-        assert_config_value(&config, "another_section", "some_val", "2");
-        assert_config_value(&config, "new_section", "reopened", "ok");
-        assert_config_value(&config, "new_section", "overridden", "3");
-        assert_config_value(&config, "bad_formatting", "value", "1");
-        Ok(())
-    }
-
-    #[test]
-    fn test_comments() -> kuro_error::Result<()> {
-        let config = parse(
-            &[(
-                "config",
-                indoc!(
-                    r#"
-            [section1] # stuff
-                key1 = value1
-            [section2#name]
-                key2 = value2
-        "#
-                ),
-            )],
-            "config",
-        )?;
-        assert_config_value(&config, "section1", "key1", "value1");
-        assert_config_value(&config, "section2#name", "key2", "value2");
-        Ok(())
-    }
-
-    #[test]
-    fn test_references() -> kuro_error::Result<()> {
-        let config = parse(
-            &[(
-                "config",
-                indoc!(
-                    r#"
-
-            [section1]
-                ref1_1 = ref1_1<$(config section3.ref3_2)>
-
-            [section2]
-                ref2_1 = ref2_1<$(config section3.ref3_1)>
-                ref2_2 = ref2_2<$(config section2.ref2_1)>
-            [section3]
-                ref3_1 = ref3_1<$(config section1.ref1_1), $(config section3.ref3_2)>
-                ref3_2 = ref3_2
-
-            [simple]
-                s1 = $(config simple.s2)$(config simple.s2)$(config simple.s2)
-                s2 = $(config simple.s3)$(config simple.s3)$(config simple.s3)
-                s3 = x
-        "#
-                ),
-            )],
-            "config",
-        )?;
-
-        assert_config_value(
-            &config,
-            "section2",
-            "ref2_2",
-            "ref2_2<ref2_1<ref3_1<ref1_1<ref3_2>, ref3_2>>>",
-        );
-
-        assert_config_value(&config, "simple", "s1", "xxxxxxxxx");
-        Ok(())
-    }
-
-    #[test]
-    fn test_reference_cycle() -> kuro_error::Result<()> {
-        let res = parse(
-            &[(
-                "config",
-                indoc!(
-                    r#"
-
-            [x]
-                a = $(config x.b)
-                b = $(config x.c)
-                c = $(config x.d)
-                d = $(config x.e)
-                e = $(config x.f)
-                f = $(config x.g)
-                g = $(config x.d)
-        "#
-                ),
-            )],
-            "config",
-        );
-
-        match res {
-            Ok(_) => panic!("Expected failure."),
-            Err(e) => {
-                let message = e.to_string();
-                let cycle = "`x.d` -> `x.e` -> `x.f` -> `x.g` -> `x.d`";
-                assert!(
-                    message.contains(cycle),
-                    "Expected error to contain \"{cycle}\", but was `{message}`"
-                );
-            }
-        }
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_includes() -> kuro_error::Result<()> {
-        let config = parse(
-            &[
-                (
-                    "base",
-                    indoc!(
-                        r#"
-                            base = okay!
-                        "#
-                    ),
-                ),
-                (
-                    "section",
-                    indoc!(
-                        r#"
-                            [section]
-                        "#
-                    ),
-                ),
-                (
-                    "some/deep/dir/includes_base",
-                    indoc!(
-                        r#"
-                            <file:../../../base>
-                        "#
-                    ),
-                ),
-                (
-                    "includes_section",
-                    indoc!(
-                        r#"
-                            <file:section>
-                        "#
-                    ),
-                ),
-                (
-                    "config",
-                    indoc!(
-                        r#"
-                        # use a couple optional includes in here to ensure those work when the file exists.
-                        [opened_section]
-                            # include into an already open section
-                            <?file:base>
-                        # start a section with an include
-                        <?file:includes_section>
-                             key = wild
-                             <?file:some/deep/dir/includes_base>
-                        [other_section]
-                        # ensure can reopen section with an include
-                        <file:section>
-                              other_key=wildtoo
-
-                        # Check that an optional include for a file that doesn't exist is okay.
-                        <?file:this_file_doesnt_exist>
-                        "#
-                    ),
-                ),
-                (
-                    "test_bad_include",
-                    indoc!(
-                        r#"
-                        <file:this_file_doesnt_exist>
-                        "#
-                    ),
-                ),
-            ],
-            "config",
-        )?;
-
-        assert_config_value(&config, "opened_section", "base", "okay!");
-        assert_config_value(&config, "section", "base", "okay!");
-        // Note that lines are all trimmed, so leading whitespace after a newline is
-        // dropped.
-        assert_config_value(&config, "section", "key", "wild");
-        assert_config_value(&config, "section", "other_key", "wildtoo");
-        Ok(())
-    }
-
-    #[test]
     fn test_config_args_ordering() -> kuro_error::Result<()> {
         let config_args = vec![
             ConfigOverride::flag_no_cell("apple.key=value1"),
             ConfigOverride::flag_no_cell("apple.key=value2"),
         ];
-        let config = parse_with_config_args(&[("config", indoc!(r#""#))], "config", &config_args)?;
+        let config = LegacyBuckConfig::from_overrides_only(&config_args)?;
         assert_config_value(&config, "apple", "key", "value2");
-
         Ok(())
     }
 
     #[test]
     fn test_config_args_empty() -> kuro_error::Result<()> {
         let config_args = vec![ConfigOverride::flag_no_cell("apple.key=")];
-        let config = parse_with_config_args(&[("config", indoc!(r#""#))], "config", &config_args)?;
+        let config = LegacyBuckConfig::from_overrides_only(&config_args)?;
         assert_config_value_is_empty(&config, "apple", "key");
-
         Ok(())
     }
 
     #[test]
-    fn test_config_args_overwrite_config_file() -> kuro_error::Result<()> {
+    fn test_config_args_cli_flag_wins() -> kuro_error::Result<()> {
+        // Q1=B: only CLI args contribute; this tests last-wins ordering.
         let config_args = vec![ConfigOverride::flag_no_cell("apple.key=value2")];
-        let config = parse_with_config_args(
-            &[(
-                "config",
-                indoc!(
-                    r#"
-            [apple]
-                key = value1
-        "#
-                ),
-            )],
-            "config",
-            &config_args,
-        )?;
-
+        let config = LegacyBuckConfig::from_overrides_only(&config_args)?;
         assert_config_value(&config, "apple", "key", "value2");
-
-        let apple_section = config.get_section("apple").unwrap();
-        let key_value = apple_section.get("key").unwrap();
         assert_eq!(
-            key_value.location(),
+            config
+                .get_section("apple")
+                .unwrap()
+                .get("key")
+                .unwrap()
+                .location(),
             LegacyBuckConfigLocation::CommandLineArgument
         );
-
         Ok(())
     }
 
     #[test]
     fn test_section_and_key() -> kuro_error::Result<()> {
         // Valid Formats
-
         let normal_section_and_key = parse_config_section_and_key("apple.key", None)?;
-
         assert_eq!("apple", normal_section_and_key.section);
         assert_eq!("key", normal_section_and_key.key);
 
         // Whitespace
-
         let section_leading_whitespace = parse_config_section_and_key("  apple.key", None)?;
         assert_eq!("apple", section_leading_whitespace.section);
         assert_eq!("key", section_leading_whitespace.key);
@@ -930,7 +536,6 @@ pub(crate) mod tests {
         assert!(pair_with_whitespace_in_key.is_err());
 
         // Invalid Formats
-
         let pair_without_dot = parse_config_section_and_key("applekey", None);
         assert!(pair_without_dot.is_err());
 
@@ -938,55 +543,10 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn test_config_file_args_overwrite_config_file() -> kuro_error::Result<()> {
-        let config_args = vec![
-            ConfigOverride::flag_no_cell("apple.key=value3"),
-            ConfigOverride::file("cli-config", Some(CellRootPathBuf::testing_new(""))),
-        ];
-        let config = parse_with_config_args(
-            &[
-                (
-                    ".buckconfig",
-                    indoc!(
-                        r#"
-                            [cells]
-                              root = .
-                            
-                            [apple]
-                              key = value1
-                        "#
-                    ),
-                ),
-                (
-                    "cli-config",
-                    indoc!(
-                        r#"
-            [apple]
-                key = value2
-        "#
-                    ),
-                ),
-            ],
-            ".buckconfig",
-            &config_args,
-        )?;
-
-        assert_config_value(&config, "apple", "key", "value2");
-
-        let apple_section = config.get_section("apple").unwrap();
-        let key_value = apple_section.get("key").unwrap();
-        let expected_path = LegacyBuckConfigLocation::File("cli-config", 2);
-        assert_eq!(key_value.location(), expected_path);
-
-        Ok(())
-    }
-
-    #[test]
     fn test_config_args_cell_in_value() -> kuro_error::Result<()> {
         let config_args = vec![ConfigOverride::flag_no_cell("apple.key=foo//value1")];
-        let config = parse_with_config_args(&[("config", indoc!(r#""#))], "config", &config_args)?;
+        let config = LegacyBuckConfig::from_overrides_only(&config_args)?;
         assert_config_value(&config, "apple", "key", "foo//value1");
-
         Ok(())
     }
 
@@ -1031,7 +591,6 @@ pub(crate) mod tests {
 
     #[test]
     fn test_from_overrides_only_skips_file_args() -> kuro_error::Result<()> {
-        use kuro_core::cells::cell_root_path::CellRootPathBuf;
         let args = vec![
             ConfigOverride::flag_no_cell("section.key=value"),
             ConfigOverride::file("some-config-file", Some(CellRootPathBuf::testing_new(""))),

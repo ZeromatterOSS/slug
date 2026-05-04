@@ -165,35 +165,26 @@ impl HasTargetAliasResolver for DiceComputations<'_> {
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
-    use indoc::indoc;
+    use kuro_cli_proto::ConfigOverride;
 
-    use crate::legacy_configs;
+    use crate::legacy_configs::configs::LegacyBuckConfig;
     use crate::target_aliases::AliasResolutionError;
     use crate::target_aliases::BuckConfigTargetAliasResolver;
 
     #[test]
     fn test_aliases() -> kuro_error::Result<()> {
-        let config = legacy_configs::configs::testing::parse(
-            &[(
-                "config",
-                indoc!(
-                    r#"
-            [alias]
-              baz = foo
-              foo = //:foo
-              bar = foo
-              bar2 = bar
-              cycle1 = cycle2
-              cycle2 = cycle3
-              cycle3 = cycle1
-              chain1 = chain2
-              chain2 = chain3
-
-        "#
-                ),
-            )],
-            "config",
-        )?;
+        // Q1=B: alias entries come from CLI -c alias.* flags, not .buckconfig files.
+        let config = LegacyBuckConfig::from_overrides_only(&[
+            ConfigOverride::flag_no_cell("alias.baz=foo"),
+            ConfigOverride::flag_no_cell("alias.foo=//:foo"),
+            ConfigOverride::flag_no_cell("alias.bar=foo"),
+            ConfigOverride::flag_no_cell("alias.bar2=bar"),
+            ConfigOverride::flag_no_cell("alias.cycle1=cycle2"),
+            ConfigOverride::flag_no_cell("alias.cycle2=cycle3"),
+            ConfigOverride::flag_no_cell("alias.cycle3=cycle1"),
+            ConfigOverride::flag_no_cell("alias.chain1=chain2"),
+            ConfigOverride::flag_no_cell("alias.chain2=chain3"),
+        ])?;
 
         let target_alias_resolver = BuckConfigTargetAliasResolver::new(config);
 

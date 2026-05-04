@@ -11,41 +11,21 @@
 use kuro_cli_proto::ConfigOverride;
 use kuro_cli_proto::config_override::ConfigType;
 use kuro_core::cells::cell_root_path::CellRootPathBuf;
-use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
 use kuro_error::BuckErrorContext;
-use kuro_fs::paths::abs_path::AbsPath;
-use kuro_fs::paths::abs_path::AbsPathBuf;
 
 use crate::legacy_configs::configs::ConfigArgumentParseError;
 use crate::legacy_configs::configs::ConfigSectionAndKey;
-use crate::legacy_configs::configs::LegacyBuckConfig;
 use crate::legacy_configs::configs::parse_config_section_and_key;
 use crate::legacy_configs::file_ops::ConfigParserFileOps;
-use crate::legacy_configs::file_ops::ConfigPath;
-use crate::legacy_configs::parser::LegacyConfigParser;
 
 /// Representation of a processed config arg, namely after file path resolution has been performed.
+///
+/// Q1=B: only the `Flag` variant is used; `File` is kept as a tombstone so that
+/// old clients sending `ConfigType::File` receive a clear error rather than a panic.
 #[derive(Debug, Clone, PartialEq, Eq, allocative::Allocative)]
 pub(crate) enum ResolvedLegacyConfigArg {
     /// A single config key-value pair (in `a.b=c` format).
     Flag(ResolvedConfigFlag),
-    /// A file containing additional config values (in `.buckconfig` format).
-    File(ResolvedConfigFile),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, allocative::Allocative)]
-pub(crate) enum ResolvedConfigFile {
-    /// If the config file is project relative, the path of the file
-    Project(ProjectRelativePathBuf),
-    /// If the config file is external, we pre-parse it to be able to insert the results into dice
-    Global(ExternalConfigFile),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, allocative::Allocative)]
-pub(crate) struct ExternalConfigFile {
-    pub(crate) parser: LegacyConfigParser,
-    // The origin path of the config file
-    origin_path: AbsPathBuf,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, allocative::Allocative)]
@@ -81,35 +61,9 @@ fn resolve_config_flag_arg(
     })
 }
 
-async fn resolve_config_file_arg(
-    cell: Option<CellRootPathBuf>,
-    arg: &str,
-    file_ops: &mut dyn ConfigParserFileOps,
-) -> kuro_error::Result<ResolvedConfigFile> {
-    if let Some(cell_path) = cell {
-        let proj_path = cell_path.as_project_relative_path().join_normalized(arg)?;
-        return Ok(ResolvedConfigFile::Project(proj_path));
-    }
-
-    let path = AbsPath::new(arg).internal_error("Client always produces absolute paths")?;
-    Ok(ResolvedConfigFile::Global(ExternalConfigFile {
-        origin_path: AbsPathBuf::new(arg)?,
-        parser: LegacyConfigParser::combine(
-            LegacyBuckConfig::start_parse_for_external_files(
-                &[ConfigPath::Global(path.to_owned())],
-                file_ops,
-                // Note that when reading immediate configs that don't follow includes, we don't apply
-                // config args either
-                true, // follow includes
-            )
-            .await?,
-        ),
-    }))
-}
-
 pub(crate) async fn resolve_config_args(
     args: &[ConfigOverride],
-    file_ops: &mut dyn ConfigParserFileOps,
+    _file_ops: &mut dyn ConfigParserFileOps,
 ) -> kuro_error::Result<Vec<ResolvedLegacyConfigArg>> {
     let mut resolved_args = Vec::new();
 
@@ -127,10 +81,14 @@ pub(crate) async fn resolve_config_args(
                 ResolvedLegacyConfigArg::Flag(resolved_flag)
             }
             ConfigType::File => {
-                let cell = u.get_cell()?.map(|p| p.to_buf());
-                let resolved_path =
-                    resolve_config_file_arg(cell, &u.config_override, file_ops).await?;
-                ResolvedLegacyConfigArg::File(resolved_path)
+                // Q1=B: --config-file is no longer supported; .buckconfig file parsing has
+                // been removed. Clients sending ConfigType::File will have their file args
+                // silently skipped. A future release may return an error here.
+                tracing::warn!(
+                    "--config-file (`{}`) is not supported and will be ignored",
+                    u.config_override
+                );
+                continue;
             }
         };
         resolved_args.push(resolved);
@@ -142,10 +100,7 @@ pub(crate) async fn resolve_config_args(
 pub(crate) fn to_proto_config_args(
     args: &[ResolvedLegacyConfigArg],
 ) -> Vec<kuro_data::BuckconfigComponent> {
-    use kuro_data::buckconfig_component::Data::ConfigFile;
     use kuro_data::buckconfig_component::Data::ConfigValue;
-    use kuro_data::config_file::Data::GlobalExternalConfig;
-    use kuro_data::config_file::Data::ProjectRelativePath;
 
     args.iter()
         .map(|arg| {
@@ -163,19 +118,6 @@ pub(crate) fn to_proto_config_args(
                             .clone()
                             .map(|flag| flag.to_string()),
                         is_cli: true,
-                    })
-                }
-                ResolvedLegacyConfigArg::File(ResolvedConfigFile::Project(p)) => {
-                    ConfigFile(kuro_data::ConfigFile {
-                        data: Some(ProjectRelativePath(p.to_string())),
-                    })
-                }
-                ResolvedLegacyConfigArg::File(ResolvedConfigFile::Global(p)) => {
-                    ConfigFile(kuro_data::ConfigFile {
-                        data: Some(GlobalExternalConfig(kuro_data::GlobalExternalConfig {
-                            values: p.parser.to_proto_external_config_values(true),
-                            origin_path: p.origin_path.to_str().unwrap_or("").to_owned(),
-                        })),
                     })
                 }
             };

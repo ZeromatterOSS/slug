@@ -400,29 +400,24 @@ const CONFIGS_INVISIBLE_TO_DICE: &[BuckconfigKeyRef<'static>] = &[
 mod tests {
     use kuro_cli_proto::ConfigOverride;
 
-    use crate::legacy_configs::configs::testing::parse_with_config_args;
+    use crate::legacy_configs::configs::LegacyBuckConfig;
 
     #[test]
     fn config_equals() -> kuro_error::Result<()> {
-        let path = "test";
-        let config1 = parse_with_config_args(
-            &[("test", "[sec1]\na=b\n[sec2]\nx=y")],
-            path,
-            &[ConfigOverride::flag_no_cell("sec1.a=c")],
-        )?;
-
-        let config2 = parse_with_config_args(&[("test", "[sec1]\na=c\n[sec2]\nx=y")], path, &[])?;
-
-        let config3 = parse_with_config_args(
-            &[("test", "[sec1]\na=b\n[sec2]\nx=y")],
-            path,
-            &[ConfigOverride::flag_no_cell("sec1.d=e")],
-        )?;
+        // Q1=B: config equality is driven by CLI flags only; file data is never read.
+        let config1 =
+            LegacyBuckConfig::from_overrides_only(&[ConfigOverride::flag_no_cell("sec1.a=c")])?;
+        let config2 =
+            LegacyBuckConfig::from_overrides_only(&[ConfigOverride::flag_no_cell("sec1.a=c")])?;
+        let config3 =
+            LegacyBuckConfig::from_overrides_only(&[ConfigOverride::flag_no_cell("sec1.d=e")])?;
 
         assert_eq!(config1.compare(&config1), true);
         assert_eq!(config2.compare(&config2), true);
         assert_eq!(config3.compare(&config3), true);
+        // Same CLI flag → equal configs
         assert_eq!(config1.compare(&config2), true);
+        // Different CLI flags → not equal
         assert_eq!(config1.compare(&config3), false);
         assert_eq!(config2.compare(&config3), false);
 
