@@ -130,38 +130,15 @@ pub struct KuroOssReConfiguration {
     pub action_cache_address: Option<String>,
     /// Whether to use TLS to interact with remote execution.
     pub tls: bool,
-    /// Path to a CA certificates bundle (PEM). Bazel-compat:
-    /// `--tls_certificate`. Read by `remote_execution/oss/re_grpc`.
-    pub tls_ca_certs: Option<String>,
     /// Path to a client certificate (PEM). Bazel-compat:
     /// `--tls_client_certificate`.
     pub tls_client_cert: Option<String>,
     /// HTTP headers to inject in all requests to RE. Bazel-compat:
     /// `--remote_header=K=V` (repeated).
     pub http_headers: Vec<HttpHeader>,
-    /// Whether to query capabilities from the RBE backend.
-    pub capabilities: Option<bool>,
     /// The instance name to use in requests. Bazel-compat:
     /// `--remote_instance_name`.
     pub instance_name: Option<String>,
-    /// Use the Meta version of the request metadata. Read by re_grpc
-    /// for the Meta-internal RE backend used by
-    /// `examples/remote_execution/internal/`.
-    pub use_fbcode_metadata: bool,
-    /// gRPC max-decoded-message-size. Kuro-specific knob.
-    pub max_decoding_message_size: Option<usize>,
-    /// gRPC `BatchReadBlobs` cumulative-blob-size cap. Kuro-specific knob.
-    pub max_total_batch_size: Option<usize>,
-    /// Per-action upload concurrency. Kuro-specific knob.
-    pub max_concurrent_uploads_per_action: Option<usize>,
-    /// CAS TTL hint in seconds. Kuro-specific knob.
-    pub cas_ttl_secs: Option<i64>,
-    /// HTTP/2 ping interval. Kuro-specific knob.
-    pub grpc_keepalive_time_secs: Option<u64>,
-    /// HTTP/2 ping ack timeout. Kuro-specific knob.
-    pub grpc_keepalive_timeout_secs: Option<u64>,
-    /// Send HTTP/2 pings while idle. Kuro-specific knob.
-    pub grpc_keepalive_while_idle: Option<bool>,
     /// Default `(key, value)` properties to attach to every remote
     /// action's `Platform` message. Populated from
     /// `--remote_default_exec_properties=KEY=VALUE` via the daemon
@@ -209,25 +186,11 @@ impl KuroOssReConfiguration {
             engine_address: legacy_config.parse(key!("engine_address"))?,
             action_cache_address: legacy_config.parse(key!("action_cache_address"))?,
             tls: legacy_config.parse(key!("tls"))?.unwrap_or(true),
-            tls_ca_certs: legacy_config.parse(key!("tls_ca_certs"))?,
             tls_client_cert: legacy_config.parse(key!("tls_client_cert"))?,
             http_headers: legacy_config
                 .parse_list(key!("http_headers"))?
                 .unwrap_or_default(),
-            capabilities: legacy_config.parse(key!("capabilities"))?,
             instance_name: legacy_config.parse(key!("instance_name"))?,
-            use_fbcode_metadata: legacy_config
-                .parse(key!("use_fbcode_metadata"))?
-                .unwrap_or(false),
-            max_decoding_message_size: legacy_config.parse(key!("max_decoding_message_size"))?,
-            max_total_batch_size: legacy_config.parse(key!("max_total_batch_size"))?,
-            max_concurrent_uploads_per_action: legacy_config
-                .parse(key!("max_concurrent_uploads_per_action"))?,
-            cas_ttl_secs: legacy_config.parse(key!("cas_ttl_secs"))?,
-            grpc_keepalive_time_secs: legacy_config.parse(key!("grpc_keepalive_time_secs"))?,
-            grpc_keepalive_timeout_secs: legacy_config
-                .parse(key!("grpc_keepalive_timeout_secs"))?,
-            grpc_keepalive_while_idle: legacy_config.parse(key!("grpc_keepalive_while_idle"))?,
             // CLI-flag-only; populated by the daemon startup-config overlay.
             default_exec_properties: Vec::new(),
         })

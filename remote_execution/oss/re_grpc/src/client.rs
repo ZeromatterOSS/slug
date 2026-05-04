@@ -89,7 +89,6 @@ use tonic::metadata;
 use tonic::metadata::MetadataKey;
 use tonic::metadata::MetadataValue;
 use tonic::service::Interceptor;
-use tonic::transport::Certificate;
 use tonic::transport::Channel;
 use tonic::transport::Identity;
 use tonic::transport::Uri;
@@ -158,21 +157,6 @@ fn ttimestamp_from(ts: Option<::prost_types::Timestamp>) -> TTimestamp {
 
 async fn create_tls_config(opts: &KuroOssReConfiguration) -> anyhow::Result<ClientTlsConfig> {
     let config = ClientTlsConfig::new().with_enabled_roots();
-
-    let config = match opts.tls_ca_certs.as_ref() {
-        Some(tls_ca_certs) => {
-            let tls_ca_certs =
-                substitute_env_vars(tls_ca_certs).context("Invalid `tls_ca_certs`")?;
-            let data = tokio::fs::read(&tls_ca_certs)
-                .await
-                .with_context(|| format!("Error reading `{tls_ca_certs}`"))?;
-            config.ca_certificate(Certificate::from_pem(data))
-        }
-        None => {
-            // We set the `tls-webpki-roots` feature so we'll get that default.
-            config
-        }
-    };
 
     let config = match opts.tls_client_cert.as_ref() {
         Some(tls_client_cert) => {
@@ -243,8 +227,6 @@ pub struct RECapabilities {
 
 /// Contains runtime options for the remote execution client as set under `kuro_re_client`
 pub struct RERuntimeOpts {
-    /// Use the Meta version of the request metadata
-    use_fbcode_metadata: bool,
     /// Maximum number of concurrent upload requests.
     max_concurrent_uploads_per_action: Option<usize>,
     /// Time that digests are assumed to live in CAS after being touched.
@@ -321,18 +303,6 @@ impl REClientBuilder {
                 endpoint = endpoint.tls_config(tls_config.clone())?;
             }
 
-            // Configure gRPC keepalive settings
-            if let Some(keepalive_time_secs) = opts.grpc_keepalive_time_secs {
-                endpoint =
-                    endpoint.http2_keep_alive_interval(Duration::from_secs(keepalive_time_secs));
-            }
-            if let Some(keepalive_timeout_secs) = opts.grpc_keepalive_timeout_secs {
-                endpoint = endpoint.keep_alive_timeout(Duration::from_secs(keepalive_timeout_secs));
-            }
-            if let Some(keepalive_while_idle) = opts.grpc_keepalive_while_idle {
-                endpoint = endpoint.keep_alive_while_idle(keepalive_while_idle);
-            }
-
             // Since we are creating the HttpConnector ourselves, any TCP
             // settings (tcp_nodelay, tcp_keepalive, connect_timeout), need to
             // be set here instead of on the endpoint
@@ -364,36 +334,12 @@ impl REClientBuilder {
             interceptor.dupe(),
         );
 
-        if let Some(max_decoding_message_size) = opts.max_decoding_message_size {
-            capabilities_client =
-                capabilities_client.max_decoding_message_size(max_decoding_message_size);
-        }
-
         let instance_name = InstanceName(opts.instance_name.clone());
 
-        let capabilities = if opts.capabilities.unwrap_or(true) {
-            Self::fetch_rbe_capabilities(
-                &mut capabilities_client,
-                &instance_name,
-                opts.max_total_batch_size,
-            )
-            .await?
-        } else {
-            RECapabilities {
-                max_total_batch_size: DEFAULT_MAX_TOTAL_BATCH_SIZE,
-                supported_compressors: Vec::new(),
-            }
-        };
+        let capabilities =
+            Self::fetch_rbe_capabilities(&mut capabilities_client, &instance_name, None).await?;
 
-        let max_decoding_msg_size = opts
-            .max_decoding_message_size
-            .unwrap_or(capabilities.max_total_batch_size * 2);
-
-        if max_decoding_msg_size < capabilities.max_total_batch_size {
-            return Err(anyhow::anyhow!(
-                "Attribute `max_decoding_message_size` must always be equal or higher to `max_total_batch_size`"
-            ));
-        }
+        let max_decoding_msg_size = capabilities.max_total_batch_size * 2;
 
         // Choose a ByteStream compressor
         let bystream_compressor = if capabilities
@@ -438,11 +384,10 @@ impl REClientBuilder {
 
         Ok(REClient::new(
             RERuntimeOpts {
-                use_fbcode_metadata: opts.use_fbcode_metadata,
-                max_concurrent_uploads_per_action: opts.max_concurrent_uploads_per_action,
+                max_concurrent_uploads_per_action: None,
                 // NOTE: This is an arbitrary number because RBE does not return information
                 // on the TTL of the remote blob.
-                cas_ttl_secs: opts.cas_ttl_secs.unwrap_or(60),
+                cas_ttl_secs: 60,
             },
             grpc_clients,
             capabilities,
@@ -696,7 +641,6 @@ impl REClient {
                     ..Default::default()
                 },
                 metadata,
-                self.runtime_opts.use_fbcode_metadata,
             ))
             .await?;
 
@@ -723,7 +667,6 @@ impl REClient {
                     ..Default::default()
                 },
                 metadata,
-                self.runtime_opts.use_fbcode_metadata,
             ))
             .await?;
 
@@ -755,11 +698,7 @@ impl REClient {
         };
 
         let stream = client
-            .execute(with_re_metadata(
-                request,
-                metadata,
-                self.runtime_opts.use_fbcode_metadata,
-            ))
+            .execute(with_re_metadata(request, metadata))
             .await?
             .into_inner();
 
@@ -872,11 +811,7 @@ impl REClient {
                 let metadata = metadata.clone();
                 let mut cas_client = self.grpc_clients.cas_client.clone();
                 let resp = cas_client
-                    .batch_update_blobs(with_re_metadata(
-                        re_request,
-                        metadata,
-                        self.runtime_opts.use_fbcode_metadata,
-                    ))
+                    .batch_update_blobs(with_re_metadata(re_request, metadata))
                     .await?;
                 Ok(resp.into_inner())
             },
@@ -885,11 +820,7 @@ impl REClient {
                 let mut bytestream_client = self.grpc_clients.bytestream_client.clone();
                 let requests = futures::stream::iter(segments);
                 let resp = bytestream_client
-                    .write(with_re_metadata(
-                        requests,
-                        metadata,
-                        self.runtime_opts.use_fbcode_metadata,
-                    ))
+                    .write(with_re_metadata(requests, metadata))
                     .await?;
 
                 Ok(resp.into_inner())
@@ -937,11 +868,7 @@ impl REClient {
                 let metadata = metadata.clone();
                 let mut client = self.grpc_clients.cas_client.clone();
                 Ok(client
-                    .batch_read_blobs(with_re_metadata(
-                        re_request,
-                        metadata,
-                        self.runtime_opts.use_fbcode_metadata,
-                    ))
+                    .batch_read_blobs(with_re_metadata(re_request, metadata))
                     .await?
                     .into_inner())
             },
@@ -950,11 +877,7 @@ impl REClient {
                 async move {
                     let mut client = self.grpc_clients.bytestream_client.clone();
                     let response = client
-                        .read(with_re_metadata(
-                            read_request,
-                            metadata,
-                            self.runtime_opts.use_fbcode_metadata,
-                        ))
+                        .read(with_re_metadata(read_request, metadata))
                         .await?
                         .into_inner();
                     Ok(Box::pin(response.into_stream()))
@@ -1003,7 +926,6 @@ impl REClient {
                             ..Default::default()
                         },
                         metadata.clone(),
-                        self.runtime_opts.use_fbcode_metadata,
                     ))
                     .await
                     .context("Failed to request what blobs are not present on remote")?;
@@ -1694,59 +1616,10 @@ where
     Ok(UploadResponse {})
 }
 
-fn with_re_metadata<T>(
-    t: T,
-    metadata: RemoteExecutionMetadata,
-    use_fbcode_metadata: bool,
-) -> tonic::Request<T> {
-    // This creates a new Tonic request with attached metadata for the RE
-    // backend. There are two cases here we need to support:
-    //
-    //   - Servers that abide by the remote execution apis defined with Bazel,
-    //     AKA the "OSS RE API", which this package implements
-    //   - The internal RE solution used at Meta, which uses a different API,
-    //     but is compatible with the OSS RE API to some extent.
-    //
-    // The second case is supported only through attaching some metadata to the
-    // request, which the fbcode RE service understands; and the reason for all
-    // of this is that it allows this OSS client package to be tested inside of
-    // fbcode builds within Meta. So there doesn't need to be a separate CI
-    // check.
-    //
-    // However, we don't need it for FOSS builds of Kuro. And in theory we
-    // could test the OSS Bazel API in the upstream GitHub CI, but doing it this
-    // way is only a little ugly, it's hidden, and it helps ensure the internal
-    // Meta builds catch those issues earlier.
-
+fn with_re_metadata<T>(t: T, metadata: RemoteExecutionMetadata) -> tonic::Request<T> {
     let mut msg = tonic::Request::new(t);
 
-    if use_fbcode_metadata {
-        // This is pretty ugly, but the protobuf spec that defines this is
-        // internal, so considering field numbers need to be stable anyway (=
-        // low risk), and this is not used in prod (= low impact if this goes
-        // wrong), we just inline it here. This is a small hack that lets us use
-        // our internal RE using this GRPC client for testing.
-        //
-        // This is defined in `fbcode/remote_execution/grpc/metadata.proto`.
-        #[derive(prost::Message)]
-        struct Metadata {
-            #[prost(message, optional, tag = "15")]
-            platform: Option<crate::grpc::Platform>,
-            #[prost(string, optional, tag = "18")]
-            use_case_id: Option<String>,
-        }
-
-        let mut encoded = Vec::new();
-        Metadata {
-            platform: metadata.platform,
-            use_case_id: Some(metadata.use_case_id),
-        }
-        .encode(&mut encoded)
-        .expect("Encoding into a Vec cannot not fail");
-
-        msg.metadata_mut()
-            .insert_bin("re-metadata-bin", MetadataValue::from_bytes(&encoded));
-    } else {
+    {
         let mut encoded = Vec::new();
         RequestMetadata {
             tool_details: Some(ToolDetails {

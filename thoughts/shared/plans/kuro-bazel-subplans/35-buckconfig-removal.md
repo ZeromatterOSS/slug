@@ -752,21 +752,15 @@ For each phase:
 
 ## Follow-ups (tracked TODOs)
 
-- [ ] **Delete `use_fbcode_metadata` and all Meta-internal-only code paths**
-      (added 2026-05-01). The `KuroOssReConfiguration::use_fbcode_metadata`
-      field is set only by `examples/remote_execution/internal/.buckconfig`
-      against a Meta-internal RE backend; OSS users have no use for it.
-      Scope:
-      - Drop the field + `[kuro_re_client] use_fbcode_metadata` parse in
-        `app/kuro_re_configuration/src/lib.rs`.
-      - Drop the consumer at `remote_execution/oss/re_grpc/src/client.rs:441`
-        and any branches that fork on it.
-      - Delete `examples/remote_execution/internal/` entirely (it's the
-        Meta-internal RE example; bucket-(A) candidate for Phase 35.6a's
-        stale-example sweep).
-      - Audit `app/kuro_execute/src/re/client.rs` (and similar)
-        for `#[cfg(fbcode_build)]` blocks that exclusively serve the
-        Meta-internal path; delete those that have no OSS counterpart.
+- [x] **Delete `use_fbcode_metadata` and all Meta-internal-only code paths**
+      (added 2026-05-01, completed 2026-05-04). Folded into 35.5
+      `kuro_re_configuration` sweep: deleted the field + parse, the
+      `with_re_metadata` fbcode branch in `re_grpc/client.rs`, and the
+      `examples/remote_execution/internal/` example.
+      Remaining audit deferred (low priority): `#[cfg(fbcode_build)]`
+      blocks in `app/kuro_execute/src/re/client.rs` and similar — most
+      are gated at the workspace level by `is_open_source()` and don't
+      compile in OSS today.
 
 ## Out of Scope
 
