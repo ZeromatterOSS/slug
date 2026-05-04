@@ -1,15 +1,2 @@
-[cells]
-  root = .
-  prelude = prelude
-
-[cell_aliases]
-  prelude = prelude
-
-[external_cells]
-  prelude = bundled
-
 [buildfile]
-  name = TARGETS.fixture
-
-[project]
-  ignore = ignored
+    name = TARGETS.fixture

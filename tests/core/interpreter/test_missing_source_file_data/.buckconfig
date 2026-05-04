@@ -1,5 +1,2 @@
 [buildfile]
-name=BUILD.bazel
-
-[repositories]
-prelude = .
+    name = BUILD.bazel

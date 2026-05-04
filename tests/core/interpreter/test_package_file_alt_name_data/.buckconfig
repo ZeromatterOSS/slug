@@ -1,7 +1,2 @@
 [buildfile]
-# Support both BUILD.bazel and BUILD (Bazel compatibility)
-# BUILD.bazel takes precedence when both exist
-name = BUILD.bazel,BUILD
-
-[repositories]
-prelude = .
+    name = BUILD.bazel,BUILD

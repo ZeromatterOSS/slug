@@ -1,6 +1,2 @@
-[repositories]
-    root = .
-[repository_aliases]
-    prelude = root
 [buildfile]
     name = BUILD.bazel

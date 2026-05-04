@@ -1,8 +1,2 @@
 [buildfile]
     name = TARGETS.fixture
-
-[repositories]
-    root = .
-
-[repository_aliases]
-    prelude = root

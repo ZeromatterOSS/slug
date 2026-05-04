@@ -1,11 +1,2 @@
-[cells]
-  root = .
-
-[external_cells]
-  prelude = bundled
-
 [buildfile]
-  name = TARGETS.fixture
-
-[build]
-  execution_platforms = root//:execution_platforms
+    name = TARGETS.fixture

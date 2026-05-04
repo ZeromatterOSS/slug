@@ -1,7 +1,2 @@
 [buildfile]
-name=TARGETS.fixture
-
-[repositories]
-root = ../
-cell = .
-prelude = ../prelude
+    name = TARGETS.fixture

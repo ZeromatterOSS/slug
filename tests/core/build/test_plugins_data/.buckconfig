@@ -1,9 +1,2 @@
 [buildfile]
-name = TARGETS.fixture
-
-[repositories]
-root = .
-prelude = prelude
-
-[build]
-execution_platforms = root//config:platforms
+    name = TARGETS.fixture

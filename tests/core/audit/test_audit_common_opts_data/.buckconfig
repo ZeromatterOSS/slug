@@ -1,6 +1,2 @@
-[cells]
-  root = .
-  prelude = .
-
 [buildfile]
-  name = TARGETS.fixture
+    name = TARGETS.fixture

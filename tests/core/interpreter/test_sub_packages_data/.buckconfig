@@ -1,6 +1,2 @@
-[cells]
-  root = .
-  prelude = .
-
 [buildfile]
-  name = BUILD.bazel
+    name = BUILD.bazel

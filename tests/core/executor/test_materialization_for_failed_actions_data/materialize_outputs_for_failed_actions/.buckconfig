@@ -1,8 +1,2 @@
 [buildfile]
-name=TARGETS.fixture
-
-[project]
-ignore=ignored
-
-[repositories]
-root = .
+    name = TARGETS.fixture
