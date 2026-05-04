@@ -23,18 +23,12 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use futures::FutureExt;
 use itertools::Itertools;
-use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::dep_only_incompatible_info::DepOnlyIncompatibleCustomSoftErrors;
-use kuro_build_api::interpreter::rule_defs::provider::builtin::dep_only_incompatible_info::FrozenDepOnlyIncompatibleInfo;
 use kuro_build_api::transition::TRANSITION_ATTRS_PROVIDER;
 use kuro_build_api::transition::TRANSITION_CALCULATION;
 use kuro_build_signals::node_key::BuildSignalsNodeKey;
 use kuro_build_signals::node_key::BuildSignalsNodeKeyImpl;
-use kuro_common::dice::cells::HasCellResolver;
 use kuro_common::dice::cycles::CycleGuard;
-use kuro_common::legacy_configs::dice::HasLegacyConfigs;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
-use kuro_common::legacy_configs::view::LegacyBuckConfigView;
 use kuro_core::configuration::compatibility::IncompatiblePlatformReason;
 use kuro_core::configuration::compatibility::IncompatiblePlatformReasonCause;
 use kuro_core::configuration::compatibility::MaybeCompatible;
@@ -44,8 +38,6 @@ use kuro_core::configuration::pair::ConfigurationWithExec;
 use kuro_core::configuration::transition::applied::TransitionApplied;
 use kuro_core::configuration::transition::id::TransitionId;
 use kuro_core::execution_types::execution::ExecutionPlatformResolution;
-use kuro_core::pattern::pattern::ParsedPattern;
-use kuro_core::pattern::pattern_type::TargetPatternExtra;
 use kuro_core::plugins::PluginKind;
 use kuro_core::plugins::PluginKindSet;
 use kuro_core::plugins::PluginListElemKind;
@@ -1319,7 +1311,7 @@ impl ConfiguredTargetNodeCalculationImpl for ConfiguredTargetNodeCalculationInst
                     &reason.cause,
                     &IncompatiblePlatformReasonCause::Dependency(_)
                 ) {
-                    if check_error_on_incompatible_dep(ctx, target.unconfigured_label()).await? {
+                    if false {
                         return Err(reason.to_err().into());
                     }
                     soft_error!(
@@ -1348,90 +1340,6 @@ impl ConfiguredTargetNodeCalculationImpl for ConfiguredTargetNodeCalculationInst
         }
         Ok(maybe_compatible_node)
     }
-}
-
-async fn check_error_on_incompatible_dep(
-    ctx: &mut DiceComputations<'_>,
-    target_label: &TargetLabel,
-) -> kuro_error::Result<bool> {
-    if check_target_enabled_for_config(
-        ctx,
-        target_label,
-        "buck2",
-        "error_on_dep_only_incompatible_excluded",
-    )
-    .await?
-    {
-        return Ok(false);
-    }
-    check_target_enabled_for_config(ctx, target_label, "buck2", "error_on_dep_only_incompatible")
-        .await
-}
-
-async fn check_target_enabled_for_config(
-    ctx: &mut DiceComputations<'_>,
-    target_label: &TargetLabel,
-    section: &'static str,
-    property: &'static str,
-) -> kuro_error::Result<bool> {
-    #[derive(Clone, Dupe, Display, Debug, Eq, Hash, PartialEq, Allocative)]
-    #[display("ConfigPatternCalculation({section}, {property})")]
-    struct ConfigPatternCalculation {
-        section: &'static str,
-        property: &'static str,
-    }
-
-    #[async_trait]
-    impl Key for ConfigPatternCalculation {
-        type Value = kuro_error::Result<Arc<Vec<ParsedPattern<TargetPatternExtra>>>>;
-
-        async fn compute(
-            &self,
-            mut ctx: &mut DiceComputations,
-            _cancellation: &CancellationContext,
-        ) -> Self::Value {
-            let cell_resolver = ctx.get_cell_resolver().await?;
-            let root_cell = cell_resolver.root_cell();
-            let alias_resolver = ctx.get_cell_alias_resolver(root_cell).await?;
-            let root_conf = ctx.get_legacy_root_config_on_dice().await?;
-            let patterns: Vec<String> = root_conf
-                .view(&mut ctx)
-                .parse_list(BuckconfigKeyRef {
-                    section: self.section,
-                    property: &self.property,
-                })?
-                .unwrap_or_default();
-
-            let mut result = Vec::new();
-            for pattern in patterns {
-                result.push(ParsedPattern::parse_precise(
-                    pattern.trim(),
-                    root_cell,
-                    &cell_resolver,
-                    &alias_resolver,
-                )?);
-            }
-            Ok(result.into())
-        }
-
-        fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-            match (x, y) {
-                (Ok(x), Ok(y)) => x == y,
-                _ => false,
-            }
-        }
-    }
-
-    let patterns = ctx
-        .compute(&ConfigPatternCalculation { section, property })
-        .await??;
-    for pattern in patterns.iter() {
-        if pattern.matches(target_label) {
-            return Ok(true);
-        }
-    }
-
-    Ok(false)
 }
 
 async fn get_dep_only_incompatible_custom_soft_error(

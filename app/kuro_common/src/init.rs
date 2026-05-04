@@ -18,7 +18,6 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::legacy_configs::configs::LegacyBuckConfig;
-use crate::legacy_configs::key::BuckconfigKeyRef;
 
 pub const DEFAULT_RETAINED_EVENT_LOGS: usize = 12;
 

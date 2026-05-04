@@ -13,5 +13,3 @@ cell = package_listing/cell
 [project]
 ignore = package_listing/*red/**
 
-[kuro]
-allow_eden_io = false

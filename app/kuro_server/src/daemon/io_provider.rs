@@ -27,21 +27,7 @@ pub async fn create_io_provider(
 ) -> kuro_error::Result<Arc<dyn IoProvider>> {
     #[cfg(fbcode_build)]
     {
-        use kuro_common::legacy_configs::key::BuckconfigKeyRef;
-        use kuro_core::rollout_percentage::RolloutPercentage;
-
-        let allow_eden_io_default =
-            RolloutPercentage::from_bool(cfg!(any(target_os = "macos", target_os = "windows")));
-
-        let allow_eden_io = root_config
-            .parse(BuckconfigKeyRef {
-                section: "kuro",
-                property: "allow_eden_io",
-            })?
-            .unwrap_or(allow_eden_io_default)
-            .roll();
-
-        if allow_eden_io {
+        if false {
             if let Some(eden) = kuro_eden::io_provider::EdenIoProvider::new(
                 fb,
                 &project_fs,

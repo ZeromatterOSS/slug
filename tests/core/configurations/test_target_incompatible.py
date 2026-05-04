@@ -9,8 +9,6 @@
 # pyre-strict
 
 
-import re
-
 import pytest
 from buck2.tests.e2e_util.api.buck import Buck
 from buck2.tests.e2e_util.asserts import expect_failure
@@ -79,73 +77,6 @@ async def test_exec_dep_transitive_incompatible_post_transition(buck: Buck) -> N
     await buck.cquery(
         "//exec_dep:one_exec_platform_transitive_incompatible_post_transition",
     )
-
-
-@pytest.mark.parametrize(
-    "target_pattern, soft_error",
-    [
-        ("//dep_incompatible:", False),
-        ("//dep_incompatible/...", False),
-        ("//...", False),
-        # target pattern doesn't match //dep_incompatible:dep_incompatible
-        (
-            "//dep_incompatible:dep_incompatible2",
-            True,
-        ),
-    ],
-)
-@buck_test(allow_soft_errors=True)
-async def test_error_on_dep_only_incompatible(
-    buck: Buck, target_pattern: str, soft_error: bool
-) -> None:
-    args = [
-        "-c",
-        f"buck2.error_on_dep_only_incompatible=//some/...,{target_pattern}",
-        "//dep_incompatible:dep_incompatible",
-    ]
-    if soft_error:
-        await check_dep_only_incompatible_soft_err(buck, args)
-    else:
-        await expect_failure(
-            buck.cquery(*args),
-            stderr_regex=INCOMPATIBLE_ERROR,
-        )
-
-
-@buck_test()
-async def test_error_on_dep_only_incompatible_conf(buck: Buck) -> None:
-    args = [
-        "//dep_incompatible:dep_incompatible_conf2",
-    ]
-    await expect_failure(
-        buck.cquery(*args),
-        stderr_regex=INCOMPATIBLE_ERROR,
-    )
-
-
-@buck_test(allow_soft_errors=True)
-async def test_error_on_dep_only_incompatible_excluded(buck: Buck) -> None:
-    args = [
-        "-c",
-        "buck2.error_on_dep_only_incompatible_excluded=//dep_incompatible:dep_incompatible_conf2",
-        "//dep_incompatible:dep_incompatible_conf2",
-    ]
-    await check_dep_only_incompatible_soft_err(buck, args)
-
-
-async def check_dep_only_incompatible_soft_err(buck: Buck, args: list[str]) -> None:
-    result = await buck.cquery(*args)
-    # This can't use the same INCOMPATIBLE_ERROR str as elsewhere.
-    # Because the result is a soft error, stderr has timestamps
-    # prefixing each line which makes this regex, which works elsewhere,
-    # fail here. The regex could try to match with the timestamp instead,
-    # but this is easier
-    assert re.search(
-        "does not pass compatibility check \\(will be error in future\\) because its transitive dep root//:incompatible",
-        result.stderr,
-        re.DOTALL | re.IGNORECASE,
-    )
-    assert re.search("is incompatible with", result.stderr, re.DOTALL | re.IGNORECASE)
 
 
 @buck_test(allow_soft_errors=True)
