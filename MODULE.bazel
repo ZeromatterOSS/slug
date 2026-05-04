@@ -1,0 +1,13 @@
+module(
+    name = "gh_facebook_kuro",
+    version = "0.1.0",
+)
+
+# Shim cell: provides compatibility shims for Meta-internal Starlark paths.
+# Registered as its historical name so that any @gh_facebook_kuro_shims_meta//
+# labels in the build graph continue to resolve.
+bazel_dep(name = "gh_facebook_kuro_shims_meta")
+local_path_override(
+    module_name = "gh_facebook_kuro_shims_meta",
+    path = "shim",
+)
