@@ -1,8 +1,7 @@
 # Bucket-C fixture (Plan 35.6a). Uses kuro-specific knobs not yet
 # migrated to CLI flags. See thoughts/shared/research/2026-05-04-fixture-bucket-classification.md
+# [repositories] removed: cell resolution comes from MODULE.bazel (bzlmod path).
 
-[repositories]
-    root = .
 [kuro]
     directories_to_allow_relative_paths = \
         //foo
