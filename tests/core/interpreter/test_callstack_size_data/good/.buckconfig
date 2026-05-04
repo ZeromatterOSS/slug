@@ -1,4 +1,0 @@
-[repositories]
-    root = ..
-[buildfile]
-    name = BUILD.bazel

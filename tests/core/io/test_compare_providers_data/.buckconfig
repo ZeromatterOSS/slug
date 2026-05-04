@@ -1,5 +1,0 @@
-[cells]
-  root = .
-
-[kuro]
-  digest_algorithms = BLAKE3-KEYED,SHA1

@@ -34,21 +34,6 @@ from buck2.tests.e2e_util.buck_workspace import buck  # noqa F401
 # These cannot be imported externally and are excluded from collection.
 # ──────────────────────────────────────────────────────────────────────────────
 collect_ignore = [
-    # Meta-internal only (requires manifold, buck2.tests.core, etc.)
-    "core/explain/test_explain.py",          # requires manifold
-    "core/io/test_edenfs.py",                # requires buck2.tests.core
-    "core/io/test_edenfs_aba.py",            # requires buck2.tests.core
-    "core/io/test_fs_hash_crawler.py",       # requires buck2.tests.core
-    "core/io/test_notify.py",               # requires buck2.tests.core
-    "core/io/test_watchman.py",             # requires buck2.tests.core
-    "core/io/test_watchman_aba.py",         # requires buck2.tests.core
-    "core/log/test_upload_re_logs.py",      # requires manifold
-    "core/query/uquery/test_uquery.py",     # requires manifold
-    # Meta-internal memory/type-checking tests (Buck2-specific infrastructure)
-    "core/interpreter/test_peak_allocated_bytes.py",        # Meta-internal peak alloc tracking
-    "core/interpreter/test_peak_allocated_bytes_exceeds_limit.py",  # Meta-internal
-    "core/interpreter/test_prelude_typecheck.py",           # Meta-internal typecheck infra
-    "core/interpreter/test_unstable_typecheck.py",          # Meta-internal typecheck infra
     # Meta-internal tests requiring NANO_PRELUDE env var or fbpython
     # NOTE: test_audit_output.py, test_audit_configurations.py, test_audit_deferred_materializer.py,
     # and test_audit_execution_platform_resolution.py now work with our NANO_PRELUDE setup.
@@ -57,36 +42,7 @@ collect_ignore = [
     # These tests require kuro to support the `?modifier` target syntax which is Buck2-specific
     # and not part of Bazel's target language
     # NOTE: test_error_categorization.py partially works - failing tests added to SKIP_TESTS
-    # NOTE: test_paranoid.py: test_noop passes; RE/paranoid-specific tests added to SKIP_TESTS below
     # NOTE: test_external_buckconfigs.py: all 4 tests pass with the fixed golden file
-    # Meta-internal unified constraint rule (native.constraint, native.platform)
-    "core/configurations/test_unified_constraint.py",         # Uses Meta-internal native.constraint rule
-    # Meta-internal exec modifier feature (uses native.constraint)
-    "core/configurations/test_exec_modifier.py",              # Uses Meta-internal native.constraint rule
-    # Buck2-specific modifier syntax (test command modifiers)
-    "core/test/test_modifiers.py",                            # Uses Buck2-specific ?modifier target syntax
-    # Test discovery listing infrastructure (requires Meta-internal listing protocol + RE)
-    "core/test/test_listing.py",                              # Requires test.discovery listing protocol and RE caching
-
-    # Require Meta-internal tooling (fbpython, Manifold, etc.)
-    # NOTE: test_incremental_remote_action.py mostly works with our fbpython shim (4/5 tests pass)
-    # test_remote_cache_is_used is skipped via SKIP_TESTS
-    "core/subscribe/test_subscribe.py",                        # Requires BUCK2_EXPECT env var
-    "core/vpnless/test_vpnless.py",                            # Meta-internal VPN-less feature
-
-    # Watchman/Eden filesystem integration tests
-    "core/io/test_file_watcher.py",                            # Requires Watchman process
-    # Meta-internal completion/console tests requiring special env vars
-    "core/completion/test_completion.py",                      # Requires BUCK2_COMPLETION_VERIFY env var
-    "core/console/test_console.py",                            # Requires FIXTURES env var
-    # Requires Mercurial (hg) VCS - not available in this environment
-    "core/trace_io/test_trace_io.py",                          # Requires hg command for VCS tracing
-    # Requires Linux cgroup support with normalized paths
-    "core/resource_control/test_action_suspension.py",         # Requires cgroup path (non-normalized on this system)
-    "core/resource_control/test_daemon_memory_metrics.py",     # Requires cgroup memory metrics
-    "core/resource_control/test_hybrid_execution_resource_control.py",  # Requires cgroup + RE
-    "core/resource_control/test_instruction_count.py",         # Requires cgroup instruction counting
-    "core/resource_control/test_memory_reporting.py",          # Requires cgroup memory reporting
 
     # tests/e2e/ - Meta-internal inplace tests requiring real workspace or non-existent test data
     # These tests use @buck_test(inplace=True/False) which conflicts with our isolated mode,
@@ -135,15 +91,6 @@ SKIP_TESTS = {
     # Buck2-specific cfg modifiers (set_modifiers in PACKAGE files)
     "test_cfg_modifiers_change_target_hash": "Uses Buck2-specific set_modifiers() PACKAGE function",
     "test_parent_cfg_modifiers_change_target_hash": "Uses Buck2-specific set_modifiers() PACKAGE function",
-    # Buck2-specific cquery ?modifier syntax
-    "test_cquery_fails_with_global_modifier": "Uses Buck2-specific ?modifier syntax in cquery",
-    "test_cquery_with_single_universe_single_modifier": "Uses Buck2-specific ?modifier syntax in cquery",
-    "test_cquery_with_single_universe_multiple_modifiers": "Uses Buck2-specific ?modifier syntax in cquery",
-    "test_cquery_with_multiple_universes_single_modifier": "Uses Buck2-specific ?modifier syntax in cquery",
-    "test_cquery_with_multiple_universes_multiple_modifier": "Uses Buck2-specific ?modifier syntax in cquery",
-    "test_cquery_same_universe": "Uses Buck2-specific ?modifier syntax in cquery",
-    "test_cquery_order_of_modifiers": "Uses Buck2-specific ?modifier syntax in cquery",
-    "test_cquery_with_attrregexfilter": "Uses Buck2-specific ?modifier syntax in cquery",
     # cquery declared_deps query - error message format differs
     # Require RE (Remote Execution) - not available in local/OSS builds
     "test_upload_all_actions": "Requires Remote Execution (RE) for action uploads",
@@ -171,50 +118,6 @@ SKIP_TESTS = {
     "test_command_report_post_build_client_error": "Requires BUCK2_TEST_BUILD_ERROR (Meta-internal)",
     "test_what_uploaded_csv": "Requires Remote Execution (RE) uploads not available",
     "test_what_uploaded_aggregated": "Requires Remote Execution (RE) uploads not available",
-    # build modifiers tests - Buck2-specific ?modifier syntax for build command
-    "test_build_with_single_modifier": "Uses Buck2-specific ?modifier syntax",
-    "test_build_with_multiple_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_build_order_of_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_build_with_different_targets_and_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_build_with_same_target_different_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_build_with_same_target_and_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_build_with_target_universe": "Uses Buck2-specific ?modifier syntax",
-    "test_build_with_target_universe_multiple_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_build_with_mutliple_target_universes": "Uses Buck2-specific ?modifier syntax",
-    "test_build_with_package_pattern": "Uses Buck2-specific ?modifier syntax",
-    "test_build_with_recursive_pattern": "Uses Buck2-specific ?modifier syntax",
-    "test_build_fails_with_global_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_build_fails_with_pattern_modifier_and_target_universe_modifier": "Uses Buck2-specific ?modifier syntax",
-    "test_build_modifiers_output_single_modifier": "Uses Buck2-specific ?modifier syntax",
-    "test_build_modifiers_output_multiple_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_build_modifiers_output_multiple_patterns": "Uses Buck2-specific ?modifier syntax",
-    "test_build_modifiers_output_multiple_modifiers_multiple_patterns": "Uses Buck2-specific ?modifier syntax",
-    "test_build_modifiers_output_duplicate_patterns": "Uses Buck2-specific ?modifier syntax",
-    "test_build_modifiers_output_with_target_universe": "Uses Buck2-specific ?modifier syntax",
-    "test_build_modifiers_that_lead_to_same_configured": "Uses Buck2-specific ?modifier syntax",
-    # build modifiers report tests - Buck2-specific modifier reporting
-    "test_build_modifiers_report": "Uses Buck2-specific ?modifier syntax",
-    "test_build_modifiers_report_error_failures_includes_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_build_modifiers_report_package_pattern": "Uses Buck2-specific ?modifier syntax",
-    "test_build_modifiers_report_recursive_pattern": "Uses Buck2-specific ?modifier syntax",
-    "test_build_modifiers_report_ambiguous_pattern": "Uses Buck2-specific ?modifier syntax",
-    "test_build_modifiers_report_deduplication": "Uses Buck2-specific ?modifier syntax",
-    # run modifiers tests - Buck2-specific ?modifier syntax
-    "test_run_single_modifier": "Uses Buck2-specific ?modifier syntax",
-    "test_run_multiple_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_run_order_of_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_run_target_universe_single_modifier": "Uses Buck2-specific ?modifier syntax",
-    "test_run_target_universe_multiple_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_run_fails_with_global_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_run_fails_with_pattern_modifier_and_target_universe_modifier": "Uses Buck2-specific ?modifier syntax",
-    # Buck2-specific ?modifier syntax for ctargets
-    "test_ctargets_modifier_single_pattern": "Uses Buck2-specific ?modifier syntax",
-    "test_ctargets_modifier_multiple_patterns": "Uses Buck2-specific ?modifier syntax",
-    "test_ctargets_modifier_multiple_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_ctargets_modifier_order_of_modifiers": "Uses Buck2-specific ?modifier syntax",
-    "test_ctargets_modifier_multi_target_pattern": "Uses Buck2-specific ?modifier syntax",
-    "test_ctargets_modifier_same_target": "Uses Buck2-specific ?modifier syntax",
-    "test_ctargets_fails_with_global_modifier": "Uses Buck2-specific ?modifier syntax",
     # Require RE (Remote Execution) - remote_only flag not supported without RE
     "test_action_fail_error_handler_with_output_remote_only": "Requires Remote Execution (--remote-only flag)",
     "test_action_fail_error_handler_with_output_content_based_path_remote_only": "Requires Remote Execution (--remote-only flag)",
@@ -235,10 +138,6 @@ SKIP_TESTS = {
     "test_cli_configured_target_modifiers_flag": "Uses Buck2-specific --modifier flag",
     "test_cli_target_fails_with_question_mark_modifier_syntax": "Uses Buck2-specific ?modifier target syntax",
     "test_cli_configured_target_fails_with_global_modifiers": "Uses Buck2-specific --modifier flag",
-    # Paranoid mode tests (test_paranoid.py) - Buck2-specific RE caching feature
-    "test_paranoid_ignores_preferences": "Requires RE and Buck2 paranoid mode (BUCK_PARANOID env var)",
-    "test_paranoid_ignores_low_pass_filter": "Requires RE and Buck2 paranoid low-pass filter feature",
-    "test_paranoid_enable_disable": "Requires buck.debug('paranoid') command (Buck2-specific) and asyncio.sleep(15)",
     # Debug commands requiring external tools
     "test_thread_dump": "Requires LLDB which is not available in this environment",
     # Materializer tests requiring RE or Meta-internal HTTP downloads (interncache-all.fbcdn.net)

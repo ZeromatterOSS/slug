@@ -1,3 +1,0 @@
-load(":defs.bzl", "projected_output")
-
-projected_output(name = "projected_output")

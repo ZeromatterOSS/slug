@@ -1,5 +1,0 @@
-oncall("magic")
-
-stub(name = "foo")
-
-stub(name = "bar")

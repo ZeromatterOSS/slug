@@ -1,2 +1,0 @@
-# Minimal project root for test_paranoid.py tests.
-# test_noop just returns immediately; this file satisfies the buck project structure requirement.

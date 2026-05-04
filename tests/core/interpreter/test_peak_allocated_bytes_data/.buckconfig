@@ -1,8 +1,0 @@
-[buildfile]
-name=BUILD.bazel
-
-[repositories]
-prelude = .
-
-[kuro]
-check_starlark_peak_memory = true

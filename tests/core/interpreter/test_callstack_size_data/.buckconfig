@@ -1,8 +1,0 @@
-[repositories]
-    root = .
-    bad = bad
-    good = good
-[repository_aliases]
-    prelude = root
-[kuro]
-    starlark_max_callstack_size = 10

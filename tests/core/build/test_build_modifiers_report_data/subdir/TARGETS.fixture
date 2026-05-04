@@ -1,5 +1,0 @@
-load("//:defs.bzl", "dummy")
-
-dummy(
-    name = "subdir",
-)

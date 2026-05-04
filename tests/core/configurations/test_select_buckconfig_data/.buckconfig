@@ -1,8 +1,0 @@
-[cells]
-  root = .
-
-[external_cells]
-  prelude = bundled
-
-[buildfile]
-  name = TARGETS.fixture
