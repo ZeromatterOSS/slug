@@ -621,7 +621,17 @@ and renaming live ones:
   for `digest_algorithms` (→ `--digest_function`), `execution_platforms`
   (→ `--platforms`), and the live RE-client knobs.
 
-### Phase 35.6a: Test fixture + stale example classification + disposition  [~2-3 days]
+### Phase 35.6a: Test fixture + stale example classification + disposition  [~2-3 days]  ✅ COMPLETE 2026-05-04
+
+**Commits**:
+- Classification: `thoughts/shared/research/2026-05-04-fixture-bucket-classification.md` (358 fixtures: 66 A / 258 B / 34 C). Authored by a Sonnet sub-agent in one pass.
+- Bucket A (`bb9feb8c`): 28 parent `_data/` dirs deleted along with 34 owning test files (every bucket-A test was exclusively about its retired knob; no surgical edits needed). 28 entries removed from `tests/conftest.py::collect_ignore`, 53 modifier-syntax entries removed from `SKIP_TESTS`. 410 files / 13138 deletions.
+- Bucket B (`8f83d837`): 249 of 258 fixtures migrated to `MODULE.bazel` via a checked-in script (`scripts/migrate_fixture_buckconfig.py`). 9 fixtures had `[buildfile]`-only configs already and were left alone. The script also drops `[external_cells] = bundled`, `[project] ignore`, and `[build] execution_platforms` (these are bucket-B-acceptable).
+- Bucket C (`15eab789`): each of the 34 surviving fixtures gets a two-line header comment pointing at the classification doc, so a future reader sees "this uses a knob not yet on a CLI flag" without chasing the appendix.
+
+**Pytest analysis baseline 122/5/3/1 unchanged** before/after each commit. Full pytest run will be revisited at Phase 35.6b before the parser is deleted.
+
+
 
 > **Scope extended 2026-05-01**: Phase 35.6a now classifies stale `examples/*`
 > workspaces in addition to test fixtures (`tests/{core,e2e}/**/test_*_data/`).
