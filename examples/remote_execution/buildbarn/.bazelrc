@@ -1,0 +1,3 @@
+# grpc:// (no TLS) → kuro infers --tls=false from the URL scheme.
+build --remote_executor=grpc://localhost:8980
+build --remote_instance_name=fuse

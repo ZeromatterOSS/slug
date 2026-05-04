@@ -504,6 +504,10 @@ fn merge_re_config(base: &ReConfigSnapshot, cli: &ReConfigSnapshot) -> ReConfigS
             .clone()
             .or_else(|| base.action_cache_address.clone()),
         tls: cli.tls.or(base.tls),
+        tls_client_cert: cli
+            .tls_client_cert
+            .clone()
+            .or_else(|| base.tls_client_cert.clone()),
         http_headers: if cli.http_headers.is_empty() {
             base.http_headers.clone()
         } else {

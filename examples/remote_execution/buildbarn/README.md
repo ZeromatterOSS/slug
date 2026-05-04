@@ -75,22 +75,18 @@ Instance name                                    Platform properties            
 More information is available in the
 [repo](https://github.com/buildbarn/bb-deployments).
 
-## Relevant configs in .buckconfig
+## Relevant configs in .bazelrc
 
 Configure the `Buildbarn` endpoint as follows:
 
-```ini
-[kuro_re_client]
-engine_address       = grpc://localhost:8980
-action_cache_address = grpc://localhost:8980
-cas_address          = grpc://localhost:8980
-tls                  = false
-
-# Select the instance name, "fuse" or "hardlinking", without quotes
-instance_name        = fuse
+```
+build --remote_executor=grpc://localhost:8980
+# Select the instance name, "fuse" or "hardlinking".
+build --remote_instance_name=fuse
 ```
 
-TLS is not used in this example.
+TLS is not used in this example. The `grpc://` URL scheme tells the kuro
+RE client to dial the endpoint without TLS.
 
 ## Relevant configs in `ExecutionPlatformInfo`
 

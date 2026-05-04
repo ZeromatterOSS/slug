@@ -5,18 +5,19 @@ This project provides a small example of what a project that utilizies
 
 In this document, we will go over the key configs used in this setup.
 
-### Relevant configs in .buckconfig
+### Relevant configs in .bazelrc
 
 First, the BuildBuddy endpoint and api key should be configured as the
 following:
 
-```ini
-[kuro_re_client]
-engine_address       = $BUILDBUDDY_ENDPOINT
-action_cache_address = $BUILDBUDDY_ENDPOINT
-cas_address          = $BUILDBUDDY_ENDPOINT
-http_headers         = x-buildbuddy-api-key:$BUILDBUDDY_API_KEY
 ```
+build --remote_executor=$BUILDBUDDY_ENDPOINT
+build --remote_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY
+```
+
+`$BUILDBUDDY_ENDPOINT` and `$BUILDBUDDY_API_KEY` are substituted by the
+RE client at connection time, so the values flow through from the
+shell environment.
 
 ### Relevant configs in `ExecutionPlatformInfo`
 

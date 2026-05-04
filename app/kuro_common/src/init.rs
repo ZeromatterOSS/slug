@@ -328,6 +328,10 @@ pub struct ReConfigSnapshot {
     pub engine_address: Option<String>,
     pub action_cache_address: Option<String>,
     pub tls: Option<bool>,
+    /// PEM file used for both the TLS client certificate and key.
+    /// Sourced from `--tls_client_certificate` (Bazel-compat).
+    #[serde(default)]
+    pub tls_client_cert: Option<String>,
     pub http_headers: Vec<String>,
     pub instance_name: Option<String>,
     /// Default `(key, value)` properties to attach to every remote
@@ -340,51 +344,12 @@ pub struct ReConfigSnapshot {
 }
 
 impl ReConfigSnapshot {
-    pub fn from_config(config: &LegacyBuckConfig) -> kuro_error::Result<Self> {
-        let get = |property| {
-            config
-                .get(BuckconfigKeyRef {
-                    section: "kuro_re_client",
-                    property,
-                })
-                .map(ToOwned::to_owned)
-        };
-        let parse_bool = |property| -> kuro_error::Result<Option<bool>> {
-            config.parse(BuckconfigKeyRef {
-                section: "kuro_re_client",
-                property,
-            })
-        };
-        let http_headers = config
-            .parse_list::<String>(BuckconfigKeyRef {
-                section: "kuro_re_client",
-                property: "http_headers",
-            })?
-            .unwrap_or_default();
-        // `[kuro_re_client] default_exec_properties = key=val,key=val`
-        // mirrors the CLI flag for users who prefer buckconfig.
-        let default_exec_properties: Vec<(String, String)> = config
-            .parse_list::<String>(BuckconfigKeyRef {
-                section: "kuro_re_client",
-                property: "default_exec_properties",
-            })?
-            .unwrap_or_default()
-            .into_iter()
-            .filter_map(|kv| {
-                let (k, v) = kv.split_once('=')?;
-                Some((k.to_owned(), v.to_owned()))
-            })
-            .collect();
-        Ok(Self {
-            address: get("address"),
-            cas_address: get("cas_address"),
-            engine_address: get("engine_address"),
-            action_cache_address: get("action_cache_address"),
-            tls: parse_bool("tls")?,
-            http_headers,
-            instance_name: get("instance_name"),
-            default_exec_properties,
-        })
+    /// `[kuro_re_client]` is no longer parsed from `.buckconfig`; the
+    /// daemon receives RE settings via the per-invocation CLI overlay
+    /// (`--remote_executor`, `--remote_header`, …) layered on top in
+    /// `streaming.rs::exec_impl`.
+    pub fn from_config(_config: &LegacyBuckConfig) -> kuro_error::Result<Self> {
+        Ok(Self::default())
     }
 }
 

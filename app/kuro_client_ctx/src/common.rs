@@ -436,6 +436,32 @@ pub struct CommonBuildConfigurationOptions {
     )]
     pub remote_default_exec_properties: Vec<String>,
 
+    /// Remote instance name (Bazel `--remote_instance_name`).
+    ///
+    /// Threaded through to the RE client's `instance_name` field via the
+    /// daemon startup-config overlay. Distinct from `--bes_instance_name`,
+    /// which targets the Build Event Service.
+    #[clap(
+        long = "remote-instance-name",
+        alias = "remote_instance_name",
+        hide = true,
+        value_name = "NAME"
+    )]
+    pub remote_instance_name: Option<String>,
+
+    /// Path to a PEM-encoded TLS client certificate for the RE backend
+    /// (Bazel `--tls_client_certificate`). Same file is used for both
+    /// the public certificate and the private key, matching kuro's
+    /// existing `[kuro_re_client] tls_client_cert` semantics.
+    #[clap(
+        long = "tls-client-certificate",
+        alias = "tls_client_certificate",
+        alias = "tls_client_cert",
+        hide = true,
+        value_name = "PATH"
+    )]
+    pub tls_client_certificate: Option<String>,
+
     /// Digest function used by the daemon's CAS / action cache (Bazel
     /// `--digest_function`).
     ///
@@ -1304,6 +1330,8 @@ impl CommonBuildConfigurationOptions {
             && cache_address.is_none()
             && header_strs.is_empty()
             && default_exec_properties.is_empty()
+            && self.remote_instance_name.is_none()
+            && self.tls_client_certificate.is_none()
         {
             return None;
         }
@@ -1313,11 +1341,16 @@ impl CommonBuildConfigurationOptions {
             cas_address: cache_address.clone(),
             engine_address: address,
             action_cache_address: cache_address,
-            tls: None, // `KuroOssReConfiguration::from_legacy_config`
-            // already defaults to `tls=true` when unset; we
-            // only flip it via explicit buckconfig.
+            // TLS is derived from URL scheme of the address in
+            // `apply_re_config_overlay` (`grpcs://` / `https://` →
+            // true, anything else → false). No dedicated CLI flag.
+            tls: None,
+            tls_client_cert: self.tls_client_certificate.clone(),
             http_headers: header_strs,
-            instance_name: self.bes_instance_name.clone(),
+            instance_name: self
+                .remote_instance_name
+                .clone()
+                .or_else(|| self.bes_instance_name.clone()),
             default_exec_properties,
         })
     }
@@ -1369,6 +1402,8 @@ impl CommonBuildConfigurationOptions {
             remote_cache: None,
             remote_retries: None,
             remote_default_exec_properties: Vec::new(),
+            remote_instance_name: None,
+            tls_client_certificate: None,
             digest_function: None,
             spawn_strategy: None,
             dynamic_local_strategy: vec![],
@@ -1484,6 +1519,8 @@ impl CommonBuildConfigurationOptions {
             remote_cache: None,
             remote_retries: None,
             remote_default_exec_properties: Vec::new(),
+            remote_instance_name: None,
+            tls_client_certificate: None,
             digest_function: None,
             spawn_strategy: None,
             dynamic_local_strategy: vec![],

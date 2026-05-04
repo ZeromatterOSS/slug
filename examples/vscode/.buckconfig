@@ -19,10 +19,3 @@ target_platform_detector_spec = target:root//...->root//kuro_utils/platforms:win
 
 [build]
 execution_platforms = root//kuro_utils/platforms:default
-
-[kuro_re_client]
-action_cache_address = grpc://localhost:8980
-engine_address = grpc://localhost:8980
-cas_address = grpc://localhost:8980
-tls = false
-instance_name = fuse

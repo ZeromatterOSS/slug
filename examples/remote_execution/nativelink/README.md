@@ -41,20 +41,17 @@ nativelink basic_cas.json5
 More information is available in the
 [repo](https://github.com/Tracemachina/nativelink).
 
-## Relevant configs in .buckconfig
+## Relevant configs in .bazelrc
 
 Configure the `NativeLink` endpoint as follows:
 
-```ini
-[kuro_re_client]
-action_cache_address = grpc://localhost:50051
-engine_address = grpc://localhost:50051
-cas_address = grpc://localhost:50051
-tls = false
-instance_name = main
+```
+build --remote_executor=grpc://localhost:50051
+build --remote_instance_name=main
 ```
 
-TLS is not used in this example.
+TLS is not used in this example. The `grpc://` URL scheme tells the kuro
+RE client to dial the endpoint without TLS.
 
 ## Relevant configs in `ExecutionPlatformInfo`
 

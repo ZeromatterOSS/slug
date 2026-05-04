@@ -14,9 +14,6 @@ use std::str::FromStr;
 
 use allocative::Allocative;
 use kuro_common::legacy_configs::configs::LegacyBuckConfig;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
-
-static BUCK2_RE_CLIENT_CFG_SECTION: &str = "kuro_re_client";
 
 pub trait RemoteExecutionStaticMetadataImpl: Sized {
     fn from_legacy_config(legacy_config: &LegacyBuckConfig) -> kuro_error::Result<Self>;
@@ -120,7 +117,7 @@ impl RemoteExecutionStaticMetadataImpl for RemoteExecutionStaticMetadata {
     }
 }
 
-#[derive(Clone, Debug, Default, Allocative)]
+#[derive(Clone, Debug, Allocative)]
 pub struct KuroOssReConfiguration {
     /// Address for RBE Content Addresable Storage service (including bytestream uploads service).
     pub cas_address: Option<String>,
@@ -171,28 +168,33 @@ impl FromStr for HttpHeader {
     }
 }
 
-impl KuroOssReConfiguration {
-    pub fn from_legacy_config(legacy_config: &LegacyBuckConfig) -> kuro_error::Result<Self> {
-        macro_rules! key {
-            ($property:literal) => {
-                BuckconfigKeyRef {
-                    section: BUCK2_RE_CLIENT_CFG_SECTION,
-                    property: $property,
-                }
-            };
-        }
-        Ok(Self {
-            cas_address: legacy_config.parse(key!("cas_address"))?,
-            engine_address: legacy_config.parse(key!("engine_address"))?,
-            action_cache_address: legacy_config.parse(key!("action_cache_address"))?,
-            tls: legacy_config.parse(key!("tls"))?.unwrap_or(true),
-            tls_client_cert: legacy_config.parse(key!("tls_client_cert"))?,
-            http_headers: legacy_config
-                .parse_list(key!("http_headers"))?
-                .unwrap_or_default(),
-            instance_name: legacy_config.parse(key!("instance_name"))?,
-            // CLI-flag-only; populated by the daemon startup-config overlay.
+impl Default for KuroOssReConfiguration {
+    fn default() -> Self {
+        // `tls = true` matches the prior `[kuro_re_client] tls`
+        // buckconfig default. Local insecure backends (buildbarn,
+        // nativelink, vscode) flip it via URL-scheme detection in
+        // `apply_re_config_overlay`.
+        Self {
+            cas_address: None,
+            engine_address: None,
+            action_cache_address: None,
+            tls: true,
+            tls_client_cert: None,
+            http_headers: Vec::new(),
+            instance_name: None,
             default_exec_properties: Vec::new(),
-        })
+        }
+    }
+}
+
+impl KuroOssReConfiguration {
+    /// `[kuro_re_client]` is no longer parsed from `.buckconfig`. RE
+    /// settings arrive per-invocation via the CLI flags
+    /// (`--remote_executor`, `--remote_header`,
+    /// `--remote_instance_name`, `--tls_client_certificate`,
+    /// `--remote_default_exec_properties`) and are layered onto this
+    /// default in `kuro_server::daemon::state::apply_re_config_overlay`.
+    pub fn from_legacy_config(_legacy_config: &LegacyBuckConfig) -> kuro_error::Result<Self> {
+        Ok(Self::default())
     }
 }

@@ -854,6 +854,19 @@ fn apply_re_config_overlay(
     }
     if let Some(tls) = snapshot.tls {
         oss.tls = tls;
+    } else if let Some(addr) = snapshot
+        .address
+        .as_deref()
+        .or(snapshot.engine_address.as_deref())
+    {
+        // Bazel-style URL-scheme detection: `grpcs://` or `https://` →
+        // TLS, anything else (typically `grpc://localhost:...`) → no
+        // TLS. The prior `[kuro_re_client] tls = false` opt-out is
+        // gone; users now express the intent via the address scheme.
+        oss.tls = addr.starts_with("grpcs://") || addr.starts_with("https://");
+    }
+    if let Some(ref cert) = snapshot.tls_client_cert {
+        oss.tls_client_cert = Some(cert.clone());
     }
     if !snapshot.http_headers.is_empty() {
         oss.http_headers = snapshot

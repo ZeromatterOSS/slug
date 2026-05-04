@@ -5,25 +5,17 @@ This project provides a small example of what a project that utilizes
 
 In this document, we will go over the key configs used in this setup.
 
-### Relevant configs in .buckconfig
-
-First, the EngFlow endpoint and certificate should be configured as the
-following:
-
-```ini
-[kuro_re_client]
-engine_address       = $ENGFLOW_ENDPOINT
-action_cache_address = $ENGFLOW_ENDPOINT
-cas_address          = $ENGFLOW_ENDPOINT
-tls_client_cert      = $ENGFLOW_CERTIFICATE
-```
-
-Additionally, EngFlow requires the `SHA256` digest function. Set it via
-`.bazelrc`:
+### Relevant configs in .bazelrc
 
 ```
 build --digest_function=SHA256
+build --remote_executor=$ENGFLOW_ENDPOINT
+build --tls_client_certificate=$ENGFLOW_CERTIFICATE
 ```
+
+`$ENGFLOW_ENDPOINT` and `$ENGFLOW_CERTIFICATE` are substituted by the
+RE client at connection time, so the values flow through from the
+shell environment.
 
 ### Relevant configs in `ExecutionPlatformInfo`
 
