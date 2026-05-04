@@ -31,7 +31,6 @@ use kuro_common::init::Timeout;
 use kuro_common::invocation_paths::InvocationPaths;
 use kuro_common::io::IoProvider;
 use kuro_common::legacy_configs::cells::BuckConfigBasedCells;
-use kuro_common::legacy_configs::key::BuckconfigKeyRef;
 use kuro_common::sqlite::sqlite_db::SqliteDb;
 use kuro_common::sqlite::sqlite_db::SqliteIdentity;
 use kuro_core::cells::name::CellName;
@@ -40,7 +39,6 @@ use kuro_core::fs::project::ProjectRoot;
 use kuro_core::fs::project_rel_path::ProjectRelativePathBuf;
 use kuro_core::is_open_source;
 use kuro_core::kuro_env;
-use kuro_core::rollout_percentage::RolloutPercentage;
 use kuro_core::tag_result;
 use kuro_error::BuckErrorContext;
 use kuro_error::ErrorTag;
@@ -300,37 +298,13 @@ impl DaemonState {
                 .parse_single_cell(cells.root_cell(), &fs)
                 .await?;
 
-            let buffer_size = root_config
-                .parse(BuckconfigKeyRef {
-                    section: "kuro",
-                    property: "event_log_buffer_size",
-                })?
-                .unwrap_or(10000);
-            let retry_backoff = Duration::from_millis(
-                root_config
-                    .parse(BuckconfigKeyRef {
-                        section: "kuro",
-                        property: "event_log_retry_backoff_duration_ms",
-                    })?
-                    .unwrap_or(500),
-            );
-            let retry_attempts = root_config
-                .parse(BuckconfigKeyRef {
-                    section: "kuro",
-                    property: "event_log_retry_attempts",
-                })?
-                .unwrap_or(5);
-            let message_batch_size = root_config.parse(BuckconfigKeyRef {
-                section: "kuro",
-                property: "event_log_message_batch_size",
-            })?;
             let scribe_sink = Self::init_scribe_sink(
                 fb,
                 ScribeConfig {
-                    buffer_size,
-                    retry_backoff,
-                    retry_attempts,
-                    message_batch_size,
+                    buffer_size: 10000,
+                    retry_backoff: Duration::from_millis(500),
+                    retry_attempts: 5,
+                    message_batch_size: None,
                     thrift_timeout: Duration::from_secs(1),
                 },
             )
@@ -410,20 +384,7 @@ impl DaemonState {
                     .flatten()
                     .map(|content| kuro_common::ignores::bazelignore::parse_bazelignore(&content));
 
-                let spec_string;
-                let ignore_str = if let Some(s) = bazelignore_spec.as_deref() {
-                    s
-                } else {
-                    let config = legacy_cells.parse_single_cell(cell, &fs).await?;
-                    spec_string = config
-                        .get(BuckconfigKeyRef {
-                            section: "project",
-                            property: "ignore",
-                        })
-                        .unwrap_or("")
-                        .to_owned();
-                    spec_string.as_str()
-                };
+                let ignore_str = bazelignore_spec.as_deref().unwrap_or("");
                 ignore_specs.insert(
                     cell,
                     IgnoreSet::from_ignore_spec(ignore_str, cells.is_root_cell(cell))?,
@@ -443,88 +404,28 @@ impl DaemonState {
             let valid_cache_dirs = paths.valid_cache_dirs();
 
             let deferred_materializer_configs = {
-                let defer_write_actions = root_config
-                    .parse::<RolloutPercentage>(BuckconfigKeyRef {
-                        section: "kuro",
-                        property: "defer_write_actions",
-                    })?
-                    .unwrap_or_else(RolloutPercentage::never)
-                    .roll();
-
-                // RE will refresh any TTL < 1 hour, so we check twice an hour and refresh any TTL
-                // < 1 hour.
-                let ttl_refresh_frequency = root_config
-                    .parse(BuckconfigKeyRef {
-                        section: "kuro",
-                        property: "ttl_refresh_frequency_seconds",
-                    })?
-                    .unwrap_or(1800);
-
-                let ttl_refresh_min_ttl = root_config
-                    .parse(BuckconfigKeyRef {
-                        section: "kuro",
-                        property: "ttl_refresh_min_ttl_seconds",
-                    })?
-                    .unwrap_or(3600);
-
-                let ttl_refresh_enabled = root_config
-                    .parse::<RolloutPercentage>(BuckconfigKeyRef {
-                        section: "kuro",
-                        property: "ttl_refresh_enabled",
-                    })?
-                    .unwrap_or_else(RolloutPercentage::never)
-                    .roll();
-
-                let update_access_times = AccessTimesUpdates::try_new_from_config_value(
-                    root_config.get(BuckconfigKeyRef {
-                        section: "kuro",
-                        property: "update_access_times",
-                    }),
-                )?;
-
-                let verbose_materializer_log = root_config
-                    .parse(BuckconfigKeyRef {
-                        section: "kuro",
-                        property: "verbose_materializer_event_log",
-                    })?
-                    .unwrap_or(false);
-
                 let clean_stale_config = CleanStaleConfig::from_buck_config(root_config)?;
-
-                let disable_eager_write_dispatch = root_config
-                    .parse::<RolloutPercentage>(BuckconfigKeyRef {
-                        section: "kuro",
-                        property: "disable_eager_write_dispatch",
-                    })?
-                    .unwrap_or_else(RolloutPercentage::never)
-                    .roll();
-
                 DeferredMaterializerConfigs {
                     materialize_final_artifacts: matches!(
                         materializations,
                         MaterializationMethod::Deferred
                     ),
-                    defer_write_actions,
+                    defer_write_actions: false,
                     ttl_refresh: TtlRefreshConfiguration {
-                        frequency: std::time::Duration::from_secs(ttl_refresh_frequency),
-                        min_ttl: chrono::Duration::seconds(ttl_refresh_min_ttl),
-                        enabled: ttl_refresh_enabled,
+                        frequency: std::time::Duration::from_secs(1800),
+                        min_ttl: chrono::Duration::seconds(3600),
+                        enabled: false,
                     },
-                    update_access_times,
-                    verbose_materializer_log,
+                    update_access_times: AccessTimesUpdates::try_new_from_config_value(None)?,
+                    verbose_materializer_log: false,
                     clean_stale_config,
-                    disable_eager_write_dispatch,
+                    disable_eager_write_dispatch: false,
                 }
             };
             let disable_eager_write_dispatch =
                 deferred_materializer_configs.disable_eager_write_dispatch;
 
-            let use_eden_thrift_read = root_config
-                .parse(BuckconfigKeyRef {
-                    section: "kuro",
-                    property: "use_eden_thrift_read",
-                })?
-                .unwrap_or(cfg!(any(target_os = "macos", target_os = "windows")));
+            let use_eden_thrift_read = cfg!(any(target_os = "macos", target_os = "windows"));
 
             let (io, _, (materializer_db, materializer_state), incremental_db_state) =
                 futures::future::try_join4(
@@ -638,22 +539,11 @@ impl DaemonState {
                 )
             })?;
 
-            let use_network_action_output_cache = root_config
-                .parse(BuckconfigKeyRef {
-                    section: "kuro",
-                    property: "use_network_action_output_cache",
-                })?
-                .unwrap_or(false);
+            let use_network_action_output_cache = false;
 
             let create_unhashed_outputs_lock = Arc::new(Mutex::new(()));
 
-            let enable_restarter = root_config
-                .parse::<RolloutPercentage>(BuckconfigKeyRef {
-                    section: "kuro",
-                    property: "restarter",
-                })?
-                .unwrap_or_else(RolloutPercentage::never)
-                .roll();
+            let enable_restarter = false;
 
             let paranoid = if init_ctx.daemon_startup_config.paranoid {
                 Some(ParanoidDownloader::new(
@@ -666,12 +556,7 @@ impl DaemonState {
                 None
             };
 
-            let remote_dep_files_enabled = root_config
-                .parse(BuckconfigKeyRef {
-                    section: "build",
-                    property: "remote_dep_file_cache_enabled",
-                })?
-                .unwrap_or(false);
+            let remote_dep_files_enabled = false;
 
             let action_freezing_enabled = init_ctx
                 .daemon_startup_config
