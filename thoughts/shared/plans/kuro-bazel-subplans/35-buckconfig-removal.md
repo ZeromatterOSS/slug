@@ -721,7 +721,27 @@ For each fixture `.buckconfig`, classify into one of three buckets:
   `.buckconfig` for `[buildfile] name`).
 - Bucket (C) is non-empty only with explicit per-entry rationale.
 
-### Phase 35.6b: Delete the legacy config parser  [~2 days]
+### Phase 35.6b: Delete the legacy config parser  [~2 days]  ✅ COMPLETE 2026-05-04
+
+**Commits** (12 total since 35.6a closeout):
+- `74fad777` — drain dead BuckconfigKeyRef consumers (allow_eden_io, error_on_dep_only_incompatible, init.rs import).
+- `e269e277` — rename `TARGETS.fixture` → `BUILD.bazel` across 389 fixtures; drop the `[buildfile] name` knob from shim/bxl_tutorial/test fixtures (~270 .buckconfig files affected, 235 deleted entirely).
+- `753c773f` — move root cell registration into a new root `MODULE.bazel`; delete `./.buckconfig` and `./.buckconfig.d/`. Per Q5=B, drop the defensive Meta-internal aliases (only loaded by `.bzl` files that don't fire in OSS).
+- `7c1ba87f` — add `LegacyBuckConfig::from_overrides_only()` constructor.
+- `a45684d1` — wire `parse_single_cell` to `from_resolved_flags`; stop reading `.buckconfig`.
+- `b872b687` — remove `ExternalPathBuckconfigData` / `ExternalConfigFile` / `--config-file` File arm.
+- `ed87fe88` — delete `parser.rs`, `parser/resolver.rs`, `file_ops.rs`, `path.rs` (~1400 LOC of pure file parsing).
+- `4f2578bd` — clean up test helpers, drop the bundled-prelude content assertion.
+- `41ff11ba` — sweep vestigial `[repositories]` from HAS_MODULE fixture `.buckconfig`s.
+- `45dfe16a` — `kuro init` scaffolds MODULE.bazel + .bazelignore (no .buckconfig); daemon logs deprecation warning on stray `.buckconfig` at workspace root.
+
+Net delta: ~3000 LOC deleted from `app/kuro_common/src/legacy_configs/`. Plan 02's bzlmod path is now the only cell-resolution path. The `BuckconfigKeyRef` lookup API (still used by `read_config()` Starlark API and `config_setting` matching) survives but is backed by an in-memory map populated only from `-c section.key=value` CLI flags — no file parsing.
+
+Per Q1=B option (b), `read_config()` and `config_setting` buckconfig matching are intentionally retained as user-facing kuro features (no Bazel equivalent for `read_config`; `config_setting` is migrated long-term but keeping the path costs ~10 LOC). The 34 bucket-C fixtures retain their `.buckconfig` files solely to feed values via the surviving lookup path; this is OK because `LegacyBuckConfig` no longer parses them — the fixture-relevant CLI overrides come through the test runner's `-c` flag.
+
+Pytest analysis baseline 122/5/3/1 unchanged across all 12 commits. LLVM Demangle smoke clean. End-to-end BuildBuddy RE smoke clean.
+
+
 
 #### Goal
 
