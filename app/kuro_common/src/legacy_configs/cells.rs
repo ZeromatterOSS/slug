@@ -88,10 +88,10 @@ fn module_depends_on_rules_python(parsed_modules: &[(String, ParsedModuleFile)])
 /// True iff any toolchain label already references the bundled
 /// `@local_config_python` cell (meaning the user has already wired up
 /// bundled rules_python toolchains and we should skip auto-injection).
-fn toolchains_include_bundled_python(toolchain_labels: &[String]) -> bool {
-    toolchain_labels
+fn toolchains_include_bundled_python(toolchains: &[kuro_bzlmod::RegisteredToolchain]) -> bool {
+    toolchains
         .iter()
-        .any(|lbl| lbl.contains(LOCAL_CONFIG_PYTHON_CELL))
+        .any(|tc| tc.label.contains(LOCAL_CONFIG_PYTHON_CELL))
 }
 
 /// Buckconfigs can partially be loaded from within dice. However, some parts of what makes up the
@@ -841,7 +841,7 @@ impl BuckConfigBasedCells {
         // parsed_modules is already in BFS order (root first from resolution).
         // dev_dependency items from non-root modules are skipped (Bazel 9.0 behavior).
         {
-            let mut all_toolchains = Vec::new();
+            let mut all_toolchains: Vec<kuro_bzlmod::RegisteredToolchain> = Vec::new();
             let mut all_exec_platforms = Vec::new();
             for (module_name, parsed_mod) in &parsed_modules {
                 let is_root = module_name == root_module_name
@@ -856,7 +856,11 @@ impl BuckConfigBasedCells {
                         );
                         continue;
                     }
-                    all_toolchains.push(item.label.clone());
+                    all_toolchains.push(kuro_bzlmod::RegisteredToolchain {
+                        module: module_name.clone(),
+                        label: item.label.clone(),
+                        is_root,
+                    });
                 }
                 for item in &parsed_mod.registered_execution_platforms {
                     if item.dev_dependency && !is_root {
@@ -886,7 +890,15 @@ impl BuckConfigBasedCells {
                 && !toolchains_include_bundled_python(&all_toolchains)
             {
                 for label in BUNDLED_RULES_PYTHON_AUTO_INJECT_LABELS {
-                    all_toolchains.push((*label).to_owned());
+                    all_toolchains.push(kuro_bzlmod::RegisteredToolchain {
+                        module: RULES_PYTHON_MODULE_NAME.to_owned(),
+                        label: (*label).to_owned(),
+                        // Auto-injected bundled toolchains must always be
+                        // eagerly loaded — they back the bundled
+                        // `@local_config_python` cell that callers expect to
+                        // be available without bzlmod fetch.
+                        is_root: true,
+                    });
                 }
                 tracing::info!(
                     "Auto-registered bundled rules_python toolchains (rules_python in deps): {:?}",
@@ -910,7 +922,8 @@ impl BuckConfigBasedCells {
             let project_root_path = project_root.root().to_path_buf();
             let bazel_ext_dir = project_root_path.join("bazel-external");
             let mut repos_needing_materialization = Vec::new();
-            for tc_label in &all_toolchains {
+            for tc in &all_toolchains {
+                let tc_label = &tc.label;
                 // Extract repo name from labels like "@repo//:all" or "@repo//pkg:target"
                 if let Some(repo_name) = extract_repo_name_from_label(tc_label) {
                     // Check if any matching directory exists in bazel-external/

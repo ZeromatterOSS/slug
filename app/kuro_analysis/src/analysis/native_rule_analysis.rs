@@ -125,6 +125,85 @@ pub fn clear_declared_toolchains() {
         .clear();
 }
 
+// ============================================================================
+// Plan 13 Phase 3: Deferred toolchain pool (lazy load on resolution miss)
+// ============================================================================
+
+/// A deferred toolchain registration — captured during eager loading so a
+/// later `resolve_toolchains` miss can lazy-load only the relevant subset.
+#[derive(Debug, Clone)]
+pub struct DeferredToolchain {
+    /// Origin module name (matched against required `toolchain_type` repo
+    /// names by the lazy-load heuristic).
+    pub module: String,
+    /// The full registered label (e.g., `@rules_swift//toolchains:all`).
+    pub label: String,
+}
+
+/// Pool of toolchain registrations from non-root modules. Populated by
+/// `ensure_registered_toolchains_loaded` instead of being eagerly loaded.
+/// `ensure_deferred_toolchains_loaded` drains relevant entries on demand.
+static DEFERRED_TOOLCHAINS: std::sync::RwLock<Vec<DeferredToolchain>> =
+    std::sync::RwLock::new(Vec::new());
+
+/// Marker set: keys (origin-module) of deferred entries already loaded so
+/// repeated `resolve_toolchains` misses for the same type don't reload.
+static LOADED_DEFERRED_KEYS: std::sync::LazyLock<
+    std::sync::RwLock<std::collections::HashSet<String>>,
+> = std::sync::LazyLock::new(|| std::sync::RwLock::new(std::collections::HashSet::new()));
+
+/// Marker: when the "load-everything-deferred" fallback has fired, set true
+/// so subsequent misses don't re-iterate the full pool.
+static LOADED_ALL_DEFERRED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// Replace the deferred pool. Called by `ensure_registered_toolchains_loaded`.
+pub fn set_deferred_toolchains(items: Vec<DeferredToolchain>) {
+    *DEFERRED_TOOLCHAINS
+        .write()
+        .expect("DEFERRED_TOOLCHAINS poisoned") = items;
+    LOADED_DEFERRED_KEYS
+        .write()
+        .expect("LOADED_DEFERRED_KEYS poisoned")
+        .clear();
+    LOADED_ALL_DEFERRED.store(false, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// Snapshot the deferred pool (cheap clone of label strings).
+pub fn get_deferred_toolchains() -> Vec<DeferredToolchain> {
+    DEFERRED_TOOLCHAINS
+        .read()
+        .expect("DEFERRED_TOOLCHAINS poisoned")
+        .clone()
+}
+
+/// True iff the (module, label) pair was already drained by a previous
+/// lazy-load pass.
+pub fn deferred_key_already_loaded(key: &str) -> bool {
+    LOADED_DEFERRED_KEYS
+        .read()
+        .expect("LOADED_DEFERRED_KEYS poisoned")
+        .contains(key)
+}
+
+/// Mark a deferred key as loaded.
+pub fn mark_deferred_key_loaded(key: String) {
+    LOADED_DEFERRED_KEYS
+        .write()
+        .expect("LOADED_DEFERRED_KEYS poisoned")
+        .insert(key);
+}
+
+/// True iff the load-everything fallback has already fired.
+pub fn deferred_all_loaded() -> bool {
+    LOADED_ALL_DEFERRED.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+/// Mark that the load-everything fallback fired.
+pub fn mark_deferred_all_loaded() {
+    LOADED_ALL_DEFERRED.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
 /// Analyze a native rule target and return the analysis result.
 pub fn analyze_native_rule(
     target: &ConfiguredTargetLabel,

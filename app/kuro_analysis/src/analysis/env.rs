@@ -86,7 +86,14 @@ use starlark::values::list::ListRef;
 use starlark_map::small_map::SmallMap;
 
 use crate::analysis::native_rule_analysis::DeclaredToolchainInfo;
+use crate::analysis::native_rule_analysis::DeferredToolchain;
+use crate::analysis::native_rule_analysis::deferred_all_loaded;
+use crate::analysis::native_rule_analysis::deferred_key_already_loaded;
+use crate::analysis::native_rule_analysis::get_deferred_toolchains;
+use crate::analysis::native_rule_analysis::mark_deferred_all_loaded;
+use crate::analysis::native_rule_analysis::mark_deferred_key_loaded;
 use crate::analysis::native_rule_analysis::register_declared_toolchain;
+use crate::analysis::native_rule_analysis::set_deferred_toolchains;
 use crate::analysis::plugins::plugins_to_starlark_value;
 use crate::attrs::resolve::ctx::AnalysisQueryResult;
 use crate::attrs::resolve::ctx::AttrResolutionContext;
@@ -514,12 +521,31 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
     let registered = kuro_bzlmod::get_registered_toolchains();
     if registered.is_empty() {
         TOOLCHAINS_LOADING_DONE.store(true, Ordering::SeqCst);
+        set_deferred_toolchains(Vec::new());
         return;
     }
 
+    // Plan 13 Phase 3: split the registry into eager (root + bundled) and
+    // deferred (non-root transitive). Only the eager set is loaded now; the
+    // deferred set lives in `DEFERRED_TOOLCHAINS` until `resolve_toolchains`
+    // misses on a required type and triggers
+    // `ensure_deferred_toolchains_loaded` for a filtered subset.
+    let (eager_registered, deferred): (Vec<_>, Vec<_>) = registered
+        .into_iter()
+        .partition(|tc| tc.is_root || is_bundled_eager_toolchain(&tc.label));
+    let deferred_pool: Vec<DeferredToolchain> = deferred
+        .iter()
+        .map(|tc| DeferredToolchain {
+            module: tc.module.clone(),
+            label: tc.label.clone(),
+        })
+        .collect();
+    set_deferred_toolchains(deferred_pool);
+
     tracing::debug!(
-        "Eagerly loading {} registered toolchain package(s)",
-        registered.len()
+        "Eagerly loading {} root toolchain package(s); {} non-root deferred",
+        eager_registered.len(),
+        deferred.len()
     );
 
     let cell_resolver = match dice.get_cell_resolver().await {
@@ -536,7 +562,8 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
     // lets the parallel dispatch below only do the expensive work.
     let mut to_load: Vec<(String, PackageLabel)> = Vec::new();
     let mut skipped_count = 0;
-    for tc_label_str in &registered {
+    for tc in &eager_registered {
+        let tc_label_str = &tc.label;
         let (repo_name, pkg_path) = match parse_registered_toolchain_label(tc_label_str) {
             Some(v) => v,
             None => {
@@ -611,13 +638,28 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         to_load.push((tc_label_str.clone(), package_label));
     }
 
-    // Load packages in parallel. Each load triggers its own transitive
-    // `.bzl` chain; the Phase-7 spoke-materialization parallelization inside
-    // each cascade gets to run concurrently across extensions too. DICE
-    // dedups overlapping `get_interpreter_results` requests.
-    //
-    // Non-fatal errors (load failures, missing target nodes) are swallowed
-    // to match the previous `continue` behaviour.
+    load_and_register_toolchain_packages(dice, to_load).await;
+
+    if skipped_count > 0 {
+        tracing::debug!(
+            "Skipped {} toolchain registration(s) (extension repos or unavailable)",
+            skipped_count
+        );
+    }
+
+    TOOLCHAINS_LOADING_DONE.store(true, Ordering::SeqCst);
+}
+
+/// Load a list of `(label_str, package_label)` toolchain packages in
+/// parallel, registering each `toolchain()` target into
+/// `DECLARED_TOOLCHAINS`. Errors are non-fatal — swallowed with a warn.
+async fn load_and_register_toolchain_packages(
+    dice: &mut DiceComputations<'_>,
+    to_load: Vec<(String, PackageLabel)>,
+) {
+    if to_load.is_empty() {
+        return;
+    }
     use futures::FutureExt;
     let _: Vec<()> = match dice
         .try_compute_join(to_load, |ctx, (tc_label_str, package_label)| {
@@ -643,12 +685,6 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
                     ) {
                         if let Some(mut info) = extract_toolchain_info_from_node(target_node) {
                             let label = target_node.label().to_string();
-                            // Plan 11 Phase 8: rules_rust generates BUILD files
-                            // with `toolchain_type = "@rules_rust//rust:toolchain"`
-                            // where `:toolchain` is an alias() of the real
-                            // `:toolchain_type` rule. Follow alias chains so
-                            // exact-string matching in `resolve_toolchains`
-                            // sees the canonical toolchain_type() label.
                             let canonical = canonicalize_toolchain_type_label(
                                 ctx,
                                 &info.toolchain_type,
@@ -664,7 +700,7 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
                                 info.toolchain_type = canonical;
                             }
                             tracing::debug!(
-                                "Eagerly registered toolchain '{}': type='{}', impl='{}'",
+                                "Registered toolchain '{}': type='{}', impl='{}'",
                                 label,
                                 info.toolchain_type,
                                 info.toolchain_impl
@@ -694,15 +730,161 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
             Vec::new()
         }
     };
+}
 
-    if skipped_count > 0 {
-        tracing::debug!(
-            "Skipped {} toolchain registration(s) (extension repos or unavailable)",
-            skipped_count
-        );
+/// Plan 13 Phase 3: build a `(label_str, PackageLabel)` list from a slice of
+/// raw label strings, applying the same parse + cell-resolve filters the
+/// eager loader uses. Returns `None` for entries that can't be resolved.
+async fn prepare_toolchain_load_list(
+    dice: &mut DiceComputations<'_>,
+    labels: &[String],
+) -> Vec<(String, PackageLabel)> {
+    let cell_resolver = match dice.get_cell_resolver().await {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::debug!("Cell resolver unavailable for deferred load: {}", e);
+            return Vec::new();
+        }
+    };
+    let mut out = Vec::new();
+    for tc_label_str in labels {
+        let (repo_name, pkg_path) = match parse_registered_toolchain_label(tc_label_str) {
+            Some(v) => v,
+            None => continue,
+        };
+        let cell_name = match CellName::unchecked_new(&repo_name) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        if cell_resolver.get(cell_name).is_err() {
+            continue;
+        }
+        let cell_rel_path = CellRelativePath::unchecked_new(&pkg_path);
+        let package_label =
+            match PackageLabel::from_cell_path(CellPathRef::new(cell_name, cell_rel_path)) {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
+        out.push((tc_label_str.clone(), package_label));
+    }
+    out
+}
+
+/// Plan 13 Phase 3: lazy-load deferred toolchain registrations whose
+/// origin module or label repo name plausibly matches the required
+/// `toolchain_type` labels. Falls back to loading the full deferred pool
+/// once if a heuristic-filtered pass still leaves the resolution wanting.
+///
+/// Returns `true` iff any deferred entry was loaded (caller should retry
+/// `resolve_toolchains` if so).
+pub async fn ensure_deferred_toolchains_loaded(
+    dice: &mut DiceComputations<'_>,
+    required_types: &[String],
+) -> bool {
+    let pool = get_deferred_toolchains();
+    if pool.is_empty() {
+        return false;
     }
 
-    TOOLCHAINS_LOADING_DONE.store(true, Ordering::SeqCst);
+    // Build the heuristic match set: repo names extracted from each
+    // required `toolchain_type` label. Most rules_X repos register
+    // toolchains for their own `:toolchain_type` target, so a deferred
+    // entry whose origin module or label repo name appears here is the
+    // likely candidate.
+    let needle_repos: std::collections::HashSet<String> = required_types
+        .iter()
+        .filter_map(|t| {
+            let s = t.trim_start_matches('@');
+            s.find("//").map(|p| s[..p].to_owned())
+        })
+        .collect();
+
+    let mut filtered: Vec<String> = Vec::new();
+    let mut filtered_keys: Vec<String> = Vec::new();
+    for entry in &pool {
+        let label_repo = entry
+            .label
+            .trim_start_matches('@')
+            .split("//")
+            .next()
+            .unwrap_or("")
+            .to_owned();
+        let key = format!("{}::{}", entry.module, entry.label);
+        if deferred_key_already_loaded(&key) {
+            continue;
+        }
+        if needle_repos.contains(&entry.module) || needle_repos.contains(&label_repo) {
+            filtered.push(entry.label.clone());
+            filtered_keys.push(key);
+        }
+    }
+
+    if !filtered.is_empty() {
+        tracing::debug!(
+            "Lazy-loading {} deferred toolchain(s) for required types {:?}",
+            filtered.len(),
+            required_types
+        );
+        for key in &filtered_keys {
+            mark_deferred_key_loaded(key.clone());
+        }
+        let to_load = prepare_toolchain_load_list(dice, &filtered).await;
+        load_and_register_toolchain_packages(dice, to_load).await;
+        return true;
+    }
+
+    // Heuristic missed. As a last-resort fallback (Plan 13 Phase 3 design),
+    // load the entire remaining deferred pool once. This guarantees we
+    // never silently fail to find a toolchain that was registered.
+    if deferred_all_loaded() {
+        return false;
+    }
+    let mut all_remaining: Vec<String> = Vec::new();
+    let mut all_remaining_keys: Vec<String> = Vec::new();
+    for entry in &pool {
+        let key = format!("{}::{}", entry.module, entry.label);
+        if deferred_key_already_loaded(&key) {
+            continue;
+        }
+        all_remaining.push(entry.label.clone());
+        all_remaining_keys.push(key);
+    }
+    if all_remaining.is_empty() {
+        mark_deferred_all_loaded();
+        return false;
+    }
+    tracing::debug!(
+        "Heuristic miss for {:?}; loading all {} remaining deferred toolchain(s)",
+        required_types,
+        all_remaining.len()
+    );
+    for key in &all_remaining_keys {
+        mark_deferred_key_loaded(key.clone());
+    }
+    let to_load = prepare_toolchain_load_list(dice, &all_remaining).await;
+    load_and_register_toolchain_packages(dice, to_load).await;
+    mark_deferred_all_loaded();
+    true
+}
+
+/// Plan 13 Phase 3: bundled cells that must always be eager-loaded even
+/// when registered transitively. These back kuro's bundled toolchains
+/// (`@bazel_tools`, `@local_config_*`, `@platforms`) — code paths assume
+/// they're materialized before resolution runs.
+fn is_bundled_eager_toolchain(label: &str) -> bool {
+    let stripped = label.trim_start_matches('@');
+    let Some(slash_pos) = stripped.find("//") else {
+        return false;
+    };
+    let repo = &stripped[..slash_pos];
+    matches!(
+        repo,
+        "bazel_tools"
+            | "platforms"
+            | "local_config_platform"
+            | "local_config_cc"
+            | "local_config_python"
+    ) || repo.starts_with("local_config_")
 }
 
 /// Parse a registered toolchain label like `@repo//pkg:target` or `@repo//:all`.
@@ -1073,11 +1255,13 @@ async fn run_analysis_with_env_underlying(
         // populated by eager loading above and by toolchain() target analysis.
         let (toolchain_resolution_result, exec_group_resolution_results) =
             resolve_toolchain_types(
+                dice,
                 analysis_env.rule_spec.toolchain_types(),
                 exec_group_defs,
                 node,
                 &candidate_constraints,
-            );
+            )
+            .await;
 
         // Plan 24 Phase 8: turn each named group's resolved exec_platform
         // label into a full `ExecutionPlatformResolution` (carrying the
@@ -1400,7 +1584,8 @@ async fn run_analysis_with_env_underlying(
 /// group corresponds to the rule-level `toolchains=[...]` declaration; named
 /// exec groups come from `exec_groups={...}`. Each group is resolved
 /// independently and may pick a different exec platform.
-fn resolve_toolchain_types(
+async fn resolve_toolchain_types(
+    dice: &mut DiceComputations<'_>,
     toolchain_types: Vec<(String, bool)>,
     exec_group_defs: Vec<(String, kuro_node::rule::ExecGroupDef)>,
     node: ConfiguredTargetNodeRef<'_>,
@@ -1477,7 +1662,34 @@ fn resolve_toolchain_types(
         candidate_platforms.to_vec()
     };
 
-    match resolve_toolchains_multi_group(&requests, &target, &candidates) {
+    // Plan 13 Phase 3: collect every required toolchain type label across
+    // all groups. If the first resolve pass fails (Err) or leaves a
+    // mandatory type unresolved, lazy-load the deferred pool filtered by
+    // those types and retry once.
+    let all_required_type_labels: Vec<String> = requests
+        .iter()
+        .flat_map(|r| r.required_types.iter().map(|t| t.type_label.clone()))
+        .collect();
+
+    let first = resolve_toolchains_multi_group(&requests, &target, &candidates);
+    let mandatory_unresolved = match &first {
+        Err(_) => true,
+        Ok(multi) => multi.groups.values().any(|g| {
+            g.resolved_toolchains
+                .iter()
+                .any(|(_, resolved)| resolved.is_none())
+        }),
+    };
+    let resolved_result = if mandatory_unresolved
+        && !all_required_type_labels.is_empty()
+        && ensure_deferred_toolchains_loaded(dice, &all_required_type_labels).await
+    {
+        resolve_toolchains_multi_group(&requests, &target, &candidates)
+    } else {
+        first
+    };
+
+    match resolved_result {
         Ok(multi_result) => {
             let default_result = multi_result.groups.get("default").cloned();
             if let Some(ref result) = default_result {

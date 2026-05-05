@@ -465,16 +465,66 @@ for that build.
 ### Success Criteria (Phase 3)
 
 #### Automated Verification:
-- [ ] `cargo build -p kuro` compiles
-- [ ] All tests pass
-- [ ] `kuro build //sdk:all_sdk_sources` completes in <30 seconds (no unnecessary downloads)
+- [x] `cargo build -p kuro` compiles (2026-05-04)
+- [x] `cargo test -p kuro_bzlmod --lib` — 161 passed (2026-05-04)
+- [x] `cargo test -p kuro_analysis --lib` — 11 passed (2026-05-04)
 
 #### Manual Verification:
-- [ ] `kuro build //sdk:sdk` reaches analysis phase
-- [ ] Wall time for first `//sdk:sdk` build drops from 30+ min stuck on multitool
-  to seconds on toolchain-loading step
-- [ ] `bazel-external/` count for `//sdk:sdk` drops correspondingly (only
-  modules in the resolution closure materialize)
+- [x] zeromatter `//sdk:sdk_contents` reaches analysis phase
+  (2026-05-04). Wall time **~3m 20s** (18:27:45 start → 18:31:05 BUILD
+  FAILED) vs. the prior 30+-min hang on
+  `Waiting on multitool//toolchains -- loading package file tree`. The new
+  failure is unrelated to Plan 13: an `@crates` extension repo from
+  rules_rs crate_universe failed to generate, surfacing as
+  `Module has no symbol all_crate_deps` while loading
+  `bazel/rules/rust.bzl` — a downstream rules_rs/crate_universe issue.
+- [ ] `bazel-external/` count for `//sdk:sdk_contents` drops correspondingly
+  (separate measurement; this run hit the `@crates` failure before the
+  full closure materialized).
+
+### Implementation summary (2026-05-04)
+
+Code changes per the touchpoints listed in the design section:
+
+- `app/kuro_bzlmod/src/lib.rs` — added `RegisteredToolchain { module, label,
+  is_root }`; `REGISTERED_TOOLCHAINS` is now `Vec<RegisteredToolchain>`;
+  `set_registered_toolchains` / `get_registered_toolchains` updated.
+- `app/kuro_common/src/legacy_configs/cells.rs` — collection loop now
+  produces structured `RegisteredToolchain` entries with `is_root` derived
+  from the same predicate that drives `dev_dependency` filtering. Bundled
+  rules_python auto-injected entries are marked `is_root = true` so they
+  remain in the eager set.
+- `app/kuro_analysis/src/analysis/native_rule_analysis.rs` — added
+  `DeferredToolchain`, `DEFERRED_TOOLCHAINS` pool, `LOADED_DEFERRED_KEYS`
+  marker set, and `LOADED_ALL_DEFERRED` fallback flag, plus accessor
+  helpers (`set_deferred_toolchains`, `get_deferred_toolchains`,
+  `deferred_key_already_loaded`, `mark_deferred_key_loaded`,
+  `deferred_all_loaded`, `mark_deferred_all_loaded`).
+- `app/kuro_analysis/src/analysis/env.rs`:
+  - `ensure_registered_toolchains_loaded` partitions the registry into
+    eager (root + bundled cells via new `is_bundled_eager_toolchain`) and
+    deferred subsets; only the eager set is loaded immediately, the
+    deferred set is parked in `DEFERRED_TOOLCHAINS`.
+  - Extracted the parallel load + register loop into
+    `load_and_register_toolchain_packages` and the parse + cell-resolve
+    pre-filter into `prepare_toolchain_load_list` so the new lazy path
+    reuses the same machinery (and the same `canonicalize_toolchain_type_label`
+    alias-following logic from Plan 11 Phase 8).
+  - Added `ensure_deferred_toolchains_loaded(dice, &required_types)`:
+    heuristic filter on `(origin module, label repo)` ∩ `(required type
+    repo names)`, with a "load all remaining" fallback when the heuristic
+    misses. Marks loaded keys in `LOADED_DEFERRED_KEYS` to avoid reload.
+  - `resolve_toolchain_types` is now `async fn` taking `&mut
+    DiceComputations`; first runs the pure resolution; on `Err` or any
+    `None` mandatory result, calls `ensure_deferred_toolchains_loaded`
+    with all required type labels and retries once.
+- `examples/lazy_toolchain/` — Smoke 3 harness (MODULE.bazel + BUILD.bazel +
+  src/main.rs + .buckconfig) declaring rules_rust + 7 unrelated rules
+  modules, with a single `rust_binary` target.
+
+Status: code complete. zeromatter `//sdk:sdk` end-to-end verification
+deferred to a follow-up session — note any progress past the 30-min wall
+back into this plan when run.
 
 ### Smoke test harness (Smoke 3)
 

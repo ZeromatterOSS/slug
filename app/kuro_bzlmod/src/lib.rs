@@ -87,6 +87,8 @@ pub use pending_repo_cells::is_extension_repo_canonical_name;
 pub use pending_repo_cells::parse_canonical_name;
 pub use pending_repo_cells::pre_compute_extension_repo_cells;
 pub use registry::DEFAULT_REGISTRY_URL;
+// `RegisteredToolchain` is defined below; re-export under the crate root for
+// consumers that already do `use kuro_bzlmod::RegisteredToolchain`.
 pub use registry::RegistryClient;
 pub use repo_spec::RepoSpec;
 pub use repo_spec::in_extension_context;
@@ -154,17 +156,29 @@ pub fn get_module_version(cell_name: &str) -> Option<String> {
 // Toolchain and Execution Platform Registrations
 // ============================================================================
 
+/// A registered toolchain entry, tracking its origin module so Plan 13
+/// Phase 3's lazy fallback can filter the deferred pool by relevance.
+#[derive(Debug, Clone)]
+pub struct RegisteredToolchain {
+    /// Origin module name (root module is marked `is_root = true`).
+    pub module: String,
+    /// The label string passed to `register_toolchains()`.
+    pub label: String,
+    /// True iff this registration came from the root module.
+    pub is_root: bool,
+}
+
 /// Global priority-ordered list of registered toolchains.
 /// Populated during cell resolution from register_toolchains() calls in MODULE.bazel.
 /// Order: root module first, then BFS order of dep graph (Bazel priority).
-static REGISTERED_TOOLCHAINS: RwLock<Vec<String>> = RwLock::new(Vec::new());
+static REGISTERED_TOOLCHAINS: RwLock<Vec<RegisteredToolchain>> = RwLock::new(Vec::new());
 
 /// Global priority-ordered list of registered execution platforms.
 static REGISTERED_EXECUTION_PLATFORMS: RwLock<Vec<String>> = RwLock::new(Vec::new());
 
 /// Set the global ordered list of registered toolchains.
 /// Called after bzlmod resolution collects registrations from all modules.
-pub fn set_registered_toolchains(toolchains: Vec<String>) {
+pub fn set_registered_toolchains(toolchains: Vec<RegisteredToolchain>) {
     if let Ok(mut guard) = REGISTERED_TOOLCHAINS.write() {
         *guard = toolchains;
     }
@@ -177,8 +191,8 @@ pub fn set_registered_execution_platforms(platforms: Vec<String>) {
     }
 }
 
-/// Get the priority-ordered list of registered toolchain labels.
-pub fn get_registered_toolchains() -> Vec<String> {
+/// Get the priority-ordered list of registered toolchains.
+pub fn get_registered_toolchains() -> Vec<RegisteredToolchain> {
     REGISTERED_TOOLCHAINS
         .read()
         .ok()
