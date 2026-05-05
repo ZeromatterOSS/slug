@@ -979,11 +979,10 @@ fn execute_git_repository(
         c.arg("reset").arg("--hard").arg("FETCH_HEAD");
     })?;
 
-    // Remove .git directory
-    let git_dir = working_dir.join(".git");
-    if git_dir.exists() {
-        std::fs::remove_dir_all(&git_dir).ok();
-    }
+    // Plan 39: keep `.git`. Downstream rules — most prominently
+    // rules_rs's `crate_git_repository` — use `git --git-dir=<>/.git
+    // worktree add` to fan one master clone out into per-crate spokes,
+    // and that fails if we strip the directory here.
 
     // Create WORKSPACE if not present
     if !working_dir.join("WORKSPACE").exists() && !working_dir.join("WORKSPACE.bazel").exists() {

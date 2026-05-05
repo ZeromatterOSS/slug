@@ -658,14 +658,34 @@ impl RepositoryContext {
 /// a path relative to the workspace root.
 pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> String {
     let stripped = label_str.trim_start_matches('@');
+    // Three label shapes to cover:
+    //   "@repo//pkg:target"  → repo+pkg+target
+    //   "@repo"              → @repo//:repo  (Bazel "implicit target = repo
+    //                                          name" shorthand)
+    //   "//pkg:target"       → root-cell, pkg+target
     let (repo, rest) = if let Some(idx) = stripped.find("//") {
         (&stripped[..idx], &stripped[idx + 2..])
-    } else {
+    } else if !label_str.starts_with('@') || stripped.is_empty() {
         ("", stripped)
+    } else {
+        (stripped, "")
     };
 
     let (pkg, target) = if let Some(colon_idx) = rest.find(':') {
-        (&rest[..colon_idx], &rest[colon_idx + 1..])
+        let p = &rest[..colon_idx];
+        let t = &rest[colon_idx + 1..];
+        // `@repo//:` (empty target after colon) is the same `@repo` shorthand
+        // BazelLabel::parse emits when given `@<repo>` — default the target
+        // to the repo name. Without this, the resolved path stops at the
+        // repo root and downstream `.dirname` strips a level too many.
+        if t.is_empty() && p.is_empty() {
+            ("", repo)
+        } else {
+            (p, t)
+        }
+    } else if rest.is_empty() {
+        // `@repo` with no //pkg:target: implicit target name = repo name.
+        ("", repo)
     } else {
         (rest, rest.rsplit('/').next().unwrap_or(rest))
     };
@@ -1351,9 +1371,49 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         path_arg: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
+        // Helper: when a label points at an extension-generated repo (spoke
+        // or extension hub), arrange for it to be on disk before we hand
+        // back the path. Bazel's `rctx.path(label)` is fetch-triggering;
+        // ours wasn't. Reuse Plan 36's sync→async bridge.
+        //
+        // The label may reference the repo by either canonical name
+        // (`rules_rs+crate+foo`) or apparent name (`foo`). The dynamic
+        // extension-cell registry maps both to the same `bazel-external/<canonical>`
+        // path; we recover the canonical from the path's last segment so
+        // the spoke-materialization registry — which is keyed strictly by
+        // canonical name when the repo lives at `bazel-external/<canonical>` —
+        // sees the right key.
+        let trigger_materialization = |label_str: &str| {
+            let stripped = label_str.trim_start_matches('@');
+            let repo = match stripped.find("//") {
+                Some(idx) => &stripped[..idx],
+                None if !stripped.is_empty() => stripped,
+                _ => return,
+            };
+            if repo.is_empty() {
+                return;
+            }
+            let canonical =
+                if let Some(cell_path) = kuro_core::cells::get_dynamic_extension_cell(repo) {
+                    cell_path.rsplit('/').next().unwrap_or(repo).to_owned()
+                } else {
+                    repo.to_owned()
+                };
+            if let Err(e) = kuro_bzlmod::materialize_spoke_sync(&canonical) {
+                tracing::debug!(
+                    "rctx.path: lazy materialization of '{}' failed (continuing): {}",
+                    canonical,
+                    e
+                );
+            }
+        };
+
         let path_str = if let Some(s) = path_arg.unpack_str() {
-            // Check if the string looks like a label (starts with @ and contains //)
-            if (s.starts_with("@@") || s.starts_with('@')) && s.contains("//") {
+            // Treat anything starting with `@` (with or without `//`) and any
+            // `//pkg:target` as a label — `resolve_label_to_path` handles the
+            // `@repo` shorthand for `@repo//:repo`.
+            if s.starts_with('@') || s.starts_with("//") {
+                trigger_materialization(s);
                 resolve_label_to_path(s, &this.working_dir)
             } else {
                 s.to_owned()
@@ -1363,6 +1423,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         } else if path_arg.get_type() == "Label" {
             // Handle Label objects: resolve to workspace-relative path.
             let label_str = format!("{}", path_arg);
+            trigger_materialization(&label_str);
             resolve_label_to_path(&label_str, &this.working_dir)
         } else {
             path_arg.to_repr()

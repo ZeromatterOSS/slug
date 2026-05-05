@@ -302,6 +302,7 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
     lockfile: &crate::lockfile::Lockfile,
     root_module_name: &str,
     existing: &[PendingRepoCell],
+    project_root: &std::path::Path,
 ) -> Vec<PendingRepoCell> {
     let existing_canonicals: std::collections::HashSet<&str> =
         existing.iter().map(|c| c.canonical_name.as_str()).collect();
@@ -354,6 +355,28 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
                 repo_spec_json,
                 path: format!("bazel-external/{}", canonical),
             });
+
+            // Also register in the spoke-materialization registry so
+            // `rctx.path(@<repo_name>)` can drive lazy materialization via
+            // `materialize_spoke_sync`. The registry is keyed by both
+            // canonical name and the bare repo name so callers that pass a
+            // pre-canonicalization apparent name still resolve.
+            let registration = crate::spoke_materialization::SpokeRegistration {
+                extension_id: std::sync::Arc::from(ext_id),
+                repo_spec: std::sync::Arc::new(repo_spec),
+                project_root: std::sync::Arc::new(project_root.to_path_buf()),
+            };
+            crate::spoke_materialization::register_spoke(canonical.clone(), registration.clone());
+            if repo_name != &canonical {
+                crate::spoke_materialization::register_spoke(repo_name.clone(), registration);
+            }
+
+            // Caller (kuro_common::cells) is expected to also register
+            // these in the dynamic-extension-cell map so
+            // `resolve_label_to_path` (used by `rctx.path(@<name>)`) can
+            // locate the repo on disk before it has been materialized.
+            // We can't do it here because kuro_bzlmod doesn't depend on
+            // kuro_core, and adding the dep risks a cycle.
         }
     }
 

@@ -830,7 +830,25 @@ impl BuckConfigBasedCells {
                 &lockfile,
                 root_module_name,
                 &pre_computed_cells,
+                project_root.root().as_path(),
             );
+            // Mirror lockfile-seeded cells into the dynamic-extension-cell
+            // registry so `resolve_label_to_path` (used by `rctx.path`)
+            // finds them before any materialization has run on disk. The
+            // pending cells flow through the static aggregator further
+            // down; this registration is just the parallel dynamic mapping.
+            for cell in &extra {
+                kuro_core::cells::register_dynamic_extension_cell(
+                    cell.canonical_name.clone(),
+                    cell.path.clone(),
+                );
+                if cell.internal_name != cell.canonical_name {
+                    kuro_core::cells::register_dynamic_extension_cell(
+                        cell.internal_name.clone(),
+                        cell.path.clone(),
+                    );
+                }
+            }
             pre_computed_cells.extend(extra);
         }
 

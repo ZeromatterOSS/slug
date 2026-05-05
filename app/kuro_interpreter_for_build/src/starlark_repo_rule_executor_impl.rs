@@ -213,7 +213,15 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
             invocation.name
         );
 
-        let invoke_result = eval.eval_function(impl_fn.to_value(), &[ctx_value], &[]);
+        // Plan 39 phase 1.75: expose DICE to `rctx.path(Label)` so it can
+        // synchronously materialize cross-repo labels (notably the master
+        // git_repository clone that rules_rs's `crate_git_repository`
+        // worktree-fans-out from). `with_extension_dice` was originally
+        // introduced for module-extension Starlark eval (Plan 36); the same
+        // sync->async bridge applies here.
+        let invoke_result = kuro_bzlmod::with_extension_dice(ctx, || {
+            eval.eval_function(impl_fn.to_value(), &[ctx_value], &[])
+        });
 
         match invoke_result {
             Ok(_) => {
