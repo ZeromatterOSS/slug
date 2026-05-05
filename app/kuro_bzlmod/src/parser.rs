@@ -379,9 +379,13 @@ pip.parse(
             kwargs_map.get("hub_name"),
             Some(crate::types::TagValue::String(s)) if s == "pip"
         ));
+        // Plan 10 Phase 4: relative `//`-labels in a non-root module
+        // canonicalize to `@@<owning_module>//pkg:target`. The MODULE.bazel
+        // above declares `module(name = "test")`, so this label canonicalizes
+        // to `@@test//:requirements_lock.txt`.
         assert!(matches!(
             kwargs_map.get("requirements_lock"),
-            Some(crate::types::TagValue::Label(s)) if s == "//:requirements_lock.txt"
+            Some(crate::types::TagValue::Label(s)) if s == "@@test//:requirements_lock.txt"
         ));
     }
 

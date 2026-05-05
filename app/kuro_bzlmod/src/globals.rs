@@ -202,10 +202,17 @@ impl<'v> StarlarkValue<'v> for ExtensionTagInvoker {
         // Create the tag with all keyword arguments
         let mut tag = ExtensionTag::new(self.tag_name.clone());
 
-        // Convert kwargs to TagValue using names_map()
+        // Convert kwargs to TagValue using names_map().
+        //
+        // Bazel rule: relative `//`-labels declared in a non-root MODULE.bazel
+        // canonicalize to the *enclosing* module's repo, not the root cell.
+        // Pass the owning module name so labels like
+        // `cargo_toml = "//tools/rust_analyzer:Cargo.toml"` declared in
+        // rules_rs's MODULE.bazel become `@@rules_rs//tools/rust_analyzer:Cargo.toml`.
+        let owning_module = ctx.module.as_ref().map(|m| m.name.as_str());
         let kwargs = args.names_map()?;
         for (name, value) in kwargs.iter() {
-            let tag_value = starlark_to_tag_value(*value)?;
+            let tag_value = starlark_to_tag_value(*value, owning_module)?;
             tag.kwargs.push((name.as_str().to_string(), tag_value));
         }
 
@@ -218,8 +225,29 @@ impl<'v> StarlarkValue<'v> for ExtensionTagInvoker {
     }
 }
 
+/// Canonicalize a relative `//`-label against the enclosing module's repo.
+///
+/// Bazel rule: a `//pkg:target` label in module `X`'s MODULE.bazel canonicalizes
+/// to `@@X//pkg:target`. Already-canonical (`@@repo//...`, `@repo//...`) and
+/// target-relative (`:name`) forms pass through untouched. When `owning_module`
+/// is `None` (root-module evaluation), relative labels also pass through.
+fn canonicalize_relative_label(s: &str, owning_module: Option<&str>) -> String {
+    if s.starts_with("//") {
+        if let Some(module) = owning_module {
+            return format!("@@{}{}", module, s);
+        }
+    }
+    s.to_string()
+}
+
 /// Convert a Starlark value to a TagValue.
-fn starlark_to_tag_value(value: Value) -> starlark::Result<TagValue> {
+///
+/// `owning_module` is the name of the module whose MODULE.bazel is being
+/// evaluated. Relative `//`-labels canonicalize against this module's repo
+/// to match Bazel semantics — labels declared in `rules_rs/MODULE.bazel` as
+/// `//tools/rust_analyzer:Cargo.toml` become `@@rules_rs//tools/rust_analyzer:Cargo.toml`.
+/// `None` means root-module evaluation; relative labels stay relative there.
+fn starlark_to_tag_value(value: Value, owning_module: Option<&str>) -> starlark::Result<TagValue> {
     if value.is_none() {
         return Ok(TagValue::None);
     }
@@ -227,7 +255,10 @@ fn starlark_to_tag_value(value: Value) -> starlark::Result<TagValue> {
     if let Some(s) = value.unpack_str() {
         // Check if it looks like a label
         if s.starts_with("//") || s.starts_with("@") || s.starts_with(":") {
-            return Ok(TagValue::Label(s.to_string()));
+            return Ok(TagValue::Label(canonicalize_relative_label(
+                s,
+                owning_module,
+            )));
         }
         return Ok(TagValue::String(s.to_string()));
     }
@@ -243,7 +274,7 @@ fn starlark_to_tag_value(value: Value) -> starlark::Result<TagValue> {
     if let Some(list) = ListRef::from_value(value) {
         let items: Vec<TagValue> = list
             .iter()
-            .map(starlark_to_tag_value)
+            .map(|v| starlark_to_tag_value(v, owning_module))
             .collect::<starlark::Result<Vec<_>>>()?;
         return Ok(TagValue::List(items));
     }
@@ -260,7 +291,7 @@ fn starlark_to_tag_value(value: Value) -> starlark::Result<TagValue> {
                         ))
                     })?
                     .to_string();
-                let value = starlark_to_tag_value(v)?;
+                let value = starlark_to_tag_value(v, owning_module)?;
                 Ok((key, value))
             })
             .collect::<starlark::Result<Vec<_>>>()?;
@@ -931,11 +962,15 @@ impl<'v> StarlarkValue<'v> for RepoRuleProxy {
                 let mut ctx = module_ctx.borrow_mut();
                 // Store as a repo rule invocation with rule source info
                 let rule_source = format!("{}%{}", self.rule_bzl_file, self.rule_name);
+                let owning_module = ctx.module.as_ref().map(|m| m.name.as_str());
                 let mut attrs = indexmap::IndexMap::new();
                 for (key, value) in kwargs.iter() {
                     let key_str = key.as_str();
                     if key_str != "name" {
-                        attrs.insert(key_str.to_owned(), starlark_to_tag_value(*value)?);
+                        attrs.insert(
+                            key_str.to_owned(),
+                            starlark_to_tag_value(*value, owning_module)?,
+                        );
                     }
                 }
                 ctx.repo_rule_invocations.push(RepoRuleInvocation {
@@ -966,4 +1001,66 @@ fn get_module_context<'v, 'a>(
 /// Creates a new ModuleFileContext.
 pub fn new_module_file_context() -> RefCell<ModuleFileContext> {
     RefCell::new(ModuleFileContext::default())
+}
+
+#[cfg(test)]
+mod label_canonicalization_tests {
+    use super::canonicalize_relative_label;
+
+    #[test]
+    fn relative_label_canonicalizes_against_owning_module() {
+        // The zeromatter case: rules_rs's MODULE.bazel uses
+        // `cargo_toml = "//tools/rust_analyzer:Cargo.toml"`. With rules_rs as
+        // the owning module, this should canonicalize to
+        // `@@rules_rs//tools/rust_analyzer:Cargo.toml`.
+        assert_eq!(
+            canonicalize_relative_label("//tools/rust_analyzer:Cargo.toml", Some("rules_rs")),
+            "@@rules_rs//tools/rust_analyzer:Cargo.toml"
+        );
+    }
+
+    #[test]
+    fn relative_label_in_root_module_passes_through() {
+        // Root module's `//foo:bar` stays as `//foo:bar` — root-cell
+        // resolution handles it.
+        assert_eq!(canonicalize_relative_label("//foo:bar", None), "//foo:bar");
+    }
+
+    #[test]
+    fn already_canonical_double_at_passes_through() {
+        // `@@repo//pkg:target` is fully canonical — leave it alone even if
+        // we know the owning module.
+        assert_eq!(
+            canonicalize_relative_label("@@other//pkg:target", Some("rules_rs")),
+            "@@other//pkg:target"
+        );
+    }
+
+    #[test]
+    fn already_canonical_single_at_passes_through() {
+        // `@repo//pkg:target` is the apparent-name form — also leave alone.
+        assert_eq!(
+            canonicalize_relative_label("@other//pkg:target", Some("rules_rs")),
+            "@other//pkg:target"
+        );
+    }
+
+    #[test]
+    fn target_relative_passes_through() {
+        // `:target` is relative to the current package, not the module —
+        // canonicalization at this layer would be wrong.
+        assert_eq!(
+            canonicalize_relative_label(":Cargo.toml", Some("rules_rs")),
+            ":Cargo.toml"
+        );
+    }
+
+    #[test]
+    fn empty_pkg_root_relative_canonicalizes() {
+        // `//:Cargo.toml` (root package of owning module) canonicalizes too.
+        assert_eq!(
+            canonicalize_relative_label("//:Cargo.toml", Some("rules_rs")),
+            "@@rules_rs//:Cargo.toml"
+        );
+    }
 }

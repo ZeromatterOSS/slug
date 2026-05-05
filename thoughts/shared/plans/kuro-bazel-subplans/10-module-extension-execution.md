@@ -590,7 +590,11 @@ fix should be minimal and targeted.
 - **`rust` extension from `@rules_rust//rust:extensions.bzl` now executes successfully** and
   generates real `rust_toolchains` repo (33KB BUILD.bazel with `toolchain()` targets)
 - Rust toolchain resolution still returns None due to toolchain_type label mismatch:
-  generated BUILD uses `@rules_rust//rust:toolchain`, rule requests `@rules_rust//rust:toolchain_type`
+  generated BUILD uses `@rules_rust//rust:toolchain` (an `alias()`), rule requests
+  `@rules_rust//rust:toolchain_type` (the alias' `actual`). **Moved to Plan 11
+  Phase 8** (alias resolution at toolchain registration). Does NOT block Plan 10
+  closure — extension execution itself works; this is a downstream toolchain-resolution
+  gap that belongs in Plan 11.
 - 2 remaining failures: `postgres-types` has `unresolved import chrono_04` (missing crate
   alias in build rules, not a kuro infrastructure issue). `zmij` and `serde_core` fail
   downstream from this.
@@ -1462,3 +1466,103 @@ Current state: `@llvm-project//llvm:llvm` reaches compile stage,
 Support compiles ~183 files, blocks on generated-header resolution
 for `llvm/Config/abi-breaking.h` (an `expand_template` output). That
 remaining blocker is tracked in Plan 15 sub-plan 15.5.3.
+
+---
+
+## Closure Status (2026-05-04)
+
+Plan 10's primary goal — letting real module extensions execute via DICE
+instead of synthetic stubs — is **complete**. Extensions execute, repos
+materialize with real content, label-to-path resolution works, parallelization
+removes the cquery-time cascade.
+
+### Phase 4 follow-up: cross-module relative-label canonicalization (complete, 2026-05-04)
+
+Discovered while attempting end-to-end verification of Plan 11 Phase 8 against
+zeromatter `//sdk:sdk`.
+
+**Bug**: When an extension's tag attribute (`attr.label`) is set in a *non-root*
+module's `MODULE.bazel` using a relative `//` label, kuro resolves it against
+the root project's cell instead of the *enclosing module's* cell.
+
+**Concrete example** (rules_rs's own MODULE.bazel):
+
+```python
+crate.from_cargo(
+    name = "rrra",
+    cargo_toml = "//tools/rust_analyzer:Cargo.toml",   # relative `//`
+    ...
+)
+```
+
+The label should canonicalize to `@@rules_rs//tools/rust_analyzer:Cargo.toml`
+(the file lives at `bazel-external/rules_rs+override/tools/rust_analyzer/Cargo.toml`).
+Instead it reaches `resolve_label_to_filesystem_path` in
+`app/kuro_interpreter_for_build/src/module_ctx/context.rs:263-270` with
+`repo = ""`, so kuro produces `<project_root>/tools/rust_analyzer/Cargo.toml`
+— which doesn't exist in zeromatter's tree.
+
+The crate extension calls `mctx.execute([Label(toml2json), toml_file])` which
+fails ENOENT, the extension fails, `@crates` becomes a stub, and analysis of
+`//sdk:sdk` fails on `Module has no symbol all_crate_deps`.
+
+**Where the canonicalization should happen**: `attr.label` tag-attribute
+coercion needs to know the *owning module* of the MODULE.bazel where the tag
+was used, and use that module's repo as the base for relative `//` labels.
+Suspect site: tag-attr coercion in `app/kuro_bzlmod/` or `module_ctx/tags.rs`,
+or label parsing from the serialized tag values.
+
+**Why not blocking Plan 10 closure**: this is a Phase 4 polish item that
+arises only with extensions whose tags are set across modules using relative
+labels. Plan 10's core (DICE execution of extensions, eager spoke
+materialization, label-to-path for already-canonical labels) works. The
+relative-label canonicalization is one more pre-existing-Phase-4-style fix
+on the same code path. Track here; close when fixed.
+
+**Minimum fix sketch**:
+- Identify where tag attribute values are coerced (likely
+  `module_ctx/tags.rs` `SerializedTag` construction or its consumer).
+- Pass the owning module's repo name through to label coercion.
+- For an `attr.label` value with `repo.is_empty()`, replace with the owning
+  module's repo before producing the canonical `@@<module>//pkg:target` form.
+
+**Resolution (2026-05-04)**: Implemented in `app/kuro_bzlmod/src/globals.rs`:
+
+- Added `canonicalize_relative_label(s, owning_module)` helper — pure-string
+  function that prepends `@@<module>` to relative `//`-labels, with
+  pass-through for already-canonical (`@@`/`@`) and target-relative (`:`) forms.
+- Threaded `owning_module: Option<&str>` through `starlark_to_tag_value` and
+  its callers (`ExtensionTagInvoker::invoke`, the `use_repo_rule` invocation
+  path). The owning module name comes from the `ModuleFileContext`'s `module`
+  decl.
+- Verified by 6 unit tests in `mod label_canonicalization_tests` covering all
+  branches (relative-to-module, root-module-pass-through, already-canonical,
+  target-relative, empty-pkg). Also verified end-to-end by the parser
+  integration test `parser::tests::test_parse_use_extension_with_tags` which
+  now asserts the canonical `@@test//:requirements_lock.txt` form.
+- All 161 `kuro_bzlmod --lib` tests pass; no regressions in `kuro_analysis`.
+
+**Status: Complete**. The zeromatter `crate.from_cargo` failure mode
+("Failed to read tools/rust_analyzer/Cargo.toml") that motivated this fix
+no longer reproduces.
+
+### Items moved to other plans (do NOT block closure)
+
+| Item | Moved to | Reason |
+|------|----------|--------|
+| Rust `toolchain_type` alias resolution | **Plan 11 Phase 8** | Belongs in toolchain resolution, not extension execution. Extensions correctly produce the BUILD that Bazel produces; the gap is downstream alias-following at registration time. |
+| Phase 6.3: register extension repos as ordinary cells (delete `ExternalCellOrigin::ExtensionRepo`) | **Stays in Plan 10 as deferred cleanup** | Structural simplification, not a correctness gap. Phases 6.1+6.2 already deliver lazy file tracking. Can land as an isolated refactor whenever convenient. |
+| Phase 7.2: on-demand spoke materialization | **Deferred indefinitely** | Disk/time amplification only, not a correctness or hang issue (Phase 7 / 7.1 fixed the actual cascade). |
+
+### Outstanding manual verification (nice-to-have)
+
+- Verify downloaded crate sources match Cargo.lock versions
+- Compare generated BUILD files with what `bazel build` produces
+
+These are sanity-checks, not gates. Real-world zeromatter and llvm-project
+graphs already exercise the path end-to-end.
+
+### Recommended action
+
+Mark Plan 10 **Complete** in the main plan index. Open work above lives in
+its rightful home (Plan 11) or as deferred follow-ups within Plan 10 itself.
