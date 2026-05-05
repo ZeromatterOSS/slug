@@ -635,13 +635,34 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
                 };
 
                 let mut registered_count = 0;
+                let mut alias_cache: HashMap<String, String> = HashMap::new();
                 for (_target_name, target_node) in eval_result.targets().iter() {
                     if matches!(
                         target_node.rule_type(),
                         RuleType::Native(NativeRuleKind::Toolchain)
                     ) {
-                        if let Some(info) = extract_toolchain_info_from_node(target_node) {
+                        if let Some(mut info) = extract_toolchain_info_from_node(target_node) {
                             let label = target_node.label().to_string();
+                            // Plan 11 Phase 8: rules_rust generates BUILD files
+                            // with `toolchain_type = "@rules_rust//rust:toolchain"`
+                            // where `:toolchain` is an alias() of the real
+                            // `:toolchain_type` rule. Follow alias chains so
+                            // exact-string matching in `resolve_toolchains`
+                            // sees the canonical toolchain_type() label.
+                            let canonical = canonicalize_toolchain_type_label(
+                                ctx,
+                                &info.toolchain_type,
+                                &mut alias_cache,
+                            )
+                            .await;
+                            if canonical != info.toolchain_type {
+                                tracing::debug!(
+                                    "Resolved toolchain_type alias '{}' -> '{}'",
+                                    info.toolchain_type,
+                                    canonical
+                                );
+                                info.toolchain_type = canonical;
+                            }
                             tracing::debug!(
                                 "Eagerly registered toolchain '{}': type='{}', impl='{}'",
                                 label,
@@ -828,6 +849,77 @@ fn parse_impl_label_to_target_label(label: &str) -> Option<TargetLabel> {
         PackageLabel::from_cell_path(CellPathRef::new(cell_name, cell_rel_path)).ok()?;
     let target_name_ref = TargetNameRef::new(target_name).ok()?;
     Some(TargetLabel::new(package_label, target_name_ref))
+}
+
+/// Plan 11 Phase 8: Resolve a `toolchain_type` label through any `alias()`
+/// chain to its canonical `toolchain_type()` rule label.
+///
+/// rules_rust's `BUILD_for_toolchain` template emits
+/// `toolchain_type = "@rules_rust//rust:toolchain"` literally, but
+/// `@rules_rust//rust:toolchain` is an `alias()` whose `actual` is
+/// `:toolchain_type` (the real `toolchain_type()` rule). Rules' Starlark uses
+/// `Label("//rust:toolchain_type")` for resolution, so without alias
+/// resolution exact-string matching in `resolve_toolchains` fails and the
+/// rust toolchain never resolves.
+///
+/// On any failure (parse error, package load error, missing target), returns
+/// the input label unchanged — toolchain registration should never block on
+/// a label we can't resolve.
+async fn canonicalize_toolchain_type_label(
+    ctx: &mut DiceComputations<'_>,
+    label_str: &str,
+    cache: &mut HashMap<String, String>,
+) -> String {
+    if let Some(canonical) = cache.get(label_str) {
+        return canonical.clone();
+    }
+
+    let mut current = label_str.to_owned();
+    let mut visited: Vec<String> = vec![current.clone()];
+    const MAX_DEPTH: usize = 8;
+
+    for _ in 0..MAX_DEPTH {
+        let target_label = match parse_impl_label_to_target_label(&current) {
+            Some(t) => t,
+            None => break,
+        };
+        let pkg = target_label.pkg();
+        let eval_result = match ctx.get_interpreter_results(pkg.dupe()).await {
+            Ok(e) => e,
+            Err(_) => break,
+        };
+        let node = match eval_result.get_target(target_label.name()) {
+            Some(n) => n,
+            None => break,
+        };
+        if !matches!(node.rule_type(), RuleType::Native(NativeRuleKind::Alias)) {
+            break;
+        }
+
+        // Read 'actual' attr from the alias.
+        let mut next: Option<String> = None;
+        for attr in node.attrs(AttrInspectOptions::All) {
+            if attr.name == "actual" {
+                let s = extract_label_from_coerced_attr(&attr.value);
+                if !s.is_empty() {
+                    next = Some(s);
+                }
+                break;
+            }
+        }
+        let next = match next {
+            Some(s) => s,
+            None => break,
+        };
+        if visited.iter().any(|v| v == &next) {
+            break; // cycle
+        }
+        visited.push(next.clone());
+        current = next;
+    }
+
+    cache.insert(label_str.to_owned(), current.clone());
+    current
 }
 
 // Used to express that the impl Future below captures multiple named lifetimes.

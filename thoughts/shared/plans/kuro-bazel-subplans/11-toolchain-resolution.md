@@ -588,6 +588,117 @@ the results are stored in generated BUILD files. Analysis just reads those BUILD
 `/usr/bin/gcc`, `/usr/bin/python3`, etc. must come from the resolved toolchain's
 providers, not from hardcoded constants.
 
+## Phase 8: Alias Resolution for `toolchain_type` Labels (follow-up, 2026-05-04)
+
+### Problem
+
+Discovered while closing Plan 10 (module extension execution). rules_rust's
+`BUILD_for_toolchain` template emits `toolchain_type = "@rules_rust//rust:toolchain"`
+literally, but `@rules_rust//rust:toolchain` is an `alias()` whose `actual` is
+`:toolchain_type` (the real `toolchain_type()` rule). Rules' Starlark uses
+`Label("//rust:toolchain_type")` for resolution. Kuro's exact-string match in
+`toolchain_resolution.rs:253-256` (`tc_type_norm != req_type_norm`) doesn't follow
+aliases, so the `rust` toolchain never resolves and `ctx.toolchains` returns
+empty.
+
+### Root cause
+
+- Generated BUILD: `app/kuro_analysis/src/analysis/env.rs::extract_toolchain_info_from_node`
+  stores the literal `toolchain_type` attr value.
+- Match site: `app/kuro_analysis/src/analysis/toolchain_resolution.rs:253-256`
+  compares the stored value to `req.type_label` after `normalize_constraint_label`
+  (which only strips `@@`/`@` prefixes).
+- The two labels `@rules_rust//rust:toolchain` and `@rules_rust//rust:toolchain_type`
+  are not string-equal, so the loop falls through and `found = None`.
+
+This is structural: Bazel's analysis dereferences the alias when registering
+toolchains; kuro stops at the alias label.
+
+### Fix
+
+Canonicalize `toolchain_type` labels at registration time.
+`ensure_registered_toolchains_loaded` (`env.rs:509`) already has DICE access. After
+`extract_toolchain_info_from_node` returns a `DeclaredToolchainInfo`:
+
+1. Parse `info.toolchain_type` to a `TargetLabel`.
+2. Load the target's package via `ctx.get_interpreter_results(pkg)`.
+3. Look up the target node by name. If `RuleType::Native(NativeRuleKind::Alias)`,
+   read its `actual` attribute and recurse (with a depth cap to prevent cycles).
+4. Replace `info.toolchain_type` with the canonical `toolchain_type()` rule label
+   before `register_declared_toolchain`.
+
+Cache `(label → canonical label)` in a small map for the duration of the
+registration pass. Most toolchain registrations point at the same handful of
+aliases.
+
+### Touchpoints
+
+- `app/kuro_analysis/src/analysis/env.rs::ensure_registered_toolchains_loaded` —
+  add alias-resolution step after `extract_toolchain_info_from_node`.
+- `app/kuro_analysis/src/analysis/env.rs::extract_toolchain_info_from_node` —
+  unchanged (alias-resolution happens at the call site, which has DICE).
+- `app/kuro_analysis/src/analysis/toolchain_resolution.rs` — unchanged. Match
+  logic stays exact-string after normalization; canonicalization happens upstream.
+
+### Success criteria
+
+#### Automated
+- `cargo check -p kuro_analysis` clean
+- `cargo test -p kuro_analysis --lib` — no regressions
+
+#### Manual
+- `kuro build //sdk:sdk` in zeromatter: `rust_library` targets resolve
+  `@rules_rust//rust:toolchain_type` to the registered rust toolchain.
+- `tracing::debug!` log shows canonical `toolchain_type` after registration
+  (e.g. `type='@rules_rust//rust:toolchain_type'` not `:toolchain`).
+
+### Status
+
+**Implemented 2026-05-04** in `app/kuro_analysis/src/analysis/env.rs`:
+- Added `canonicalize_toolchain_type_label()` async helper — parses the label,
+  loads the package via DICE, walks `alias()` chains by reading the `actual`
+  attr; cycle-safe (visited set), depth-capped (8), benign on errors (returns
+  input unchanged).
+- Wired into `ensure_registered_toolchains_loaded`'s parallel loader: after
+  `extract_toolchain_info_from_node`, replaces `info.toolchain_type` with the
+  canonical label before `register_declared_toolchain`. Per-task `alias_cache`
+  HashMap; DICE handles cross-task dedup of `get_interpreter_results`.
+
+**Verified:**
+- `cargo check -p kuro_analysis` clean
+- `cargo build -p kuro` clean
+- `cargo test -p kuro_analysis --lib` — 11/11 pass
+
+**End-to-end runtime exercise pending**: zeromatter's `//sdk:sdk` build
+is now blocked by the **Plan 13 Phase 3** toolchain-loading wall (30+ minute
+serial materialization of all bzlmod transitive toolchain registrations)
+rather than by extension execution failures. The Plan 10 Phase 4 follow-up
+that previously blocked extension materialization (cross-module
+relative-label canonicalization in `attr.label` tag attributes) was fixed
+2026-05-04 in the same session.
+
+Additionally, zeromatter uses **rules_rs**, whose
+`declare_rustc_toolchains` macro emits the canonical
+`@rules_rust//rust:toolchain_type` label directly — so even when the build
+progresses past extension materialization, the alias case wouldn't fire in
+this specific repo. The alias case requires **rules_rust's own
+`rust_register_toolchains()` workflow** (`BUILD_for_toolchain` template at
+`repository_utils.bzl:474-501`), which emits
+`toolchain_type = "@rules_rust//rust:toolchain"` (alias) literally. Any repo
+using that workflow rather than rules_rs will exercise this code path.
+
+The alias case is specific to **rules_rust's own `rust_register_toolchains()`
+workflow** (`BUILD_for_toolchain` template at `repository_utils.bzl:474-501`),
+which emits `toolchain_type = "@rules_rust//rust:toolchain"` (alias) literally.
+Any repo using that workflow rather than rules_rs will exercise this code path.
+
+The fix is defensive and correct; full runtime exercise will land naturally
+the first time a `rust_register_toolchains()`-based workspace is built. A
+debug-level trace logs `Resolved toolchain_type alias '<src>' -> '<dst>'` on
+each canonicalization for observability.
+
+---
+
 ## References
 
 - [Bazel Toolchains Documentation](https://bazel.build/extending/toolchains)
