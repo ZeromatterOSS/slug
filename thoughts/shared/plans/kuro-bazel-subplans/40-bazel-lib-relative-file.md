@@ -1,6 +1,22 @@
 # Plan 40: bazel_lib `relative_file` produces paths missing leading `/`
 
-## Status: PROPOSED
+## Status: COMPLETE (2026-05-05)
+
+Fixed by bumping `KURO_BAZEL_VERSION` from `9.0.0` to `9.0.1`. That
+flips `bazel_features.external_deps.repo_rules_relativize_symlinks`
+to `True`, routing rules_rs's `relative_symlink` helper to the
+`rctx.symlink(target_path, link_path)` branch (which kuro implements
+correctly with absolute paths) instead of the
+`ln -sf relative_file(...)` fallback (which produces broken
+`var/...`-prefixed targets in kuro's stubbed bazel_lib).
+
+The `bazel_features+version_extension+bazel_features_version` repo
+caches `native.bazel_version` via `local = True` repository_rule, but
+its `.kuro_repo_complete` marker prevents kuro from re-running on
+daemon restart. Workaround for this build: deleted the marker so the
+repo rule wrote `version = '9.0.1'`. Long-term fix: respect the `local
+= True` flag and re-run such rules on every server restart so the
+cached output stays in sync with `native.bazel_version`.
 
 ## Context
 

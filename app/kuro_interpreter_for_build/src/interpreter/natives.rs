@@ -835,14 +835,19 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
 /// Kuro's reported Bazel version for compatibility with modern rules.
 ///
 /// This version is reported via `native.bazel_version` to satisfy version checks
-/// in rulesets like rules_cc, bazel_features, etc. We report 9.0.0 to ensure
-/// compatibility with Bazel 9.0+ rules.
+/// in rulesets like rules_cc, bazel_features, etc. We report 9.0.1 to ensure
+/// compatibility with Bazel 9.0+ rules and to flip
+/// `bazel_features.external_deps.repo_rules_relativize_symlinks` to True so
+/// rules_rs's `relative_symlink` helper takes the `rctx.symlink` branch (which
+/// kuro implements correctly with absolute paths) instead of the
+/// `ln -sf relative_file(...)` fallback (which depends on a fully-loaded
+/// `bazel_lib` and produces broken `var/...`-prefixed targets in kuro).
 ///
-/// Using "9.0.0" without a suffix so version comparisons work correctly.
+/// Using "9.0.1" without a suffix so version comparisons work correctly.
 /// The bazel_features module compares versions as tuples where released versions
 /// (no prerelease suffix) compare greater than prereleases. This ensures checks
 /// like `version >= "9.0.0-pre.20250911"` return True.
-pub const KURO_BAZEL_VERSION: &str = "9.0.0";
+pub const KURO_BAZEL_VERSION: &str = "9.0.1";
 
 /// Register the Bazel-compatible `native` namespace.
 pub(crate) fn register_bazel_native(globals: &mut GlobalsBuilder) {
