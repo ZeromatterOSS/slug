@@ -186,6 +186,13 @@ impl StarlarkTemplateDict {
         }
         content
     }
+
+    /// Snapshot of accumulated `(pattern, replacement)` pairs for handing
+    /// off to a deferred action (Plan 42). Returns owned strings since the
+    /// action lives past the analysis-time scope this dict was created in.
+    pub fn entries_for_action(&self) -> Vec<(String, String)> {
+        self.entries.borrow().clone()
+    }
 }
 
 impl<'v> AllocValue<'v> for StarlarkTemplateDict {
@@ -683,164 +690,59 @@ pub(crate) fn analysis_actions_methods_write(methods: &mut MethodsBuilder) {
         computed_substitutions: starlark::values::Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<starlark::values::none::NoneType> {
-        // Implement expand_template by reading the template source file content
-        // and applying substitutions, then writing via a write action.
-        //
-        // For source file templates (like python_bootstrap_template.txt),
-        // we can read the file at analysis time since it's a known source file.
+        // Plan 42: register a deferred `ExpandTemplateAction` so the template
+        // file is materialized as an action input before we read it at
+        // execution time. Source-file and build-artifact templates flow
+        // through the same path; for source files, the action input
+        // dependency is essentially free.
 
         let mut this = this.state()?;
         let (declaration, output_artifact) =
             this.get_or_declare_output(eval, output, OutputType::File, None)?;
 
-        // Try to read the template content from the source file.
-        //
-        // TODO(kuro): This reads templates directly from disk at analysis time,
-        // bypassing DICE/artifact infrastructure. Replace with an action or
-        // proper source-file materialization that goes through the normal
-        // artifact path. Until then, any missing/unreadable template must fail
-        // loudly rather than silently producing an empty output file.
-        let artifact_like = <&dyn kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkArtifactLike>::unpack_value(template)?
+        let artifact_like = <&dyn kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike>::unpack_value(template)?
             .ok_or_else(|| kuro_error::kuro_error!(
                 kuro_error::ErrorTag::Input,
-                "expand_template: `template` must be an artifact, got {}",
+                "expand_template: `template` must be an input artifact, got {}",
                 template.to_repr()
             ))?;
-        let (pkg, rel_path) = artifact_like.source_path_info().ok_or_else(|| {
-            kuro_error::kuro_error!(
-                kuro_error::ErrorTag::Input,
-                "expand_template: template artifact has no source path ({})",
-                template.to_repr()
-            )
-        })?;
-        let cell_name = pkg.cell_name().as_str();
-        let pkg_path = pkg.cell_relative_path().as_str();
-        let full_path = if pkg_path.is_empty() {
-            rel_path.clone()
-        } else {
-            format!("{}/{}", pkg_path, rel_path)
-        };
-        // The daemon's CWD may be inside buck-out/v2, resolve to project root.
-        let project_root = std::env::current_dir()
-            .ok()
-            .and_then(|cwd| {
-                if cwd.ends_with("buck-out/v2") {
-                    Some(cwd.parent()?.parent()?.to_path_buf())
-                } else {
-                    Some(cwd)
-                }
-            })
-            .unwrap_or_default();
-        let template_content: String = if kuro_core::cells::is_root_cell_name(cell_name) {
-            let p = project_root.join(&full_path);
-            std::fs::read_to_string(&p).map_err(|e| {
-                kuro_error::kuro_error!(
-                    kuro_error::ErrorTag::Input,
-                    "expand_template: failed to read template '{}' (resolved to {}): {}",
-                    full_path,
-                    p.display(),
-                    e
-                )
-            })?
-        } else {
-            let bundled_path = project_root.join(format!(
-                "buck-out/v2/external_cells/bundled/{}/{}",
-                cell_name, full_path
-            ));
-            std::fs::read_to_string(&bundled_path)
-                .or_else(|_| {
-                    // Try bazel-external/{cell}+{version}/{path} format.
-                    let external_dir = project_root.join("bazel-external");
-                    if let Ok(entries) = std::fs::read_dir(&external_dir) {
-                        let prefix = format!("{}+", cell_name);
-                        for entry in entries.flatten() {
-                            let name = entry.file_name();
-                            let name_str = name.to_string_lossy();
-                            if name_str.starts_with(&prefix) || name_str == cell_name {
-                                let versioned_path = entry.path().join(&full_path);
-                                if let Ok(content) = std::fs::read_to_string(&versioned_path) {
-                                    return Ok(content);
-                                }
-                            }
-                        }
-                    }
-                    // Try buck-out/v2/external_cells/bzlmod/{cell}+{version}/{path}.
-                    let bzlmod_dir = project_root.join("buck-out/v2/external_cells/bzlmod");
-                    if let Ok(entries) = std::fs::read_dir(&bzlmod_dir) {
-                        let prefix = format!("{}+", cell_name);
-                        for entry in entries.flatten() {
-                            let name = entry.file_name();
-                            let name_str = name.to_string_lossy();
-                            if name_str.starts_with(&prefix) || name_str == cell_name {
-                                let versioned_path = entry.path().join(&full_path);
-                                if let Ok(content) = std::fs::read_to_string(&versioned_path) {
-                                    return Ok(content);
-                                }
-                            }
-                        }
-                    }
-                    Err(std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        format!(
-                            "template not found in any location for cell '{}', path '{}'",
-                            cell_name, full_path
-                        ),
-                    ))
-                })
-                .map_err(|e| {
-                    kuro_error::kuro_error!(
-                        kuro_error::ErrorTag::Input,
-                        "expand_template: failed to read template for cell '{}', path '{}': {}",
-                        cell_name,
-                        full_path,
-                        e
-                    )
-                })?
-        };
+        let template_group = artifact_like.get_artifact_group()?;
 
-        // Apply substitutions
-        let mut content = template_content;
+        // Collect substitutions in declaration order. Bazel applies them
+        // sequentially as substring replacements.
+        let mut subs: Vec<(String, String)> = Vec::new();
         if !substitutions.is_none() {
             if let Some(dict) = starlark::values::dict::DictRef::from_value(substitutions) {
                 for (key, value) in dict.iter() {
                     if let (Some(k), Some(v)) = (key.unpack_str(), value.unpack_str()) {
-                        content = content.replace(k, v);
+                        subs.push((k.to_owned(), v.to_owned()));
                     }
                 }
             }
         }
-
-        // Apply computed_substitutions from a TemplateDict object
         if !computed_substitutions.is_none() {
             if let Some(tdict) = computed_substitutions.downcast_ref::<StarlarkTemplateDict>() {
-                content = tdict.apply_to(content);
+                for (k, v) in tdict.entries_for_action() {
+                    subs.push((k, v));
+                }
             }
         }
 
-        // Register a write action with the substituted content
-        let content_str = eval.heap().alloc_str(&content);
-        let content_value = content_str.to_value();
-        let cmd_args =
-            kuro_build_api::interpreter::rule_defs::cmd_args::StarlarkCmdArgs::try_from_value(
-                content_value,
-            )?;
-        let content_cli = CommandLineArg::from_cmd_args(eval.heap().alloc_typed(cmd_args));
-
-        let action = UnregisteredWriteAction {
+        let action = crate::actions::impls::expand_template::UnregisteredExpandTemplateAction {
+            template: template_group,
+            substitutions: subs,
             is_executable,
-            macro_files: None,
-            absolute: false,
-            use_dep_files_placeholder_for_content_based_paths: false,
         };
         this.register_action(
             indexset![output_artifact],
             action,
-            Some(content_cli.to_value()),
+            None,
             None,
             None,
             std::sync::Arc::new(std::collections::BTreeMap::new()),
         )?;
 
+        let _ = declaration;
         Ok(starlark::values::none::NoneType)
     }
 
