@@ -110,7 +110,7 @@ mod tests {
 
     #[test]
     fn test_extension_execution_output() {
-        let mut specs = HashMap::new();
+        let mut specs = fxhash::FxHashMap::default();
         specs.insert(
             "test_repo".to_owned(),
             RepoSpec::new("@@bazel_tools//repo:http.bzl%http_archive".to_owned()),

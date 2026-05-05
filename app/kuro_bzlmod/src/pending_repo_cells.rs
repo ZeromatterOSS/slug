@@ -589,7 +589,7 @@ mod tests {
     use crate::repository_invocations::AttrValue;
 
     fn make_test_result() -> ModuleExtensionResult {
-        let mut specs = HashMap::new();
+        let mut specs = fxhash::FxHashMap::default();
         specs.insert(
             "numpy".to_owned(),
             RepoSpec::new("@@rules_python//pip:pip.bzl%pip_install".to_owned())
@@ -746,7 +746,7 @@ mod tests {
         let result = make_test_result();
         let mut defs1 = build_extension_cells(&result).unwrap();
 
-        let mut specs2 = HashMap::new();
+        let mut specs2 = fxhash::FxHashMap::default();
         specs2.insert(
             "gazelle".to_owned(),
             RepoSpec::new("@@rules_go//go:deps.bzl%go_deps".to_owned()),

@@ -468,14 +468,17 @@ impl Lockfile {
                     .and_then(|stripped| self.module_extensions.get(stripped))
             })?;
 
-        // Validate that the cached data matches our current inputs.
-        // For Bazel-generated lockfiles, kuro may compute different digests,
-        // so we use the cached specs with a warning rather than discarding them.
+        // Validate that the cached data matches our current inputs. Mismatched
+        // digests mean the extension's `.bzl` code or its tag inputs have
+        // changed since the cache was written, so the cached repo specs are
+        // stale and must not be returned. Returning stale specs would silently
+        // skip extension re-execution and produce wrong builds.
         if !ext_data.is_valid(bzl_transitive_digest, usages_digest) {
-            tracing::warn!(
-                "Extension cache digest mismatch for '{}' (using lockfile specs anyway)",
+            tracing::debug!(
+                "Extension cache miss for '{}': digest mismatch (will re-execute)",
                 extension_id
             );
+            return None;
         }
 
         // Convert lockfile specs back to RepoSpecs
@@ -633,6 +636,7 @@ pub fn lockfile_path(workspace_root: &Path) -> PathBuf {
 mod tests {
     use std::fs;
 
+    use fxhash::FxHashMap;
     use tempfile::TempDir;
 
     use super::*;
@@ -748,7 +752,7 @@ mod tests {
 
     #[test]
     fn test_lockfile_extension_data_creation() {
-        let mut specs = HashMap::new();
+        let mut specs: IndexMap<String, LockfileRepoSpec> = IndexMap::new();
         specs.insert(
             "numpy".to_string(),
             LockfileRepoSpec::new("@@rules_python//pip:pip.bzl%pip_install".to_string())
@@ -777,7 +781,7 @@ mod tests {
 
     #[test]
     fn test_lockfile_extension_data_validation() {
-        let specs = HashMap::new();
+        let specs: IndexMap<String, LockfileRepoSpec> = IndexMap::new();
         let ext_data =
             LockfileExtensionData::new("digest1".to_string(), "digest2".to_string(), specs);
 
@@ -895,7 +899,7 @@ mod tests {
         );
 
         // Create and cache an extension result
-        let mut repo_specs = HashMap::new();
+        let mut repo_specs = FxHashMap::default();
         repo_specs.insert(
             "numpy".to_string(),
             RepoSpec::new("@@rules_python//pip:pip.bzl%pip_install".to_string()).with_attr(
@@ -936,7 +940,7 @@ mod tests {
 
         let mut lockfile = Lockfile::new();
 
-        let mut repo_specs = HashMap::new();
+        let mut repo_specs = FxHashMap::default();
         repo_specs.insert(
             "foo".to_string(),
             RepoSpec::new("rule".to_string())
@@ -968,7 +972,7 @@ mod tests {
 
         let mut lockfile = Lockfile::new();
 
-        let mut repo_specs = HashMap::new();
+        let mut repo_specs = FxHashMap::default();
         repo_specs.insert(
             "foo".to_string(),
             RepoSpec::new("rule".to_string())
@@ -1000,7 +1004,7 @@ mod tests {
 
         let mut lockfile = Lockfile::new();
 
-        let mut repo_specs = HashMap::new();
+        let mut repo_specs = FxHashMap::default();
         repo_specs.insert(
             "foo".to_string(),
             RepoSpec::new("rule".to_string())
@@ -1032,7 +1036,7 @@ mod tests {
         let mut lockfile = Lockfile::new();
 
         // Set up extension cache with complex attrs
-        let mut repo_specs = HashMap::new();
+        let mut repo_specs = FxHashMap::default();
         repo_specs.insert(
             "numpy".to_string(),
             RepoSpec::new("@@rules_python//pip:pip.bzl%pip_install".to_string())
@@ -1094,7 +1098,7 @@ mod tests {
         let ext_id = "@@ext//ext.bzl%ext".to_string();
 
         // Initial cache
-        let mut specs1 = HashMap::new();
+        let mut specs1 = FxHashMap::default();
         specs1.insert("v1_repo".to_string(), RepoSpec::new("rule".to_string()));
 
         lockfile.set_extension_cache(
@@ -1112,7 +1116,7 @@ mod tests {
         assert!(!cached1.contains_key("v2_repo"));
 
         // Update with new data
-        let mut specs2 = HashMap::new();
+        let mut specs2 = FxHashMap::default();
         specs2.insert("v2_repo".to_string(), RepoSpec::new("rule2".to_string()));
 
         lockfile.set_extension_cache(
@@ -1142,7 +1146,7 @@ mod tests {
         let mut lockfile = Lockfile::new();
         let ext_id = "@@ext//ext.bzl%ext";
 
-        let specs = HashMap::new();
+        let specs = FxHashMap::default();
         lockfile.set_extension_cache(
             ext_id.to_string(),
             "digest".to_string(),
@@ -1172,13 +1176,13 @@ mod tests {
             "@@a//a.bzl%a".to_string(),
             "d1".to_string(),
             "u1".to_string(),
-            &HashMap::new(),
+            &FxHashMap::default(),
         );
         lockfile.set_extension_cache(
             "@@b//b.bzl%b".to_string(),
             "d2".to_string(),
             "u2".to_string(),
-            &HashMap::new(),
+            &FxHashMap::default(),
         );
 
         let mut ids: Vec<_> = lockfile.extension_ids().collect();

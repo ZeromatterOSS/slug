@@ -798,7 +798,7 @@ mod tests {
 
     #[test]
     fn test_module_extension_result_creation() {
-        let mut specs = HashMap::new();
+        let mut specs = FxHashMap::default();
         specs.insert(
             "numpy".to_owned(),
             RepoSpec::new("@@rules_python//...%pip_install".to_owned())
@@ -830,7 +830,7 @@ mod tests {
 
     #[test]
     fn test_canonical_name_lookup() {
-        let mut specs = HashMap::new();
+        let mut specs = FxHashMap::default();
         specs.insert("foo".to_owned(), RepoSpec::new("rule".to_owned()));
         specs.insert("bar".to_owned(), RepoSpec::new("rule".to_owned()));
 
@@ -854,7 +854,7 @@ mod tests {
 
     #[test]
     fn test_internal_name_from_canonical() {
-        let mut specs = HashMap::new();
+        let mut specs = FxHashMap::default();
         specs.insert("numpy".to_owned(), RepoSpec::new("rule".to_owned()));
 
         let result = ModuleExtensionResult::new(
@@ -895,7 +895,7 @@ mod tests {
 
     #[test]
     fn test_build_canonical_names() {
-        let mut specs = HashMap::new();
+        let mut specs = FxHashMap::default();
         specs.insert("numpy".to_owned(), RepoSpec::new("rule".to_owned()));
         specs.insert("pandas".to_owned(), RepoSpec::new("rule".to_owned()));
 
@@ -1016,7 +1016,7 @@ mod tests {
 
     #[test]
     fn test_get_repo_spec() {
-        let mut specs = HashMap::new();
+        let mut specs = FxHashMap::default();
         specs.insert(
             "test_repo".to_owned(),
             RepoSpec::new("@@bazel_tools//repo:http.bzl%http_archive".to_owned()).with_attr(
@@ -1038,7 +1038,7 @@ mod tests {
 
     #[test]
     fn test_repo_names_iterator() {
-        let mut specs = HashMap::new();
+        let mut specs = FxHashMap::default();
         specs.insert("a".to_owned(), RepoSpec::new("rule".to_owned()));
         specs.insert("b".to_owned(), RepoSpec::new("rule".to_owned()));
         specs.insert("c".to_owned(), RepoSpec::new("rule".to_owned()));
@@ -1077,7 +1077,7 @@ mod tests {
         let lock_path = temp_dir.path().join("MODULE.bazel.lock");
 
         // Create test repo specs
-        let mut specs = HashMap::new();
+        let mut specs = FxHashMap::default();
         specs.insert(
             "numpy".to_owned(),
             RepoSpec::new("@@rules_python//pip:pip.bzl%pip_install".to_owned())
@@ -1125,7 +1125,7 @@ mod tests {
         lockfile.write(&lock_path).unwrap();
 
         // Update with extension cache
-        let specs = HashMap::new();
+        let specs = FxHashMap::default();
         update_lockfile_extension_cache(&lock_path, "@@ext//ext.bzl%ext", "bzl", "usages", &specs)
             .unwrap();
 
