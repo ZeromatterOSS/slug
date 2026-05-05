@@ -130,6 +130,24 @@ static DYNAMIC_EXTENSION_CELLS: std::sync::LazyLock<
     std::sync::Mutex<std::collections::HashMap<String, String>>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
+/// Plan 36: dynamic-cell sibling registry that carries the
+/// `ExtensionRepoCellSetup` alongside the path, so that
+/// `get_or_create_dynamic_cell` can wire `ExternalCellOrigin::ExtensionRepo`
+/// onto the synthesized `CellInstance`. With the origin set, the existing
+/// file-ops layer routes accesses through
+/// `kuro_external_cells::extension_repo::get_file_ops_delegate`, which
+/// drives lazy DICE materialization on first read — the same path
+/// `mark_external_cell` produces for `use_repo`'d extension cells at
+/// startup.
+///
+/// Stored separately from `DYNAMIC_EXTENSION_CELLS` so the older path-only
+/// callers keep working unchanged.
+static DYNAMIC_EXTENSION_CELL_SETUPS: std::sync::LazyLock<
+    std::sync::Mutex<
+        std::collections::HashMap<String, crate::cells::external::ExtensionRepoCellSetup>,
+    >,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
 /// Global project root for dynamic cell filesystem operations.
 static DYNAMIC_PROJECT_ROOT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 
@@ -150,6 +168,34 @@ pub fn register_dynamic_extension_cell(canonical_name: String, path: String) {
     if short_name != canonical_name {
         ensure_external_symlink(&canonical_name, &path);
     }
+}
+
+/// Plan 36: register a dynamic extension spoke cell with its
+/// `ExtensionRepoCellSetup` so that `get_or_create_dynamic_cell`
+/// wires `ExternalCellOrigin::ExtensionRepo` onto the synthesized
+/// `CellInstance` — matching how use_repo'd extension cells are
+/// registered at startup. With the origin set, the file-ops layer
+/// routes accesses through the lazy materialization path.
+pub fn register_dynamic_extension_cell_with_setup(
+    canonical_name: String,
+    path: String,
+    setup: crate::cells::external::ExtensionRepoCellSetup,
+) {
+    if let Ok(mut setups) = DYNAMIC_EXTENSION_CELL_SETUPS.lock() {
+        setups.insert(canonical_name.clone(), setup);
+    }
+    register_dynamic_extension_cell(canonical_name, path);
+}
+
+/// Lookup the `ExtensionRepoCellSetup` for a dynamic extension cell, if
+/// one was registered alongside the path mapping.
+pub fn get_dynamic_extension_cell_setup(
+    name: &str,
+) -> Option<crate::cells::external::ExtensionRepoCellSetup> {
+    DYNAMIC_EXTENSION_CELL_SETUPS
+        .lock()
+        .ok()
+        .and_then(|m| m.get(name).cloned())
 }
 
 /// Set the project root for dynamic cell filesystem scanning.
@@ -530,23 +576,32 @@ impl CellResolver {
         // First try exact match, then try finding canonical name by suffix match
         // (handles placeholder labels that use bare names like "crates__tempfile-3.26.0"
         // instead of canonical "rules_rs+crate+crates__tempfile-3.26.0").
-        let dynamic_path = get_dynamic_extension_cell(cell.as_str()).or_else(|| {
-            let suffix = format!("+{}", cell.as_str());
-            if let Ok(cells) = DYNAMIC_EXTENSION_CELLS.lock() {
-                for (canonical, path) in cells.iter() {
-                    if canonical.ends_with(&suffix) {
-                        return Some(path.clone());
+        let dynamic_lookup = {
+            let exact =
+                get_dynamic_extension_cell(cell.as_str()).map(|p| (cell.as_str().to_owned(), p));
+            exact.or_else(|| {
+                let suffix = format!("+{}", cell.as_str());
+                if let Ok(cells) = DYNAMIC_EXTENSION_CELLS.lock() {
+                    for (canonical, path) in cells.iter() {
+                        if canonical.ends_with(&suffix) {
+                            return Some((canonical.clone(), path.clone()));
+                        }
                     }
                 }
-            }
-            None
-        });
-        if let Some(path) = dynamic_path {
+                None
+            })
+        };
+        if let Some((canonical, path)) = dynamic_lookup {
             // Auto-register this cell
             if let Ok(rel_path) = ProjectRelativePath::new(&path) {
                 let cell_path = CellRootPathBuf::new(rel_path.to_owned());
                 let nested = nested::NestedCells::from_cell_roots(&[], &*cell_path);
-                if let Ok(instance) = CellInstance::new(cell, cell_path, None, nested) {
+                // Plan 36: if the canonical name has a registered
+                // ExtensionRepoCellSetup, attach it as the external origin
+                // so file ops route through the lazy-materialization path.
+                let external = get_dynamic_extension_cell_setup(&canonical)
+                    .map(crate::cells::external::ExternalCellOrigin::ExtensionRepo);
+                if let Ok(instance) = CellInstance::new(cell, cell_path, external, nested) {
                     // Create external/ symlink for action execution
                     ensure_external_symlink(cell.as_str(), &path);
                     if let Ok(mut dynamic) = self.0.dynamic_cells.write() {

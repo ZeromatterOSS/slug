@@ -498,20 +498,41 @@ pub(crate) async fn get_file_ops_delegate(
                         continue;
                     }
                 };
-                kuro_core::cells::register_dynamic_extension_cell(
+                // Plan 36: build an ExtensionRepoCellSetup for the spoke so
+                // the cell resolver attaches `ExternalCellOrigin::ExtensionRepo`
+                // to the synthesized CellInstance, which routes file-ops
+                // accesses through `extension_repo::get_file_ops_delegate`'s
+                // lazy DICE materialization path. Without this, accessing
+                // `crates__clap-4.5.60//` during analysis fails because the
+                // spoke's directory hasn't been written yet — the BUILD-file
+                // listing skips the lazy-materialization layer.
+                let spec_hash = spec.compute_hash();
+                let repo_spec_json = serde_json::to_string(spec).unwrap_or_default();
+                let cell_setup = kuro_core::cells::external::ExtensionRepoCellSetup {
+                    canonical_name: std::sync::Arc::from(canonical.as_str()),
+                    extension_id: std::sync::Arc::from(setup.extension_id.as_ref()),
+                    internal_name: std::sync::Arc::from(internal_name.as_str()),
+                    spec_hash: std::sync::Arc::from(spec_hash.as_str()),
+                    repo_spec_json: std::sync::Arc::from(repo_spec_json.as_str()),
+                    materialized: false,
+                };
+                kuro_core::cells::register_dynamic_extension_cell_with_setup(
                     canonical.clone(),
                     format!("bazel-external/{}", canonical),
+                    cell_setup.clone(),
                 );
                 if internal_name != &canonical {
-                    kuro_core::cells::register_dynamic_extension_cell(
+                    kuro_core::cells::register_dynamic_extension_cell_with_setup(
                         internal_name.clone(),
                         format!("bazel-external/{}", canonical),
+                        cell_setup,
                     );
                 }
-                // Plan 36: also record (canonical_name -> RepoSpec) so that a
-                // sibling extension dereferencing a Label that points into this
-                // spoke can drive lazy materialization via
-                // `kuro_bzlmod::materialize_spoke_sync`.
+                // Also record (canonical_name -> RepoSpec) so that a sibling
+                // extension dereferencing a Label that points into this spoke
+                // can drive lazy materialization via
+                // `kuro_bzlmod::materialize_spoke_sync` from sync Starlark
+                // eval (the mctx.path/read path).
                 let registration = kuro_bzlmod::SpokeRegistration {
                     extension_id: std::sync::Arc::from(setup.extension_id.as_ref()),
                     repo_spec: std::sync::Arc::new(spec.clone()),

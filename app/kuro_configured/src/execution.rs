@@ -260,21 +260,27 @@ async fn exec_platform_executor_config_from_cfg(
 /// Builds the cfg that kuro uses as the legacy exec-configuration when
 /// `build.execution_platforms` is not set.
 ///
-/// In Bazel, omitting `register_execution_platforms()` means exec cfg ==
-/// target cfg. Kuro used to do the same (pass through `target_cfg`), but
-/// that collapses Plan 19.3's `platform(exec_properties = {...})` defaults
-/// — they become no-ops for every tool build because the top-level
-/// `apply_cli_build_settings` (Plan 19.4) has already pinned the target
-/// cfg's `compilation_mode` before the exec-transition can apply the
-/// platform's "opt" default.
+/// Bazel's rule: omitting `register_execution_platforms()` means exec cfg
+/// == target cfg (the target platform doubles as the exec platform). Kuro
+/// matches that today: pass `target_cfg` through when it's bound to a
+/// real platform.
 ///
-/// This helper loads `@local_config_platform//:host`'s `PlatformInfo`
-/// directly (mirroring `get_default_platform` in
-/// `target_platform_resolution`) and returns *its* cfg, which carries
-/// `compilation_mode = "opt"` via the exec_properties folded in by
-/// `PlatformInfo::to_configuration`. Fall back to `target_cfg` when the
-/// host platform is unavailable (e.g. Meta-internal builds that don't
-/// auto-register local_config_platform).
+/// Fallback: when `target_cfg` is unbound (no `--target-platforms` /
+/// `--host_platform` resolved to a real `platform()`), load
+/// `@local_config_platform//:host`'s `PlatformInfo` and return its cfg.
+/// This keeps Plan 19.3's `platform(exec_properties = {...})` defaults
+/// (e.g. `compilation_mode = "opt"`) working for default builds while
+/// no longer overriding a user-configured target/host platform whose
+/// constraints (e.g. `@llvm//constraints/libc:gnu.2.28`) the build
+/// actually depends on.
+///
+/// History: this used to *unconditionally* substitute lcp, which broke
+/// zeromatter-style workspaces that set `--host_platform` to a custom
+/// `platform()` carrying extra constraints. The substitution stripped
+/// those constraints from the exec config and downstream `select()`
+/// chains (rules_rs `RESOLVED_PLATFORMS`, rules_cc per-libc) fell
+/// through to `@platforms//:incompatible`. See Plan 24 §5 (host-fallback
+/// retirement).
 async fn legacy_exec_cfg(
     ctx: &mut DiceComputations<'_>,
     target_cfg: &ConfigurationNoExec,
@@ -285,6 +291,13 @@ async fn legacy_exec_cfg(
     use kuro_core::package::PackageLabel;
     use kuro_core::target::name::TargetNameRef;
 
+    // Bazel-shape: when target cfg is bound to a real platform, exec cfg
+    // mirrors it (no `register_execution_platforms()` ⇒ exec == target).
+    if target_cfg.cfg().is_bound() {
+        return target_cfg.dupe();
+    }
+
+    // Unbound target cfg → use lcp/host as the legacy fallback.
     let lcp_cell = match CellName::unchecked_new("local_config_platform") {
         Ok(name) => name,
         Err(_) => return target_cfg.dupe(),
