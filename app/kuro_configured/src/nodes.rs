@@ -768,8 +768,12 @@ async fn resolve_transition_attrs<'a>(
         }
     }
 
-    // For Bazel-style transitions (no declared attrs), include ALL target node attributes.
-    // Bazel transitions can access any rule attribute via `attr.xxx`.
+    // For Bazel-style transitions (no declared inputs), include ALL
+    // target node attributes so the transition impl can read any of them
+    // via `attr.xxx`. The post-transition `verify_transitioned_attrs`
+    // tolerates cfg-only differences for label-typed attrs (Plan 41) so
+    // this broad sweep doesn't trip false positives on every platform
+    // transition.
     if any_bazel_style && result.is_empty() {
         for coerced_attr in target_node.attrs(AttrInspectOptions::All) {
             if result.contains_key(coerced_attr.name) {
@@ -787,6 +791,55 @@ async fn resolve_transition_attrs<'a>(
     }
 
     Ok(result)
+}
+
+/// Compare two `ConfiguredAttr` values for transition idempotency, ignoring
+/// configuration differences on label-typed payloads.
+///
+/// The point of `verify_transitioned_attrs` is to detect a transition impl
+/// that produces a different *value* in the post-transition cfg vs the
+/// pre-transition cfg — e.g. a string attribute that mutates as a side
+/// effect of transitioning. Label-typed attrs (`attr.label`,
+/// `attr.label_list`, …) carry a `ConfiguredProvidersLabel` whose cfg
+/// component naturally changes when the rule's cfg changes; that change is
+/// expected and must not trip the check. Plan 41.
+fn configured_attrs_equal_modulo_cfg(a: &ConfiguredAttr, b: &ConfiguredAttr) -> bool {
+    use kuro_node::attrs::configured_attr::ConfiguredAttr as CA;
+    match (a, b) {
+        (CA::Label(la), CA::Label(lb)) => la.unconfigured() == lb.unconfigured(),
+        (CA::SourceLabel(la), CA::SourceLabel(lb)) => la.unconfigured() == lb.unconfigured(),
+        (CA::Dep(da), CA::Dep(db)) => da.label.unconfigured() == db.label.unconfigured(),
+        (CA::List(la), CA::List(lb)) => {
+            la.len() == lb.len()
+                && la
+                    .iter()
+                    .zip(lb.iter())
+                    .all(|(x, y)| configured_attrs_equal_modulo_cfg(x, y))
+        }
+        (CA::Tuple(la), CA::Tuple(lb)) => {
+            la.len() == lb.len()
+                && la
+                    .iter()
+                    .zip(lb.iter())
+                    .all(|(x, y)| configured_attrs_equal_modulo_cfg(x, y))
+        }
+        (CA::Dict(da), CA::Dict(db)) => {
+            da.len() == db.len()
+                && da.iter().zip(db.iter()).all(|((ka, va), (kb, vb))| {
+                    configured_attrs_equal_modulo_cfg(ka, kb)
+                        && configured_attrs_equal_modulo_cfg(va, vb)
+                })
+        }
+        (CA::OneOf(va, ia), CA::OneOf(vb, ib)) => {
+            ia == ib && configured_attrs_equal_modulo_cfg(va, vb)
+        }
+        // For all other variants (Bool/Int/String/etc plus the more exotic
+        // dep variants whose cfg-stripping would need deeper plumbing) fall
+        // back to direct equality. This errs on the strict side: the only
+        // false positives we've actually observed in zeromatter are on plain
+        // `attr.label`/`attr.label_list` defaults.
+        _ => a == b,
+    }
 }
 
 /// Verifies if configured node's attributes are equal to the same attributes configured with pre-transition configuration.
@@ -809,7 +862,10 @@ fn verify_transitioned_attrs(
                         .format_with(", ", |v, f| f(&format_args!("{v:?}")))
                 )
             })?;
-        if &transition_configured_attr.value != attr_value.as_ref() {
+        if !configured_attrs_equal_modulo_cfg(
+            &transition_configured_attr.value,
+            attr_value.as_ref(),
+        ) {
             return Err(NodeCalculationError::TransitionAttrIncompatibleChange(
                 node.label().unconfigured().dupe(),
                 pre_transition_config.dupe(),

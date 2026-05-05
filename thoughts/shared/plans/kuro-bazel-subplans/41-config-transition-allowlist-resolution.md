@@ -1,6 +1,30 @@
 # Plan 41: `_allowlist_function_transition` resolves under wrong cfg after transition
 
-## Status: PROPOSED
+## Status: COMPLETE (2026-05-05)
+
+Fix landed in `app/kuro_configured/src/nodes.rs`:
+
+- New helper `configured_attrs_equal_modulo_cfg` walks `ConfiguredAttr`
+  values and, for label-bearing variants (`Label`, `SourceLabel`,
+  `Dep`, plus `List`/`Tuple`/`Dict`/`OneOf` recursively), compares by
+  unconfigured target. Other variants fall through to direct equality.
+- `verify_transitioned_attrs` now uses this helper instead of `!=`.
+
+That accommodates the legitimate cfg change on label-typed attrs that
+follows from the rule's own transition while still catching genuine
+non-idempotent transitions on scalar attrs (the original purpose of
+the check).
+
+The Bazel-style all-attrs sweep in `resolve_transition_attrs` is
+preserved (transitions need to read attrs via `attr.<name>`); only
+the post-transition idempotency comparison is now cfg-tolerant.
+
+ZeroMatter `//sdk:sdk_contents` advances past the
+`_allowlist_function_transition`, `_always_enable_metadata_output_groups`,
+and `allocator_libraries` failures into real rule analysis. Next
+blocker (Plan 42): `ctx.actions.expand_template` rejects build-artifact
+templates (`bazel_lib`'s `expand_template` rule passes a generated
+file via `template = ctx.file.template`).
 
 ## Context
 
