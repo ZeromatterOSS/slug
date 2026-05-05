@@ -814,8 +814,25 @@ impl BuckConfigBasedCells {
         } else {
             &parsed.module.name
         };
-        let (pre_computed_cells, pre_computed_aliases) =
+        let (mut pre_computed_cells, pre_computed_aliases) =
             kuro_bzlmod::pre_compute_extension_repo_cells(&parsed_modules, root_module_name)?;
+
+        // Augment with extension-internal spokes recorded in MODULE.bazel.lock.
+        // The use_repo()-driven pass above only registers repos the project
+        // explicitly imports (e.g. the `crates` hub), not the spokes the hub's
+        // generated BUILD.bazel references via `@crates__<name>//`. Without this
+        // pass, warm builds with a populated cache fail with `unknown cell name`
+        // because the only path that registers spokes (`get_file_ops_delegate`'s
+        // post-extension-eval loop) is gated on the hub's `.kuro_repo_complete`
+        // marker.
+        if let Some(lockfile) = kuro_bzlmod::cached_lockfile(project_root.root().as_path()) {
+            let extra = kuro_bzlmod::pre_compute_extension_repo_cells_from_lockfile(
+                &lockfile,
+                root_module_name,
+                &pre_computed_cells,
+            );
+            pre_computed_cells.extend(extra);
+        }
 
         // Aggregate extension usages from all modules and store globally.
         // This data is needed by DICE when extension repos are lazily executed.

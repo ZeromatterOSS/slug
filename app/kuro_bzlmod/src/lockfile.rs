@@ -632,6 +632,69 @@ pub fn lockfile_path(workspace_root: &Path) -> PathBuf {
     workspace_root.join("MODULE.bazel.lock")
 }
 
+/// Process-wide cache of parsed `MODULE.bazel.lock` files, keyed by absolute
+/// workspace path. Both startup-time spoke seeding (in `kuro_common::cells`)
+/// and per-extension cache lookup (in `extension_execution_dice`) hit the
+/// same lockfile; without this cache they each pay the parse cost (~160KB
+/// JSON for zeromatter's lockfile).
+///
+/// Returns `None` if the lockfile is absent or unreadable. The negative result
+/// is also cached so repeated misses don't re-stat the filesystem.
+static LOCKFILE_CACHE: std::sync::OnceLock<
+    std::sync::Mutex<std::collections::HashMap<PathBuf, Option<std::sync::Arc<Lockfile>>>>,
+> = std::sync::OnceLock::new();
+
+fn lockfile_cache()
+-> &'static std::sync::Mutex<std::collections::HashMap<PathBuf, Option<std::sync::Arc<Lockfile>>>> {
+    LOCKFILE_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+/// Read `MODULE.bazel.lock` from `workspace_root`, returning a process-wide
+/// cached `Arc<Lockfile>`. `None` means the file is absent or failed to
+/// parse. Use `invalidate_cached_lockfile` to drop the cached entry when the
+/// lockfile is known to have changed (e.g. after writing a new one).
+pub fn cached_lockfile(workspace_root: &Path) -> Option<std::sync::Arc<Lockfile>> {
+    let path = lockfile_path(workspace_root);
+    let key = path.clone();
+
+    {
+        let cache = lockfile_cache().lock().ok()?;
+        if let Some(entry) = cache.get(&key) {
+            return entry.clone();
+        }
+    }
+
+    let parsed = if path.exists() {
+        match Lockfile::read(&path) {
+            Ok(l) => Some(std::sync::Arc::new(l)),
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to read MODULE.bazel.lock at {}: {}",
+                    path.display(),
+                    e
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    if let Ok(mut cache) = lockfile_cache().lock() {
+        cache.insert(key, parsed.clone());
+    }
+    parsed
+}
+
+/// Drop the cached `Arc<Lockfile>` for `workspace_root`. Call after writing a
+/// new lockfile so the next `cached_lockfile` call re-reads from disk.
+pub fn invalidate_cached_lockfile(workspace_root: &Path) {
+    let key = lockfile_path(workspace_root);
+    if let Ok(mut cache) = lockfile_cache().lock() {
+        cache.remove(&key);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;

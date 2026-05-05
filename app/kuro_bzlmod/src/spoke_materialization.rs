@@ -82,6 +82,34 @@ pub fn lookup_spoke(canonical_name: &str) -> Option<SpokeRegistration> {
         .and_then(|m| m.get(canonical_name).cloned())
 }
 
+/// Set of extension IDs whose sibling spokes have already been registered as
+/// dynamic cells (or seeded statically from `MODULE.bazel.lock`).
+///
+/// `kuro_external_cells::extension_repo::get_file_ops_delegate` consults this
+/// to decide whether it needs to evaluate the extension via DICE just to
+/// discover spoke names. With the lockfile present, startup-time spoke
+/// seeding marks every extension as already-seeded so the DICE compute is
+/// skipped on warm builds. Without the lockfile, the first file-ops call
+/// triggers extension eval (DICE-cached), registers all sibling spokes, and
+/// marks the extension here so subsequent calls short-circuit.
+static SEEDED_EXTENSIONS: RwLock<Option<std::collections::HashSet<String>>> = RwLock::new(None);
+
+/// Mark `extension_id`'s sibling spokes as already registered. Idempotent.
+pub fn mark_extension_spokes_seeded(extension_id: &str) {
+    let mut guard = SEEDED_EXTENSIONS.write().unwrap();
+    let set = guard.get_or_insert_with(std::collections::HashSet::new);
+    set.insert(extension_id.to_owned());
+}
+
+/// Returns true if `extension_id`'s sibling spokes are known to be registered.
+pub fn extension_spokes_seeded(extension_id: &str) -> bool {
+    SEEDED_EXTENSIONS
+        .read()
+        .unwrap()
+        .as_ref()
+        .is_some_and(|s| s.contains(extension_id))
+}
+
 // ============================================================================
 // Thread-local DICE pointer for sync->async bridging during extension eval
 // ============================================================================

@@ -407,41 +407,35 @@ impl Key for ModuleExtensionExecutionKey {
         let bzl_transitive_digest = compute_bzl_transitive_digest(&self.extension_id);
         let usages_digest = self.input_hash.to_string();
 
-        // 1. Check lockfile cache (if project_root is set)
+        // 1. Check lockfile cache (if project_root is set). Lockfile parse
+        //    is shared with `cached_lockfile` callers (e.g. startup spoke
+        //    seeding) so zeromatter-sized lockfiles only get parsed once.
         if let Some(project_root) = &self.project_root {
-            let lock_path = lockfile_path(project_root);
-            if lock_path.exists() {
-                match Lockfile::read(&lock_path) {
-                    Ok(lockfile) => {
-                        if let Some(cached_specs) = lockfile.get_extension_cache(
-                            &self.extension_id,
-                            &bzl_transitive_digest,
-                            &usages_digest,
-                        ) {
-                            tracing::info!(
-                                "Extension '{}' cache HIT: using {} cached repo specs",
-                                self.extension_id,
-                                cached_specs.len()
-                            );
+            if let Some(lockfile) = crate::lockfile::cached_lockfile(project_root) {
+                if let Some(cached_specs) = lockfile.get_extension_cache(
+                    &self.extension_id,
+                    &bzl_transitive_digest,
+                    &usages_digest,
+                ) {
+                    tracing::info!(
+                        "Extension '{}' cache HIT: using {} cached repo specs",
+                        self.extension_id,
+                        cached_specs.len()
+                    );
 
-                            let result = ModuleExtensionResult::new(
-                                self.extension_id.clone(),
-                                self.input_hash.to_string(),
-                                cached_specs,
-                                &self.root_module_name,
-                            );
+                    let result = ModuleExtensionResult::new(
+                        self.extension_id.clone(),
+                        self.input_hash.to_string(),
+                        cached_specs,
+                        &self.root_module_name,
+                    );
 
-                            return Ok(Arc::new(result));
-                        } else {
-                            tracing::debug!(
-                                "Extension '{}' cache MISS: digests don't match",
-                                self.extension_id
-                            );
-                        }
-                    }
-                    Err(e) => {
-                        tracing::debug!("Could not read lockfile for cache check: {}", e);
-                    }
+                    return Ok(Arc::new(result));
+                } else {
+                    tracing::debug!(
+                        "Extension '{}' cache MISS: digests don't match",
+                        self.extension_id
+                    );
                 }
             }
         }
@@ -787,6 +781,12 @@ fn update_lockfile_extension_cache(
 
     // Write back
     lockfile.write(lock_path)?;
+
+    // Drop the cached parse so subsequent `cached_lockfile` calls see the new
+    // contents (e.g. the spec we just persisted).
+    if let Some(parent) = lock_path.parent() {
+        crate::lockfile::invalidate_cached_lockfile(parent);
+    }
 
     Ok(())
 }

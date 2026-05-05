@@ -71,6 +71,8 @@ pub use fetch::SourceFetcher;
 pub use integrity::verify_integrity;
 pub use lockfile::Lockfile;
 pub use lockfile::LockfileMode;
+pub use lockfile::cached_lockfile;
+pub use lockfile::invalidate_cached_lockfile;
 pub use lockfile::lockfile_path;
 pub use module_extension_executor::ExtensionExecutionOutput;
 pub use module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
@@ -87,6 +89,7 @@ pub use pending_repo_cells::extract_use_repos_for_extension;
 pub use pending_repo_cells::is_extension_repo_canonical_name;
 pub use pending_repo_cells::parse_canonical_name;
 pub use pending_repo_cells::pre_compute_extension_repo_cells;
+pub use pending_repo_cells::pre_compute_extension_repo_cells_from_lockfile;
 pub use registry::DEFAULT_REGISTRY_URL;
 // `RegisteredToolchain` is defined below; re-export under the crate root for
 // consumers that already do `use kuro_bzlmod::RegisteredToolchain`.
@@ -121,7 +124,9 @@ pub use resolution::resolve_local_modules;
 pub use resolution::resolve_local_override;
 pub use resolution::resolve_with_lockfile;
 pub use spoke_materialization::SpokeRegistration;
+pub use spoke_materialization::extension_spokes_seeded;
 pub use spoke_materialization::lookup_spoke;
+pub use spoke_materialization::mark_extension_spokes_seeded;
 pub use spoke_materialization::materialize_spoke_sync;
 pub use spoke_materialization::register_spoke;
 pub use spoke_materialization::with_extension_dice;

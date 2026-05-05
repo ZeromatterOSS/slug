@@ -279,6 +279,92 @@ pub fn pre_compute_extension_repo_cells(
     Ok((cells, aliases))
 }
 
+/// Augment a pre-computed `PendingRepoCell` set with every spoke repo recorded
+/// in `MODULE.bazel.lock`.
+///
+/// `pre_compute_extension_repo_cells` only registers repos that the project's
+/// MODULE.bazel files explicitly import via `use_repo()`. That captures hub
+/// repos (e.g. `crates`) but not extension-internal spokes that the hub's
+/// generated BUILD.bazel references (e.g. `@crates__strsim-0.11.1//`). Those
+/// spokes were previously registered as a side-effect of `get_file_ops_delegate`
+/// running the extension at lazy-eval time, but that path is gated on the
+/// hub's `.kuro_repo_complete` marker — so warm rebuilds with a populated
+/// cache never registered the spokes.
+///
+/// This helper closes the gap: walk every extension's `generatedRepoSpecs`
+/// in the lockfile and produce a `PendingRepoCell` for each repo with the
+/// `repo_spec_json` already populated from the lockfile entry. Cells already
+/// in `existing` (from `use_repo()`) are skipped — those entries are kept as-is
+/// so the use_repo apparent-name aliases keep pointing at them.
+///
+/// Returns the cells to append (deduped against `existing`).
+pub fn pre_compute_extension_repo_cells_from_lockfile(
+    lockfile: &crate::lockfile::Lockfile,
+    root_module_name: &str,
+    existing: &[PendingRepoCell],
+) -> Vec<PendingRepoCell> {
+    let existing_canonicals: std::collections::HashSet<&str> =
+        existing.iter().map(|c| c.canonical_name.as_str()).collect();
+
+    let mut new_cells = Vec::new();
+    for ext_id in lockfile.extension_ids() {
+        let Some(ext_data) = lockfile.get_extension_data(ext_id) else {
+            continue;
+        };
+        let Some(general) = ext_data.general.as_ref() else {
+            continue;
+        };
+
+        let owner =
+            crate::extension_execution_dice::extract_owning_module(ext_id, root_module_name);
+        let ext_name = crate::extension_execution_dice::extract_extension_name(ext_id);
+
+        // The lockfile entry pins down every spoke this extension generated;
+        // mark the extension as seeded so the runtime path in
+        // `extension_repo::get_file_ops_delegate` skips its DICE compute.
+        if !general.generated_repo_specs.is_empty() {
+            crate::spoke_materialization::mark_extension_spokes_seeded(ext_id);
+        }
+
+        for (repo_name, lock_spec) in &general.generated_repo_specs {
+            let canonical = format!("{}+{}+{}", owner, ext_name, repo_name);
+            if existing_canonicals.contains(canonical.as_str()) {
+                continue;
+            }
+
+            let repo_spec = lock_spec.to_repo_spec();
+            let repo_spec_json = match serde_json::to_string(&repo_spec) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to serialize lockfile RepoSpec for '{}' (ext '{}'): {}",
+                        repo_name,
+                        ext_id,
+                        e
+                    );
+                    continue;
+                }
+            };
+
+            new_cells.push(PendingRepoCell {
+                canonical_name: canonical.clone(),
+                extension_id: ext_id.to_owned(),
+                internal_name: repo_name.clone(),
+                spec_hash: repo_spec.compute_hash(),
+                repo_spec_json,
+                path: format!("bazel-external/{}", canonical),
+            });
+        }
+    }
+
+    tracing::info!(
+        "Pre-seeded {} extension spoke cell(s) from MODULE.bazel.lock",
+        new_cells.len()
+    );
+
+    new_cells
+}
+
 /// Convert a MODULE.bazel `TagValue` (parser representation) to an `AttrValue`
 /// (serialized RepoSpec representation).
 fn tag_value_to_attr_value(tv: &TagValue) -> AttrValue {

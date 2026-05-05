@@ -801,7 +801,20 @@ fn lex_provider_pattern(
     // treat `/pkg:target` as the root cell package `pkg:target`.
     // This is clearly a target pattern (has `:` or ends with `/...`), not a file path.
     let (cell_alias, pattern) = match split1_opt_ascii(pattern, AsciiStr2::new("//")) {
-        Some((a, p)) => (Some(a.trim_start_matches('@')), p),
+        Some((a, p)) => {
+            // Bazel canonical-prefix semantics:
+            //   `@@//pkg`    = main repo (root cell), distinct from
+            //   `@//pkg`     = current repo
+            //   `@@name//pkg` and `@name//pkg` both resolve `name` via aliases
+            // Preserve a literal "@@" sentinel so the resolver can route empty
+            // canonical alias to the root cell instead of the current cell.
+            let alias = if a == "@@" {
+                "@@"
+            } else {
+                a.trim_start_matches('@')
+            };
+            (Some(alias), p)
+        }
         None => {
             // Check for Git Bash // → / conversion: /pkg:target or /pkg/...
             if pattern.starts_with('/')
@@ -1153,8 +1166,14 @@ where
         return Err(TargetPatternParseError::AbsoluteRequired.into());
     }
 
-    // We ask for the cell, but if the pattern is relative we might not use it
-    let cell = cell_alias_resolver.resolve(cell_alias.unwrap_or_default())?;
+    // We ask for the cell, but if the pattern is relative we might not use it.
+    // Bazel `@@//pkg` (canonical empty alias) routes to the root cell; this is
+    // distinct from `@//pkg` / `//pkg` which mean the current cell.
+    let cell = if cell_alias == Some("@@") {
+        cell_resolver.root_cell()
+    } else {
+        cell_alias_resolver.resolve(cell_alias.unwrap_or_default())?
+    };
 
     let package_path = pattern.package_path();
 

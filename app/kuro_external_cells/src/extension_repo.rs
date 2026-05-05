@@ -307,6 +307,99 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
     }
 }
 
+/// Idempotently register every sibling spoke of `extension_id` as a dynamic
+/// cell. Returns silently if the extension was already seeded (typically by
+/// startup-time lockfile pre-seeding in `kuro_common::cells`) or is not a
+/// module extension (e.g. a `use_repo_rule()` invocation, which has no
+/// siblings).
+///
+/// Failure to register is logged at debug and otherwise ignored: the caller
+/// will still error out cleanly downstream if a needed cell is missing.
+async fn ensure_extension_spokes_registered(
+    ctx: &mut DiceComputations<'_>,
+    extension_id: &str,
+    project_root_path: &std::path::Path,
+) {
+    if kuro_bzlmod::extension_spokes_seeded(extension_id) {
+        return;
+    }
+    let Some(ext_key) = kuro_bzlmod::create_extension_execution_key(extension_id) else {
+        // Not a module extension — `use_repo_rule()` and similar produce a
+        // single repo with no siblings, so there is nothing to seed. Mark
+        // seeded so we don't retry on every cell access.
+        kuro_bzlmod::mark_extension_spokes_seeded(extension_id);
+        return;
+    };
+
+    let ext_result = match ctx.compute(&ext_key).await {
+        Ok(Ok(r)) => r,
+        Ok(Err(e)) => {
+            tracing::debug!(
+                "Skipping spoke seeding for '{}': extension eval failed: {}",
+                extension_id,
+                e
+            );
+            return;
+        }
+        Err(e) => {
+            tracing::debug!(
+                "Skipping spoke seeding for '{}': DICE error: {}",
+                extension_id,
+                e
+            );
+            return;
+        }
+    };
+
+    for (internal_name, spec) in ext_result.generated_repo_specs.iter() {
+        let canonical = match ext_result.canonical_names.get(internal_name) {
+            Some(c) => c.clone(),
+            None => {
+                tracing::warn!(
+                    "Extension '{}' result has spec for '{}' but no canonical \
+                     name; skipping dynamic cell registration",
+                    extension_id,
+                    internal_name
+                );
+                continue;
+            }
+        };
+        let spec_hash = spec.compute_hash();
+        let repo_spec_json = serde_json::to_string(spec).unwrap_or_default();
+        let cell_setup = kuro_core::cells::external::ExtensionRepoCellSetup {
+            canonical_name: std::sync::Arc::from(canonical.as_str()),
+            extension_id: std::sync::Arc::from(extension_id),
+            internal_name: std::sync::Arc::from(internal_name.as_str()),
+            spec_hash: std::sync::Arc::from(spec_hash.as_str()),
+            repo_spec_json: std::sync::Arc::from(repo_spec_json.as_str()),
+            materialized: false,
+        };
+        kuro_core::cells::register_dynamic_extension_cell_with_setup(
+            canonical.clone(),
+            format!("bazel-external/{}", canonical),
+            cell_setup.clone(),
+        );
+        if internal_name != &canonical {
+            kuro_core::cells::register_dynamic_extension_cell_with_setup(
+                internal_name.clone(),
+                format!("bazel-external/{}", canonical),
+                cell_setup,
+            );
+        }
+        let registration = kuro_bzlmod::SpokeRegistration {
+            extension_id: std::sync::Arc::from(extension_id),
+            repo_spec: std::sync::Arc::new(spec.clone()),
+            project_root: std::sync::Arc::new(project_root_path.to_path_buf()),
+        };
+        kuro_bzlmod::register_spoke(canonical.clone(), registration.clone());
+        if internal_name != &canonical {
+            kuro_bzlmod::register_spoke(internal_name.clone(), registration);
+        }
+    }
+
+    kuro_bzlmod::mark_extension_spokes_seeded(extension_id);
+}
+
 /// Get the file ops delegate for an extension-generated repository cell.
 ///
 /// This computes the expected path for the materialized repository
@@ -335,11 +428,45 @@ pub(crate) async fn get_file_ops_delegate(
         .join("bazel-external")
         .join(setup.canonical_name.as_ref());
 
+    // Make sure every sibling spoke of this extension is registered as a
+    // dynamic cell. Idempotent across the daemon's lifetime — short-circuits
+    // when the lockfile pre-seed (in `kuro_common::cells`) has already done
+    // it. Necessary on warm builds where `.kuro_repo_complete` markers would
+    // otherwise skip the materialization block below, leaving spoke lookups
+    // unresolvable.
+    ensure_extension_spokes_registered(ctx, &setup.extension_id, &project_root_path).await;
+
     // Check if the repository is fully materialized (marked complete).
     // We check for .kuro_repo_complete rather than just directory existence because
     // partial materialization (e.g., source downloaded but BUILD.bazel not generated)
     // can leave directories without the completion marker.
-    if !source_path.join(".kuro_repo_complete").exists() {
+    //
+    // Marker content distinguishes "complete" (real materialization) from
+    // "stub" (placeholder written by `materialize_stub_repo` when the
+    // extension previously failed). When we now have a valid `repo_spec_json`
+    // — typically because the lockfile pre-seed populated it — a stub from a
+    // prior failed run can be discarded and re-materialized cleanly.
+    let marker_path = source_path.join(".kuro_repo_complete");
+    let is_stale_stub = marker_path.exists()
+        && !setup.repo_spec_json.is_empty()
+        && std::fs::read_to_string(&marker_path)
+            .ok()
+            .is_some_and(|s| s.trim() == "stub");
+    if is_stale_stub {
+        tracing::info!(
+            "Extension repo '{}' has stale stub marker but a valid RepoSpec is now available; \
+             discarding stub and re-materializing",
+            setup.canonical_name
+        );
+        if let Err(e) = std::fs::remove_dir_all(&source_path) {
+            tracing::warn!(
+                "Failed to remove stale stub dir for '{}': {} (proceeding anyway)",
+                setup.canonical_name,
+                e
+            );
+        }
+    }
+    if !marker_path.exists() {
         tracing::warn!(
             "Extension repo '{}' not materialized, triggering lazy execution (ext_id='{}', repo_spec_json_empty={})",
             setup.canonical_name,
@@ -473,76 +600,10 @@ pub(crate) async fn get_file_ops_delegate(
                 }
             };
 
-            // Register spoke repos in the dynamic cell registry so cell resolution
-            // can find them when hub BUILD files reference them (e.g. @crates__tempfile).
-            // Actual materialization happens lazily when the cell is first accessed —
-            // Bazel-style on-demand fetch via DICE dedup, not upfront serial walk.
-            //
-            // Read the canonical names off `ext_result.canonical_names` (computed
-            // by `build_canonical_names` which knows the root module name) rather
-            // than re-deriving from `setup.extension_id` here. The latter route
-            // does not have access to the root module name and would emit
-            // `<root_module>+ext+repo` instead of `_main+ext+repo`, registering
-            // a duplicate cell at a different `bazel-external/` path that no
-            // materializer ever populates.
-            for (internal_name, spec) in ext_result.generated_repo_specs.iter() {
-                let canonical = match ext_result.canonical_names.get(internal_name) {
-                    Some(c) => c.clone(),
-                    None => {
-                        tracing::warn!(
-                            "Extension '{}' result has spec for '{}' but no canonical \
-                             name; skipping dynamic cell registration",
-                            setup.extension_id,
-                            internal_name
-                        );
-                        continue;
-                    }
-                };
-                // Plan 36: build an ExtensionRepoCellSetup for the spoke so
-                // the cell resolver attaches `ExternalCellOrigin::ExtensionRepo`
-                // to the synthesized CellInstance, which routes file-ops
-                // accesses through `extension_repo::get_file_ops_delegate`'s
-                // lazy DICE materialization path. Without this, accessing
-                // `crates__clap-4.5.60//` during analysis fails because the
-                // spoke's directory hasn't been written yet — the BUILD-file
-                // listing skips the lazy-materialization layer.
-                let spec_hash = spec.compute_hash();
-                let repo_spec_json = serde_json::to_string(spec).unwrap_or_default();
-                let cell_setup = kuro_core::cells::external::ExtensionRepoCellSetup {
-                    canonical_name: std::sync::Arc::from(canonical.as_str()),
-                    extension_id: std::sync::Arc::from(setup.extension_id.as_ref()),
-                    internal_name: std::sync::Arc::from(internal_name.as_str()),
-                    spec_hash: std::sync::Arc::from(spec_hash.as_str()),
-                    repo_spec_json: std::sync::Arc::from(repo_spec_json.as_str()),
-                    materialized: false,
-                };
-                kuro_core::cells::register_dynamic_extension_cell_with_setup(
-                    canonical.clone(),
-                    format!("bazel-external/{}", canonical),
-                    cell_setup.clone(),
-                );
-                if internal_name != &canonical {
-                    kuro_core::cells::register_dynamic_extension_cell_with_setup(
-                        internal_name.clone(),
-                        format!("bazel-external/{}", canonical),
-                        cell_setup,
-                    );
-                }
-                // Also record (canonical_name -> RepoSpec) so that a sibling
-                // extension dereferencing a Label that points into this spoke
-                // can drive lazy materialization via
-                // `kuro_bzlmod::materialize_spoke_sync` from sync Starlark
-                // eval (the mctx.path/read path).
-                let registration = kuro_bzlmod::SpokeRegistration {
-                    extension_id: std::sync::Arc::from(setup.extension_id.as_ref()),
-                    repo_spec: std::sync::Arc::new(spec.clone()),
-                    project_root: std::sync::Arc::new(project_root_path.clone()),
-                };
-                kuro_bzlmod::register_spoke(canonical.clone(), registration.clone());
-                if internal_name != &canonical {
-                    kuro_bzlmod::register_spoke(internal_name.clone(), registration);
-                }
-            }
+            // Spoke registration moved to `ensure_extension_spokes_registered`
+            // at the top of `get_file_ops_delegate` so it runs even when the
+            // hub already has `.kuro_repo_complete`. This block now only
+            // resolves the current repo's spec out of the same eval result.
 
             match ext_result.get_repo_spec(&setup.internal_name).cloned() {
                 Some(spec) => spec,

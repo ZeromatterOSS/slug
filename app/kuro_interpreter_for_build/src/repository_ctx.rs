@@ -1990,21 +1990,55 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         Ok(Value::new_none())
     }
 
-    /// Apply a patch file.
+    /// Apply a patch file. Bazel signature accepts `strip` either positionally
+    /// or by keyword, matching `repository_ctx.patch(patch_file, strip=0)`.
     fn patch<'v>(
         this: &RepositoryContext,
         #[starlark(require = pos)] patch_file: Value<'v>,
-        #[starlark(require = named, default = 0)] strip: i32,
+        #[starlark(default = 0)] strip: i32,
     ) -> starlark::Result<Value<'v>> {
-        let patch_str = if let Some(s) = patch_file.unpack_str() {
-            s.to_owned()
-        } else if let Some(repo_path) = patch_file.downcast_ref::<RepositoryPath>() {
-            repo_path.path_str().to_owned()
-        } else {
-            patch_file.to_repr()
+        // Resolve the patch_file argument to an absolute on-disk path.
+        // Bazel accepts: a `Label`, a `RepositoryPath`, or a string. Strings
+        // can be either a relative path inside the working dir OR a
+        // stringified label (e.g. `"@@//:foo.patch"`); the latter has to
+        // route through the cell resolver, otherwise the resulting path
+        // contains literal `@@//:` segments and `patch(1)` can't open it.
+        //
+        // `resolve_label_to_path` returns a project-relative path for root
+        // cell labels and an absolute path for extension-cell labels. Since
+        // we run `patch(1)` with `current_dir = working_dir` (an external
+        // repo dir), root-cell-relative paths would be resolved against the
+        // wrong root — so anchor any non-absolute result at the project root.
+        let is_label_str = |s: &str| s.starts_with('@') || s.starts_with("//");
+        let resolve_label = |s: &str| -> std::path::PathBuf {
+            let resolved = resolve_label_to_path(s, &this.working_dir);
+            let p = std::path::PathBuf::from(&resolved);
+            if p.is_absolute() {
+                p
+            } else if let Some(root) = kuro_core::cells::get_dynamic_project_root() {
+                root.join(p)
+            } else {
+                p
+            }
         };
-
-        let patch_path = this.resolve_path(&patch_str);
+        let patch_path = if let Some(repo_path) = patch_file.downcast_ref::<RepositoryPath>() {
+            repo_path.absolute_path().to_path_buf()
+        } else if patch_file.get_type() == "Label" {
+            resolve_label(&format!("{patch_file}"))
+        } else if let Some(s) = patch_file.unpack_str() {
+            if is_label_str(s) {
+                resolve_label(s)
+            } else {
+                std::path::PathBuf::from(this.resolve_path(s))
+            }
+        } else {
+            let repr = patch_file.to_repr();
+            if is_label_str(&repr) {
+                resolve_label(&repr)
+            } else {
+                std::path::PathBuf::from(this.resolve_path(&repr))
+            }
+        };
 
         // Apply patch using the patch command
         let output = Command::new("patch")
