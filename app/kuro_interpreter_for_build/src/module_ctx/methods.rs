@@ -68,14 +68,37 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] path: Value,
         #[starlark(require = named, default = "auto")] watch: &str,
     ) -> starlark::Result<String> {
-        let path_str = path.unpack_str().unwrap_or("");
-        let resolved = if Path::new(path_str).is_absolute() {
-            PathBuf::from(path_str)
-        } else if let Some(ref wd) = this.working_dir {
-            wd.join(path_str)
+        let resolved = if let Some(s) = path.unpack_str() {
+            if Path::new(s).is_absolute() {
+                PathBuf::from(s)
+            } else if let Some(ref wd) = this.working_dir {
+                wd.join(s)
+            } else {
+                PathBuf::from(s)
+            }
+        } else if let Some(repo_path) = path.downcast_ref::<RepositoryPath>() {
+            repo_path.absolute_path()
+        } else if path.get_type() == "Label" {
+            let label_str = format!("{}", path);
+            if let Some(resolved) = this.resolve_label_to_filesystem_path(&label_str) {
+                resolved
+            } else {
+                let workspace_root = this
+                    .working_dir
+                    .as_ref()
+                    .map(|wd| wd.as_ref().as_path())
+                    .unwrap_or_else(|| Path::new("."));
+                PathBuf::from(resolve_label_to_path(&label_str, workspace_root))
+            }
         } else {
-            PathBuf::from(path_str)
+            return Err(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "module_ctx.read() requires a string, Label, or path object, got {}",
+                path.get_type()
+            )
+            .into());
         };
+        let path_str = resolved.to_string_lossy().to_string();
         let content = std::fs::read_to_string(&resolved).map_err(|e| {
             let working_dir = this
                 .working_dir
@@ -435,14 +458,20 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
 
     /// Get an environment variable value.
     /// Returns the value as a string, or the default if not set.
-    fn getenv(
+    fn getenv<'v>(
         this: &ModuleContext,
         #[starlark(require = pos)] name: &str,
-        default: Option<&str>,
-    ) -> starlark::Result<String> {
+        #[starlark(default = starlark::values::none::NoneOr::None)]
+        default: starlark::values::none::NoneOr<&str>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = this;
         match std::env::var(name) {
-            Ok(v) => Ok(v),
-            Err(_) => Ok(default.unwrap_or("").to_owned()),
+            Ok(v) => Ok(heap.alloc(v)),
+            Err(_) => match default {
+                starlark::values::none::NoneOr::Other(s) => Ok(heap.alloc(s)),
+                starlark::values::none::NoneOr::None => Ok(Value::new_none()),
+            },
         }
     }
 

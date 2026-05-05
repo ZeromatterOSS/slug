@@ -478,9 +478,11 @@ for that build.
   rules_rs crate_universe failed to generate, surfacing as
   `Module has no symbol all_crate_deps` while loading
   `bazel/rules/rust.bzl` — a downstream rules_rs/crate_universe issue.
-- [ ] `bazel-external/` count for `//sdk:sdk_contents` drops correspondingly
-  (separate measurement; this run hit the `@crates` failure before the
-  full closure materialized).
+- [x] `bazel-external/` count for `//sdk:sdk_contents` drops correspondingly
+  (2026-05-05). Fresh build (rm -rf bazel-external) materialized **120**
+  repos vs. the prior baseline of **1120** — ~90% reduction. The build
+  still fails at the `@crates` rules_rs/crate_universe extension
+  (separate downstream blocker, not Plan 13 scope).
 
 ### Implementation summary (2026-05-04)
 
