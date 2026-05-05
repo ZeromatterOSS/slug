@@ -267,49 +267,57 @@ impl ConcreteModuleExtensionExecutor {
             }
         }
 
-        // 6. Execute with RepoSpec capture registry active
-        let (result, specs) = with_repo_spec_registry(|| {
-            // Create a Starlark module for evaluation
-            let starlark_module = Module::new();
+        // 6. Execute with RepoSpec capture registry active.
+        //
+        // Plan 36: also stash a thread-local pointer to `ctx` so that
+        // `mctx.path(Label)` / `mctx.read(Label)` calls inside the eval
+        // can drive lazy materialization of sibling-extension spoke
+        // repos via `kuro_bzlmod::materialize_spoke_sync`.
+        let (result, specs) = kuro_bzlmod::with_extension_dice(ctx, || {
+            with_repo_spec_registry(|| {
+                // Create a Starlark module for evaluation
+                let starlark_module = Module::new();
 
-            // Allocate the module_ctx on the heap
-            let ctx_value = starlark_module.heap().alloc(module_ctx);
+                // Allocate the module_ctx on the heap
+                let ctx_value = starlark_module.heap().alloc(module_ctx);
 
-            // Create an evaluator
-            let mut eval = Evaluator::new(&starlark_module);
+                // Create an evaluator
+                let mut eval = Evaluator::new(&starlark_module);
 
-            // Get the implementation function
-            let implementation = frozen_extension.implementation();
+                // Get the implementation function
+                let implementation = frozen_extension.implementation();
 
-            tracing::debug!(
-                "Invoking extension implementation for '{}'",
-                aggregated.extension_name
-            );
+                tracing::debug!(
+                    "Invoking extension implementation for '{}'",
+                    aggregated.extension_name
+                );
 
-            // Invoke: implementation(module_ctx)
-            let invoke_result = eval.eval_function(implementation.to_value(), &[ctx_value], &[]);
+                // Invoke: implementation(module_ctx)
+                let invoke_result =
+                    eval.eval_function(implementation.to_value(), &[ctx_value], &[]);
 
-            match invoke_result {
-                Ok(return_value) => {
-                    // Extension implementations should return None
-                    if !return_value.is_none() {
-                        tracing::warn!(
-                            "Extension '{}' returned non-None value: {}",
-                            aggregated.extension_name,
-                            return_value.get_type()
-                        );
+                match invoke_result {
+                    Ok(return_value) => {
+                        // Extension implementations should return None
+                        if !return_value.is_none() {
+                            tracing::warn!(
+                                "Extension '{}' returned non-None value: {}",
+                                aggregated.extension_name,
+                                return_value.get_type()
+                            );
+                        }
+                        Ok::<(), kuro_error::Error>(())
                     }
-                    Ok::<(), kuro_error::Error>(())
+                    Err(e) => {
+                        tracing::error!(
+                            "Extension '{}' implementation failed: {}",
+                            aggregated.extension_name,
+                            e
+                        );
+                        Err(ExtensionExecutionError::ImplementationError(e.to_string()).into())
+                    }
                 }
-                Err(e) => {
-                    tracing::error!(
-                        "Extension '{}' implementation failed: {}",
-                        aggregated.extension_name,
-                        e
-                    );
-                    Err(ExtensionExecutionError::ImplementationError(e.to_string()).into())
-                }
-            }
+            })
         });
 
         // Check for execution errors

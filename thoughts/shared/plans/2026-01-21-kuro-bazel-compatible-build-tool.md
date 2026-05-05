@@ -465,7 +465,7 @@ Quick reference to all phases and their locations:
 | 32    | Local Overhead Parity                  | [32-local-overhead-parity.md](./kuro-bazel-subplans/32-local-overhead-parity.md) | [ ] Not Started |
 | 33    | Generic Dynamic Dependency Discovery   | [33-dynamic-dependency-discovery.md](./kuro-bazel-subplans/33-dynamic-dependency-discovery.md) | [ ] Not Started |
 | 34    | Sandboxed Execution Strategy           | [34-sandboxed-execution-strategy.md](./kuro-bazel-subplans/34-sandboxed-execution-strategy.md) | [ ] Not Started |
-| 36    | Extension Spoke Lazy Materialization   | [36-extension-spoke-lazy-materialization.md](./kuro-bazel-subplans/36-extension-spoke-lazy-materialization.md) | [ ] Not Started (next blocker after Plan 13.3 for `zeromatter//sdk:sdk_contents` — `mctx.path(Label)` must trigger DICE materialization of the referenced spoke repo) |
+| 36    | Extension Spoke Lazy Materialization   | [36-extension-spoke-lazy-materialization.md](./kuro-bazel-subplans/36-extension-spoke-lazy-materialization.md) | [~] Phase 1–2 done (2026-05-05). `zeromatter//sdk:sdk_contents` reaches analysis; `cargo_linux_x86_64_1_95_0` spoke materializes lazily; new failure is target compatibility (Plan 11/24). Phases 3–5 (`repository_ctx` audit, `repository_rule_attr` backfill, stubbed sub-extension loud-fail) still open. |
 
 ---
 

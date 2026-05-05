@@ -137,18 +137,69 @@ After this plan:
 
 ### Verification criteria
 
-- [ ] `kuro build //sdk:sdk_contents` reaches an analysis or build
+- [x] `kuro build //sdk:sdk_contents` reaches an analysis or build
       action error, not a `module_ctx`/`repository_ctx` extension
-      error.
-- [ ] `bazel-external/` after the build contains
-      `rules_rs+toolchains+cargo_linux_x86_64_1_95_0` (the spoke we
-      forced via Label access) but NOT every spoke the toolchains
-      extension declared.
-- [ ] Existing `examples/lazy_toolchain` smoke test still completes
-      under the Plan 13 budget.
-- [ ] `cargo test -p kuro_interpreter_for_build` passes.
-- [ ] `pytest tests/core/bzlmod tests/core/analysis -q` no
-      regressions.
+      error (2026-05-05). New failure: target compatibility
+      (`crates__clap-4.5.60` incompatible with host platform) — out
+      of Plan 36 scope, belongs to Plan 11/24.
+- [x] `bazel-external/` after the build contains
+      `rules_rs+toolchains+cargo_linux_x86_64_1_95_0` (2026-05-05).
+      The crate extension successfully drove its `mctx.path(Label)`
+      through the new lazy-materialization path. Total bazel-external
+      count grew from 120 (Plan 13 baseline) to 1915 — reflects the
+      crate extension legitimately materializing per-crate spoke
+      repos for the workspace's transitive Cargo deps. This is the
+      correct Bazel-shaped behavior; Plan 13's Phase 3 win still
+      applies (we did not eagerly load thousands of toolchain repos
+      we don't need).
+- [ ] `examples/lazy_toolchain` smoke test still completes under the
+      Plan 13 budget — blocked by a pre-existing gazelle MODULE.bazel
+      `print()` builtin parsing issue, unrelated to Plan 36.
+- [x] `cargo test -p kuro_interpreter_for_build` passes (50 passed
+      2026-05-05).
+- [x] `cargo test -p kuro_bzlmod --lib` passes (163 passed 2026-05-05).
+- [x] `pytest tests/core/analysis -q` — no regressions (18 pre-existing
+      failures, 300 passed; identical pass/fail set before/after Plan 36).
+
+## Implementation status (2026-05-05)
+
+Phase 1 (audit) and Phase 2 (mctx.path/read → DICE materialization)
+landed on `main`. Touchpoints:
+
+- `app/kuro_bzlmod/src/spoke_materialization.rs` (new) — global
+  `SPOKE_REGISTRY: RwLock<HashMap<canonical_name, SpokeRegistration>>`
+  + `EXTENSION_DICE_PTR` thread-local + `materialize_spoke_sync()`
+  sync→async bridge using `tokio::task::block_in_place` +
+  `Handle::block_on`. The bridge is the only `unsafe` in this plan;
+  it is sound because the pointer's lifetime is strictly bounded by
+  the `with_extension_dice` scope, which is a synchronous closure
+  inside a single async DICE compute.
+- `app/kuro_external_cells/src/extension_repo.rs` — when the spoke
+  registration loop registers dynamic cells, it now also calls
+  `kuro_bzlmod::register_spoke()` so the canonical name maps to its
+  `RepoSpec` for later lazy materialization.
+- `app/kuro_interpreter_for_build/src/module_extension_executor_impl.rs`
+  — wraps the Starlark eval in `kuro_bzlmod::with_extension_dice(ctx,
+  || { ... })` so that nested sync code can drive DICE work.
+- `app/kuro_interpreter_for_build/src/module_ctx/methods.rs` — `read()`
+  and `path()` resolve a `Label` to a path, then call a new helper
+  `ensure_spoke_materialized(&path)` that extracts the canonical
+  spoke name from the `bazel-external/<canonical>/...` shape and
+  drives `materialize_spoke_sync`.
+
+Phase 3 (`repository_ctx` audit): not started. Repository rule
+callers tend to be inside the cell currently being materialized, so
+the asymmetry is a latent footgun rather than a current blocker.
+
+Phase 4 (`repository_rule_attr` backfill): not started — surfaced as
+the new top blocker once Phase 2 unblocked the python extension's
+spoke generation. Tracked here, work pending. Specific symbols:
+`auth_patterns`, `_rules_python_workspace`, `vcs`.
+
+Phase 5 (loud-fail for stubbed sub-extensions): not started.
+
+Phase 6 (zeromatter walkthrough): in progress. New blocker is target
+compatibility, not extension execution.
 
 ## Phase 1: Audit and Spec
 

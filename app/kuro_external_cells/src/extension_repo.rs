@@ -485,7 +485,7 @@ pub(crate) async fn get_file_ops_delegate(
             // `<root_module>+ext+repo` instead of `_main+ext+repo`, registering
             // a duplicate cell at a different `bazel-external/` path that no
             // materializer ever populates.
-            for (internal_name, _spec) in ext_result.generated_repo_specs.iter() {
+            for (internal_name, spec) in ext_result.generated_repo_specs.iter() {
                 let canonical = match ext_result.canonical_names.get(internal_name) {
                     Some(c) => c.clone(),
                     None => {
@@ -507,6 +507,19 @@ pub(crate) async fn get_file_ops_delegate(
                         internal_name.clone(),
                         format!("bazel-external/{}", canonical),
                     );
+                }
+                // Plan 36: also record (canonical_name -> RepoSpec) so that a
+                // sibling extension dereferencing a Label that points into this
+                // spoke can drive lazy materialization via
+                // `kuro_bzlmod::materialize_spoke_sync`.
+                let registration = kuro_bzlmod::SpokeRegistration {
+                    extension_id: std::sync::Arc::from(setup.extension_id.as_ref()),
+                    repo_spec: std::sync::Arc::new(spec.clone()),
+                    project_root: std::sync::Arc::new(project_root_path.clone()),
+                };
+                kuro_bzlmod::register_spoke(canonical.clone(), registration.clone());
+                if internal_name != &canonical {
+                    kuro_bzlmod::register_spoke(internal_name.clone(), registration);
                 }
             }
 

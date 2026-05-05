@@ -31,6 +31,44 @@ use crate::repository_ctx::extract_archive;
 use crate::repository_ctx::get_urls_from_value;
 use crate::repository_ctx::resolve_label_to_path;
 
+/// Plan 36: ensure the spoke repo containing `path` is materialized on disk.
+///
+/// `path` is the result of resolving a Label argument (typically inside
+/// `mctx.path(Label)` or `mctx.read(Label)`). If it lives under
+/// `<project_root>/bazel-external/<canonical_name>/...`, drive lazy DICE
+/// materialization for that spoke before the caller dereferences it.
+///
+/// Best-effort: when no extension-dice scope is active (e.g. a unit test
+/// builds a `ModuleContext` directly), or no registration exists, returns
+/// silently and lets the caller proceed with the path it already has.
+fn ensure_spoke_materialized(path: &Path) {
+    let Some(canonical) = canonical_name_from_path(path) else {
+        return;
+    };
+    if let Err(e) = kuro_bzlmod::materialize_spoke_sync(&canonical) {
+        tracing::warn!(
+            "Lazy materialization of spoke '{}' failed (continuing with stale path): {}",
+            canonical,
+            e
+        );
+    }
+}
+
+/// Extract the canonical spoke name from a path that points into
+/// `bazel-external/<canonical>/...`. Returns `None` for paths that don't
+/// match this shape.
+fn canonical_name_from_path(path: &Path) -> Option<String> {
+    let mut components = path.components();
+    while let Some(c) = components.next() {
+        if c.as_os_str() == "bazel-external" {
+            if let Some(next) = components.next() {
+                return Some(next.as_os_str().to_string_lossy().to_string());
+            }
+        }
+    }
+    None
+}
+
 /// Module context methods for Bazel module extensions.
 /// I/O operations (download, execute, file) are fully implemented.
 /// Watch/template/patch methods remain as no-ops (acceptable for most extensions).
@@ -80,7 +118,8 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             repo_path.absolute_path()
         } else if path.get_type() == "Label" {
             let label_str = format!("{}", path);
-            if let Some(resolved) = this.resolve_label_to_filesystem_path(&label_str) {
+            let resolved = if let Some(resolved) = this.resolve_label_to_filesystem_path(&label_str)
+            {
                 resolved
             } else {
                 let workspace_root = this
@@ -89,7 +128,10 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
                     .map(|wd| wd.as_ref().as_path())
                     .unwrap_or_else(|| Path::new("."));
                 PathBuf::from(resolve_label_to_path(&label_str, workspace_root))
-            }
+            };
+            // Plan 36: drive lazy spoke materialization before the read.
+            ensure_spoke_materialized(&resolved);
+            resolved
         } else {
             return Err(kuro_error::kuro_error!(
                 kuro_error::ErrorTag::Input,
@@ -492,6 +534,9 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             // Handle Label objects: resolve via cell path map (Bazel's getPathFromLabel).
             let label_str = format!("{}", path);
             if let Some(resolved) = this.resolve_label_to_filesystem_path(&label_str) {
+                // Plan 36: ensure the spoke is on disk before the caller
+                // dereferences the returned path (e.g. with `mctx.execute`).
+                ensure_spoke_materialized(&resolved);
                 return Ok(heap.alloc(RepositoryPath::new(resolved.to_string_lossy().to_string())));
             }
             // Fallback to legacy resolution if cell paths not available
@@ -500,7 +545,9 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
                 .as_ref()
                 .map(|wd| wd.as_ref().as_path())
                 .unwrap_or_else(|| Path::new("."));
-            resolve_label_to_path(&label_str, workspace_root)
+            let legacy = resolve_label_to_path(&label_str, workspace_root);
+            ensure_spoke_materialized(Path::new(&legacy));
+            legacy
         } else {
             return Err(kuro_error::kuro_error!(
                 kuro_error::ErrorTag::Input,
