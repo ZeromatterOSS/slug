@@ -362,6 +362,106 @@ loading would require:
 **Recommendation**: Defer this phase. Phases 1-2 should be sufficient for the
 zeromatter use case. If needed, revisit after confirming Phase 2 results.
 
+### 2026-05-04 update: real-world evidence the deferral was wrong
+
+End-to-end verification of Plan 11 Phase 8 (toolchain alias resolution) on
+zeromatter `//sdk:sdk` reproduced exactly the pathology Phase 3 was
+scoped to fix:
+
+- `Waiting on multitool//toolchains -- loading package file tree` for **20+
+  consecutive minutes** while the daemon serially loads the bzlmod transitive
+  closure (multitool, rules_robolectric, rules_swift, rules_kotlin,
+  rules_fuzzing, rules_jvm_external, rules_java, …).
+- ~900 external repos materialized for an `//sdk:sdk` target whose actual
+  toolchain dependency footprint is well under 50.
+- Phases 1+2 successfully eliminated the *failure* mode (no more BUILD FAILED
+  on irrelevant load errors), but did nothing for the *latency* mode — kuro
+  still loads and materializes everything.
+- Bazel building the same target finishes the analogous step in seconds,
+  because Skyframe only loads toolchain packages whose modules are in the
+  target's transitive closure.
+
+Status escalated: Phase 3 is no longer optional. It's the structural fix for
+real-world parity on any non-trivial bzlmod workspace. The Approach B path
+(remove `ensure_registered_toolchains_loaded`, make `get_declared_toolchains`
+a DICE computation, populate lazily on first `ctx.toolchains[T]` access) is
+the right shape — same architecture Bazel uses.
+
+### Phase 3 design (refined 2026-05-04)
+
+**Minimum viable cut: track origin module, eager-load root-only, lazy fallback.**
+
+#### Storage change
+
+`app/kuro_bzlmod/src/lib.rs::REGISTERED_TOOLCHAINS` becomes
+`Vec<RegisteredToolchain { module: String, label: String, is_root: bool }>`.
+
+`set_registered_toolchains` takes the per-module structured list instead of a
+flat `Vec<String>`. `cells.rs::~843` already iterates `parsed_modules` with
+known `is_root` — pipe that through.
+
+#### Eager-load behavior change
+
+`app/kuro_analysis/src/analysis/env.rs::ensure_registered_toolchains_loaded`
+filters `to_load` to root-module registrations only. Transitive registrations
+go into a global `DEFERRED_TOOLCHAINS` pool (mirroring the existing
+`DECLARED_TOOLCHAINS`).
+
+#### Lazy fallback on resolution miss
+
+`app/kuro_analysis/src/analysis/toolchain_resolution.rs::resolve_toolchains`
+gains a fallback path: when a required mandatory `toolchain_type` produces no
+match in `DECLARED_TOOLCHAINS`, call a new
+`ensure_deferred_toolchains_loaded(ctx, &required_type)` which:
+
+1. Iterates `DEFERRED_TOOLCHAINS`.
+2. Filters to registrations whose label's *repo name* appears in the
+   `required_type`'s repo name OR the registration's *origin module* name
+   matches the type's repo name. (Heuristic: most rules_X repos register
+   toolchains for their own type.)
+3. Loads only the filtered subset via `dice.get_interpreter_results` (using
+   the same parallel `try_compute_join` machinery as the eager path).
+4. Marks loaded entries in a "loaded" set so re-queries for the same type
+   don't reload.
+
+If the heuristic still misses, fall through to "load all deferred" once. This
+guarantees correctness — at worst we degrade to current Phase 1+2 behavior
+for that build.
+
+#### Correctness invariants
+
+- **Root toolchains always loaded**: same as today.
+- **Transitive toolchains only loaded when a target's resolution needs them**:
+  matches Bazel.
+- **Determinism**: the filter is purely a function of `(deferred set, required
+  type)` — no ordering dependency.
+- **No silent miss**: full-deferred fallback ensures we never claim "no
+  toolchain found" if a deferred entry would have matched.
+
+#### Touchpoints
+
+- `app/kuro_bzlmod/src/lib.rs` — type change for `REGISTERED_TOOLCHAINS`,
+  add `RegisteredToolchain` struct, update getter signature.
+- `app/kuro_common/src/legacy_configs/cells.rs:843-902` — populate structured
+  list with `is_root` and `module_name`.
+- `app/kuro_analysis/src/analysis/env.rs::ensure_registered_toolchains_loaded`
+  — filter to root-only; populate `DEFERRED_TOOLCHAINS`.
+- `app/kuro_analysis/src/analysis/native_rule_analysis.rs` — add
+  `DEFERRED_TOOLCHAINS` static + helpers, plus a `LOADED_DEFERRED_KEYS`
+  marker set.
+- `app/kuro_analysis/src/analysis/toolchain_resolution.rs::resolve_toolchains`
+  — accept `&mut DiceComputations` (or via callback) and call lazy-load on
+  miss.
+
+#### Risks
+
+- `resolve_toolchains` currently has no DICE access (pure function). Threading
+  DICE through is the biggest refactor cost.
+- Bundle cells (`@bazel_tools`, `@local_config_platform`) currently load
+  through the same eager path — must remain in the eager set.
+- The heuristic-based filter may need iteration. Start with permissive (load
+  all-deferred) and tighten.
+
 ### Success Criteria (Phase 3)
 
 #### Automated Verification:
@@ -371,6 +471,38 @@ zeromatter use case. If needed, revisit after confirming Phase 2 results.
 
 #### Manual Verification:
 - [ ] `kuro build //sdk:sdk` reaches analysis phase
+- [ ] Wall time for first `//sdk:sdk` build drops from 30+ min stuck on multitool
+  to seconds on toolchain-loading step
+- [ ] `bazel-external/` count for `//sdk:sdk` drops correspondingly (only
+  modules in the resolution closure materialize)
+
+### Smoke test harness (Smoke 3)
+
+Phase 3's verification target: `examples/lazy_toolchain/` — a focused example
+that demonstrates the loading-wall pathology in miniature without requiring
+zeromatter.
+
+Layout:
+```
+examples/lazy_toolchain/
+  MODULE.bazel
+  BUILD.bazel
+  src/main.rs
+```
+
+`MODULE.bazel` declares `bazel_dep` for ~8–10 rules repos that each register
+their own toolchains (rules_cc, rules_rust, rules_python, rules_oci,
+protobuf, rules_pkg, rules_java, rules_go), but the target uses only one
+(rules_rust). Pre-Phase-3 baseline: build wall time dominated by
+materialization of all bzlmod deps' toolchain repos. Post-Phase-3 target:
+build wall < 60s on warm daemon, with `bazel-external/` count limited to
+modules actually reachable from the rust_library closure.
+
+Acceptance:
+- `kuro build //:bin` completes in < 60s (warm daemon)
+- `bazel-external/` count after build is < 50 repos (vs. ~200+ pre-Phase-3)
+- `kuro build //:bin -v 5 2>&1 | grep "Skipping deferred"` shows transitive
+  modules' toolchain registrations were deferred and never loaded
 
 ---
 
