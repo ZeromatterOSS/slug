@@ -187,9 +187,28 @@ landed on `main`. Touchpoints:
   spoke name from the `bazel-external/<canonical>/...` shape and
   drives `materialize_spoke_sync`.
 
-Phase 3 (`repository_ctx` audit): not started. Repository rule
-callers tend to be inside the cell currently being materialized, so
-the asymmetry is a latent footgun rather than a current blocker.
+Phase 3 (analysis-time spoke materialization, partially landed
+2026-05-05 in commit `01ce01f5`): the analysis-time complement to
+Phase 2's `mctx.path/read` sync bridge. When the cell resolver
+synthesizes a `CellInstance` for a dynamic extension spoke
+(`get_or_create_dynamic_cell`), it now attaches
+`ExternalCellOrigin::ExtensionRepo(setup)` if the spoke was
+registered with a `RepoSpec` via the new
+`register_dynamic_extension_cell_with_setup` API. With the origin
+set, file-ops accesses route through
+`extension_repo::get_file_ops_delegate`'s lazy materialization path
+— same code path used by `use_repo`'d cells at startup.
+
+Without this, target analysis that reaches deep into crate-spoke
+dependencies (e.g. `crates__clap-4.5.60//:clap` from a `rust_binary`)
+hit raw `read_dir` on an unmaterialized `bazel-external/.../`
+directory and aborted before triggering materialization. With it,
+~550 crate spokes lazily materialize during zeromatter's
+`//sdk:sdk_contents` analysis as their cells are first accessed.
+
+`repository_ctx` audit (the original Phase 3 scope) is still open —
+it's a sister concern but not the current blocker. Logged as Phase
+3b for follow-up.
 
 Phase 4 (`repository_rule_attr` backfill): not started — surfaced as
 the new top blocker once Phase 2 unblocked the python extension's

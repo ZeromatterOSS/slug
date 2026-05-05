@@ -824,6 +824,35 @@ exist. Phase 5's contribution is:
    error enumerates *every* skipped platform (not just the first), so
    misconfiguration debugging is tractable.
 
+### Phase 5 Follow-up (2026-05-05): host-fallback hardening
+
+Verifying Plan 36 against `zeromatter//sdk:sdk_contents` surfaced a
+second flavor of the host-fallback bug: even when registrations
+*don't* exist (legitimate "no exec platforms registered" case),
+`legacy_exec_cfg` was *unconditionally* substituting
+`@local_config_platform//:host`'s cfg for the target cfg. That
+strips constraints carried only by the user's `--target-platforms`
+or `--host_platform` (e.g. zeromatter's
+`@llvm//constraints/libc:gnu.2.28`), and downstream `select()` chains
+in rules_rs/rules_cc fall through to `@platforms//:incompatible` for
+every transitively-depended crate.
+
+Bazel's actual rule when no exec platforms registered: **exec cfg
+== target cfg**. Mirror it. `legacy_exec_cfg` now returns
+`target_cfg.dupe()` whenever target_cfg is bound; the lcp/host
+substitution only triggers for the genuinely unbound case (no
+`--target-platforms`, no `--host_platform`, no `register_*` —
+the very-default build).
+
+Code change: `app/kuro_configured/src/execution.rs::legacy_exec_cfg`.
+Commit: `01ce01f5`.
+
+- [x] Bound `target_cfg` passes through to exec cfg (Bazel-shaped)
+- [x] Unbound `target_cfg` still falls back to lcp for the
+      compilation_mode=opt default that Plan 19.3 introduced
+- [x] No regression on default builds (multi_package
+      `//:gen_version_header` still passes)
+
 ---
 
 ## Phase 6: End-to-end clang verification

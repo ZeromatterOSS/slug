@@ -454,7 +454,7 @@ Quick reference to all phases and their locations:
 | 21    | Lazy Toolchain Loading & dev_dep      | [13-lazy-toolchain-loading.md](./kuro-bazel-subplans/13-lazy-toolchain-loading.md) | [~] Phases 1–2 done; **Phase 3 open** (per-target reachability — addresses 30-min toolchain-loading wall on zeromatter //sdk:sdk) |
 | 22    | CLI Flag Compatibility                 | [22-cli-flag-compat.md](./kuro-bazel-subplans/22-cli-flag-compat.md) | [~] In Progress |
 | 23    | Module Extension Real-World Patterns   | [23-module-extension-realworld.md](./kuro-bazel-subplans/23-module-extension-realworld.md) | [x] Complete |
-| 24    | Exec Platform Resolution               | [24-exec-platform-resolution.md](./kuro-bazel-subplans/24-exec-platform-resolution.md) | [~] Phases 1–7 done; 8 (per-group routing), 9 (per-action kwarg), 10 (BEP assertion) pending |
+| 24    | Exec Platform Resolution               | [24-exec-platform-resolution.md](./kuro-bazel-subplans/24-exec-platform-resolution.md) | [~] Phases 1–7 done; Phase 5 follow-up landed 2026-05-05 (`legacy_exec_cfg` mirrors target cfg when bound — fixes zeromatter-style workspaces with custom platform constraints); Phases 8 (per-group routing), 9 (per-action kwarg), 10 (BEP assertion) pending |
 | 25    | Remote Execution against BuildBuddy    | [25-remote-execution-buildbuddy.md](./kuro-bazel-subplans/25-remote-execution-buildbuddy.md) | [~] In Progress |
 | 26    | String Interning Cleanup               | [26-string-interning.md](./kuro-bazel-subplans/26-string-interning.md) | [ ] Not Started |
 | 27    | Native Language Rule Removal           | [27-native-language-rule-removal.md](./kuro-bazel-subplans/27-native-language-rule-removal.md) | [ ] Not Started |
@@ -465,7 +465,7 @@ Quick reference to all phases and their locations:
 | 32    | Local Overhead Parity                  | [32-local-overhead-parity.md](./kuro-bazel-subplans/32-local-overhead-parity.md) | [ ] Not Started |
 | 33    | Generic Dynamic Dependency Discovery   | [33-dynamic-dependency-discovery.md](./kuro-bazel-subplans/33-dynamic-dependency-discovery.md) | [ ] Not Started |
 | 34    | Sandboxed Execution Strategy           | [34-sandboxed-execution-strategy.md](./kuro-bazel-subplans/34-sandboxed-execution-strategy.md) | [ ] Not Started |
-| 36    | Extension Spoke Lazy Materialization   | [36-extension-spoke-lazy-materialization.md](./kuro-bazel-subplans/36-extension-spoke-lazy-materialization.md) | [~] Phase 1–2 done (2026-05-05). `zeromatter//sdk:sdk_contents` reaches analysis; `cargo_linux_x86_64_1_95_0` spoke materializes lazily; new failure is target compatibility (Plan 11/24). Phases 3–5 (`repository_ctx` audit, `repository_rule_attr` backfill, stubbed sub-extension loud-fail) still open. |
+| 36    | Extension Spoke Lazy Materialization   | [36-extension-spoke-lazy-materialization.md](./kuro-bazel-subplans/36-extension-spoke-lazy-materialization.md) | [~] Phases 1–3 done (2026-05-05). `zeromatter//sdk:sdk_contents` reaches deep analysis with ~550 crate spokes lazily materialized; new blocker is a package-file-tree-loading hang on a zeromatter-specific local-vendored crate (`crates__rstar-0.12.2-zm`), out of plan scope. Phases 3b (`repository_ctx` audit), 4 (`repository_rule_attr` backfill), 5 (stubbed sub-extension loud-fail) still open. |
 
 ---
 
