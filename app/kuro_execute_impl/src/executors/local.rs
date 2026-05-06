@@ -318,6 +318,79 @@ impl LocalExecutor {
             return Err(manager.error("prepare_output_dirs_failed", e));
         };
 
+        // Materialize per-Args paramfile slots into the freshly prepared
+        // scratch dir, then splice the slot's `param_file_arg` (with `%s` →
+        // path) over the slot range in `args`. Iterate slots in descending
+        // `start` order so earlier indices remain valid after splicing.
+        let param_args_owned: Option<Vec<String>> = if request.param_files().is_empty() {
+            None
+        } else {
+            let exe_len = request.exe().len();
+            let mut new_args: Vec<String> = args.to_vec();
+            let scratch_dir = scratch_path
+                .0
+                .as_ref()
+                .map(|sp| self.artifact_fs.fs().resolve(sp).as_path().to_owned())
+                .unwrap_or_else(std::env::temp_dir);
+            let mut any_failed = false;
+            let mut slots: Vec<&kuro_execute::execute::request::ParamFileSlot> =
+                request.param_files().iter().collect();
+            slots.sort_by(|a, b| b.start.cmp(&a.start));
+            for (slot_idx, slot) in slots.iter().enumerate() {
+                let arg_start = exe_len + slot.start;
+                let arg_end = exe_len + slot.end;
+                if arg_end > new_args.len() || arg_start > arg_end {
+                    tracing::warn!(
+                        "param_file slot out of range: start={} end={} args_len={}",
+                        slot.start,
+                        slot.end,
+                        new_args.len()
+                    );
+                    any_failed = true;
+                    break;
+                }
+                let slot_args = &new_args[arg_start..arg_end];
+                let needs_materialize = slot.use_always || {
+                    let total: usize = slot_args.iter().map(|s| s.len() + 1).sum();
+                    total > 32768
+                };
+                if !needs_materialize {
+                    continue;
+                }
+                let param_path = scratch_dir.join(format!("kuro-params-{}", slot_idx));
+                let content = match slot.format {
+                    ParamFileFormat::Shell => slot_args
+                        .iter()
+                        .map(|s| {
+                            let mut q = String::from("'");
+                            q.push_str(&s.replace('\'', "'\\''"));
+                            q.push('\'');
+                            q
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                    ParamFileFormat::Multiline | ParamFileFormat::FlagPerLine => {
+                        slot_args.join("\n")
+                    }
+                };
+                if let Err(e) = std::fs::write(&param_path, content) {
+                    tracing::warn!(
+                        "Failed to write param file {}: {}; using inline args",
+                        param_path.display(),
+                        e
+                    );
+                    any_failed = true;
+                    break;
+                }
+                let replacement = slot
+                    .param_file_arg
+                    .replace("%s", &param_path.to_string_lossy());
+                new_args.splice(arg_start..arg_end, std::iter::once(replacement));
+            }
+            if any_failed { None } else { Some(new_args) }
+        };
+        let args: &[String] = param_args_owned.as_deref().unwrap_or(args);
+
         let (time_span, start_time, res) = executor_stage_async(
             {
                 let env = env
@@ -775,113 +848,10 @@ impl LocalExecutor {
             None
         };
 
-        // Optionally write args to a param file and replace command line.
-        // This supports Bazel's args.use_param_file() for very long argument lists.
-        let param_args_replaced: Option<Vec<String>> = if let Some(pf) = request.param_file() {
-            let exe_len = request.exe().len();
-            let param_args = &args[exe_len..];
-            let needs_param_file = pf.use_always || {
-                let total: usize = param_args.iter().map(|s| s.len() + 1).sum();
-                total > 32768
-            };
-            if needs_param_file {
-                let param_dir = scratch_path
-                    .0
-                    .as_ref()
-                    .map(|sp| self.artifact_fs.fs().resolve(sp).as_path().to_owned())
-                    .unwrap_or_else(std::env::temp_dir);
-                let param_path = param_dir.join("kuro-params");
-
-                let content = match pf.format {
-                    ParamFileFormat::Shell => param_args
-                        .iter()
-                        .map(|s| {
-                            // Simple shell quoting: wrap in single quotes, escape internal '
-                            let mut q = String::from("'");
-                            q.push_str(&s.replace('\'', "'\\''"));
-                            q.push('\'');
-                            q
-                        })
-                        .collect::<Vec<_>>()
-                        .join("\n"),
-                    ParamFileFormat::Multiline | ParamFileFormat::FlagPerLine => {
-                        param_args.join("\n")
-                    }
-                };
-
-                match std::fs::write(&param_path, content) {
-                    Ok(()) => {
-                        let param_file_arg = pf
-                            .param_file_arg
-                            .replace("%s", &param_path.to_string_lossy());
-                        let mut new_args: Vec<String> = args[..exe_len].to_vec();
-                        new_args.push(param_file_arg);
-                        Some(new_args)
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            "Failed to write param file {}: {}; using full args",
-                            param_path.display(),
-                            e
-                        );
-                        None
-                    }
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        // Bazel compatibility: handle inline param file args for use_param_file.
-        // When a Bazel Args object has use_param_file() but kuro expands them inline
-        // (because the param file config is on a nested Args, not the top-level),
-        // the args appear as positional params. Detect this pattern and write them
-        // to a temp file with the correct --cargo_manifest_args=@<file> argument.
-        let param_args_replaced = param_args_replaced.or_else(|| {
-            // Look for inline cargo_runfiles args: after all --key=value named args,
-            // there may be positional args: runfiles_dir, retain_list, mapping1=dest1, ...
-            // These should go into a param file for --cargo_manifest_args=@<file>.
-            let exe_len = request.exe().len();
-            let remaining = &args[exe_len..];
-            // Find the cargo_runfiles directory arg specifically.
-            // It's a positional arg (no --) that ends with .cargo_runfiles.
-            // This ONLY matches the cargo_build_script runner pattern.
-            let cargo_runfiles_pos = remaining
-                .iter()
-                .position(|a| !a.starts_with("--") && a.ends_with(".cargo_runfiles"));
-            if let Some(pos_idx) = cargo_runfiles_pos {
-                let positional = &remaining[pos_idx..];
-                // Heuristic: positional args for cargo_runfiles have at least 3 entries
-                // (dir, retain_list, mapping1=dest1) and the 3rd+ contain "="
-                if positional.len() >= 3 && positional.iter().skip(2).any(|a| a.contains('=')) {
-                    // Use a temp file outside the build output tree. The scratch_path
-                    // is inside the action's output dir which gets cleaned by
-                    // create_output_dirs before the command runs.
-                    let param_dir = std::env::temp_dir().join("kuro-param-files");
-                    let _ = std::fs::create_dir_all(&param_dir);
-                    // Use a unique temp file per invocation
-                    let param_path = {
-                        use std::sync::atomic::AtomicU64;
-                        use std::sync::atomic::Ordering;
-                        static COUNTER: AtomicU64 = AtomicU64::new(0);
-                        let id = COUNTER.fetch_add(1, Ordering::Relaxed);
-                        param_dir.join(format!("cargo-manifest-{}", id))
-                    };
-                    let content = positional.join("\n");
-                    if let Ok(()) = std::fs::write(&param_path, &content) {
-                        let param_file_arg =
-                            format!("--cargo_manifest_args=@{}", param_path.to_string_lossy());
-                        let mut new_args: Vec<String> = args[..exe_len].to_vec();
-                        new_args.extend_from_slice(&remaining[..pos_idx]);
-                        new_args.push(param_file_arg);
-                        return Some(new_args);
-                    }
-                }
-            }
-            None
-        });
-        let effective_args: &[String] = param_args_replaced.as_deref().unwrap_or(args);
+        // Param-file slot materialization happens inside `exec_once` after
+        // `prep_scratch_path` cleans+recreates the scratch dir; otherwise our
+        // freshly written paramfiles would be deleted before the action runs.
+        let effective_args: &[String] = args;
 
         let (time_span, start_time, res, manager) = match self
             .exec_with_resource_control(

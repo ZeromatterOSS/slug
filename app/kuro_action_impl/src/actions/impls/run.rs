@@ -92,7 +92,7 @@ use kuro_execute::execute::request::CommandExecutionPaths;
 use kuro_execute::execute::request::CommandExecutionRequest;
 use kuro_execute::execute::request::ExecutorPreference;
 use kuro_execute::execute::request::ParamFileFormat;
-use kuro_execute::execute::request::ParamFileSpec;
+use kuro_execute::execute::request::ParamFileSlot;
 use kuro_execute::execute::request::RemoteWorkerSpec;
 use kuro_execute::execute::request::WorkerId;
 use kuro_execute::execute::request::WorkerSpec;
@@ -546,6 +546,7 @@ impl RunAction {
         ExpandedCommandLineDigestForDepFiles,
         Option<WorkerSpec>,
         Option<RemoteWorkerSpec>,
+        Vec<ParamFileSlot>,
     )> {
         let fs = &action_execution_ctx.executor_fs();
         let mut cli_ctx = DefaultCommandLineContext::new(fs);
@@ -740,12 +741,57 @@ impl RunAction {
             None
         };
 
+        // Render args, capturing per-item boundaries so each Args object's
+        // `use_param_file(...)` config can target the exact arg range it
+        // contributed. Bazel's `cargo_build_script.bzl` builds a runfiles_args
+        // object with `args.use_param_file("--cargo_manifest_args=@%s",
+        // use_always=True)` and passes it as one element of
+        // `arguments=[main_args, runfiles_args]`. Each nested Args needs its
+        // own paramfile slot, not a global one.
         let mut args_rendered = Vec::<String>::new();
-        values.args.add_to_command_line(
-            &mut args_rendered,
-            &mut cli_ctx,
-            &artifact_path_mapping,
-        )?;
+        let mut param_file_slots: Vec<ParamFileSlot> = Vec::new();
+
+        let frozen_args: &FrozenStarlarkCmdArgs = &self.starlark_values.args;
+        if frozen_args.has_options() {
+            // Top-level options (delimiter, prepend, etc.) require rendering
+            // the entire args atomically — wrap_builder concatenates items.
+            // Fall back to a single global slot if a top-level param_file is set.
+            let start = args_rendered.len();
+            values.args.add_to_command_line(
+                &mut args_rendered,
+                &mut cli_ctx,
+                &artifact_path_mapping,
+            )?;
+            if let Some(pf) = frozen_args.param_file() {
+                param_file_slots.push(slot_from_param_file_data(pf, start, args_rendered.len()));
+            }
+        } else {
+            // No top-level options: render each top-level item individually.
+            // This is the common shape for ctx.actions.run(arguments=[...]).
+            for item in frozen_args.top_level_items() {
+                let item_start = args_rendered.len();
+                item.as_command_line_arg().add_to_command_line(
+                    &mut args_rendered,
+                    &mut cli_ctx,
+                    &artifact_path_mapping,
+                )?;
+                let item_end = args_rendered.len();
+                if let Some(nested) = item
+                    .to_frozen_value()
+                    .downcast_frozen_ref::<FrozenStarlarkCmdArgs>()
+                {
+                    if let Some(pf) = nested.as_ref().param_file() {
+                        param_file_slots.push(slot_from_param_file_data(pf, item_start, item_end));
+                    }
+                }
+            }
+            if let Some(pf) = frozen_args.param_file() {
+                param_file_slots.push(slot_from_param_file_data(pf, 0, args_rendered.len()));
+            }
+        }
+        // Dep-file digest path: render once via the normal top-level flow so
+        // the digest matches what Buck has historically computed (paramfile
+        // location must not perturb the digest).
         values.args.add_to_command_line(
             &mut command_line_digest_for_dep_files,
             &mut cli_ctx,
@@ -806,6 +852,7 @@ impl RunAction {
             command_line_digest_for_dep_files.finalize(),
             worker,
             remote_worker,
+            param_file_slots,
         ))
     }
 
@@ -843,8 +890,13 @@ impl RunAction {
         ExpandedCommandLineDigestForDepFiles,
         HostSharingRequirements,
     )> {
-        let (expanded, expanded_command_line_digest_for_dep_files, worker, remote_worker) =
-            self.expand_command_line_and_worker(ctx, visitor)?;
+        let (
+            expanded,
+            expanded_command_line_digest_for_dep_files,
+            worker,
+            remote_worker,
+            param_file_slots,
+        ) = self.expand_command_line_and_worker(ctx, visitor)?;
 
         let executor_fs = ctx.executor_fs();
         let fs = executor_fs.fs();
@@ -926,12 +978,6 @@ impl RunAction {
             ctx.run_action_knobs().action_paths_interner.as_ref(),
         )?;
 
-        let param_file = self
-            .starlark_values
-            .args
-            .param_file()
-            .map(frozen_param_file_to_spec);
-
         Ok((
             PreparedRunAction {
                 expanded,
@@ -939,7 +985,7 @@ impl RunAction {
                 paths,
                 worker,
                 remote_worker,
-                param_file,
+                param_file_slots,
             },
             expanded_command_line_digest_for_dep_files,
             host_sharing_requirements,
@@ -1319,7 +1365,7 @@ pub(crate) struct PreparedRunAction {
     paths: CommandExecutionPaths,
     worker: Option<WorkerSpec>,
     remote_worker: Option<RemoteWorkerSpec>,
-    param_file: Option<ParamFileSpec>,
+    param_file_slots: Vec<ParamFileSlot>,
 }
 
 impl PreparedRunAction {
@@ -1330,7 +1376,7 @@ impl PreparedRunAction {
             paths,
             worker,
             remote_worker,
-            param_file,
+            param_file_slots,
         } = self;
 
         for (k, v) in extra_env {
@@ -1347,12 +1393,14 @@ impl PreparedRunAction {
         CommandExecutionRequest::new(exe, args, paths, env)
             .with_worker(worker)
             .with_remote_worker(remote_worker)
-            .with_param_file(param_file)
+            .with_param_files(param_file_slots)
     }
 }
 
-fn frozen_param_file_to_spec(pf: &FrozenParamFileData) -> ParamFileSpec {
-    ParamFileSpec {
+fn slot_from_param_file_data(pf: &FrozenParamFileData, start: usize, end: usize) -> ParamFileSlot {
+    ParamFileSlot {
+        start,
+        end,
         param_file_arg: pf.param_file_arg.as_str().to_owned(),
         use_always: pf.use_always,
         format: match pf.format {

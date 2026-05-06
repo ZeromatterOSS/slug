@@ -406,8 +406,11 @@ pub struct CommandExecutionRequest {
 
     is_test: bool,
 
-    /// Param file spec: if set, args may be written to a file and replaced with a single arg.
-    param_file: Option<ParamFileSpec>,
+    /// Per-Args paramfile slots: each slot describes a contiguous range of `args`
+    /// (indices relative to `args`, not the exe-prefixed full vec) that should be
+    /// materialized into a single paramfile and replaced with the slot's
+    /// `param_file_arg` (with `%s` substituted by the paramfile path).
+    param_files: Vec<ParamFileSlot>,
 }
 
 /// Format for entries in a param file.
@@ -422,14 +425,17 @@ pub enum ParamFileFormat {
     Shell,
 }
 
-/// Specification for writing command-line arguments to a param file.
+/// Per-Args paramfile slot. Covers `args[start..end]`; on materialization those
+/// args are written to a file and replaced with `param_file_arg.replace("%s",
+/// path)`.
 #[derive(Clone, Debug)]
-pub struct ParamFileSpec {
-    /// Template argument to pass on the command line, e.g. `@%s` → `@/path/to/params`.
+pub struct ParamFileSlot {
+    pub start: usize,
+    pub end: usize,
+    /// Template argument, e.g. `--cargo_manifest_args=@%s`.
     pub param_file_arg: String,
-    /// If true, always use a param file regardless of argument length.
+    /// If true, materialize regardless of length. Bazel `use_always=True`.
     pub use_always: bool,
-    /// Format for param file entries.
     pub format: ParamFileFormat,
 }
 
@@ -467,7 +473,7 @@ impl CommandExecutionRequest {
             outputs_for_error_handler: Vec::new(),
             run_action_key: None,
             is_test: false,
-            param_file: None,
+            param_files: Vec::new(),
         }
     }
 
@@ -749,13 +755,13 @@ impl CommandExecutionRequest {
         self.is_test
     }
 
-    pub fn with_param_file(mut self, spec: Option<ParamFileSpec>) -> Self {
-        self.param_file = spec;
+    pub fn with_param_files(mut self, slots: Vec<ParamFileSlot>) -> Self {
+        self.param_files = slots;
         self
     }
 
-    pub fn param_file(&self) -> Option<&ParamFileSpec> {
-        self.param_file.as_ref()
+    pub fn param_files(&self) -> &[ParamFileSlot] {
+        &self.param_files
     }
 }
 

@@ -593,6 +593,19 @@ impl FrozenStarlarkCmdArgs {
         self.param_file.as_deref()
     }
 
+    /// Top-level items (each may be a string, artifact, or nested cmd_args).
+    /// Used by callers that need to render items individually to track per-item
+    /// boundaries (e.g. per-Args paramfile materialization).
+    pub fn top_level_items(&self) -> &[FrozenCommandLineArg] {
+        FrozenCommandLineArg::slice_from_frozen_value_unchecked(&self.items)
+    }
+
+    /// Returns true if this cmd_args has any options (delimiter, prepend, etc.)
+    /// that affect how items concatenate at the top level.
+    pub fn has_options(&self) -> bool {
+        !self.options.is_empty()
+    }
+
     /// Search for param_file config in this object or nested cmd_args items.
     /// In Bazel, use_param_file can be on an individual Args object within a list.
     /// Buck2 only checks the top-level. This method searches nested items too.
