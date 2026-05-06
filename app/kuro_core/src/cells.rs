@@ -157,17 +157,19 @@ pub fn register_dynamic_extension_cell(canonical_name: String, path: String) {
     if let Ok(mut cells) = DYNAMIC_EXTENSION_CELLS.lock() {
         cells.insert(canonical_name.clone(), path.clone());
     }
-    // Also create the external/ symlink for action execution.
-    // Extract the short name (last component after '+') for spoke repos.
-    let short_name = canonical_name
-        .rfind('+')
-        .map(|i| &canonical_name[i + 1..])
-        .unwrap_or(&canonical_name);
-    ensure_external_symlink(short_name, &path);
-    // Also create a symlink for the full canonical name if different
-    if short_name != canonical_name {
-        ensure_external_symlink(&canonical_name, &path);
-    }
+    // Always write the canonical-name symlink (`<owner>+<ext>+<repo>`).
+    // Action commands, file-watch paths, and `bazel-external/` consumers
+    // all use the canonical form as the source of truth.
+    ensure_external_symlink(&canonical_name, &path);
+
+    // Apparent-name aliasing (e.g. consuming modules' `use_repo`) is
+    // handled elsewhere through proper alias maps. Do NOT also write a
+    // symlink under the spoke's last `+`-segment as the apparent name:
+    // for `rules_foreign_cc+ext+rules_python` that segment is
+    // `rules_python`, which collides with the bzlmod module
+    // `rules_python+1.9.0`. The collision used to silently overwrite the
+    // module's symlink so action paths resolved to the wrong directory
+    // (e.g. rules_python's bootstrap templates went missing).
 }
 
 /// Plan 36: register a dynamic extension spoke cell with its

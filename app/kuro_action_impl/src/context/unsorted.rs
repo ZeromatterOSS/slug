@@ -61,14 +61,14 @@ fn sibling_to_prefix<'v>(sibling: Value<'v>) -> starlark::Result<Option<String>>
                 starlark::values::StringValue::default()
             })
             .map_err(starlark::Error::from)?;
-        Ok(parent_dir.into_inner())
+        Ok(parent_dir.into_inner().map(normalize_sibling_prefix))
     } else if let Some(s) = sibling.unpack_str() {
         if let Some(idx) = s.rfind('/') {
             let parent = &s[..idx];
             if parent.is_empty() {
                 Ok(None)
             } else {
-                Ok(Some(parent.to_owned()))
+                Ok(Some(normalize_sibling_prefix(parent.to_owned())))
             }
         } else {
             Ok(None)
@@ -81,6 +81,28 @@ fn sibling_to_prefix<'v>(sibling: Value<'v>) -> starlark::Result<Option<String>>
         )
         .into())
     }
+}
+
+/// Bazel's `File.short_path` uses `../<repo>/<path>` to reference files in
+/// other repositories (see `Label.toShortPath()` in upstream bazel). When
+/// the bazel-compat short_path is fed back to `declare_file(sibling=...)`,
+/// the leading `..` is meant to mirror that file's location under
+/// `<output_base>/external/<repo>/<path>`. Kuro's path normalizer rejects
+/// `..` outright, so rewrite the prefix to `external/<repo>/<rest>` —
+/// matching bazel's output layout (`bazel-out/<cfg>/bin/external/<repo>/...`).
+fn normalize_sibling_prefix(prefix: String) -> String {
+    let mut remaining = prefix.as_str();
+    let mut consumed_parent = false;
+    while let Some(rest) = remaining.strip_prefix("../") {
+        remaining = rest;
+        consumed_parent = true;
+    }
+    if consumed_parent {
+        // Remaining begins with `<repo>/...` (or just `<repo>` with no suffix).
+        // Place it under `external/<repo>/...`.
+        return format!("external/{remaining}");
+    }
+    prefix
 }
 
 #[starlark_module]

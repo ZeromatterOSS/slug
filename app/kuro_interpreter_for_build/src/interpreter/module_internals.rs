@@ -406,6 +406,14 @@ impl ModuleInternals {
         spec.resolve_glob(self.package_listing.files())
     }
 
+    /// Files in this package whose parent-chain may contain directories
+    /// matching a glob's `exclude_directories = 0` request. Returned as
+    /// raw file paths; callers walk `.parent()` to derive directory
+    /// candidates.
+    pub(crate) fn glob_directory_candidates(&self) -> impl Iterator<Item = &PackageRelativePath> {
+        self.package_listing.files().files()
+    }
+
     pub(crate) fn sub_packages(&self) -> impl Iterator<Item = &PackageRelativePath> {
         self.package_listing
             .subpackages_within(PackageRelativePath::empty())

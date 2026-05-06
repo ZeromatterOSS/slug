@@ -1659,12 +1659,47 @@ async fn resolve_toolchain_types(
     // toolchains with no matching registration resolve to None; the ctx
     // still exposes the entry so `ctx.toolchains[type]` returns the
     // collection (None-typed), not a lookup error.
+    //
+    // Pre-resolve aliases for every required type so the
+    // resolver can compare canonically against registered toolchain types
+    // (which were canonicalized at registration time). The original label
+    // stays on `RequiredToolchainType.type_label` (used as the result map
+    // key, where `ctx.toolchains[X].at(X)` looks it up); the canonical
+    // form is stashed in `canonical_type_label` for the comparison side.
+    // Without this, rules_python's `@rules_python//python:toolchain_type`
+    // (an alias to `@bazel_tools//tools/python:toolchain_type`) never
+    // matches the registered `local_config_python//:host_toolchain` whose
+    // type was canonicalized to the bazel_tools form.
+    let mut alias_cache: HashMap<String, String> = HashMap::new();
+    let mut all_type_labels: Vec<String> = Vec::new();
+    for (label, _) in &toolchain_types {
+        all_type_labels.push(label.clone());
+    }
+    for (_, def) in &exec_group_defs {
+        for t in &def.toolchain_types {
+            all_type_labels.push(t.clone());
+        }
+    }
+    for label in &all_type_labels {
+        if !alias_cache.contains_key(label) {
+            let canonical = canonicalize_toolchain_type_label(dice, label, &mut alias_cache).await;
+            alias_cache.insert(label.clone(), canonical);
+        }
+    }
+    let resolve_alias = |label: &str| -> String {
+        alias_cache
+            .get(label)
+            .cloned()
+            .unwrap_or_else(|| label.to_owned())
+    };
+
     let mut requests = vec![ExecGroupResolutionRequest {
         group_name: "default".to_owned(),
         required_types: toolchain_types
             .iter()
             .map(|(label, mandatory)| RequiredToolchainType {
                 type_label: label.clone(),
+                canonical_type_label: resolve_alias(label),
                 mandatory: *mandatory,
             })
             .collect(),
@@ -1678,6 +1713,7 @@ async fn resolve_toolchain_types(
                 .iter()
                 .map(|t| RequiredToolchainType {
                     type_label: t.clone(),
+                    canonical_type_label: resolve_alias(t),
                     // Exec group toolchains default to optional — many rules
                     // declare them with mandatory=False (e.g., cc_test's
                     // test_runner_toolchain_type). The mandatory flag should

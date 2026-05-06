@@ -34,8 +34,16 @@ use super::native_rule_analysis::get_declared_toolchains;
 /// A required toolchain type for a rule.
 #[derive(Debug, Clone)]
 pub struct RequiredToolchainType {
-    /// The toolchain_type label (e.g., "@bazel_tools//tools/cpp:toolchain_type")
+    /// The toolchain_type label as written by the rule
+    /// (e.g., `@rules_python//python:toolchain_type`). Used as the result
+    /// map key so `ctx.toolchains[X]` finds its entry.
     pub type_label: String,
+    /// The canonical (alias-resolved) toolchain_type label used for
+    /// comparison against the registered toolchain set
+    /// (e.g., `@bazel_tools//tools/python:toolchain_type` after the
+    /// rules_python alias is followed). Defaults to `type_label` when no
+    /// alias is involved.
+    pub canonical_type_label: String,
     /// Whether this toolchain is mandatory (true) or optional (false)
     pub mandatory: bool,
 }
@@ -249,9 +257,14 @@ pub fn resolve_toolchains(
 
             // Search declared toolchains in registration order (priority)
             for (tc_label, tc_info) in &declared {
-                // Check toolchain_type matches
+                // Check toolchain_type matches. Compare the registered
+                // type against the request's canonical (alias-resolved)
+                // form so an alias like
+                // `@rules_python//python:toolchain_type` →
+                // `@bazel_tools//tools/python:toolchain_type` matches the
+                // toolchain registered under the bazel_tools form.
                 let tc_type_norm = normalize_constraint_label(&tc_info.toolchain_type);
-                let req_type_norm = normalize_constraint_label(&req.type_label);
+                let req_type_norm = normalize_constraint_label(&req.canonical_type_label);
                 if tc_type_norm != req_type_norm {
                     continue;
                 }

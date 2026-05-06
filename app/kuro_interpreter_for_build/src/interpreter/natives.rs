@@ -558,30 +558,57 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
         #[starlark(require = named, default = 1)] exclude_directories: i32,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<ValueOfUnchecked<'v, UnpackList<String>>> {
-        let _ = exclude_directories;
         let extra = ModuleInternals::from_context(eval, "native.glob")?;
         let spec = GlobSpec::new(&include.items, &exclude.items)?;
-        if !allow_empty {
-            let results: Vec<_> = extra
-                .resolve_glob(&spec)
-                .map(|path| path.as_str().to_owned())
-                .collect();
-            if results.is_empty() {
-                return Err(kuro_error::kuro_error!(
-                    kuro_error::ErrorTag::Input,
-                    "glob pattern '{}' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with package(default_glob_allow_empty = ...))",
-                    include.items.join(", ")
-                )
-                .into());
+
+        let mut results: Vec<String> = extra
+            .resolve_glob(&spec)
+            .map(|path| path.as_str().to_owned())
+            .collect();
+
+        // Bazel default: directories are excluded. When the caller passes
+        // `exclude_directories = 0` (e.g. rules_cc's llvm toolchain BUILD
+        // does this to grab the versioned `lib/clang/<N>` directory), also
+        // include matching directory paths derived from the files in this
+        // package's listing. The kuro `PackageFileListing` only stores
+        // files, so directory entries must be reconstructed from each
+        // file's parent chain.
+        if exclude_directories == 0 {
+            let mut seen: std::collections::HashSet<String> = results.iter().cloned().collect();
+            let mut dir_matches: Vec<String> = Vec::new();
+            for file in extra.glob_directory_candidates() {
+                let mut current = file.parent();
+                while let Some(dir) = current {
+                    if dir.as_str().is_empty() {
+                        break;
+                    }
+                    if !seen.insert(dir.as_str().to_owned()) {
+                        // Already seen this dir (or it was a file match) —
+                        // and all of its ancestors have been visited too.
+                        break;
+                    }
+                    if spec.matches(dir.as_str()) {
+                        dir_matches.push(dir.as_str().to_owned());
+                    }
+                    current = dir.parent();
+                }
             }
-            Ok(eval
-                .heap()
-                .alloc_typed_unchecked(AllocList(results.iter().map(|s| s.as_str())))
-                .cast())
-        } else {
-            let res = extra.resolve_glob(&spec).map(|path| path.as_str());
-            Ok(eval.heap().alloc_typed_unchecked(AllocList(res)).cast())
+            results.extend(dir_matches);
         }
+
+        if !allow_empty && results.is_empty() {
+            return Err(kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "glob pattern '{}' didn't match anything, but allow_empty is set to False (the default value of allow_empty can be set with package(default_glob_allow_empty = ...))",
+                include.items.join(", ")
+            )
+            .into());
+        }
+
+        Ok(eval
+            .heap()
+            .alloc_typed_unchecked(AllocList(results.iter().map(|s| s.as_str())))
+            .cast())
     }
 
     /// Returns the name of the package being evaluated.

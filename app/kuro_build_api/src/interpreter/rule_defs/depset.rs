@@ -50,6 +50,7 @@ use starlark::values::ValueLike;
 use starlark::values::list::AllocList;
 use starlark::values::list::ListRef;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
+use starlark::values::none::NoneOr;
 use starlark::values::starlark_value;
 
 use crate::interpreter::rule_defs::transitive_set::FrozenTransitiveSetDefinition;
@@ -825,12 +826,21 @@ pub fn register_depset(globals: &mut GlobalsBuilder) {
     ///     A new depset containing the specified elements.
     fn depset<'v>(
         #[starlark(default = UnpackListOrTuple::default())] direct: UnpackListOrTuple<Value<'v>>,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        transitive: UnpackListOrTuple<Value<'v>>,
+        // Accept `None` for `transitive` as equivalent to an empty list —
+        // bazel's `depset(transitive = None)` works, kuro's used to reject
+        // it. rules_rust's `make_libstd_and_allocator_ccinfo` passes
+        // through `transitive = allocator_inputs` which can be `None`.
+        #[starlark(require = named, default = NoneOr::None)] transitive: NoneOr<
+            UnpackListOrTuple<Value<'v>>,
+        >,
         #[starlark(require = named, default = "default")] order: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let heap = eval.heap();
-        make_depset_from_lists(heap, direct.items, transitive.items, order)
+        let transitive_items = match transitive {
+            NoneOr::None => Vec::new(),
+            NoneOr::Other(list) => list.items,
+        };
+        make_depset_from_lists(heap, direct.items, transitive_items, order)
     }
 }
