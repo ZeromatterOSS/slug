@@ -3233,11 +3233,23 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 
         // --- Compile actions below ---
 
+        // `-c` / `/c` (compile-only) belongs to the Bazel action_config's
+        // command_line template, not to feature-derived flag_sets. It is only
+        // emitted when a `source_file` variable is bound — i.e. the caller is
+        // actually invoking a compile action with a known input. Callers like
+        // rules_rust's `cargo_build_script` build compile_variables with
+        // `cc_common.create_compile_variables(feature_configuration,
+        // cc_toolchain)` (no source_file) to derive *default CFLAGS*, and
+        // those CFLAGS must not include `-c` — otherwise downstream cc-rs
+        // probes that compile-and-link in one shot (e.g. aws-lc-sys's
+        // `memcmp_check`) end up producing relocatable object files instead
+        // of executables.
+        let has_source = get_var("source_file").is_some();
         if msvc {
             // MSVC compile flags
             args.push(heap.alloc_str("/nologo").to_value());
             args.push(heap.alloc_str("/EHsc").to_value());
-            if is_compile {
+            if is_compile && has_source {
                 args.push(heap.alloc_str("/c").to_value());
             }
         } else {
@@ -3245,7 +3257,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             if get_var("pic").is_some() {
                 args.push(heap.alloc_str("-fPIC").to_value());
             }
-            if is_compile {
+            if is_compile && has_source {
                 args.push(heap.alloc_str("-c").to_value());
             }
         }
