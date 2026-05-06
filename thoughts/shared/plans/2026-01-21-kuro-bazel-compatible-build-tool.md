@@ -466,6 +466,7 @@ Quick reference to all phases and their locations:
 | 33    | Generic Dynamic Dependency Discovery   | [33-dynamic-dependency-discovery.md](./kuro-bazel-subplans/33-dynamic-dependency-discovery.md) | [ ] Not Started |
 | 34    | Sandboxed Execution Strategy           | [34-sandboxed-execution-strategy.md](./kuro-bazel-subplans/34-sandboxed-execution-strategy.md) | [ ] Not Started |
 | 36    | Extension Spoke Lazy Materialization   | [36-extension-spoke-lazy-materialization.md](./kuro-bazel-subplans/36-extension-spoke-lazy-materialization.md) | [~] Phases 1–3 done (2026-05-05). `zeromatter//sdk:sdk_contents` reaches deep analysis with ~550 crate spokes lazily materialized; new blocker is a package-file-tree-loading hang on a zeromatter-specific local-vendored crate (`crates__rstar-0.12.2-zm`), out of plan scope. Phases 3b (`repository_ctx` audit), 4 (`repository_rule_attr` backfill), 5 (stubbed sub-extension loud-fail) still open. |
+| 45    | Per-Args paramfile + cargo_build_script runfiles | [45-per-args-paramfile-and-cargo-runfiles.md](./kuro-bazel-subplans/45-per-args-paramfile-and-cargo-runfiles.md) | [ ] PROPOSED. Unsticks `zeromatter//sdk:sdk_contents` execution layer past the third gap (cargo_build_script runfiles_dir not materialized). Phase 1 lifts `param_file` from `Option<ParamFileSpec>` to per-Args slots so rules_rust's nested `args.use_param_file(use_always=True)` works; obsoletes the cargo_runfiles heuristic in `local.rs:836-870`. Sibling to §15.5.23 (LANDED) and Plan 44 Phase 3 (execroot). |
 
 ---
 
