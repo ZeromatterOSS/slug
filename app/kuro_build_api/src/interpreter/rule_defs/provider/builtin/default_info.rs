@@ -920,6 +920,7 @@ fn default_info_creator(builder: &mut GlobalsBuilder) {
         let mut default_runfiles_value = default_runfiles.into_option();
         let mut data_runfiles_value = data_runfiles.into_option();
         let runfiles_value = runfiles.into_option();
+        let used_runfiles_kwarg = runfiles_value.is_some();
 
         if let Some(runfiles_value) = runfiles_value {
             if default_runfiles_value.is_none() {
@@ -930,15 +931,42 @@ fn default_info_creator(builder: &mut GlobalsBuilder) {
             }
         }
 
-        let default_runfiles_value = match default_runfiles_value {
+        let mut default_runfiles_value = match default_runfiles_value {
             Some(value) => validate_runfiles_value(value)?,
             None => empty_runfiles_value(heap),
         };
 
-        let data_runfiles_value = match data_runfiles_value {
+        let mut data_runfiles_value = match data_runfiles_value {
             Some(value) => validate_runfiles_value(value)?,
             None => empty_runfiles_value(heap),
         };
+
+        // Bazel: when `DefaultInfo(runfiles=…, executable=…)` is used, the
+        // executable is implicitly added to both default_runfiles and
+        // data_runfiles. Consumers like rules_rust's
+        // `cargo_build_script_runfiles` rely on this — the runfiles paramfile
+        // they build from `script[DefaultInfo].default_runfiles` would
+        // otherwise be empty for first-party build scripts with no `data`,
+        // and the runner panics on `assert!(!runfiles.is_empty())`. Only
+        // honour the auto-add when the caller used the `runfiles=` kwarg
+        // (per Bazel docs); explicit `default_runfiles=` / `data_runfiles=`
+        // give the rule full control and are left alone.
+        let exe_opt = executable.into_option();
+        if used_runfiles_kwarg {
+            if let Some(exe_val) = exe_opt {
+                let exe_runfiles = create_runfiles(
+                    heap,
+                    heap.alloc(AllocList([exe_val])),
+                    heap.alloc(Depset::empty()),
+                    heap.alloc(AllocDict::EMPTY),
+                    heap.alloc(AllocDict::EMPTY),
+                )?;
+                default_runfiles_value =
+                    merge_runfiles_values(heap, default_runfiles_value, exe_runfiles)?;
+                data_runfiles_value =
+                    merge_runfiles_values(heap, data_runfiles_value, exe_runfiles)?;
+            }
+        }
 
         // Step A of §15.5.23: when a rule returns DefaultInfo with both an executable
         // and non-empty default_runfiles, synthesize a symlink tree at
@@ -948,7 +976,6 @@ fn default_info_creator(builder: &mut GlobalsBuilder) {
         // `associated_artifacts`. As a safety net we also append the tree artifact
         // to `other_outputs` so `kuro build :target` materialises it even if the exe
         // is not in `default_outputs`.
-        let exe_opt = executable.into_option();
         let (final_exe_opt, tree_artifact_opt): (Option<Value<'v>>, Option<Value<'v>>) =
             match exe_opt {
                 Some(exe_val) if runfiles_has_content(default_runfiles_value) => {
