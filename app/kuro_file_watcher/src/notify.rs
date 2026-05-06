@@ -60,6 +60,12 @@ const RESERVED_OUTPUT_COMPONENTS: &[&str] = &[
     "bazel-testlogs",
     "bazel-bazel",
     "bazel-external",
+    // <project_root>/execroot/<basename> is a self-symlink installed by
+    // ensure_execroot_self_symlink in kuro_core::cells. notify follows it
+    // recursively into the project, so without this filter every change
+    // also fires under `execroot/<basename>/...` and DICE invalidates
+    // packages twice.
+    "execroot",
 ];
 
 pub(crate) fn is_reserved_output_path(

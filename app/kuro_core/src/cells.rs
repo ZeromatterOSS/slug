@@ -202,7 +202,58 @@ pub fn get_dynamic_extension_cell_setup(
 
 /// Set the project root for dynamic cell filesystem scanning.
 pub fn set_dynamic_project_root(root: std::path::PathBuf) {
+    ensure_execroot_self_symlink(&root);
     let _ = DYNAMIC_PROJECT_ROOT.set(root);
+}
+
+/// Create `<project_root>/execroot/<project_basename>` as a symlink back
+/// to the project root.
+///
+/// Bazel's rules_rust `process_wrapper` resolves `${exec_root}` at action
+/// time as `<output_base>/execroot/<workspace_name>`, where
+/// `workspace_name` is the basename of the action's cwd. Under Bazel that
+/// path is the actual symlink-tree the action runs in. Kuro runs actions
+/// directly in the project root with no sandbox, so the path doesn't
+/// exist on disk — and `OUT_DIR=${exec_root}/buck-out/...` injected by
+/// rules_rust into rustc env then points at a missing prefix, breaking
+/// any crate whose `lib.rs` does `include!(concat!(env!("OUT_DIR"), "..."))`
+/// (target-triple, pyo3-build-config, …).
+///
+/// Creating `execroot/<basename> -> ..` is the cheapest way to make
+/// `${exec_root}/x` resolve back to `<project_root>/x` without changing
+/// rules_rust or process_wrapper.
+fn ensure_execroot_self_symlink(project_root: &std::path::Path) {
+    let basename = match project_root.file_name().and_then(|s| s.to_str()) {
+        Some(b) if !b.is_empty() => b,
+        _ => return,
+    };
+    let execroot_dir = project_root.join("execroot");
+    let link_path = execroot_dir.join(basename);
+    let desired_target = std::path::PathBuf::from("..");
+    match link_path.symlink_metadata() {
+        Ok(meta) if meta.file_type().is_symlink() => {
+            if let Ok(current) = std::fs::read_link(&link_path) {
+                if current == desired_target {
+                    return;
+                }
+            }
+            let _ = std::fs::remove_file(&link_path);
+        }
+        Ok(_) => {
+            // Real entry — leave alone.
+            return;
+        }
+        Err(_) => {}
+    }
+    let _ = std::fs::create_dir_all(&execroot_dir);
+    #[cfg(unix)]
+    {
+        let _ = std::os::unix::fs::symlink(&desired_target, &link_path);
+    }
+    #[cfg(windows)]
+    {
+        let _ = std::os::windows::fs::symlink_dir(&desired_target, &link_path);
+    }
 }
 
 /// Get the project root (if set).
