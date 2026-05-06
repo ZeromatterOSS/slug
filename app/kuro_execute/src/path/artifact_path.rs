@@ -60,7 +60,13 @@ impl ArtifactPath<'_> {
         Ok(f(file_name))
     }
 
-    pub fn with_short_path<F, T>(&self, f: F) -> T
+    /// Internal helper: the artifact's path *without* the Bazel
+    /// repo-relative prefix (no package, no `../<cell>/`). Used by
+    /// `Artifact::project()` to compute `hidden_components_count` deltas, and
+    /// generally wherever a caller needs the rule-local fragment that
+    /// `BuildArtifactPath::path` describes (post-projection,
+    /// post-`hidden_components_count`).
+    pub fn with_rule_local_short_path<F, T>(&self, f: F) -> T
     where
         for<'b> F: FnOnce(&'b ForwardRelativePath) -> T,
     {
@@ -72,38 +78,107 @@ impl ArtifactPath<'_> {
                     Some(p) => p,
                     None => ForwardRelativePath::empty(),
                 };
-                // Buck2 semantics: short_path for generated files is just the artifact's
-                // own relative path within the rule's artifact namespace (no package prefix).
-                // e.g., ctx.actions.write("my_output", "") -> short_path = "my_output"
                 f(path)
             }
             Either::Right(source) => {
-                // Buck2 semantics: short_path for source files is the path relative to the
-                // package directory (NOT the full cell-relative path).
-                // e.g., source file at pkg/dir1/file.txt -> short_path = "dir1/file.txt"
-                // This matches how Buck2 uses short_path as a dictionary key for symlinked_dir etc.
                 let file_rel: &ForwardRelativePath = source.path().as_ref();
-                let cell_name = source.package().cell_name();
                 let full = file_rel.join(self.projected_path);
                 let path = match full.strip_prefix_components(self.hidden_components_count) {
                     Some(p) => p,
                     None => ForwardRelativePath::empty(),
                 };
-                if is_root_cell_name(cell_name.as_str()) {
-                    f(path)
-                } else {
-                    // External repo: prepend "../repo_name/pkg_rel/"
-                    let pkg_path: &ForwardRelativePath =
-                        source.package().cell_relative_path().as_ref();
-                    let cell_rel_path = if pkg_path.is_empty() {
-                        path.as_str().to_owned()
-                    } else {
-                        format!("{}/{}", pkg_path.as_str(), path.as_str())
+                f(path)
+            }
+        }
+    }
+
+    pub fn with_short_path<F, T>(&self, f: F) -> T
+    where
+        for<'b> F: FnOnce(&'b ForwardRelativePath) -> T,
+    {
+        // Bazel `File.short_path`: the file's path relative to its repository
+        // root (workspace root for the main repo, repo root for external
+        // repos). Excludes configuration-specific bin_dir prefixes. For
+        // external repos the result has a `../<repo_name>/` prefix so it lands
+        // outside `<exe>.runfiles/<workspace>/` when laid down in a runfiles
+        // tree.
+        //
+        // - root-cell build artifact in package `lib/glue`, artifact path
+        //   `glue-build-script_` → short_path = `lib/glue/glue-build-script_`
+        // - external-cell build artifact in package `` of repo
+        //   `crates__libm-0.2.16`, artifact path `build_script_build` →
+        //   short_path = `../crates__libm-0.2.16/build_script_build`
+        // - root-cell source `lib/glue/build.rs` → `lib/glue/build.rs`
+        // - external-cell source `crates__libm-0.2.16//src/lib.rs` →
+        //   `../crates__libm-0.2.16/src/lib.rs`
+        match self.base_path.as_ref() {
+            Either::Left(buck_out) => {
+                let rule_local = buck_out.path();
+                let rule_local = rule_local.join_cow(self.projected_path);
+                let rule_local =
+                    match rule_local.strip_prefix_components(self.hidden_components_count) {
+                        Some(p) => p,
+                        None => ForwardRelativePath::empty(),
                     };
+                // Reach the configured target label through the owner so we
+                // can prepend the package (and external `../<cell>/`).
+                let cfg_label = buck_out.owner().owner().configured_label();
+                match cfg_label {
+                    Some(label) => {
+                        let cell_name = label.pkg().cell_name();
+                        let pkg_rel = label.pkg().cell_relative_path().as_str();
+                        let rule_local_str = rule_local.as_str();
+                        let prefixed = match (
+                            is_root_cell_name(cell_name.as_str()),
+                            pkg_rel.is_empty(),
+                            rule_local_str.is_empty(),
+                        ) {
+                            (true, true, _) => rule_local_str.to_owned(),
+                            (true, false, true) => pkg_rel.to_owned(),
+                            (true, false, false) => format!("{}/{}", pkg_rel, rule_local_str),
+                            (false, true, true) => format!("../{}", cell_name.as_str()),
+                            (false, true, false) => {
+                                format!("../{}/{}", cell_name.as_str(), rule_local_str)
+                            }
+                            (false, false, true) => {
+                                format!("../{}/{}", cell_name.as_str(), pkg_rel)
+                            }
+                            (false, false, false) => {
+                                format!("../{}/{}/{}", cell_name.as_str(), pkg_rel, rule_local_str)
+                            }
+                        };
+                        let buf = ForwardRelativePathBuf::unchecked_new(prefixed);
+                        f(buf.as_ref())
+                    }
+                    None => {
+                        // No configured target owner (anon target / dynamic
+                        // action / etc.) — fall back to the rule-local path.
+                        f(rule_local)
+                    }
+                }
+            }
+            Either::Right(source) => {
+                let file_rel: &ForwardRelativePath = source.path().as_ref();
+                let full = file_rel.join(self.projected_path);
+                let in_pkg = match full.strip_prefix_components(self.hidden_components_count) {
+                    Some(p) => p,
+                    None => ForwardRelativePath::empty(),
+                };
+                let cell_name = source.package().cell_name();
+                let pkg_path: &ForwardRelativePath = source.package().cell_relative_path().as_ref();
+                let cell_rel = if pkg_path.is_empty() {
+                    in_pkg.as_str().to_owned()
+                } else {
+                    format!("{}/{}", pkg_path.as_str(), in_pkg.as_str())
+                };
+                if is_root_cell_name(cell_name.as_str()) {
+                    let buf = ForwardRelativePathBuf::unchecked_new(cell_rel);
+                    f(buf.as_ref())
+                } else {
                     let with_prefix = ForwardRelativePathBuf::unchecked_new(format!(
                         "../{}/{}",
                         cell_name.as_str(),
-                        cell_rel_path
+                        cell_rel
                     ));
                     f(with_prefix.as_ref())
                 }

@@ -232,17 +232,36 @@ fn exe_parent_and_filename<'v>(
     exe: &'v dyn StarlarkInputArtifactLike<'v>,
 ) -> kuro_error::Result<(Option<String>, String)> {
     // Snapshot the short path into owned pieces while the callback borrows it.
+    // The runfiles tree is declared in *this* rule's artifact namespace, so we
+    // need a forward-relative path. Bazel-form short_path for an external-repo
+    // executable starts with `../<repo>/...`, which is not a valid
+    // forward-relative path component. Strip the leading `../<repo>` so the
+    // tree lands as a sibling of the exe within the rule's namespace.
     let pieces = std::cell::RefCell::new((None::<String>, String::new()));
     exe.with_short_path(&|path| {
         let mut slot = pieces.borrow_mut();
-        slot.0 = path.parent().and_then(|p| {
-            let s = p.as_str();
-            if s.is_empty() {
+        let parent_str = path.parent().map(|p| p.as_str().to_owned());
+        let cleaned_parent = parent_str.and_then(|s| {
+            // External-repo Bazel short_path: strip `../<repo>` (and optional
+            // package suffix) so the tree declaration uses a valid
+            // forward-relative path within this rule's namespace. If the
+            // exe sits at the package root of an external repo, the parent
+            // collapses to `None`.
+            let cleaned = if let Some(rest) = s.strip_prefix("../") {
+                match rest.split_once('/') {
+                    Some((_, after)) => after.to_owned(),
+                    None => String::new(),
+                }
+            } else {
+                s
+            };
+            if cleaned.is_empty() {
                 None
             } else {
-                Some(s.to_owned())
+                Some(cleaned)
             }
         });
+        slot.0 = cleaned_parent;
         slot.1 = path
             .file_name()
             .map(|f| f.as_str().to_owned())

@@ -190,7 +190,8 @@ impl Artifact {
 
         let hidden_components_count = self.0.hidden_components_count
             + if hide_prefix {
-                self.get_path().with_short_path(|p| p.iter().count())
+                self.get_path()
+                    .with_rule_local_short_path(|p| p.iter().count())
             } else {
                 0
             };
@@ -400,7 +401,8 @@ impl<'v> DeclaredArtifact<'v> {
 
         let hidden_components_count = self.hidden_components_count
             + if hide_prefix {
-                self.get_path().with_short_path(|p| p.iter().count())
+                self.get_path()
+                    .with_rule_local_short_path(|p| p.iter().count())
             } else {
                 0
             };
@@ -881,19 +883,31 @@ mod tests {
         full.get_path()
             .with_full_path(|p| assert_eq!(p, expected_full.as_str()));
 
-        // with_short_path returns just the artifact-relative path (no buck-out prefix)
+        // with_short_path returns the Bazel-form repo-relative path:
+        // for an external cell `cell` and package `pkg`, that is
+        // `../<cell>/<pkg>/<rule_local>`.
         full.get_path()
-            .with_short_path(|p| assert_eq!(p, "foo/bar.cpp"));
+            .with_short_path(|p| assert_eq!(p, "../cell/pkg/foo/bar.cpp"));
+
+        // with_rule_local_short_path returns just the rule-local fragment
+        // (no package, no `../<cell>/`).
+        full.get_path()
+            .with_rule_local_short_path(|p| assert_eq!(p, "foo/bar.cpp"));
 
         // hidden artifacts share the same full path
         hidden
             .get_path()
             .with_full_path(|p| assert_eq!(p, expected_full.as_str()));
 
-        // hidden short_path strips the first component
+        // hidden short_path: hidden_components_count strips from the rule-local
+        // fragment (`foo/bar.cpp` → `bar.cpp`), then the Bazel prefix is
+        // applied. Result: `../<cell>/<pkg>/bar.cpp`.
         hidden
             .get_path()
-            .with_short_path(|p| assert_eq!(p, "bar.cpp"));
+            .with_short_path(|p| assert_eq!(p, "../cell/pkg/bar.cpp"));
+        hidden
+            .get_path()
+            .with_rule_local_short_path(|p| assert_eq!(p, "bar.cpp"));
 
         Ok(())
     }
