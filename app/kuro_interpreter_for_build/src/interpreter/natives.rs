@@ -215,33 +215,46 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
         // This is critical for rules packages (e.g., rules_cc) that use
         // Label("//:target") to refer to their own repo's targets.
 
-        // Try BuildContext first (available during loading/interpretation).
-        // During analysis, BuildContext is unavailable - fall back to call stack parsing.
-        let (file_cell, pkg_path) = if let Ok(build_ctx) = BuildContext::from_context(eval) {
-            let cell = build_ctx.starlark_path().cell().to_string();
-            let pkg = match &build_ctx.additional {
-                PerFileTypeContext::Build(module) => module
-                    .buildfile_path()
-                    .package()
-                    .to_cell_path()
-                    .path()
-                    .as_str()
-                    .to_owned(),
-                PerFileTypeContext::Bzl(bzl_ctx) => {
-                    bzl_ctx.bzl_path.path_parent().path().as_str().to_owned()
-                }
-                _ => build_ctx.base_path()?.path().as_str().to_owned(),
-            };
-            (cell, pkg)
-        } else {
-            // During analysis: extract cell name and package from call stack filename.
-            // The filename is a project-relative path like:
-            //   "bazel-external/rules_rust/0.40.0/rust/private/utils.bzl"
-            //   "bazel_tools/tools/build_rules/filegroup.bzl"
-            //   "some/local/file.bzl"
+        // Bazel resolves `Label("//...")` relative to the LEXICAL location of
+        // the call, i.e. the file containing the Label() call as written —
+        // not the file currently being interpreted. When a macro defined in
+        // `@rules_cc//cc/toolchains/toolchain.bzl` calls `Label("//cc/...")`
+        // and that macro is invoked from `@llvm_toolchains//:BUILD.bazel`,
+        // the label must resolve in `@rules_cc`, not `@llvm_toolchains`.
+        //
+        // `BuildContext::from_context(eval)` reports the *currently
+        // interpreting* file's cell, which is the BUILD file in the macro
+        // case — wrong. Use the call-stack top location's filename to find
+        // the .bzl file that lexically contains the Label() call, and
+        // derive the cell from its project-relative path. Only fall back
+        // to BuildContext when the call stack lacks a location (rare).
+        let (file_cell, pkg_path) = {
             let location = eval.call_stack_top_location();
             let filename = location.as_ref().map(|l| l.filename().to_owned());
-            extract_cell_and_package_from_filename(filename.as_deref().unwrap_or(""))
+            match filename.as_deref() {
+                Some(f) if !f.is_empty() => extract_cell_and_package_from_filename(f),
+                _ => {
+                    if let Ok(build_ctx) = BuildContext::from_context(eval) {
+                        let cell = build_ctx.starlark_path().cell().to_string();
+                        let pkg = match &build_ctx.additional {
+                            PerFileTypeContext::Build(module) => module
+                                .buildfile_path()
+                                .package()
+                                .to_cell_path()
+                                .path()
+                                .as_str()
+                                .to_owned(),
+                            PerFileTypeContext::Bzl(bzl_ctx) => {
+                                bzl_ctx.bzl_path.path_parent().path().as_str().to_owned()
+                            }
+                            _ => build_ctx.base_path()?.path().as_str().to_owned(),
+                        };
+                        (cell, pkg)
+                    } else {
+                        (String::new(), String::new())
+                    }
+                }
+            }
         };
 
         let resolved = if label_string.starts_with("@@") || label_string.starts_with('@') {

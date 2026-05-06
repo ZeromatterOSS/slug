@@ -219,6 +219,32 @@ pub fn get_dynamic_project_root() -> Option<std::path::PathBuf> {
 /// and left a `external/<cell>` symlink pointing to a different version in
 /// `bazel-external/`), it is replaced. Non-symlink entries (directories or files) are
 /// left alone — the user put them there.
+/// Score a `bazel-external/<basename>` path for `external/<apparent>` symlink
+/// precedence. Higher = more preferred.
+///
+/// When multiple cells share the same apparent name (e.g. `rules_python`
+/// is both the bzlmod module `rules_python+1.9.0` AND an extension spoke
+/// `rules_foreign_cc+ext+rules_python`), the symlink should point at the
+/// bzlmod module form because that's where bazel_dep'd consumers expect
+/// templates and other source files to live. Extension spokes get their
+/// own symlinks under their canonical names elsewhere.
+///
+///   `rules_python+1.9.0`               → 2 (module form, name+version)
+///   `rules_foreign_cc+ext+rules_python` → 1 (extension spoke, 3 segments)
+///   `rules_python`                     → 0 (no version, ambiguous)
+fn module_form_priority(cell_path: &str) -> u8 {
+    let basename = std::path::Path::new(cell_path)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
+    let plus_count = basename.matches('+').count();
+    match plus_count {
+        1 => 2,
+        n if n >= 2 => 1,
+        _ => 0,
+    }
+}
+
 pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
     let project_root = match DYNAMIC_PROJECT_ROOT.get() {
         Some(root) => root.clone(),
@@ -227,6 +253,7 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
     let external_dir = project_root.join("external");
     let link_path = external_dir.join(cell_name);
     let desired_target = std::path::PathBuf::from("..").join(cell_path);
+    let desired_priority = module_form_priority(cell_path);
     match link_path.symlink_metadata() {
         Ok(meta) if meta.file_type().is_symlink() => {
             // Replace symlink only if it points to a different target.
@@ -239,6 +266,28 @@ pub fn ensure_external_symlink(cell_name: &str, cell_path: &str) {
             match std::fs::read_link(&link_path) {
                 Ok(current) => {
                     if current == desired_target {
+                        return;
+                    }
+                    // Precedence: prefer bzlmod-module-form targets
+                    // (`name+version`) over extension-spoke targets
+                    // (`owner+ext+name`). Multiple extensions can produce
+                    // sibling spokes that share the same apparent
+                    // `cell_name`; whichever wins the race must be the
+                    // module, not a spoke, so consumers of `external/<name>`
+                    // (like template-expand actions reading
+                    // `external/rules_python/python/private/...`) find
+                    // the right files.
+                    let current_str = current.to_string_lossy();
+                    let current_priority = module_form_priority(&current_str);
+                    if current_priority > desired_priority {
+                        tracing::debug!(
+                            "ensure_external_symlink: keeping {} (was {} pri={}, would be {} pri={})",
+                            link_path.display(),
+                            current.display(),
+                            current_priority,
+                            desired_target.display(),
+                            desired_priority,
+                        );
                         return;
                     }
                     match (
