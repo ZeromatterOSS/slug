@@ -958,29 +958,49 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         if let Some(label) = this.0.label {
             let target = label.label().target();
             let cfg = label.label().cfg();
+            let cell = target.pkg().cell_name().as_str();
             let pkg_path = target.pkg().cell_relative_path().as_str();
             let target_name = target.name().as_str();
-            let label_str = if pkg_path.is_empty() {
+            let cell_qualified = if pkg_path.is_empty() {
+                format!("@{}//:{}", cell, target_name)
+            } else {
+                format!("@{}//{}:{}", cell, pkg_path, target_name)
+            };
+            let cell_relative = if pkg_path.is_empty() {
                 format!("//:{}", target_name)
             } else {
                 format!("//{}:{}", pkg_path, target_name)
             };
 
-            let cfg_value: Option<Value<'v>> = BuildSettingLabel::from_bazel_label(&label_str)
+            // Try the canonical-cell form first (matches storage that
+            // canonicalizes CLI cell aliases via the alias resolver), then
+            // fall back to the cell-less form for callers that wrote with
+            // no cell prefix.
+            let cfg_value: Option<Value<'v>> = BuildSettingLabel::from_bazel_label(&cell_qualified)
                 .ok()
                 .and_then(|l| cfg.get_build_setting(&l).ok().flatten())
+                .or_else(|| {
+                    BuildSettingLabel::from_bazel_label(&cell_relative)
+                        .ok()
+                        .and_then(|l| cfg.get_build_setting(&l).ok().flatten())
+                })
                 .map(|v| build_setting_value_to_starlark(v, heap));
 
             // Fallback: the process-global starlark_flags store, used by
             // any path that wrote there (e.g. transition mirror-writes).
             let final_value = cfg_value.or_else(|| {
-                crate::interpreter::rule_defs::build_config::get_starlark_flag(&label_str).map(
-                    |cli_value| match cli_value.as_str() {
-                        "True" | "true" | "1" => heap.alloc(true).to_value(),
-                        "False" | "false" | "0" => heap.alloc(false).to_value(),
-                        s => heap.alloc_str(s).to_value(),
-                    },
-                )
+                let cli_value =
+                    crate::interpreter::rule_defs::build_config::get_starlark_flag(&cell_qualified)
+                        .or_else(|| {
+                            crate::interpreter::rule_defs::build_config::get_starlark_flag(
+                                &cell_relative,
+                            )
+                        });
+                cli_value.map(|cli_value| match cli_value.as_str() {
+                    "True" | "true" | "1" => heap.alloc(true).to_value(),
+                    "False" | "false" | "0" => heap.alloc(false).to_value(),
+                    s => heap.alloc_str(s).to_value(),
+                })
             });
 
             if let Some(value) = final_value {

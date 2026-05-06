@@ -14,6 +14,7 @@ use async_trait::async_trait;
 use dice::DiceComputations;
 use dupe::Dupe;
 use kuro_common::dice::cells::HasCellResolver;
+use kuro_core::cells::CellAliasResolver;
 use kuro_core::cells::name::CellName;
 use kuro_core::cells::paths::CellRelativePath;
 use kuro_core::configuration::build_setting::BuildSettingLabel;
@@ -97,14 +98,56 @@ const COMPILATION_MODE_LABEL: &str = "@bazel_tools//tools/cpp:compilation_mode";
 /// cfg then sees the settings in `ConfigurationData.build_settings`.
 /// Transitions and exec-platform construction preserve these entries since
 /// `ConfigurationData::with_build_setting` only ever adds or overrides.
-fn apply_cli_build_settings(cfg: ConfigurationData) -> kuro_error::Result<ConfigurationData> {
+async fn apply_cli_build_settings(
+    ctx: &mut DiceComputations<'_>,
+    cfg: ConfigurationData,
+) -> kuro_error::Result<ConfigurationData> {
     let compilation_mode =
         kuro_build_api::interpreter::rule_defs::build_config::get_compilation_mode();
     let starlark_flags: Vec<(String, String)> =
         kuro_build_api::interpreter::rule_defs::build_config::get_all_starlark_flags()
             .into_iter()
             .collect();
-    apply_cli_build_settings_with(cfg, &compilation_mode, &starlark_flags)
+    let resolver = ctx.get_cell_resolver().await?;
+    let alias_resolver = resolver.root_cell_cell_alias_resolver();
+    apply_cli_build_settings_with(
+        cfg,
+        &compilation_mode,
+        &starlark_flags,
+        Some(alias_resolver),
+    )
+}
+
+/// Rewrites a Bazel-style `@alias//pkg:name` label so the cell prefix is the
+/// canonical cell name resolved through `aliases`. Labels without a cell
+/// prefix or with an unknown alias are returned unchanged so the synthetic
+/// `@kuro_settings` routing in `BuildSettingLabel::from_bazel_label` still
+/// works for `//command_line_option:...` keys and for tests without a
+/// resolver.
+fn canonicalize_cell_alias(raw: &str, aliases: Option<&CellAliasResolver>) -> String {
+    let Some(aliases) = aliases else {
+        return raw.to_owned();
+    };
+    let Some(rest) = raw.strip_prefix('@') else {
+        return raw.to_owned();
+    };
+    // Skip the canonical-name marker `@@` — caller already provided a
+    // canonical cell.
+    if rest.starts_with('@') {
+        return raw.to_owned();
+    }
+    let Some(sep) = rest.find("//") else {
+        return raw.to_owned();
+    };
+    let alias = &rest[..sep];
+    let tail = &rest[sep..]; // includes leading "//"
+    if alias.is_empty() {
+        return raw.to_owned();
+    }
+    match aliases.resolve(alias) {
+        Ok(canonical) if canonical.as_str() != alias => format!("@{}{}", canonical.as_str(), tail),
+        _ => raw.to_owned(),
+    }
 }
 
 /// Pure helper that folds the given compilation_mode and starlark_flags into
@@ -114,6 +157,7 @@ fn apply_cli_build_settings_with(
     cfg: ConfigurationData,
     compilation_mode: &str,
     starlark_flags: &[(String, String)],
+    aliases: Option<&CellAliasResolver>,
 ) -> kuro_error::Result<ConfigurationData> {
     if !cfg.is_bound() {
         return Ok(cfg);
@@ -126,7 +170,8 @@ fn apply_cli_build_settings_with(
     )?;
 
     for (raw_label, raw_value) in starlark_flags {
-        let label = match BuildSettingLabel::from_bazel_label(raw_label) {
+        let canonical_label = canonicalize_cell_alias(raw_label, aliases);
+        let label = match BuildSettingLabel::from_bazel_label(&canonical_label) {
             Ok(l) => l,
             Err(e) => {
                 tracing::warn!("skipping CLI flag `{raw_label}`: {e}");
@@ -187,7 +232,7 @@ impl ConfiguredTargetCalculationImpl for ConfiguredTargetCalculationInstance {
                 )
                 .await
                 .with_buck_error_context(|| format!("Resolving modifiers for target `{target}`"))?;
-            apply_cli_build_settings(resolved)
+            apply_cli_build_settings(ctx, resolved).await
         }
 
         match node.rule_kind() {
@@ -247,7 +292,7 @@ mod tests {
 
     #[test]
     fn cli_compilation_mode_lands_in_build_settings() -> kuro_error::Result<()> {
-        let cfg = apply_cli_build_settings_with(make_cfg(), "opt", &[])?;
+        let cfg = apply_cli_build_settings_with(make_cfg(), "opt", &[], None)?;
         let label = BuildSettingLabel::from_bazel_label(COMPILATION_MODE_LABEL)?;
         assert_eq!(
             cfg.get_build_setting(&label)?,
@@ -262,7 +307,7 @@ mod tests {
             ("//:my_flag".to_owned(), "baz".to_owned()),
             ("@foo//:feature".to_owned(), "on".to_owned()),
         ];
-        let cfg = apply_cli_build_settings_with(make_cfg(), "fastbuild", &flags)?;
+        let cfg = apply_cli_build_settings_with(make_cfg(), "fastbuild", &flags, None)?;
         let my_flag = BuildSettingLabel::from_bazel_label("//:my_flag")?;
         assert_eq!(
             cfg.get_build_setting(&my_flag)?,
@@ -281,12 +326,50 @@ mod tests {
     /// opt-configured analyses coexist in the DICE cache without colliding.
     #[test]
     fn differing_compilation_modes_produce_distinct_cfgs() -> kuro_error::Result<()> {
-        let opt = apply_cli_build_settings_with(make_cfg(), "opt", &[])?;
-        let dbg = apply_cli_build_settings_with(make_cfg(), "dbg", &[])?;
-        let fastbuild = apply_cli_build_settings_with(make_cfg(), "fastbuild", &[])?;
+        let opt = apply_cli_build_settings_with(make_cfg(), "opt", &[], None)?;
+        let dbg = apply_cli_build_settings_with(make_cfg(), "dbg", &[], None)?;
+        let fastbuild = apply_cli_build_settings_with(make_cfg(), "fastbuild", &[], None)?;
         assert_ne!(opt.output_hash(), dbg.output_hash());
         assert_ne!(opt.output_hash(), fastbuild.output_hash());
         assert_ne!(dbg.output_hash(), fastbuild.output_hash());
+        Ok(())
+    }
+
+    /// `--@apparent//pkg:flag=value` should be stored under the cell's
+    /// canonical name when an alias resolver maps `apparent` → canonical.
+    /// Lookups in `ctx.build_setting_value` use the canonical name (from
+    /// `pkg.cell_name()`), so storage must agree.
+    #[test]
+    fn cell_alias_is_canonicalized_at_storage_time() -> kuro_error::Result<()> {
+        use std::collections::HashMap;
+
+        use kuro_core::cells::alias::NonEmptyCellAlias;
+
+        let canonical = CellName::testing_new("rules_rust+0.69.0");
+        let mut aliases = HashMap::new();
+        aliases.insert(NonEmptyCellAlias::new("rules_rust".to_owned())?, canonical);
+        let resolver = CellAliasResolver::new(CellName::testing_new("root"), aliases)?;
+
+        let flags = vec![(
+            "@rules_rust//cargo/settings:experimental_symlink_execroot".to_owned(),
+            "true".to_owned(),
+        )];
+        let cfg = apply_cli_build_settings_with(make_cfg(), "fastbuild", &flags, Some(&resolver))?;
+
+        // Canonical-cell lookup matches.
+        let canonical_label = BuildSettingLabel::from_bazel_label(
+            "@rules_rust+0.69.0//cargo/settings:experimental_symlink_execroot",
+        )?;
+        assert_eq!(
+            cfg.get_build_setting(&canonical_label)?,
+            Some(&BuildSettingValue::String("true".to_owned()))
+        );
+        // Apparent-cell lookup MISSES — that's the whole point of
+        // canonicalizing on the storage side.
+        let apparent_label = BuildSettingLabel::from_bazel_label(
+            "@rules_rust//cargo/settings:experimental_symlink_execroot",
+        )?;
+        assert_eq!(cfg.get_build_setting(&apparent_label)?, None);
         Ok(())
     }
 
@@ -298,7 +381,7 @@ mod tests {
             ("bogus".to_owned(), "x".to_owned()),
             ("//:good".to_owned(), "y".to_owned()),
         ];
-        let cfg = apply_cli_build_settings_with(make_cfg(), "fastbuild", &flags)?;
+        let cfg = apply_cli_build_settings_with(make_cfg(), "fastbuild", &flags, None)?;
         let good = BuildSettingLabel::from_bazel_label("//:good")?;
         assert_eq!(
             cfg.get_build_setting(&good)?,

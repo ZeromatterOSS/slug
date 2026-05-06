@@ -135,3 +135,180 @@ Some are already accepted-but-ignored; others trigger "unexpected
 argument" errors that bubble up under `--config=generic_clang` etc.
 Triage incrementally as they block concrete workflows, rather than as a
 single sweep.
+
+---
+
+### 22.4 Cell-aware `--@cell//pkg:flag=value` build-setting plumbing (DONE 2026-05-06)
+
+Landed in:
+- `app/kuro_build_api/src/interpreter/rule_defs/context.rs` —
+  `ctx.build_setting_value` now constructs `@<cell>//pkg:name` from
+  `target.pkg().cell_name()` and falls back to the cell-less form for
+  legacy callers.
+- `app/kuro_configured/src/target_platform_resolution.rs` — new
+  `canonicalize_cell_alias` helper rewrites `@<apparent>//pkg:name`
+  CLI flags through the root cell's `CellAliasResolver` before storing
+  them in `cfg.build_settings`. `apply_cli_build_settings` is now
+  async and threads `DiceComputations` to fetch the resolver.
+
+New unit test `cell_alias_is_canonicalized_at_storage_time` exercises
+the rules_rust shape (`--@rules_rust//cargo/settings:experimental_symlink_execroot=true`
+with apparent→canonical mapping `rules_rust → rules_rust+0.69.0`).
+
+Verified end-to-end: zeromatter `kuro build //sdk:sdk_contents` now puts
+`RULES_RUST_SYMLINK_EXEC_ROOT=1` in `cargo_build_script_run` action
+envs. Build advances past analysis into execution and fails at a
+separate downstream issue (`Failed to delete symlink … CHANGELOG.md`)
+inside rules_rust's `cargo_build_script_runner` — outside the scope
+of this phase.
+
+`cargo test -p kuro_node -p kuro_common -p kuro_configured -p kuro_action_impl --lib`
+all green (7 + 83 + 5 + 47 = 142 tests pass).
+
+Original write-up below for context:
+
+> Discovered while investigating zeromatter `//sdk:sdk_contents`'s
+> `lib/units:build_script` panic. Root cause: rules_rust's `.bazelrc`
+> sets `build --@rules_rust//cargo/settings:experimental_symlink_execroot=true`,
+> which should put `RULES_RUST_SYMLINK_EXEC_ROOT=1` in the build-script
+> action env. In kuro the env var is absent: the CLI flag is parsed and
+> stored, but the analysis-time lookup never finds it because cell
+> prefixes are dropped on the lookup side (and not canonicalized on
+> the storage side).
+
+#### Symptom
+
+`bool_flag` / `string_flag` / `int_flag` rules from
+`@bazel_skylib//rules:common_settings.bzl` always observe the
+`build_setting_default`, regardless of any
+`--@cell//pkg:flag=value` override on the CLI or in `.bazelrc`. Any
+rule that gates behaviour on `ctx.attr._x[BuildSettingInfo].value` —
+including rules_rust's `experimental_symlink_execroot` — sees the
+default and silently does the wrong thing.
+
+#### Storage path (works)
+
+1. `app/kuro_client_ctx/src/bazelrc.rs:441-468` — `normalize_args`
+   peels `--@<cell>//pkg:flag=value` out of CLI args into `STARLARK_FLAGS`.
+2. `app/kuro_client_ctx/src/client_ctx.rs:258` — propagated to daemon
+   via `client_context.starlark_flags`.
+3. `app/kuro_server/src/ctx.rs:342` — daemon calls `set_starlark_flags`.
+4. `app/kuro_build_api/src/interpreter/rule_defs/build_config.rs:347-365`
+   — stored in process-global map keyed on the raw CLI label
+   (`@<cell>//pkg:flag`).
+5. `app/kuro_configured/src/target_platform_resolution.rs:128-140` —
+   folded into `cfg.build_settings` via
+   `BuildSettingLabel::from_bazel_label`. Cell name from the CLI alias
+   is preserved verbatim through `TargetLabel::testing_parse`
+   (`app/kuro_core/src/target/label/label.rs:222-244`).
+
+#### Lookup path (broken)
+
+`app/kuro_build_api/src/interpreter/rule_defs/context.rs:958-984` —
+`ctx.build_setting_value`:
+
+```rust
+let pkg_path = target.pkg().cell_relative_path().as_str();
+let target_name = target.name().as_str();
+let label_str = if pkg_path.is_empty() {
+    format!("//:{}", target_name)
+} else {
+    format!("//{}:{}", pkg_path, target_name)
+};
+```
+
+The cell prefix is **omitted**.
+`BuildSettingLabel::from_bazel_label("//pkg:flag")`
+(`app/kuro_core/src/configuration/build_setting.rs:52-69`) routes
+unprefixed labels to a synthetic `@kuro_settings` cell. Storage key is
+`@<cell>//pkg:flag`; lookup key is `@kuro_settings//pkg:flag` — miss.
+
+The same lookup also tries the raw process-global map at
+`context.rs:977` via `get_starlark_flag(&label_str)` with the same
+cell-less string — also a miss.
+
+#### Secondary concern: bzlmod cell-alias canonicalization
+
+Even after the lookup includes a cell prefix, the CLI alias
+(`rules_rust`) may not match the canonical cell where the build_setting
+target actually loads (e.g. `rules_rust+0.69.0` if bzlmod has
+canonicalized it, or some apparent-name aliased form). The two paths
+must agree on the cell-name basis, which means the storage side has to
+resolve CLI cell aliases through bzlmod's apparent-name table — see
+`collect_transitive_repo_aliases` in
+`app/kuro_common/src/legacy_configs/cells.rs` and the BazelDep
+`apparent_name()` machinery in `app/kuro_bzlmod/src/types.rs`.
+
+#### Fix shape
+
+1. **Lookup-side cell inclusion** —
+   `app/kuro_build_api/src/interpreter/rule_defs/context.rs:961-984`:
+   build the lookup label as
+   `@{cell}//{pkg}:{name}` using `target.pkg().cell_name().as_str()`
+   (`PackageLabel::cell_name()` exists at
+   `app/kuro_core/src/package.rs:155`). Same fix for the
+   `get_starlark_flag` fallback at `context.rs:977`.
+
+2. **Storage-side alias canonicalization** —
+   `app/kuro_configured/src/target_platform_resolution.rs:128-140` and
+   `app/kuro_build_api/src/interpreter/rule_defs/build_config.rs:347-365`:
+   resolve the CLI cell alias through the active bzlmod apparent-name
+   table before keying. `BuildSettingLabel::from_bazel_label` currently
+   funnels unprefixed labels through a synthetic `@kuro_settings` cell
+   (`app/kuro_core/src/configuration/build_setting.rs:48-65`) — this
+   was added as a stub; the canonical-cell routing in Plan 37 plus the
+   apparent-name table are the right source of truth here.
+
+3. **Synthetic-cell follow-up** — once both sides go through the real
+   resolver, audit whether `@kuro_settings` is still needed for any
+   call sites (transitions declaring inputs/outputs as raw
+   `"//command_line_option:..."` strings, etc.) or can be retired.
+
+#### Tests
+
+- Unit test in
+  `app/kuro_build_api/src/interpreter/rule_defs/context.rs` (or a
+  dedicated test crate): analyze a `bool_flag` target in a non-root
+  cell with a CLI override; assert
+  `ctx.attr._x[BuildSettingInfo].value` reflects the override.
+- Integration test under `tests/core/` that reproduces the
+  rules_rust `experimental_symlink_execroot` shape:
+  `--@cell//pkg:flag=true` → `bool_flag` target's
+  `BuildSettingInfo.value == True`. Run with the CLI alias and with
+  the canonical cell name; both should match.
+- Round-trip test that the apparent-name resolver agrees on both
+  sides: storing under `--@apparent//...` and looking up via the
+  canonical cell name (and vice versa) both succeed.
+
+#### Acceptance criteria
+
+1. `kuro build` of a target whose analysis reads
+   `BuildSettingInfo.value` from a CLI-overridden flag in a
+   non-root cell observes the override (not the default).
+2. Specifically: `cd zeromatter && kuro build //sdk:sdk_contents`
+   produces a `lib/units:build_script` action env containing
+   `RULES_RUST_SYMLINK_EXEC_ROOT=1`. (Other blockers in that build
+   are out of scope here — the verification is the env var, not
+   the full build succeeding.)
+3. `cargo test -p kuro_configured -p kuro_build_api -p kuro_common --lib`
+   stays green.
+4. The `starlark_flags_land_in_build_settings` test in
+   `target_platform_resolution.rs` is extended to exercise the
+   lookup path, not just the storage path.
+
+#### Out of scope
+
+- Rebuilding the `@kuro_settings` synthetic-cell mechanism — keep it
+  for now, just route real cells correctly first.
+- Transition output overrides (writing `--@cell//pkg:flag=value` from
+  a Starlark transition). Storage side already handles arbitrary
+  string keys via `set_starlark_flag`; that path will inherit the
+  same canonicalization fix.
+
+#### Effort
+
+Medium. Lookup fix is ~10 lines plus a test. Cell-alias
+canonicalization on the storage side requires plumbing the apparent-
+name resolver into `apply_cli_build_settings_with` and
+`set_starlark_flags` (currently both run before any cell context is
+materialized). Likely 1-2 days including the integration test.
