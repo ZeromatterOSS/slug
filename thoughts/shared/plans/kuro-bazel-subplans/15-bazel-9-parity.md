@@ -211,6 +211,45 @@ Remove the "using lockfile specs anyway" fallback
 extension re-execution and overwrite the lockfile entry. Matches
 Bazel's `--lockfile_mode=update` default.
 
+### Findings (2026-05-05) — `MODULE.bazel.lock` round-trip divergence
+
+Comparing kuro's emitted lockfile against a fresh
+`bazel 9.1.0 mod graph` run on `examples/multi_package` revealed
+**three** different key-format conventions in play and
+**over-locking** of internal extensions:
+
+| Source | `moduleExtensions` key format | Example |
+|---|---|---|
+| Fresh bazel 9.1.0 | `@@<canonical>+//pkg:file%name` | `@@rules_python+//python/uv:uv.bzl%uv` |
+| Stale committed kuro lock | `//pkg:file%name` (no `@`) | `//host:extension.bzl%host_platform` |
+| Kuro (current) | `@<apparent>//pkg:file%name` | `@platforms//host:extension.bzl%host_platform` |
+
+Source: `app/kuro_bzlmod/src/extensions.rs:209-226`
+`canonical_extension_id()` rewrites `//pkg:file.bzl` →
+`@<module>//pkg:file.bzl` for owner/consumer dedupe; that key then
+flows through `extension_execution_dice.rs:776`
+`lockfile.set_extension_cache(extension_id, …)` straight into the
+lockfile.
+
+**Over-locking:** kuro emits 12 entries for `multi_package`'s lock;
+fresh bazel emits 4. The 8 kuro-only entries are extensions that bazel
+treats as internal/version-bound and intentionally does not lock,
+because their output is fully determined by the bazel/kuro version
+(the implementation is bundled with the tool, not user-specified):
+
+- `@platforms//host:extension.bzl%host_platform`
+- `@rules_cc//cc:extensions.bzl%cc_configure_extension`
+- `@rules_cc//cc:extensions.bzl%compatibility_proxy`
+- `@bazel_features//private:extensions.bzl%version_extension`
+- `@rules_java//java:extensions.bzl%toolchains`
+- (plus a handful of similar transitively-invoked internal extensions)
+
+Round-trip success criterion 3
+(*"Kuro-generated lockfile entries are re-readable by Bazel 9 on the
+same workspace"*) is currently broken on both axes.
+
+### Changes
+
 ### Changes
 
 - `app/kuro_bzlmod/src/lockfile.rs:445-509`: modify
@@ -219,6 +258,49 @@ Bazel's `--lockfile_mode=update` default.
 - `app/kuro_bzlmod/src/extension_execution_dice.rs:406-438`: when
   cache returns `None`, execute extension and write updated entry to
   lockfile at end of compute.
+- **Lockfile key format**: write keys as
+  `@@<canonical>+//pkg:file.bzl%name` (canonical repo with `@@` prefix
+  and `+` version-or-empty suffix), not the current
+  `@<apparent>//pkg:file.bzl%name`. Affects both
+  `set_extension_cache()` (write) and `get_extension_cache()` (read).
+  Internal aggregation can keep its `@<apparent>` form; convert at the
+  lockfile boundary only.
+- **Skip internal/version-bound extensions** when writing the
+  lockfile: maintain a small allow-skip set
+  (`KURO_INTERNAL_EXTENSIONS`) keyed by canonical extension id. Initial
+  members: `host_platform`, `cc_configure_extension`,
+  `compatibility_proxy`, `version_extension`,
+  `rules_java//java:extensions.bzl%toolchains`. These extensions ship
+  their implementation with kuro; locking them is noise that
+  guarantees bazel-round-trip mismatches.
+
+  **Side-fix (2026-05-05):** the lockfile-key format change exposed a
+  latent bug in `pending_repo_cells.rs:185` where the *raw*
+  `usage.extension_bzl_file` (e.g. `//java:extensions.bzl`) was passed
+  to `extract_owning_module` instead of the canonicalized `ext_id`
+  built 12 lines above. With a bare `//` path the helper falls through
+  to "no module prefix → `_main`", mis-attributing every transitive
+  module's relative `use_extension(…)` to the root module. Fixed in
+  the same commit; symlink targets now match bazel's
+  `<owning_module>+<ext>+<repo>` exactly. The same fix also taught
+  `extract_owning_module` to strip the bazel-canonical trailing `+` on
+  the module segment (`@@<repo>+//…` → `<repo>`), since
+  `pending_repo_cells.rs:330` re-derives canonical names from lockfile
+  keys and would otherwise emit `<repo>++<ext>+<repo>` once the keys
+  use the new format.
+
+  **Blocker (2026-05-05):** a naive skip-list breaks
+  `examples/multi_package` because kuro's spoke-materialization path
+  reads back the lockfile entries for these very extensions to seed
+  cell registration (`pending_repo_cells.rs::seed_from_lockfile`).
+  Removing the entries causes `File not found:
+  multi_package//bazel-external/_main+host_platform+host_platform`
+  and similar at BUILD-evaluation time. Decoupling spoke registration
+  from the lockfile is a prerequisite — likely a small refactor of the
+  startup-time seed path so it sources its inputs from in-memory
+  aggregation results rather than re-reading the persisted lockfile.
+  The format-fix portion of this phase is independent and can land
+  first; over-locking removal lands once spoke seeding is decoupled.
 - `compute_bzl_transitive_digest`
   (`extension_execution_dice.rs:703-717`) currently stubs to hash
   extension_id only; upgrade to real transitive .bzl hashing matching

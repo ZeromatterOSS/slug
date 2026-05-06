@@ -1293,6 +1293,13 @@ async fn run_analysis_with_env_underlying(
         // For each resolved toolchain type, analyze the impl target via DICE
         // to get its real providers. Types that fail analysis get None (the
         // ResolvedToolchains.at() method returns an error for unresolved types).
+        let mandatory_types: std::collections::HashSet<String> = analysis_env
+            .rule_spec
+            .toolchain_types()
+            .into_iter()
+            .filter_map(|(label, mandatory)| if mandatory { Some(label) } else { None })
+            .collect();
+
         let resolved_toolchains_for_ctx = if let Some(result) = &toolchain_resolution_result {
             let any_resolved = result.resolved_toolchains.values().any(|v| v.is_some());
             if any_resolved {
@@ -1310,47 +1317,71 @@ async fn run_analysis_with_env_underlying(
                             tc.toolchain_impl
                         );
 
-                        // Try to analyze the toolchain impl target
-                        let provider_value =
+                        let is_mandatory = mandatory_types.contains(type_label);
+
+                        // Analyze the toolchain impl target. For mandatory
+                        // toolchains, propagate analysis errors so the user
+                        // sees the real failure (rather than a cryptic
+                        // "NoneType has no attribute X" at the call site).
+                        let provider_value: Option<FrozenProviderCollectionValue> =
                             match parse_impl_label_to_target_label(&tc.toolchain_impl) {
                                 Some(target_label) => {
-                                    let configured =
-                                        target_label.configure(target_cfg.dupe());
-                                    match dice.get_analysis_result(&configured).await {
-                                        Ok(maybe_compat) => match maybe_compat {
-                                            kuro_core::configuration::compatibility::MaybeCompatible::Compatible(analysis) => {
-                                                match analysis.providers() {
-                                                    Ok(providers) => {
-                                                        let owned = providers.to_owned();
-                                                        tracing::debug!(
-                                                            "  {} → analyzed impl '{}' successfully",
-                                                            type_label,
-                                                            tc.toolchain_impl
-                                                        );
-                                                        Some(owned)
+                                    let configured = target_label.configure(target_cfg.dupe());
+                                    let analysis_result =
+                                        dice.get_analysis_result(&configured).await;
+                                    match analysis_result {
+                                        Ok(kuro_core::configuration::compatibility::MaybeCompatible::Compatible(analysis)) => {
+                                            match analysis.providers() {
+                                                Ok(providers) => Some(providers.to_owned()),
+                                                Err(e) => {
+                                                    if is_mandatory {
+                                                        return Err(e).with_buck_error_context(|| {
+                                                            format!(
+                                                                "Failed to extract providers from \
+                                                                 mandatory toolchain impl '{}' for \
+                                                                 toolchain type '{}'",
+                                                                tc.toolchain_impl, type_label
+                                                            )
+                                                        });
                                                     }
-                                                    Err(e) => {
-                                                        tracing::debug!(
-                                                            "  {} → providers extraction failed: {}",
-                                                            type_label,
-                                                            e
-                                                        );
-                                                        None
-                                                    }
+                                                    tracing::debug!(
+                                                        "  {} → providers extraction failed (optional): {}",
+                                                        type_label,
+                                                        e
+                                                    );
+                                                    None
                                                 }
                                             }
-                                            _ => {
-                                                tracing::debug!(
-                                                    "  {} → impl '{}' is incompatible",
-                                                    type_label,
-                                                    tc.toolchain_impl
-                                                );
-                                                None
+                                        }
+                                        Ok(_) => {
+                                            if is_mandatory {
+                                                return Err(kuro_error::kuro_error!(
+                                                    kuro_error::ErrorTag::Input,
+                                                    "Mandatory toolchain impl '{}' for type '{}' \
+                                                     is incompatible with target configuration",
+                                                    tc.toolchain_impl,
+                                                    type_label
+                                                ));
                                             }
-                                        },
-                                        Err(e) => {
                                             tracing::debug!(
-                                                "  {} → analysis of impl '{}' failed: {:#}",
+                                                "  {} → impl '{}' incompatible (optional)",
+                                                type_label,
+                                                tc.toolchain_impl
+                                            );
+                                            None
+                                        }
+                                        Err(e) => {
+                                            if is_mandatory {
+                                                return Err(e).with_buck_error_context(|| {
+                                                    format!(
+                                                        "Failed to analyze mandatory toolchain \
+                                                         impl '{}' for toolchain type '{}'",
+                                                        tc.toolchain_impl, type_label
+                                                    )
+                                                });
+                                            }
+                                            tracing::debug!(
+                                                "  {} → analysis of impl '{}' failed (optional): {:#}",
                                                 type_label,
                                                 tc.toolchain_impl,
                                                 e
@@ -1360,8 +1391,17 @@ async fn run_analysis_with_env_underlying(
                                     }
                                 }
                                 None => {
+                                    if is_mandatory {
+                                        return Err(kuro_error::kuro_error!(
+                                            kuro_error::ErrorTag::Input,
+                                            "Could not parse mandatory toolchain impl label '{}' \
+                                             for toolchain type '{}'",
+                                            tc.toolchain_impl,
+                                            type_label
+                                        ));
+                                    }
                                     tracing::debug!(
-                                        "  {} → could not parse impl label '{}'",
+                                        "  {} → could not parse impl label '{}' (optional)",
                                         type_label,
                                         tc.toolchain_impl
                                     );

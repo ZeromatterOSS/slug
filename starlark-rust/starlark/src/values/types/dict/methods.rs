@@ -169,7 +169,7 @@ pub(crate) fn dict_methods(registry: &mut MethodsBuilder) {
     fn pop<'v>(
         this: Value<'v>,
         #[starlark(require = pos)] key: Value<'v>,
-        #[starlark(require = pos)] default: Option<Value<'v>>,
+        default: Option<Value<'v>>,
     ) -> starlark::Result<Value<'v>> {
         let mut me = DictMut::from_value(this)?;
         match me.aref.remove_hashed(key.get_hashed()?) {

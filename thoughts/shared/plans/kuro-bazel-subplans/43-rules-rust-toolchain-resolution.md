@@ -1,12 +1,12 @@
-# Plan 43: rules_rust toolchain resolution returns None
+# Plan 43: dict.pop kwarg + toolchain impl-error surfacing
 
-## Status: PROPOSED
+## Status: COMPLETE (2026-05-05)
 
-## Context
+## Original symptom
 
 After Plan 42 (`expand_template` deferred), zeromatter's
-`//sdk:sdk_contents` build advances into rule analysis and fails
-inside rules_rust:
+`//example_engine:example_engine` (and `//sdk:sdk_contents`) build advances into
+rule analysis and fails inside rules_rust:
 
 ```
 * bazel-external/rules_rust+0.69.0/rust/private/rust_allocator_libraries.bzl:268, in _rust_allocator_libraries_impl
@@ -14,122 +14,99 @@ inside rules_rust:
 error: Object of type `NoneType` has no attribute `make_libstd_and_allocator_ccinfo`
 ```
 
-`toolchain` here comes from `find_toolchain(ctx)` in
-`rules_rust+0.69.0/rust/private/utils.bzl:62-71`:
+## Misdiagnosis
 
-```python
-def find_toolchain(ctx):
-    return ctx.toolchains[Label("//rust:toolchain_type")]
-```
+The first hypothesis — that kuro's toolchain resolver wasn't following
+the `//rust:toolchain` → `//rust:toolchain_type` alias used by
+`rules_rust+rust+rust_toolchains` — turned out to be wrong. Resolution
+already finds a matching toolchain (rules_rs's
+`@default_rust_toolchains` registers with the canonical
+`@rules_rust//rust:toolchain_type`, not the deprecated alias). With
+`BUCK_LOG=kuro_analysis=debug` the daemon log clearly shows
+`Toolchain resolution for ... 2/2 type(s) resolved`.
 
-i.e. `ctx.toolchains[Label("@rules_rust//rust:toolchain_type")]`. Kuro
-returns `None` from this lookup, so the .NoneType-attribute access
-blows up.
+The `NoneType` error came from a **silent failure two layers down.**
 
-## Investigation summary
+## Actual root cause chain
 
-ZeroMatter's MODULE.bazel registers two toolchain repos:
+1. Resolution selects
+   `default_rust_toolchains//:linux_x86_64_1_95_0_rust_toolchain` for
+   `@@rules_rust//rust:toolchain_type`. ✓
+2. Kuro tries to *analyze* that impl target. Its dep graph leads to
+   `llvm//tools:llvm-profdata` →
+   `llvm//toolchain:bootstrapped_toolchain` → loading
+   `bazel-external/rules_cc+0.2.17/cc/toolchains/toolchain.bzl:164`:
+   ```python
+   cc_toolchain_visibility = kwargs.pop("visibility", default = None)
+   ```
+3. Kuro's starlark `dict.pop` declares `default` as
+   `#[starlark(require = pos)]`
+   (`starlark/src/values/types/dict/methods.rs:172`). Bazel's starlark
+   accepts it as a keyword. The .bzl load errors with
+   `Found 'default' extra named parameter(s) for call to function`.
+4. `app/kuro_analysis/src/analysis/env.rs:1351-1359` catches the
+   analysis error and stores `None` in `resolved_toolchains` (the
+   `provider_value` arm). ✗ **swallowed.**
+5. `ResolvedToolchains.at()`
+   (`app/kuro_build_api/src/interpreter/rule_defs/context.rs:1898`)
+   returns `Value::new_none()` for `Some(None)` entries.
+6. Rule code does `toolchain.make_libstd_and_allocator_ccinfo(...)` —
+   NoneType error. The user never sees the real cause.
 
-```python
-register_toolchains("@llvm_toolchains//:all")
-register_toolchains("@default_rust_toolchains//:all")
-```
+## Fixes applied
 
-`@default_rust_toolchains` is a rules_rs-flavored repo that
-`declare_rustc_toolchains(version = "1.95.0", ...)` — generates a
-package full of `toolchain(...)` rules.
+### Fix A: `dict.pop` accepts `default` as keyword
 
-`rules_rust+0.69.0/rust:BUILD.bazel` (lines 13-20):
+`starlark-rust/starlark/src/values/types/dict/methods.rs`: drop
+`require = pos` from the `default` param of `dict.pop`. Bazel's starlark
+accepts both positional and keyword forms; rules_cc relies on the
+keyword form.
 
-```python
-toolchain_type(name = "toolchain_type", ...)
-alias(
-    name = "toolchain",
-    actual = "toolchain_type",
-    deprecation = "instead use `@rules_rust//rust:toolchain_type`",
-)
-```
+### Fix B: surface mandatory toolchain impl-analysis errors
 
-`bazel-external/rules_rust+rust+rust_toolchains/BUILD.bazel`
-(materialized but possibly not the one zeromatter uses) registers
-`toolchain(... toolchain_type = "@@rules_rust//rust:toolchain", ...)`
-— the **deprecated alias name**, not the canonical
-`:toolchain_type`.
+`app/kuro_analysis/src/analysis/env.rs` (block previously at
+1296-1387): for *mandatory* toolchain types, propagate impl-analysis
+errors with `with_buck_error_context` instead of swallowing them into
+`None`. Optional toolchains still degrade to `None` (matches Bazel's
+optional-toolchain semantics).
 
-Kuro's `app/kuro_analysis/src/analysis/toolchain_resolution.rs:240+`
-matches by exact label after `normalize_constraint_label`:
-
-```rust
-let tc_type_norm = normalize_constraint_label(&tc_info.toolchain_type);
-let req_type_norm = normalize_constraint_label(&req.type_label);
-if tc_type_norm != req_type_norm {
-    continue;
-}
-```
-
-So `:toolchain` (registered) and `:toolchain_type` (requested) never
-match. Even when alias resolution would produce identical canonical
-targets, kuro doesn't follow them.
-
-That's hypothesis (a). Hypothesis (b): rules_rs's
-`declare_rustc_toolchains` may not register *any* toolchain matching
-the linux-gnu-host target platform zeromatter is building under, or its
-generated toolchains may not have the rules_rust-shaped
-`ToolchainInfo` provider that `find_toolchain`'s callers expect. Need
-to verify before implementing.
-
-## Investigation steps
-
-1. **What `toolchain()`s are registered?** Print/dump the list kuro
-   builds from `register_toolchains` after package expansion. Confirm
-   whether `:all` from `@default_rust_toolchains` and from
-   `rules_rust+rust+rust_toolchains` is being walked, and what
-   `toolchain_type` labels each one carries.
-
-2. **Alias following.** Trace
-   `app/kuro_analysis/src/analysis/toolchain_resolution.rs::resolve_toolchains`
-   for the failing target. Does the `toolchain_type` field arrive
-   pre- or post-alias? If it arrives as a literal `:toolchain` while
-   the rule asks for `:toolchain_type`, alias-aware matching is the
-   fix.
-
-3. **Provider shape.** If a toolchain is found and returned but
-   `make_libstd_and_allocator_ccinfo` is still missing, the
-   rules_rs-generated `ToolchainInfo` is incomplete relative to
-   rules_rust's expectations. That's a different fix (extend rules_rs
-   toolchain output, or shim missing fields in kuro).
-
-## Likely fix path
-
-Phase 1 (small, high-value): make toolchain resolution alias-aware.
-- During `set_registered_toolchains` or at resolution time, follow
-  each registered `toolchain.toolchain_type` through aliases (using
-  the cell resolver's alias map / a load of the BUILD file). Store
-  the canonical `toolchain_type` on the resolved record.
-- In `resolve_toolchains`, normalize the requested type label the
-  same way before equality.
-
-Phase 2 (provider parity): if Phase 1 unblocks resolution but the
-returned `ToolchainInfo` is still missing rules_rust-specific fields,
-two options:
-- **Adapt rules_rs**: extend `declare_rustc_toolchains` to emit a
-  rules_rust-shaped struct (the cleaner long-term path).
-- **Shim in kuro**: detect rules_rs-shaped toolchains on lookup and
-  wrap them in a synthesized `ToolchainInfo` with the
-  rules_rust-shaped lambdas.
-
-## Out of scope
-
-- Actually compiling Rust (rules_rust uses cc_common.create_link_variables,
-  rust_std fetches, etc.) — once the toolchain is found, those
-  surface as the next layer of issues.
-- Cross-compilation toolchain selection.
-- `register_execution_platforms` semantics (separate domain).
+The test of "is this toolchain mandatory" reads from
+`analysis_env.rule_spec.toolchain_types()` (Vec<(label, mandatory)>);
+mandatory == true entries surface their failures.
 
 ## Verification
 
-- Re-run zeromatter `//sdk:sdk_contents`; expect `find_toolchain` to
-  return a real ToolchainInfo, then advance to the next layer
-  (likely cc_common/link_variables or actual rustc invocation).
-- `cargo test -p kuro_analysis --lib` (toolchain_resolution tests).
-- `examples/multi_package` still builds.
+`cd ../zeromatter && /var/mnt/dev/kuro/kuro build //example_engine:example_engine`
+now fails with a real, actionable error chain:
+
+```
+4: Failed to analyze mandatory toolchain impl
+   'llvm_toolchains//:linux_x86_64_cc_toolchain' for toolchain type
+   '@@bazel_tools//tools/cpp:toolchain_type'
+...
+13: package `llvm_toolchains//cc/toolchains/impl:` does not exist
+    dir `llvm_toolchains//cc` does not exist. Did you mean one of [`rules_cc//cc`]?
+```
+
+That deeper failure (llvm cc toolchain config loading) is its own
+issue, not part of plan 43's scope.
+
+## Lessons / follow-ups
+
+- Silent fallback to `None` masked a starlark-builtin gap and a
+  toolchain-impl loader bug for two layers. Surfacing the mandatory
+  case fixes the symptom of plan 43 *and* every future
+  toolchain-impl-load failure for mandatory types.
+- `kwargs.pop("foo", default = X)` may exist in other rules as well —
+  generic Bazel-compat starlark fix, no targeted fixture needed.
+
+## Out of scope (for this plan)
+
+- Toolchain alias resolution. Still a real edge case
+  (`rules_rust+rust+rust_toolchains` registers via the deprecated
+  alias). Not exercised by the zeromatter build because rules_rs's
+  `@default_rust_toolchains` registers via the canonical type and gets
+  selected first. File a follow-up if/when a build hits the alias path.
+- llvm cc toolchain config loading
+  (`llvm_toolchains//cc/toolchains/impl:darwin_aarch64`) — the new
+  surfaced error.

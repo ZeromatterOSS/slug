@@ -449,10 +449,16 @@ impl Lockfile {
         usages_digest: &str,
     ) -> Option<fxhash::FxHashMap<String, RepoSpec>> {
         // Try exact match first, then normalized forms for Bazel lockfile compat.
-        // Lockfiles may use "//:file.bzl%name" while kuro uses ":file.bzl%name" or vice versa.
+        // Lockfiles may use any of:
+        //   - kuro internal:        "@<apparent>//pkg:file.bzl%name"
+        //   - bazel 9 canonical:    "@@<canonical>+//pkg:file.bzl%name"
+        //   - bazel legacy/relative: "//pkg:file.bzl%name"
+        // Also handle ":" prefix used by some older serialization paths.
+        let canonical_form = lockfile_canonical_extension_id(extension_id);
         let ext_data = self
             .module_extensions
             .get(extension_id)
+            .or_else(|| self.module_extensions.get(&canonical_form))
             .or_else(|| {
                 // Try adding // prefix: ":file.bzl%name" -> "//:file.bzl%name"
                 if extension_id.starts_with(':') {
@@ -630,6 +636,28 @@ impl LockfileMode {
 /// Get the lockfile path for a workspace.
 pub fn lockfile_path(workspace_root: &Path) -> PathBuf {
     workspace_root.join("MODULE.bazel.lock")
+}
+
+/// Translate kuro's internal `@<apparent>//pkg:file.bzl%name` extension id to
+/// bazel 9's canonical `@@<repo>+//pkg:file.bzl%name` lockfile-key form.
+///
+/// Used for both writing (so kuro emits the same key shape as bazel) and
+/// reading (so kuro accepts bazel-written lockfiles unchanged).
+pub fn lockfile_canonical_extension_id(internal_id: &str) -> String {
+    if internal_id.starts_with("@@") {
+        return internal_id.to_owned();
+    }
+    if let Some(rest) = internal_id.strip_prefix('@') {
+        if let Some(slash_pos) = rest.find("//") {
+            let name = &rest[..slash_pos];
+            let after = &rest[slash_pos..];
+            return format!("@@{name}+{after}");
+        }
+    }
+    if internal_id.starts_with("//") {
+        return format!("@@_main+{internal_id}");
+    }
+    internal_id.to_owned()
 }
 
 /// Process-wide cache of parsed `MODULE.bazel.lock` files, keyed by absolute

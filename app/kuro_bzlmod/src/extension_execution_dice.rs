@@ -675,10 +675,18 @@ pub fn extract_owning_module(extension_id: &str, root_module_name: &str) -> Stri
     // Strip the extension name part (after %)
     let bzl_part = extension_id.split('%').next().unwrap_or(extension_id);
 
-    // Look for @module// or @@module// pattern
+    // Look for @module// or @@module// pattern.
+    //
+    // The module segment may appear in two shapes:
+    //   - kuro internal:        `@<apparent>//...`        → module = "<apparent>"
+    //   - bazel 9 canonical:    `@@<repo>+//...`          → module = "<repo>+"
+    // Strip the bazel-canonical trailing `+` so both shapes converge on the
+    // same owning-module name (otherwise format!"{}+{}+{}" produces
+    // `<repo>++<ext>+<repo>` for the canonical form).
     let stripped = bzl_part.trim_start_matches('@');
     if let Some(pos) = stripped.find("//") {
         let module = &stripped[..pos];
+        let module = module.strip_suffix('+').unwrap_or(module);
         if !module.is_empty() {
             // Map the root module's declared name back to Bazel's canonical
             // `_main` placeholder so callers all agree on one canonical
@@ -771,9 +779,19 @@ fn update_lockfile_extension_cache(
         Lockfile::new()
     };
 
-    // Update the extension cache
+    // Drop legacy bare `//pkg:file%name` keys that pre-date kuro emitting
+    // canonical `@@<repo>+//...` form. They're stale (no cell info) and
+    // create duplicate entries on every write.
+    lockfile
+        .module_extensions
+        .retain(|k, _| !k.starts_with("//"));
+
+    // Update the extension cache. Translate the internal extension id to
+    // bazel's canonical `@@<repo>+//...` lockfile key form so the file
+    // round-trips cleanly with `bazel mod`.
+    let lockfile_key = crate::lockfile::lockfile_canonical_extension_id(extension_id);
     lockfile.set_extension_cache(
-        extension_id.to_owned(),
+        lockfile_key,
         bzl_transitive_digest.to_owned(),
         usages_digest.to_owned(),
         generated_repo_specs,

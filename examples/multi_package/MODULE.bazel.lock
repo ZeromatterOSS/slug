@@ -3,23 +3,60 @@
   "registryFileHashes": {},
   "selectedYankedVersions": {},
   "moduleExtensions": {
-    "//host:extension.bzl%host_platform": {
+    "@@bazel_features+//private:extensions.bzl%version_extension": {
       "general": {
-        "bzlTransitiveDigest": "sha256-PjTviMLm/yska2BJQONmL8Fp1hiRRRWfoSM5U5KEgw8=",
-        "usagesDigest": "sha256-YwUeR/VFU/IJ+kUwkIuC88Vzfg5nRqwcOM/06kB9Btw=",
+        "bzlTransitiveDigest": "sha256-h9KnB4G2LJdnaEsWbO/qL6Jc70NRv23NMiHaMwgXhNg=",
+        "usagesDigest": "sha256-T1s2WLP9bfcJxeG7OlSaNDn1hKHuzCIyLs1xehpTnS4=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
-          "host_platform": {
-            "repoRuleId": "platforms//host/extension.bzl%host_platform_repo",
+          "bazel_features_globals": {
+            "repoRuleId": "bazel_features//private/globals_repo.bzl%globals_repo",
+            "attributes": {
+              "globals": {
+                "CcSharedLibraryHintInfo": "7.0.0-pre.20230316.2",
+                "CcSharedLibraryInfo": "6.0.0-pre.20220630.1",
+                "DefaultInfo": "0.0.1",
+                "PackageSpecificationInfo": "6.4.0",
+                "RunEnvironmentInfo": "5.3.0",
+                "__TestingOnly_NeverAvailable": "1000000000.0.0",
+                "macro": "8.0.0",
+                "subrule": "7.0.0"
+              },
+              "legacy_globals": {
+                "JavaInfo": "8.0.0",
+                "JavaPluginInfo": "8.0.0",
+                "ProtoInfo": "8.0.0",
+                "PyCcLinkParamsProvider": "8.0.0",
+                "PyInfo": "8.0.0",
+                "PyRuntimeInfo": "8.0.0",
+                "cc_proto_aspect": "8.0.0"
+              }
+            }
+          },
+          "bazel_features_version": {
+            "repoRuleId": "bazel_features//private/version_repo.bzl%version_repo",
             "attributes": {}
           }
         }
       }
     },
-    "//cc:extensions.bzl%cc_configure_extension": {
+    "@@rules_cc+//cc:extensions.bzl%compatibility_proxy": {
       "general": {
-        "bzlTransitiveDigest": "sha256-0FUn+FkUyCDgJFzuvbdye9opQVXc3XtkTQmCtDeotrQ=",
-        "usagesDigest": "sha256-l9PwyEFNC+inUkmZMjZ82zBR/V1AKjJDrKh2OenIHu4=",
+        "bzlTransitiveDigest": "sha256-p3VAaxiy6+caETXEhzeZj9L9IeQa2GTzAATQxKe6/lw=",
+        "usagesDigest": "sha256-YxCQa/VEAZbUigJimhnGpvYLIe21K7CQXFgZcfGbug8=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {
+          "cc_compatibility_proxy": {
+            "repoRuleId": "rules_cc//cc/extensions.bzl%_compatibility_proxy_repo_rule",
+            "attributes": {}
+          }
+        }
+      }
+    },
+    "@@rules_cc+//cc:extensions.bzl%cc_configure_extension": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-XjMFk9UrjHpznGj+pfY/O73eLDks99PoP61Zn9l26uE=",
+        "usagesDigest": "sha256-DfOiEyUp6hY5Uh340IWcOODcyzKbPAezLhqb6yKmFy8=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
           "local_config_cc": {
@@ -33,96 +70,608 @@
         }
       }
     },
-    "//private:extensions.bzl%version_extension": {
+    "@@platforms+//host:extension.bzl%host_platform": {
       "general": {
-        "bzlTransitiveDigest": "sha256-MI+r/Hb11CFy2VpXcMb9wifsZ4fwZDR5xYosTp8ez4E=",
-        "usagesDigest": "sha256-g7odpjyP17m4cdGeS/bn7qujCiO2P020c27ahq4kHPA=",
+        "bzlTransitiveDigest": "sha256-dMZqTZHQMA9A7m1HhjDuiRa4Bv/0i2n8gJJrdJn0e9I=",
+        "usagesDigest": "sha256-Cb4zXlCJ8Hu0tkJ1yjRJKGG0SUouSNJbAt3M7nlqWFo=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
-          "bazel_features_globals": {
-            "repoRuleId": "bazel_features//private/globals_repo.bzl%globals_repo",
+          "host_platform": {
+            "repoRuleId": "platforms//host/extension.bzl%host_platform_repo",
+            "attributes": {}
+          }
+        }
+      }
+    },
+    "@@rules_python+//python:extensions.bzl%pip_install": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-c+e3h/KzxI1kKt7c2lSv+TsChJYEGjfanR6ZeX9Xef0=",
+        "usagesDigest": "sha256-w+acsZY2/Zi6223t4UDYajH0Xo0n/5+z/RV2oWk/pYA=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {
+          "pypi__click": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_python%http_archive",
             "attributes": {
-              "legacy_globals": {
-                "JavaInfo": "8.0.0",
-                "JavaPluginInfo": "8.0.0",
-                "ProtoInfo": "8.0.0",
-                "PyCcLinkParamsProvider": "8.0.0",
-                "PyInfo": "8.0.0",
-                "PyRuntimeInfo": "8.0.0",
-                "cc_proto_aspect": "8.0.0"
-              },
-              "globals": {
-                "CcSharedLibraryHintInfo": "7.0.0-pre.20230316.2",
-                "CcSharedLibraryInfo": "6.0.0-pre.20220630.1",
-                "DefaultInfo": "0.0.1",
-                "PackageSpecificationInfo": "6.4.0",
-                "RunEnvironmentInfo": "5.3.0",
-                "__TestingOnly_NeverAvailable": "1000000000.0.0",
-                "macro": "8.0.0",
-                "subrule": "7.0.0"
-              }
+              "url": "https://files.pythonhosted.org/packages/76/0a/b6c5f311e32aeb3b406e03c079ade51e905ea630fc19d1262a46249c1c86/click-8.0.1-py3-none-any.whl",
+              "sha256": "fba402a4a47334742d782209a7c79bc448911afe1149d07bdabdf480b3e2f4b6",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:defs.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\"**/*.py\", \"**/* *\", \"BUILD\", \"WORKSPACE\"]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n",
+              "urls": [],
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "strip_prefix": "",
+              "add_prefix": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file": null,
+              "workspace_file": null,
+              "workspace_file_content": ""
             }
           },
-          "bazel_features_version": {
-            "repoRuleId": "bazel_features//private/version_repo.bzl%version_repo",
-            "attributes": {}
+          "pypi__colorama": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_python%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/44/98/5b86278fbbf250d239ae0ecb724f8572af1c91f4a11edf4d36a206189440/colorama-0.4.4-py2.py3-none-any.whl",
+              "sha256": "9f47eda37229f68eee03b24b9748937c7dc3868f906e8ba69fbcbdd3bc5dc3e2",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:defs.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\"**/*.py\", \"**/* *\", \"BUILD\", \"WORKSPACE\"]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n",
+              "urls": [],
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "strip_prefix": "",
+              "add_prefix": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file": null,
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "pypi__installer": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_python%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/1b/21/3e6ebd12d8dccc55bcb7338db462c75ac86dbd0ac7439ac114616b21667b/installer-0.5.1-py3-none-any.whl",
+              "sha256": "1d6c8d916ed82771945b9c813699e6f57424ded970c9d8bf16bbc23e1e826ed3",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:defs.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\"**/*.py\", \"**/* *\", \"BUILD\", \"WORKSPACE\"]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n",
+              "urls": [],
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "strip_prefix": "",
+              "add_prefix": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file": null,
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "pypi__pep517": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_python%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/f4/67/846c08e18fefb265a66e6fd5a34269d649b779718d9bf59622085dabd370/pep517-0.12.0-py2.py3-none-any.whl",
+              "sha256": "dd884c326898e2c6e11f9e0b64940606a93eb10ea022a2e067959f3a110cf161",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:defs.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\"**/*.py\", \"**/* *\", \"BUILD\", \"WORKSPACE\"]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n",
+              "urls": [],
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "strip_prefix": "",
+              "add_prefix": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file": null,
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "pypi__pip": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_python%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/96/2f/caec18213f6a67852f6997fb0673ae08d2e93d1b81573edb93ba4ef06970/pip-22.1.2-py3-none-any.whl",
+              "sha256": "a3edacb89022ef5258bf61852728bf866632a394da837ca49eb4303635835f17",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:defs.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\"**/*.py\", \"**/* *\", \"BUILD\", \"WORKSPACE\"]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n",
+              "urls": [],
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "strip_prefix": "",
+              "add_prefix": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file": null,
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "pypi__pip_tools": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_python%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/fe/5c/8995799b0ccf832906b4968b4eb2045beb9b3de79e96e6b1a6e4fc4e6974/pip_tools-6.6.2-py3-none-any.whl",
+              "sha256": "6b486548e5a139e30e4c4a225b3b7c2d46942a9f6d1a91143c21b1de4d02fd9b",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:defs.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\"**/*.py\", \"**/* *\", \"BUILD\", \"WORKSPACE\"]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n",
+              "urls": [],
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "strip_prefix": "",
+              "add_prefix": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file": null,
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "pypi__setuptools": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_python%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/7c/5b/3d92b9f0f7ca1645cba48c080b54fe7d8b1033a4e5720091d1631c4266db/setuptools-60.10.0-py3-none-any.whl",
+              "sha256": "782ef48d58982ddb49920c11a0c5c9c0b02e7d7d1c2ad0aa44e1a1e133051c96",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:defs.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\"**/*.py\", \"**/* *\", \"BUILD\", \"WORKSPACE\"]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n",
+              "urls": [],
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "strip_prefix": "",
+              "add_prefix": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file": null,
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "pypi__tomli": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_python%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/97/75/10a9ebee3fd790d20926a90a2547f0bf78f371b2f13aa822c759680ca7b9/tomli-2.0.1-py3-none-any.whl",
+              "sha256": "939de3e7a6161af0c887ef91b7d41a53e7c5a1ca976325f429cb46ea9bc30ecc",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:defs.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\"**/*.py\", \"**/* *\", \"BUILD\", \"WORKSPACE\"]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n",
+              "urls": [],
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "strip_prefix": "",
+              "add_prefix": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file": null,
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "pypi__wheel": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_python%http_archive",
+            "attributes": {
+              "url": "https://files.pythonhosted.org/packages/27/d6/003e593296a85fd6ed616ed962795b2f87709c3eee2bca4f6d0fe55c6d00/wheel-0.37.1-py2.py3-none-any.whl",
+              "sha256": "4bdcd7d840138086126cd09254dc6195fb4fc6f01c050a1d7236f2630db1d22a",
+              "type": "zip",
+              "build_file_content": "package(default_visibility = [\"//visibility:public\"])\n\nload(\"@rules_python//python:defs.bzl\", \"py_library\")\n\npy_library(\n    name = \"lib\",\n    srcs = glob([\"**/*.py\"]),\n    data = glob([\"**/*\"], exclude=[\"**/*.py\", \"**/* *\", \"BUILD\", \"WORKSPACE\"]),\n    # This makes this directory a top-level in the python import\n    # search path for anything that depends on this.\n    imports = [\".\"],\n)\n",
+              "urls": [],
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "strip_prefix": "",
+              "add_prefix": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file": null,
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
           }
         }
       }
     },
-    "//cc:extensions.bzl%compatibility_proxy": {
+    "@@rules_java+//java:extensions.bzl%toolchains": {
       "general": {
-        "bzlTransitiveDigest": "sha256-paDx7Xl9dOclbuBQsHmF7pLOiXGY+UF7PUkEN6Eub1E=",
-        "usagesDigest": "sha256-Vs5MBW3jZzR+Q6ZqnzFiiDW17MA69U5u7rgJyo5KBDg=",
+        "bzlTransitiveDigest": "sha256-gINb05gMqwEH6LdERYxP/Jvl0JqwoNlCD+lsiiLZtBc=",
+        "usagesDigest": "sha256-PlSAlaiI8//XtPY9Cc0laJ9HFdEoo1JtuXWFItk3uhE=",
         "recordedInputs": [],
         "generatedRepoSpecs": {
-          "cc_compatibility_proxy": {
-            "repoRuleId": "rules_cc//cc/extensions.bzl%_compatibility_proxy_repo_rule",
-            "attributes": {}
-          }
-        }
-      }
-    },
-    "//java:extensions.bzl%toolchains": {
-      "general": {
-        "bzlTransitiveDigest": "sha256-uuFvYW8NajSJz7f2LRisIC6d2zZ40vDM+l767Jtg0tc=",
-        "usagesDigest": "sha256-glqJf4Zuxhh/IpZK8HpVTVHl7xzvgzYyJT+N8bdRtK8=",
-        "recordedInputs": [],
-        "generatedRepoSpecs": {
+          "local_jdk": {
+            "repoRuleId": "rules_java//toolchains/local_java_repository.bzl%_local_java_repository_rule",
+            "attributes": {
+              "target_name": "local_jdk",
+              "java_home": "",
+              "version": "",
+              "build_file": "@@rules_java//toolchains:jdk.BUILD"
+            }
+          },
+          "remote_java_tools": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "sha256": "8fb4d3138bd92a9d3324dae29c9f70d91ca2db18cd0bf1997446eed4657d19b3",
+              "urls": [
+                "https://mirror.bazel.build/bazel_java_tools/releases/java/v11.8/java_tools-v11.8.zip",
+                "https://github.com/bazelbuild/java_tools/releases/download/java_v11.8/java_tools-v11.8.zip"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "strip_prefix": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file": null,
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remote_java_tools_darwin": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "sha256": "0dcf4500cc4a1de8e563c1d48a079a7a0cf77cc246e39fd37fcc78ddf409ed26",
+              "urls": [
+                "https://mirror.bazel.build/bazel_java_tools/releases/java/v11.8/java_tools_darwin-v11.8.zip",
+                "https://github.com/bazelbuild/java_tools/releases/download/java_v11.8/java_tools_darwin-v11.8.zip"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "strip_prefix": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file": null,
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remote_java_tools_linux": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "sha256": "41502b293eea292b0577b46e8d7738bfe88180562acbf99ed620b5387a60efee",
+              "urls": [
+                "https://mirror.bazel.build/bazel_java_tools/releases/java/v11.8/java_tools_linux-v11.8.zip",
+                "https://github.com/bazelbuild/java_tools/releases/download/java_v11.8/java_tools_linux-v11.8.zip"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "strip_prefix": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file": null,
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remote_java_tools_windows": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "sha256": "056ed8ba64920409eab63e3c4888c1970a523d2c03965784fc3243e37195318b",
+              "urls": [
+                "https://mirror.bazel.build/bazel_java_tools/releases/java/v11.8/java_tools_windows-v11.8.zip",
+                "https://github.com/bazelbuild/java_tools/releases/download/java_v11.8/java_tools_windows-v11.8.zip"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "strip_prefix": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file": null,
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remotejdk11_linux": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "e064b61d93304012351242bf0823c6a2e41d9e28add7ea7f05378b7243d34247",
+              "strip_prefix": "zulu11.56.19-ca-jdk11.0.15-linux_x64",
+              "urls": [
+                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-linux_x64.tar.gz",
+                "https://cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-linux_x64.tar.gz"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remotejdk11_linux_aarch64": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "fc7c41a0005180d4ca471c90d01e049469e0614cf774566d4cf383caa29d1a97",
+              "strip_prefix": "zulu11.56.19-ca-jdk11.0.15-linux_aarch64",
+              "urls": [
+                "https://mirror.bazel.build/cdn.azul.com/zulu-embedded/bin/zulu11.56.19-ca-jdk11.0.15-linux_aarch64.tar.gz",
+                "https://cdn.azul.com/zulu-embedded/bin/zulu11.56.19-ca-jdk11.0.15-linux_aarch64.tar.gz"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remotejdk11_linux_aarch64_toolchain_config_repo": {
+            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
+            "attributes": {
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_11\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"11\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:linux\", \"@platforms//cpu:aarch64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk11_linux_aarch64//:jdk\",\n)\n"
+            }
+          },
+          "remotejdk11_linux_ppc64le": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "a8fba686f6eb8ae1d1a9566821dbd5a85a1108b96ad857fdbac5c1e4649fc56f",
+              "strip_prefix": "jdk-11.0.15+10",
+              "urls": [
+                "https://mirror.bazel.build/github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.15+10/OpenJDK11U-jdk_ppc64le_linux_hotspot_11.0.15_10.tar.gz",
+                "https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.15+10/OpenJDK11U-jdk_ppc64le_linux_hotspot_11.0.15_10.tar.gz"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remotejdk11_linux_ppc64le_toolchain_config_repo": {
+            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
+            "attributes": {
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_11\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"11\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:linux\", \"@platforms//cpu:ppc\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk11_linux_ppc64le//:jdk\",\n)\n"
+            }
+          },
+          "remotejdk11_linux_s390x": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "a58fc0361966af0a5d5a31a2d8a208e3c9bb0f54f345596fd80b99ea9a39788b",
+              "strip_prefix": "jdk-11.0.15+10",
+              "urls": [
+                "https://mirror.bazel.build/github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.15+10/OpenJDK11U-jdk_s390x_linux_hotspot_11.0.15_10.tar.gz",
+                "https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.15+10/OpenJDK11U-jdk_s390x_linux_hotspot_11.0.15_10.tar.gz"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
           "remotejdk11_linux_s390x_toolchain_config_repo": {
             "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
             "attributes": {
               "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_11\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"11\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:linux\", \"@platforms//cpu:s390x\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk11_linux_s390x//:jdk\",\n)\n"
             }
           },
-          "remote_java_tools_windows": {
+          "remotejdk11_linux_toolchain_config_repo": {
+            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
+            "attributes": {
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_11\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"11\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:linux\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk11_linux//:jdk\",\n)\n"
+            }
+          },
+          "remotejdk11_macos": {
             "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
             "attributes": {
-              "type": "",
-              "workspace_file": null,
-              "remote_module_file_integrity": "",
-              "build_file_content": "",
-              "integrity": "",
-              "patch_tool": "",
-              "canonical_id": "",
-              "workspace_file_content": "",
-              "sha256": "056ed8ba64920409eab63e3c4888c1970a523d2c03965784fc3243e37195318b",
-              "patch_strip": 0,
-              "patch_cmds": [],
-              "patch_args": [],
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "2614e5c5de8e989d4d81759de4c333aa5b867b17ab9ee78754309ba65c7f6f55",
+              "strip_prefix": "zulu11.56.19-ca-jdk11.0.15-macosx_x64",
               "urls": [
-                "https://mirror.bazel.build/bazel_java_tools/releases/java/v11.8/java_tools_windows-v11.8.zip",
-                "https://github.com/bazelbuild/java_tools/releases/download/java_v11.8/java_tools_windows-v11.8.zip"
+                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-macosx_x64.tar.gz",
+                "https://cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-macosx_x64.tar.gz"
               ],
-              "strip_prefix": "",
-              "netrc": "",
-              "add_prefix": "",
               "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
               "patches": [],
               "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
               "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
               "patch_cmds_win": [],
-              "build_file": null
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remotejdk11_macos_aarch64": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "6bb0d2c6e8a29dcd9c577bbb2986352ba12481a9549ac2c0bcfd00ed60e538d2",
+              "strip_prefix": "zulu11.56.19-ca-jdk11.0.15-macosx_aarch64",
+              "urls": [
+                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-macosx_aarch64.tar.gz",
+                "https://cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-macosx_aarch64.tar.gz"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
             }
           },
           "remotejdk11_macos_aarch64_toolchain_config_repo": {
@@ -131,34 +680,177 @@
               "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_11\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"11\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:macos\", \"@platforms//cpu:aarch64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk11_macos_aarch64//:jdk\",\n)\n"
             }
           },
-          "remotejdk11_linux_ppc64le": {
+          "remotejdk11_macos_toolchain_config_repo": {
+            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
+            "attributes": {
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_11\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"11\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:macos\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk11_macos//:jdk\",\n)\n"
+            }
+          },
+          "remotejdk11_win": {
             "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
             "attributes": {
-              "patch_cmds": [],
               "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "strip_prefix": "jdk-11.0.15+10",
-              "canonical_id": "",
-              "patch_cmds_win": [],
-              "workspace_file": null,
-              "build_file_content": "",
+              "sha256": "a106c77389a63b6bd963a087d5f01171bd32aa3ee7377ecef87531390dcb9050",
+              "strip_prefix": "zulu11.56.19-ca-jdk11.0.15-win_x64",
               "urls": [
-                "https://mirror.bazel.build/github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.15+10/OpenJDK11U-jdk_ppc64le_linux_hotspot_11.0.15_10.tar.gz",
-                "https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.15+10/OpenJDK11U-jdk_ppc64le_linux_hotspot_11.0.15_10.tar.gz"
+                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-win_x64.zip",
+                "https://cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-win_x64.zip"
               ],
-              "patch_args": [],
-              "patch_tool": "",
-              "remote_module_file_integrity": "",
-              "remote_module_file_urls": [],
-              "workspace_file_content": "",
-              "add_prefix": "",
-              "remote_patch_strip": 0,
-              "netrc": "",
+              "url": "",
               "integrity": "",
-              "patch_strip": 0,
-              "sha256": "a8fba686f6eb8ae1d1a9566821dbd5a85a1108b96ad857fdbac5c1e4649fc56f",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
               "type": "",
               "patches": [],
-              "url": ""
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remotejdk11_win_arm64": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "b8a28e6e767d90acf793ea6f5bed0bb595ba0ba5ebdf8b99f395266161e53ec2",
+              "strip_prefix": "jdk-11.0.13+8",
+              "urls": [
+                "https://mirror.bazel.build/aka.ms/download-jdk/microsoft-jdk-11.0.13.8.1-windows-aarch64.zip"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remotejdk11_win_arm64_toolchain_config_repo": {
+            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
+            "attributes": {
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_11\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"11\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:windows\", \"@platforms//cpu:arm64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk11_win_arm64//:jdk\",\n)\n"
+            }
+          },
+          "remotejdk11_win_toolchain_config_repo": {
+            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
+            "attributes": {
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_11\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"11\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:windows\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk11_win//:jdk\",\n)\n"
+            }
+          },
+          "remotejdk15_linux": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "0a38f1138c15a4f243b75eb82f8ef40855afcc402e3c2a6de97ce8235011b1ad",
+              "strip_prefix": "zulu15.27.17-ca-jdk15.0.0-linux_x64",
+              "urls": [
+                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu15.27.17-ca-jdk15.0.0-linux_x64.tar.gz",
+                "https://cdn.azul.com/zulu/bin/zulu15.27.17-ca-jdk15.0.0-linux_x64.tar.gz"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remotejdk15_linux_toolchain_config_repo": {
+            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
+            "attributes": {
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_15\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"15\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:linux\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk15_linux//:jdk\",\n)\n"
+            }
+          },
+          "remotejdk15_macos": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "f80b2e0512d9d8a92be24497334c974bfecc8c898fc215ce0e76594f00437482",
+              "strip_prefix": "zulu15.27.17-ca-jdk15.0.0-macosx_x64",
+              "urls": [
+                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu15.27.17-ca-jdk15.0.0-macosx_x64.tar.gz",
+                "https://cdn.azul.com/zulu/bin/zulu15.27.17-ca-jdk15.0.0-macosx_x64.tar.gz"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remotejdk15_macos_aarch64": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "2613c3f15eef6b6ecd0fd102da92282b985e4573905dc902f1783d8059c1efc5",
+              "strip_prefix": "zulu15.29.15-ca-jdk15.0.2-macosx_aarch64",
+              "urls": [
+                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu15.29.15-ca-jdk15.0.2-macosx_aarch64.tar.gz",
+                "https://cdn.azul.com/zulu/bin/zulu15.29.15-ca-jdk15.0.2-macosx_aarch64.tar.gz"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
             }
           },
           "remotejdk15_macos_aarch64_toolchain_config_repo": {
@@ -167,142 +859,220 @@
               "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_15\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"15\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:macos\", \"@platforms//cpu:aarch64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk15_macos_aarch64//:jdk\",\n)\n"
             }
           },
-          "remotejdk15_macos_aarch64": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "canonical_id": "",
-              "sha256": "2613c3f15eef6b6ecd0fd102da92282b985e4573905dc902f1783d8059c1efc5",
-              "build_file_content": "",
-              "workspace_file": null,
-              "patches": [],
-              "type": "",
-              "add_prefix": "",
-              "remote_patch_strip": 0,
-              "patch_cmds": [],
-              "patch_tool": "",
-              "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "remote_module_file_urls": [],
-              "patch_cmds_win": [],
-              "url": "",
-              "patch_strip": 0,
-              "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu15.29.15-ca-jdk15.0.2-macosx_aarch64.tar.gz",
-                "https://cdn.azul.com/zulu/bin/zulu15.29.15-ca-jdk15.0.2-macosx_aarch64.tar.gz"
-              ],
-              "strip_prefix": "zulu15.29.15-ca-jdk15.0.2-macosx_aarch64",
-              "workspace_file_content": "",
-              "remote_module_file_integrity": "",
-              "integrity": "",
-              "patch_args": [],
-              "netrc": ""
-            }
-          },
-          "remotejdk15_linux": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "workspace_file": null,
-              "patch_tool": "",
-              "integrity": "",
-              "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu15.27.17-ca-jdk15.0.0-linux_x64.tar.gz",
-                "https://cdn.azul.com/zulu/bin/zulu15.27.17-ca-jdk15.0.0-linux_x64.tar.gz"
-              ],
-              "sha256": "0a38f1138c15a4f243b75eb82f8ef40855afcc402e3c2a6de97ce8235011b1ad",
-              "patch_cmds": [],
-              "patches": [],
-              "type": "",
-              "add_prefix": "",
-              "build_file_content": "",
-              "patch_strip": 0,
-              "remote_patch_strip": 0,
-              "canonical_id": "",
-              "remote_module_file_urls": [],
-              "remote_module_file_integrity": "",
-              "strip_prefix": "zulu15.27.17-ca-jdk15.0.0-linux_x64",
-              "patch_cmds_win": [],
-              "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "workspace_file_content": "",
-              "url": "",
-              "netrc": "",
-              "patch_args": []
-            }
-          },
-          "remotejdk17_win_toolchain_config_repo": {
+          "remotejdk15_macos_toolchain_config_repo": {
             "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
             "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_17\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"17\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:windows\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk17_win//:jdk\",\n)\n"
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_15\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"15\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:macos\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk15_macos//:jdk\",\n)\n"
+            }
+          },
+          "remotejdk15_win": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "f535a530151e6c20de8a3078057e332b08887cb3ba1a4735717357e72765cad6",
+              "strip_prefix": "zulu15.27.17-ca-jdk15.0.0-win_x64",
+              "urls": [
+                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu15.27.17-ca-jdk15.0.0-win_x64.zip",
+                "https://cdn.azul.com/zulu/bin/zulu15.27.17-ca-jdk15.0.0-win_x64.zip"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remotejdk15_win_toolchain_config_repo": {
+            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
+            "attributes": {
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_15\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"15\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:windows\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk15_win//:jdk\",\n)\n"
             }
           },
           "remotejdk16_linux": {
             "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
             "attributes": {
-              "patch_tool": "",
               "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "add_prefix": "",
-              "patch_args": [],
+              "sha256": "236b5ea97aff3cb312e743848d7efa77faf305170e41371a732ca93c1b797665",
+              "strip_prefix": "zulu16.28.11-ca-jdk16.0.0-linux_x64",
               "urls": [
                 "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu16.28.11-ca-jdk16.0.0-linux_x64.tar.gz",
                 "https://cdn.azul.com/zulu/bin/zulu16.28.11-ca-jdk16.0.0-linux_x64.tar.gz"
               ],
-              "workspace_file": null,
-              "patch_cmds": [],
-              "strip_prefix": "zulu16.28.11-ca-jdk16.0.0-linux_x64",
-              "build_file_content": "",
-              "patch_cmds_win": [],
-              "patches": [],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
               "canonical_id": "",
+              "add_prefix": "",
               "type": "",
-              "patch_strip": 0,
+              "patches": [],
               "remote_module_file_urls": [],
               "remote_module_file_integrity": "",
               "remote_patch_strip": 0,
-              "integrity": "",
-              "sha256": "236b5ea97aff3cb312e743848d7efa77faf305170e41371a732ca93c1b797665",
-              "netrc": "",
-              "url": "",
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
               "workspace_file_content": ""
             }
           },
-          "remotejdk17_win_arm64_toolchain_config_repo": {
+          "remotejdk16_linux_toolchain_config_repo": {
             "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
             "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_17\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"17\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:windows\", \"@platforms//cpu:arm64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk17_win_arm64//:jdk\",\n)\n"
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_16\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"16\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:linux\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk16_linux//:jdk\",\n)\n"
             }
           },
-          "remotejdk17_macos_aarch64_toolchain_config_repo": {
-            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
-            "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_17\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"17\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:macos\", \"@platforms//cpu:aarch64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk17_macos_aarch64//:jdk\",\n)\n"
-            }
-          },
-          "remotejdk11_win": {
+          "remotejdk16_macos": {
             "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
             "attributes": {
-              "add_prefix": "",
-              "strip_prefix": "zulu11.56.19-ca-jdk11.0.15-win_x64",
-              "patch_tool": "",
-              "remote_patch_strip": 0,
-              "workspace_file": null,
               "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "patches": [],
-              "sha256": "a106c77389a63b6bd963a087d5f01171bd32aa3ee7377ecef87531390dcb9050",
-              "build_file_content": "",
-              "type": "",
-              "patch_cmds": [],
-              "patch_args": [],
+              "sha256": "6d47ef22dc56ce1f5a102ed39e21d9a97320f0bb786818e2c686393109d79bc5",
+              "strip_prefix": "zulu16.28.11-ca-jdk16.0.0-macosx_x64",
               "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-win_x64.zip",
-                "https://cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-win_x64.zip"
+                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu16.28.11-ca-jdk16.0.0-macosx_x64.tar.gz",
+                "https://cdn.azul.com/zulu/bin/zulu16.28.11-ca-jdk16.0.0-macosx_x64.tar.gz"
               ],
               "url": "",
-              "patch_strip": 0,
-              "remote_module_file_integrity": "",
-              "netrc": "",
               "integrity": "",
-              "workspace_file_content": "",
-              "patch_cmds_win": [],
+              "netrc": "",
               "canonical_id": "",
-              "remote_module_file_urls": []
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remotejdk16_macos_aarch64": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "c92131e83bc71474850e667bc4e05fca33662b8feb009a0547aa14e76b40e890",
+              "strip_prefix": "zulu16.28.11-ca-jdk16.0.0-macosx_aarch64",
+              "urls": [
+                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu16.28.11-ca-jdk16.0.0-macosx_aarch64.tar.gz",
+                "https://cdn.azul.com/zulu/bin/zulu16.28.11-ca-jdk16.0.0-macosx_aarch64.tar.gz"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remotejdk16_macos_aarch64_toolchain_config_repo": {
+            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
+            "attributes": {
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_16\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"16\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:macos\", \"@platforms//cpu:aarch64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk16_macos_aarch64//:jdk\",\n)\n"
+            }
+          },
+          "remotejdk16_macos_toolchain_config_repo": {
+            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
+            "attributes": {
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_16\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"16\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:macos\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk16_macos//:jdk\",\n)\n"
+            }
+          },
+          "remotejdk16_win": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "6cbf98ada27476526a5f6dff79fd5f2c15e2f671818e503bdf741eb6c8fed3d4",
+              "strip_prefix": "zulu16.28.11-ca-jdk16.0.0-win_x64",
+              "urls": [
+                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu16.28.11-ca-jdk16.0.0-win_x64.zip",
+                "https://cdn.azul.com/zulu/bin/zulu16.28.11-ca-jdk16.0.0-win_x64.zip"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remotejdk16_win_toolchain_config_repo": {
+            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
+            "attributes": {
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_16\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"16\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:windows\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk16_win//:jdk\",\n)\n"
+            }
+          },
+          "remotejdk17_linux": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "73d5c4bae20325ca41b606f7eae64669db3aac638c5b3ead4a975055846ad6de",
+              "strip_prefix": "zulu17.32.13-ca-jdk17.0.2-linux_x64",
+              "urls": [
+                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu17.32.13-ca-jdk17.0.2-linux_x64.tar.gz",
+                "https://cdn.azul.com/zulu/bin/zulu17.32.13-ca-jdk17.0.2-linux_x64.tar.gz"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
             }
           },
           "remotejdk17_linux_toolchain_config_repo": {
@@ -314,169 +1084,67 @@
           "remotejdk17_macos": {
             "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
             "attributes": {
-              "strip_prefix": "zulu17.32.13-ca-jdk17.0.2-macosx_x64",
               "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "integrity": "",
-              "url": "",
-              "workspace_file": null,
-              "build_file_content": "",
-              "patch_strip": 0,
-              "patches": [],
-              "remote_module_file_urls": [],
+              "sha256": "89d04b2d99b05dcb25114178e65f6a1c5ca742e125cab0a63d87e7e42f3fcb80",
+              "strip_prefix": "zulu17.32.13-ca-jdk17.0.2-macosx_x64",
               "urls": [
                 "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu17.32.13-ca-jdk17.0.2-macosx_x64.tar.gz",
                 "https://cdn.azul.com/zulu/bin/zulu17.32.13-ca-jdk17.0.2-macosx_x64.tar.gz"
               ],
-              "remote_patch_strip": 0,
-              "patch_cmds": [],
-              "workspace_file_content": "",
-              "sha256": "89d04b2d99b05dcb25114178e65f6a1c5ca742e125cab0a63d87e7e42f3fcb80",
-              "canonical_id": "",
-              "netrc": "",
-              "patch_tool": "",
-              "remote_module_file_integrity": "",
-              "patch_cmds_win": [],
-              "patch_args": [],
-              "type": "",
-              "add_prefix": ""
-            }
-          },
-          "remote_java_tools_darwin": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "netrc": "",
-              "strip_prefix": "",
-              "patch_tool": "",
-              "patch_cmds_win": [],
-              "workspace_file_content": "",
-              "patch_args": [],
-              "workspace_file": null,
-              "remote_module_file_integrity": "",
-              "urls": [
-                "https://mirror.bazel.build/bazel_java_tools/releases/java/v11.8/java_tools_darwin-v11.8.zip",
-                "https://github.com/bazelbuild/java_tools/releases/download/java_v11.8/java_tools_darwin-v11.8.zip"
-              ],
-              "type": "",
-              "patches": [],
-              "sha256": "0dcf4500cc4a1de8e563c1d48a079a7a0cf77cc246e39fd37fcc78ddf409ed26",
-              "remote_patch_strip": 0,
-              "remote_module_file_urls": [],
-              "patch_cmds": [],
-              "canonical_id": "",
-              "build_file": null,
-              "integrity": "",
-              "patch_strip": 0,
-              "build_file_content": "",
-              "add_prefix": "",
-              "url": ""
-            }
-          },
-          "remotejdk16_macos": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "integrity": "",
-              "patch_tool": "",
-              "type": "",
-              "canonical_id": "",
-              "strip_prefix": "zulu16.28.11-ca-jdk16.0.0-macosx_x64",
-              "add_prefix": "",
-              "build_file_content": "",
-              "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "remote_module_file_integrity": "",
-              "remote_module_file_urls": [],
               "url": "",
-              "workspace_file_content": "",
-              "workspace_file": null,
-              "patch_strip": 0,
-              "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu16.28.11-ca-jdk16.0.0-macosx_x64.tar.gz",
-                "https://cdn.azul.com/zulu/bin/zulu16.28.11-ca-jdk16.0.0-macosx_x64.tar.gz"
-              ],
-              "remote_patch_strip": 0,
-              "sha256": "6d47ef22dc56ce1f5a102ed39e21d9a97320f0bb786818e2c686393109d79bc5",
-              "patch_cmds": [],
+              "integrity": "",
               "netrc": "",
-              "patch_cmds_win": [],
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
               "patches": [],
-              "patch_args": []
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
             }
           },
-          "remotejdk11_linux_toolchain_config_repo": {
+          "remotejdk17_macos_aarch64": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+            "attributes": {
+              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "54247dde248ffbcd3c048675504b1c503b81daf2dc0d64a79e353c48d383c977",
+              "strip_prefix": "zulu17.32.13-ca-jdk17.0.2-macosx_aarch64",
+              "urls": [
+                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu17.32.13-ca-jdk17.0.2-macosx_aarch64.tar.gz",
+                "https://cdn.azul.com/zulu/bin/zulu17.32.13-ca-jdk17.0.2-macosx_aarch64.tar.gz"
+              ],
+              "url": "",
+              "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "add_prefix": "",
+              "type": "",
+              "patches": [],
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
+            }
+          },
+          "remotejdk17_macos_aarch64_toolchain_config_repo": {
             "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
             "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_11\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"11\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:linux\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk11_linux//:jdk\",\n)\n"
-            }
-          },
-          "remotejdk16_win_toolchain_config_repo": {
-            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
-            "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_16\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"16\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:windows\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk16_win//:jdk\",\n)\n"
-            }
-          },
-          "remotejdk11_macos_toolchain_config_repo": {
-            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
-            "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_11\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"11\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:macos\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk11_macos//:jdk\",\n)\n"
-            }
-          },
-          "remotejdk17_linux": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "remote_module_file_urls": [],
-              "workspace_file_content": "",
-              "strip_prefix": "zulu17.32.13-ca-jdk17.0.2-linux_x64",
-              "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "patch_args": [],
-              "add_prefix": "",
-              "patches": [],
-              "patch_cmds": [],
-              "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu17.32.13-ca-jdk17.0.2-linux_x64.tar.gz",
-                "https://cdn.azul.com/zulu/bin/zulu17.32.13-ca-jdk17.0.2-linux_x64.tar.gz"
-              ],
-              "patch_tool": "",
-              "type": "",
-              "sha256": "73d5c4bae20325ca41b606f7eae64669db3aac638c5b3ead4a975055846ad6de",
-              "patch_cmds_win": [],
-              "workspace_file": null,
-              "canonical_id": "",
-              "build_file_content": "",
-              "remote_module_file_integrity": "",
-              "integrity": "",
-              "patch_strip": 0,
-              "url": "",
-              "remote_patch_strip": 0,
-              "netrc": ""
-            }
-          },
-          "remotejdk16_macos_aarch64": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "workspace_file": null,
-              "netrc": "",
-              "canonical_id": "",
-              "sha256": "c92131e83bc71474850e667bc4e05fca33662b8feb009a0547aa14e76b40e890",
-              "build_file_content": "",
-              "patch_args": [],
-              "patch_cmds_win": [],
-              "remote_module_file_urls": [],
-              "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu16.28.11-ca-jdk16.0.0-macosx_aarch64.tar.gz",
-                "https://cdn.azul.com/zulu/bin/zulu16.28.11-ca-jdk16.0.0-macosx_aarch64.tar.gz"
-              ],
-              "workspace_file_content": "",
-              "patches": [],
-              "integrity": "",
-              "patch_strip": 0,
-              "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "type": "",
-              "patch_tool": "",
-              "strip_prefix": "zulu16.28.11-ca-jdk16.0.0-macosx_aarch64",
-              "remote_module_file_integrity": "",
-              "remote_patch_strip": 0,
-              "patch_cmds": [],
-              "url": "",
-              "add_prefix": ""
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_17\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"17\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:macos\", \"@platforms//cpu:aarch64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk17_macos_aarch64//:jdk\",\n)\n"
             }
           },
           "remotejdk17_macos_toolchain_config_repo": {
@@ -485,492 +1153,114 @@
               "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_17\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"17\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:macos\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk17_macos//:jdk\",\n)\n"
             }
           },
-          "remotejdk17_macos_aarch64": {
+          "remotejdk17_win": {
             "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
             "attributes": {
-              "remote_patch_strip": 0,
-              "build_file_content": "",
-              "patch_tool": "",
-              "remote_module_file_urls": [],
-              "add_prefix": "",
               "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "sha256": "e965aa0ea7a0661a3446cf8f10ee00684b851f883b803315289f26b4aa907fdb",
+              "strip_prefix": "zulu17.32.13-ca-jdk17.0.2-win_x64",
+              "urls": [
+                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu17.32.13-ca-jdk17.0.2-win_x64.zip",
+                "https://cdn.azul.com/zulu/bin/zulu17.32.13-ca-jdk17.0.2-win_x64.zip"
+              ],
+              "url": "",
+              "integrity": "",
               "netrc": "",
-              "integrity": "",
-              "sha256": "54247dde248ffbcd3c048675504b1c503b81daf2dc0d64a79e353c48d383c977",
-              "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu17.32.13-ca-jdk17.0.2-macosx_aarch64.tar.gz",
-                "https://cdn.azul.com/zulu/bin/zulu17.32.13-ca-jdk17.0.2-macosx_aarch64.tar.gz"
-              ],
-              "patch_cmds": [],
-              "patch_args": [],
-              "workspace_file": null,
-              "workspace_file_content": "",
-              "patch_strip": 0,
-              "remote_module_file_integrity": "",
-              "url": "",
-              "patches": [],
-              "type": "",
               "canonical_id": "",
-              "strip_prefix": "zulu17.32.13-ca-jdk17.0.2-macosx_aarch64",
-              "patch_cmds_win": []
-            }
-          },
-          "remote_java_tools": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "type": "",
-              "canonical_id": "",
-              "remote_module_file_urls": [],
-              "remote_patch_strip": 0,
-              "workspace_file_content": "",
-              "patches": [],
-              "patch_cmds_win": [],
-              "remote_module_file_integrity": "",
-              "build_file": null,
-              "sha256": "8fb4d3138bd92a9d3324dae29c9f70d91ca2db18cd0bf1997446eed4657d19b3",
-              "patch_strip": 0,
-              "patch_args": [],
               "add_prefix": "",
-              "url": "",
-              "netrc": "",
-              "patch_cmds": [],
-              "patch_tool": "",
-              "build_file_content": "",
-              "integrity": "",
-              "urls": [
-                "https://mirror.bazel.build/bazel_java_tools/releases/java/v11.8/java_tools-v11.8.zip",
-                "https://github.com/bazelbuild/java_tools/releases/download/java_v11.8/java_tools-v11.8.zip"
-              ],
-              "workspace_file": null,
-              "strip_prefix": ""
-            }
-          },
-          "remotejdk16_macos_aarch64_toolchain_config_repo": {
-            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
-            "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_16\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"16\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:macos\", \"@platforms//cpu:aarch64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk16_macos_aarch64//:jdk\",\n)\n"
-            }
-          },
-          "remotejdk15_win_toolchain_config_repo": {
-            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
-            "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_15\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"15\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:windows\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk15_win//:jdk\",\n)\n"
-            }
-          },
-          "remotejdk11_linux_ppc64le_toolchain_config_repo": {
-            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
-            "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_11\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"11\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:linux\", \"@platforms//cpu:ppc\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk11_linux_ppc64le//:jdk\",\n)\n"
-            }
-          },
-          "remotejdk11_win_arm64": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "patches": [],
-              "urls": [
-                "https://mirror.bazel.build/aka.ms/download-jdk/microsoft-jdk-11.0.13.8.1-windows-aarch64.zip"
-              ],
-              "patch_strip": 0,
-              "patch_cmds_win": [],
-              "patch_cmds": [],
-              "url": "",
-              "workspace_file_content": "",
-              "remote_patch_strip": 0,
-              "workspace_file": null,
-              "strip_prefix": "jdk-11.0.13+8",
               "type": "",
-              "add_prefix": "",
-              "build_file_content": "",
-              "integrity": "",
-              "canonical_id": "",
-              "sha256": "b8a28e6e767d90acf793ea6f5bed0bb595ba0ba5ebdf8b99f395266161e53ec2",
-              "netrc": "",
+              "patches": [],
+              "remote_module_file_urls": [],
               "remote_module_file_integrity": "",
-              "build_file": "@@rules_java//toolchains:jdk.BUILD",
+              "remote_patch_strip": 0,
               "patch_tool": "",
-              "remote_module_file_urls": [],
-              "patch_args": []
-            }
-          },
-          "remotejdk11_linux": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "integrity": "",
-              "patch_strip": 0,
-              "remote_module_file_urls": [],
               "patch_args": [],
-              "workspace_file": null,
-              "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-linux_x64.tar.gz",
-                "https://cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-linux_x64.tar.gz"
-              ],
-              "type": "",
-              "sha256": "e064b61d93304012351242bf0823c6a2e41d9e28add7ea7f05378b7243d34247",
-              "patch_cmds_win": [],
-              "workspace_file_content": "",
-              "remote_module_file_integrity": "",
-              "patches": [],
-              "url": "",
-              "canonical_id": "",
-              "strip_prefix": "zulu11.56.19-ca-jdk11.0.15-linux_x64",
-              "build_file_content": "",
-              "remote_patch_strip": 0,
-              "patch_cmds": [],
-              "add_prefix": "",
-              "patch_tool": "",
-              "netrc": "",
-              "build_file": "@@rules_java//toolchains:jdk.BUILD"
-            }
-          },
-          "remotejdk16_linux_toolchain_config_repo": {
-            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
-            "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_16\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"16\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:linux\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk16_linux//:jdk\",\n)\n"
-            }
-          },
-          "remotejdk15_win": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "patch_args": [],
-              "type": "",
-              "sha256": "f535a530151e6c20de8a3078057e332b08887cb3ba1a4735717357e72765cad6",
-              "patch_tool": "",
-              "integrity": "",
-              "workspace_file": null,
               "patch_strip": 0,
-              "remote_module_file_integrity": "",
-              "patch_cmds_win": [],
-              "netrc": "",
-              "add_prefix": "",
-              "url": "",
-              "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "strip_prefix": "zulu15.27.17-ca-jdk15.0.0-win_x64",
-              "canonical_id": "",
-              "remote_module_file_urls": [],
-              "patches": [],
-              "build_file_content": "",
-              "remote_patch_strip": 0,
-              "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu15.27.17-ca-jdk15.0.0-win_x64.zip",
-                "https://cdn.azul.com/zulu/bin/zulu15.27.17-ca-jdk15.0.0-win_x64.zip"
-              ],
-              "workspace_file_content": "",
-              "patch_cmds": []
-            }
-          },
-          "remotejdk15_linux_toolchain_config_repo": {
-            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
-            "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_15\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"15\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:linux\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk15_linux//:jdk\",\n)\n"
-            }
-          },
-          "remotejdk16_win": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "patch_args": [],
-              "remote_patch_strip": 0,
-              "workspace_file": null,
               "patch_cmds": [],
-              "type": "",
-              "patch_strip": 0,
-              "remote_module_file_urls": [],
-              "workspace_file_content": "",
-              "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu16.28.11-ca-jdk16.0.0-win_x64.zip",
-                "https://cdn.azul.com/zulu/bin/zulu16.28.11-ca-jdk16.0.0-win_x64.zip"
-              ],
-              "strip_prefix": "zulu16.28.11-ca-jdk16.0.0-win_x64",
-              "build_file_content": "",
-              "sha256": "6cbf98ada27476526a5f6dff79fd5f2c15e2f671818e503bdf741eb6c8fed3d4",
-              "remote_module_file_integrity": "",
-              "patches": [],
-              "integrity": "",
-              "canonical_id": "",
-              "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "patch_tool": "",
-              "url": "",
-              "add_prefix": "",
               "patch_cmds_win": [],
-              "netrc": ""
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
             }
           },
           "remotejdk17_win_arm64": {
             "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
             "attributes": {
-              "patch_cmds": [],
-              "workspace_file": null,
               "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "patches": [],
-              "patch_tool": "",
-              "workspace_file_content": "",
               "sha256": "811d7e7591bac4f081dfb00ba6bd15b6fc5969e1f89f0f327ef75147027c3877",
-              "remote_patch_strip": 0,
               "strip_prefix": "zulu17.30.15-ca-jdk17.0.1-win_aarch64",
-              "add_prefix": "",
-              "build_file_content": "",
               "urls": [
                 "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu17.30.15-ca-jdk17.0.1-win_aarch64.zip",
                 "https://cdn.azul.com/zulu/bin/zulu17.30.15-ca-jdk17.0.1-win_aarch64.zip"
               ],
-              "netrc": "",
-              "remote_module_file_integrity": "",
-              "type": "",
-              "patch_cmds_win": [],
-              "canonical_id": "",
               "url": "",
-              "patch_strip": 0,
-              "integrity": "",
-              "remote_module_file_urls": [],
-              "patch_args": []
-            }
-          },
-          "remotejdk17_win": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "patch_tool": "",
-              "patch_cmds_win": [],
-              "remote_patch_strip": 0,
-              "build_file_content": "",
-              "workspace_file": null,
-              "patch_cmds": [],
-              "patch_args": [],
-              "strip_prefix": "zulu17.32.13-ca-jdk17.0.2-win_x64",
-              "type": "",
-              "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu17.32.13-ca-jdk17.0.2-win_x64.zip",
-                "https://cdn.azul.com/zulu/bin/zulu17.32.13-ca-jdk17.0.2-win_x64.zip"
-              ],
-              "build_file": "@@rules_java//toolchains:jdk.BUILD",
               "integrity": "",
               "netrc": "",
+              "canonical_id": "",
               "add_prefix": "",
-              "remote_module_file_integrity": "",
-              "workspace_file_content": "",
-              "url": "",
-              "patch_strip": 0,
-              "patches": [],
-              "canonical_id": "",
-              "remote_module_file_urls": [],
-              "sha256": "e965aa0ea7a0661a3446cf8f10ee00684b851f883b803315289f26b4aa907fdb"
-            }
-          },
-          "remotejdk11_linux_aarch64": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "strip_prefix": "zulu11.56.19-ca-jdk11.0.15-linux_aarch64",
-              "canonical_id": "",
-              "remote_patch_strip": 0,
               "type": "",
-              "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu-embedded/bin/zulu11.56.19-ca-jdk11.0.15-linux_aarch64.tar.gz",
-                "https://cdn.azul.com/zulu-embedded/bin/zulu11.56.19-ca-jdk11.0.15-linux_aarch64.tar.gz"
-              ],
-              "remote_module_file_integrity": "",
-              "integrity": "",
-              "patch_cmds_win": [],
-              "workspace_file": null,
-              "url": "",
-              "patch_tool": "",
-              "remote_module_file_urls": [],
-              "sha256": "fc7c41a0005180d4ca471c90d01e049469e0614cf774566d4cf383caa29d1a97",
-              "patch_cmds": [],
-              "workspace_file_content": "",
-              "netrc": "",
-              "patch_args": [],
-              "build_file_content": "",
-              "add_prefix": "",
-              "patch_strip": 0,
               "patches": [],
-              "build_file": "@@rules_java//toolchains:jdk.BUILD"
-            }
-          },
-          "remote_java_tools_linux": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "workspace_file_content": "",
-              "patches": [],
-              "sha256": "41502b293eea292b0577b46e8d7738bfe88180562acbf99ed620b5387a60efee",
-              "workspace_file": null,
-              "urls": [
-                "https://mirror.bazel.build/bazel_java_tools/releases/java/v11.8/java_tools_linux-v11.8.zip",
-                "https://github.com/bazelbuild/java_tools/releases/download/java_v11.8/java_tools_linux-v11.8.zip"
-              ],
-              "patch_args": [],
-              "patch_cmds_win": [],
-              "type": "",
-              "patch_cmds": [],
-              "patch_tool": "",
-              "build_file_content": "",
-              "url": "",
-              "integrity": "",
-              "remote_patch_strip": 0,
-              "build_file": null,
               "remote_module_file_urls": [],
-              "netrc": "",
-              "canonical_id": "",
               "remote_module_file_integrity": "",
-              "patch_strip": 0,
-              "strip_prefix": "",
-              "add_prefix": ""
-            }
-          },
-          "remotejdk11_macos_aarch64": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "patch_cmds": [],
-              "workspace_file": null,
-              "type": "",
-              "workspace_file_content": "",
-              "strip_prefix": "zulu11.56.19-ca-jdk11.0.15-macosx_aarch64",
-              "integrity": "",
               "remote_patch_strip": 0,
-              "url": "",
-              "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "build_file_content": "",
-              "canonical_id": "",
-              "patch_cmds_win": [],
-              "patch_strip": 0,
-              "sha256": "6bb0d2c6e8a29dcd9c577bbb2986352ba12481a9549ac2c0bcfd00ed60e538d2",
-              "netrc": "",
-              "add_prefix": "",
-              "patch_args": [],
-              "remote_module_file_integrity": "",
-              "remote_module_file_urls": [],
-              "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-macosx_aarch64.tar.gz",
-                "https://cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-macosx_aarch64.tar.gz"
-              ],
-              "patch_tool": "",
-              "patches": []
-            }
-          },
-          "remotejdk15_macos_toolchain_config_repo": {
-            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
-            "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_15\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"15\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:macos\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk15_macos//:jdk\",\n)\n"
-            }
-          },
-          "remotejdk15_macos": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "add_prefix": "",
-              "patches": [],
-              "patch_strip": 0,
-              "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu15.27.17-ca-jdk15.0.0-macosx_x64.tar.gz",
-                "https://cdn.azul.com/zulu/bin/zulu15.27.17-ca-jdk15.0.0-macosx_x64.tar.gz"
-              ],
-              "patch_cmds": [],
-              "sha256": "f80b2e0512d9d8a92be24497334c974bfecc8c898fc215ce0e76594f00437482",
-              "patch_cmds_win": [],
-              "type": "",
-              "remote_patch_strip": 0,
-              "workspace_file_content": "",
-              "build_file_content": "",
-              "remote_module_file_integrity": "",
-              "integrity": "",
-              "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "strip_prefix": "zulu15.27.17-ca-jdk15.0.0-macosx_x64",
-              "workspace_file": null,
-              "netrc": "",
-              "url": "",
               "patch_tool": "",
               "patch_args": [],
-              "remote_module_file_urls": [],
-              "canonical_id": ""
-            }
-          },
-          "remotejdk11_macos": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
-            "attributes": {
-              "url": "",
-              "patch_cmds": [],
-              "remote_module_file_integrity": "",
-              "remote_module_file_urls": [],
-              "patch_cmds_win": [],
-              "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "patch_args": [],
-              "urls": [
-                "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-macosx_x64.tar.gz",
-                "https://cdn.azul.com/zulu/bin/zulu11.56.19-ca-jdk11.0.15-macosx_x64.tar.gz"
-              ],
-              "canonical_id": "",
-              "patches": [],
-              "remote_patch_strip": 0,
               "patch_strip": 0,
-              "netrc": "",
-              "strip_prefix": "zulu11.56.19-ca-jdk11.0.15-macosx_x64",
-              "type": "",
-              "add_prefix": "",
-              "patch_tool": "",
-              "integrity": "",
-              "sha256": "2614e5c5de8e989d4d81759de4c333aa5b867b17ab9ee78754309ba65c7f6f55",
-              "workspace_file": null,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
               "build_file_content": "",
+              "workspace_file": null,
               "workspace_file_content": ""
             }
           },
-          "remotejdk11_win_toolchain_config_repo": {
+          "remotejdk17_win_arm64_toolchain_config_repo": {
             "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
             "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_11\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"11\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:windows\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk11_win//:jdk\",\n)\n"
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_17\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"17\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:windows\", \"@platforms//cpu:arm64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk17_win_arm64//:jdk\",\n)\n"
             }
           },
-          "remotejdk11_linux_s390x": {
-            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_java%http_archive",
+          "remotejdk17_win_toolchain_config_repo": {
+            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
             "attributes": {
-              "patch_args": [],
-              "patch_tool": "",
-              "patch_cmds_win": [],
-              "strip_prefix": "jdk-11.0.15+10",
-              "workspace_file": null,
-              "remote_module_file_integrity": "",
-              "patch_cmds": [],
-              "build_file_content": "",
-              "remote_patch_strip": 0,
+              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_17\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"17\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:windows\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk17_win//:jdk\",\n)\n"
+            }
+          }
+        }
+      }
+    },
+    "@@rules_jvm_external+//:non-module-deps.bzl%non_module_deps": {
+      "general": {
+        "bzlTransitiveDigest": "sha256-YppYHn0FPp0M9ABMHXICTA0yODvlBvbNk0ByWFzaePI=",
+        "usagesDigest": "sha256-tQTgXHPF40mkR+D5gtbsPowIOFxKx22avpyW/F4kgGY=",
+        "recordedInputs": [],
+        "generatedRepoSpecs": {
+          "io_bazel_rules_kotlin": {
+            "repoRuleId": "bazel_tools//tools/build_defs/repo/http.bzl@rules_jvm_external%http_archive",
+            "attributes": {
+              "sha256": "946747acdbeae799b085d12b240ec346f775ac65236dfcf18aa0cd7300f6de78",
               "urls": [
-                "https://mirror.bazel.build/github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.15+10/OpenJDK11U-jdk_s390x_linux_hotspot_11.0.15_10.tar.gz",
-                "https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.15+10/OpenJDK11U-jdk_s390x_linux_hotspot_11.0.15_10.tar.gz"
+                "https://github.com/bazelbuild/rules_kotlin/releases/download/v1.7.0-RC-2/rules_kotlin_release.tgz"
               ],
-              "workspace_file_content": "",
-              "sha256": "a58fc0361966af0a5d5a31a2d8a208e3c9bb0f54f345596fd80b99ea9a39788b",
               "url": "",
-              "type": "",
-              "canonical_id": "",
-              "remote_module_file_urls": [],
-              "netrc": "",
-              "add_prefix": "",
-              "build_file": "@@rules_java//toolchains:jdk.BUILD",
               "integrity": "",
+              "netrc": "",
+              "canonical_id": "",
+              "strip_prefix": "",
+              "add_prefix": "",
+              "type": "",
               "patches": [],
-              "patch_strip": 0
-            }
-          },
-          "remotejdk11_win_arm64_toolchain_config_repo": {
-            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
-            "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_11\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"11\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:windows\", \"@platforms//cpu:arm64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk11_win_arm64//:jdk\",\n)\n"
-            }
-          },
-          "remotejdk16_macos_toolchain_config_repo": {
-            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
-            "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_16\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"16\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:macos\", \"@platforms//cpu:x86_64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk16_macos//:jdk\",\n)\n"
-            }
-          },
-          "local_jdk": {
-            "repoRuleId": "rules_java//toolchains/local_java_repository.bzl%_local_java_repository_rule",
-            "attributes": {
-              "build_file": "@@rules_java//toolchains:jdk.BUILD",
-              "target_name": "local_jdk",
-              "java_home": "",
-              "version": ""
-            }
-          },
-          "remotejdk11_linux_aarch64_toolchain_config_repo": {
-            "repoRuleId": "rules_java//toolchains/remote_java_repository.bzl%_toolchain_config",
-            "attributes": {
-              "build_file": "\nconfig_setting(\n    name = \"prefix_version_setting\",\n    values = {\"java_runtime_version\": \"remotejdk_11\"},\n    visibility = [\"//visibility:private\"],\n)\nconfig_setting(\n    name = \"version_setting\",\n    values = {\"java_runtime_version\": \"11\"},\n    visibility = [\"//visibility:private\"],\n)\nalias(\n    name = \"version_or_prefix_version_setting\",\n    actual = select({\n        \":version_setting\": \":version_setting\",\n        \"//conditions:default\": \":prefix_version_setting\",\n    }),\n    visibility = [\"//visibility:private\"],\n)\ntoolchain(\n    name = \"toolchain\",\n    target_compatible_with = [\"@platforms//os:linux\", \"@platforms//cpu:aarch64\"],\n    target_settings = [\":version_or_prefix_version_setting\"],\n    toolchain_type = \"@bazel_tools//tools/jdk:runtime_toolchain_type\",\n    toolchain = \"@remotejdk11_linux_aarch64//:jdk\",\n)\n"
+              "remote_module_file_urls": [],
+              "remote_module_file_integrity": "",
+              "remote_patch_strip": 0,
+              "patch_tool": "",
+              "patch_args": [],
+              "patch_strip": 0,
+              "patch_cmds": [],
+              "patch_cmds_win": [],
+              "build_file": null,
+              "build_file_content": "",
+              "workspace_file": null,
+              "workspace_file_content": ""
             }
           }
         }

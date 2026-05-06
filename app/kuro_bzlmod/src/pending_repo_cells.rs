@@ -182,7 +182,15 @@ pub fn pre_compute_extension_repo_cells(
             // (regardless of its declared name, which is only used by OTHER modules
             // to reference it). Extensions defined in the root module's own .bzl files
             // therefore produce repos like `_main+ext_name+repo_name`.
-            let extracted_owner = extract_owning_module(&usage.extension_bzl_file, module_name);
+            // Use the canonical `ext_id` (e.g. `@rules_java//java:extensions.bzl%toolchains`)
+            // here, NOT `usage.extension_bzl_file` (e.g. `//java:extensions.bzl`).
+            // `extract_owning_module` reads the `@<module>//` prefix; a bare
+            // `//` path has no prefix and falls back to `_main`, which would
+            // mis-attribute every transitive dep's relative `use_extension`
+            // to the root module (e.g. `rules_java`'s toolchains extension
+            // showing up as `_main+toolchains+...` instead of
+            // `rules_java+toolchains+...`).
+            let extracted_owner = extract_owning_module(&ext_id, root_module_name);
             let owner_module = if is_root && extracted_owner == module_name {
                 "_main"
             } else {
