@@ -50,7 +50,6 @@
 //! extension execution engine.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::fmt;
 
 use allocative::Allocative;
@@ -182,7 +181,7 @@ fn coerced_attr_to_repo_attr_value(
 ) -> Option<RepoAttrValue> {
     use kuro_node::attrs::coerced_attr::CoercedAttr;
     match attr {
-        CoercedAttr::String(s) => {
+        CoercedAttr::String(s) | CoercedAttr::EnumVariant(s) => {
             let s = s.as_str().to_owned();
             if s.starts_with("//") || s.starts_with("@") || s.starts_with(":") {
                 Some(RepoAttrValue::Label(s))
@@ -193,15 +192,34 @@ fn coerced_attr_to_repo_attr_value(
         CoercedAttr::Int(i) => Some(RepoAttrValue::Int(*i)),
         CoercedAttr::Bool(b) => Some(RepoAttrValue::Bool(b.0)),
         CoercedAttr::None => Some(RepoAttrValue::None),
+        CoercedAttr::Label(label)
+        | CoercedAttr::Dep(label)
+        | CoercedAttr::SourceLabel(label)
+        | CoercedAttr::ConfigurationDep(label)
+        | CoercedAttr::SplitTransitionDep(label) => Some(RepoAttrValue::Label(label.to_string())),
+        CoercedAttr::OneOf(value, _) => coerced_attr_to_repo_attr_value(value),
         CoercedAttr::List(list) => {
             let items: Vec<String> = list
                 .iter()
-                .filter_map(|v| match v {
-                    CoercedAttr::String(s) => Some(s.as_str().to_owned()),
+                .filter_map(|v| match coerced_attr_to_repo_attr_value(v)? {
+                    RepoAttrValue::String(s) | RepoAttrValue::Label(s) => Some(s),
                     _ => None,
                 })
                 .collect();
             Some(RepoAttrValue::StringList(items))
+        }
+        CoercedAttr::Dict(dict) => {
+            let entries = dict
+                .iter()
+                .filter_map(|(k, v)| {
+                    let key = match coerced_attr_to_repo_attr_value(k)? {
+                        RepoAttrValue::String(s) | RepoAttrValue::Label(s) => s,
+                        _ => return None,
+                    };
+                    Some((key, coerced_attr_to_repo_attr_value(v)?))
+                })
+                .collect();
+            Some(RepoAttrValue::Dict(entries))
         }
         _ => None, // Other types not yet needed
     }
