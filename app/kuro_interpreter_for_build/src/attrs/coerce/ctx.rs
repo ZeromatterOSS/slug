@@ -360,23 +360,10 @@ impl BuildAttrCoercionContext {
 
                 // Bazel-compatible: bare target names (e.g., "foo_bar") resolve relative to
                 // the current package. Try prepending ":" if the original parse failed.
-                // But skip this for bare names that are known source files in the package,
-                // so that one_of(dep, source) coercion falls through to source coercion.
                 let is_bare_name = !value.is_empty()
                     && !value.starts_with("//")
                     && !value.starts_with('@')
                     && !value.starts_with(':');
-                let is_source_file = if is_bare_name {
-                    if let Some((_, listing)) = &self.enclosing_package {
-                        <&PackageRelativePath>::try_from(value)
-                            .map(|p| listing.get_file(p).is_some())
-                            .unwrap_or(false)
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                };
                 // Even in strict mode (bzl file attr defaults), bare names like
                 // "LICENSE" resolve as relative labels — Bazel treats
                 // `attr.label(default = "LICENSE")` as `:LICENSE`.
@@ -385,6 +372,23 @@ impl BuildAttrCoercionContext {
                     // "declare_config_settings.bzl") resolve as ":foo_bar" in the current
                     // package. This applies even when the name matches a source file —
                     // in a dep/label attr context, bare names are always labels.
+                    // Plan 46 exception: bare names that resolve to an on-disk
+                    // *directory* under the enclosing package defer to source
+                    // coercion. `one_of(dep, source)` then routes the value
+                    // through `SourceAttrType::coerce_item`, which (with
+                    // allow_directory) expands the directory to its files.
+                    if let Some((_pkg, listing)) = &self.enclosing_package {
+                        if let Ok(rel) = <&PackageRelativePath>::try_from(value) {
+                            if listing.get_dir(rel).is_some()
+                                && listing.get_file(rel).is_none()
+                            {
+                                return Err(BuildAttrCoercionContextError::RequiredLabel(
+                                    value.to_owned(),
+                                )
+                                .into());
+                            }
+                        }
+                    }
                     // Check output registry first for declared outputs.
                     let output_target = self.output_file_registry.borrow().get(value).cloned();
                     let target_name_to_use = output_target.as_deref().unwrap_or(value);
@@ -399,12 +403,18 @@ impl BuildAttrCoercionContext {
                     }
                 } else if is_bare_name && value.contains('/') {
                     // Bare name with path separators (e.g., "crypto/aes/file.pl",
-                    // "src/parser.rs"). Two cases:
-                    //   1. Source file: "src/foo.h" on disk — implicit source target.
-                    //   2. Declared output: a rule with `attr.output(out =
+                    // "src/parser.rs", "lib/clang/22"). Three cases:
+                    //   1. Declared output: a rule with `attr.output(out =
                     //      "include/llvm/Config/TargetMCAs.def")` registers the
                     //      full slashed path in `output_file_registry`. Redirect
                     //      to the producer target so analysis can find it.
+                    //   2. On-disk source path (file or directory) under the
+                    //      enclosing package: defer to source coercion so the
+                    //      `one_of(dep, source)` wrapper around filegroup-style
+                    //      attrs picks up the bytes from disk. Plan 46.
+                    //   3. Otherwise: synthesize `:<value>` as an implicit
+                    //      source-or-generated target (legacy behaviour for
+                    //      generated files registered elsewhere).
                     // Check the output registry first so generated files with
                     // slashed names resolve to their producing target.
                     if let Some(producer) = self.output_file_registry.borrow().get(value).cloned() {
@@ -421,7 +431,27 @@ impl BuildAttrCoercionContext {
                             .into()),
                         };
                     }
-                    // Fall through to source-file handling.
+                    // Defer to source-coercion when the path exists on disk
+                    // under the enclosing package (file OR directory). The
+                    // `one_of(dep, source)` wrapper then routes the value
+                    // through `SourceAttrType::coerce_item`. Without this,
+                    // a directory path like "lib/clang/22" coerces here as a
+                    // synthetic `:lib/clang/22` label and analysis fails
+                    // with "Unknown target".
+                    if let Some((_pkg, listing)) = &self.enclosing_package {
+                        if let Ok(rel) = <&PackageRelativePath>::try_from(value) {
+                            if listing.get_file(rel).is_some() || listing.get_dir(rel).is_some() {
+                                return Err(BuildAttrCoercionContextError::RequiredLabel(
+                                    value.to_owned(),
+                                )
+                                .into());
+                            }
+                        }
+                    }
+                    // Fall through to source-file handling for paths that
+                    // aren't on disk and aren't declared outputs — the
+                    // legacy synthesis still names a target the rule may
+                    // populate elsewhere (e.g. via `exports_files`).
                     if let Some((pkg_label, _listing)) = &self.enclosing_package {
                         let target = TargetNameRef::unchecked_new(value);
                         Ok(ProvidersLabel::default_for(TargetLabel::new(

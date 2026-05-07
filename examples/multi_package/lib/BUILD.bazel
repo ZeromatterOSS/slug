@@ -6,6 +6,14 @@ exports_files(
     visibility = ["//visibility:public"],
 )
 
+# Plan 46: filegroup srcs accepts directory paths. The contained
+# files (recursively) become the filegroup's outputs.
+filegroup(
+    name = "headers_dir",
+    srcs = ["headers"],
+    visibility = ["//visibility:public"],
+)
+
 cc_library(
     name = "math",
     srcs = ["math.cpp"],

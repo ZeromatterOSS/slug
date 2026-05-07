@@ -181,6 +181,10 @@ pub(crate) mod rule_defs {
 
     /// Creates the AttributeSpec for filegroup.
     /// filegroup has optional `srcs` (list of sources/deps) and `data` attributes.
+    ///
+    /// Both attrs use `AttrType::source(true)` (allow_directory) to match
+    /// Bazel's semantics: `srcs = ["some_dir"]` includes every file under
+    /// `some_dir/`. Plan 46.
     fn filegroup_attributes() -> AttributeSpec {
         let srcs_attr = Attribute::new(
             Some(Arc::new(CoercedAttr::List(
@@ -189,7 +193,7 @@ pub(crate) mod rule_defs {
             "The list of files or targets in this filegroup",
             AttrType::list(AttrType::one_of(vec![
                 AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
-                AttrType::source(false),
+                AttrType::source(true),
             ])),
         );
 
@@ -200,7 +204,7 @@ pub(crate) mod rule_defs {
             "The list of data files for this filegroup",
             AttrType::list(AttrType::one_of(vec![
                 AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
-                AttrType::source(false),
+                AttrType::source(true),
             ])),
         );
 
@@ -1098,10 +1102,13 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         let internals = ModuleInternals::from_context(eval, "filegroup")?;
         let coercion_ctx = internals.attr_coercion_context();
 
-        // Coerce srcs and data - accept both lists and select() expressions
+        // Coerce srcs and data - accept both lists and select() expressions.
+        // `AttrType::source(true)` (allow_directory) matches Bazel's
+        // `srcs = ["some_dir"]` semantics — see `filegroup_attributes`
+        // and Plan 46.
         let srcs_attr_type = AttrType::list(AttrType::one_of(vec![
             AttrType::dep(ProviderIdSet::EMPTY, PluginKindSet::EMPTY),
-            AttrType::source(false),
+            AttrType::source(true),
         ]));
         let data_attr_type = srcs_attr_type.clone();
 
