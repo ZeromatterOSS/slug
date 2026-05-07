@@ -193,21 +193,30 @@ impl LocalExecutor {
         cgroup: Option<CgroupPathBuf>,
         freeze_rx: impl ActionFreezeEventReceiver,
         sandbox: Option<SandboxSpec>,
+        action_execroot: Option<&'a kuro_fs::paths::abs_norm_path::AbsNormPath>,
     ) -> impl futures::future::Future<Output = kuro_error::Result<CommandResult>> + Send + 'a {
         async move {
-            // Plan 44 Phase 2.5: route action cwd through the
-            // synthesized execroot at `<project_root>/execroot/<basename>/`.
-            // The execroot mirrors the workspace's directory tree via
-            // top-level symlinks; leaf files at workspace root are
-            // omitted so `read_dir(cwd)` matches Bazel's exec_root
-            // shape. Falls back to the project root if the layout
-            // helper couldn't determine a basename or hasn't run.
-            let working_directory = match kuro_core::cells::execroot_path(self.root.as_path())
-                .filter(|p| p.is_dir())
-                .and_then(|p| kuro_fs::paths::abs_norm_path::AbsNormPathBuf::new(p).ok())
-            {
+            // Plan 44 Phase 2.6: cwd is the per-action execroot built
+            // by `action_execroot::ensure_execroot`. It contains only
+            // the symlinks the action's declared inputs require, so
+            // `read_dir(cwd)` returns exactly the prefixes the action
+            // needs — matching Bazel's exec_root invariant.
+            //
+            // Phase 2.5 fallback: when the caller didn't supply a
+            // per-action execroot (e.g. a code path that hasn't been
+            // updated, or non-action shell-out tests), fall back to
+            // the shared synthesized execroot from
+            // `kuro_core::cells::execroot_path`. Last resort: the
+            // project root.
+            let working_directory = match action_execroot {
                 Some(execroot) => std::borrow::Cow::Owned(execroot.join(working_directory)),
-                None => self.root.join_cow(working_directory),
+                None => match kuro_core::cells::execroot_path(self.root.as_path())
+                    .filter(|p| p.is_dir())
+                    .and_then(|p| kuro_fs::paths::abs_norm_path::AbsNormPathBuf::new(p).ok())
+                {
+                    Some(execroot) => std::borrow::Cow::Owned(execroot.join(working_directory)),
+                    None => self.root.join_cow(working_directory),
+                },
             };
 
             // When sandbox is active, bypass the forkserver and use direct process spawning.
@@ -441,6 +450,16 @@ impl LocalExecutor {
                 let start_time = SystemTime::now();
 
                 let env = env.iter().map(|(k, v)| (k, v.into_os_str()));
+                // Plan 44 Phase 2.6: per-action execroot keyed by the
+                // action's declared input prefix set. Computed here so
+                // each `self.exec` call routes cwd through a directory
+                // containing only the symlinks the action needs.
+                let prefixes = crate::executors::action_execroot::collect_input_prefixes(
+                    request,
+                    &self.artifact_fs,
+                );
+                let action_execroot =
+                    crate::executors::action_execroot::ensure_execroot(&self.root, &prefixes);
                 let r = if let Some(worker) = worker {
                     let env: Vec<(OsString, OsString)> = env
                         .into_iter()
@@ -462,6 +481,7 @@ impl LocalExecutor {
                         cgroup,
                         freeze_rx,
                         sandbox,
+                        action_execroot.as_deref(),
                     )
                     .await
                 };
@@ -2027,6 +2047,7 @@ mod tests {
                 None,
                 futures::stream::pending(),
                 None,
+                None,
             )
             .await?;
         assert_matches!(status, GatherOutputStatus::Finished { exit_code, .. } if exit_code == 0);
@@ -2073,6 +2094,7 @@ mod tests {
                 None,
                 futures::stream::pending(),
                 None,
+                None,
             )
             .await?;
         assert_matches!(status, GatherOutputStatus::TimedOut ( duration ) if duration == Duration::from_secs(1));
@@ -2099,6 +2121,7 @@ mod tests {
                 false,
                 None,
                 futures::stream::pending(),
+                None,
                 None,
             )
             .await?;
