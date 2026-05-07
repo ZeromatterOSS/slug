@@ -1552,7 +1552,7 @@ no longer reproduces.
 |------|----------|--------|
 | Rust `toolchain_type` alias resolution | **Plan 11 Phase 8** | Belongs in toolchain resolution, not extension execution. Extensions correctly produce the BUILD that Bazel produces; the gap is downstream alias-following at registration time. |
 | Phase 6.3: register extension repos as ordinary cells (delete `ExternalCellOrigin::ExtensionRepo`) | **Stays in Plan 10 as deferred cleanup** | Structural simplification, not a correctness gap. Phases 6.1+6.2 already deliver lazy file tracking. Can land as an isolated refactor whenever convenient. |
-| Phase 7.2: on-demand spoke materialization | **Deferred indefinitely** | Disk/time amplification only, not a correctness or hang issue (Phase 7 / 7.1 fixed the actual cascade). |
+| Phase 7.2: on-demand spoke materialization | **Plan 36** | Later zeromatter verification proved this was a correctness issue for extensions that call `mctx.path(Label)` on internal spoke repos. Plan 36 is the successor plan and now owns the remaining `repository_ctx` audit / attr-backfill / loud-fail follow-ups. |
 
 ### Outstanding manual verification (nice-to-have)
 

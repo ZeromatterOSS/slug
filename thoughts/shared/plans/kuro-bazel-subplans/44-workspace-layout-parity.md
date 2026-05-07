@@ -5,7 +5,11 @@
 > Sibling: [15-bazel-9-parity.md](./15-bazel-9-parity.md) Phase 3 (lockfile
 > round-trip) — same theme, different scope.
 
-## Status: PROPOSED
+## Status: PARTIAL
+
+Phase 2.5's shared synthesized execroot stopgap has landed. Phase 2.6
+(per-action execroot narrowing) and Phase 3 (real Bazel-shaped execroot
+and external-repo layout) remain proposed.
 
 ## Context
 

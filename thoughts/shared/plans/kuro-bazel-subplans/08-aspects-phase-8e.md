@@ -1,5 +1,8 @@
 # Aspects Phase 8e: required_aspect_providers for rules_cc Compatibility
 
+> **Status: SUPERSEDED.** Use [06-aspects.md](./06-aspects.md) and the
+> `06-aspects-phase-*` files for current aspect status.
+>
 > **Main Plan**: [08-aspects.md](./08-aspects.md)
 > **Previous Phase**: [08-aspects-phase-8d.md](./08-aspects-phase-8d.md)
 

@@ -1,5 +1,9 @@
 # Phase 8: Bazel Aspects Implementation
 
+> **Status: SUPERSEDED.** Use [06-aspects.md](./06-aspects.md) as the
+> authoritative aspects plan. This duplicate has older unchecked status
+> markers.
+>
 > **Parent Plan**: [Kuro Bazel-Compatible Build Tool](../2026-01-21-kuro-bazel-compatible-build-tool.md)
 > **Blocks**: [02-bzlmod.md](./02-bzlmod.md) - rules_cc loading requires `aspect()` built-in
 

@@ -1,5 +1,10 @@
 # Rules Integration Phases (7-10)
 
+> **Status: SUPERSEDED.** Use
+> [07-rules-integration.md](./07-rules-integration.md) as the authoritative
+> rules integration plan. This duplicate preserves older pre-renumbering
+> history.
+>
 > **Parent Plan**: [Kuro Bazel-Compatible Build Tool](../2026-01-21-kuro-bazel-compatible-build-tool.md)
 >
 > **Key Research**: [rules_cc Native Requirements](../research/2026-01-26-rules-cc-native-requirements.md)
@@ -326,4 +331,3 @@ oci_image(
 - [ ] Load image into Docker and run container
 
 ---
-

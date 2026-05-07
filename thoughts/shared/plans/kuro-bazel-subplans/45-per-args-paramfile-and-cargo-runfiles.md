@@ -8,12 +8,18 @@
 >   This plan covers a different runfiles flavour: explicit
 >   `ctx.actions.declare_directory("foo.cargo_runfiles")` outputs that the
 >   action's own runner is supposed to populate.
-> - [44-workspace-layout-parity.md](./44-workspace-layout-parity.md) Phase 3 —
->   introduces an execroot. The `execroot/<basename> -> ..` self-symlink
->   landed today (commit `d29a4ff4`) is a tactical interim; Phase 4 below
->   removes it once Plan 44 Phase 3 lands.
+> - [44-workspace-layout-parity.md](./44-workspace-layout-parity.md) —
+>   Phase 2.5 provides the current shared synthesized execroot stopgap.
+>   Phase 2.6 narrows that execroot per action, and Phase 3 later replaces
+>   it with a real Bazel-shaped execroot. Phase 4 below removes the interim
+>   self-symlink once Phase 3 lands.
 
 ## Status: PROPOSED
+
+This plan is not blocked on Plan 44 Phase 3. Phase 1 can land against the
+current Phase 2.5 execroot stopgap; Plan 44 Phase 2.6 may reduce runfiles
+collisions, and Phase 4 here is the cleanup hook after the full Phase 3
+execroot lands.
 
 ## Context
 

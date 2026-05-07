@@ -1,5 +1,9 @@
 # Infrastructure Phases (11-14)
 
+> **Status: SUPERSEDED.** Use [08-infrastructure.md](./08-infrastructure.md)
+> as the authoritative infrastructure plan. This duplicate preserves older
+> pre-renumbering history.
+>
 > **Parent Plan**: [Kuro Bazel-Compatible Build Tool](../2026-01-21-kuro-bazel-compatible-build-tool.md)
 
 This sub-plan covers infrastructure improvements: stable Rust migration, sandboxing, platform support, and query commands.

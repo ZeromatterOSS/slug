@@ -1,5 +1,9 @@
 # Builtins Compatibility Phase (7)
 
+> **Status: SUPERSEDED.** Use
+> [05-builtins-compatibility.md](./05-builtins-compatibility.md) as the
+> authoritative builtins plan. This duplicate preserves older history.
+>
 > **Parent Plan**: [Kuro Bazel-Compatible Build Tool](../2026-01-21-kuro-bazel-compatible-build-tool.md)
 
 This sub-plan covers ensuring Kuro has all Bazel built-in rules, functions, and modules while removing Buck2-specific builtins that conflict with Bazel compatibility.

@@ -1,5 +1,8 @@
 # Aspects Phase 8d: Shadow Graph Propagation via compute_dep_aspects
 
+> **Status: SUPERSEDED.** Use [06-aspects.md](./06-aspects.md) and the
+> `06-aspects-phase-*` files for current aspect status.
+>
 > **Main Plan**: [08-aspects.md](./08-aspects.md)
 > **Previous Phase**: [08-aspects-phase-8c.md](./08-aspects-phase-8c.md)
 

@@ -1,5 +1,9 @@
 # Aspects Phase 8e: required_aspect_providers for rules_cc Compatibility
 
+> **Status: HISTORICAL.** Roll-up status is tracked in
+> [06-aspects.md](./06-aspects.md). The sibling `08-aspects-phase-*` files are
+> older duplicate copies and are marked superseded.
+>
 > **Main Plan**: [06-aspects.md](./06-aspects.md)
 > **Previous Phase**: [06-aspects-phase-8d.md](./06-aspects-phase-8d.md)
 

@@ -1,5 +1,8 @@
 # Aspects Phase 8c: Shadow Graph Propagation and DICE Integration
 
+> **Status: SUPERSEDED.** Use [06-aspects.md](./06-aspects.md) and the
+> `06-aspects-phase-*` files for current aspect status.
+>
 > **Main Plan**: [08-aspects.md](./08-aspects.md)
 > **Previous Phase**: [08-aspects-phase-8b.md](./08-aspects-phase-8b.md)
 

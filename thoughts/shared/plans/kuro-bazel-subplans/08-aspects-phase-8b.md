@@ -1,5 +1,8 @@
 # Aspects Phase 8b: Aspect Context and Basic Execution
 
+> **Status: SUPERSEDED.** Use [06-aspects.md](./06-aspects.md) and the
+> `06-aspects-phase-*` files for current aspect status.
+>
 > **Main Plan**: [08-aspects.md](./08-aspects.md)
 > **Research**: [BXL vs Bazel Aspects Comparison](../../research/2026-01-30-bxl-vs-bazel-aspects-comparison.md)
 

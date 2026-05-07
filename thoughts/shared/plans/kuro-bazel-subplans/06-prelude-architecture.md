@@ -1,5 +1,10 @@
 # Prelude Architecture Phase (6b)
 
+> **Status: SUPERSEDED.** Use
+> [04-prelude-architecture.md](./04-prelude-architecture.md) as the
+> authoritative prelude plan. This duplicate preserves older history and may
+> contain stale `.buckconfig`/`BUCK` references.
+>
 > **Parent Plan**: [Kuro Bazel-Compatible Build Tool](../2026-01-21-kuro-bazel-compatible-build-tool.md)
 
 This sub-plan covers the prelude architecture: preserving Buck2's prelude loading mechanism, migrating Bazel shims from native Rust to Starlark, and removing unused Buck2-specific prelude code.

@@ -1,5 +1,9 @@
 # Aspects Phase 8b: Aspect Context and Basic Execution
 
+> **Status: HISTORICAL.** Roll-up status is tracked in
+> [06-aspects.md](./06-aspects.md). The sibling `08-aspects-phase-*` files are
+> older duplicate copies and are marked superseded.
+>
 > **Main Plan**: [06-aspects.md](./06-aspects.md)
 > **Research**: [BXL vs Bazel Aspects Comparison](../../research/2026-01-30-bxl-vs-bazel-aspects-comparison.md)
 
