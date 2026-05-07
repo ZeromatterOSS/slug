@@ -117,12 +117,14 @@ pointing into the new location for now.
 **Effort**: 2-3 days, mechanical. Low risk (no semantics change).
 Can land before Phase 3.
 
-### Phase 2.5 (medium): minimal per-action execroot for sandbox-free input isolation
+### Phase 2.5 (medium): shared synthesized execroot — STOPGAP, FROZEN
 
-**Status: PARTIAL (2026-05-07)** — directory-only execroot landed plus
-a coarse name-based collision filter. Covers crate runfiles trees with
-no top-level subdir matching the filtered names. Per-action input
-narrowing (next step) is the proper fix; tracked below.
+**Status: DONE-AS-FAR-AS-IT-GOES (2026-05-07)** — directory-only
+shared execroot landed plus a coarse name-based collision filter.
+The filter is **frozen** — no new entries. Any future collision
+("crate `foo` has a `bar/` subdir whose name matches a workspace
+top-level dir") triggers Phase 2.6 (per-action narrowing) instead
+of growing the list.
 
 **Landed:**
 - `app/kuro_core/src/cells.rs::ensure_execroot_layout` builds
@@ -154,188 +156,148 @@ them via `cwd-relative/<name>/...` will break — accept and adjust
 the list as collisions surface, since per-action narrowing (below)
 is the proper fix and supersedes this.
 
-**Outstanding:**
-- `crates__zerocopy-0.8.42//:_bs` end-to-end verification is blocked
-  by an unrelated kuro analysis bug
-  (`llvm-toolchain-minimal-22.1.0-linux-amd64//:lib/clang/22` is a
-  directory path used as a `filegroup` src in
-  `bazel-external/llvm+0.7.0/directory.bzl::headers_directory`;
-  Bazel allows directory paths as filegroup srcs, kuro's BUILD
-  coercion rejects them as missing labels). Track separately.
-- The collision-name filter is a workaround. The remaining failure
-  mode below still hits cases where the crate's runfiles tree has a
-  subdir whose name matches a zeromatter first-party dir not in the
-  filter list (e.g. a hypothetical zeromatter `target/`). Failure mode:
-  `create_runfiles_dir` creates `manifest_dir/ci/<runfiles>` as a
-  real subdirectory; `should_symlink_exec_root` then iterates
-  exec_root, finds our `ci` symlink, calls
-  `symlink_if_not_exists(<exec_root>/ci, manifest_dir/ci)` — swallows
-  AlreadyExists, pushes `manifest_dir/ci` into `exec_root_links`,
-  and the cleanup loop's `remove_symlink(manifest_dir/ci)` panics
-  with `IsADirectory` since the path is a real dir, not a symlink.
-- This is the same upstream rules_rust runner shape (push-to-cleanup
-  even when symlink wasn't created) re-manifesting at directory
-  granularity. Phase 2.5's directory-only filter only protected
-  against leaf-file collisions.
+**Why the filter is frozen**: each new collision (`scripts/` from
+`crates__cookie-0.18.1` was the most recent) just adds a name that
+*also* breaks first-party workspace paths by that name. The set of
+"crate runfile subdir names that match arbitrary user workspace
+dirs" is unbounded; growing the allowlist won't converge. Phase 2.6
+removes the need for the list.
 
-**Next step (Phase 2.6 or revisit 2.5):** narrow exec_root contents
-per-action so only the action's declared inputs appear at top level.
-For cargo_build_script actions that's just `external/` and
-`buck-out/`, no first-party workspace dirs. Sketch:
+---
 
-1. In `kuro_execute_impl`, pass the action's input set through to
-   the `exec` call (already partially threaded via
-   `request.working_directory()` etc.).
-2. Build a per-action exec_root at
-   `<buck-out>/v2/execroot/<action_digest>/` containing symlinks
-   only for the inputs (or their top-level prefix). Reuse across
-   actions with identical input-set hashes.
-3. Continue to set cwd to that path. Outputs flow through the
-   `buck-out/` symlink as before.
+### Phase 2.6 (medium): per-action execroot narrowing — supersedes the allowlist
 
-Alternative: patch rules_rust upstream so `exec_root_links` only
-pushes paths where `symlink_if_not_exists` actually created the link
-(returns a bool). One-line fix in
-`bazel-external/rules_rust+0.69.0/cargo/private/cargo_build_script_runner/bin.rs:69-84`,
-but the patch needs to survive bzlmod cache invalidation — likely
-needs a kuro-side patch hook (see `kuro_external_cells_bundled`
-build script).
+**Status: PROPOSED**
 
+**Goal**: replace the shared allowlist-filtered execroot from Phase
+2.5 with a per-action execroot that contains only the symlinks the
+action's inputs actually require. Action-level isolation by input
+declaration, no sandbox.
 
+#### Why this is the right fix
 
-Discovered while extending Plan 22.4 (cell-aware build-setting CLI flags)
-into zeromatter `//sdk:sdk_contents`. The cell-flag fix lands
-`RULES_RUST_SYMLINK_EXEC_ROOT=1` in `cargo_build_script_run` action
-envs as intended. With the flag set, `cargo_build_script_runner/bin.rs`
-does:
+Phase 2.5's collision-name filter is whack-a-mole because the
+runner's invariant is "`read_dir(exec_root)` is the action's
+declared inputs". Bazel achieves that via per-action sandbox
+staging. Kuro's shared synthesized execroot mirrors the workspace's
+directory tree, so any workspace top-level dir whose name happens
+to match a *runfile subdir* of *any* action's tree is a latent
+collision.
 
-```rust
-let exec_root = env::current_dir().unwrap();
-for path in read_dir(&exec_root)? {
-    let link = manifest_dir.join(file_name);
-    symlink_if_not_exists(&path, &link)?;   // swallows AlreadyExists
-    exec_root_links.push(link)              // pushed UNCONDITIONALLY
-}
-// build script runs ...
-for link in exec_root_links { remove_symlink(&link)?; }
-cargo_manifest_maker.drain_runfiles_dir(...)?;  // expects symlinks intact
-```
+The proper fix scopes the workspace-mirror to one action's worth of
+input prefixes. For `cargo_build_script` that's always just
+`external/` (its source crate path) and `buck-out/` (its tools and
+declared outputs). For first-party actions it's whichever workspace
+directories they list as inputs.
 
-In Bazel, `exec_root` is a per-build staging directory whose top-level
-entries are the action's declared inputs (`external/`, `bazel-out/`,
-plus the workspace's own dirs as a symlink subtree). In kuro,
-`exec_root = cwd = $(kuro root --kind project)` — the user's source
-tree. ZeroMatter's project root has `Cargo.toml`, `Cargo.lock`,
-`CHANGELOG.md`, `README.md` at top level. Those collide name-wise with
-crate runfiles (`create_runfiles_dir` had already symlinked
-`manifest_dir/CHANGELOG.md → external/<crate>/CHANGELOG.md`). The
-runner's exec_root_links cleanup then removes the runfiles symlink it
-didn't create, and `drain_runfiles_dir` panics with
-`Failed to delete symlink … CHANGELOG.md … NotFound`. Confirmed on
-disk: every crate runfiles dir has exactly the entries that *don't*
-collide with zeromatter top-level files.
+Net: zero allowlist, zero collisions by construction.
 
-This is not a rules_rust bug — Bazel doesn't hit it because the
-exec_root layout invariant holds. It's the kuro execution-environment
-gap. Phase 3 is the full fix; this phase carves out the smallest
-slice that unblocks the rules_rust pattern (and any similar
-read-dir-of-exec-root behaviour) without requiring sandboxing,
-per-build staging, or broad path-shape changes.
+#### Target architecture
 
-**Scope**: per-action exec_root containing *only* what the action
-declares.
+1. For each action, compute the set of distinct top-level path
+   components from its declared inputs (artifacts and tools). For
+   most actions this is a small set (e.g. `{external, buck-out}`
+   for cargo_build_script; `{lib, external, buck-out}` for a
+   first-party rust_library that pulls a crate dep).
 
-**Target architecture**:
-1. For each action, allocate `<buck-out>/v2/execroot/<action_digest>/`.
-2. Materialize **only**:
-   - Top-level symlink `external/` →
-     `<workspace>/external/` (kuro's apparent-name alias dir; Phase 3
-     replaces this with a real subtree).
-   - Top-level symlink `buck-out/` → `<workspace>/buck-out/`. Outputs
-     declared under buck-out flow through this symlink, so no
-     post-action copy-back needed.
-   - The action's declared first-party source inputs: `lib/` /
-     `sdk/` etc. as **directory symlinks** to the workspace
-     equivalents, **not** file-by-file.
-3. Run the action with `cwd = <execroot>`. Existing
-   workspace-relative paths in the action's command line resolve
-   through the directory symlinks.
-4. Garbage-collect `<execroot>/<action_digest>/` after the action
-   completes (or leave under buck-out lifecycle — needs a small
-   decision).
+2. Hash the sorted prefix set → `<input_set_digest>`. Group actions
+   by digest; share an execroot dir per digest, not per action.
+   Cache lookup in-memory + on-disk under
+   `<buck-out>/v2/execroot/<input_set_digest>/`.
 
-**Why this works for the rules_rust case**: top-level
-`read_dir(exec_root)` returns `["external", "buck-out", "lib",
-"sdk", …]` — all directories. None collide with leaf-file runfiles
-(`CHANGELOG.md`, `Cargo.toml`, `README.md`). The runner's
-`symlink_if_not_exists`/cleanup loop creates `manifest_dir/external
-→ exec_root/external` and friends; those don't shadow runfiles
-entries.
+3. Populate the execroot lazily on first action that needs it:
+   one directory symlink per prefix → workspace counterpart. Total
+   work bounded by ~|inputs|; typical action <10 entries.
 
-**Why this is "without full-on sandboxing"**: no input
-hermeticity, no per-action resource limits, no cgroup work.
-Symlinks point straight at the workspace, so an action that
-strays outside its declared inputs still sees them — same as
-today. The only invariant we add is "top-level shape matches
-Bazel's exec_root", which is what `read_dir(exec_root)` callers
-actually rely on.
+4. Set the action's `cwd` to the per-digest execroot. Outputs still
+   flow through `<execroot>/buck-out/` → `<workspace>/buck-out/`,
+   no copy-back.
 
-**Touch points**:
-- `app/kuro_execute_impl/` (and the local-execution path) —
-  build the per-action execroot before launching, set `cwd` on the
-  spawn.
-- `app/kuro_action_impl/` — thread the action's declared input set
-  through to the staging step. Today most actions use the workspace
-  directly; the staging set is "all top-level entries of the
-  workspace minus collidables" as a v0, tightened in v1.
-- `set_dynamic_project_root` (per memory `execroot_self_symlink.md`)
-  — already installs `execroot/<basename>` so rules_rust
-  process_wrapper's `${exec_root}/buck-out/...` resolves.
-  Coordinate with the new execroot.
-- `tests/core/` — any test that asserts on action `cwd` or
-  workspace-relative paths needs review. Cargo build script tests
-  in particular.
+5. Garbage-collect `<buck-out>/v2/execroot/` on `kuro clean`. No
+   per-action GC needed — execroots are content-addressed by input
+   set and small enough to leak across builds.
 
-**Risks & mitigations**:
-- *Performance*: per-action staging directory creation is
-  non-trivial at scale. v0 uses one symlink per workspace
-  top-level entry — bounded fanout, ~1ms per action. Cache &
-  reuse across actions in the same build (group by input set).
-- *Path leakage*: an action that reads
-  `<workspace>/some-untracked-file` via a directory symlink still
-  succeeds; we accept this. Hermeticity is Phase 3 + sandbox
-  territory.
-- *Output collision*: `<execroot>/buck-out/` symlink means
-  outputs land at the workspace's buck-out. No copy-back needed,
-  but two parallel actions writing the same buck-out path
-  (action graph bug) become harder to attribute. This is the
-  same risk as today.
-- *Tools at absolute paths* (`/usr/bin/gcc` etc.) — unaffected
-  (action env already passes them as absolute).
+#### Why "narrowing", not "sandbox"
 
-**Verification**:
-- ZeroMatter `kuro build //sdk:sdk_contents` advances past the
-  `crates__typenum-1.19.0:_bs` `drain_runfiles_dir` panic.
-  `RULES_RUST_SYMLINK_EXEC_ROOT=1` still flows; runfiles dir on
-  disk contains all 11+ entries (CHANGELOG.md, Cargo.lock,
-  Cargo.toml, README.md, build.rs, LICENSE*, src/, tests/,
-  cargo_toml_env_vars.env), not just the 7 non-colliding ones.
-- `cargo test -p kuro_action_impl -p kuro_execute_impl --lib`
-  passes.
+- No input hermeticity: an action that reads
+  `<workspace>/some-untracked-file` through `<execroot>/external/...`
+  still succeeds via the symlink target. Same risk as today.
+- No process isolation: `cwd` is the only thing changing.
+- No copy-back of outputs: `buck-out/` symlinked through.
+- No per-action resource limits, cgroups, namespaces.
+
+The single invariant we're enforcing: `read_dir(cwd)` returns only
+prefixes the action declared. That's what rules_rust's runner (and
+any similar `read_dir(exec_root)` consumer) needs.
+
+#### Touch points
+
+- `app/kuro_execute/src/execute/request.rs` — `CommandExecutionRequest`
+  already exposes `inputs()`, `outputs()`. Add a helper that
+  extracts the sorted top-level prefix set from inputs+tools.
+- `app/kuro_execute_impl/src/executors/local.rs::exec_once` — call
+  the helper, hash the prefix set, build/reuse the execroot dir,
+  pass its absolute path to `exec`.
+- `app/kuro_execute_impl/src/executors/local.rs::exec` — accept the
+  per-action execroot path (replaces the
+  `kuro_core::cells::execroot_path` call from Phase 2.5).
+- `app/kuro_core/src/cells.rs` — keep `execroot_path` as a fallback
+  for actions where the request isn't available; remove
+  `is_likely_runfiles_collision` once Phase 2.6 lands and verify
+  the global `ensure_execroot_layout` is no longer the cwd source
+  for any action path.
+- `app/kuro_action_impl/` — confirm input-set extraction has
+  everything it needs (action metadata blobs, scratch paths,
+  incremental remote outputs).
+
+#### Risks & mitigations
+
+- **Per-action setup overhead**: small dir + ~5-10 symlinks. v0
+  measurement target: <2ms per execroot creation, amortized via
+  digest-keyed reuse. If hot-path becomes visible, batch via
+  `BlockingExecutor` queue.
+- **Tests asserting on `cwd`**: a few in `kuro_execute_impl` already
+  observe `cwd = execroot/<basename>`. Update to observe per-digest
+  path, or accept either shape.
+- **Apparent-name aliases in the action's prefix set**: for
+  `external/<apparent>`, the workspace target is the bzlmod
+  apparent-name symlink already. That's transitive through one
+  more symlink hop — fine for filesystem semantics, slight
+  performance hit on path resolution.
+- **Concurrent actions writing to the same execroot dir**: shared
+  by digest, multiple actions may target the same dir
+  simultaneously. Use atomic `mkdir` + `symlinkat` with
+  `EEXIST`-tolerance, no per-action mutation after creation.
+
+#### Verification
+
+- ZeroMatter `kuro build //sdk:sdk_contents` advances past
+  `crates__cookie-0.18.1//:_bs` (current Phase 2.5 + frozen-filter
+  blocker) without any `is_likely_runfiles_collision` entry.
+- Running with `is_likely_runfiles_collision` returning `false`
+  unconditionally (no allowlist) builds zerocopy, typenum, cookie
+  cleanly.
+- `kuro_execute_impl --lib` passes; tests updated for per-digest
+  cwd shape.
 - `examples/multi_package :gen_version_header` still builds.
-- `tests/core/...` regression sweep — review failures, expect
-  some path-shape tests to need updates.
+- Cold-build wall-clock for `//sdk:sdk_contents` within ~3× bazel
+  baseline (bazel 9.3s → kuro <30s, ignoring extension
+  materialization which is a separate plan).
 
-**Effort**: 3-5 days. The action-execution layer is well-isolated
-in `kuro_execute_impl`; staging logic is mechanical. Test
-fallout is the unknown.
+#### Effort
 
-**Relationship to Phase 3**: Phase 2.5 provides "exec_root has
-the right top-level shape, no sandboxing". Phase 3 turns each
-top-level entry into a real subtree (`external/<canonical>` as
-real dir, not a symlink to workspace) and makes the execroot the
-authoritative filesystem view. Phase 3 builds on 2.5 by tightening
-the input set; 2.5 doesn't change paths user-facing.
+3-5 days. Most of the plumbing already exists from Phase 2.5
+(directory symlinks, cwd routing, execroot path helper). The new
+work is the input-set extraction, digest keying, and removing the
+allowlist.
+
+#### Relationship to Phase 3
+
+Phase 2.6 keeps the workspace as the authoritative source tree
+(symlinks point into it). Phase 3 flips that: the execroot becomes
+the source of truth, `external/` becomes a real subtree under
+buck-out, and `<workspace>/external/` goes away. Phase 2.6 is a
+strict subset of Phase 3's setup work; Phase 3 builds on it.
 
 ---
 
