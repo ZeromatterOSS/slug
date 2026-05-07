@@ -138,11 +138,14 @@ struct MaterializedSet {
 /// Build (or return the cached path of) a per-action execroot
 /// containing top-level symlinks for every prefix in `prefixes`.
 ///
-/// Path: `<project_root>/buck-out/v2/execroot/<digest>/`. Directory
-/// is created lazily; symlinks point to the workspace's
-/// `<project_root>/<prefix>/` directory. If a prefix doesn't exist as
-/// a workspace directory it's silently skipped — actions reference
-/// real paths only.
+/// Path: `<project_root>/execroot/<digest>/`. Mirrors Bazel's
+/// `<output_base>/execroot/<workspace_name>/` layout so that
+/// rules_rust's `process_wrapper` (which derives `${exec_root}` as
+/// `<output_base>/execroot/<basename of cwd>`) resolves to the
+/// directory that actually exists on disk. The directory is created
+/// lazily; symlinks point to the workspace's `<project_root>/<prefix>/`
+/// directory. If a prefix doesn't exist as a workspace directory it's
+/// silently skipped — actions reference real paths only.
 pub(crate) fn ensure_execroot(
     project_root: &AbsNormPath,
     prefixes: &BTreeSet<String>,
@@ -151,7 +154,7 @@ pub(crate) fn ensure_execroot(
         return None;
     }
     let digest = digest_prefixes(prefixes);
-    let execroot_rel = format!("buck-out/v2/execroot/{digest}");
+    let execroot_rel = format!("execroot/{digest}");
     let execroot_abs: PathBuf = project_root.as_path().join(&execroot_rel);
 
     let mut guard = MATERIALIZED_EXECROOTS.lock().ok()?;
