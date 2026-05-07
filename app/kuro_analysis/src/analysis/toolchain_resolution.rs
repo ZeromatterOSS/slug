@@ -28,6 +28,7 @@ use std::collections::HashSet;
 
 use kuro_core::execution_types::execution::ExecutionPlatform;
 
+use super::native_rule_analysis::DeclaredToolchainInfo;
 use super::native_rule_analysis::get_declared_toolchains;
 
 /// A required toolchain type for a rule.
@@ -161,37 +162,12 @@ impl PlatformConstraints {
 /// Handles:
 /// - `@@platforms//os:linux` → `platforms//os:linux`
 /// - `@platforms//os:linux` → `platforms//os:linux`
-/// - `@platforms+1.0.0//os:linux` → `platforms//os:linux`
 /// - `platforms//os:linux` → `platforms//os:linux` (already normalized)
 /// - `//os:linux` → `//os:linux` (relative, kept as-is)
 fn normalize_constraint_label(label: &str) -> String {
+    // Strip all leading @ characters
     let label = label.trim_start_matches('@');
-    let Some((repo, rest)) = label.split_once("//") else {
-        return label.to_owned();
-    };
-
-    let repo = normalize_bzlmod_repo_name(repo);
-    format!("{repo}//{rest}")
-}
-
-fn normalize_bzlmod_repo_name(repo: &str) -> &str {
-    if let Some(module_name) = repo.strip_suffix('+') {
-        return module_name;
-    }
-
-    let Some((module_name, suffix)) = repo.split_once('+') else {
-        return repo;
-    };
-
-    if suffix
-        .as_bytes()
-        .first()
-        .is_some_and(|b| b.is_ascii_digit())
-    {
-        module_name
-    } else {
-        repo
-    }
+    label.to_owned()
 }
 
 /// Resolve toolchains for a target.
@@ -452,47 +428,6 @@ mod tests {
             normalize_constraint_label("platforms//os:linux"),
             "platforms//os:linux"
         );
-        assert_eq!(
-            normalize_constraint_label("@@platforms+1.0.0//os:linux"),
-            "platforms//os:linux"
-        );
-        assert_eq!(
-            normalize_constraint_label("@rules_cc+0.2.17//cc:toolchain_type"),
-            "rules_cc//cc:toolchain_type"
-        );
-        assert_eq!(
-            normalize_constraint_label(
-                "@rules_cc+cc_configure_extension+local_config_cc_toolchains//:cc-toolchain-k8"
-            ),
-            "rules_cc+cc_configure_extension+local_config_cc_toolchains//:cc-toolchain-k8"
-        );
-    }
-
-    #[test]
-    fn test_constraint_matching_across_bzlmod_module_version_repo_name() {
-        let apparent_platform = PlatformConstraints {
-            label: "@local_config_platform//:host".to_owned(),
-            constraint_values: HashSet::from([
-                "@platforms//os:linux".to_owned(),
-                "@platforms//cpu:x86_64".to_owned(),
-            ]),
-        };
-        assert!(apparent_platform.satisfies(&[
-            "@platforms+1.0.0//os:linux".to_owned(),
-            "@platforms+1.0.0//cpu:x86_64".to_owned(),
-        ]));
-
-        let canonical_platform = PlatformConstraints {
-            label: "@local_config_platform//:host".to_owned(),
-            constraint_values: HashSet::from([
-                "@platforms+1.0.0//os:linux".to_owned(),
-                "@platforms+1.0.0//cpu:x86_64".to_owned(),
-            ]),
-        };
-        assert!(canonical_platform.satisfies(&[
-            "@platforms//os:linux".to_owned(),
-            "@platforms//cpu:x86_64".to_owned(),
-        ]));
     }
 
     /// Plan 24 Phase 8: per-group `exec_compatible_with` constraints

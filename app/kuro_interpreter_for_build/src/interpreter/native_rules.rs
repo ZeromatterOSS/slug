@@ -815,13 +815,17 @@ pub(crate) fn create_native_target_node(
         TargetNameRef::new(target_name)?,
     );
 
-    // Build attribute values. Collect ALL attrs (name, visibility, and
-    // user-provided) into a single (id, value) list, then sort by id
-    // and push in order so `push_sorted`'s monotonic-id invariant
-    // holds. Without sorting all together, a user attribute whose id
-    // is lower than visibility's (e.g. `exec_compatible_with` at id 4
-    // vs visibility at id 5) would violate the monotonic invariant
-    // and panic with "attributes must be sorted".
+    // Build attribute values
+    let mut attr_values = AttrValues::with_capacity(attrs.len() + 2);
+
+    // Add the required name attribute first (it has AttributeId(0))
+    attr_values.push_sorted(
+        NAME_ATTRIBUTE.id,
+        CoercedAttr::String(StringLiteral(ArcStr::from(target_name))),
+    );
+
+    // Add visibility attribute (AttributeId(5))
+    // Use explicit visibility if provided, otherwise fall back to package default
     let visibility_spec = if visibility.is_empty() {
         default_visibility.dupe()
     } else {
@@ -829,29 +833,28 @@ pub(crate) fn create_native_target_node(
             .unwrap_or_else(|_| VisibilityWithinViewBuilder::with_capacity(0))
             .build_visibility()
     };
-
-    let mut combined: Vec<(AttributeId, CoercedAttr)> = Vec::with_capacity(attrs.len() + 2);
-    combined.push((
-        NAME_ATTRIBUTE.id,
-        CoercedAttr::String(StringLiteral(ArcStr::from(target_name))),
-    ));
-    combined.push((
+    attr_values.push_sorted(
         VISIBILITY_ATTRIBUTE.id,
         CoercedAttr::Visibility(visibility_spec),
-    ));
-    for (attr_name, coerced_value) in attrs {
-        if let Some((_, attr_id, _)) = rule
-            .attributes
-            .attr_specs()
-            .find(|(name, _, _)| *name == attr_name)
-        {
-            combined.push((attr_id, coerced_value));
-        }
-    }
-    combined.sort_by_key(|(id, _)| *id);
+    );
 
-    let mut attr_values = AttrValues::with_capacity(combined.len());
-    for (attr_id, coerced_value) in combined {
+    // Resolve attribute IDs from the spec, then insert in id order so
+    // `push_sorted`'s monotonic-id invariant holds. Without sorting,
+    // a user-provided attribute whose id falls between internal
+    // attribute ids (e.g. `exec_properties` at id 16, internal,
+    // alongside rule-specific attrs that occupy higher ids) would
+    // panic with "attributes must be sorted".
+    let mut resolved: Vec<(AttributeId, CoercedAttr)> = attrs
+        .into_iter()
+        .filter_map(|(attr_name, coerced_value)| {
+            rule.attributes
+                .attr_specs()
+                .find(|(name, _, _)| *name == attr_name)
+                .map(|(_, attr_id, _)| (attr_id, coerced_value))
+        })
+        .collect();
+    resolved.sort_by_key(|(id, _)| *id);
+    for (attr_id, coerced_value) in resolved {
         attr_values.push_sorted(attr_id, coerced_value);
     }
 
@@ -1936,7 +1939,14 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
-        let _ = (tags, testonly, deprecation, target_settings);
+        let _ = (
+            tags,
+            testonly,
+            deprecation,
+            target_settings,
+            exec_compatible_with,
+            target_compatible_with,
+        );
         let internals = ModuleInternals::from_context(eval, "toolchain")?;
         let coercion_ctx = internals.attr_coercion_context();
 
@@ -1945,22 +1955,9 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             dep_type.coerce(AttrIsConfigurable::No, coercion_ctx, toolchain_type)?;
         let coerced_toolchain = dep_type.coerce(AttrIsConfigurable::No, coercion_ctx, toolchain)?;
 
-        // Coerce exec_compatible_with / target_compatible_with (lists of
-        // constraint_value labels) so toolchain resolution can compare an
-        // exec/target platform's constraint_values against this
-        // toolchain's required set. Without this the lists default to
-        // empty, every toolchain matches every platform, and the first
-        // registered toolchain wins regardless of host OS/CPU.
-        let constraints_attr_type = AttrType::list(dep_type.clone());
-        let coerce_constraint_list =
-            |values: UnpackListOrTuple<Value<'v>>| -> starlark::Result<CoercedAttr> {
-                let items: Vec<Value<'v>> = values.into_iter().collect();
-                let value = eval.heap().alloc(items);
-                Ok(constraints_attr_type.coerce(AttrIsConfigurable::No, coercion_ctx, value)?)
-            };
-        let coerced_exec_compat = coerce_constraint_list(exec_compatible_with)?;
-        let coerced_target_compat = coerce_constraint_list(target_compatible_with)?;
-
+        // Note: exec_compatible_with and target_compatible_with are internal attributes
+        // already present in the rule's AttributeSpec. We do not pass them as user attrs here;
+        // they use their empty-list defaults. Toolchain resolution is not yet implemented.
         let target_node = create_native_target_node(
             rule_defs::TOOLCHAIN_RULE.clone(),
             internals.package(),
@@ -1968,8 +1965,6 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
             vec![
                 ("toolchain_type".to_owned(), coerced_toolchain_type),
                 ("toolchain".to_owned(), coerced_toolchain),
-                ("exec_compatible_with".to_owned(), coerced_exec_compat),
-                ("target_compatible_with".to_owned(), coerced_target_compat),
             ],
             &extract_visibility_strings(visibility),
             internals.attr_coercion_context(),
