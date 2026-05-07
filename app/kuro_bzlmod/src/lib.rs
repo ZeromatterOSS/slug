@@ -37,6 +37,7 @@ pub mod module_extension_executor;
 pub mod parser;
 pub mod pending_repo_cells;
 pub mod registry;
+pub mod repo_mapping;
 pub mod repo_spec;
 pub mod repository_execution;
 pub mod repository_executor;
@@ -94,6 +95,11 @@ pub use registry::DEFAULT_REGISTRY_URL;
 // `RegisteredToolchain` is defined below; re-export under the crate root for
 // consumers that already do `use kuro_bzlmod::RegisteredToolchain`.
 pub use registry::RegistryClient;
+pub use repo_mapping::BzlmodRepoMapping;
+pub use repo_mapping::CanonicalLabel;
+pub use repo_mapping::CanonicalRepoName;
+pub use repo_mapping::ExtensionImportCanonicalization;
+pub use repo_mapping::canonical_repo_for_extension_import;
 pub use repo_spec::RepoSpec;
 pub use repo_spec::in_extension_context;
 pub use repo_spec::record_repo_spec;

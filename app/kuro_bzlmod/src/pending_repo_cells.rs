@@ -110,28 +110,6 @@ impl ExtensionCellDefinitions {
     }
 }
 
-fn canonical_repo_for_extension_import(
-    usage: &ExtensionUsage,
-    owner_module: &str,
-    ext_name: &str,
-    internal_name: &str,
-) -> (String, bool) {
-    if let Some(dep_repo) = usage
-        .repo_overrides
-        .iter()
-        .find_map(|(repo_in_extension, dep_repo)| {
-            (repo_in_extension == internal_name).then_some(dep_repo.as_str())
-        })
-    {
-        return (dep_repo.to_owned(), true);
-    }
-
-    (
-        format!("{}+{}+{}", owner_module, ext_name, internal_name),
-        false,
-    )
-}
-
 /// Pre-compute extension repo cells from `use_repo()` declarations alone.
 ///
 /// This is the Bazel 9.0-compatible approach: canonical names are deterministically
@@ -220,12 +198,14 @@ pub fn pre_compute_extension_repo_cells(
             for import in &usage.imports {
                 // Positional repos: use_repo(ext, "numpy", "requests")
                 for repo_name in &import.repos {
-                    let (canonical, is_override) = canonical_repo_for_extension_import(
+                    let canonical = crate::repo_mapping::canonical_repo_for_extension_import(
                         usage,
                         owner_module,
                         &ext_name,
                         repo_name,
                     );
+                    let is_override = canonical.is_override;
+                    let canonical = canonical.canonical_name.into_string();
 
                     if !is_override && seen_canonical.insert(canonical.clone()) {
                         let path = format!("bazel-external/{}", canonical);
@@ -250,12 +230,14 @@ pub fn pre_compute_extension_repo_cells(
 
                 // Keyword repos: use_repo(ext, myname = "actual_repo")
                 for (apparent_name, actual_name) in &import.repo_mapping {
-                    let (canonical, is_override) = canonical_repo_for_extension_import(
+                    let canonical = crate::repo_mapping::canonical_repo_for_extension_import(
                         usage,
                         owner_module,
                         &ext_name,
                         actual_name,
                     );
+                    let is_override = canonical.is_override;
+                    let canonical = canonical.canonical_name.into_string();
 
                     if !is_override && seen_canonical.insert(canonical.clone()) {
                         let path = format!("bazel-external/{}", canonical);

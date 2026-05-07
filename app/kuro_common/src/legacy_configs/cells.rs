@@ -85,180 +85,6 @@ fn module_depends_on_rules_python(parsed_modules: &[(String, ParsedModuleFile)])
         .any(|(name, _)| name == RULES_PYTHON_MODULE_NAME)
 }
 
-/// Resolve a `register_toolchains()`/`register_execution_platforms()` label in
-/// the repository-mapping context of the MODULE.bazel file that declared it.
-///
-/// Bazel treats the repository part of `@repo//...` as an apparent name scoped
-/// to the declaring module. In particular, `use_repo(ext, "foo")` makes
-/// `@foo` visible only to that module, and Bazel maps it to the extension repo's
-/// canonical name before downstream package/toolchain resolution.
-fn canonicalize_registered_label_for_module(
-    label: &str,
-    parsed_mod: &ParsedModuleFile,
-    root_module_name: &str,
-    is_root: bool,
-) -> String {
-    let Some(stripped) = label.strip_prefix('@') else {
-        return label.to_owned();
-    };
-    if stripped.starts_with('@') {
-        return label.to_owned();
-    }
-    let Some((apparent_repo, rest)) = stripped.split_once("//") else {
-        return label.to_owned();
-    };
-    if apparent_repo.is_empty() || apparent_repo.contains('+') {
-        return label.to_owned();
-    }
-
-    let module_name = if parsed_mod.module.name.is_empty() {
-        root_module_name
-    } else {
-        &parsed_mod.module.name
-    };
-
-    for usage in &parsed_mod.extension_usages {
-        let ext_id = kuro_bzlmod::extensions::canonical_extension_id(
-            &usage.extension_bzl_file,
-            &usage.extension_name,
-            module_name,
-        );
-        let ext_name = kuro_bzlmod::extract_extension_name(&ext_id);
-        let extracted_owner = kuro_bzlmod::extract_owning_module(&ext_id, root_module_name);
-        let owner_module = if is_root && extracted_owner == module_name {
-            "_main".to_owned()
-        } else {
-            extracted_owner
-        };
-
-        for import in &usage.imports {
-            for repo_name in &import.repos {
-                if apparent_repo == repo_name {
-                    let canonical_repo = usage
-                        .repo_overrides
-                        .iter()
-                        .find_map(|(repo_in_extension, dep_repo)| {
-                            (repo_in_extension == repo_name).then_some(dep_repo.as_str())
-                        })
-                        .map_or_else(
-                            || format!("{}+{}+{}", owner_module, ext_name, repo_name),
-                            str::to_owned,
-                        );
-                    return format!("@{}//{}", canonical_repo, rest);
-                }
-            }
-            for (mapped_apparent, actual_name) in &import.repo_mapping {
-                if apparent_repo == mapped_apparent {
-                    let canonical_repo = usage
-                        .repo_overrides
-                        .iter()
-                        .find_map(|(repo_in_extension, dep_repo)| {
-                            (repo_in_extension == actual_name).then_some(dep_repo.as_str())
-                        })
-                        .map_or_else(
-                            || format!("{}+{}+{}", owner_module, ext_name, actual_name),
-                            str::to_owned,
-                        );
-                    return format!("@{}//{}", canonical_repo, rest);
-                }
-            }
-        }
-    }
-
-    for dep in &parsed_mod.module.bazel_deps {
-        if apparent_repo == dep.apparent_name() && dep.name != apparent_repo {
-            return format!("@{}//{}", dep.name, rest);
-        }
-    }
-
-    label.to_owned()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn parsed_module(name: &str) -> ParsedModuleFile {
-        ParsedModuleFile {
-            module: kuro_bzlmod::types::Module::new(name.to_owned(), kuro_bzlmod::Version::empty()),
-            has_module_directive: true,
-            extension_usages: Vec::new(),
-            repo_rule_invocations: Vec::new(),
-            registered_toolchains: Vec::new(),
-            registered_execution_platforms: Vec::new(),
-        }
-    }
-
-    #[test]
-    fn registered_label_uses_module_scoped_use_repo_mapping() {
-        let mut module = parsed_module("bazel_lib");
-        let mut usage = kuro_bzlmod::types::ExtensionUsage::new(
-            "@bazel_lib//lib:extensions.bzl".to_owned(),
-            "toolchains".to_owned(),
-        );
-        usage
-            .imports
-            .push(kuro_bzlmod::types::UseRepo::new().add_repo("coreutils_toolchains".to_owned()));
-        module.extension_usages.push(usage);
-
-        assert_eq!(
-            canonicalize_registered_label_for_module(
-                "@coreutils_toolchains//:all",
-                &module,
-                "zeromatter",
-                false,
-            ),
-            "@bazel_lib+toolchains+coreutils_toolchains//:all"
-        );
-    }
-
-    #[test]
-    fn registered_label_uses_use_repo_keyword_mapping_and_override_repo() {
-        let mut module = parsed_module("rules_owner");
-        let mut usage = kuro_bzlmod::types::ExtensionUsage::new(
-            "@rules_owner//:extensions.bzl".to_owned(),
-            "ext".to_owned(),
-        );
-        usage.imports.push(
-            kuro_bzlmod::types::UseRepo::new()
-                .add_mapping("public_name".to_owned(), "generated_name".to_owned()),
-        );
-        usage
-            .repo_overrides
-            .push(("generated_name".to_owned(), "actual_dep".to_owned()));
-        module.extension_usages.push(usage);
-
-        assert_eq!(
-            canonicalize_registered_label_for_module(
-                "@public_name//pkg:target",
-                &module,
-                "root",
-                false,
-            ),
-            "@actual_dep//pkg:target"
-        );
-    }
-
-    #[test]
-    fn registered_label_uses_bazel_dep_apparent_name() {
-        let mut module = parsed_module("owner");
-        let mut dep =
-            kuro_bzlmod::types::BazelDep::new("rules_cc".to_owned(), kuro_bzlmod::Version::empty());
-        dep.repo_name = Some("cc_rules".to_owned());
-        module.module.bazel_deps.push(dep);
-
-        assert_eq!(
-            canonicalize_registered_label_for_module(
-                "@cc_rules//cc:toolchain",
-                &module,
-                "root",
-                false,
-            ),
-            "@rules_cc//cc:toolchain"
-        );
-    }
-}
-
 /// True iff any toolchain label already references the bundled
 /// `@local_config_python` cell (meaning the user has already wired up
 /// bundled rules_python toolchains and we should skip auto-injection).
@@ -1056,6 +882,8 @@ impl BuckConfigBasedCells {
                 let is_root = module_name == root_module_name
                     || module_name == "_main"
                     || parsed_mod.module.name == root_module_name;
+                let repo_mapping =
+                    kuro_bzlmod::BzlmodRepoMapping::for_module(parsed_mod, root_module_name);
                 for item in &parsed_mod.registered_toolchains {
                     if item.dev_dependency && !is_root {
                         tracing::debug!(
@@ -1065,12 +893,7 @@ impl BuckConfigBasedCells {
                         );
                         continue;
                     }
-                    let label = canonicalize_registered_label_for_module(
-                        &item.label,
-                        parsed_mod,
-                        root_module_name,
-                        is_root,
-                    );
+                    let label = repo_mapping.canonicalize_label_to_storage_string(&item.label);
                     all_toolchains.push(kuro_bzlmod::RegisteredToolchain {
                         module: module_name.clone(),
                         label,
@@ -1086,12 +909,8 @@ impl BuckConfigBasedCells {
                         );
                         continue;
                     }
-                    all_exec_platforms.push(canonicalize_registered_label_for_module(
-                        &item.label,
-                        parsed_mod,
-                        root_module_name,
-                        is_root,
-                    ));
+                    all_exec_platforms
+                        .push(repo_mapping.canonicalize_label_to_storage_string(&item.label));
                 }
             }
             // If the module graph depends on rules_python but never registers
