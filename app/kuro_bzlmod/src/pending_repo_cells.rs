@@ -33,8 +33,6 @@
 //! The cell definitions and aliases generated here are passed to `CellsAggregator`
 //! in kuro_common during cell resolver construction.
 
-use std::collections::HashMap;
-
 use crate::extension_execution_dice::ModuleExtensionResult;
 use crate::extension_execution_dice::extract_extension_name;
 use crate::repo_spec::RepoSpec;
@@ -110,6 +108,28 @@ impl ExtensionCellDefinitions {
         self.cells.extend(other.cells);
         self.aliases.extend(other.aliases);
     }
+}
+
+fn canonical_repo_for_extension_import(
+    usage: &ExtensionUsage,
+    owner_module: &str,
+    ext_name: &str,
+    internal_name: &str,
+) -> (String, bool) {
+    if let Some(dep_repo) = usage
+        .repo_overrides
+        .iter()
+        .find_map(|(repo_in_extension, dep_repo)| {
+            (repo_in_extension == internal_name).then_some(dep_repo.as_str())
+        })
+    {
+        return (dep_repo.to_owned(), true);
+    }
+
+    (
+        format!("{}+{}+{}", owner_module, ext_name, internal_name),
+        false,
+    )
 }
 
 /// Pre-compute extension repo cells from `use_repo()` declarations alone.
@@ -200,9 +220,14 @@ pub fn pre_compute_extension_repo_cells(
             for import in &usage.imports {
                 // Positional repos: use_repo(ext, "numpy", "requests")
                 for repo_name in &import.repos {
-                    let canonical = format!("{}+{}+{}", owner_module, ext_name, repo_name);
+                    let (canonical, is_override) = canonical_repo_for_extension_import(
+                        usage,
+                        owner_module,
+                        &ext_name,
+                        repo_name,
+                    );
 
-                    if seen_canonical.insert(canonical.clone()) {
+                    if !is_override && seen_canonical.insert(canonical.clone()) {
                         let path = format!("bazel-external/{}", canonical);
                         cells.push(PendingRepoCell {
                             canonical_name: canonical.clone(),
@@ -225,9 +250,14 @@ pub fn pre_compute_extension_repo_cells(
 
                 // Keyword repos: use_repo(ext, myname = "actual_repo")
                 for (apparent_name, actual_name) in &import.repo_mapping {
-                    let canonical = format!("{}+{}+{}", owner_module, ext_name, actual_name);
+                    let (canonical, is_override) = canonical_repo_for_extension_import(
+                        usage,
+                        owner_module,
+                        &ext_name,
+                        actual_name,
+                    );
 
-                    if seen_canonical.insert(canonical.clone()) {
+                    if !is_override && seen_canonical.insert(canonical.clone()) {
                         let path = format!("bazel-external/{}", canonical);
                         cells.push(PendingRepoCell {
                             canonical_name: canonical.clone(),
@@ -252,7 +282,16 @@ pub fn pre_compute_extension_repo_cells(
     // Also register use_repo_rule() invocations as extension cells.
     // In Bazel, use_repo_rule() creates implicit single-repo extensions.
     // The canonical name for use_repo_rule is just the repo name (not prefixed).
-    for (_module_name, parsed) in parsed_modules {
+    for (cell_name, parsed) in parsed_modules {
+        let module_name = if parsed.module.name.is_empty() {
+            root_module_name
+        } else {
+            &parsed.module.name
+        };
+        let is_root = cell_name == root_module_name
+            || cell_name == "_main"
+            || parsed.module.name == root_module_name;
+
         for invocation in &parsed.repo_rule_invocations {
             let canonical = invocation.name.clone();
             if seen_canonical.insert(canonical.clone()) {
@@ -260,7 +299,9 @@ pub fn pre_compute_extension_repo_cells(
                 // Serialize the invocation attrs into a RepoSpec so the normal
                 // cached-spec materialization path handles them (preserves defaults
                 // via repo rule definition lookup downstream).
-                let mut spec = RepoSpec::new(invocation.rule_source.clone());
+                let rule_source =
+                    canonicalize_repo_rule_source(&invocation.rule_source, module_name, is_root);
+                let mut spec = RepoSpec::new(rule_source.clone());
                 for (k, v) in &invocation.attrs {
                     spec.attributes
                         .insert(k.clone(), tag_value_to_attr_value(v));
@@ -268,7 +309,7 @@ pub fn pre_compute_extension_repo_cells(
                 let repo_spec_json = serde_json::to_string(&spec).unwrap_or_default();
                 cells.push(PendingRepoCell {
                     canonical_name: canonical.clone(),
-                    extension_id: invocation.rule_source.clone(),
+                    extension_id: rule_source,
                     internal_name: invocation.name.clone(),
                     spec_hash: String::new(),
                     repo_spec_json,
@@ -285,6 +326,28 @@ pub fn pre_compute_extension_repo_cells(
     );
 
     Ok((cells, aliases))
+}
+
+fn canonicalize_repo_rule_source(rule_source: &str, module_name: &str, is_root: bool) -> String {
+    let Some((bzl_file, rule_name)) = rule_source.rsplit_once('%') else {
+        return rule_source.to_owned();
+    };
+
+    let resolved = if !is_root {
+        if bzl_file.starts_with("//") {
+            format!("@{}{}", module_name, bzl_file)
+        } else if let Some(rest) = bzl_file.strip_prefix(':') {
+            format!("@{}//:{}", module_name, rest)
+        } else {
+            bzl_file.to_owned()
+        }
+    } else if let Some(rest) = bzl_file.strip_prefix(':') {
+        format!("//:{}", rest)
+    } else {
+        bzl_file.to_owned()
+    };
+
+    format!("{resolved}%{rule_name}")
 }
 
 /// Augment a pre-computed `PendingRepoCell` set with every spoke repo recorded
@@ -317,6 +380,14 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
 
     let mut new_cells = Vec::new();
     for ext_id in lockfile.extension_ids() {
+        if ext_id.starts_with(':') || ext_id.starts_with("//") {
+            tracing::debug!(
+                "Skipping legacy relative lockfile extension key '{}' during spoke pre-seeding",
+                ext_id
+            );
+            continue;
+        }
+
         let Some(ext_data) = lockfile.get_extension_data(ext_id) else {
             continue;
         };
@@ -699,11 +770,25 @@ pub fn parse_canonical_name(canonical: &str) -> Option<(&str, &str, &str)> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::sync::Arc;
 
     use super::*;
     use crate::repo_spec::RepoSpec;
     use crate::repository_invocations::AttrValue;
+    use crate::types::Module;
+    use crate::version::Version;
+
+    fn parsed_module(name: &str) -> ParsedModuleFile {
+        ParsedModuleFile {
+            module: Module::new(name.to_owned(), Version::empty()),
+            has_module_directive: true,
+            extension_usages: Vec::new(),
+            repo_rule_invocations: Vec::new(),
+            registered_toolchains: Vec::new(),
+            registered_execution_platforms: Vec::new(),
+        }
+    }
 
     fn make_test_result() -> ModuleExtensionResult {
         let mut specs = fxhash::FxHashMap::default();
@@ -752,6 +837,57 @@ mod tests {
         for cell in &defs.cells {
             assert_eq!(cell.extension_id, "@@rules_python//pip:pip.bzl%pip");
         }
+    }
+
+    #[test]
+    fn test_canonicalize_repo_rule_source_for_dependency_module() {
+        assert_eq!(
+            canonicalize_repo_rule_source(
+                "//toolchain/local/triplet:defs.bzl%toolchain_local_triplet",
+                "toolchain_utils",
+                false,
+            ),
+            "@toolchain_utils//toolchain/local/triplet:defs.bzl%toolchain_local_triplet",
+        );
+        assert_eq!(
+            canonicalize_repo_rule_source(":extensions.bzl%maven", "rules_jvm_external", false),
+            "@rules_jvm_external//:extensions.bzl%maven",
+        );
+    }
+
+    #[test]
+    fn test_canonicalize_repo_rule_source_keeps_root_relative() {
+        assert_eq!(
+            canonicalize_repo_rule_source("//:rbe.bzl%rbe_platform_repository", "zeromatter", true),
+            "//:rbe.bzl%rbe_platform_repository",
+        );
+        assert_eq!(
+            canonicalize_repo_rule_source(":rbe.bzl%rbe_platform_repository", "zeromatter", true),
+            "//:rbe.bzl%rbe_platform_repository",
+        );
+    }
+
+    #[test]
+    fn test_precompute_use_repo_honors_override_repo() {
+        let mut module = parsed_module("rules_owner");
+        let mut usage =
+            ExtensionUsage::new("@rules_owner//:extensions.bzl".to_owned(), "ext".to_owned());
+        usage
+            .imports
+            .push(UseRepo::new().add_mapping("public".to_owned(), "generated".to_owned()));
+        usage
+            .repo_overrides
+            .push(("generated".to_owned(), "actual_dep".to_owned()));
+        module.extension_usages.push(usage);
+
+        let (cells, aliases) =
+            pre_compute_extension_repo_cells(&[("rules_owner".to_owned(), module)], "root")
+                .unwrap();
+
+        assert!(cells.is_empty());
+        assert_eq!(aliases.len(), 1);
+        assert_eq!(aliases[0].apparent_name, "public");
+        assert_eq!(aliases[0].canonical_name, "actual_dep");
     }
 
     #[test]

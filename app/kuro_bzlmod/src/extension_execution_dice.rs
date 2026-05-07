@@ -784,7 +784,7 @@ fn update_lockfile_extension_cache(
     // create duplicate entries on every write.
     lockfile
         .module_extensions
-        .retain(|k, _| !k.starts_with("//"));
+        .retain(|k, _| !k.starts_with("//") && !k.starts_with(':'));
 
     // Update the extension cache. Translate the internal extension id to
     // bazel's canonical `@@<repo>+//...` lockfile key form so the file

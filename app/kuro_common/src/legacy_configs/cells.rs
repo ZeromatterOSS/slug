@@ -85,6 +85,180 @@ fn module_depends_on_rules_python(parsed_modules: &[(String, ParsedModuleFile)])
         .any(|(name, _)| name == RULES_PYTHON_MODULE_NAME)
 }
 
+/// Resolve a `register_toolchains()`/`register_execution_platforms()` label in
+/// the repository-mapping context of the MODULE.bazel file that declared it.
+///
+/// Bazel treats the repository part of `@repo//...` as an apparent name scoped
+/// to the declaring module. In particular, `use_repo(ext, "foo")` makes
+/// `@foo` visible only to that module, and Bazel maps it to the extension repo's
+/// canonical name before downstream package/toolchain resolution.
+fn canonicalize_registered_label_for_module(
+    label: &str,
+    parsed_mod: &ParsedModuleFile,
+    root_module_name: &str,
+    is_root: bool,
+) -> String {
+    let Some(stripped) = label.strip_prefix('@') else {
+        return label.to_owned();
+    };
+    if stripped.starts_with('@') {
+        return label.to_owned();
+    }
+    let Some((apparent_repo, rest)) = stripped.split_once("//") else {
+        return label.to_owned();
+    };
+    if apparent_repo.is_empty() || apparent_repo.contains('+') {
+        return label.to_owned();
+    }
+
+    let module_name = if parsed_mod.module.name.is_empty() {
+        root_module_name
+    } else {
+        &parsed_mod.module.name
+    };
+
+    for usage in &parsed_mod.extension_usages {
+        let ext_id = kuro_bzlmod::extensions::canonical_extension_id(
+            &usage.extension_bzl_file,
+            &usage.extension_name,
+            module_name,
+        );
+        let ext_name = kuro_bzlmod::extract_extension_name(&ext_id);
+        let extracted_owner = kuro_bzlmod::extract_owning_module(&ext_id, root_module_name);
+        let owner_module = if is_root && extracted_owner == module_name {
+            "_main".to_owned()
+        } else {
+            extracted_owner
+        };
+
+        for import in &usage.imports {
+            for repo_name in &import.repos {
+                if apparent_repo == repo_name {
+                    let canonical_repo = usage
+                        .repo_overrides
+                        .iter()
+                        .find_map(|(repo_in_extension, dep_repo)| {
+                            (repo_in_extension == repo_name).then_some(dep_repo.as_str())
+                        })
+                        .map_or_else(
+                            || format!("{}+{}+{}", owner_module, ext_name, repo_name),
+                            str::to_owned,
+                        );
+                    return format!("@{}//{}", canonical_repo, rest);
+                }
+            }
+            for (mapped_apparent, actual_name) in &import.repo_mapping {
+                if apparent_repo == mapped_apparent {
+                    let canonical_repo = usage
+                        .repo_overrides
+                        .iter()
+                        .find_map(|(repo_in_extension, dep_repo)| {
+                            (repo_in_extension == actual_name).then_some(dep_repo.as_str())
+                        })
+                        .map_or_else(
+                            || format!("{}+{}+{}", owner_module, ext_name, actual_name),
+                            str::to_owned,
+                        );
+                    return format!("@{}//{}", canonical_repo, rest);
+                }
+            }
+        }
+    }
+
+    for dep in &parsed_mod.module.bazel_deps {
+        if apparent_repo == dep.apparent_name() && dep.name != apparent_repo {
+            return format!("@{}//{}", dep.name, rest);
+        }
+    }
+
+    label.to_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parsed_module(name: &str) -> ParsedModuleFile {
+        ParsedModuleFile {
+            module: kuro_bzlmod::types::Module::new(name.to_owned(), kuro_bzlmod::Version::empty()),
+            has_module_directive: true,
+            extension_usages: Vec::new(),
+            repo_rule_invocations: Vec::new(),
+            registered_toolchains: Vec::new(),
+            registered_execution_platforms: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn registered_label_uses_module_scoped_use_repo_mapping() {
+        let mut module = parsed_module("bazel_lib");
+        let mut usage = kuro_bzlmod::types::ExtensionUsage::new(
+            "@bazel_lib//lib:extensions.bzl".to_owned(),
+            "toolchains".to_owned(),
+        );
+        usage
+            .imports
+            .push(kuro_bzlmod::types::UseRepo::new().add_repo("coreutils_toolchains".to_owned()));
+        module.extension_usages.push(usage);
+
+        assert_eq!(
+            canonicalize_registered_label_for_module(
+                "@coreutils_toolchains//:all",
+                &module,
+                "zeromatter",
+                false,
+            ),
+            "@bazel_lib+toolchains+coreutils_toolchains//:all"
+        );
+    }
+
+    #[test]
+    fn registered_label_uses_use_repo_keyword_mapping_and_override_repo() {
+        let mut module = parsed_module("rules_owner");
+        let mut usage = kuro_bzlmod::types::ExtensionUsage::new(
+            "@rules_owner//:extensions.bzl".to_owned(),
+            "ext".to_owned(),
+        );
+        usage.imports.push(
+            kuro_bzlmod::types::UseRepo::new()
+                .add_mapping("public_name".to_owned(), "generated_name".to_owned()),
+        );
+        usage
+            .repo_overrides
+            .push(("generated_name".to_owned(), "actual_dep".to_owned()));
+        module.extension_usages.push(usage);
+
+        assert_eq!(
+            canonicalize_registered_label_for_module(
+                "@public_name//pkg:target",
+                &module,
+                "root",
+                false,
+            ),
+            "@actual_dep//pkg:target"
+        );
+    }
+
+    #[test]
+    fn registered_label_uses_bazel_dep_apparent_name() {
+        let mut module = parsed_module("owner");
+        let mut dep =
+            kuro_bzlmod::types::BazelDep::new("rules_cc".to_owned(), kuro_bzlmod::Version::empty());
+        dep.repo_name = Some("cc_rules".to_owned());
+        module.module.bazel_deps.push(dep);
+
+        assert_eq!(
+            canonicalize_registered_label_for_module(
+                "@cc_rules//cc:toolchain",
+                &module,
+                "root",
+                false,
+            ),
+            "@rules_cc//cc:toolchain"
+        );
+    }
+}
+
 /// True iff any toolchain label already references the bundled
 /// `@local_config_python` cell (meaning the user has already wired up
 /// bundled rules_python toolchains and we should skip auto-injection).
@@ -891,9 +1065,15 @@ impl BuckConfigBasedCells {
                         );
                         continue;
                     }
+                    let label = canonicalize_registered_label_for_module(
+                        &item.label,
+                        parsed_mod,
+                        root_module_name,
+                        is_root,
+                    );
                     all_toolchains.push(kuro_bzlmod::RegisteredToolchain {
                         module: module_name.clone(),
-                        label: item.label.clone(),
+                        label,
                         is_root,
                     });
                 }
@@ -906,7 +1086,12 @@ impl BuckConfigBasedCells {
                         );
                         continue;
                     }
-                    all_exec_platforms.push(item.label.clone());
+                    all_exec_platforms.push(canonicalize_registered_label_for_module(
+                        &item.label,
+                        parsed_mod,
+                        root_module_name,
+                        is_root,
+                    ));
                 }
             }
             // If the module graph depends on rules_python but never registers
@@ -996,21 +1181,13 @@ impl BuckConfigBasedCells {
         // Set project root for dynamic cell filesystem scanning
         kuro_core::cells::set_dynamic_project_root(project_root.root().to_path_buf());
 
-        // Convert pre-computed cells to the format expected by BzlmodResolutionResult.
-        // Use the internal (short) name as the cell name, and canonical as an alias.
-        // This prevents cell name duality where the same repo gets separate DICE computations
-        // under different names (canonical vs short), causing output path mismatches.
+        // Convert pre-computed cells to the format expected by
+        // BzlmodResolutionResult. Bazel's identity for extension-generated
+        // repositories is the canonical repo name; apparent names from
+        // use_repo() are repository-mapping entries that point at that identity.
         let mut ext_cells = Vec::new();
         for cell in pre_computed_cells {
-            // Use internal_name (short name) as the cell name if different from canonical.
-            // This matches what dynamic cell resolution uses when spoke repos are discovered.
-            let use_short = cell.internal_name != cell.canonical_name;
-            let cell_name_str = if use_short {
-                &cell.internal_name
-            } else {
-                &cell.canonical_name
-            };
-            let cell_name = CellName::unchecked_new(cell_name_str)?;
+            let cell_name = CellName::unchecked_new(&cell.canonical_name)?;
             let cell_path = CellRootPathBuf::new(ProjectRelativePath::new(&cell.path)?.to_owned());
             let setup = ExtensionRepoCellSetup {
                 canonical_name: Arc::from(cell.canonical_name.as_str()),
@@ -1028,14 +1205,10 @@ impl BuckConfigBasedCells {
         let existing_cell_names: std::collections::HashSet<&str> =
             cells.iter().map(|(name, _, _)| name.as_str()).collect();
 
-        // Build a set of ext_cell names too for conflict detection.
-        let ext_cell_names: std::collections::HashSet<&str> =
-            ext_cells.iter().map(|(name, _, _)| name.as_str()).collect();
-
-        // Convert pre-computed aliases.
-        // Since cells are now registered under short (internal) names, we need to:
-        // 1. Create canonical → short aliases (so @rules_rs+crate+crates__foo still works)
-        // 2. Skip short → canonical aliases (the cell already IS the short name)
+        // Convert pre-computed aliases. Apparent names from use_repo() are
+        // module-scoped in Bazel; Kuro still has a global alias table, so keep
+        // this to direct apparent names to canonical cells without inventing a
+        // second cell identity.
         let mut ext_aliases = Vec::new();
         for alias in pre_computed_aliases {
             if existing_cell_names.contains(alias.apparent_name.as_str()) {
@@ -1046,28 +1219,8 @@ impl BuckConfigBasedCells {
                 );
                 continue;
             }
-            // If the apparent name IS a cell (short name), skip the alias
-            if ext_cell_names.contains(alias.apparent_name.as_str()) {
-                // Instead, create a reverse alias: canonical → short
-                if alias.canonical_name != alias.apparent_name {
-                    if let (Ok(canon_alias), Ok(short_cell)) = (
-                        NonEmptyCellAlias::new(alias.canonical_name.clone()),
-                        CellName::unchecked_new(&alias.apparent_name),
-                    ) {
-                        ext_aliases.push((canon_alias, short_cell));
-                    }
-                }
-                continue;
-            }
-            // Normal alias: apparent → canonical (but canonical might now be a short name)
-            // Find the actual cell name (might be short name)
-            let target_cell = ext_cells
-                .iter()
-                .find(|(_, _, setup)| setup.canonical_name.as_ref() == alias.canonical_name)
-                .map(|(name, _, _)| name.as_str())
-                .unwrap_or(&alias.canonical_name);
             let apparent_name = NonEmptyCellAlias::new(alias.apparent_name)?;
-            let canonical_name = CellName::unchecked_new(target_cell)?;
+            let canonical_name = CellName::unchecked_new(&alias.canonical_name)?;
             ext_aliases.push((apparent_name, canonical_name));
         }
 

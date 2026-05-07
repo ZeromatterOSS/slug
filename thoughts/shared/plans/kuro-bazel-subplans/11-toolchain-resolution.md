@@ -14,6 +14,82 @@ from the host system at analysis time. Real Bazel resolves toolchains by matchin
 module extensions (`cc_configure_extension`, `rust.toolchain`, etc.) that probe the
 host and generate proper toolchain definitions.
 
+## Current ZeroMatter Blocker (2026-05-07)
+
+ZeroMatter verification has moved past the old CC toolchain miss, the module-extension
+identity/materialization failures, and the downstream `NoneType.coreutils_info`
+crash. The current hard blocker is still owned by this plan: a mandatory
+`bazel_lib` toolchain type now fails directly during toolchain resolution.
+
+Repro:
+
+```bash
+cd /var/mnt/dev/kuro
+cargo build --bin kuro
+
+cd /var/mnt/dev/zeromatter
+/var/mnt/dev/kuro/kuro build //sdk:sdk_contents 2>&1 | tee /tmp/zeromatter-sdk-contents-20260507.log
+```
+
+Observed with build ID `d9d514f6-4817-4ca2-99e2-7220893866be`:
+
+```text
+BUILD FAILED
+Error running analysis for `zeromatter//sdk:sdk_contents`
+...
+Error running analysis for `zeromatter//sdk:sdk_info_json`
+...
+Toolchain resolution failed for 'zeromatter//sdk:sdk_info_json':
+No execution platform found that provides all mandatory toolchain types:
+["@bazel_lib//lib:expand_template_toolchain_type"]
+ • '@bazel_lib//lib:expand_template_toolchain_type': NO toolchain() registrations found for type
+```
+
+Important negative evidence from `/tmp/zeromatter-sdk-contents-20260507.log`:
+
+- No `Unable to find a CC toolchain`.
+- No `File not found: zeromatter//extensions.bzl`.
+- No `@rules_jvm_external//extensions.bzl%maven` root-path failure.
+- No `repository_rule_attr` miss.
+- No maven `Failed to write downloaded file`.
+- No rules_python `Failed to delete the python tester`.
+
+The relevant upstream Starlark in ZeroMatter's materialized repo:
+
+- `/var/mnt/dev/zeromatter/bazel-external/bazel_lib+3.2.2/lib/private/expand_template.bzl`
+- `_EXPAND_TEMPLATE_TOOLCHAIN = Label("@bazel_lib//lib:expand_template_toolchain_type")`
+- rules request `@bazel_lib//lib:expand_template_toolchain_type`, while materialized
+  extension toolchain wrappers currently use `@aspect_bazel_lib//lib:expand_template_toolchain_type`.
+
+So this is expected to be default exec-group toolchain resolution, not named
+exec-group handling from Plan 12. The next agent should first determine why
+the required type and registered toolchain type disagree on `bazel_lib` vs
+`aspect_bazel_lib`; this is likely another missing repository-mapping application
+in BUILD/.bzl label coercion or extension-repo label materialization.
+
+Likely touchpoints:
+
+- `app/kuro_interpreter_for_build/src/attrs/coerce/ctx.rs`: verify BUILD/.bzl
+  label coercion applies the package's repository mapping, not only global cell
+  aliases.
+- `app/kuro_analysis/src/analysis/env.rs`: verify extracted `toolchain()`
+  wrapper metadata canonicalizes both sibling extension repos and apparent
+  module repo names through the wrapper package's repository mapping.
+- `app/kuro_analysis/src/analysis/toolchain_resolution.rs`: verify comparison
+  does not paper over repository-mapping mismatches with string-only aliases.
+
+Useful focused log probes:
+
+```bash
+rg -n 'expand_template_toolchain_type|aspect_bazel_lib|bazel_lib|Resolved toolchain|RequiredToolchain|Toolchain resolution' /tmp/zeromatter-sdk-contents-20260507.log
+```
+
+Desired next outcome:
+
+- ZeroMatter `//sdk:sdk_contents` advances past `zeromatter//sdk:sdk_info_json`.
+- Required toolchain types and registered toolchain wrappers agree after
+  repository mapping is applied, without repo-name special cases.
+
 ## Current State Analysis
 
 ### What Exists (Working)

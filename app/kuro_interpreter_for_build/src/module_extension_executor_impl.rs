@@ -125,11 +125,30 @@ pub(crate) fn parse_bzlmod_bzl_path(
         // //local:path.bzl -> use root cell
         cell_resolver.root_cell()
     } else {
-        // @repo//path:file.bzl -> try to find cell with that name
-        // First try exact match as cell name
-        match CellName::unchecked_new(cell_part) {
-            Ok(name) if cell_resolver.get(name).is_ok() => name,
-            _ => {
+        // @repo//path:file.bzl -> try to find cell with that name.
+        //
+        // Bazel canonical repository labels in lockfiles and captured repo
+        // specs can look like `@@rules_nodejs+//nodejs:repositories.bzl`.
+        // Kuro's source module cells are registered under the apparent module
+        // name (`rules_nodejs`), while extension repos keep the full
+        // `module+extension+repo` name. Try the canonical spelling first, then
+        // the apparent module prefix before falling back.
+        let mut candidates = vec![cell_part];
+        if let Some(stripped) = cell_part.strip_suffix('+') {
+            candidates.push(stripped);
+        }
+        if let Some((apparent, _)) = cell_part.split_once('+') {
+            candidates.push(apparent);
+        }
+
+        candidates
+            .into_iter()
+            .find_map(|candidate| {
+                CellName::unchecked_new(candidate)
+                    .ok()
+                    .filter(|name| cell_resolver.get(*name).is_ok())
+            })
+            .unwrap_or_else(|| {
                 // Fall back to root cell if repo name doesn't match a cell
                 // This handles cases where bzlmod repos haven't been registered as cells yet
                 tracing::debug!(
@@ -137,8 +156,7 @@ pub(crate) fn parse_bzlmod_bzl_path(
                     cell_part
                 );
                 cell_resolver.root_cell()
-            }
-        }
+            })
     };
 
     // Parse the path:file.bzl part

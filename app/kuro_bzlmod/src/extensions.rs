@@ -215,9 +215,9 @@ pub fn canonical_extension_id(
         format!("@{}{}", declaring_module_name, extension_bzl_file)
     } else if let Some(rest) = extension_bzl_file.strip_prefix(':') {
         if declaring_module_name.is_empty() {
-            format!("//{rest}")
+            format!("//:{rest}")
         } else {
-            format!("@{}//{}", declaring_module_name, rest)
+            format!("@{}//:{}", declaring_module_name, rest)
         }
     } else {
         extension_bzl_file.to_owned()
