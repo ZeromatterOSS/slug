@@ -501,6 +501,13 @@ pub fn get_deps_from_analysis_results(
 /// Flag to ensure registered toolchain packages are loaded only once per session.
 static TOOLCHAINS_LOADING_DONE: AtomicBool = AtomicBool::new(false);
 
+/// Serializes deferred toolchain loading. Resolution can run concurrently for
+/// many configured targets; without this gate, several misses can all decide to
+/// drain the deferred pool before any one load has populated the global
+/// `DeclaredToolchainInfo` registry.
+static DEFERRED_TOOLCHAIN_LOAD_LOCK: std::sync::LazyLock<futures::lock::Mutex<()>> =
+    std::sync::LazyLock::new(|| futures::lock::Mutex::new(()));
+
 /// Reset the eager loading flag (for fresh builds / daemon restart).
 pub fn reset_toolchain_loading() {
     TOOLCHAINS_LOADING_DONE.store(false, Ordering::SeqCst);
@@ -783,6 +790,7 @@ pub async fn ensure_deferred_toolchains_loaded(
     dice: &mut DiceComputations<'_>,
     required_types: &[String],
 ) -> bool {
+    let _guard = DEFERRED_TOOLCHAIN_LOAD_LOCK.lock().await;
     let pool = get_deferred_toolchains();
     if pool.is_empty() {
         return false;
@@ -827,11 +835,11 @@ pub async fn ensure_deferred_toolchains_loaded(
             filtered.len(),
             required_types
         );
-        for key in &filtered_keys {
-            mark_deferred_key_loaded(key.clone());
-        }
         let to_load = prepare_toolchain_load_list(dice, &filtered).await;
         load_and_register_toolchain_packages(dice, to_load).await;
+        for key in filtered_keys {
+            mark_deferred_key_loaded(key);
+        }
         return true;
     }
 
@@ -860,11 +868,11 @@ pub async fn ensure_deferred_toolchains_loaded(
         required_types,
         all_remaining.len()
     );
-    for key in &all_remaining_keys {
-        mark_deferred_key_loaded(key.clone());
-    }
     let to_load = prepare_toolchain_load_list(dice, &all_remaining).await;
     load_and_register_toolchain_packages(dice, to_load).await;
+    for key in all_remaining_keys {
+        mark_deferred_key_loaded(key);
+    }
     mark_deferred_all_loaded();
     true
 }
