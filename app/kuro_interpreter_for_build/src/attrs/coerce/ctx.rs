@@ -379,9 +379,7 @@ impl BuildAttrCoercionContext {
                     // allow_directory) expands the directory to its files.
                     if let Some((_pkg, listing)) = &self.enclosing_package {
                         if let Ok(rel) = <&PackageRelativePath>::try_from(value) {
-                            if listing.get_dir(rel).is_some()
-                                && listing.get_file(rel).is_none()
-                            {
+                            if listing.get_dir(rel).is_some() && listing.get_file(rel).is_none() {
                                 return Err(BuildAttrCoercionContextError::RequiredLabel(
                                     value.to_owned(),
                                 )

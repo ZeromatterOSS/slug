@@ -7,9 +7,9 @@
 
 ## Status: PARTIAL
 
-Phase 2.5's shared synthesized execroot stopgap has landed. Phase 2.6
-(per-action execroot narrowing) and Phase 3 (real Bazel-shaped execroot
-and external-repo layout) remain proposed.
+Phase 2.5's shared synthesized execroot stopgap has landed and Phase 2.6's
+per-action execroot narrowing has landed through commit `16191ed9`. Phase 3
+(real Bazel-shaped execroot and external-repo layout) remains proposed.
 
 ## Context
 
@@ -217,7 +217,32 @@ removes the need for the list.
 
 ### Phase 2.6 (medium): per-action execroot narrowing — supersedes the allowlist
 
-**Status: PROPOSED**
+**Status: LANDED, PARTIALLY VERIFIED (2026-05-07)**
+
+**Landed:**
+- `82db238f` computes a declared-input-derived prefix set per action,
+  shares execroots by digest under
+  `<workspace>/buck-out/v2/execroot/<digest>/`, and routes local action
+  cwd through the digest execroot.
+- `16191ed9` moves that digest execroot to
+  `<workspace>/execroot/<digest>/` to better match Bazel's execroot
+  layout while preserving kuro's `buck-out` output convention.
+- The Phase 2.5 collision-name filter remains frozen and superseded for
+  actions that use the Phase 2.6 path.
+
+**Verified:**
+- `examples/multi_package :gen_version_header` builds clean.
+- `crates__cookie-0.18.1//:_bs` warm build succeeds in 2.2s.
+- ZeroMatter `//sdk:sdk_contents` cold build progressed through 1393
+  commands before exposing the native `toolchain()` constraint propagation
+  bug tracked in Plan 11.
+- After the Plan 11 fix (`b542145a`), the smaller ZeroMatter
+  `rules_cc//:link_extra_lib --target-platforms=//bazel/platforms:linux-gnu-host`
+  no longer reports `Unable to find a CC toolchain`; the run later failed
+  via daemon/event-bus breakage after external-repo materialization warnings.
+
+**Still pending:** a clean end-to-end ZeroMatter `//sdk:sdk_contents` run after
+the daemon/external-repo materialization stability issue is addressed.
 
 **Goal**: replace the shared allowlist-filtered execroot from Phase
 2.5 with a per-action execroot that contains only the symlinks the

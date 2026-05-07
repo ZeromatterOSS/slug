@@ -197,6 +197,38 @@ The `platform()` rule's analysis already stores constraint_values. Ensure the
 - [x] `toolchain()` targets analyzed with real constraint info
 - [x] `toolchain_type()` targets return proper type identifiers
 
+#### Status Note (2026-05-07):
+Native `toolchain()` target construction now preserves user-supplied
+`exec_compatible_with` and `target_compatible_with` lists. The native rule had
+accepted these kwargs but dropped them before creating the `TargetNode`, so every
+declared toolchain registered with empty compatibility constraints and the first
+registered candidate matched every host/target platform. ZeroMatter exposed this as
+darwin toolchains being eligible on a Linux host.
+
+Fix landed in `b542145a`:
+- `app/kuro_interpreter_for_build/src/interpreter/native_rules.rs::toolchain`
+  coerces both compatibility lists as `list(dep)` and passes them to
+  `create_native_target_node`.
+- `create_native_target_node` now merges `name`, `visibility`, and user attrs
+  into one `(AttributeId, CoercedAttr)` vector and sorts once before
+  `push_sorted`; this is required because `exec_compatible_with` is attr id 4
+  and `visibility` is attr id 5.
+- `app/kuro_analysis/src/analysis/toolchain_resolution.rs` normalizes bzlmod
+  module-version repo names for constraint matching, so apparent labels like
+  `@platforms//os:linux` and canonical labels like
+  `@platforms+1.0.0//os:linux` compare equal while extension repos such as
+  `rules_cc+cc_configure_extension+local_config_cc_toolchains` remain distinct.
+
+Verification:
+- `cargo test -p kuro_analysis toolchain_resolution --lib` passes.
+- `cargo test -p kuro_interpreter_for_build -p kuro_analysis -p kuro_node -p kuro_common -p kuro_configured -p kuro_action_impl -p kuro_core --lib`
+  passes except the pre-existing `kuro_core::pattern::pattern::tests::test_relaxed`.
+- `cargo build --bin kuro` passes.
+- `examples/multi_package :gen_version_header` builds clean.
+- ZeroMatter `rules_cc//:link_extra_lib --target-platforms=//bazel/platforms:linux-gnu-host`
+  no longer reports `Unable to find a CC toolchain`; the run later failed with
+  daemon/event-bus breakage after external-repo materialization warnings.
+
 ---
 
 ## Phase 3: Implement the Resolution Algorithm

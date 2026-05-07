@@ -339,15 +339,54 @@ pub fn resolve_toolchains(
         }
     }
 
-    // No platform satisfies all mandatory types
+    // No platform satisfies all mandatory types. Dump enough context to
+    // diagnose constraint-label mismatches (the common cause): for each
+    // unsatisfied mandatory type, list the registered toolchains'
+    // `exec_compatible_with` against the candidate exec platforms'
+    // `constraint_values` so a mismatched cell prefix or extra/missing
+    // constraint is visible in the error message.
     let missing_types: Vec<&str> = required_types
         .iter()
         .filter(|req| req.mandatory)
         .map(|req| req.type_label.as_str())
         .collect();
+    let mut diag = String::new();
+    for req in required_types.iter().filter(|r| r.mandatory) {
+        let req_canon = normalize_constraint_label(&req.canonical_type_label);
+        let registrations: Vec<&(String, super::native_rule_analysis::DeclaredToolchainInfo)> =
+            declared
+                .iter()
+                .filter(|(_, info)| normalize_constraint_label(&info.toolchain_type) == req_canon)
+                .collect();
+        if registrations.is_empty() {
+            diag.push_str(&format!(
+                "  • '{}': NO toolchain() registrations found for type\n",
+                req.type_label
+            ));
+            continue;
+        }
+        diag.push_str(&format!(
+            "  • '{}': {} registration(s) found, none matched. Sample first 3:\n",
+            req.type_label,
+            registrations.len()
+        ));
+        for (lbl, info) in registrations.iter().take(3) {
+            diag.push_str(&format!(
+                "      - {}: exec_compat={:?}, target_compat={:?}\n",
+                lbl, info.exec_compatible_with, info.target_compatible_with
+            ));
+        }
+    }
+    diag.push_str("  Candidate exec platforms:\n");
+    for p in eligible_exec_platforms.iter().take(3) {
+        diag.push_str(&format!(
+            "      - {}: constraints={:?}\n",
+            p.label, p.constraint_values
+        ));
+    }
     Err(format!(
-        "No execution platform found that provides all mandatory toolchain types: {:?}",
-        missing_types
+        "No execution platform found that provides all mandatory toolchain types: {:?}\n{}",
+        missing_types, diag
     ))
 }
 
