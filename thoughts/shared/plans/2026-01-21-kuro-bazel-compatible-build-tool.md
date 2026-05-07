@@ -262,6 +262,72 @@ We will fork Buck2 and progressively modify it to speak Bazel's dialect. The app
 
 ---
 
+## Current Roadmap
+
+This section is the authoritative short-form priority list. The longer
+tables below preserve historical coverage and per-plan status.
+
+### Current Blockers / Next Work
+
+| Priority | Plan | Why now | Exit criteria |
+|----------|------|---------|---------------|
+| 1 | [46-directory-paths-in-filegroup-srcs.md](./kuro-bazel-subplans/46-directory-paths-in-filegroup-srcs.md) | Unblocks LLVM toolchain analysis reached during zeromatter/rules_rust verification. | Directory paths in `filegroup.srcs` coerce as source directories; zeromatter advances past `llvm-toolchain-minimal...//:lib/clang/22`. |
+| 2 | [45-per-args-paramfile-and-cargo-runfiles.md](./kuro-bazel-subplans/45-per-args-paramfile-and-cargo-runfiles.md) | Unblocks rules_rust `cargo_build_script_runner` by honoring nested `args.use_param_file(use_always=True)`. | `cargo_build_script` runfiles args arrive via `--cargo_manifest_args=@...`; the local cargo-runfiles heuristic is deleted. |
+| 3 | [44-workspace-layout-parity.md](./kuro-bazel-subplans/44-workspace-layout-parity.md) Phase 2.6 | Replaces the frozen shared-execroot collision allowlist with per-action prefix narrowing. | Action cwd exposes only declared top-level prefixes; no new collision-name entries are added. |
+| 4 | [36-extension-spoke-lazy-materialization.md](./kuro-bazel-subplans/36-extension-spoke-lazy-materialization.md) follow-ups | Extension materialization is a recurring zeromatter blocker; Phases 3b/4/5 are still open. | `repository_ctx` Label-path audit complete, missing `repository_rule_attr` accessors backfilled, stubbed sub-extension failures are loud and direct. |
+| 5 | [31-bazel-perf-parity.md](./kuro-bazel-subplans/31-bazel-perf-parity.md) | After correctness blockers, warm-RE perf parity is the next measured gap. | Persistent action cache + watcher filter + daemon-resident BES meet the plan's gap-closing targets. |
+
+### Dependency Map
+
+| Plan | Depends on | Feeds / unblocks | Notes |
+|------|------------|------------------|-------|
+| 46 | Existing source/dep coercion code | 45 and zeromatter cargo-build-script verification | Independent small correctness fix; should land before relying on LLVM-backed toolchains in zeromatter. |
+| 45 | Current Plan 44 Phase 2.5 execroot stopgap | ZeroMatter `//sdk:sdk_contents` execution | Does not wait for Plan 44 Phase 3; Phase 4 in Plan 45 is cleanup after full execroot. |
+| 44 Phase 2.6 | Current local executor cwd routing | Plan 34 sandbox strategy, Plan 45 cleanup, generated-output hygiene | Establishes action-cwd shape before sandboxing enforces it. |
+| 36 follow-ups | Plan 10/23 extension execution | Rules_python/rules_rs extension stability | Keep scoped to extension/repository_ctx materialization, not execroot or action runfiles. |
+| 34 | Plan 44 action-layout invariants | Hermetic local execution | Sandboxing must enforce an already-defined cwd/input/output model, not invent one. |
+| 25 | Plan 24 for exec platform selection | Remote action dispatch and CAS/BES transport | Plan 25 owns transport, not worker-pool/platform selection. |
+| 31 | Plan 30 BES throughput | Warm-RE parity | Plan 31.3 is the owner of daemon-resident BES upload. |
+| 47 | Plan 06 aspect base | Full aspects parity | Owns DICE caching, incrementality, aspect chains, aspect toolchains, and `graph_structure_aspect`. |
+| 48 | Existing stub inventory | Small parity-gap closure | Groups genquery, stamping, proto, and platform-fragment gaps until any item needs a standalone plan. |
+| 49 | Plan 44 layout policy | Repo hygiene | Adds checks so generated layout artifacts do not re-enter commits. |
+
+### Plan Hygiene Rules
+
+- Use one of four top-level statuses: **Proposed**, **Partial**,
+  **Complete**, or **Superseded/Historical**. Avoid "functional" as a
+  completion state unless every documented success criterion is checked.
+- Every active plan must list:
+  - unit or Rust crate tests;
+  - integration tests under `tests/` or a focused example;
+  - one real-world target when the plan is motivated by zeromatter/LLVM;
+  - remaining manual-only risk, if any.
+- Every Bazel-parity decision must cite upstream Bazel source or tests before
+  final closure. Debugging notes may cite observed behavior first, but final
+  status should include the source of truth.
+- Every completed plan with deferred work must name the successor plan or
+  explicitly mark the work as historical/deferred cleanup.
+- Generated workspace/output artifacts (`bazel-bin`, `bazel-out`,
+  `bazel-testlogs`, `bazel-*`, `execroot/`, `external/`, `bazel-external/`)
+  must stay ignored and out of commits. Plan 44 owns layout policy; a future
+  CI hygiene check should fail if these appear in `git status --short`.
+
+### Unowned Parity Gaps
+
+These are known holes that should get dedicated follow-up plans before being
+declared done:
+
+| Gap | Current table reference | Proposed owner |
+|-----|-------------------------|----------------|
+| `genquery` execution is a touch/empty-output stub | Remaining Stub Behavior / High Priority | [Plan 48](./kuro-bazel-subplans/48-small-parity-gaps.md) |
+| build status stamping (`StampFile`, stable/volatile status files) | Remaining Stub Behavior / High Priority | [Plan 48](./kuro-bazel-subplans/48-small-parity-gaps.md) |
+| `proto_common.compile()` and protoc toolchain lookup | Remaining Stub Behavior / Medium Priority | [Plan 48](./kuro-bazel-subplans/48-small-parity-gaps.md) |
+| `target_platform_has_constraint()` real constraint query | Remaining Stub Behavior / Medium Priority | [Plan 48](./kuro-bazel-subplans/48-small-parity-gaps.md) |
+| C++ fragment sysroot/FDO values | Remaining Stub Behavior / Medium Priority | [Plan 48](./kuro-bazel-subplans/48-small-parity-gaps.md) |
+| aspect DICE caching, incremental recomputation, `requires`, aspect toolchains, `apply_to_generating_rules` | Plan 06 | [Plan 47](./kuro-bazel-subplans/47-aspects-completion.md) |
+
+---
+
 ## Sub-Plans
 
 The detailed implementation is split into focused sub-plans:
@@ -292,7 +358,7 @@ The detailed implementation is split into focused sub-plans:
 | [25-remote-execution-buildbuddy.md](./kuro-bazel-subplans/25-remote-execution-buildbuddy.md)         | Make `kuro build … --config=remote` actually dispatch actions to BuildBuddy's RBE workers (currently runs locally despite RE config). Daemon constraint refresh, executor-factory promotion of `Executor::Local` → remote when RE configured, CAS upload smoke test. | **In Progress** (RE wire smoke-test landed; 25.1 next) |
 | [24-exec-platform-resolution.md](./kuro-bazel-subplans/24-exec-platform-resolution.md)               | Constraint-based execution-platform resolution: surface `register_execution_platforms()` + `--extra_execution_platforms` candidates into `compute_execution_platforms`, drive the existing `check_execution_platform` constraint matcher, retire the `legacy_execution_platform` host-fallback for registered workspaces, per-target `exec_properties` overrides, per-exec-group platform selection, per-action `exec_properties` kwarg, hermetic BEP RE Platform assertion. Supersedes Plan 11's "no remote exec platform selection" exclusion and Plan 25.3.E/F point-fixes. | **Partial** (Phases 1–9 landed; Phase 10 covered at executor-config grain, full BEP wire assertion deferred) |
 | [26-string-interning.md](./kuro-bazel-subplans/26-string-interning.md)                               | Audit and clean up string-heavy Bazel-compat code written after the Buck2 fork. Extend existing `static_interner`, `ConcurrentTargetLabelInterner`, and scoped attr interning patterns to stable graph identifiers and hot string-keyed maps; document guardrails for future AI-agent work. | **Not Started** |
-| [27-native-language-rule-removal.md](./kuro-bazel-subplans/27-native-language-rule-removal.md)       | Remove/quarantine remaining Buck2-era native language-rule implementations. Convert removed Bazel 9 symbols such as no-load `cc_*` into Bazel-shaped removed-rule diagnostics, migrate kuro-owned fixtures to explicit loads, and keep native modules such as `cc_common` available for external Starlark rulesets. | **Not Started** |
+| [27-native-language-rule-removal.md](./kuro-bazel-subplans/27-native-language-rule-removal.md)       | Remove/quarantine remaining Buck2-era native language-rule implementations. Convert removed Bazel 9 symbols such as no-load `cc_*` into Bazel-shaped removed-rule diagnostics, migrate kuro-owned fixtures to explicit loads, and keep native modules such as `cc_common` available for external Starlark rulesets. | **Complete** (Phases 27.1–27.6 landed; native language rules are removed-rule stubs with guardrails) |
 | [28-builtins-module-architecture.md](./kuro-bazel-subplans/28-builtins-module-architecture.md)       | Add a bundled Bazel builtins module layer, inspired by Bonanza's exports/wrappers pattern but sourced from Bazel 9. Export selected Starlark builtins into BUILD globals, `native`, and external `.bzl` environments; add a rule-implementation wrapper for incremental `ctx` compatibility migration; integrate or remove remaining Buck2 prelude machinery. | **Complete** (all phases landed 2026-05-01; migration discipline remains ongoing) |
 | [29-cc-include-dir-determinism.md](./kuro-bazel-subplans/29-cc-include-dir-determinism.md)           | Retire the `EXTERNAL_INCLUDE_DIRS` process-global mutable registry in cc_common; route every `-I` / `-iquote` / `-isystem` / `-idirafter` flag through `CcCompilationContext` providers (matches Bazel + Bonanza). Closes the remaining 25% BB action-cache miss rate from Plan 18.10.3 — the global's *set membership* still races with parallel action prep even after the sort fix. Target: kuro→kuro warm = 99%+ cache hit on `@llvm-project//llvm`. | **Complete** (29.2 + 29.3 + 29.4 landed; full llvm warm = 100% cache hit, 57s wall, digest match=4853/4853; copts now plumbed through `compile_build_variables.user_compile_flags` + `WORKSPACE_ROOT` hardcoded) |
 | [30-bes-upload-throughput.md](./kuro-bazel-subplans/30-bes-upload-throughput.md)                     | Close the BES-upload performance gap to bazel on warm `@llvm-project//llvm` (57 s kuro vs 50 s bazel; profiling pinpointed 23 s post-build BES drain wait as the entire delta). Earlier stream open, tonic flow-control tuning, daemon-resident uploader, parallel lifecycle handshakes. Substrate (tonic / prost) is fine; Connect-rs and grpcio are not viable replacements. | **30.1 + 30.2 + 30.5 done 2026-04-29** (warm wall 57.4 s → 14.81 s, post-build wait 23.2 s → ~2.9 s); 30.3 deferred to plan 31.3; 30.4 done |
@@ -312,6 +378,9 @@ The detailed implementation is split into focused sub-plans:
 | [44-workspace-layout-parity.md](./kuro-bazel-subplans/44-workspace-layout-parity.md)                 | Move toward Bazel-shaped workspace symlinks, external repo location, and execroot layout. | **Partial** (Phase 2.5 landed; 2.6/3 proposed) |
 | [45-per-args-paramfile-and-cargo-runfiles.md](./kuro-bazel-subplans/45-per-args-paramfile-and-cargo-runfiles.md) | Per-Args paramfile materialization for rules_rust cargo build script runfiles. | **Proposed** |
 | [46-directory-paths-in-filegroup-srcs.md](./kuro-bazel-subplans/46-directory-paths-in-filegroup-srcs.md) | Accept directory paths in `filegroup.srcs` / `one_of(dep, source)` attrs. | **Proposed** |
+| [47-aspects-completion.md](./kuro-bazel-subplans/47-aspects-completion.md)                             | Finish remaining aspect parity: DICE caching, incrementality, `requires`, aspect toolchains, `apply_to_generating_rules`, and `graph_structure_aspect`. | **Proposed** |
+| [48-small-parity-gaps.md](./kuro-bazel-subplans/48-small-parity-gaps.md)                               | Own small remaining parity gaps: genquery, stamping, proto action/toolchain behavior, and `target_platform_has_constraint()`. | **Proposed** |
+| [49-generated-output-hygiene.md](./kuro-bazel-subplans/49-generated-output-hygiene.md)                 | Add repo hygiene checks preventing generated layout artifacts from being committed. | **Proposed** |
 
 ### Remaining Stub Behavior
 
@@ -326,8 +395,8 @@ plan or an explicit decision that the stub is adequate. Organized by priority.
 | `create_cc_compile_action` hardcoded compiler | `cc_common.rs:1400` | Real CC toolchain compiler path | Plan 11 |
 | `CtxCheat*` family (7 stubs) | `cc_common.rs:702` | Real `actions2ctx_cheat()` for rules_cc | Plan 11 (partially) |
 | ~~`create_cc_analysis_result()` empty stubs~~ | _deleted_ | _Resolved by Plan 27.3 (native cc_* rules are now removed-rule stubs; real cc_* analysis comes from `@rules_cc`)._ | ✅ done 2026-04-30 |
-| `analyze_genquery()` touch stub | `native_rule_analysis.rs:1360` | Real genquery execution | Needs plan |
-| `StampFile` stubs | `context.rs:4873` | Real build status stamping | Needs plan |
+| `analyze_genquery()` touch stub | `native_rule_analysis.rs:1360` | Real genquery execution | Plan 48 |
+| `StampFile` stubs | `context.rs:4873` | Real build status stamping | Plan 48 |
 
 **Medium Priority (functional but not Bazel-accurate):**
 
@@ -339,11 +408,11 @@ plan or an explicit decision that the stub is adequate. Organized by priority.
 | `--compilation_mode` accepted-and-ignored | `common.rs:261` | Flag populates `ConfigurationData.build_settings` | Plan 19 |
 | `transition(impl=...)` impl fn never runs | `app/kuro_transition/src/transition/starlark.rs` | Transition dict returned from `impl` actually mutates the outgoing cfg | Plan 19 |
 | `ctx.var["COMPILATION_MODE"]` not set | `context.rs:943` | Reads from configured build settings so rules can select on it | Plan 19 |
-| `proto_common.compile()` no-op | `proto_common.rs:212` | Real proto compilation actions | Needs plan |
-| `proto_common.get_tool_path()` hardcoded | `proto_common.rs:272` | Protoc path from toolchain | Needs plan |
-| `CppFragment.sysroot()` returns None | `fragments.rs:482` | Real sysroot from CC toolchain | Needs plan |
-| `CppFragment.fdo_instrument()` returns None | `fragments.rs:151` | FDO instrumentation support | Needs plan |
-| `target_platform_has_constraint()` uses host OS | `context.rs:1013` | Real platform constraint query | Plan 28 |
+| `proto_common.compile()` no-op | `proto_common.rs:212` | Real proto compilation actions | Plan 48 |
+| `proto_common.get_tool_path()` hardcoded | `proto_common.rs:272` | Protoc path from toolchain | Plan 48 |
+| `CppFragment.sysroot()` returns None | `fragments.rs:482` | Real sysroot from CC toolchain | Plan 48 |
+| `CppFragment.fdo_instrument()` returns None | `fragments.rs:151` | FDO instrumentation support | Plan 48 |
+| `target_platform_has_constraint()` uses host OS | `context.rs:1013` | Real platform constraint query | Plan 48 |
 
 **Low Priority (rarely hit, adequate for most builds):**
 
@@ -467,7 +536,7 @@ Quick reference to all phases and their locations:
 | 24    | Exec Platform Resolution               | [24-exec-platform-resolution.md](./kuro-bazel-subplans/24-exec-platform-resolution.md) | [~] Partial: Phases 1–9 landed; Phase 10 covered at executor-config grain, full BEP wire assertion deferred |
 | 25    | Remote Execution against BuildBuddy    | [25-remote-execution-buildbuddy.md](./kuro-bazel-subplans/25-remote-execution-buildbuddy.md) | [~] In Progress |
 | 26    | String Interning Cleanup               | [26-string-interning.md](./kuro-bazel-subplans/26-string-interning.md) | [ ] Not Started |
-| 27    | Native Language Rule Removal           | [27-native-language-rule-removal.md](./kuro-bazel-subplans/27-native-language-rule-removal.md) | [ ] Not Started |
+| 27    | Native Language Rule Removal           | [27-native-language-rule-removal.md](./kuro-bazel-subplans/27-native-language-rule-removal.md) | [x] Complete (removed-rule stubs + guardrails landed 2026-04-30) |
 | 28    | Bazel Builtins Module Architecture     | [28-builtins-module-architecture.md](./kuro-bazel-subplans/28-builtins-module-architecture.md) | [x] Complete (all phases landed 2026-05-01; migration discipline remains ongoing) |
 | 29    | cc Include-Dir Determinism             | [29-cc-include-dir-determinism.md](./kuro-bazel-subplans/29-cc-include-dir-determinism.md) | [x] Complete |
 | 30    | BES Upload Throughput                  | [30-bes-upload-throughput.md](./kuro-bazel-subplans/30-bes-upload-throughput.md) | [~] Partial: 30.1+30.2+30.4+30.5 done; daemon-resident BES moved to Plan 31.3 |

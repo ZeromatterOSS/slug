@@ -16,6 +16,21 @@
 > spoke repos by `Label` and depend on those spokes being on disk
 > before the next call.
 
+## Status: PARTIAL
+
+Phases 1-3 landed and zeromatter now reaches deep analysis with lazily
+materialized crate spokes. This plan remains high-priority because the
+remaining follow-ups are extension correctness gaps, not cleanup:
+
+1. Phase 3b: audit `repository_ctx.path(Label)` /
+   `repository_ctx.read(Label)` for the same materialization guarantee.
+2. Phase 4: backfill `repository_rule_attr` accessors surfaced by real
+   rules_python/rules_rs extensions (`auth_patterns`,
+   `_rules_python_workspace`, `vcs`, plus anything discovered during the
+   audit).
+3. Phase 5: replace confusing downstream `No such file` errors from
+   stubbed sub-extension spokes with a direct extension-failure error.
+
 ## Scope
 
 When a module extension calls `mctx.path(Label("@spoke_repo//pkg:file"))`

@@ -5,6 +5,10 @@
 > Follows Plan 8 / Phase 16's functional Linux sandbox prototype and Plan 32's
 > local-overhead work. This plan owns a production sandboxed execution strategy
 > for local actions.
+>
+> Depends on [Plan 44](./44-workspace-layout-parity.md)'s action-layout
+> invariants. Plan 34 enforces the declared-input/output contract; it does
+> not choose a separate cwd, external-repo, or output-root model.
 
 ## Goal
 

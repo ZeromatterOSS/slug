@@ -11,6 +11,12 @@
 > plan intentionally breaks kuro workspaces that still rely on Buck2-era
 > native language rules.
 
+## Status: COMPLETE
+
+Phases 27.1-27.6 landed on 2026-04-29..2026-04-30. Remaining work in this
+file is historical context; the main plan's stub table now marks the
+native-language analysis path as resolved.
+
 ## Scope
 
 Remove or quarantine kuro's remaining native language-rule
@@ -584,8 +590,9 @@ removing native implementations from developer workflows.
   contains its rule name so users can locate the call site.
 - Doc-comments on `RemovedNativeRule` enum + per-variant cite the
   Bazel 9 source pattern (`BaseRuleClasses.java EmptyRule`).
-- Main-plan "Remaining Stub Behavior" table update — not yet
-  performed; tracked as a small Plan 27 follow-up below.
+- Main-plan "Remaining Stub Behavior" table update performed in the
+  plan-status cleanup pass; `create_cc_analysis_result()` is now marked
+  resolved there.
 
 ### Acceptance verified
 
@@ -597,10 +604,7 @@ removing native implementations from developer workflows.
 
 ### Remaining for Phase 27.6
 
-- Update the main plan
-  (`thoughts/shared/plans/2026-01-21-kuro-bazel-compatible-build-tool.md`)
-  "Remaining Stub Behavior" table to mark
-  `create_cc_analysis_result()` as resolved. Trivial doc edit, deferred.
+None. The doc-only main-plan table follow-up is complete.
 
 ### Goal
 

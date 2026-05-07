@@ -43,6 +43,52 @@ Side effects of the divergence:
 - New users running `bazel build` and `kuro build` in the same
   workspace see two independent state trees and unfamiliar paths.
 
+## Action Layout Invariants
+
+Plan 44 owns the action-cwd and workspace-layout contract. Other plans
+may consume or enforce this contract, but should not redefine it.
+
+### Current stopgap state (Phase 2.5)
+
+- Source tree authority: the real checkout remains the authoritative
+  source tree.
+- Action cwd: local actions run under
+  `<workspace>/execroot/<workspace_basename>/`.
+- Workspace view: the execroot contains directory symlinks for selected
+  top-level workspace directories plus `buck-out` / external access as
+  required by declared inputs.
+- Outputs: writes still flow through `buck-out` in the real workspace;
+  there is no copy-back step.
+- External repos: materialized extension/BCR repos still live under the
+  current kuro external location until Phase 2 / Phase 3 moves them.
+- Hermeticity: this is not a sandbox. It narrows `read_dir(cwd)` for
+  tools like rules_rust's cargo runner, but symlink targets can still
+  expose undeclared files.
+
+### Target state (Phase 2.6 + Phase 3)
+
+- Phase 2.6 narrows the execroot per action or per input-prefix digest.
+  The cwd exposes only top-level prefixes derived from declared inputs
+  and tools. This removes the frozen collision-name filter.
+- Phase 3 moves toward Bazel's shape:
+  `<output_base>/execroot/<workspace_name>` for action cwd and
+  `<output_base>/external/<canonical>` for materialized repos.
+- Plan 34 then enforces the declared-input contract through sandboxing.
+  It must use this plan's cwd/input/output model as input rather than
+  inventing a different action layout.
+- Plan 45 may land before Phase 3. Its per-Args paramfile work should
+  work against the current Phase 2.5 cwd and remain valid after Phase
+  2.6/3 because the action sees the same declared input prefixes.
+
+## Generated Output Hygiene
+
+`bazel-bin`, `bazel-out`, `bazel-testlogs`, `bazel-*`, `execroot/`,
+`external/`, and `bazel-external/` are generated workspace/output
+artifacts. They must remain ignored and must not be committed. Phase 44
+owns the layout policy for these names; a future CI hygiene check should
+fail if any of them appear in `git status --short` outside a deliberately
+tracked fixture.
+
 ## Three subgoals, three sizes
 
 ### Phase 1 (small): bazel convenience symlinks at workspace root

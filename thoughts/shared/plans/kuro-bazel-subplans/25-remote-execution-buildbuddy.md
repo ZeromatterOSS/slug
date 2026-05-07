@@ -23,6 +23,23 @@ Plan 24 supersedes both with a constraint-based resolver that walks
 `register_execution_platforms()` + `--extra_execution_platforms`
 candidates the way Bazel does.
 
+## Boundary after Plan 24
+
+Plan 25 should not grow new platform-selection logic. Its remaining
+ownership is:
+
+- translate Bazel-shaped remote flags into RE/BES transport config;
+- create or refresh daemon-side RE clients when per-invocation config
+  changes;
+- upload inputs to CAS, dispatch actions, download outputs, and report
+  remote/cache/local counts;
+- preserve BuildBuddy/BES trace upload behavior.
+
+Worker-pool choice, target/platform `exec_properties`, per-exec-group
+routing, and per-action `exec_properties` are Plan 24's domain. If Plan
+25 work observes a wrong worker pool, update Plan 24 or its follow-up
+tests rather than adding a transport-layer workaround.
+
 ## Scope
 
 Make `kuro build … --config=remote` (with a Bazel-shape `.bazelrc`
