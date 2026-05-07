@@ -668,7 +668,7 @@ async fn load_and_register_toolchain_packages(
                     Ok(r) => r,
                     Err(e) => {
                         tracing::warn!(
-                            "Toolchain package '{}' load failed (non-fatal): {}",
+                            "Toolchain package '{}' load failed (non-fatal): {:#}",
                             tc_label_str,
                             e
                         );
@@ -974,11 +974,18 @@ fn extract_toolchain_info_from_node(
     })
 }
 
-/// Extract a label string from a CoercedAttr (dep or label).
+/// Extract a label string from a CoercedAttr (dep, label, or configuration_dep).
+///
+/// `exec_compatible_with` / `target_compatible_with` use
+/// `attrs.configuration_dep(...)` and land as `CoercedAttr::ConfigurationDep`
+/// after coercion — we have to handle that variant or the constraint
+/// list reads empty and toolchain resolution falls back to "first
+/// registration wins" regardless of host OS/CPU.
 fn extract_label_from_coerced_attr(attr: &CoercedAttr) -> String {
     match attr {
         CoercedAttr::Dep(providers_label) => providers_label.target().to_string(),
         CoercedAttr::Label(providers_label) => providers_label.target().to_string(),
+        CoercedAttr::ConfigurationDep(providers_label) => providers_label.target().to_string(),
         CoercedAttr::String(s) => s.0.as_str().to_owned(),
         _ => String::new(),
     }

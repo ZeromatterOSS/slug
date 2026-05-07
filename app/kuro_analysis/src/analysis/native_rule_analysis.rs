@@ -1200,29 +1200,32 @@ fn analyze_toolchain(
 /// Extract label strings from a configured attribute that's a list of deps.
 fn extract_label_strings_from_attr(attr: &ConfiguredAttr) -> Vec<String> {
     let mut labels = Vec::new();
-    match attr {
-        ConfiguredAttr::List(list) => {
-            for item in list.iter() {
-                match item {
-                    ConfiguredAttr::Dep(dep) => {
-                        labels.push(dep.label.target().unconfigured().to_string());
-                    }
-                    ConfiguredAttr::Label(label) => {
-                        labels.push(label.target().unconfigured().to_string());
-                    }
-                    ConfiguredAttr::OneOf(inner, _) => {
-                        // Unwrap OneOf to get the inner dep/label
-                        if let ConfiguredAttr::Dep(dep) = inner.as_ref() {
-                            labels.push(dep.label.target().unconfigured().to_string());
-                        } else if let ConfiguredAttr::Label(label) = inner.as_ref() {
-                            labels.push(label.target().unconfigured().to_string());
-                        }
-                    }
-                    _ => {}
-                }
+    fn push_one(labels: &mut Vec<String>, item: &ConfiguredAttr) {
+        match item {
+            ConfiguredAttr::Dep(dep) => {
+                labels.push(dep.label.target().unconfigured().to_string());
             }
+            ConfiguredAttr::Label(label) => {
+                labels.push(label.target().unconfigured().to_string());
+            }
+            // `exec_compatible_with` / `target_compatible_with` and other
+            // compatibility attrs use `attrs.configuration_dep(...)`,
+            // which lands as `ConfigurationDep` after coercion. Without
+            // this branch, `extract_label_strings_from_attr` silently
+            // drops every constraint and toolchain resolution sees an
+            // empty `exec_compatible_with` list — every toolchain
+            // matches every platform and the first one wins.
+            ConfiguredAttr::ConfigurationDep(label) => {
+                labels.push(label.target().to_string());
+            }
+            ConfiguredAttr::OneOf(inner, _) => push_one(labels, inner),
+            _ => {}
         }
-        _ => {}
+    }
+    if let ConfiguredAttr::List(list) = attr {
+        for item in list.iter() {
+            push_one(&mut labels, item);
+        }
     }
     labels
 }

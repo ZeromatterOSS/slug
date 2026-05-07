@@ -1951,7 +1951,14 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         // toolchain's required set. Without this the lists default to
         // empty, every toolchain matches every platform, and the first
         // registered toolchain wins regardless of host OS/CPU.
-        let constraints_attr_type = AttrType::list(dep_type.clone());
+        //
+        // Match the rule's internal attr type (`AttrType::list(configuration_dep(CompatibilityAttribute))`).
+        // Using `dep` here trips the "attr and type mismatch" check at
+        // `ConfiguredAttr::Dep` when the rule expects `ConfigurationDep`.
+        use kuro_node::attrs::attr_type::configuration_dep::ConfigurationDepKind;
+        let constraints_attr_type = AttrType::list(AttrType::configuration_dep(
+            ConfigurationDepKind::CompatibilityAttribute,
+        ));
         let coerce_constraint_list =
             |values: UnpackListOrTuple<Value<'v>>| -> starlark::Result<CoercedAttr> {
                 let items: Vec<Value<'v>> = values.into_iter().collect();
