@@ -261,9 +261,19 @@ fn ensure_execroot_layout(project_root: &std::path::Path) {
         return;
     }
 
-    // Symlink each top-level workspace directory into the execroot.
-    // Skip leaf files at workspace root — they're the source of the
-    // rules_rust runfiles-dir collision this layout fixes.
+    // Symlink each top-level workspace directory into the execroot,
+    // EXCEPT names that commonly appear as subdirectories of crate
+    // runfiles trees. Including those at exec_root top-level causes
+    // rules_rust's `cargo_build_script_runner` to push them into its
+    // `exec_root_links` cleanup list while AlreadyExists at
+    // `manifest_dir/<name>` (which create_runfiles_dir populated as a
+    // real directory). The cleanup then panics on `remove_symlink`
+    // because the path is a real dir, not a symlink.
+    //
+    // This is a coarse filter — names listed here cover the common
+    // cases (Cargo crates' `ci/`, `docs/`, `examples/`, …). Phase 3
+    // replaces this with per-action input narrowing (only the
+    // inputs the action declares appear at top level).
     let entries = match std::fs::read_dir(project_root) {
         Ok(e) => e,
         Err(_) => return,
@@ -272,6 +282,11 @@ fn ensure_execroot_layout(project_root: &std::path::Path) {
         let name = entry.file_name();
         // Skip the execroot dir itself to avoid recursive layout.
         if name == "execroot" {
+            continue;
+        }
+        // Skip workspace dirs whose name commonly appears as a
+        // top-level subdir of a Cargo crate's runfiles tree.
+        if is_likely_runfiles_collision(&name) {
             continue;
         }
         let metadata = match entry.metadata() {
@@ -301,6 +316,34 @@ fn ensure_execroot_layout(project_root: &std::path::Path) {
             let _ = std::os::windows::fs::symlink_dir(&target, &link);
         }
     }
+}
+
+/// Names that frequently appear at the top level of a Cargo crate's
+/// runfiles tree. Including a workspace top-level directory by these
+/// names causes the rules_rust runner cleanup to fail (see
+/// [`ensure_execroot_layout`]).
+///
+/// Conservative list — includes only well-known Cargo / Rust-project
+/// conventions. False positives only mean those workspace dirs aren't
+/// reachable as `cwd-relative/<name>/...` from inside an action; that
+/// breaks any first-party action that reads `<name>/...` as a
+/// workspace-relative path. Add new entries as collisions surface.
+fn is_likely_runfiles_collision(name: &std::ffi::OsStr) -> bool {
+    matches!(
+        name.to_str(),
+        Some(
+            "ci" | "docs"
+                | "examples"
+                | "tests"
+                | "src"
+                | "benches"
+                | "bench"
+                | "doc"
+                | "assets"
+                | "data"
+                | "fixtures"
+        )
+    )
 }
 
 /// Get the project root (if set).
@@ -1092,5 +1135,90 @@ mod tests {
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn execroot_path_returns_basename_subdir() {
+        let path = std::path::Path::new("/tmp/some/workspace");
+        assert_eq!(
+            super::execroot_path(path),
+            Some(std::path::PathBuf::from(
+                "/tmp/some/workspace/execroot/workspace"
+            ))
+        );
+    }
+
+    #[test]
+    fn execroot_path_returns_none_for_empty_basename() {
+        assert_eq!(super::execroot_path(std::path::Path::new("/")), None);
+    }
+
+    #[test]
+    fn ensure_execroot_layout_creates_dir_only_symlinks() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+
+        // Mix of files and directories at workspace root, including
+        // names that frequently appear in Cargo crate runfiles trees.
+        std::fs::create_dir(root.join("external")).unwrap();
+        std::fs::create_dir(root.join("buck-out")).unwrap();
+        std::fs::create_dir(root.join("lib")).unwrap();
+        std::fs::create_dir(root.join("ci")).unwrap();
+        std::fs::create_dir(root.join("docs")).unwrap();
+        std::fs::create_dir(root.join("tests")).unwrap();
+        std::fs::write(root.join("Cargo.toml"), "[package]\n").unwrap();
+        std::fs::write(root.join("CHANGELOG.md"), "").unwrap();
+
+        super::ensure_execroot_layout(root);
+
+        let exec = root.join("execroot").join(root.file_name().unwrap());
+        assert!(exec.is_dir(), "execroot should be a real directory");
+
+        // Top-level dirs that don't collide with crate runfiles trees
+        // are symlinked through.
+        assert!(exec.join("external").is_dir());
+        assert!(exec.join("buck-out").is_dir());
+        assert!(exec.join("lib").is_dir());
+
+        // Top-level dirs whose names collide with common crate
+        // runfiles subdirs are skipped.
+        assert!(!exec.join("ci").exists());
+        assert!(!exec.join("docs").exists());
+        assert!(!exec.join("tests").exists());
+
+        // Leaf files are skipped — their presence at exec_root top
+        // level would collide with the runfiles tree's leaf-file
+        // entries (CHANGELOG.md, Cargo.toml, …).
+        assert!(!exec.join("Cargo.toml").exists());
+        assert!(!exec.join("CHANGELOG.md").exists());
+    }
+
+    #[test]
+    fn ensure_execroot_layout_replaces_legacy_self_symlink() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let basename = root.file_name().unwrap();
+
+        // Older kuro builds installed `execroot/<basename> -> ..` —
+        // simulate that and ensure the layout helper replaces it
+        // with a real directory.
+        let exec_dir = root.join("execroot");
+        std::fs::create_dir_all(&exec_dir).unwrap();
+        let legacy = exec_dir.join(basename);
+        #[cfg(unix)]
+        std::os::unix::fs::symlink("..", &legacy).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir("..", &legacy).unwrap();
+
+        std::fs::create_dir(root.join("external")).unwrap();
+
+        super::ensure_execroot_layout(root);
+
+        assert!(legacy.is_dir(), "legacy symlink should be replaced");
+        assert!(
+            !legacy.symlink_metadata().unwrap().file_type().is_symlink(),
+            "legacy symlink should be removed"
+        );
+        assert!(legacy.join("external").is_dir());
     }
 }

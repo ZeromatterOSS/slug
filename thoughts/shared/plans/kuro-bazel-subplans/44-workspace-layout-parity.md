@@ -119,10 +119,10 @@ Can land before Phase 3.
 
 ### Phase 2.5 (medium): minimal per-action execroot for sandbox-free input isolation
 
-**Status: PARTIAL (2026-05-07)** — directory-only execroot landed; covers
-runfiles trees with no top-level dir collisions. Per-action input
-narrowing (next step) needed to cover trees with subdirs that match
-workspace top-level names (e.g. `ci/`).
+**Status: PARTIAL (2026-05-07)** — directory-only execroot landed plus
+a coarse name-based collision filter. Covers crate runfiles trees with
+no top-level subdir matching the filtered names. Per-action input
+narrowing (next step) is the proper fix; tracked below.
 
 **Landed:**
 - `app/kuro_core/src/cells.rs::ensure_execroot_layout` builds
@@ -137,15 +137,35 @@ workspace top-level names (e.g. `ci/`).
 **Verified:**
 - `examples/multi_package :gen_version_header` — builds clean.
 - `crates__typenum-1.19.0//:_bs` cold build — succeeds; no
-  `drain_runfiles_dir` panic (typenum runfiles tree has no `ci/`,
-  `docs/`, etc. that would collide with zeromatter's first-party
-  workspace dirs).
+  `drain_runfiles_dir` panic.
+- `kuro_core --lib execroot` — 4/4 unit tests pass
+  (`execroot_path_returns_basename_subdir`,
+  `execroot_path_returns_none_for_empty_basename`,
+  `ensure_execroot_layout_creates_dir_only_symlinks`,
+  `ensure_execroot_layout_replaces_legacy_self_symlink`).
 - `kuro_execute_impl --lib` — 44/44 tests pass.
 
+**Collision-name filter** (`is_likely_runfiles_collision` in
+`app/kuro_core/src/cells.rs`): excludes `ci`, `docs`, `examples`,
+`tests`, `src`, `benches`, `bench`, `doc`, `assets`, `data`,
+`fixtures` from the layout. Workspace dirs by these names won't
+appear at exec_root top level; first-party actions that reference
+them via `cwd-relative/<name>/...` will break — accept and adjust
+the list as collisions surface, since per-action narrowing (below)
+is the proper fix and supersedes this.
+
 **Outstanding:**
-- `crates__zerocopy-0.8.42//:_bs` and similar crates whose runfiles
-  tree contains a directory named like a zeromatter top-level dir
-  (`ci/`, plausibly `docs/`, `examples/`) still fail. Failure mode:
+- `crates__zerocopy-0.8.42//:_bs` end-to-end verification is blocked
+  by an unrelated kuro analysis bug
+  (`llvm-toolchain-minimal-22.1.0-linux-amd64//:lib/clang/22` is a
+  directory path used as a `filegroup` src in
+  `bazel-external/llvm+0.7.0/directory.bzl::headers_directory`;
+  Bazel allows directory paths as filegroup srcs, kuro's BUILD
+  coercion rejects them as missing labels). Track separately.
+- The collision-name filter is a workaround. The remaining failure
+  mode below still hits cases where the crate's runfiles tree has a
+  subdir whose name matches a zeromatter first-party dir not in the
+  filter list (e.g. a hypothetical zeromatter `target/`). Failure mode:
   `create_runfiles_dir` creates `manifest_dir/ci/<runfiles>` as a
   real subdirectory; `should_symlink_exec_root` then iterates
   exec_root, finds our `ci` symlink, calls
