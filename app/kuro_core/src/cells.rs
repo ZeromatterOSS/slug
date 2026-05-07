@@ -202,57 +202,104 @@ pub fn get_dynamic_extension_cell_setup(
 
 /// Set the project root for dynamic cell filesystem scanning.
 pub fn set_dynamic_project_root(root: std::path::PathBuf) {
-    ensure_execroot_self_symlink(&root);
+    ensure_execroot_layout(&root);
     let _ = DYNAMIC_PROJECT_ROOT.set(root);
 }
 
-/// Create `<project_root>/execroot/<project_basename>` as a symlink back
-/// to the project root.
+/// Path to the per-project execroot directory used as `cwd` for action
+/// execution. Returns `<project_root>/execroot/<project_basename>` when
+/// the project root has a usable basename, or `None` otherwise (in which
+/// case actions fall back to running with `cwd = project_root`).
+pub fn execroot_path(project_root: &std::path::Path) -> Option<std::path::PathBuf> {
+    let basename = project_root.file_name().and_then(|s| s.to_str())?;
+    if basename.is_empty() {
+        return None;
+    }
+    Some(project_root.join("execroot").join(basename))
+}
+
+/// Build `<project_root>/execroot/<project_basename>/` as a real
+/// directory containing **directory-only** symlinks to each top-level
+/// workspace entry.
 ///
-/// Bazel's rules_rust `process_wrapper` resolves `${exec_root}` at action
-/// time as `<output_base>/execroot/<workspace_name>`, where
-/// `workspace_name` is the basename of the action's cwd. Under Bazel that
-/// path is the actual symlink-tree the action runs in. Kuro runs actions
-/// directly in the project root with no sandbox, so the path doesn't
-/// exist on disk — and `OUT_DIR=${exec_root}/buck-out/...` injected by
-/// rules_rust into rustc env then points at a missing prefix, breaking
-/// any crate whose `lib.rs` does `include!(concat!(env!("OUT_DIR"), "..."))`
-/// (target-triple, pyo3-build-config, …).
+/// Plan 44 Phase 2.5: Bazel's rules_rust runner (and any tool that does
+/// `read_dir(exec_root)`) expects exec_root's top level to look like
+/// Bazel's exec_root — a synthesized staging dir with the action's
+/// declared inputs as top-level entries — not the user's source tree
+/// with `Cargo.toml` / `README.md` / etc. at top level. Without this,
+/// `cargo_build_script_runner`'s `RULES_RUST_SYMLINK_EXEC_ROOT=1`
+/// codepath wipes runfiles symlinks that share a name with a top-level
+/// workspace file (`CHANGELOG.md`, `Cargo.toml`, `README.md`, …) and
+/// `drain_runfiles_dir` then panics with `NotFound`.
 ///
-/// Creating `execroot/<basename> -> ..` is the cheapest way to make
-/// `${exec_root}/x` resolve back to `<project_root>/x` without changing
-/// rules_rust or process_wrapper.
-fn ensure_execroot_self_symlink(project_root: &std::path::Path) {
-    let basename = match project_root.file_name().and_then(|s| s.to_str()) {
-        Some(b) if !b.is_empty() => b,
-        _ => return,
+/// Including only directories means `read_dir(execroot)` returns just
+/// the workspace's directory tree (`external/`, `buck-out/`, plus the
+/// user's first-party directories). Top-level leaf files are excluded;
+/// well-formed Bazel actions reference them via `external/<repo>/...`
+/// or similar paths, which still resolve through the directory
+/// symlinks. The execroot is shared across all actions in the build —
+/// safe because every action's view of the workspace top-level shape
+/// is identical, and outputs flow through the `buck-out/` symlink.
+///
+/// This also subsumes the older self-symlink behavior: rules_rust's
+/// `process_wrapper` resolves `${exec_root}` to the action's cwd, so
+/// `${exec_root}/buck-out/...` resolves through the new `buck-out`
+/// symlink to the actual `buck-out` tree.
+fn ensure_execroot_layout(project_root: &std::path::Path) {
+    let Some(execroot) = execroot_path(project_root) else {
+        return;
     };
-    let execroot_dir = project_root.join("execroot");
-    let link_path = execroot_dir.join(basename);
-    let desired_target = std::path::PathBuf::from("..");
-    match link_path.symlink_metadata() {
-        Ok(meta) if meta.file_type().is_symlink() => {
-            if let Ok(current) = std::fs::read_link(&link_path) {
-                if current == desired_target {
-                    return;
-                }
+
+    // Replace any previous symlink-style execroot (older kuro builds
+    // installed `execroot/<basename> -> ..`).
+    if let Ok(meta) = execroot.symlink_metadata() {
+        if meta.file_type().is_symlink() {
+            let _ = std::fs::remove_file(&execroot);
+        }
+    }
+    if std::fs::create_dir_all(&execroot).is_err() {
+        return;
+    }
+
+    // Symlink each top-level workspace directory into the execroot.
+    // Skip leaf files at workspace root — they're the source of the
+    // rules_rust runfiles-dir collision this layout fixes.
+    let entries = match std::fs::read_dir(project_root) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        // Skip the execroot dir itself to avoid recursive layout.
+        if name == "execroot" {
+            continue;
+        }
+        let metadata = match entry.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        if !metadata.is_dir() {
+            continue;
+        }
+        let link = execroot.join(&name);
+        match link.symlink_metadata() {
+            Ok(m) if m.file_type().is_symlink() => {
+                // Refresh: remove and recreate. Cheap and avoids
+                // stale targets after workspace layout changes.
+                let _ = std::fs::remove_file(&link);
             }
-            let _ = std::fs::remove_file(&link_path);
+            Ok(_) => continue,
+            Err(_) => {}
         }
-        Ok(_) => {
-            // Real entry — leave alone.
-            return;
+        let target = entry.path();
+        #[cfg(unix)]
+        {
+            let _ = std::os::unix::fs::symlink(&target, &link);
         }
-        Err(_) => {}
-    }
-    let _ = std::fs::create_dir_all(&execroot_dir);
-    #[cfg(unix)]
-    {
-        let _ = std::os::unix::fs::symlink(&desired_target, &link_path);
-    }
-    #[cfg(windows)]
-    {
-        let _ = std::os::windows::fs::symlink_dir(&desired_target, &link_path);
+        #[cfg(windows)]
+        {
+            let _ = std::os::windows::fs::symlink_dir(&target, &link);
+        }
     }
 }
 

@@ -195,7 +195,20 @@ impl LocalExecutor {
         sandbox: Option<SandboxSpec>,
     ) -> impl futures::future::Future<Output = kuro_error::Result<CommandResult>> + Send + 'a {
         async move {
-            let working_directory = self.root.join_cow(working_directory);
+            // Plan 44 Phase 2.5: route action cwd through the
+            // synthesized execroot at `<project_root>/execroot/<basename>/`.
+            // The execroot mirrors the workspace's directory tree via
+            // top-level symlinks; leaf files at workspace root are
+            // omitted so `read_dir(cwd)` matches Bazel's exec_root
+            // shape. Falls back to the project root if the layout
+            // helper couldn't determine a basename or hasn't run.
+            let working_directory = match kuro_core::cells::execroot_path(self.root.as_path())
+                .filter(|p| p.is_dir())
+                .and_then(|p| kuro_fs::paths::abs_norm_path::AbsNormPathBuf::new(p).ok())
+            {
+                Some(execroot) => std::borrow::Cow::Owned(execroot.join(working_directory)),
+                None => self.root.join_cow(working_directory),
+            };
 
             // When sandbox is active, bypass the forkserver and use direct process spawning.
             // The sandbox relies on pre_exec hooks (Linux namespaces) which are only available
@@ -2013,20 +2026,29 @@ mod tests {
                 false,
                 None,
                 futures::stream::pending(),
+                None,
             )
             .await?;
         assert_matches!(status, GatherOutputStatus::Finished { exit_code, .. } if exit_code == 0);
 
         let stdout = std::str::from_utf8(&stdout).buck_error_context("Invalid stdout")?;
 
+        // Plan 44 Phase 2.5: cwd is the synthesized execroot
+        // (`<root>/execroot/<basename>/`), so PWD/pwd reflect that path
+        // when the helper succeeds. The helper may decline to set up a
+        // layout (e.g. test_executor's tmpdir lacks a basename) — fall
+        // back to the project root.
+        let expected_path = kuro_core::cells::execroot_path(root.as_path())
+            .filter(|p| p.is_dir())
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|| root.to_string_lossy().into_owned());
+
         if cfg!(windows) {
             let lines: Vec<&str> = stdout.split("\r\n").collect();
-            let expected_path = format!("{root}");
-
             assert_eq!(lines[3], expected_path);
             assert_eq!(lines[4], expected_path);
         } else {
-            assert_eq!(stdout, format!("{root}\n{root}\n"));
+            assert_eq!(stdout, format!("{expected_path}\n{expected_path}\n"));
         }
 
         Ok(())
@@ -2050,6 +2072,7 @@ mod tests {
                 false,
                 None,
                 futures::stream::pending(),
+                None,
             )
             .await?;
         assert_matches!(status, GatherOutputStatus::TimedOut ( duration ) if duration == Duration::from_secs(1));
@@ -2076,6 +2099,7 @@ mod tests {
                 false,
                 None,
                 futures::stream::pending(),
+                None,
             )
             .await?;
         assert_matches!(status, GatherOutputStatus::Finished { exit_code, .. } if exit_code == 0);
