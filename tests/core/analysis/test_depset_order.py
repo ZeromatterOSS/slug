@@ -24,27 +24,24 @@ async def test_depset_orders(buck: Buck) -> None:
         "//:preorder",
         "//:postorder",
         "//:topological",
+        "//:topological_diamond",
         "//:default",
         "//:default_infer",
     )
 
     assert _read_lines(buck, "//:preorder", result) == ["c", "a", "b"]
     assert _read_lines(buck, "//:postorder", result) == ["a", "b", "c"]
-
-    topological = _read_lines(buck, "//:topological", result)
-    assert set(topological) == {"a", "b", "c"}
-
-    default = _read_lines(buck, "//:default", result)
-    assert set(default) == {"a", "b", "c"}
-
-    assert _read_lines(buck, "//:default_infer", result) == ["c", "a", "b"]
+    assert _read_lines(buck, "//:topological", result) == ["c", "a", "b"]
+    assert _read_lines(buck, "//:topological_diamond", result) == ["d", "b", "c", "a"]
+    assert _read_lines(buck, "//:default", result) == ["a", "b", "c"]
+    assert _read_lines(buck, "//:default_infer", result) == ["a", "b", "c"]
 
 
 @buck_test(data_dir="test_depset_order_data")
 async def test_depset_order_mismatch(buck: Buck) -> None:
     await expect_failure(
         buck.build("//:mismatch"),
-        stderr_regex="transitive elements must all have the same order",
+        stderr_regex="incompatible",
     )
 
 
@@ -75,26 +72,26 @@ async def test_depset_keyword_direct_transitive(buck: Buck) -> None:
 
 @buck_test(data_dir="test_depset_order_data")
 async def test_depset_union_operator(buck: Buck) -> None:
-    """depset | depset creates a union of both depsets."""
-    result = await buck.build("//:depset_union")
-    output = result.get_build_report().output_for_target("//:depset_union")
-    content = output.read_text().strip().splitlines()
-    assert content == ["x", "y", "z"], f"Expected [x, y, z], got {content}"
+    """Bazel 9 depset does not support the Kuro prototype | operator."""
+    await expect_failure(
+        buck.build("//:depset_union"),
+        stderr_regex="unsupported binary operation",
+    )
 
 
 @buck_test(data_dir="test_depset_order_data")
 async def test_depset_order_attribute(buck: Buck) -> None:
-    """depset.order returns the traversal order string."""
-    result = await buck.build("//:depset_order_attr")
-    output = result.get_build_report().output_for_target("//:depset_order_attr")
-    content = output.read_text().strip().splitlines()
-    assert content == ["preorder", "default"], f"Expected [preorder, default], got {content}"
+    """Bazel 9 depset does not expose a public .order attribute."""
+    await expect_failure(
+        buck.build("//:depset_order_attr"),
+        stderr_regex="order",
+    )
 
 
 @buck_test(data_dir="test_depset_order_data")
 async def test_depset_len(buck: Buck) -> None:
-    """len(depset) returns the total number of elements."""
-    result = await buck.build("//:depset_len")
-    output = result.get_build_report().output_for_target("//:depset_len")
-    content = output.read_text().strip()
-    assert content == "3", f"Expected 3, got {content}"
+    """Bazel 9 depset is not iterable and does not implement len()."""
+    await expect_failure(
+        buck.build("//:depset_len"),
+        stderr_regex="iterable or string",
+    )

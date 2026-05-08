@@ -17,6 +17,16 @@ def _depset_default_infer_impl(ctx):
     return [DefaultInfo(files = depset([out]))]
 
 
+def _depset_topological_diamond_impl(ctx):
+    a = depset(["a"], order = "topological")
+    b = depset(["b"], transitive = [a], order = "topological")
+    c = depset(["c"], transitive = [a], order = "topological")
+    d = depset(["d"], transitive = [b, c], order = "topological")
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(output = out, content = "\n".join([str(x) for x in d.to_list()]))
+    return [DefaultInfo(files = depset([out]))]
+
+
 def _depset_mismatch_impl(ctx):
     a = depset(["a"], order = "preorder")
     b = depset(["b"], order = "postorder")
@@ -35,6 +45,11 @@ depset_order_rule = rule(
 
 depset_default_infer_rule = rule(
     implementation = _depset_default_infer_impl,
+    attrs = {},
+)
+
+depset_topological_diamond_rule = rule(
+    implementation = _depset_topological_diamond_impl,
     attrs = {},
 )
 

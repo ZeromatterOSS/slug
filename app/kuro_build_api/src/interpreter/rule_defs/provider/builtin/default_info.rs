@@ -664,10 +664,15 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
             let depset = Depset::from_frozen_values(frozen_elements, "default".to_owned());
             Ok(heap.alloc(depset))
         } else {
-            // Some values aren't frozen (synthetic DefaultInfo case).
-            // Create a DepsetWithList that can hold the unfrozen values.
-            let depset = DepsetWithListGen::<Value<'v>>::new(outputs_value);
-            Ok(heap.alloc(depset))
+            // Synthetic DefaultInfo can hold unfrozen outputs during evaluation.
+            // Keep the public value on the normal depset facade so flattening,
+            // validation, and truthiness follow the same path as other depsets.
+            let transitive = heap.alloc(AllocList::EMPTY);
+            Ok(heap.alloc(LiveDepsetGen::new(
+                outputs_value,
+                transitive,
+                "default".to_owned(),
+            )))
         }
     }
 
@@ -737,81 +742,6 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
             ("executable", executable),
             ("runfiles_manifest", Value::new_none()),
         ])))
-    }
-}
-
-/// A depset wrapper that holds an unfrozen list internally.
-/// This is used for synthetic DefaultInfo where values aren't frozen yet.
-///
-/// Uses the Gen pattern with Coerce/Freeze to properly handle frozen/unfrozen values.
-#[derive(
-    Debug,
-    Clone,
-    Coerce,
-    Trace,
-    Freeze,
-    derive_more::Display,
-    ProvidesStaticType,
-    NoSerialize,
-    Allocative
-)]
-#[display("depset({list})")]
-#[repr(C)]
-pub struct DepsetWithListGen<V: ValueLifetimeless> {
-    list: V,
-}
-
-starlark::starlark_complex_value!(pub DepsetWithList);
-
-impl<'v, V: ValueLike<'v>> DepsetWithListGen<V> {
-    pub fn new(list: V) -> Self {
-        Self { list }
-    }
-
-    fn list_len(&self) -> usize {
-        ListRef::from_value(self.list.to_value()).map_or(0, |l| l.len())
-    }
-}
-
-#[starlark::values::starlark_value(type = "depset")]
-impl<'v, V: ValueLike<'v>> starlark::values::StarlarkValue<'v> for DepsetWithListGen<V>
-where
-    Self: ProvidesStaticType<'v>,
-{
-    fn get_methods() -> Option<&'static starlark::environment::Methods> {
-        static RES: starlark::environment::MethodsStatic =
-            starlark::environment::MethodsStatic::new();
-        RES.methods(depset_with_list_methods)
-    }
-
-    fn to_bool(&self) -> bool {
-        self.list_len() > 0
-    }
-
-    fn length(&self) -> starlark::Result<i32> {
-        Ok(self.list_len() as i32)
-    }
-}
-
-#[starlark_module]
-fn depset_with_list_methods(builder: &mut MethodsBuilder) {
-    fn to_list<'v>(
-        #[starlark(this)] this: Value<'v>,
-        heap: Heap<'v>,
-    ) -> starlark::Result<Value<'v>> {
-        // Try unfrozen first, then frozen
-        if let Some(depset) = DepsetWithList::from_value(this) {
-            let elements: Vec<Value<'v>> =
-                ListRef::from_value(depset.list).map_or_else(Vec::new, |l| l.iter().collect());
-            Ok(heap.alloc(AllocList(elements)))
-        } else if let Some(depset) = this.downcast_ref::<FrozenDepsetWithList>() {
-            let elements: Vec<Value<'v>> = ListRef::from_frozen_value(depset.list)
-                .map_or_else(Vec::new, |l| l.iter().collect());
-            Ok(heap.alloc(AllocList(elements)))
-        } else {
-            // Fallback - return empty list
-            Ok(heap.alloc(AllocList(Vec::<Value>::new())))
-        }
     }
 }
 

@@ -53,6 +53,8 @@ use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneOr;
 use starlark::values::starlark_value;
 
+use crate::interpreter::rule_defs::nested_set::NestedSetOrder;
+use crate::interpreter::rule_defs::nested_set::collect_nested_set;
 use crate::interpreter::rule_defs::transitive_set::FrozenTransitiveSetDefinition;
 use crate::interpreter::rule_defs::transitive_set::transitive_set_definition::builtin_definition;
 
@@ -66,16 +68,25 @@ enum DepsetError {
     #[error("depset transitive elements must be depsets")]
     TransitiveNotDepset,
     #[error(
-        "depset transitive elements must all have the same order, got `{first}` and `{second}`"
-    )]
-    TransitiveOrderMismatch { first: String, second: String },
-    #[error(
         "depset order `{order}` is incompatible with transitive depset order `{transitive_order}`"
     )]
     OrderIncompatible {
         order: String,
         transitive_order: String,
     },
+    #[error("depset elements must not be mutable values")]
+    MutableElement,
+    #[error("cannot add an item of type `{item_type}` to a depset of `{depset_type}`")]
+    ElementTypeMismatch {
+        item_type: String,
+        depset_type: String,
+    },
+    #[error(
+        "in call to len(), parameter 'x' got value of type 'depset', want 'iterable or string'"
+    )]
+    LenUnsupported,
+    #[error("unsupported binary operation: depset | depset")]
+    BitOrUnsupported,
 }
 
 pub fn bazel_depset_tset_definition()
@@ -162,48 +173,20 @@ impl Depset {
 
     /// Collect all elements with a specific traversal order.
     pub fn collect_all_frozen_ordered(&self, order: &str) -> Vec<FrozenValue> {
-        let mut result = Vec::new();
-        let mut visited = HashSet::new();
-        self.collect_frozen_recursive_ordered(&mut result, order, &mut visited);
-        result
-    }
-
-    fn collect_frozen_recursive_ordered(
-        &self,
-        result: &mut Vec<FrozenValue>,
-        order: &str,
-        visited: &mut HashSet<usize>,
-    ) {
-        // Use pointer address of this Depset as identity to avoid exponential blowup
-        // on DAGs with shared substructure.
-        let self_id = self as *const Depset as usize;
-        if !visited.insert(self_id) {
-            return;
-        }
-        match order {
-            "postorder" | "topological" => {
-                // Transitive children first, then direct
-                for child in &self.children {
-                    if let Some(child_depset) = child.downcast_ref::<Depset>() {
-                        child_depset.collect_frozen_recursive_ordered(result, order, visited);
-                    }
-                }
-                for elem in &self.direct {
-                    result.push(*elem);
-                }
-            }
-            _ => {
-                // "preorder" / "default" — direct first, then transitive
-                for elem in &self.direct {
-                    result.push(*elem);
-                }
-                for child in &self.children {
-                    if let Some(child_depset) = child.downcast_ref::<Depset>() {
-                        child_depset.collect_frozen_recursive_ordered(result, order, visited);
-                    }
-                }
-            }
-        }
+        let order = NestedSetOrder::parse(order).unwrap_or(NestedSetOrder::Default);
+        collect_nested_set(
+            self,
+            order,
+            |depset| depset as *const Depset as usize,
+            |depset| depset.direct.clone(),
+            |depset| {
+                depset
+                    .children
+                    .iter()
+                    .filter_map(|child| child.downcast_ref::<Depset>())
+                    .collect()
+            },
+        )
     }
 
     /// Check if the depset is empty.
@@ -291,44 +274,11 @@ impl<'v> StarlarkValue<'v> for Depset {
     }
 
     fn length(&self) -> starlark::Result<i32> {
-        Ok(self.len() as i32)
+        Err(kuro_error::Error::from(DepsetError::LenUnsupported).into())
     }
 
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "direct" | "transitive" | "order")
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "direct" => {
-                let elems: Vec<Value<'v>> = self.direct.iter().map(|v| v.to_value()).collect();
-                Some(heap.alloc(AllocList(elems)))
-            }
-            "transitive" => {
-                let children: Vec<Value<'v>> = self.children.iter().map(|v| v.to_value()).collect();
-                Some(heap.alloc(AllocList(children)))
-            }
-            "order" => Some(heap.alloc(self.order.as_str())),
-            _ => None,
-        }
-    }
-
-    fn bit_or(&self, other: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        // depset | depset creates a new depset with both as transitive children
-        let self_val = heap.alloc(Depset::new(
-            self.direct.clone(),
-            self.children.clone(),
-            self.order.clone(),
-        ));
-        let transitive = vec![self_val, other];
-        let effective_order = validate_depset_order(&self.order, &transitive)?;
-        let direct_list = heap.alloc(AllocList::EMPTY);
-        let transitive_list = heap.alloc(AllocList(transitive));
-        Ok(heap.alloc(LiveDepsetGen {
-            direct: direct_list,
-            transitive: transitive_list,
-            order: effective_order,
-        }))
+    fn bit_or(&self, _other: Value<'v>, _heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        Err(kuro_error::Error::from(DepsetError::BitOrUnsupported).into())
     }
 }
 
@@ -444,52 +394,73 @@ where
     }
 
     fn length(&self) -> starlark::Result<i32> {
-        // Count direct elements
-        let direct_len = self.direct.to_value().length().unwrap_or(0);
-        // Count transitive elements by summing children lengths.
-        // Hoist ListRef::from_value out of the loop and iterate forward once
-        // instead of using nth(i), which walked from scratch each iteration.
-        let mut total = direct_len;
-        let trans_val = self.transitive.to_value();
-        if let Some(list) = ListRef::from_value(trans_val) {
-            for child in list.iter() {
-                total += child.length().unwrap_or(0);
-            }
+        Err(kuro_error::Error::from(DepsetError::LenUnsupported).into())
+    }
+
+    fn bit_or(&self, _other: Value<'v>, _heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        Err(kuro_error::Error::from(DepsetError::BitOrUnsupported).into())
+    }
+}
+
+enum DepsetView<'v> {
+    Live(&'v LiveDepsetGen<Value<'v>>),
+    FrozenLive(&'v LiveDepsetGen<FrozenValue>),
+    Frozen(&'v Depset),
+}
+
+impl<'v> DepsetView<'v> {
+    fn from_value(value: Value<'v>) -> Option<Self> {
+        if let Some(live) = value.downcast_ref::<LiveDepsetGen<Value<'v>>>() {
+            return Some(Self::Live(live));
         }
-        Ok(total)
+        if let Some(live) = value.downcast_ref::<LiveDepsetGen<FrozenValue>>() {
+            return Some(Self::FrozenLive(live));
+        }
+        value.downcast_ref::<Depset>().map(Self::Frozen)
     }
 
-    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(attribute, "direct" | "transitive" | "order")
-    }
-
-    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        match attribute {
-            "direct" => Some(self.direct.to_value()),
-            "transitive" => Some(self.transitive.to_value()),
-            "order" => Some(heap.alloc(self.order.as_str())),
-            _ => None,
+    fn direct_values(&self, heap: Heap<'v>) -> Vec<Value<'v>> {
+        match self {
+            Self::Live(live) => live
+                .direct
+                .iterate(heap)
+                .map(|iter| iter.collect())
+                .unwrap_or_default(),
+            Self::FrozenLive(live) => ListRef::from_value(live.direct.to_value())
+                .map(|list| list.iter().collect())
+                .unwrap_or_default(),
+            Self::Frozen(depset) => depset
+                .direct_values()
+                .iter()
+                .map(|v| v.to_value())
+                .collect(),
         }
     }
 
-    fn bit_or(&self, other: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
-        // depset | depset creates a new depset with both as transitive children
-        let self_order = self.order.clone();
-        let self_direct = heap.alloc(AllocList::EMPTY);
-        // Create a depset value for self to use as transitive child
-        let self_depset = heap.alloc(LiveDepsetGen {
-            direct: self.direct.to_value(),
-            transitive: self.transitive.to_value(),
-            order: self_order.clone(),
-        });
-        let transitive = vec![self_depset, other];
-        let effective_order = validate_depset_order(&self_order, &transitive)?;
-        let transitive_list = heap.alloc(AllocList(transitive));
-        Ok(heap.alloc(LiveDepsetGen {
-            direct: self_direct,
-            transitive: transitive_list,
-            order: effective_order,
-        }))
+    fn child_values(&self, heap: Heap<'v>) -> Vec<Value<'v>> {
+        match self {
+            Self::Live(live) => live
+                .transitive
+                .iterate(heap)
+                .map(|iter| iter.collect())
+                .unwrap_or_default(),
+            Self::FrozenLive(live) => ListRef::from_value(live.transitive.to_value())
+                .map(|list| list.iter().collect())
+                .unwrap_or_default(),
+            Self::Frozen(depset) => depset
+                .children_values()
+                .iter()
+                .map(|v| v.to_value())
+                .collect(),
+        }
+    }
+
+    fn order_str(&self) -> &'v str {
+        match self {
+            Self::Live(live) => live.order.as_str(),
+            Self::FrozenLive(live) => live.order.as_str(),
+            Self::Frozen(depset) => depset.order_str(),
+        }
     }
 }
 
@@ -499,130 +470,17 @@ pub fn collect_depset_elements<'v>(
     elements: &mut Vec<Value<'v>>,
     heap: Heap<'v>,
 ) {
-    let mut visited = HashSet::new();
-    collect_depset_elements_impl(value, elements, heap, &mut visited);
-}
-
-fn collect_depset_elements_impl<'v>(
-    value: Value<'v>,
-    elements: &mut Vec<Value<'v>>,
-    heap: Heap<'v>,
-    visited: &mut HashSet<ValueIdentity<'v>>,
-) {
-    // Track visited depsets to avoid exponential blowup on DAGs with shared substructure.
-    if !visited.insert(value.identity()) {
-        return;
+    if let Some(order) = depset_order_from_value(value) {
+        collect_depset_elements_ordered(value, elements, heap, order);
     }
-    // Try unfrozen live depset first
-    if let Some(live) = value.downcast_ref::<LiveDepsetGen<Value>>() {
-        // Collect direct elements
-        if let Ok(direct_iter) = live.direct.iterate(heap) {
-            for elem in direct_iter {
-                elements.push(elem);
-            }
-        }
-        // Recursively collect transitive
-        if let Ok(trans_iter) = live.transitive.iterate(heap) {
-            for child in trans_iter {
-                collect_depset_elements_impl(child, elements, heap, visited);
-            }
-        }
-    }
-    // Try regular frozen depset
-    else if let Some(frozen_depset) = value.downcast_ref::<Depset>() {
-        for elem in frozen_depset.collect_all_frozen() {
-            elements.push(elem.to_value());
-        }
-    }
-    // If type is "depset", try to access via attributes (handles frozen LiveDepset)
-    else if value.get_type() == "depset" {
-        // Use get_attr to access direct and transitive fields
-        if let Some(direct_attr) = value.get_attr("direct", heap).ok().flatten() {
-            if let Ok(direct_iter) = direct_attr.iterate(heap) {
-                for elem in direct_iter {
-                    elements.push(elem);
-                }
-            }
-        }
-        if let Some(trans_attr) = value.get_attr("transitive", heap).ok().flatten() {
-            if let Ok(trans_iter) = trans_attr.iterate(heap) {
-                for child in trans_iter {
-                    collect_depset_elements_impl(child, elements, heap, visited);
-                }
-            }
-        }
-    }
-    // Else: not a depset, ignore
 }
 
 pub fn depset_direct_and_transitive<'v>(
     value: Value<'v>,
     heap: Heap<'v>,
 ) -> starlark::Result<(Vec<Value<'v>>, Vec<Value<'v>>)> {
-    if let Some(live) = value.downcast_ref::<LiveDepsetGen<Value<'v>>>() {
-        let mut direct = Vec::new();
-        if let Ok(iter) = live.direct.iterate(heap) {
-            for item in iter {
-                direct.push(item);
-            }
-        }
-        let mut transitive = Vec::new();
-        if let Ok(iter) = live.transitive.iterate(heap) {
-            for item in iter {
-                transitive.push(item);
-            }
-        }
-        return Ok((direct, transitive));
-    }
-
-    if let Some(live) = value.downcast_ref::<LiveDepsetGen<FrozenValue>>() {
-        let mut direct = Vec::new();
-        if let Some(list) = ListRef::from_value(live.direct.to_value()) {
-            for item in list.iter() {
-                direct.push(item);
-            }
-        }
-        let mut transitive = Vec::new();
-        if let Some(list) = ListRef::from_value(live.transitive.to_value()) {
-            for item in list.iter() {
-                transitive.push(item);
-            }
-        }
-        return Ok((direct, transitive));
-    }
-
-    if let Some(depset) = value.downcast_ref::<Depset>() {
-        let direct = depset
-            .direct_values()
-            .iter()
-            .map(|v| v.to_value())
-            .collect::<Vec<_>>();
-        let transitive = depset
-            .children_values()
-            .iter()
-            .map(|v| v.to_value())
-            .collect::<Vec<_>>();
-        return Ok((direct, transitive));
-    }
-
-    if value.get_type() == "depset" {
-        let mut direct = Vec::new();
-        if let Some(direct_attr) = value.get_attr("direct", heap).ok().flatten() {
-            if let Ok(iter) = direct_attr.iterate(heap) {
-                for item in iter {
-                    direct.push(item);
-                }
-            }
-        }
-        let mut transitive = Vec::new();
-        if let Some(trans_attr) = value.get_attr("transitive", heap).ok().flatten() {
-            if let Ok(iter) = trans_attr.iterate(heap) {
-                for item in iter {
-                    transitive.push(item);
-                }
-            }
-        }
-        return Ok((direct, transitive));
+    if let Some(depset) = DepsetView::from_value(value) {
+        return Ok((depset.direct_values(heap), depset.child_values(heap)));
     }
 
     Err(kuro_error::Error::from(DepsetError::TransitiveNotDepset).into())
@@ -635,90 +493,26 @@ fn collect_depset_elements_ordered<'v>(
     heap: Heap<'v>,
     order: &str,
 ) {
-    let mut visited = HashSet::new();
-    collect_depset_elements_ordered_impl(value, elements, heap, order, &mut visited);
+    let order = NestedSetOrder::parse(order).unwrap_or(NestedSetOrder::Default);
+    elements.extend(collect_nested_set(
+        value,
+        order,
+        |depset| depset.identity(),
+        |depset| depset_direct_values(depset, heap),
+        |depset| depset_child_values(depset, heap),
+    ));
 }
 
-fn collect_depset_elements_ordered_impl<'v>(
-    value: Value<'v>,
-    elements: &mut Vec<Value<'v>>,
-    heap: Heap<'v>,
-    order: &str,
-    visited: &mut HashSet<ValueIdentity<'v>>,
-) {
-    // Track visited depsets to avoid exponential blowup on DAGs with shared substructure.
-    if !visited.insert(value.identity()) {
-        return;
-    }
+fn depset_child_values<'v>(value: Value<'v>, heap: Heap<'v>) -> Vec<Value<'v>> {
+    DepsetView::from_value(value)
+        .map(|depset| depset.child_values(heap))
+        .unwrap_or_default()
+}
 
-    let is_postorder = matches!(order, "postorder" | "topological");
-
-    // Try unfrozen live depset first
-    if let Some(live) = value.downcast_ref::<LiveDepsetGen<Value>>() {
-        if is_postorder {
-            if let Ok(trans_iter) = live.transitive.iterate(heap) {
-                for child in trans_iter {
-                    collect_depset_elements_ordered_impl(child, elements, heap, order, visited);
-                }
-            }
-            if let Ok(direct_iter) = live.direct.iterate(heap) {
-                for elem in direct_iter {
-                    elements.push(elem);
-                }
-            }
-        } else {
-            if let Ok(direct_iter) = live.direct.iterate(heap) {
-                for elem in direct_iter {
-                    elements.push(elem);
-                }
-            }
-            if let Ok(trans_iter) = live.transitive.iterate(heap) {
-                for child in trans_iter {
-                    collect_depset_elements_ordered_impl(child, elements, heap, order, visited);
-                }
-            }
-        }
-    }
-    // Try regular frozen depset
-    else if let Some(frozen_depset) = value.downcast_ref::<Depset>() {
-        for elem in frozen_depset.collect_all_frozen_ordered(order) {
-            elements.push(elem.to_value());
-        }
-    }
-    // If type is "depset", try to access via attributes (handles frozen LiveDepset)
-    else if value.get_type() == "depset" {
-        if is_postorder {
-            if let Some(trans_attr) = value.get_attr("transitive", heap).ok().flatten() {
-                if let Ok(trans_iter) = trans_attr.iterate(heap) {
-                    for child in trans_iter {
-                        collect_depset_elements_ordered_impl(child, elements, heap, order, visited);
-                    }
-                }
-            }
-            if let Some(direct_attr) = value.get_attr("direct", heap).ok().flatten() {
-                if let Ok(direct_iter) = direct_attr.iterate(heap) {
-                    for elem in direct_iter {
-                        elements.push(elem);
-                    }
-                }
-            }
-        } else {
-            if let Some(direct_attr) = value.get_attr("direct", heap).ok().flatten() {
-                if let Ok(direct_iter) = direct_attr.iterate(heap) {
-                    for elem in direct_iter {
-                        elements.push(elem);
-                    }
-                }
-            }
-            if let Some(trans_attr) = value.get_attr("transitive", heap).ok().flatten() {
-                if let Ok(trans_iter) = trans_attr.iterate(heap) {
-                    for child in trans_iter {
-                        collect_depset_elements_ordered_impl(child, elements, heap, order, visited);
-                    }
-                }
-            }
-        }
-    }
+fn depset_direct_values<'v>(value: Value<'v>, heap: Heap<'v>) -> Vec<Value<'v>> {
+    DepsetView::from_value(value)
+        .map(|depset| depset.direct_values(heap))
+        .unwrap_or_default()
 }
 
 /// Generic methods for depsets that use Value and handle any depset variant.
@@ -759,74 +553,106 @@ fn generic_live_depset_methods(builder: &mut MethodsBuilder) {
 }
 
 fn depset_order_from_value<'v>(value: Value<'v>) -> Option<&'v str> {
-    if let Some(live) = value.downcast_ref::<LiveDepsetGen<Value<'v>>>() {
-        return Some(live.order.as_str());
-    }
-    if let Some(live) = value.downcast_ref::<LiveDepsetGen<FrozenValue>>() {
-        return Some(live.order.as_str());
-    }
-    if let Some(depset) = value.downcast_ref::<Depset>() {
-        return Some(depset.order_str());
-    }
-    // Fallback: accept any value whose Starlark type is "depset" (e.g. DepsetWithListGen
-    // from DefaultInfo.files). Assume "default" order since we can't extract the actual order.
-    if value.get_type() == "depset" {
-        return Some("default");
-    }
-    None
+    DepsetView::from_value(value).map(|depset| depset.order_str())
 }
 
 fn validate_depset_order<'v>(order: &str, transitive: &[Value<'v>]) -> starlark::Result<String> {
-    let mut effective_order = order.to_owned();
-    match effective_order.as_str() {
-        "default" | "preorder" | "postorder" | "topological" => {}
-        _ => {
-            return Err(kuro_error::Error::from(DepsetError::InvalidOrder {
-                order: order.to_owned(),
-            })
-            .into());
-        }
-    }
+    let Some(parsed_order) = NestedSetOrder::parse(order) else {
+        return Err(kuro_error::Error::from(DepsetError::InvalidOrder {
+            order: order.to_owned(),
+        })
+        .into());
+    };
 
-    let mut transitive_order: Option<String> = None;
     for item in transitive {
         let Some(item_order) = depset_order_from_value(*item) else {
             return Err(kuro_error::Error::from(DepsetError::TransitiveNotDepset).into());
         };
-        if item_order == "default" {
-            continue;
-        }
-        match &transitive_order {
-            None => transitive_order = Some(item_order.to_owned()),
-            Some(existing) => {
-                if existing != item_order {
-                    return Err(
-                        kuro_error::Error::from(DepsetError::TransitiveOrderMismatch {
-                            first: existing.clone(),
-                            second: item_order.to_owned(),
-                        })
-                        .into(),
-                    );
-                }
-            }
-        }
-    }
-
-    if effective_order == "default" {
-        if let Some(non_default) = transitive_order {
-            effective_order = non_default;
-        }
-    } else if let Some(non_default) = transitive_order {
-        if non_default != effective_order {
+        let Some(item_order) = NestedSetOrder::parse(item_order) else {
             return Err(kuro_error::Error::from(DepsetError::OrderIncompatible {
                 order: order.to_owned(),
-                transitive_order: non_default,
+                transitive_order: item_order.to_owned(),
+            })
+            .into());
+        };
+        if !parsed_order.is_compatible_with_child(item_order) {
+            return Err(kuro_error::Error::from(DepsetError::OrderIncompatible {
+                order: order.to_owned(),
+                transitive_order: item_order.as_str().to_owned(),
             })
             .into());
         }
     }
 
-    Ok(effective_order)
+    Ok(parsed_order.as_str().to_owned())
+}
+
+fn validate_direct_depset_element(value: Value) -> starlark::Result<String> {
+    value
+        .get_hashed()
+        .map_err(|_| kuro_error::Error::from(DepsetError::MutableElement))?;
+    Ok(value.get_type().to_owned())
+}
+
+fn merge_depset_element_type(
+    expected: &mut Option<String>,
+    item_type: String,
+) -> starlark::Result<()> {
+    match expected {
+        None => {
+            *expected = Some(item_type);
+            Ok(())
+        }
+        Some(depset_type) if depset_type == &item_type => Ok(()),
+        Some(depset_type) => Err(kuro_error::Error::from(DepsetError::ElementTypeMismatch {
+            item_type,
+            depset_type: depset_type.clone(),
+        })
+        .into()),
+    }
+}
+
+fn depset_element_type<'v>(
+    value: Value<'v>,
+    heap: Heap<'v>,
+    visited: &mut HashSet<ValueIdentity<'v>>,
+) -> starlark::Result<Option<String>> {
+    if !visited.insert(value.identity()) {
+        return Ok(None);
+    }
+
+    for direct in depset_direct_values(value, heap) {
+        return Ok(Some(validate_direct_depset_element(direct)?));
+    }
+
+    let mut element_type = None;
+    for child in depset_child_values(value, heap) {
+        if let Some(child_type) = depset_element_type(child, heap, visited)? {
+            merge_depset_element_type(&mut element_type, child_type)?;
+        }
+    }
+    Ok(element_type)
+}
+
+fn validate_depset_elements<'v>(
+    direct: &[Value<'v>],
+    transitive: &[Value<'v>],
+    heap: Heap<'v>,
+) -> starlark::Result<()> {
+    let mut element_type = None;
+    for item in direct {
+        merge_depset_element_type(&mut element_type, validate_direct_depset_element(*item)?)?;
+    }
+    for child in transitive {
+        let Some(_) = depset_order_from_value(*child) else {
+            return Err(kuro_error::Error::from(DepsetError::TransitiveNotDepset).into());
+        };
+        let mut visited = HashSet::new();
+        if let Some(child_type) = depset_element_type(*child, heap, &mut visited)? {
+            merge_depset_element_type(&mut element_type, child_type)?;
+        }
+    }
+    Ok(())
 }
 
 pub fn make_depset_from_lists<'v>(
@@ -835,6 +661,7 @@ pub fn make_depset_from_lists<'v>(
     transitive: Vec<Value<'v>>,
     order: &str,
 ) -> starlark::Result<Value<'v>> {
+    validate_depset_elements(&direct, &transitive, heap)?;
     let effective_order = validate_depset_order(order, &transitive)?;
     let direct_list = heap.alloc(AllocList(direct));
     let transitive_list = heap.alloc(AllocList(transitive));
@@ -862,7 +689,7 @@ pub fn register_depset(globals: &mut GlobalsBuilder) {
     /// Returns:
     ///     A new depset containing the specified elements.
     fn depset<'v>(
-        #[starlark(default = UnpackListOrTuple::default())] direct: UnpackListOrTuple<Value<'v>>,
+        #[starlark(default = NoneOr::None)] direct: NoneOr<UnpackListOrTuple<Value<'v>>>,
         // Accept `None` for `transitive` as equivalent to an empty list —
         // bazel's `depset(transitive = None)` works, kuro's used to reject
         // it. rules_rust's `make_libstd_and_allocator_ccinfo` passes
@@ -874,10 +701,14 @@ pub fn register_depset(globals: &mut GlobalsBuilder) {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let heap = eval.heap();
+        let direct_items = match direct {
+            NoneOr::None => Vec::new(),
+            NoneOr::Other(list) => list.items,
+        };
         let transitive_items = match transitive {
             NoneOr::None => Vec::new(),
             NoneOr::Other(list) => list.items,
         };
-        make_depset_from_lists(heap, direct.items, transitive_items, order)
+        make_depset_from_lists(heap, direct_items, transitive_items, order)
     }
 }

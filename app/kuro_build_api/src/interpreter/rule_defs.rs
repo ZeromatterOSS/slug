@@ -31,6 +31,7 @@ pub mod digest_config;
 pub mod fragments;
 pub mod java_common;
 pub mod label_relative_path;
+pub mod nested_set;
 pub mod platform_common;
 pub mod plugins;
 pub mod proto_common;

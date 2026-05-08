@@ -4,7 +4,132 @@
 >
 > Related: [Plan 51](./51-kurod-memory-profiling.md)
 
-## Status: PROPOSED
+## Status: IN PROGRESS
+
+## Progress Notes
+
+### 2026-05-08 Phase 0 first slice
+
+- Probed installed Bazel 9.1.0 for depset public surface, `None`
+  constructor arguments, default/preorder/postorder/topological flattening,
+  direct duplicate suppression, same-type errors, mutability/hashability
+  errors, and order mismatch errors.
+- Added a small shared `NestedSetOrder` scaffold under
+  `app/kuro_build_api/src/interpreter/rule_defs/nested_set.rs`; kept
+  `TransitiveSetOrdering` separate and only added a mapping for the common
+  preorder/postorder/topological variants.
+- Tightened depset behavior without making it a `TransitiveSet` alias:
+  removed Starlark-visible `.direct`, `.transitive`, and `.order`; made
+  `len(depset)` and `depset | depset` fail; accepted `direct = None`;
+  stopped default-order inference from transitive children; changed default
+  flattening to the Bazel 9.1.0-observed postorder-like behavior; added
+  topological traversal for the documented diamond shape; added direct
+  element hashability/mutability and top-level same-type validation.
+- Added focused Rust parity tests in
+  `app/kuro_build_api_tests/src/interpreter/rule_defs/depset.rs` for surface,
+  validation, ordering, and frozen/live crossing. These are currently blocked
+  by unrelated `kuro_build_api_tests` compile errors in stale
+  `ActionsRegistry::register(...)` call sites before the depset tests run.
+- Rewrote `tests/core/analysis/test_depset_order.py` expectations for Bazel 9
+  parity and added a topological diamond fixture. Verified
+  `pytest -q tests/core/analysis/test_depset_order.py` passes.
+- Verified existing transitive set e2e coverage still passes with
+  `pytest -q tests/core/transitive_sets/test_transitive_sets.py`.
+- Ran the Plan 51 memory checkpoint baseline command against
+  `../zeromatter` with `KURO_MEMORY_CHECKPOINTS=1` and
+  `--isolation-dir plan54-depset-baseline`. The run was manually stopped after
+  RSS reached about 10,097,636 KiB during package-file-tree loading. No
+  `depset_to_list_frozen` or `depset_to_list_live` checkpoint lines appeared in
+  `/tmp/plan54_depset_baseline_memory.log` before that point, so these
+  checkpoints are not currently implicated in the early high-RSS phase seen in
+  that run. This does not rule out later analysis-time depset flattening after
+  package loading advances.
+
+### 2026-05-08 Phase 1 traversal scaffold slice
+
+- Added a representation-agnostic `collect_nested_set` traversal helper in
+  `app/kuro_build_api/src/interpreter/rule_defs/nested_set.rs` for
+  `default`/`postorder`, `preorder`, and `topological` nested-DAG walks.
+  Callers provide node identity, direct-item extraction, and child extraction,
+  so this does not collapse depset into `TransitiveSet` or change either public
+  facade.
+- Reworked depset flattening to use the shared nested-set traversal helper for
+  both frozen `Depset` values and live `LiveDepsetGen` values. This removes the
+  depset-specific duplicated recursive/postorder and topological traversal code
+  while preserving value-level dedupe in `to_list`.
+- Repaired the unrelated `kuro_build_api_tests` stale
+  `ActionsRegistry::register(...)` call sites by passing the default exec-group
+  metadata (`None` exec group and empty per-action exec properties). This
+  unblocked the new Rust depset parity tests.
+- Verified:
+  `cargo fmt`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `pytest -q tests/core/analysis/test_depset_order.py`;
+  `pytest -q tests/core/transitive_sets/test_transitive_sets.py`;
+  `cargo check -p kuro`.
+
+### 2026-05-08 Phase 1 depset facade slice
+
+- Added an internal `DepsetView` facade over frozen `Depset`, live
+  `LiveDepsetGen<Value>`, and frozen-live `LiveDepsetGen<FrozenValue>` values.
+  Shared depset operations now use this view for direct items, transitive
+  children, and stored order, instead of repeating type-specific extraction
+  branches or falling back through removed Starlark-visible `.direct` /
+  `.transitive` attributes.
+- Reworked the generic `collect_depset_elements` path to use the same ordered
+  `collect_nested_set` walk as `to_list` while still leaving value-level
+  dedupe to `to_list`. This keeps extraction order consistent for frozen and
+  live depsets without making depset a public `TransitiveSet` alias.
+- Removed the separate `DepsetWithListGen` wrapper used by synthetic
+  `DefaultInfo.files`; unfrozen synthetic default outputs now allocate the
+  normal live depset facade with direct outputs and no transitive children.
+- Kept the existing streaming `TransitiveSet` preorder/postorder/topological
+  iterators separate for now. They are still used by projection and action
+  input paths, so this slice only shares order vocabulary and traversal
+  algorithms rather than forcing those paths through a materializing helper.
+- Verified:
+  `cargo fmt`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `pytest -q tests/core/analysis/test_depset_order.py`;
+  `pytest -q tests/core/transitive_sets/test_transitive_sets.py`;
+  `pytest -q tests/core/analysis/test_runfiles.py`;
+  `cargo check -p kuro`;
+  `cargo build -p kuro`;
+  `git diff --check`.
+
+### 2026-05-08 Phase 1 completion slice
+
+- Added explicit shared nested-set dedupe strategy entry points:
+  `NestedSetDedup::NodeIdentity`, `NestedSetDedup::ValueHashEq`,
+  `collect_nested_set_with_dedup`, `collect_nested_set_node_dedup`, and
+  `collect_nested_set_value_dedup_by`.
+- Added focused unit coverage for the shared preorder/postorder/topological
+  diamond behavior and value-hash/equality output dedupe in
+  `app/kuro_build_api/src/interpreter/rule_defs/nested_set.rs`.
+- Kept `TransitiveSet` streaming iterators as the execution path for
+  projection/reduction/action-input behavior. The shared core now owns the
+  common Bazel-order vocabulary and materializing traversal/dedupe algorithms;
+  tset-only `bfs`/`dfs` behavior remains outside the shared Bazel-order core.
+- Phase 1 is complete. The next work is Phase 2 representation replacement,
+  where any deeper tset sharing should preserve streaming behavior rather than
+  forcing action/projection paths through materializing collection.
+- Verified:
+  `cargo fmt`;
+  `cargo test -p kuro_build_api nested_set -- --nocapture`.
+
+Remaining for Phase 2:
+
+- Replace the separate frozen-only `Depset` shape and live `LiveDepsetGen`
+  storage with a single `DepsetGen<V>` facade over shared nested-DAG mechanics.
+- Store parsed `NestedSetOrder`, direct values, transitive children, element
+  type metadata, emptiness, and approximate depth at construction rather than
+  reinterpreting Starlark list values during traversal.
+- Replace `make_depset_from_lists`, `Depset::empty`, and
+  `Depset::from_frozen_values` with a unified builder that validates type,
+  order, hashability, and depth.
+- Match Bazel 9 error wording more exactly for every validation branch.
+- Revisit the Plan 51 zeromatter memory repro after package-file-tree loading can
+  advance far enough to hit analysis-time depset flattening checkpoints.
 
 ## Problem
 
@@ -140,24 +265,33 @@ Relevant current files:
 - `app/kuro_util/src/memory_checkpoint.rs`
 - `scripts/memory_smoke.sh`
 
-Current local behavior that needs attention:
+Current local behavior after Phase 1:
 
+- `app/kuro_build_api/src/interpreter/rule_defs/nested_set.rs` now provides
+  the shared `NestedSetOrder` vocabulary and materializing
+  preorder/postorder/topological collection helpers with explicit
+  node-identity and value-hash/equality dedupe entry points.
 - `Depset` stores `direct: Vec<FrozenValue>`, `children: Vec<FrozenValue>`,
-  and `order: String`.
+  and `order: String`; Phase 2 should replace this frozen-only shape with a
+  generic live/frozen facade.
 - `LiveDepsetGen<V>` stores `direct` and `transitive` as list values plus an
-  order string.
-- `DepsetWithListGen<V>` exists only to wrap `DefaultInfo.files` when values
-  are not frozen.
+  order string; Phase 2 should stop repeatedly reinterpreting these list values
+  during traversal.
+- `DepsetView` provides an internal facade over frozen `Depset`, live
+  `LiveDepsetGen<Value>`, and frozen-live `LiveDepsetGen<FrozenValue>`.
+- `DefaultInfo.files` now uses the normal live depset facade for synthetic
+  default outputs; the old `DepsetWithListGen` wrapper is gone.
 - `collect_depset_elements` silently ignores non-depsets in some call paths.
-- `to_list` dedupes by value equality, but type/hashability validation is
-  incomplete.
-- `length()` is implemented for depsets, which is not Bazel-compatible.
-- `has_attr/get_attr` expose `direct`, `transitive`, and `order`, which are not
-  Bazel-compatible Starlark members.
-- `bit_or` implements `depset | depset`, which is not Bazel-compatible.
-- `validate_depset_order` infers order from non-default children for a default
-  parent; this does not match the observed Bazel 9.x behavior above.
-- `topological` in depset collection is treated like `postorder`.
+- `to_list` uses the shared nested-set traversal helper and then dedupes by
+  value equality while preserving order.
+- `len(depset)`, `depset | depset`, and Starlark-visible `.direct`,
+  `.transitive`, and `.order` now fail or remain absent for Bazel 9 parity.
+- Default-order and topological depset traversal now match the focused Bazel
+  9.1.0 probes covered by tests.
+- `TransitiveSet` keeps its existing streaming iterators for
+  projection/reduction/action-input behavior. It shares the common
+  preorder/postorder/topological order vocabulary but not a materializing
+  execution path.
 
 Plan 51 added `KURO_MEMORY_CHECKPOINTS`-gated depset flattening checkpoints
 around current `depset.to_list()` paths:
@@ -395,31 +529,52 @@ TransitiveSet regression:
 - `project_as_args` and `project_as_json` remain lazy from action perspective.
 - Tset topological, bfs, dfs examples in docs still match.
 
-### Phase 1: introduce shared order and traversal tests
+### Phase 1: introduce shared order and traversal tests (complete)
 
-Add `NestedSetOrder` with Bazel names:
+Added `NestedSetOrder` with Bazel names:
 
 - `default`
 - `postorder`
 - `preorder`
 - `topological`
 
-Keep `TransitiveSetOrdering` as a separate public enum for now, but map its
-common variants to shared traversal implementations. Tset-only variants remain
-`bfs` and `dfs`.
+Kept `TransitiveSetOrdering` as a separate public enum and mapped its common
+variants to `NestedSetOrder`. Tset-only variants remain `bfs` and `dfs`, and
+the existing tset streaming iterators remain the execution path.
 
-Move traversal algorithms into a shared module with two dedupe strategies:
+Moved materializing traversal algorithms into a shared module with two dedupe
+strategies:
 
-- `Dedup::NodeIdentity` for tsets.
-- `Dedup::ValueHashEq` for depsets.
+- `NestedSetDedup::NodeIdentity`.
+- `NestedSetDedup::ValueHashEq`.
 
-This phase should be behavior-preserving for tsets and should allow a depset
-prototype to call the same preorder/postorder/topological traversal code.
+This phase is behavior-preserving for tsets and allows depset to call the same
+preorder/postorder/topological traversal code without making depset a public
+alias for `TransitiveSet`.
 
 ### Phase 2: replace depset internals
 
 Create `DepsetGen<V>` and remove the separate frozen-only `Depset` shape once
 live/frozen handling is proven.
+
+Phase 2 guardrails:
+
+- Split representation replacement into small, reviewable slices. Prefer
+  parsed-order storage first, then a unified builder, then live/frozen storage
+  replacement. Do not combine representation churn, consumer rewrites, and
+  Bazel error wording changes in one broad patch.
+- Treat `NestedSetDedup::ValueHashEq` as a helper for hashable caller-supplied
+  identities, not as proof that arbitrary Starlark `Value` dedupe can use a
+  stable hash key. Real depset `to_list` must preserve Bazel value-equality
+  behavior.
+- Do not claim Plan 51 memory improvement from Phase 2 until a zeromatter repro
+  reaches `depset_to_list_frozen` or `depset_to_list_live` checkpoints and the
+  before/after counts support that claim.
+- Keep saying precisely that `TransitiveSet` shares order vocabulary and tests
+  with the nested-set core while its streaming projection/reduction/action-input
+  paths remain separate.
+- Add approximate depth or depth-limit checks only with focused Bazel 9 source
+  confirmation or black-box probes. Avoid inventing Kuro-only depth behavior.
 
 Implementation notes:
 
@@ -543,9 +698,9 @@ depset facade is semantically correct.
 
 Once the new depset facade and shared traversal are stable:
 
-- Delete `DepsetWithListGen`.
-- Delete old fallback code that treats any value with `get_type() == "depset"`
-  as depset-like by scraping `.direct` and `.transitive`.
+- Confirm `DepsetWithListGen` remains deleted.
+- Delete any remaining old fallback code that treats arbitrary values as
+  depset-like by scraping `.direct` and `.transitive`.
 - Delete Kuro-only depset tests for `.order`, `len`, and `|`, or rewrite them
   as negative parity tests.
 - Update the bridge section in the parent plan, which currently describes a

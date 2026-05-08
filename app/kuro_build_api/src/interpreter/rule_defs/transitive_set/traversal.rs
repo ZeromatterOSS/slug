@@ -25,6 +25,7 @@ use starlark::values::ValueLike;
 use starlark::values::ValueOfUncheckedGeneric;
 use starlark::values::starlark_value;
 
+use crate::interpreter::rule_defs::nested_set::NestedSetOrder;
 use crate::interpreter::rule_defs::transitive_set::FrozenTransitiveSet;
 use crate::interpreter::rule_defs::transitive_set::TransitiveSet;
 use crate::interpreter::rule_defs::transitive_set::TransitiveSetError;
@@ -62,6 +63,15 @@ impl TransitiveSetOrdering {
                 ordering: s.to_owned(),
             }
             .into()),
+        }
+    }
+
+    pub fn as_nested_set_order(self) -> Option<NestedSetOrder> {
+        match self {
+            Self::Preorder => Some(NestedSetOrder::Preorder),
+            Self::Postorder => Some(NestedSetOrder::Postorder),
+            Self::Topological => Some(NestedSetOrder::Topological),
+            Self::Bfs | Self::Dfs => None,
         }
     }
 }

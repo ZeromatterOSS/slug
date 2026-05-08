@@ -8,6 +8,7 @@ load(
     "depset_order_attr_rule",
     "depset_order_rule",
     "depset_producer",
+    "depset_topological_diamond_rule",
     "depset_union_rule",
 )
 
@@ -35,6 +36,10 @@ depset_order_rule(
 
 depset_default_infer_rule(
     name = "default_infer",
+)
+
+depset_topological_diamond_rule(
+    name = "topological_diamond",
 )
 
 depset_mismatch_rule(

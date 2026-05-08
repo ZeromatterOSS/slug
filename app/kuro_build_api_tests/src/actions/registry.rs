@@ -187,6 +187,8 @@ fn register_actions() -> kuro_error::Result<()> {
             &DeferredHolderKey::Base(base.dupe()),
             outputs,
             unregistered_action.clone(),
+            None,
+            std::sync::Arc::new(std::collections::BTreeMap::new()),
         )?;
 
         assert_eq!(actions.testing_pending_action_keys(), vec![key]);
@@ -240,7 +242,13 @@ fn finalizing_actions() -> kuro_error::Result<()> {
             None,
         );
         let holder_key = DeferredHolderKey::Base(base.dupe());
-        actions.register(&holder_key, outputs, unregistered_action)?;
+        actions.register(
+            &holder_key,
+            outputs,
+            unregistered_action,
+            None,
+            std::sync::Arc::new(std::collections::BTreeMap::new()),
+        )?;
 
         let result = (actions.finalize()?)(&AnalysisValueFetcher::testing_new(holder_key))?;
 
@@ -332,7 +340,13 @@ fn category_identifier_test(
             identifier.map(|i| i.to_owned()),
         );
 
-        actions.register(&base, indexset![], unregistered_action)?;
+        actions.register(
+            &base,
+            indexset![],
+            unregistered_action,
+            None,
+            std::sync::Arc::new(std::collections::BTreeMap::new()),
+        )?;
     }
 
     (actions.finalize()?)(&AnalysisValueFetcher::testing_new(base))?;

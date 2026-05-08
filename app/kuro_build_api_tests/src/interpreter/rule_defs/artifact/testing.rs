@@ -155,6 +155,8 @@ pub(crate) fn artifactory(builder: &mut GlobalsBuilder) {
                 CategoryRef::new("fake_action").unwrap().to_owned(),
                 None,
             ),
+            None,
+            std::sync::Arc::new(std::collections::BTreeMap::new()),
         )?;
         Ok(StarlarkDeclaredArtifact::new(
             None,
@@ -223,6 +225,8 @@ pub(crate) fn artifactory(builder: &mut GlobalsBuilder) {
                 CategoryRef::new("fake_action").unwrap().to_owned(),
                 None,
             ),
+            None,
+            std::sync::Arc::new(std::collections::BTreeMap::new()),
         )?;
 
         let value = declaration
