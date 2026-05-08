@@ -467,3 +467,28 @@ instead of being repeatedly flattened or retained in Starlark heap structures.
 At this point the remaining `//sdk:sdk_contents` failure is not an early alias,
 label, package-listing UB, or unbounded diagnostic issue. It is a genuine
 high-RSS analysis problem around large bzlmod/toolchain graphs.
+
+## Progress 2026-05-08: depset flattening checkpoints
+
+Added `KURO_MEMORY_CHECKPOINTS`-gated checkpoints around Bazel depset
+flattening so the next zeromatter repro can confirm or rule out repeated large
+`depset.to_list()` expansion during analysis. The new checkpoint names are:
+
+- `depset_to_list_frozen`
+- `depset_to_list_live`
+
+Each checkpoint records:
+
+- direct element count at the root depset;
+- transitive child count at the root depset;
+- collected element count before value dedupe;
+- deduped element count after `to_list()` value dedupe;
+- duplicate element count.
+
+This is intentionally diagnostic-only: when `KURO_MEMORY_CHECKPOINTS` is not
+set, the live depset path avoids the extra direct/transitive extraction and the
+existing `to_list()` behavior is unchanged.
+
+- [x] Added depset flattening memory checkpoints
+- [x] Ran `cargo fmt -- app/kuro_build_api/src/interpreter/rule_defs/depset.rs`
+- [x] Ran `cargo check -p kuro_build_api`

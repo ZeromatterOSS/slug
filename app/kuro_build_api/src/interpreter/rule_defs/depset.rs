@@ -241,6 +241,44 @@ impl Display for Depset {
 
 starlark_simple_value!(Depset);
 
+fn dedupe_values_preserving_order<'v>(
+    elements: Vec<Value<'v>>,
+) -> starlark::Result<Vec<Value<'v>>> {
+    let mut deduped: Vec<Value<'v>> = Vec::with_capacity(elements.len());
+    for value in elements {
+        let mut is_dup = false;
+        for existing in &deduped {
+            if existing.equals(value)? {
+                is_dup = true;
+                break;
+            }
+        }
+        if !is_dup {
+            deduped.push(value);
+        }
+    }
+    Ok(deduped)
+}
+
+fn depset_to_list_checkpoint(
+    checkpoint: &'static str,
+    direct_len: usize,
+    transitive_len: usize,
+    collected_len: usize,
+    deduped_len: usize,
+) {
+    kuro_util::memory_checkpoint::checkpoint(
+        checkpoint,
+        [
+            ("direct_len", direct_len),
+            ("transitive_len", transitive_len),
+            ("collected_len", collected_len),
+            ("deduped_len", deduped_len),
+            ("duplicate_len", collected_len.saturating_sub(deduped_len)),
+        ],
+    );
+}
+
 #[starlark_value(type = "depset")]
 impl<'v> StarlarkValue<'v> for Depset {
     fn get_methods() -> Option<&'static Methods> {
@@ -309,19 +347,15 @@ fn frozen_depset_methods(builder: &mut MethodsBuilder) {
         // merge values that are semantically equal, since arbitrary Starlark
         // values are not Hash-stable and Display-string collisions would
         // incorrectly merge distinct values.
-        let mut deduped: Vec<Value<'v>> = Vec::with_capacity(collected.len());
-        for v in collected {
-            let mut is_dup = false;
-            for existing in &deduped {
-                if existing.equals(v)? {
-                    is_dup = true;
-                    break;
-                }
-            }
-            if !is_dup {
-                deduped.push(v);
-            }
-        }
+        let collected_len = collected.len();
+        let deduped = dedupe_values_preserving_order(collected)?;
+        depset_to_list_checkpoint(
+            "depset_to_list_frozen",
+            this.direct.len(),
+            this.children.len(),
+            collected_len,
+            deduped.len(),
+        );
         Ok(heap.alloc(AllocList(deduped)))
     }
 }
@@ -697,6 +731,13 @@ fn generic_live_depset_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         let order = depset_order_from_value(this).unwrap_or("default");
+        let (direct_len, transitive_len) = if kuro_util::memory_checkpoint::enabled() {
+            depset_direct_and_transitive(this, heap)
+                .map(|(direct, transitive)| (direct.len(), transitive.len()))
+                .unwrap_or((0, 0))
+        } else {
+            (0, 0)
+        };
         let mut elements: Vec<Value<'v>> = Vec::new();
         collect_depset_elements_ordered(this, &mut elements, heap, order);
         // Bazel depsets deduplicate elements: depset(["a", "a"]).to_list() == ["a"]
@@ -704,19 +745,15 @@ fn generic_live_depset_methods(builder: &mut MethodsBuilder) {
         // Value::equals, which short-circuits on ptr_eq. Using the Display
         // string would wrongly collapse distinct values whose representations
         // happen to coincide (e.g. artifacts at different configurations).
-        let mut deduped: Vec<Value<'v>> = Vec::with_capacity(elements.len());
-        for v in elements {
-            let mut is_dup = false;
-            for existing in &deduped {
-                if existing.equals(v)? {
-                    is_dup = true;
-                    break;
-                }
-            }
-            if !is_dup {
-                deduped.push(v);
-            }
-        }
+        let collected_len = elements.len();
+        let deduped = dedupe_values_preserving_order(elements)?;
+        depset_to_list_checkpoint(
+            "depset_to_list_live",
+            direct_len,
+            transitive_len,
+            collected_len,
+            deduped.len(),
+        );
         Ok(heap.alloc(AllocList(deduped)))
     }
 }
