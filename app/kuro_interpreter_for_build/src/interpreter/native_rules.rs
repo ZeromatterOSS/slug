@@ -934,14 +934,14 @@ pub fn register_native_rules(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = starlark::values::none::NoneType)] visibility: Value<
             'v,
         >,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        tags: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] tags: Value<'v>,
         #[starlark(require = named, default = starlark::values::none::NoneType)] testonly: Value<
             'v,
         >,
         #[starlark(require = named, default = "")] deprecation: &str,
-        #[starlark(require = named, default = UnpackListOrTuple::default())]
-        features: UnpackListOrTuple<String>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] features: Value<
+            'v,
+        >,
         #[starlark(kwargs)] _extra_kwargs: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<NoneType> {
