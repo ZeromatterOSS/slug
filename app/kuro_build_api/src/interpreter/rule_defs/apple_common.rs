@@ -137,6 +137,13 @@ fn apple_common_module_methods(builder: &mut MethodsBuilder) {
         Ok(XcodeVersionConfigProvider)
     }
 
+    /// XcodeVersionProperties provider.
+    #[starlark(attribute)]
+    fn XcodeProperties<'v>(this: &AppleCommonModule) -> starlark::Result<Value<'v>> {
+        let _ = this;
+        Ok(Value::new_none())
+    }
+
     /// AppleDynamicFramework provider.
     #[starlark(attribute)]
     fn AppleDynamicFramework(

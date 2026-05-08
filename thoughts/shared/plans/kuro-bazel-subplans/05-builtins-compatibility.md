@@ -296,6 +296,18 @@ These modules must be available as globals in .bzl files.
 
 **Status**: Stubs implemented (sufficient for rules_cc loading)
 
+#### Follow-up: Bazel 9 Apple `XcodeProperties` Tombstone (OPEN, 2026-05-08)
+
+ZeroMatter's LLVM toolchain now reaches `@with_cfg.bzl//with_cfg/private:rule_defaults.bzl`,
+which enumerates Bazel's default provider forwarding set. Bazel 9's Java
+`AppleCommonApi.java` still documents `XcodeProperties` as a provider
+key/constructor, but the user-visible builtins export in
+`src/main/starlark/builtins_bzl/common/objc/apple_common.bzl` exposes
+`apple_common.XcodeProperties = None` with a TODO to remove it after
+`with_cfg.bzl` migrates away. Kuro must match the Starlark builtins export that
+rulesets actually see: the attribute exists, but it is `None`, so provider lists
+can filter it out with Bazel-compatible `if p` logic.
+
 ### Implementation Strategy
 
 **Phase 7c.1: Critical Modules (blocks rules_cc)**
