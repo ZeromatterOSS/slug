@@ -48,6 +48,7 @@ use starlark::values::list::AllocList;
 use starlark::values::none::NoneOr;
 use starlark::values::starlark_value;
 
+use crate::interpreter::rule_defs::depset::Depset;
 use crate::interpreter::rule_defs::py_common::NativeProviderInstance;
 use crate::interpreter::rule_defs::py_common::create_native_provider_instance;
 
@@ -326,6 +327,18 @@ fn java_common_internal_methods(builder: &mut MethodsBuilder) {
         Ok(false)
     }
 
+    fn incompatible_disable_non_executable_java_binary<'v>(
+        #[starlark(this)] _this: &JavaCommonInternal,
+    ) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
+    fn incompatible_java_info_merge_runtime_module_flags<'v>(
+        #[starlark(this)] _this: &JavaCommonInternal,
+    ) -> starlark::Result<bool> {
+        Ok(false)
+    }
+
     #[allow(unused_variables)]
     fn check_java_toolchain_is_declared_on_rule<'v>(
         #[starlark(this)] _this: &JavaCommonInternal,
@@ -342,6 +355,45 @@ fn java_common_internal_methods(builder: &mut MethodsBuilder) {
         provider_type: Value<'v>,
     ) -> starlark::Result<Value<'v>> {
         Ok(Value::new_none())
+    }
+
+    #[allow(unused_variables)]
+    fn expand_java_opts<'v>(
+        #[starlark(this)] _this: &JavaCommonInternal,
+        ctx: Value<'v>,
+        attr: &str,
+        #[starlark(require = named)] tokenize: bool,
+        #[starlark(require = named, default = false)] exec_paths: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(eval.heap().alloc(AllocList::EMPTY))
+    }
+
+    #[allow(unused_variables)]
+    fn target_kind<'v>(
+        #[starlark(this)] _this: &JavaCommonInternal,
+        target: Value<'v>,
+    ) -> starlark::Result<&'static str> {
+        Ok("")
+    }
+
+    #[allow(unused_variables)]
+    fn collect_native_deps_dirs<'v>(
+        #[starlark(this)] _this: &JavaCommonInternal,
+        libraries: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(eval.heap().alloc(Depset::empty()))
+    }
+
+    #[allow(unused_variables)]
+    fn get_runtime_classpath_for_archive<'v>(
+        #[starlark(this)] _this: &JavaCommonInternal,
+        jars: Value<'v>,
+        excluded_jars: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        Ok(eval.heap().alloc(Depset::empty()))
     }
 }
 
