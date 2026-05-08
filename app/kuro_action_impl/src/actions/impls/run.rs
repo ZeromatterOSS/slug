@@ -843,11 +843,19 @@ impl RunAction {
         command_line_digest_for_dep_files.push_arg(env_len.to_string());
         command_line_digest_for_dep_files.push_count();
 
+        let path_rewrites = rendered_output_path_rewrites(&self.outputs, &cli_ctx, fs)?;
+        rewrite_rendered_paths(&mut exe_rendered, &path_rewrites);
+        rewrite_rendered_paths(&mut args_rendered, &path_rewrites);
+        let mut cli_env = cli_env?;
+        for value in cli_env.values_mut() {
+            rewrite_rendered_path(value, &path_rewrites);
+        }
+
         Ok((
             ExpandedCommandLine {
                 exe: exe_rendered,
                 args: args_rendered,
-                env: cli_env?,
+                env: cli_env,
             },
             command_line_digest_for_dep_files.finalize(),
             worker,
@@ -1408,6 +1416,42 @@ fn slot_from_param_file_data(pf: &FrozenParamFileData, start: usize, end: usize)
             StarlarkParamFileFormat::FlagPerLine => ParamFileFormat::FlagPerLine,
             StarlarkParamFileFormat::Shell => ParamFileFormat::Shell,
         },
+    }
+}
+
+fn rendered_output_path_rewrites(
+    outputs: &BoxSliceSet<BuildArtifact>,
+    cli_ctx: &DefaultCommandLineContext,
+    fs: &ExecutorFs<'_>,
+) -> kuro_error::Result<Vec<(String, String)>> {
+    let mut rewrites = Vec::new();
+    for output in outputs {
+        let artifact: Artifact = output.dupe().into();
+        let output_path = output.get_path();
+        let rendered = artifact
+            .get_path()
+            .with_full_path(|path| path.as_str().to_owned());
+        let resolved = cli_ctx
+            .resolve_project_path(fs.fs().resolve_build(output_path, None)?)?
+            .into_string();
+        if rendered != resolved {
+            rewrites.push((rendered, resolved));
+        }
+    }
+    Ok(rewrites)
+}
+
+fn rewrite_rendered_paths(values: &mut [String], rewrites: &[(String, String)]) {
+    for value in values {
+        rewrite_rendered_path(value, rewrites);
+    }
+}
+
+fn rewrite_rendered_path(value: &mut String, rewrites: &[(String, String)]) {
+    for (from, to) in rewrites {
+        if value.contains(from) {
+            *value = value.replace(from, to);
+        }
     }
 }
 
