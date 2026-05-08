@@ -1807,10 +1807,11 @@ async fn resolve_toolchain_types(
                 .any(|(_, resolved)| resolved.is_none())
         }),
     };
-    let resolved_result = if mandatory_unresolved
-        && !all_required_type_labels.is_empty()
-        && ensure_deferred_toolchains_loaded(dice, &all_required_type_labels).await
-    {
+    let resolved_result = if mandatory_unresolved && !all_required_type_labels.is_empty() {
+        // Retry even when this call did not perform the load itself. Another
+        // concurrent analysis may have populated the global declared-toolchain
+        // registry while this call waited on the deferred-load gate.
+        ensure_deferred_toolchains_loaded(dice, &all_required_type_labels).await;
         resolve_toolchains_multi_group(&requests, &target, &candidates)
     } else {
         first
