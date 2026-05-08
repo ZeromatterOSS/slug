@@ -354,11 +354,14 @@ fn canonicalize_repo_rule_source(rule_source: &str, module_name: &str, is_root: 
 pub fn pre_compute_extension_repo_cells_from_lockfile(
     lockfile: &crate::lockfile::Lockfile,
     root_module_name: &str,
-    existing: &[PendingRepoCell],
+    existing: &mut [PendingRepoCell],
     project_root: &std::path::Path,
 ) -> Vec<PendingRepoCell> {
-    let existing_canonicals: std::collections::HashSet<&str> =
-        existing.iter().map(|c| c.canonical_name.as_str()).collect();
+    let existing_by_canonical: std::collections::HashMap<String, usize> = existing
+        .iter()
+        .enumerate()
+        .map(|(idx, cell)| (cell.canonical_name.clone(), idx))
+        .collect();
 
     let mut new_cells = Vec::new();
     for ext_id in lockfile.extension_ids() {
@@ -390,11 +393,11 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
 
         for (repo_name, lock_spec) in &general.generated_repo_specs {
             let canonical = format!("{}+{}+{}", owner, ext_name, repo_name);
-            if existing_canonicals.contains(canonical.as_str()) {
-                continue;
-            }
-
-            let repo_spec = lock_spec.to_repo_spec();
+            let repo_spec = canonicalize_lockfile_repo_spec_labels(
+                lock_spec.to_repo_spec(),
+                ext_id,
+                root_module_name,
+            );
             let repo_spec_json = match serde_json::to_string(&repo_spec) {
                 Ok(s) => s,
                 Err(e) => {
@@ -407,30 +410,34 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
                     continue;
                 }
             };
+            let spec_hash = repo_spec.compute_hash();
+
+            if let Some(idx) = existing_by_canonical.get(canonical.as_str()).copied() {
+                let cell = &mut existing[idx];
+                if cell.repo_spec_json.is_empty() {
+                    cell.spec_hash = spec_hash.clone();
+                    cell.repo_spec_json = repo_spec_json.clone();
+                }
+                register_lockfile_seeded_spoke(
+                    ext_id,
+                    repo_name,
+                    &canonical,
+                    repo_spec,
+                    project_root,
+                );
+                continue;
+            }
 
             new_cells.push(PendingRepoCell {
                 canonical_name: canonical.clone(),
                 extension_id: ext_id.to_owned(),
                 internal_name: repo_name.clone(),
-                spec_hash: repo_spec.compute_hash(),
+                spec_hash,
                 repo_spec_json,
                 path: format!("bazel-external/{}", canonical),
             });
 
-            // Also register in the spoke-materialization registry so
-            // `rctx.path(@<repo_name>)` can drive lazy materialization via
-            // `materialize_spoke_sync`. The registry is keyed by both
-            // canonical name and the bare repo name so callers that pass a
-            // pre-canonicalization apparent name still resolve.
-            let registration = crate::spoke_materialization::SpokeRegistration {
-                extension_id: std::sync::Arc::from(ext_id),
-                repo_spec: std::sync::Arc::new(repo_spec),
-                project_root: std::sync::Arc::new(project_root.to_path_buf()),
-            };
-            crate::spoke_materialization::register_spoke(canonical.clone(), registration.clone());
-            if repo_name != &canonical {
-                crate::spoke_materialization::register_spoke(repo_name.clone(), registration);
-            }
+            register_lockfile_seeded_spoke(ext_id, repo_name, &canonical, repo_spec, project_root);
 
             // Caller (kuro_common::cells) is expected to also register
             // these in the dynamic-extension-cell map so
@@ -447,6 +454,89 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
     );
 
     new_cells
+}
+
+fn canonicalize_lockfile_repo_spec_labels(
+    mut repo_spec: RepoSpec,
+    ext_id: &str,
+    root_module_name: &str,
+) -> RepoSpec {
+    let owner = crate::extension_execution_dice::extract_owning_module(ext_id, root_module_name);
+    let package = extension_package(ext_id);
+    for value in repo_spec.attributes.values_mut() {
+        canonicalize_lockfile_attr_labels(value, &owner, &package);
+    }
+    repo_spec
+}
+
+fn canonicalize_lockfile_attr_labels(value: &mut AttrValue, owner: &str, package: &str) {
+    match value {
+        AttrValue::String(s) => {
+            if looks_like_relative_label(s) {
+                *s = canonicalize_lockfile_label(s, owner, package);
+            }
+        }
+        AttrValue::StringList(items) => {
+            for item in items {
+                if looks_like_relative_label(item) {
+                    *item = canonicalize_lockfile_label(item, owner, package);
+                }
+            }
+        }
+        AttrValue::Label(label) => {
+            *label = canonicalize_lockfile_label(label, owner, package);
+        }
+        AttrValue::Dict(entries) => {
+            for value in entries.values_mut() {
+                canonicalize_lockfile_attr_labels(value, owner, package);
+            }
+        }
+        AttrValue::Int(_) | AttrValue::Bool(_) | AttrValue::None => {}
+    }
+}
+
+fn looks_like_relative_label(value: &str) -> bool {
+    value.starts_with("//") || value.starts_with(':')
+}
+
+fn canonicalize_lockfile_label(label: &str, owner: &str, package: &str) -> String {
+    crate::repo_mapping::canonicalize_label_with_package_context(label, owner, package, None)
+        .map(|label| label.to_unambiguous_string())
+        .unwrap_or_else(|| label.to_owned())
+}
+
+fn extension_package(ext_id: &str) -> String {
+    let bzl_part = ext_id.split('%').next().unwrap_or(ext_id);
+    let after_repo = if let Some(pos) = bzl_part.find("//") {
+        &bzl_part[pos + 2..]
+    } else {
+        bzl_part
+    };
+    let package = after_repo.split(':').next().unwrap_or_default();
+    package.to_owned()
+}
+
+fn register_lockfile_seeded_spoke(
+    ext_id: &str,
+    repo_name: &str,
+    canonical: &str,
+    repo_spec: RepoSpec,
+    project_root: &std::path::Path,
+) {
+    // Also register in the spoke-materialization registry so
+    // `rctx.path(@<repo_name>)` can drive lazy materialization via
+    // `materialize_spoke_sync`. The registry is keyed by both canonical name
+    // and the bare repo name so callers that pass a pre-canonicalization
+    // apparent name still resolve.
+    let registration = crate::spoke_materialization::SpokeRegistration {
+        extension_id: std::sync::Arc::from(ext_id),
+        repo_spec: std::sync::Arc::new(repo_spec),
+        project_root: std::sync::Arc::new(project_root.to_path_buf()),
+    };
+    crate::spoke_materialization::register_spoke(canonical.to_owned(), registration.clone());
+    if repo_name != canonical {
+        crate::spoke_materialization::register_spoke(repo_name.to_owned(), registration);
+    }
 }
 
 /// Convert a MODULE.bazel `TagValue` (parser representation) to an `AttrValue`

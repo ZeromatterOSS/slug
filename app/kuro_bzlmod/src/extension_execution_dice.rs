@@ -683,7 +683,10 @@ pub fn extract_owning_module(extension_id: &str, root_module_name: &str) -> Stri
     // Strip the bazel-canonical trailing `+` so both shapes converge on the
     // same owning-module name (otherwise format!"{}+{}+{}" produces
     // `<repo>++<ext>+<repo>` for the canonical form).
-    let stripped = bzl_part.trim_start_matches('@');
+    let stripped = bzl_part
+        .strip_prefix("@@")
+        .or_else(|| bzl_part.strip_prefix('@'))
+        .unwrap_or(bzl_part);
     if let Some(pos) = stripped.find("//") {
         let module = &stripped[..pos];
         let module = module.strip_suffix('+').unwrap_or(module);

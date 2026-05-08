@@ -234,7 +234,11 @@ impl<'v> StarlarkValue<'v> for ExtensionTagInvoker {
 fn canonicalize_relative_label(s: &str, owning_module: Option<&str>) -> String {
     if s.starts_with("//") {
         if let Some(module) = owning_module {
-            return format!("@@{}{}", module, s);
+            return crate::repo_mapping::canonicalize_label_with_package_context(
+                s, module, "", None,
+            )
+            .map(|label| label.to_unambiguous_string())
+            .unwrap_or_else(|| s.to_owned());
         }
     }
     s.to_string()

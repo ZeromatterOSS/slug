@@ -73,6 +73,9 @@ use starlark::values::starlark_value_as_type::StarlarkValueAsType;
 use tar::Archive;
 use zip::ZipArchive;
 
+use crate::label_filesystem::LabelFilesystemResolver;
+use crate::label_filesystem::RootLabelResolution;
+use crate::label_filesystem::is_bazel_label_string;
 use crate::module_ctx::RepositoryOs;
 
 // ============================================================================
@@ -657,160 +660,24 @@ impl RepositoryContext {
 /// Given a label like "@repo//pkg:file" or "//pkg:file", returns
 /// a path relative to the workspace root.
 pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> String {
-    let stripped = label_str.trim_start_matches('@');
-    // Three label shapes to cover:
-    //   "@repo//pkg:target"  → repo+pkg+target
-    //   "@repo"              → @repo//:repo  (Bazel "implicit target = repo
-    //                                          name" shorthand)
-    //   "//pkg:target"       → root-cell, pkg+target
-    let (repo, rest) = if let Some(idx) = stripped.find("//") {
-        (&stripped[..idx], &stripped[idx + 2..])
-    } else if !label_str.starts_with('@') || stripped.is_empty() {
-        ("", stripped)
+    LabelFilesystemResolver::new(workspace_root)
+        .with_root_label_resolution(RootLabelResolution::Relative)
+        .resolve_label_string(label_str)
+        .map(|path| path.to_string_lossy().to_string())
+        .unwrap_or_else(|| label_str.to_owned())
+}
+
+fn resolve_label_to_filesystem_path(label_str: &str, workspace_root: &Path) -> PathBuf {
+    let path = LabelFilesystemResolver::new(workspace_root)
+        .with_root_label_resolution(RootLabelResolution::ProjectAbsolute)
+        .resolve_label_string(label_str)
+        .unwrap_or_else(|| PathBuf::from(label_str));
+    if path.is_absolute() {
+        path
+    } else if let Some(root) = kuro_core::cells::get_dynamic_project_root() {
+        root.join(path)
     } else {
-        (stripped, "")
-    };
-
-    let (pkg, target) = if let Some(colon_idx) = rest.find(':') {
-        let p = &rest[..colon_idx];
-        let t = &rest[colon_idx + 1..];
-        // `@repo//:` (empty target after colon) is the same `@repo` shorthand
-        // BazelLabel::parse emits when given `@<repo>` — default the target
-        // to the repo name. Without this, the resolved path stops at the
-        // repo root and downstream `.dirname` strips a level too many.
-        if t.is_empty() && p.is_empty() {
-            ("", repo)
-        } else {
-            (p, t)
-        }
-    } else if rest.is_empty() {
-        // `@repo` with no //pkg:target: implicit target name = repo name.
-        ("", repo)
-    } else {
-        (rest, rest.rsplit('/').next().unwrap_or(rest))
-    };
-
-    let is_root = repo.is_empty() || kuro_core::cells::is_root_cell_name(repo);
-    if is_root {
-        if pkg.is_empty() {
-            target.to_owned()
-        } else {
-            format!("{}/{}", pkg, target)
-        }
-    } else {
-        // External repo: try multiple locations
-        // Use project root for all scans (workspace_root is often a repo dir, not project root)
-        let project_root = kuro_core::cells::get_dynamic_project_root();
-
-        // 1. Check dynamic cell registry for absolute path.
-        // Bazel's repository_ctx.path(Label(...)) does NOT require the target file
-        // to exist — it returns a path that callers can use for .dirname,
-        // .get_child, etc. Existence checks belong in readdir/exists, not here.
-        if let Some(cell_path) = kuro_core::cells::get_dynamic_extension_cell(repo) {
-            if let Some(ref root) = project_root {
-                let abs_path = if pkg.is_empty() {
-                    root.join(&cell_path).join(target)
-                } else {
-                    root.join(&cell_path).join(pkg).join(target)
-                };
-                return abs_path.to_string_lossy().to_string();
-            }
-        }
-
-        // 2. Scan bazel-external/ from project root (primary) and workspace_root (fallback).
-        // Return the first plausible parent directory match, even if the target file
-        // does not exist yet.
-        let scan_dirs: Vec<std::path::PathBuf> = {
-            let mut dirs = Vec::new();
-            if let Some(ref root) = project_root {
-                dirs.push(root.join("bazel-external"));
-            }
-            let ws_ext = workspace_root.join("bazel-external");
-            if ws_ext.exists() && !dirs.iter().any(|d| d == &ws_ext) {
-                dirs.push(ws_ext);
-            }
-            dirs
-        };
-
-        for scan_dir in &scan_dirs {
-            // Try exact match first — does the repo DIRECTORY exist?
-            let exact = scan_dir.join(repo);
-            if exact.exists() {
-                let path = if pkg.is_empty() {
-                    exact.join(target)
-                } else {
-                    exact.join(pkg).join(target)
-                };
-                return path.to_string_lossy().to_string();
-            }
-            // Scan for versioned names matching `<repo>+<version>` while
-            // rejecting extension-generated repos of the form
-            // `<repo>+<extension>+<innername>`. Without this filter, a request
-            // for `@rules_cc` finds `rules_cc+compatibility_proxy+cc_compatibility_proxy`
-            // before `rules_cc+0.2.17` because the scan order is
-            // filesystem-dependent. Extension repos have three or more `+`
-            // segments; bzlmod-module cells have exactly two (name+version).
-            if let Ok(entries) = std::fs::read_dir(scan_dir) {
-                for entry in entries.flatten() {
-                    let name = entry.file_name();
-                    let name_str = name.to_string_lossy();
-                    if !name_str.starts_with(&format!("{}+", repo)) {
-                        continue;
-                    }
-                    // Reject extension-generated repos (3+ segments).
-                    if name_str.matches('+').count() > 1 {
-                        continue;
-                    }
-                    {
-                        let path = if pkg.is_empty() {
-                            entry.path().join(target)
-                        } else {
-                            entry.path().join(pkg).join(target)
-                        };
-                        return path.to_string_lossy().to_string();
-                    }
-                }
-            }
-            // Scan for extension-generated repos whose canonical name is
-            // `<owning_module>+<extension_name>+<repo>` (three `+`-segments,
-            // with the requested apparent name as the final segment). The
-            // above filter intentionally rejects these when the apparent
-            // name matches the FIRST segment (to avoid a rules_cc miss
-            // grabbing an extension's compatibility_proxy spoke). Here we
-            // match on the LAST segment, which is unambiguous: for
-            // `_main+llvm_repos_extension+llvm-raw`, the final segment
-            // is exactly the repo the user typed (`llvm-raw`).
-            if let Ok(entries) = std::fs::read_dir(scan_dir) {
-                for entry in entries.flatten() {
-                    let name = entry.file_name();
-                    let name_str = name.to_string_lossy();
-                    if name_str.matches('+').count() < 2 {
-                        continue;
-                    }
-                    if !entry.path().is_dir() {
-                        continue;
-                    }
-                    let last_segment = name_str.rsplit('+').next().unwrap_or("");
-                    if last_segment != repo {
-                        continue;
-                    }
-                    let path = if pkg.is_empty() {
-                        entry.path().join(target)
-                    } else {
-                        entry.path().join(pkg).join(target)
-                    };
-                    return path.to_string_lossy().to_string();
-                }
-            }
-        }
-
-        // 3. Fallback: return unresolved path
-        let fallback = if pkg.is_empty() {
-            format!("{}/{}", repo, target)
-        } else {
-            format!("{}/{}/{}", repo, pkg, target)
-        };
-        fallback
+        path
     }
 }
 
@@ -1384,12 +1251,12 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         // canonical name when the repo lives at `bazel-external/<canonical>` —
         // sees the right key.
         let trigger_materialization = |label_str: &str| {
-            let stripped = label_str.trim_start_matches('@');
-            let repo = match stripped.find("//") {
-                Some(idx) => &stripped[..idx],
-                None if !stripped.is_empty() => stripped,
-                _ => return,
+            let Some(label) =
+                kuro_bzlmod::canonicalize_label_with_package_context(label_str, "", "", None)
+            else {
+                return;
             };
+            let repo = label.repo().as_str();
             if repo.is_empty() {
                 return;
             }
@@ -1412,7 +1279,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             // Treat anything starting with `@` (with or without `//`) and any
             // `//pkg:target` as a label — `resolve_label_to_path` handles the
             // `@repo` shorthand for `@repo//:repo`.
-            if s.starts_with('@') || s.starts_with("//") {
+            if is_bazel_label_string(s) {
                 trigger_materialization(s);
                 resolve_label_to_path(s, &this.working_dir)
             } else {
@@ -1996,12 +1863,16 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<String> {
         let _ = watch;
         let file_path = if let Some(s) = path.unpack_str() {
-            this.resolve_path(s)
+            if is_bazel_label_string(s) {
+                resolve_label_to_filesystem_path(s, &this.working_dir)
+            } else {
+                this.resolve_path(s)
+            }
         } else if let Some(repo_path) = path.downcast_ref::<RepositoryPath>() {
             repo_path.absolute_path()
         } else if path.get_type() == "Label" {
             let label_str = path.to_str();
-            PathBuf::from(resolve_label_to_path(&label_str, &this.working_dir))
+            resolve_label_to_filesystem_path(&label_str, &this.working_dir)
         } else {
             this.resolve_path(&path.to_str())
         };
@@ -2070,32 +1941,20 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         // we run `patch(1)` with `current_dir = working_dir` (an external
         // repo dir), root-cell-relative paths would be resolved against the
         // wrong root — so anchor any non-absolute result at the project root.
-        let is_label_str = |s: &str| s.starts_with('@') || s.starts_with("//");
-        let resolve_label = |s: &str| -> std::path::PathBuf {
-            let resolved = resolve_label_to_path(s, &this.working_dir);
-            let p = std::path::PathBuf::from(&resolved);
-            if p.is_absolute() {
-                p
-            } else if let Some(root) = kuro_core::cells::get_dynamic_project_root() {
-                root.join(p)
-            } else {
-                p
-            }
-        };
         let patch_path = if let Some(repo_path) = patch_file.downcast_ref::<RepositoryPath>() {
             repo_path.absolute_path().to_path_buf()
         } else if patch_file.get_type() == "Label" {
-            resolve_label(&format!("{patch_file}"))
+            resolve_label_to_filesystem_path(&format!("{patch_file}"), &this.working_dir)
         } else if let Some(s) = patch_file.unpack_str() {
-            if is_label_str(s) {
-                resolve_label(s)
+            if is_bazel_label_string(s) {
+                resolve_label_to_filesystem_path(s, &this.working_dir)
             } else {
                 std::path::PathBuf::from(this.resolve_path(s))
             }
         } else {
             let repr = patch_file.to_repr();
-            if is_label_str(&repr) {
-                resolve_label(&repr)
+            if is_bazel_label_string(&repr) {
+                resolve_label_to_filesystem_path(&repr, &this.working_dir)
             } else {
                 std::path::PathBuf::from(this.resolve_path(&repr))
             }

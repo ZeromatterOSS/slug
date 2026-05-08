@@ -84,9 +84,11 @@ enum BuildAttrCoercionContextError {
 ///
 /// Returns `None` if the string cannot be parsed as an `@`-prefixed label.
 fn try_make_placeholder_label(value: &str) -> Option<ProvidersLabel> {
-    let stripped = value.strip_prefix('@')?;
+    let stripped = value
+        .strip_prefix("@@")
+        .or_else(|| value.strip_prefix('@'))?;
     let sep_idx = stripped.find("//")?;
-    let cell_alias = stripped[..sep_idx].trim_start_matches('@');
+    let cell_alias = &stripped[..sep_idx];
     if cell_alias.is_empty() {
         return None;
     }

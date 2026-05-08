@@ -175,23 +175,21 @@ fn execute_http_archive(
                 } else if let Some(build_file) = attrs.get_optional_string("build_file") {
                     // build_file is a label like "@@repo//path:BUILD.foo" or a file path
                     let build_file_path = resolve_build_file_label(build_file, working_dir);
-                    if let Ok(content) = std::fs::read_to_string(&build_file_path) {
-                        std::fs::write(working_dir.join("BUILD.bazel"), content).map_err(|e| {
-                            RepositoryExecutionError::ExecutionFailed {
-                                name: invocation.name.clone(),
-                                reason: format!(
-                                    "Failed to write BUILD.bazel from build_file: {}",
-                                    e
-                                ),
-                            }
-                        })?;
-                    } else {
-                        tracing::warn!(
-                            "Could not read build_file '{}' for repository '{}'",
-                            build_file,
-                            invocation.name
-                        );
-                    }
+                    let content = std::fs::read_to_string(&build_file_path).map_err(|e| {
+                        RepositoryExecutionError::ExecutionFailed {
+                            name: invocation.name.clone(),
+                            reason: format!(
+                                "Could not read build_file '{}' for repository '{}' at '{}': {}",
+                                build_file, invocation.name, build_file_path, e
+                            ),
+                        }
+                    })?;
+                    std::fs::write(working_dir.join("BUILD.bazel"), content).map_err(|e| {
+                        RepositoryExecutionError::ExecutionFailed {
+                            name: invocation.name.clone(),
+                            reason: format!("Failed to write BUILD.bazel from build_file: {}", e),
+                        }
+                    })?;
                 }
 
                 // Apply patches if specified
@@ -501,57 +499,110 @@ fn get_urls(attrs: &InvocationAttrs) -> kuro_error::Result<Vec<String>> {
     Ok(urls)
 }
 
-/// Resolve a build_file label like "@@rules_rust//path:file" to a filesystem path.
+/// Resolve a repository-rule file attribute that may be a Bazel label.
+///
+/// `build_file` and `patches` are executed while materializing
+/// `{project_root}/bazel-external/{repo}`. Keep the bzlmod-side resolver small:
+/// semantic parsing goes through `repo_mapping`, the normal path is exact, and
+/// the old `bazel-external` directory scan remains only as an explicit fallback
+/// for legacy module-version directories that have not been registered here.
 fn resolve_build_file_label(label: &str, working_dir: &Path) -> String {
-    if !label.contains("//") {
+    let Some(parsed) =
+        crate::repo_mapping::canonicalize_label_with_package_context(label, "", "", None)
+    else {
         return label.to_owned();
+    };
+
+    let project_root = working_dir
+        .parent()
+        .and_then(Path::parent)
+        .map(Path::to_path_buf);
+
+    let Some(project_root) = project_root else {
+        return label_to_relative_fragment(&parsed)
+            .to_string_lossy()
+            .to_string();
+    };
+
+    let repo = repository_executor_repo_dir_name(parsed.repo().as_str());
+    let normal_path = if repo.is_empty() {
+        label_path_under(&project_root, &parsed)
+    } else {
+        label_path_under(project_root.join("bazel-external").join(&repo), &parsed)
+    };
+
+    if normal_path.exists() {
+        return normal_path.to_string_lossy().to_string();
     }
-    let stripped = label.trim_start_matches('@');
-    let (repo_raw, rest) = if let Some(idx) = stripped.find("//") {
-        (&stripped[..idx], &stripped[idx + 2..])
-    } else {
-        return label.to_owned();
+
+    let Some(fallback_path) =
+        scan_bazel_external_for_repository_executor(&project_root, &repo, &parsed)
+    else {
+        return normal_path.to_string_lossy().to_string();
     };
-    // Bazel uses `+ext+name` for root-module extension repos (empty module prefix).
-    // Kuro stores these as `_main+ext+name`. Rewrite to match.
-    let repo_owned;
-    let repo: &str = if repo_raw.starts_with('+') {
-        repo_owned = format!("_main{}", repo_raw);
-        &repo_owned
+
+    fallback_path.to_string_lossy().to_string()
+}
+
+fn repository_executor_repo_dir_name(repo: &str) -> String {
+    if repo.starts_with('+') {
+        format!("_main{}", repo)
     } else {
-        repo_raw
-    };
-    let (pkg, target) = if let Some(colon) = rest.find(':') {
-        (&rest[..colon], &rest[colon + 1..])
-    } else {
-        (rest, rest.rsplit('/').next().unwrap_or(rest))
-    };
-    // Scan from project root (working_dir is {project_root}/bazel-external/{repo})
-    if let Some(bazel_ext_dir) = working_dir.parent() {
-        let bazel_ext = bazel_ext_dir.to_path_buf();
-        if let Ok(entries) = std::fs::read_dir(&bazel_ext) {
-            for entry in entries.flatten() {
-                let name = entry.file_name();
-                let name_str = name.to_string_lossy();
-                if name_str.as_ref() == repo || name_str.starts_with(&format!("{}+", repo)) {
-                    let path = if pkg.is_empty() {
-                        entry.path().join(target)
-                    } else {
-                        entry.path().join(pkg).join(target)
-                    };
-                    if path.exists() {
-                        return path.to_string_lossy().to_string();
-                    }
-                }
-            }
+        repo.to_owned()
+    }
+}
+
+fn label_path_under(
+    base: impl Into<PathBuf>,
+    label: &crate::repo_mapping::CanonicalLabel,
+) -> PathBuf {
+    let mut path = base.into();
+    if !label.package().is_empty() {
+        path.push(label.package());
+    }
+    path.push(label.target());
+    path
+}
+
+fn label_to_relative_fragment(label: &crate::repo_mapping::CanonicalLabel) -> PathBuf {
+    label_path_under(label.repo().as_str(), label)
+}
+
+fn scan_bazel_external_for_repository_executor(
+    project_root: &Path,
+    repo: &str,
+    label: &crate::repo_mapping::CanonicalLabel,
+) -> Option<PathBuf> {
+    if repo.is_empty() {
+        return None;
+    }
+
+    let bazel_external = project_root.join("bazel-external");
+    if !bazel_external.exists() {
+        return None;
+    }
+
+    tracing::debug!(
+        repo,
+        "Falling back to bazel-external directory scanning for repository executor label"
+    );
+
+    let entries = std::fs::read_dir(&bazel_external).ok()?;
+    let repo_prefix = format!("{}+", repo);
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.as_ref() != repo && !name.starts_with(&repo_prefix) {
+            continue;
+        }
+
+        let path = label_path_under(entry.path(), label);
+        if path.exists() {
+            return Some(path);
         }
     }
-    // Fallback: try relative to working dir
-    let fallback = label
-        .trim_start_matches('@')
-        .replace("//", "/")
-        .replace(':', "/");
-    fallback
+
+    None
 }
 
 /// Download and extract an archive.
@@ -1256,5 +1307,69 @@ mod tests {
 
         assert!(verify_sha256(data, &expected).is_ok());
         assert!(verify_sha256(data, "wrong_hash").is_err());
+    }
+
+    #[test]
+    fn resolve_build_file_label_uses_canonical_label_parser() {
+        let temp = TempDir::new().unwrap();
+        let project_root = temp.path();
+        let repo_root = project_root.join("bazel-external").join("rules_cc");
+        let working_dir = project_root.join("bazel-external").join("current_repo");
+        std::fs::create_dir_all(repo_root.join("cc")).unwrap();
+        std::fs::create_dir_all(&working_dir).unwrap();
+        std::fs::write(repo_root.join("cc").join("BUILD.rules"), "").unwrap();
+
+        let resolved = resolve_build_file_label("@@rules_cc//cc:BUILD.rules", &working_dir);
+
+        assert_eq!(
+            PathBuf::from(resolved),
+            repo_root.join("cc").join("BUILD.rules")
+        );
+    }
+
+    #[test]
+    fn resolve_build_file_label_keeps_plain_paths_plain() {
+        let temp = TempDir::new().unwrap();
+        let working_dir = temp.path().join("bazel-external").join("current_repo");
+
+        assert_eq!(
+            resolve_build_file_label("third_party/BUILD.foo", &working_dir),
+            "third_party/BUILD.foo"
+        );
+    }
+
+    #[test]
+    fn resolve_build_file_label_supports_main_repo_labels() {
+        let temp = TempDir::new().unwrap();
+        let project_root = temp.path();
+        let working_dir = project_root.join("bazel-external").join("current_repo");
+        std::fs::create_dir_all(project_root.join("tools")).unwrap();
+        std::fs::create_dir_all(&working_dir).unwrap();
+        std::fs::write(project_root.join("tools").join("BUILD.repo"), "").unwrap();
+
+        let resolved = resolve_build_file_label("//tools:BUILD.repo", &working_dir);
+
+        assert_eq!(
+            PathBuf::from(resolved),
+            project_root.join("tools").join("BUILD.repo")
+        );
+    }
+
+    #[test]
+    fn resolve_build_file_label_quarantines_bazel_external_scan_fallback() {
+        let temp = TempDir::new().unwrap();
+        let project_root = temp.path();
+        let legacy_repo = project_root.join("bazel-external").join("rules_cc+0.1.0");
+        let working_dir = project_root.join("bazel-external").join("current_repo");
+        std::fs::create_dir_all(legacy_repo.join("cc")).unwrap();
+        std::fs::create_dir_all(&working_dir).unwrap();
+        std::fs::write(legacy_repo.join("cc").join("BUILD.rules"), "").unwrap();
+
+        let resolved = resolve_build_file_label("@rules_cc//cc:BUILD.rules", &working_dir);
+
+        assert_eq!(
+            PathBuf::from(resolved),
+            legacy_repo.join("cc").join("BUILD.rules")
+        );
     }
 }

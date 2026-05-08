@@ -30,6 +30,8 @@ use starlark::values::StarlarkValue;
 use starlark::values::Value;
 use starlark::values::starlark_value;
 
+use crate::label_filesystem::LabelFilesystemResolver;
+use crate::label_filesystem::RootLabelResolution;
 use crate::module_ctx::methods::module_ctx_methods;
 use crate::module_ctx::module::BazelModule;
 use crate::module_ctx::os::RepositoryOs;
@@ -244,83 +246,11 @@ impl ModuleContext {
     /// Returns None if the label can't be resolved.
     pub fn resolve_label_to_filesystem_path(&self, label_str: &str) -> Option<PathBuf> {
         let project_root = self.project_root.as_ref()?;
-
-        // Parse @@repo//pkg:target or @repo//pkg:target
-        let stripped = label_str.trim_start_matches('@');
-        let (repo, rest) = if let Some(pos) = stripped.find("//") {
-            (&stripped[..pos], &stripped[pos + 2..])
-        } else {
-            // No // separator — not a valid label
-            return None;
-        };
-        let (pkg, target) = if let Some(colon_pos) = rest.find(':') {
-            (&rest[..colon_pos], &rest[colon_pos + 1..])
-        } else {
-            // No colon — package path is the whole thing, target = last component
-            (rest, rest.rsplit('/').next().unwrap_or(rest))
-        };
-
-        if repo.is_empty() {
-            // Root repo label: @@//pkg:target → project_root/pkg/target
-            let mut path = project_root.clone();
-            if !pkg.is_empty() {
-                path.push(pkg);
-            }
-            path.push(target);
-            Some(path)
-        } else {
-            // External repo label: @@repo//pkg:target
-            // Look up repo in cell_paths (exact match first, then fuzzy)
-            let repo_path = self
-                .cell_paths
-                .get(repo)
-                .or_else(|| {
-                    // Try matching cell names that start with "repo+" (versioned cells)
-                    // e.g., repo="rules_rs" matches cell "rules_rs+override"
-                    self.cell_paths
-                        .iter()
-                        .find(|(k, _)| k.starts_with(&format!("{}+", repo)))
-                        .map(|(_, v)| v)
-                })
-                .cloned();
-
-            // If found in cell_paths, use it
-            if let Some(rp) = repo_path {
-                let mut path = rp;
-                if !pkg.is_empty() {
-                    path.push(pkg);
-                }
-                path.push(target);
-                return Some(path);
-            }
-
-            // Fallback: scan bazel-external/ for extension repos with matching
-            // internal name. Extension repos have canonical names like
-            // "module+ext+repo_name". The repo_name portion matches the apparent
-            // name in the Label. This handles repos created by extensions that
-            // aren't in use_repo() but are referenced by other extensions.
-            let bazel_external = project_root.join("bazel-external");
-            if bazel_external.is_dir() {
-                let suffix = format!("+{}", repo);
-                if let Ok(entries) = std::fs::read_dir(&bazel_external) {
-                    for entry in entries.filter_map(|e| e.ok()) {
-                        let name = entry.file_name().to_string_lossy().to_string();
-                        if name.ends_with(&suffix)
-                            && entry.file_type().map(|t| t.is_dir()).unwrap_or(false)
-                        {
-                            let mut path = entry.path();
-                            if !pkg.is_empty() {
-                                path.push(pkg);
-                            }
-                            path.push(target);
-                            return Some(path);
-                        }
-                    }
-                }
-            }
-
-            None
-        }
+        LabelFilesystemResolver::new(project_root)
+            .with_project_root(Some(project_root))
+            .with_cell_paths(&self.cell_paths)
+            .with_root_label_resolution(RootLabelResolution::ProjectAbsolute)
+            .resolve_label_string(label_str)
     }
 
     /// Get the modules.

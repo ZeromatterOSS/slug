@@ -64,18 +64,32 @@ impl From<&str> for CanonicalRepoName {
     }
 }
 
-/// Canonical bzlmod label in single-`@` storage form.
+/// Canonical bzlmod label.
+///
+/// Bazel distinguishes unambiguous canonical label syntax (`@@repo//pkg:target`)
+/// from apparent label syntax (`@repo//pkg:target`). Keep that distinction in
+/// the API so callsites must choose whether they need Bazel canonical form or
+/// the legacy single-`@` storage form still used by some Kuro paths.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CanonicalLabel {
     repo: CanonicalRepoName,
     package_and_target: String,
+    package: String,
+    target: String,
 }
 
 impl CanonicalLabel {
     pub fn new(repo: CanonicalRepoName, package_and_target: impl Into<String>) -> Self {
+        let package_and_target = package_and_target.into();
+        let (package, target) = split_package_and_target(&package_and_target)
+            .unwrap_or(("", package_and_target.as_str()));
+        let package = package.to_owned();
+        let target = target.to_owned();
         Self {
             repo,
-            package_and_target: package_and_target.into(),
+            package_and_target,
+            package,
+            target,
         }
     }
 
@@ -83,27 +97,52 @@ impl CanonicalLabel {
         &self.repo
     }
 
+    pub fn package(&self) -> &str {
+        &self.package
+    }
+
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
     pub fn package_and_target(&self) -> &str {
         &self.package_and_target
     }
 
     pub fn parse_storage_string(label: &str) -> Option<Self> {
-        let parsed = ParsedLabel::parse(label)?;
+        let parsed = ParsedAbsoluteLabel::parse(label)?;
         Some(parsed.to_canonical_label(CanonicalRepoName::from(parsed.repo)))
     }
 
-    pub fn to_storage_string(&self) -> String {
+    /// Render in Bazel's unambiguous canonical label form.
+    pub fn to_unambiguous_string(&self) -> String {
+        format!("@@{}//{}:{}", self.repo, self.package, self.target)
+    }
+
+    /// Render in the legacy Kuro storage form.
+    ///
+    /// Prefer `to_unambiguous_string()` for new code unless the callsite is
+    /// explicitly reading or writing legacy single-`@` data.
+    pub fn to_legacy_storage_string(&self) -> String {
         format!("@{}//{}", self.repo, self.package_and_target)
     }
 
+    pub fn into_legacy_storage_string(self) -> String {
+        self.to_legacy_storage_string()
+    }
+
+    pub fn to_storage_string(&self) -> String {
+        self.to_legacy_storage_string()
+    }
+
     pub fn into_storage_string(self) -> String {
-        format!("@{}//{}", self.repo, self.package_and_target)
+        self.into_legacy_storage_string()
     }
 }
 
 impl std::fmt::Display for CanonicalLabel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "@{}//{}", self.repo, self.package_and_target)
+        f.write_str(&self.to_unambiguous_string())
     }
 }
 
@@ -179,14 +218,7 @@ impl BzlmodRepoMapping {
     /// names (`@module+extension+repo//...`) are returned in single-`@` storage
     /// form without applying the apparent-name mapping again.
     pub fn canonicalize_label(&self, label: &str) -> Option<CanonicalLabel> {
-        let parsed = ParsedLabel::parse(label)?;
-
-        if parsed.canonical || parsed.repo.contains('+') {
-            return Some(parsed.to_canonical_label(CanonicalRepoName::from(parsed.repo)));
-        }
-
-        let canonical_repo = self.canonical_repo_name(parsed.repo);
-        Some(parsed.to_canonical_label(canonical_repo))
+        canonicalize_label_with_package_context(label, "", "", Some(self))
     }
 
     /// Canonicalize a label for legacy storage paths that still use raw strings.
@@ -195,6 +227,39 @@ impl BzlmodRepoMapping {
             .map(CanonicalLabel::into_storage_string)
             .unwrap_or_else(|| label.to_owned())
     }
+}
+
+/// Canonicalize a label string in a Bazel package context.
+///
+/// This mirrors the bzlmod-relevant part of Bazel's
+/// `Label.parseWithPackageContext`: `@@repo` is already canonical, `@repo`
+/// is mapped through the provided repository mapping, `//pkg` stays in the
+/// current repository, and `:target` stays in the current package.
+pub fn canonicalize_label_with_package_context(
+    label: &str,
+    current_repo: impl Into<CanonicalRepoName>,
+    current_package: &str,
+    repo_mapping: Option<&BzlmodRepoMapping>,
+) -> Option<CanonicalLabel> {
+    let current_repo = current_repo.into();
+    let parsed = ParsedPackageContextLabel::parse(label, current_package)?;
+    let canonical_repo = match parsed.repo {
+        ParsedRepo::Current => current_repo,
+        ParsedRepo::Canonical(repo) => CanonicalRepoName::new(repo),
+        ParsedRepo::Apparent(repo) => {
+            if repo.contains('+') {
+                CanonicalRepoName::new(repo)
+            } else if let Some(mapping) = repo_mapping {
+                mapping.canonical_repo_name(repo)
+            } else {
+                CanonicalRepoName::new(repo)
+            }
+        }
+    };
+    Some(CanonicalLabel::new(
+        canonical_repo,
+        format!("{}:{}", parsed.package, parsed.target),
+    ))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -240,14 +305,25 @@ fn parsed_module_name<'a>(parsed: &'a ParsedModuleFile, root_module_name: &'a st
     }
 }
 
+fn split_package_and_target(package_and_target: &str) -> Option<(&str, &str)> {
+    if let Some((package, target)) = package_and_target.split_once(':') {
+        return Some((package, target));
+    }
+    let target = package_and_target
+        .rsplit('/')
+        .next()
+        .unwrap_or(package_and_target);
+    Some((package_and_target, target))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ParsedLabel<'a> {
+struct ParsedAbsoluteLabel<'a> {
     canonical: bool,
     repo: &'a str,
     rest: &'a str,
 }
 
-impl<'a> ParsedLabel<'a> {
+impl<'a> ParsedAbsoluteLabel<'a> {
     fn parse(label: &'a str) -> Option<Self> {
         let (canonical, stripped) = if let Some(rest) = label.strip_prefix("@@") {
             (true, rest)
@@ -267,6 +343,111 @@ impl<'a> ParsedLabel<'a> {
     fn to_canonical_label(self, repo: CanonicalRepoName) -> CanonicalLabel {
         CanonicalLabel::new(repo, self.rest)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ParsedRepo<'a> {
+    Current,
+    Canonical(&'a str),
+    Apparent(&'a str),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ParsedPackageContextLabel<'a> {
+    repo: ParsedRepo<'a>,
+    package: &'a str,
+    target: &'a str,
+}
+
+impl<'a> ParsedPackageContextLabel<'a> {
+    fn parse(label: &'a str, current_package: &'a str) -> Option<Self> {
+        if let Some(rest) = label.strip_prefix("@@") {
+            let Some((repo, rest)) = parse_repo_and_rest_or_shorthand(rest) else {
+                return Some(Self {
+                    repo: ParsedRepo::Canonical(rest),
+                    package: "",
+                    target: rest,
+                });
+            };
+            let (package, target) = parse_package_and_target(rest);
+            let target = if package.is_empty() && target.is_empty() {
+                repo
+            } else {
+                target
+            };
+            return Some(Self {
+                repo: ParsedRepo::Canonical(repo),
+                package,
+                target,
+            });
+        }
+
+        if let Some(rest) = label.strip_prefix('@') {
+            let Some((repo, rest)) = parse_repo_and_rest_or_shorthand(rest) else {
+                return Some(Self {
+                    repo: ParsedRepo::Apparent(rest),
+                    package: "",
+                    target: rest,
+                });
+            };
+            let (package, target) = parse_package_and_target(rest);
+            let target = if package.is_empty() && target.is_empty() {
+                repo
+            } else {
+                target
+            };
+            return Some(Self {
+                repo: ParsedRepo::Apparent(repo),
+                package,
+                target,
+            });
+        }
+
+        if let Some(rest) = label.strip_prefix("//") {
+            let (package, target) = parse_package_and_target(rest);
+            return Some(Self {
+                repo: ParsedRepo::Current,
+                package,
+                target,
+            });
+        }
+
+        if let Some(target) = label.strip_prefix(':') {
+            return Some(Self {
+                repo: ParsedRepo::Current,
+                package: current_package,
+                target,
+            });
+        }
+
+        if let Some((repo, rest)) = label.split_once("//") {
+            if !repo.is_empty() {
+                let (package, target) = parse_package_and_target(rest);
+                return Some(Self {
+                    repo: ParsedRepo::Apparent(repo),
+                    package,
+                    target,
+                });
+            }
+        }
+
+        None
+    }
+}
+
+fn parse_repo_and_rest_or_shorthand(label_without_at: &str) -> Option<(&str, &str)> {
+    label_without_at.split_once("//")
+}
+
+fn parse_package_and_target(rest: &str) -> (&str, &str) {
+    if let Some((package, target)) = rest.split_once(':') {
+        return (package, target);
+    }
+    if rest.is_empty() {
+        return ("", "");
+    }
+    let target = rest.rsplit('/').next().unwrap_or(rest);
+    (rest, target)
 }
 
 #[cfg(test)]
@@ -385,5 +566,88 @@ mod tests {
 
         assert_eq!(label.repo().as_str(), "rules_cc");
         assert_eq!(label.package_and_target(), "cc:toolchain");
+    }
+
+    #[test]
+    fn canonical_label_renderers_distinguish_bazel_and_legacy_forms() {
+        let label = CanonicalLabel::new(CanonicalRepoName::new("rules_cc"), "cc:toolchain");
+
+        assert_eq!(label.to_unambiguous_string(), "@@rules_cc//cc:toolchain");
+        assert_eq!(label.to_legacy_storage_string(), "@rules_cc//cc:toolchain");
+    }
+
+    #[test]
+    fn package_context_canonicalizes_current_repo_absolute_label() {
+        let label =
+            canonicalize_label_with_package_context("//tools:lock", "rules_rs", "ext", None)
+                .unwrap();
+
+        assert_eq!(label.to_unambiguous_string(), "@@rules_rs//tools:lock");
+    }
+
+    #[test]
+    fn package_context_canonicalizes_package_relative_label() {
+        let label = canonicalize_label_with_package_context(":lock", "rules_rs", "tools/ext", None)
+            .unwrap();
+
+        assert_eq!(label.to_unambiguous_string(), "@@rules_rs//tools/ext:lock");
+    }
+
+    #[test]
+    fn package_context_keeps_unambiguous_canonical_repo() {
+        let label = canonicalize_label_with_package_context(
+            "@@rules_cc//cc:toolchain",
+            "rules_rs",
+            "ext",
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(label.repo().as_str(), "rules_cc");
+        assert_eq!(label.to_unambiguous_string(), "@@rules_cc//cc:toolchain");
+    }
+
+    #[test]
+    fn package_context_maps_apparent_repo() {
+        let mut module = parsed_module("owner");
+        let mut dep = BazelDep::new("rules_cc".to_owned(), Version::empty());
+        dep.repo_name = Some("cc_rules".to_owned());
+        module.module.bazel_deps.push(dep);
+        let mapping = BzlmodRepoMapping::for_module(&module, "root");
+
+        let label = canonicalize_label_with_package_context(
+            "@cc_rules//cc:toolchain",
+            "owner",
+            "ext",
+            Some(&mapping),
+        )
+        .unwrap();
+
+        assert_eq!(label.to_unambiguous_string(), "@@rules_cc//cc:toolchain");
+    }
+
+    #[test]
+    fn package_context_supports_legacy_lockfile_repo_label_shape() {
+        let label =
+            canonicalize_label_with_package_context("rules_cc//cc:toolchain", "owner", "ext", None)
+                .unwrap();
+
+        assert_eq!(label.to_unambiguous_string(), "@@rules_cc//cc:toolchain");
+    }
+
+    #[test]
+    fn package_context_supports_repo_shorthand() {
+        let label =
+            canonicalize_label_with_package_context("@rules_cc", "owner", "ext", None).unwrap();
+
+        assert_eq!(label.to_unambiguous_string(), "@@rules_cc//:rules_cc");
+    }
+
+    #[test]
+    fn package_context_supports_empty_target_repo_shorthand() {
+        let label =
+            canonicalize_label_with_package_context("@rules_cc//:", "owner", "ext", None).unwrap();
+
+        assert_eq!(label.to_unambiguous_string(), "@@rules_cc//:rules_cc");
     }
 }

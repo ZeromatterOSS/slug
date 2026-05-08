@@ -205,20 +205,12 @@ fn repo_label_context_from_eval(eval: &mut Evaluator<'_, '_, '_>) -> Option<Repo
 }
 
 fn canonicalize_repo_attr_label(label: &str, context: Option<&RepoLabelContext>) -> String {
-    if label.starts_with("@@") {
-        return label.to_owned();
-    }
-    if label.starts_with('@') {
-        return label.to_owned();
-    }
-    let Some(context) = context else {
-        return label.to_owned();
-    };
-    if label.starts_with("//") {
-        return format!("@@{}{}", context.repo, label);
-    }
-    let target = label.strip_prefix(':').unwrap_or(label);
-    format!("@@{}//{}:{}", context.repo, context.package, target)
+    let (repo, package) = context
+        .map(|context| (context.repo.as_str(), context.package.as_str()))
+        .unwrap_or(("", ""));
+    kuro_bzlmod::canonicalize_label_with_package_context(label, repo, package, None)
+        .map(|label| label.to_unambiguous_string())
+        .unwrap_or_else(|| label.to_owned())
 }
 
 fn extract_repo_and_package_from_filename(filename: &str) -> Option<(String, String)> {

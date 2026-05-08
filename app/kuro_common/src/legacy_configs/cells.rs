@@ -829,7 +829,7 @@ impl BuckConfigBasedCells {
             let extra = kuro_bzlmod::pre_compute_extension_repo_cells_from_lockfile(
                 &lockfile,
                 root_module_name,
-                &pre_computed_cells,
+                &mut pre_computed_cells,
                 project_root.root().as_path(),
             );
             // Mirror lockfile-seeded cells into the dynamic-extension-cell
@@ -963,9 +963,12 @@ impl BuckConfigBasedCells {
             let mut repos_needing_materialization = Vec::new();
             for tc in &all_toolchains {
                 let tc_label = &tc.label;
-                // Extract repo name from labels like "@repo//:all" or "@repo//pkg:target"
                 if let Some(repo_name) = extract_repo_name_from_label(tc_label) {
-                    // Check if any matching directory exists in bazel-external/
+                    // Diagnostic/materialization bookkeeping only: label
+                    // resolution itself goes through the typed resolvers.
+                    // This scan checks whether a registered toolchain's repo
+                    // already has a materialized legacy/module-version
+                    // directory so we can log pending repos.
                     let has_dir = if bazel_ext_dir.is_dir() {
                         std::fs::read_dir(&bazel_ext_dir)
                             .ok()
@@ -1398,13 +1401,14 @@ impl BuckConfigBasedCells {
 /// Extract the repo name from a toolchain/platform label.
 /// E.g., "@local_config_cc_toolchains//:all" → "local_config_cc_toolchains"
 ///       "//cc/private/toolchain/test:default_test_runner_toolchain" → None (relative)
-fn extract_repo_name_from_label(label: &str) -> Option<&str> {
-    let stripped = label
-        .strip_prefix("@@")
-        .or_else(|| label.strip_prefix('@'))?;
-    let end = stripped.find("//").unwrap_or(stripped.len());
-    let name = &stripped[..end];
-    if name.is_empty() { None } else { Some(name) }
+fn extract_repo_name_from_label(label: &str) -> Option<String> {
+    let parsed = kuro_bzlmod::canonicalize_label_with_package_context(label, "", "", None)?;
+    let repo = parsed.repo().as_str();
+    if repo.is_empty() {
+        None
+    } else {
+        Some(repo.to_owned())
+    }
 }
 
 /// Convert a TagValue to a RepoSpec AttrValue (for extension cell repo specs).

@@ -1,0 +1,288 @@
+# Plan 51: Kurod Memory Profiling
+
+> Parent: [2026-01-21-kuro-bazel-compatible-build-tool.md](../2026-01-21-kuro-bazel-compatible-build-tool.md)
+>
+> Related: [Plan 16](./16-benchmark-telemetry.md),
+> [Plan 17](./17-optimization.md),
+> [Plan 21](./21-warm-invocation-overhead.md),
+> [Plan 31](./31-bazel-perf-parity.md),
+> [Plan 50](./50-canonical-label-architecture.md)
+
+## Status: PLANNED
+
+## Goal
+
+Profile and reduce `kurod` memory usage during large bzlmod/zeromatter
+builds. Recent local runs showed `kurod` consuming more than 20 GB of
+memory. Before optimizing broadly, identify whether memory is being spent
+on expected retained graph state or on avoidable behavior such as giant
+diagnostic strings, duplicated alias maps, retained event payloads, or
+repeated cloned repository metadata.
+
+The goal is not merely to lower one repro's peak RSS. The goal is to make
+memory growth explainable, bounded where possible, and covered by enough
+instrumentation that future regressions are easy to diagnose.
+
+## Recent Trigger
+
+While verifying Plan 50 from `/var/mnt/dev/zeromatter`:
+
+```sh
+/var/mnt/dev/kuro/target/debug/kuro \
+  --isolation-dir verify-canonical-label-architecture \
+  build //sdk:sdk_contents
+```
+
+the build failed during analysis after loading many external repositories.
+The output included a very large diagnostic for an unknown cell alias:
+
+- `Toolchain package '@rules_python+python+pythons_hub//:all' load failed`
+- `unknown cell alias: '@rules_python'`
+- the diagnostic rendered a huge "known aliases are" list
+
+That diagnostic path is a priority suspect because large rendered strings
+can be allocated repeatedly and retained in errors, event logs, or analysis
+state.
+
+## Investigation Questions
+
+- Does RSS grow steadily, spike in one phase, or stay high after a failed
+  build returns?
+- Is memory mostly retained graph state, temporary allocations, daemon
+  caches, diagnostics/events, or duplicated repository/cell data?
+- Are large cell alias maps cloned per package, configuration, target, or
+  error?
+- Are rendered error strings retained when structured errors would suffice?
+- Does event logging buffer huge diagnostics before flushing?
+- Does `bazel-external` or package tree scanning retain full path lists for
+  many repositories?
+- Does the daemon release memory between builds, or does warm daemon state
+  accumulate unexpectedly?
+
+## Phase 1: Fast Triage
+
+Capture process-level memory and daemon state for the running or next
+repro:
+
+```sh
+pgrep -af kurod
+ps -o pid,ppid,rss,vsz,etime,nlwp,cmd -p <pid>
+pmap -x <pid> | tail -n 20
+lsof -p <pid> | wc -l
+```
+
+Track RSS over time while reproducing:
+
+```sh
+while true; do
+  date
+  ps -o pid,rss,vsz,nlwp,etime,cmd -p <pid>
+  sleep 5
+done
+```
+
+Record whether memory climbs during:
+
+- daemon startup;
+- bzlmod module/lockfile loading;
+- external repository materialization;
+- package loading;
+- configured target analysis;
+- diagnostic rendering;
+- event log flushing;
+- idle time after a failed build.
+
+## Phase 2: Narrow Reproductions
+
+Use the full zeromatter repro as the baseline, then reduce it:
+
+1. Full repro:
+
+   ```sh
+   /var/mnt/dev/kuro/target/debug/kuro \
+     --isolation-dir verify-canonical-label-architecture \
+     build //sdk:sdk_contents
+   ```
+
+2. A smaller target that loads bzlmod and external repositories but avoids
+   full SDK analysis.
+
+3. A target or synthetic fixture that triggers the unknown-cell-alias
+   diagnostic with a large alias set.
+
+4. A warm-daemon second run to distinguish one-time loading from retained
+   daemon growth.
+
+For each repro, record:
+
+- peak RSS;
+- RSS after failure or success;
+- elapsed time;
+- last high-level build phase before the spike;
+- whether the large alias diagnostic was emitted.
+
+## Phase 3: In-Process Memory Checkpoints
+
+Add temporary low-overhead tracing around high-cardinality phases. Each
+checkpoint should log current RSS plus relevant object counts.
+
+Candidate checkpoint sites:
+
+- bzlmod lockfile decode;
+- pending repo/cell registration;
+- dynamic extension-cell registration;
+- package loading;
+- configured target analysis;
+- cell alias map creation;
+- diagnostic construction and rendering;
+- event emission and event log buffering/flushing.
+
+Useful counts:
+
+- registered cells;
+- aliases per cell;
+- total alias entries;
+- loaded packages;
+- configured targets;
+- configured target graph nodes;
+- repository specs;
+- extension repos;
+- pending materialization entries;
+- retained diagnostics/events;
+- total bytes in rendered diagnostic strings, if available.
+
+Prefer a helper that can be left behind under a debug flag or tracing
+target instead of one-off prints.
+
+## Phase 4: Heap Profiling
+
+Run at least one reproduction under an allocation profiler.
+
+Preferred tools, in order:
+
+1. `heaptrack` for actionable allocation call stacks.
+2. `valgrind --tool=massif` if `heaptrack` is unavailable, accepting the
+   slower run.
+3. allocator-native profiling if the daemon already uses, or can easily
+   use, a profiling allocator.
+
+Example:
+
+```sh
+heaptrack /var/mnt/dev/kuro/target/debug/kuro \
+  --isolation-dir verify-canonical-label-architecture \
+  build //sdk:sdk_contents
+```
+
+The output should identify:
+
+- top allocation sites;
+- top retained allocation sites;
+- repeated allocation hot loops;
+- large strings, vectors, maps, or graph nodes;
+- whether diagnostic/event rendering dominates the spike.
+
+## Phase 5: Specific Suspects
+
+### Giant Diagnostics
+
+The unknown-cell-alias diagnostic currently can render an enormous alias
+list. Audit:
+
+- where the alias list is built;
+- whether the list is sorted/cloned for every error;
+- whether the full rendered string is stored in multiple places;
+- whether the event log retains it.
+
+Likely guardrail:
+
+- cap displayed aliases to a small number, for example 50 or 100;
+- include total alias count;
+- include a short hint for how to inspect the full alias set when needed.
+
+### Alias Map Cloning
+
+Audit cell alias data structures for accidental full clones across:
+
+- cells;
+- packages;
+- configurations;
+- target nodes;
+- toolchain contexts;
+- diagnostics.
+
+Likely guardrails:
+
+- share alias maps behind `Arc`;
+- intern common strings;
+- store canonical identifiers instead of repeated rendered labels where
+  possible.
+
+### Event and Error Retention
+
+Audit whether structured errors are rendered early and then retained as
+large strings.
+
+Likely guardrails:
+
+- render diagnostics late;
+- cap event payload sizes;
+- avoid storing both structured and rendered forms unless needed;
+- truncate repeated contextual lists in event payloads.
+
+### Package and Directory State
+
+Audit external package loading and `bazel-external` scanning for retained
+path lists or per-repo directory snapshots.
+
+Likely guardrails:
+
+- stream scans instead of retaining full lists;
+- avoid duplicate absolute and project-relative path storage;
+- keep fallback scan results scoped to the operation unless cached
+  intentionally.
+
+## Phase 6: Fixes and Guardrails
+
+Apply fixes in order of confidence:
+
+1. Cap huge diagnostics and event payloads.
+2. Replace obvious full-map clones with shared data.
+3. Avoid retaining rendered error strings where structured errors exist.
+4. Add focused memory checkpoints behind tracing/debug flags.
+5. Add a smoke benchmark or script that records peak RSS for a
+   representative bzlmod load.
+
+Any guardrail should preserve enough information to debug real failures.
+Truncation should say exactly how many entries were omitted.
+
+## Acceptance Criteria
+
+- We can reproduce and report peak RSS for the baseline zeromatter command.
+- We know which phase accounts for the largest memory spike.
+- Heap profiling identifies the top retained allocation categories.
+- Unknown-cell-alias diagnostics no longer render or retain unbounded alias
+  lists.
+- Alias/cell/repo metadata is not cloned per package or configured target
+  without a clear reason.
+- Event logging cannot retain arbitrarily large rendered diagnostics.
+- A repeatable memory smoke command exists, even if it is initially manual.
+
+## Verification
+
+Minimum verification for the first implementation pass:
+
+- `cargo fmt` on touched Rust files.
+- `cargo check` for touched crates.
+- Re-run the baseline zeromatter command and record peak RSS.
+- Capture before/after examples for the unknown-cell-alias diagnostic.
+- Confirm truncated diagnostics include total counts.
+
+Optional but preferred:
+
+- `heaptrack` or Massif report attached or summarized in the plan progress.
+- Warm-daemon second run showing whether RSS stabilizes or grows.
+
+## Progress
+
+No implementation yet.

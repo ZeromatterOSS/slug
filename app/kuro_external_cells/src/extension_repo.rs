@@ -28,6 +28,7 @@ use cmp_any::PartialEqAny;
 use compact_str::CompactString;
 use dice::DiceComputations;
 use kuro_bzlmod::ExtensionRepoExecutionKey;
+use kuro_bzlmod::RepoAttrValue;
 use kuro_bzlmod::RepoSpec;
 use kuro_common::dice::data::HasIoProvider;
 use kuro_common::external_symlink::ExternalSymlink;
@@ -452,10 +453,15 @@ pub(crate) async fn get_file_ops_delegate(
         && std::fs::read_to_string(&marker_path)
             .ok()
             .is_some_and(|s| s.trim() == "stub");
-    if is_stale_stub {
+    let is_stale_missing_build = marker_path.exists()
+        && !setup.repo_spec_json.is_empty()
+        && repo_spec_requires_build_file(&setup.repo_spec_json)
+        && !source_path.join("BUILD.bazel").exists()
+        && !source_path.join("BUILD").exists();
+    if is_stale_stub || is_stale_missing_build {
         tracing::info!(
-            "Extension repo '{}' has stale stub marker but a valid RepoSpec is now available; \
-             discarding stub and re-materializing",
+            "Extension repo '{}' has stale materialization with a valid RepoSpec available; \
+             discarding it and re-materializing",
             setup.canonical_name
         );
         if let Err(e) = std::fs::remove_dir_all(&source_path) {
@@ -689,6 +695,30 @@ pub(crate) async fn get_file_ops_delegate(
         source_path,
         digest_config,
     )))
+}
+
+fn repo_spec_requires_build_file(repo_spec_json: &str) -> bool {
+    let Ok(repo_spec) = serde_json::from_str::<RepoSpec>(repo_spec_json) else {
+        return false;
+    };
+    repo_spec
+        .attributes
+        .get("build_file")
+        .is_some_and(attr_value_is_present)
+        || repo_spec
+            .attributes
+            .get("build_file_content")
+            .is_some_and(attr_value_is_present)
+}
+
+fn attr_value_is_present(value: &RepoAttrValue) -> bool {
+    match value {
+        RepoAttrValue::None => false,
+        RepoAttrValue::String(s) | RepoAttrValue::Label(s) => !s.is_empty(),
+        RepoAttrValue::StringList(items) => !items.is_empty(),
+        RepoAttrValue::Dict(entries) => !entries.is_empty(),
+        RepoAttrValue::Int(_) | RepoAttrValue::Bool(_) => true,
+    }
 }
 
 /// Create `buck-out/v2/external_cells/extension_repo/{canonical_name}` as a symlink
