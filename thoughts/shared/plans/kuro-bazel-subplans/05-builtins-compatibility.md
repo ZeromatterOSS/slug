@@ -477,6 +477,132 @@ Per 04-prelude-architecture.md, these language-specific directories should be re
 
 ---
 
+## Follow-up: Alias-Backed `config_setting_group` Matching (OPEN, 2026-05-08)
+
+### Symptom
+
+After the root registered toolchain loading fixes, zeromatter's
+`//sdk:sdk_contents` advances to analysis of the selected LLVM C++
+toolchain and fails inside:
+
+```
+llvm//toolchain/args/linux:default_libs
+```
+
+The target is an `alias(actual = select({...}))` over:
+
+```
+llvm//platforms/config:musl
+llvm//platforms/config:gnu
+```
+
+Kuro reports:
+
+```
+None of 2 conditions matched configuration
+`zeromatter//bazel/platforms:linux-gnu-host#...`
+and no default was set:
+  llvm//platforms/config:musl
+  llvm//platforms/config:gnu
+```
+
+The configured platform includes `@llvm//constraints/libc:gnu.2.28`, so
+the `gnu` branch should match.
+
+### Root Cause Hypothesis
+
+`llvm//platforms/config:gnu` is not a plain native `config_setting`.
+LLVM defines it via `@bazel_skylib//lib:selects.bzl`:
+
+```
+selects.config_setting_group(
+    name = "gnu",
+    match_any = [
+        "//constraints/libc:<glibc version>",
+        ...
+    ] + [
+        "<os>_<cpu>_unconstrained",
+        ...
+    ],
+)
+```
+
+`selects.config_setting_group` expands to native `alias` chains whose
+`actual` attributes are themselves selected by configuration. Bazel treats
+these alias-backed groups as valid select keys: the group matches iff the
+resolved alias target's `ConfigurationInfo` matches.
+
+Kuro currently supports native `config_setting`, `constraint_value`,
+`platform`, `alias`, and `select()` independently, but select-key matching
+appears to assume a direct `ConfigurationInfo` provider for each key. That
+misses alias-backed configuration groups.
+
+### Desired Behavior
+
+- A `select()` key may point at an alias that resolves to a
+  `config_setting`, `constraint_value`, or another alias-backed group.
+- Matching must use the provider/configuration data of the resolved target,
+  exactly as Bazel does.
+- Alias resolution must remain general; do not special-case LLVM,
+  `bazel_skylib`, `gnu`, or `musl`.
+- Existing plain `config_setting` and `constraint_value` behavior must remain
+  unchanged.
+
+### Implementation Notes
+
+Likely touchpoints:
+
+- `app/kuro_configured/src/configuration.rs`
+  - `ConfigurationNodeKey` currently asks for `FrozenConfigurationInfo` on
+    the select key's analysis result.
+  - For aliases, the analysis result forwarded by `analyze_alias` should
+    expose the resolved target's providers. If it does not, inspect how
+    configuration deps are collected and configured for select keys.
+- `app/kuro_analysis/src/analysis/native_rule_analysis.rs`
+  - `analyze_alias` already forwards its actual target's `AnalysisResult`.
+    The bug may be earlier: select-key dependency discovery/configuration may
+    analyze the alias before resolving its configurable `actual`.
+- `app/kuro_node/src/attrs/coerced_attr.rs`
+  - `select()` matching should continue to consume
+    `MatchedConfigurationSettingKeys`, but the entries may need to be
+    populated through alias resolution.
+
+### Verification
+
+Add a small fixture before relying on zeromatter:
+
+```
+constraint_setting(name = "libc")
+constraint_value(name = "gnu", constraint_setting = ":libc")
+platform(name = "linux_gnu", constraint_values = [":gnu"])
+
+config_setting(name = "is_gnu", constraint_values = [":gnu"])
+alias(name = "gnu_group", actual = select({
+    ":is_gnu": ":is_gnu",
+    "//conditions:default": ":never_matches",
+}))
+
+alias(name = "chosen", actual = select({
+    ":gnu_group": ":gnu_output",
+}))
+```
+
+Then build with `--platforms=//:linux_gnu` and assert the alias selects
+`:gnu_output`.
+
+ZeroMatter smoke:
+
+```
+cd /var/mnt/dev/zeromatter
+/var/mnt/dev/kuro/target/debug/kuro --isolation-dir verify-config-setting-group build //sdk:sdk_contents
+```
+
+Success for this follow-up is getting past
+`llvm//toolchain/args/linux:default_libs` without adding any
+LLVM-specific behavior.
+
+---
+
 ## References
 
 ### Bazel Documentation
