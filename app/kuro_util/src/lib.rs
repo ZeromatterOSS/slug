@@ -21,6 +21,7 @@ pub mod golden_test_helper;
 pub mod hash;
 pub mod indent;
 pub mod late_binding;
+pub mod memory_checkpoint;
 pub mod network_speed_average;
 pub mod os;
 pub mod per_thread_instruction_counter;

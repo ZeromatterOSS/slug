@@ -381,6 +381,14 @@ impl Lockfile {
 
         let lockfile: Lockfile = serde_json::from_str(&content)
             .map_err(|e| LockfileError::ParseError(format!("{}: {}", path.display(), e)))?;
+        kuro_util::memory_checkpoint::checkpoint(
+            "bzlmod_lockfile_read",
+            [
+                ("bytes", content.len()),
+                ("extensions", lockfile.module_extensions.len()),
+                ("registry_hashes", lockfile.registry_file_hashes.len()),
+            ],
+        );
 
         // Check version compatibility
         if lockfile.lock_file_version > LOCKFILE_VERSION {
@@ -694,7 +702,13 @@ pub fn cached_lockfile(workspace_root: &Path) -> Option<std::sync::Arc<Lockfile>
 
     let parsed = if path.exists() {
         match Lockfile::read(&path) {
-            Ok(l) => Some(std::sync::Arc::new(l)),
+            Ok(l) => {
+                kuro_util::memory_checkpoint::checkpoint(
+                    "bzlmod_lockfile_cache_insert",
+                    [("extensions", l.module_extensions.len())],
+                );
+                Some(std::sync::Arc::new(l))
+            }
             Err(e) => {
                 tracing::warn!(
                     "Failed to read MODULE.bazel.lock at {}: {}",

@@ -92,6 +92,8 @@ pub mod unchecked_cell_rel_path;
 use std::collections::HashMap;
 use std::collections::hash_map;
 use std::fmt::Debug;
+use std::fmt::Display;
+use std::fmt::Formatter;
 use std::sync::Arc;
 use std::sync::RwLock;
 
@@ -154,6 +156,52 @@ static DYNAMIC_EXTENSION_CELL_SETUPS: std::sync::LazyLock<
 
 /// Global project root for dynamic cell filesystem operations.
 static DYNAMIC_PROJECT_ROOT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
+const MAX_UNKNOWN_CELL_ALIAS_SUGGESTIONS: usize = 50;
+
+#[derive(Debug)]
+struct KnownCellAliasesForError {
+    aliases: Vec<NonEmptyCellAlias>,
+    total: usize,
+}
+
+impl KnownCellAliasesForError {
+    fn new(aliases: &HashMap<NonEmptyCellAlias, CellName>) -> Self {
+        let total = aliases.len();
+        let aliases = aliases
+            .keys()
+            .sorted()
+            .take(MAX_UNKNOWN_CELL_ALIAS_SUGGESTIONS)
+            .cloned()
+            .collect();
+        Self { aliases, total }
+    }
+}
+
+impl Display for KnownCellAliasesForError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.total == 0 {
+            return f.write_str("<none>");
+        }
+
+        write!(f, "{}", self.aliases.iter().format(", "))?;
+
+        let omitted = self.total.saturating_sub(self.aliases.len());
+        if omitted != 0 {
+            write!(
+                f,
+                " (showing {} of {}; {} omitted)",
+                self.aliases.len(),
+                self.total,
+                omitted
+            )?;
+        } else {
+            write!(f, " ({} total)", self.total)?;
+        }
+
+        Ok(())
+    }
+}
 
 /// Register a dynamically-discovered extension repo cell.
 /// Called after extension execution materializes repos.
@@ -549,8 +597,8 @@ enum CellError {
     DuplicateNames(CellName, CellRootPathBuf, CellRootPathBuf),
     #[error("Two cells, `{0}` and `{1}`, share the same path `{2}`")]
     DuplicatePaths(CellName, CellName, CellRootPathBuf),
-    #[error("unknown cell alias: `{0}`. In cell `{1}`, known aliases are: `{}`", .2.iter().sorted().join(", "))]
-    UnknownCellAlias(CellAlias, CellName, Vec<NonEmptyCellAlias>),
+    #[error("unknown cell alias: `{0}`. In cell `{1}`, known aliases are: `{2}`")]
+    UnknownCellAlias(CellAlias, CellName, KnownCellAliasesForError),
     #[error("unknown cell name: `{0}`. known cell names are `{}`", .1.iter().join(", "))]
     UnknownCellName(CellName, Vec<CellName>),
     #[error(
@@ -580,6 +628,7 @@ impl CellAliasResolver {
         current: CellName,
         mut aliases: HashMap<NonEmptyCellAlias, CellName>,
     ) -> kuro_error::Result<CellAliasResolver> {
+        let input_aliases = aliases.len();
         let current_as_alias = NonEmptyCellAlias::new(current.as_str().to_owned())?;
         if let Some(alias_target) = aliases.insert(current_as_alias, current) {
             if alias_target != current {
@@ -588,6 +637,11 @@ impl CellAliasResolver {
         }
 
         let aliases = Arc::new(aliases);
+
+        kuro_util::memory_checkpoint::checkpoint(
+            "cell_alias_resolver_new",
+            [("input_aliases", input_aliases), ("aliases", aliases.len())],
+        );
 
         Ok(CellAliasResolver { current, aliases })
     }
@@ -654,7 +708,7 @@ impl CellAliasResolver {
         Err(kuro_error::Error::from(CellError::UnknownCellAlias(
             CellAlias::new(alias.to_owned()),
             self.current,
-            self.aliases.keys().cloned().collect(),
+            KnownCellAliasesForError::new(&self.aliases),
         )))
     }
 
@@ -699,6 +753,7 @@ impl CellResolver {
         cells: Vec<CellInstance>,
         root_cell_alias_resolver: CellAliasResolver,
     ) -> kuro_error::Result<CellResolver> {
+        let input_cell_count = cells.len();
         let mut path_mappings: SequenceTrie<FileNameBuf, CellName> = SequenceTrie::new();
         let mut root_cell = None;
         for cell in &cells {
@@ -742,6 +797,14 @@ impl CellResolver {
                 }
             }
         }
+        kuro_util::memory_checkpoint::checkpoint(
+            "cell_resolver_new",
+            [
+                ("input_cells", input_cell_count),
+                ("cells", cells_map.len()),
+                ("root_aliases", root_cell_alias_resolver.aliases.len()),
+            ],
+        );
         Ok(CellResolver(Arc::new(CellResolverInternals {
             cells: cells_map,
             dynamic_cells: RwLock::new(HashMap::new()),
@@ -1168,6 +1231,28 @@ mod tests {
     #[test]
     fn execroot_path_returns_none_for_empty_basename() {
         assert_eq!(super::execroot_path(std::path::Path::new("/")), None);
+    }
+
+    #[test]
+    fn unknown_cell_alias_diagnostic_caps_known_aliases() -> kuro_error::Result<()> {
+        let mut aliases = HashMap::new();
+        for i in 0..100 {
+            aliases.insert(
+                NonEmptyCellAlias::new(format!("alias_{i:03}"))?,
+                CellName::testing_new("root"),
+            );
+        }
+        let resolver = CellAliasResolver::new(CellName::testing_new("root"), aliases)?;
+
+        let err = resolver.resolve("missing").unwrap_err().to_string();
+
+        assert!(err.contains("unknown cell alias: `missing`"));
+        assert!(err.contains("known aliases are: `alias_000"));
+        assert!(err.contains("showing 50 of 101; 51 omitted"));
+        assert!(!err.contains("alias_050"));
+        assert!(!err.contains("alias_099"));
+
+        Ok(())
     }
 
     #[test]

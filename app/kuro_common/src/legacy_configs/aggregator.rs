@@ -153,6 +153,13 @@ impl CellsAggregator {
             .collect::<kuro_error::Result<Vec<_>>>()?;
 
         let root_cell_alias_resolver = CellAliasResolver::new(self.root_cell, self.root_aliases)?;
+        kuro_util::memory_checkpoint::checkpoint(
+            "legacy_cells_aggregator_make_cell_resolver",
+            [
+                ("cell_infos", self.cell_infos.len()),
+                ("cell_instances", instances.len()),
+            ],
+        );
 
         CellResolver::new(instances, root_cell_alias_resolver)
     }

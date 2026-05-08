@@ -851,6 +851,14 @@ impl BuckConfigBasedCells {
             }
             pre_computed_cells.extend(extra);
         }
+        kuro_util::memory_checkpoint::checkpoint(
+            "legacy_cells_bzlmod_precomputed_repos",
+            [
+                ("parsed_modules", parsed_modules.len()),
+                ("precomputed_cells", pre_computed_cells.len()),
+                ("precomputed_aliases", pre_computed_aliases.len()),
+            ],
+        );
 
         // Aggregate extension usages from all modules and store globally.
         // This data is needed by DICE when extension repos are lazily executed.

@@ -8,7 +8,7 @@
 > [Plan 31](./31-bazel-perf-parity.md),
 > [Plan 50](./50-canonical-label-architecture.md)
 
-## Status: PLANNED
+## Status: IN PROGRESS
 
 ## Goal
 
@@ -285,4 +285,33 @@ Optional but preferred:
 
 ## Progress
 
-No implementation yet.
+- First implementation pass:
+  - capped unknown-cell-alias diagnostics to 50 displayed aliases and a
+    total/omitted count, so errors no longer clone/render unbounded alias
+    lists;
+  - interned `CellAlias` and `NonEmptyCellAlias` using the existing
+    `static_interner` pattern already used for `CellName`, reducing repeated
+    alias string clones in maps and diagnostics;
+  - added `KURO_MEMORY_CHECKPOINTS`-gated tracing checkpoints for lockfile
+    reads/cache inserts, bzlmod extension repo precompute, lockfile spoke
+    seeding, extension cell aggregation, and cell resolver construction;
+  - added `scripts/memory_smoke.sh` for repeatable RSS sampling by PID, pgrep
+    pattern, or wrapped command.
+- Short zeromatter repro capture from `/var/mnt/dev/zeromatter`:
+  - command:
+    `KURO_MEMORY_CHECKPOINTS=1 scripts/memory_smoke.sh --interval 5 --include-pgrep 'kurod\[zeromatter\].*verify-canonical-label-architecture-memory-profile-3' -- target/debug/kuro --isolation-dir verify-canonical-label-architecture-memory-profile-3 build //sdk:sdk_contents`;
+  - failed early on `unknown cell alias: bazel_lib`;
+  - diagnostic was bounded to 50 displayed aliases:
+    `showing 50 of 5518; 5468 omitted`;
+  - peak sampled client+daemon RSS: 302204 KiB;
+  - final sampled daemon RSS after failure: 225944 KiB;
+  - checkpoint highlights:
+    - `bzlmod_pre_compute_extension_repo_cells`: 71 parsed modules, 380 cells,
+      401 aliases, RSS 196427776 bytes in daemon;
+    - `bzlmod_pre_compute_extension_repo_cells_from_lockfile`: 380 existing
+      cells, 4708 new lockfile-seeded cells, RSS 207536128 bytes;
+    - `legacy_cells_bzlmod_precomputed_repos`: 5088 precomputed cells,
+      401 aliases, RSS 207945728 bytes;
+    - `cell_alias_resolver_new`: 5518 aliases, RSS 214892544 bytes;
+    - `cell_resolver_new`: 5147 cells and 5518 root aliases, RSS 215416832
+      bytes.

@@ -313,6 +313,14 @@ pub fn pre_compute_extension_repo_cells(
         }
     }
 
+    kuro_util::memory_checkpoint::checkpoint(
+        "bzlmod_pre_compute_extension_repo_cells",
+        [
+            ("parsed_modules", parsed_modules.len()),
+            ("cells", cells.len()),
+            ("aliases", aliases.len()),
+        ],
+    );
     tracing::info!(
         "Pre-computed {} extension repo cell(s) and {} alias(es) from use_repo()/use_repo_rule() declarations",
         cells.len(),
@@ -479,6 +487,13 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
     tracing::info!(
         "Pre-seeded {} extension spoke cell(s) from MODULE.bazel.lock",
         new_cells.len()
+    );
+    kuro_util::memory_checkpoint::checkpoint(
+        "bzlmod_pre_compute_extension_repo_cells_from_lockfile",
+        [
+            ("existing_cells", existing.len()),
+            ("new_cells", new_cells.len()),
+        ],
     );
 
     new_cells
@@ -815,6 +830,14 @@ pub fn build_all_extension_cells(
         }
     }
 
+    kuro_util::memory_checkpoint::checkpoint(
+        "bzlmod_build_all_extension_cells",
+        [
+            ("extensions", extension_results.len()),
+            ("cells", all_defs.cell_count()),
+            ("aliases", all_defs.alias_count()),
+        ],
+    );
     Ok(all_defs)
 }
 
