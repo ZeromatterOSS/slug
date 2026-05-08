@@ -77,6 +77,7 @@ use kuro_core::fs::buck_out_path::BuildArtifactPath;
 use kuro_error::BuckErrorContext;
 use kuro_error::kuro_error;
 use kuro_events::dispatch::span_async_simple;
+use kuro_execute::artifact::artifact_dyn::ArtifactDyn;
 use kuro_execute::artifact::fs::ExecutorFs;
 use kuro_execute::execute::action_digest::ActionDigest;
 use kuro_execute::execute::action_digest_and_blobs::ActionDigestAndBlobs;
@@ -843,7 +844,13 @@ impl RunAction {
         command_line_digest_for_dep_files.push_arg(env_len.to_string());
         command_line_digest_for_dep_files.push_count();
 
-        let path_rewrites = rendered_output_path_rewrites(&self.outputs, &cli_ctx, fs)?;
+        let path_rewrites = rendered_action_path_rewrites(
+            &self.outputs,
+            artifact_visitor,
+            action_execution_ctx,
+            &cli_ctx,
+            fs,
+        )?;
         rewrite_rendered_paths(&mut exe_rendered, &path_rewrites);
         rewrite_rendered_paths(&mut args_rendered, &path_rewrites);
         let mut cli_env = cli_env?;
@@ -1419,26 +1426,82 @@ fn slot_from_param_file_data(pf: &FrozenParamFileData, start: usize, end: usize)
     }
 }
 
-fn rendered_output_path_rewrites(
+fn rendered_action_path_rewrites(
     outputs: &BoxSliceSet<BuildArtifact>,
+    artifact_visitor: &RunActionVisitor<'_>,
+    action_execution_ctx: &dyn ActionExecutionCtx,
     cli_ctx: &DefaultCommandLineContext,
     fs: &ExecutorFs<'_>,
 ) -> kuro_error::Result<Vec<(String, String)>> {
-    let mut rewrites = Vec::new();
+    let mut rewrites = IndexMap::new();
     for output in outputs {
         let artifact: Artifact = output.dupe().into();
         let output_path = output.get_path();
-        let rendered = artifact
-            .get_path()
-            .with_full_path(|path| path.as_str().to_owned());
         let resolved = cli_ctx
             .resolve_project_path(fs.fs().resolve_build(output_path, None)?)?
             .into_string();
-        if rendered != resolved {
-            rewrites.push((rendered, resolved));
+        add_rendered_path_rewrite(&mut rewrites, &artifact, resolved);
+    }
+
+    let own_outputs: std::collections::HashSet<&BuildArtifact> = outputs.iter().collect();
+    for group in artifact_visitor.inputs() {
+        if let ArtifactGroup::Artifact(artifact) = group {
+            if let BaseArtifactKind::Build(built) = artifact.as_parts().0 {
+                if own_outputs.contains(built) {
+                    continue;
+                }
+            }
+        }
+
+        let values = action_execution_ctx.artifact_values(group);
+        for (artifact, value) in values.iter() {
+            if !matches!(artifact.as_parts().0, BaseArtifactKind::Build(_)) {
+                continue;
+            }
+
+            let content_hash = if artifact.has_content_based_path() {
+                Some(value.content_based_path_hash())
+            } else {
+                None
+            };
+            let resolved = cli_ctx
+                .resolve_project_path(artifact.resolve_path(fs.fs(), content_hash.as_ref())?)?
+                .into_string();
+            add_rendered_path_rewrite(&mut rewrites, artifact, resolved);
         }
     }
+
+    let mut rewrites = rewrites.into_iter().collect::<Vec<_>>();
+    rewrites.sort_by(|(left, _), (right, _)| right.len().cmp(&left.len()));
     Ok(rewrites)
+}
+
+fn add_rendered_path_rewrite(
+    rewrites: &mut IndexMap<String, String>,
+    artifact: &Artifact,
+    resolved: String,
+) {
+    let rendered = artifact
+        .get_path()
+        .with_full_path(|path| path.as_str().to_owned());
+    if rendered != resolved {
+        rewrites.entry(rendered.clone()).or_insert(resolved.clone());
+    }
+
+    let mut rendered_parent = parent_path(&rendered);
+    let mut resolved_parent = parent_path(&resolved);
+    while let (Some(rendered), Some(resolved)) = (rendered_parent, resolved_parent) {
+        if rendered != resolved {
+            rewrites.entry(rendered.clone()).or_insert(resolved.clone());
+        }
+        rendered_parent = parent_path(&rendered);
+        resolved_parent = parent_path(&resolved);
+    }
+}
+
+fn parent_path(path: &str) -> Option<String> {
+    path.rsplit_once('/')
+        .and_then(|(parent, _)| (!parent.is_empty()).then(|| parent.to_owned()))
 }
 
 fn rewrite_rendered_paths(values: &mut [String], rewrites: &[(String, String)]) {
@@ -1447,10 +1510,45 @@ fn rewrite_rendered_paths(values: &mut [String], rewrites: &[(String, String)]) 
     }
 }
 
+fn contains_path_fragment(value: &str, fragment: &str) -> bool {
+    value
+        .match_indices(fragment)
+        .any(|(start, _)| path_fragment_boundary(value, start, fragment.len()))
+}
+
+fn path_fragment_boundary(value: &str, start: usize, len: usize) -> bool {
+    let before = value[..start].chars().next_back();
+    let after = value[start + len..].chars().next();
+    before.is_none_or(is_path_delimiter) && after.is_none_or(is_path_delimiter)
+}
+
+fn is_path_delimiter(ch: char) -> bool {
+    !matches!(ch, 'A'..='Z' | 'a'..='z' | '0'..='9' | '_' | '-' | '.')
+}
+
+fn replace_path_fragment(value: &str, from: &str, to: &str) -> String {
+    let mut replaced = String::new();
+    let mut cursor = 0;
+    for (start, _) in value.match_indices(from) {
+        if !path_fragment_boundary(value, start, from.len()) {
+            continue;
+        }
+        replaced.push_str(&value[cursor..start]);
+        replaced.push_str(to);
+        cursor = start + from.len();
+    }
+    if cursor == 0 {
+        value.to_owned()
+    } else {
+        replaced.push_str(&value[cursor..]);
+        replaced
+    }
+}
+
 fn rewrite_rendered_path(value: &mut String, rewrites: &[(String, String)]) {
     for (from, to) in rewrites {
-        if value.contains(from) {
-            *value = value.replace(from, to);
+        if contains_path_fragment(value, from) {
+            *value = replace_path_fragment(value, from, to);
         }
     }
 }
