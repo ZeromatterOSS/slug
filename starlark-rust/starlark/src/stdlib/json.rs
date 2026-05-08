@@ -247,9 +247,16 @@ pub(crate) fn json(globals: &mut GlobalsBuilder) {
 
         fn decode<'v>(
             #[starlark(require = pos)] x: &str,
+            #[starlark(require = named)] default: Option<Value<'v>>,
             heap: Heap<'v>,
         ) -> anyhow::Result<Value<'v>> {
-            Ok(heap.alloc(serde_json::from_str::<serde_json::Value>(x)?))
+            match serde_json::from_str::<serde_json::Value>(x) {
+                Ok(value) => Ok(heap.alloc(value)),
+                Err(e) => match default {
+                    Some(default) => Ok(default),
+                    None => Err(e.into()),
+                },
+            }
         }
 
         /// Pretty-prints an already-encoded JSON string with indentation.
@@ -315,6 +322,8 @@ mod tests {
             "123456789123456789123456789",
             "json.decode('123456789123456789123456789')",
         );
+        a.eq("None", "json.decode('invalid', default = None)");
+        a.eq("'fallback'", "json.decode('invalid', default = 'fallback')");
     }
 
     #[test]
