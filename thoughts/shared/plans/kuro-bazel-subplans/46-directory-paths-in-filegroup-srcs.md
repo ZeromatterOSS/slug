@@ -9,7 +9,7 @@
 > `Unknown target lib/clang/22` from
 > `llvm-toolchain-minimal-22.1.0-linux-amd64//`.
 
-## Status: PROPOSED
+## Status: IN PROGRESS
 
 ## Context
 
@@ -220,6 +220,33 @@ build files. Candidates (grep
 
 For now, scope to filegroup only. Other rules can opt in as concrete
 needs surface.
+
+## Progress
+
+2026-05-08:
+
+- Earlier Plan 46 work had already landed the `filegroup` part:
+  native `filegroup` uses `AttrType::source(true)`, and bare path-shaped
+  existing files/directories defer from dep coercion to source coercion.
+- ZeroMatter Plan 50 verification surfaced the same directory-source class
+  through rules_cc: `cc_library(hdrs = ["include"])` in
+  `llvm+glibc+glibc_headers_x86_64-linux-gnu.2.28//` reaches
+  `attr.label_list(allow_files = True)`, which still used
+  `AttrType::source(false)` and rejected directory paths.
+- Generalized the fix from filegroup-only to Bazel-compatible
+  `attr.label_list(allow_files = True)`: source alternatives now allow
+  directories so attrs like rules_cc `hdrs` expand directory paths to the
+  contained files.
+- Kept `attr.label(allow_single_file = True)` file-only. For
+  `attr.label(allow_files = True)`, directories are allowed only when the
+  caller did not request single-file semantics.
+- Updated `PackageListing::testing_files` to include parent directory
+  entries, matching real package listings closely enough for directory
+  source coercion tests.
+- Added a regression test for a Starlark rule with
+  `attr.label_list(allow_files = True)` accepting `hdrs = ["include"]`
+  and coercing it to a source directory containing `include/a.h` and
+  `include/bits/b.h`.
 
 ## Risk
 

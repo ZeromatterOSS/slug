@@ -241,6 +241,25 @@ pub fn canonicalize_label_with_package_context(
     current_package: &str,
     repo_mapping: Option<&BzlmodRepoMapping>,
 ) -> Option<CanonicalLabel> {
+    canonicalize_label_with_package_context_and_repo_resolver(
+        label,
+        current_repo,
+        current_package,
+        repo_mapping,
+        |_| None,
+    )
+}
+
+/// Canonicalize a label string in a Bazel package context, using a caller
+/// supplied apparent-repository resolver when a full `BzlmodRepoMapping` is not
+/// available at the callsite.
+pub fn canonicalize_label_with_package_context_and_repo_resolver(
+    label: &str,
+    current_repo: impl Into<CanonicalRepoName>,
+    current_package: &str,
+    repo_mapping: Option<&BzlmodRepoMapping>,
+    mut apparent_repo_resolver: impl FnMut(&str) -> Option<CanonicalRepoName>,
+) -> Option<CanonicalLabel> {
     let current_repo = current_repo.into();
     let parsed = ParsedPackageContextLabel::parse(label, current_package)?;
     let canonical_repo = match parsed.repo {
@@ -251,6 +270,8 @@ pub fn canonicalize_label_with_package_context(
                 CanonicalRepoName::new(repo)
             } else if let Some(mapping) = repo_mapping {
                 mapping.canonical_repo_name(repo)
+            } else if let Some(repo) = apparent_repo_resolver(repo) {
+                repo
             } else {
                 CanonicalRepoName::new(repo)
             }
@@ -624,6 +645,25 @@ mod tests {
         .unwrap();
 
         assert_eq!(label.to_unambiguous_string(), "@@rules_cc//cc:toolchain");
+    }
+
+    #[test]
+    fn package_context_uses_apparent_repo_resolver_for_shorthand_labels() {
+        let label = canonicalize_label_with_package_context_and_repo_resolver(
+            "@launcher",
+            "owner",
+            "ext",
+            None,
+            |repo| {
+                (repo == "launcher").then(|| CanonicalRepoName::new("rules_python+python+launcher"))
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            label.to_unambiguous_string(),
+            "@@rules_python+python+launcher//:launcher"
+        );
     }
 
     #[test]

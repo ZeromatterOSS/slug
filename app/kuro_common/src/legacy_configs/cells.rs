@@ -1043,6 +1043,10 @@ impl BuckConfigBasedCells {
             }
             let apparent_name = NonEmptyCellAlias::new(alias.apparent_name)?;
             let canonical_name = CellName::unchecked_new(&alias.canonical_name)?;
+            kuro_core::cells::register_dynamic_extension_cell_alias(
+                apparent_name.as_str().to_owned(),
+                canonical_name.as_str().to_owned(),
+            );
             ext_aliases.push((apparent_name, canonical_name));
         }
 
@@ -1066,6 +1070,13 @@ impl BuckConfigBasedCells {
                     parsed_mod.repo_rule_invocations.len()
                 );
                 for invocation in &parsed_mod.repo_rule_invocations {
+                    if ext_cells
+                        .iter()
+                        .any(|(_, _, setup)| setup.internal_name.as_ref() == invocation.name)
+                    {
+                        continue;
+                    }
+
                     let cell_name_str = invocation.name.clone();
                     let cell_path_str = format!("bazel-external/{}", cell_name_str);
 

@@ -240,6 +240,18 @@ Migrate these callsites to the shared parser/resolver:
   now exact (`bazel-external/<canonical_repo>/<package>/<target>` or the main
   repo root for `//pkg:target`), with legacy `bazel-external` directory
   scanning isolated in a small traced fallback helper.
+- Routed the interpreter `Label()` global through the shared canonical label
+  parser. When a full module repo mapping is not available at that callsite,
+  apparent repositories are resolved through the active cell alias resolver so
+  `@repo` shorthand stores the canonical repo name and `@@repo` remains
+  unremapped.
+- Updated `use_repo_rule()` precomputed repo cells to use Bazel 9 canonical
+  names (`+rule+repo` for root-module calls and
+  `module+rule+repo` for dependency-module calls) while preserving the
+  invocation `name` as the apparent alias.
+- Registered bzlmod apparent-to-canonical aliases in the dynamic cell registry
+  so `Label()` can canonicalize `@repo` in `.bzl` evaluations that do not have
+  a `BuildContext`.
 - Moved toolchain repo-name extraction in
   `app/kuro_common/src/legacy_configs/cells.rs` onto
   `canonicalize_label_with_package_context`. The adjacent `bazel-external`

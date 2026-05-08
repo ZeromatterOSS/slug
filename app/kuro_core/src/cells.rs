@@ -130,6 +130,10 @@ static DYNAMIC_EXTENSION_CELLS: std::sync::LazyLock<
     std::sync::Mutex<std::collections::HashMap<String, String>>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
+static DYNAMIC_EXTENSION_CELL_ALIASES: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<String, String>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
 /// Plan 36: dynamic-cell sibling registry that carries the
 /// `ExtensionRepoCellSetup` alongside the path, so that
 /// `get_or_create_dynamic_cell` can wire `ExternalCellOrigin::ExtensionRepo`
@@ -170,6 +174,19 @@ pub fn register_dynamic_extension_cell(canonical_name: String, path: String) {
     // `rules_python+1.9.0`. The collision used to silently overwrite the
     // module's symlink so action paths resolved to the wrong directory
     // (e.g. rules_python's bootstrap templates went missing).
+}
+
+pub fn register_dynamic_extension_cell_alias(apparent_name: String, canonical_name: String) {
+    if let Ok(mut aliases) = DYNAMIC_EXTENSION_CELL_ALIASES.lock() {
+        aliases.insert(apparent_name, canonical_name);
+    }
+}
+
+pub fn resolve_dynamic_extension_cell_alias(apparent_name: &str) -> Option<String> {
+    DYNAMIC_EXTENSION_CELL_ALIASES
+        .lock()
+        .ok()
+        .and_then(|aliases| aliases.get(apparent_name).cloned())
 }
 
 /// Plan 36: register a dynamic extension spoke cell with its

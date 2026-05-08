@@ -187,6 +187,40 @@ fn extract_cell_and_package_from_filename(filename: &str) -> (String, String) {
     (String::new(), String::new())
 }
 
+fn canonical_repo_name_for_label_context(
+    eval: &Evaluator<'_, '_, '_>,
+    apparent_repo_name: &str,
+) -> String {
+    if apparent_repo_name.is_empty() {
+        return String::new();
+    }
+
+    if let Ok(build_ctx) = BuildContext::from_context(eval) {
+        if let Ok(cell_name) = build_ctx
+            .cell_info()
+            .cell_alias_resolver()
+            .resolve(apparent_repo_name)
+        {
+            let cell_name = cell_name.as_str();
+            if kuro_core::cells::is_root_cell_name(cell_name) {
+                return String::new();
+            }
+            return cell_name.to_owned();
+        }
+    }
+
+    if let Some(canonical_name) =
+        kuro_core::cells::resolve_dynamic_extension_cell_alias(apparent_repo_name)
+    {
+        if kuro_core::cells::is_root_cell_name(&canonical_name) {
+            return String::new();
+        }
+        return canonical_name;
+    }
+
+    apparent_repo_name.to_owned()
+}
+
 /// Register Bazel-specific module-level globals.
 ///
 /// These are functions that can be called at the top level of .bzl files.
@@ -257,18 +291,20 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
             }
         };
 
-        let resolved = if label_string.starts_with("@@") || label_string.starts_with('@') {
-            // Already fully qualified with repository
-            label_string.to_owned()
-        } else if label_string.starts_with("//") {
-            // Absolute path within the current file's repository
-            // Use @@ prefix for canonical labels (Bazel 9.0+ bzlmod format)
-            format!("@@{}{}", file_cell, label_string)
-        } else {
-            // Relative label (:target or bare target)
-            let target = label_string.strip_prefix(':').unwrap_or(label_string);
-            format!("@@{}//{}:{}", file_cell, pkg_path, target)
-        };
+        let current_repo = canonical_repo_name_for_label_context(eval, &file_cell);
+        let resolved = kuro_bzlmod::canonicalize_label_with_package_context_and_repo_resolver(
+            label_string,
+            current_repo,
+            &pkg_path,
+            None,
+            |apparent_repo| {
+                Some(kuro_bzlmod::CanonicalRepoName::new(
+                    canonical_repo_name_for_label_context(eval, apparent_repo),
+                ))
+            },
+        )
+        .map(|label| label.to_unambiguous_string())
+        .unwrap_or_else(|| label_string.to_owned());
 
         Ok(eval.heap().alloc(BazelLabel::parse(&resolved)))
     }

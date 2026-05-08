@@ -21,6 +21,7 @@ use starlark::starlark_module;
 use starlark::values::Heap;
 use starlark::values::Value;
 use starlark::values::ValueLike;
+use starlark::values::list_or_tuple::UnpackListOrTuple;
 
 use crate::module_ctx::context::ModuleContext;
 use crate::repository_ctx::DownloadInfo;
@@ -352,42 +353,33 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
     /// Execute a command and return its output.
     fn execute<'v>(
         this: &ModuleContext,
-        #[starlark(require = pos)] arguments: Value<'v>,
+        #[starlark(require = pos)] arguments: UnpackListOrTuple<Value<'v>>,
         #[starlark(require = named, default = 600)] _timeout: i32,
         #[starlark(require = named)] environment: Option<Value<'v>>,
         #[starlark(require = named, default = true)] quiet: bool,
         #[starlark(require = named, default = "")] working_directory: &str,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
-        let args: Vec<String> =
-            if let Some(list) = starlark::values::list::ListRef::from_value(arguments) {
-                list.iter()
-                    .map(|v| {
-                        if v.get_type() == "Label" {
-                            // Resolve Labels via cell path map (Bazel's getPathFromLabel)
-                            let label_str = v.to_str();
-                            this.resolve_label_to_filesystem_path(&label_str)
-                                .map(|p| p.to_string_lossy().to_string())
-                                .unwrap_or(label_str)
-                        } else if let Some(rp) =
-                            v.downcast_ref::<crate::repository_ctx::RepositoryPath>()
-                        {
-                            // RepositoryPath objects (from mctx.path()) → extract path string
-                            rp.path_str().to_owned()
-                        } else {
-                            v.unpack_str()
-                                .map(|s| s.to_owned())
-                                .unwrap_or_else(|| v.to_str())
-                        }
-                    })
-                    .collect()
-            } else {
-                return Err(kuro_error::kuro_error!(
-                    kuro_error::ErrorTag::Input,
-                    "arguments must be a list"
-                )
-                .into());
-            };
+        let args: Vec<String> = arguments
+            .items
+            .iter()
+            .map(|v| {
+                if v.get_type() == "Label" {
+                    // Resolve Labels via cell path map (Bazel's getPathFromLabel)
+                    let label_str = v.to_str();
+                    this.resolve_label_to_filesystem_path(&label_str)
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or(label_str)
+                } else if let Some(rp) = v.downcast_ref::<crate::repository_ctx::RepositoryPath>() {
+                    // RepositoryPath objects (from mctx.path()) → extract path string
+                    rp.path_str().to_owned()
+                } else {
+                    v.unpack_str()
+                        .map(|s| s.to_owned())
+                        .unwrap_or_else(|| v.to_str())
+                }
+            })
+            .collect();
 
         if args.is_empty() {
             return Err(kuro_error::kuro_error!(

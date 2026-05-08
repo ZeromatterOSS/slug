@@ -54,16 +54,6 @@ struct StringIterableGen<'v, V: ValueLike<'v>> {
     produce_char: bool, // if not char, then int
 }
 
-pub(crate) fn iterate_chars<'v>(
-    string: StringValue<'v>,
-    heap: Heap<'v>,
-) -> ValueOfUnchecked<'v, StarlarkIter<String>> {
-    ValueOfUnchecked::new(heap.alloc_complex(StringIterableGen::<'v, Value<'v>> {
-        string,
-        produce_char: true,
-    }))
-}
-
 pub(crate) fn iterate_codepoints<'v>(
     string: StringValue<'v>,
     heap: Heap<'v>,

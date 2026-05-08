@@ -101,6 +101,7 @@ pub use repo_mapping::CanonicalRepoName;
 pub use repo_mapping::ExtensionImportCanonicalization;
 pub use repo_mapping::canonical_repo_for_extension_import;
 pub use repo_mapping::canonicalize_label_with_package_context;
+pub use repo_mapping::canonicalize_label_with_package_context_and_repo_resolver;
 pub use repo_spec::RepoSpec;
 pub use repo_spec::in_extension_context;
 pub use repo_spec::record_repo_spec;

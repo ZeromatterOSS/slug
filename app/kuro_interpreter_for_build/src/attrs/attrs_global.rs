@@ -1052,10 +1052,13 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
             } else {
                 AttrType::dep(effective_providers, PluginKindSet::EMPTY)
             };
-            AttrType::one_of(vec![
-                dep_type,
-                AttrType::source(false), // allow_directory = false
-            ])
+            // Bazel's `allow_files=True` accepts package directory paths in
+            // file-carrying attrs such as rules_cc `hdrs`; list contexts expand
+            // those directories through `CoercedPath::inputs()`. Keep
+            // `allow_single_file=True` file-only so `ctx.file.<attr>` cannot
+            // silently bind a directory.
+            let allow_directory = allow_files_bool && !allow_single_file_bool;
+            AttrType::one_of(vec![dep_type, AttrType::source(allow_directory)])
         } else if is_exec {
             AttrType::exec_dep(effective_providers)
         } else {
@@ -1173,7 +1176,10 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         let inner = if allow_files_bool {
             AttrType::one_of(vec![
                 dep_type,
-                AttrType::source(false), // allow_directory = false
+                // `allow_files=True` label lists are the generic shape behind
+                // Bazel rule attrs like rules_cc `hdrs`. Directory paths in
+                // these lists expand to the files under the directory.
+                AttrType::source(true),
             ])
         } else {
             dep_type

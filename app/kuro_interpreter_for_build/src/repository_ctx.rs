@@ -67,6 +67,7 @@ use starlark::values::StarlarkValue;
 use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::dict::AllocDict;
+use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneOr;
 use starlark::values::starlark_value;
 use starlark::values::starlark_value_as_type::StarlarkValueAsType;
@@ -1523,7 +1524,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
     /// Execute a command.
     fn execute<'v>(
         this: &RepositoryContext,
-        #[starlark(require = pos)] arguments: Value<'v>,
+        #[starlark(require = pos)] arguments: UnpackListOrTuple<Value<'v>>,
         #[starlark(require = named, default = 600)] timeout: i32,
         #[starlark(require = named)] environment: Option<Value<'v>>,
         #[starlark(require = named, default = true)] quiet: bool,
@@ -1531,32 +1532,25 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
         // Get arguments as list of strings, resolving Label and RepositoryPath objects
-        let args: Vec<String> =
-            if let Some(list) = starlark::values::list::ListRef::from_value(arguments) {
-                list.iter()
-                    .map(|v| {
-                        if let Some(s) = v.unpack_str() {
-                            s.to_owned()
-                        } else if let Some(repo_path) = v.downcast_ref::<RepositoryPath>() {
-                            // RepositoryPath: use absolute path
-                            repo_path.absolute_path().to_string_lossy().to_string()
-                        } else if v.get_type() == "Label" {
-                            // Label: resolve to filesystem path via cell paths
-                            let label_str = v.to_str();
-                            resolve_label_to_path(&label_str, &this.working_dir)
-                        } else {
-                            // Other: convert to string
-                            v.to_str()
-                        }
-                    })
-                    .collect()
-            } else {
-                return Err(kuro_error::kuro_error!(
-                    kuro_error::ErrorTag::Input,
-                    "arguments must be a list"
-                )
-                .into());
-            };
+        let args: Vec<String> = arguments
+            .items
+            .iter()
+            .map(|v| {
+                if let Some(s) = v.unpack_str() {
+                    s.to_owned()
+                } else if let Some(repo_path) = v.downcast_ref::<RepositoryPath>() {
+                    // RepositoryPath: use absolute path
+                    repo_path.absolute_path().to_string_lossy().to_string()
+                } else if v.get_type() == "Label" {
+                    // Label: resolve to filesystem path via cell paths
+                    let label_str = v.to_str();
+                    resolve_label_to_path(&label_str, &this.working_dir)
+                } else {
+                    // Other: convert to string
+                    v.to_str()
+                }
+            })
+            .collect();
 
         if args.is_empty() {
             return Err(kuro_error::kuro_error!(

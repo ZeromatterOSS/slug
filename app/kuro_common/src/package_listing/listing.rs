@@ -126,14 +126,32 @@ pub mod testing {
         }
 
         fn testing_new(files: &[&str], buildfile: &str) -> Self {
-            let files = files.iter().map(|f| {
-                PackageRelativePathBuf::try_from((*f).to_owned())
-                    .unwrap()
-                    .to_arc()
-            });
+            let files = files
+                .iter()
+                .map(|f| {
+                    PackageRelativePathBuf::try_from((*f).to_owned())
+                        .unwrap()
+                        .to_arc()
+                })
+                .collect::<Vec<_>>();
+            let directories = files
+                .iter()
+                .flat_map(|file| {
+                    let mut directories = Vec::new();
+                    let mut current = file.as_ref();
+                    while let Some(parent) = current.parent() {
+                        if parent.is_empty() {
+                            break;
+                        }
+                        directories.push(parent.to_arc());
+                        current = parent;
+                    }
+                    directories
+                })
+                .collect::<Vec<_>>();
             PackageListing::new(
                 SortedSet::from_iter(files),
-                SortedSet::new(),
+                SortedSet::from_iter(directories),
                 SortedVec::new(),
                 FileNameBuf::unchecked_new(buildfile),
             )

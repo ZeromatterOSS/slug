@@ -263,7 +263,8 @@ pub fn pre_compute_extension_repo_cells(
 
     // Also register use_repo_rule() invocations as extension cells.
     // In Bazel, use_repo_rule() creates implicit single-repo extensions.
-    // The canonical name for use_repo_rule is just the repo name (not prefixed).
+    // The apparent repo name is the invocation's `name`, while the canonical
+    // repo name includes the owning module and repo-rule name.
     for (cell_name, parsed) in parsed_modules {
         let module_name = if parsed.module.name.is_empty() {
             root_module_name
@@ -275,7 +276,12 @@ pub fn pre_compute_extension_repo_cells(
             || parsed.module.name == root_module_name;
 
         for invocation in &parsed.repo_rule_invocations {
-            let canonical = invocation.name.clone();
+            let canonical = canonicalize_repo_rule_invocation_name(
+                module_name,
+                is_root,
+                &invocation.rule_source,
+                &invocation.name,
+            );
             if seen_canonical.insert(canonical.clone()) {
                 let path = format!("bazel-external/{}", canonical);
                 // Serialize the invocation attrs into a RepoSpec so the normal
@@ -298,6 +304,12 @@ pub fn pre_compute_extension_repo_cells(
                     path,
                 });
             }
+            if invocation.name != canonical {
+                aliases.push(RepoAlias {
+                    apparent_name: invocation.name.clone(),
+                    canonical_name: canonical,
+                });
+            }
         }
     }
 
@@ -308,6 +320,22 @@ pub fn pre_compute_extension_repo_cells(
     );
 
     Ok((cells, aliases))
+}
+
+fn canonicalize_repo_rule_invocation_name(
+    module_name: &str,
+    is_root: bool,
+    rule_source: &str,
+    repo_name: &str,
+) -> String {
+    let Some((_, rule_name)) = rule_source.rsplit_once('%') else {
+        return repo_name.to_owned();
+    };
+    if is_root {
+        format!("+{}+{}", rule_name, repo_name)
+    } else {
+        format!("{}+{}+{}", module_name, rule_name, repo_name)
+    }
 }
 
 fn canonicalize_repo_rule_source(rule_source: &str, module_name: &str, is_root: bool) -> String {
@@ -846,6 +874,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
+    use crate::globals::RepoRuleInvocation;
     use crate::repo_spec::RepoSpec;
     use crate::repository_invocations::AttrValue;
     use crate::types::Module;
@@ -936,6 +965,46 @@ mod tests {
         assert_eq!(
             canonicalize_repo_rule_source(":rbe.bzl%rbe_platform_repository", "zeromatter", true),
             "//:rbe.bzl%rbe_platform_repository",
+        );
+    }
+
+    #[test]
+    fn test_canonicalize_repo_rule_invocation_name_matches_bazel_root_shape() {
+        assert_eq!(
+            canonicalize_repo_rule_invocation_name("zeromatter", true, "//:repo.bzl%rr", "launcher"),
+            "+rr+launcher",
+        );
+    }
+
+    #[test]
+    fn test_precompute_use_repo_rule_uses_canonical_name_and_apparent_alias() {
+        let mut module = parsed_module("ape");
+        module.repo_rule_invocations.push(RepoRuleInvocation {
+            name: "launcher".to_owned(),
+            rule_source: "@toolchain_utils//toolchain/local/select:defs.bzl%toolchain_local_select"
+                .to_owned(),
+            attrs: indexmap::IndexMap::new(),
+        });
+
+        let (cells, aliases) =
+            pre_compute_extension_repo_cells(&[("ape+1.0.1".to_owned(), module)], "zeromatter")
+                .unwrap();
+
+        assert_eq!(cells.len(), 1);
+        assert_eq!(
+            cells[0].canonical_name,
+            "ape+toolchain_local_select+launcher"
+        );
+        assert_eq!(cells[0].internal_name, "launcher");
+        assert_eq!(
+            cells[0].path,
+            "bazel-external/ape+toolchain_local_select+launcher"
+        );
+        assert_eq!(aliases.len(), 1);
+        assert_eq!(aliases[0].apparent_name, "launcher");
+        assert_eq!(
+            aliases[0].canonical_name,
+            "ape+toolchain_local_select+launcher"
         );
     }
 

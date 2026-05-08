@@ -17,8 +17,11 @@ use std::sync::Arc;
 
 use dupe::Dupe;
 use indoc::indoc;
+use kuro_build_api::interpreter::rule_defs::provider::registration::register_builtin_providers;
 use kuro_common::package_listing::listing::PackageListing;
 use kuro_common::package_listing::listing::testing::PackageListingExt;
+use kuro_core::build_file_path::BuildFilePath;
+use kuro_core::bzl::ImportPath;
 use kuro_core::cells::cell_path_with_allowed_relative_dir::CellPathWithAllowedRelativeDir;
 use kuro_core::cells::name::CellName;
 use kuro_core::cells::paths::CellRelativePath;
@@ -31,9 +34,12 @@ use kuro_interpreter_for_build::attrs::coerce::ctx::BuildAttrCoercionContext;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
 use kuro_interpreter_for_build::interpreter::testing::cells;
 use kuro_node::attrs::attr_type::AttrType;
+use kuro_node::attrs::coerced_attr::CoercedAttr;
+use kuro_node::attrs::coerced_path::CoercedPath;
 use kuro_node::attrs::coercion_context::AttrCoercionContext;
 use kuro_node::attrs::configurable::AttrIsConfigurable;
 use kuro_node::attrs::hacks::value_to_string;
+use kuro_node::attrs::inspect_options::AttrInspectOptions;
 use kuro_node::provider_id_set::ProviderIdSet;
 use starlark::values::Heap;
 
@@ -166,6 +172,73 @@ fn attr_label_list_works() -> kuro_error::Result<()> {
             attr.label_list(allow_files=True)
         "#
     ))
+}
+
+#[test]
+fn attr_label_list_allow_files_accepts_directory_sources() -> kuro_error::Result<()> {
+    let mut tester = Tester::new().unwrap();
+    tester.additional_globals(register_builtin_providers);
+    tester.add_import(
+        &ImportPath::testing_new("root//:rules.bzl"),
+        indoc!(
+            r#"
+            def _impl(ctx):
+                return DefaultInfo()
+
+            dir_headers = rule(
+                impl = _impl,
+                attrs = {
+                    "hdrs": attr.label_list(allow_files = True),
+                },
+            )
+            "#
+        ),
+    )?;
+
+    let build_path = BuildFilePath::testing_new("root//some/package:BUILD.bazel");
+    let result = tester.eval_build_file(
+        &build_path,
+        indoc!(
+            r#"
+            load("//:rules.bzl", "dir_headers")
+
+            dir_headers(
+                name = "headers",
+                hdrs = ["include"],
+            )
+            "#
+        ),
+        PackageListing::testing_files(&["include/a.h", "include/bits/b.h"]),
+    )?;
+
+    let target = result
+        .get_target(kuro_core::target::name::TargetNameRef::new("headers")?)
+        .expect("target should be recorded");
+    let hdrs = target
+        .attr_or_none("hdrs", AttrInspectOptions::All)
+        .expect("hdrs attr should be present");
+
+    let CoercedAttr::List(items) = hdrs.value else {
+        panic!("expected list attr, got {:?}", hdrs.value);
+    };
+    assert_eq!(items.len(), 1);
+
+    let CoercedAttr::OneOf(inner, _) = &items[0] else {
+        panic!("expected one_of attr, got {:?}", items[0]);
+    };
+    let CoercedAttr::SourceFile(CoercedPath::Directory(dir)) = &**inner else {
+        panic!("expected directory source, got {:?}", inner);
+    };
+
+    assert_eq!("include", dir.dir.as_str());
+    let files = dir
+        .files
+        .iter()
+        .map(|path| path.as_str().to_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(vec!["include/a.h", "include/bits/b.h"], files);
+
+    Ok(())
 }
 
 #[test]

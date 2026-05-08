@@ -39,7 +39,6 @@ use crate::values::none::NoneOr;
 use crate::values::string::dot_format;
 use crate::values::tuple::UnpackTuple;
 use crate::values::type_repr::StarlarkTypeRepr;
-use crate::values::types::string::iter::iterate_chars;
 use crate::values::types::string::iter::iterate_codepoints;
 use crate::values::typing::iter::StarlarkIter;
 
@@ -110,22 +109,16 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
     /// https://github.com/bazelbuild/starlark/blob/master/spec.md#string·elems
     /// ): returns an iterable of the bytes values of a string.
     ///
-    /// `S.elems()` returns an iterable value containing the
-    /// sequence of numeric bytes values in the string S.
-    ///
-    /// To materialize the entire sequence of bytes, apply `list(...)` to the
-    /// result.
+    /// `S.elems()` returns a list containing the sequence of characters in
+    /// the string S.
     ///
     /// ```
     /// # starlark::assert::is_true(r#"
     /// list("Hello, 世界".elems()) == ["H", "e", "l", "l", "o", ",", " ", "世", "界"]
     /// # "#);
     /// ```
-    fn elems<'v>(
-        this: StringValue<'v>,
-        heap: Heap<'v>,
-    ) -> anyhow::Result<ValueOfUnchecked<'v, StarlarkIter<String>>> {
-        Ok(iterate_chars(this, heap))
+    fn elems<'v>(this: StringValue<'v>, heap: Heap<'v>) -> anyhow::Result<Value<'v>> {
+        Ok(heap.alloc(AllocList(this.as_str().chars().map(|c| heap.alloc(c)))))
     }
 
     /// [string.capitalize](
@@ -1305,8 +1298,14 @@ mod tests {
     }
 
     #[test]
-    fn test_opaque_iterator() {
-        assert::is_true("type('foo'.elems()) != type([])");
+    fn test_elems_matches_bazel_list_behavior() {
+        assert::eq("'foo'.elems()", "['f', 'o', 'o']");
+        assert::eq("'foo'.elems()[:]", "['f', 'o', 'o']");
+        assert::is_true("type('foo'.elems()) == type([])");
+    }
+
+    #[test]
+    fn test_codepoints_opaque_iterator() {
         assert::is_true("type('foo'.codepoints()) != type([])");
     }
 }

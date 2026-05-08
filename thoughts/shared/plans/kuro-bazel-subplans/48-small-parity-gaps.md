@@ -19,6 +19,8 @@ larger than expected.
 | `target_platform_has_constraint()` | Host-OS shortcut | Query the configured target platform constraints. |
 | `CppFragment.sysroot()` | Returns `None` | Read sysroot from the selected C++ toolchain / configured fragment. |
 | `CppFragment.fdo_instrument()` | Returns `None` | Reflect FDO instrumentation configuration when present. |
+| `string.elems()` | Returns opaque iterator | Match Bazel 9: return a list so list operations such as slicing work (`"abc".elems()[:]`). |
+| `repository_ctx.execute()` / `module_ctx.execute()` args | Accept only list | Match Bazel 9: accept list or tuple command argument sequences. |
 
 ## Bazel Source of Truth
 
@@ -39,3 +41,25 @@ Each item needs:
 - one fixture that fails before the change and passes after it;
 - a note whether Bazel source behavior was matched exactly or whether the
   item was intentionally split to a larger follow-up.
+
+## Progress
+
+2026-05-08:
+
+- ZeroMatter verification after Plan 50 and Plan 46 directory-source fixes
+  reached rules_python's pip extension and failed evaluating
+  `content.elems()[:]` in `parse_requirements_txt.bzl`: Kuro's
+  `string.elems()` returned an opaque iterator that did not support slicing.
+- Checked Bazel 9.1.0 behavior directly with a tiny rule:
+  `type("abc".elems())` prints `list`, and `"abc".elems()[:]` prints
+  `["a", "b", "c"]`.
+- Updated Kuro's Starlark `string.elems()` implementation to return a list
+  rather than an opaque iterator. Left `string.codepoints()` unchanged for
+  now; Bazel 9.1.0 reports no `codepoints` method, so removing or hiding that
+  extra surface should be handled separately if it blocks Bazel 9 parity.
+- The next zeromatter run reached `ape.pe` and failed on
+  `rctx.execute(("cmd.exe", "/c", "@echo.%SYSTEMROOT%"))` because Kuro only
+  accepted lists. Checked Bazel 9.1.0 with a tiny module extension:
+  `mctx.execute(("/bin/echo", "ok"))` succeeds. Updated both
+  `repository_ctx.execute()` and `module_ctx.execute()` to unpack list-or-tuple
+  command arguments.
