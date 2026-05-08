@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use std::alloc::Layout;
+use std::backtrace::Backtrace;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -167,6 +169,17 @@ fn terminate_on_panic() {
     }));
 }
 
+fn log_alloc_errors() {
+    std::alloc::set_alloc_error_hook(|layout: Layout| {
+        eprintln!(
+            "memory allocation of {} bytes with alignment {} failed\nallocation backtrace:\n{}",
+            layout.size(),
+            layout.align(),
+            Backtrace::force_capture(),
+        );
+    });
+}
+
 fn verify_buck_out_dir(paths: &InvocationPaths) -> kuro_error::Result<()> {
     let path = paths.buck_out_path();
     fs_util::create_dir_all(path.clone())?;
@@ -293,6 +306,7 @@ impl DaemonCommand {
         listener_created();
 
         terminate_on_panic();
+        log_alloc_errors();
 
         maybe_schedule_termination()?;
 

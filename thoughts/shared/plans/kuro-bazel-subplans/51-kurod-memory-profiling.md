@@ -313,5 +313,157 @@ Optional but preferred:
     - `legacy_cells_bzlmod_precomputed_repos`: 5088 precomputed cells,
       401 aliases, RSS 207945728 bytes;
     - `cell_alias_resolver_new`: 5518 aliases, RSS 214892544 bytes;
-    - `cell_resolver_new`: 5147 cells and 5518 root aliases, RSS 215416832
-      bytes.
+  - `cell_resolver_new`: 5147 cells and 5518 root aliases, RSS 215416832
+
+## Progress 2026-05-08: package-listing preallocation guard
+
+After root bzlmod aliases and native platform-label fixes, the zeromatter
+`//sdk:sdk_contents` build reached package loading and failed while waiting on
+`crates__aws-smithy-http-0.63.6// -- loading package file tree` with:
+
+```text
+memory allocation of 1715238139729024 bytes failed
+```
+
+The failure shape points at `Directory::flatten()` in
+`app/kuro_common/src/package_listing/interpreter.rs`, which preallocated three
+vectors from recursively accumulated directory counters before collecting the
+actual entries. That makes package listing vulnerable to a bad/corrupt
+bookkeeping count or unexpected external-repo directory shape turning into a
+huge allocation before any real data is pushed.
+
+Implemented a systemic guard: `flatten()` now builds the output vectors with
+`Vec::new()` and lets actual collection drive allocation growth. This preserves
+the same listing semantics and removes the unbounded trust in recursive
+preallocation counts.
+
+- [x] Removed recursive-counter-based preallocation from package listing
+- [x] Re-ran zeromatter `//sdk:sdk_contents`: the petabyte allocation is gone
+
+The follow-up run progressed past `aws-smithy-http` and then the daemon
+segfaulted while many package-file-tree loads were still active, with RSS
+above 10 GiB. `build -j 2` did not materially reduce loading concurrency.
+
+Second guard implemented in the same package-listing subsystem:
+`Directory::gather_subdirs()` now walks subdirectories sequentially within a
+single package instead of spawning a DICE `compute_join` for every child
+directory. Kuro still has package-level parallelism, but a large external repo
+no longer multiplies that with intra-package directory fan-out and many
+partially retained directory trees.
+
+- [x] Removed intra-package package-listing fan-out
+- [x] Re-ran zeromatter `//sdk:sdk_contents` after sequential traversal
+
+The clean rerun still failed in package loading, this time while waiting on
+`crates__diplomat-runtime-0.15.1// -- loading package file tree`, with:
+
+```text
+memory allocation of 4497183668736512 bytes failed
+```
+
+Third package-listing guard: replace the recursive `Directory` tree with a
+streaming DFS that writes files, directories, and subpackages directly into the
+final listing vectors. This removes the recursive bookkeeping counters entirely
+and avoids retaining every intermediate directory node plus its child vectors
+until a later flatten pass. The traversal remains deterministic and still
+stops at subpackage boundaries, but package listing now has one representation
+of discovered paths instead of both a tree and the final sorted listing.
+
+- [x] Replaced recursive package-listing tree/flatten with streaming DFS
+- [x] Re-ran zeromatter `//sdk:sdk_contents` after streaming DFS
+
+The OOM persisted with the same failure phase, so the next step is to identify
+the exact allocation site rather than continuing to guess from the status line.
+Added a daemon allocation-error hook that prints the failed layout and a forced
+backtrace before aborting. This is general memory diagnostic infrastructure and
+should make future oversized allocation failures actionable.
+
+- [x] Added daemon allocation-error backtrace hook
+- [x] Re-ran zeromatter `//sdk:sdk_contents` with allocation backtraces
+
+The backtrace showed this was not package-listing memory pressure. The daemon
+panicked in `Vec::clone` while cloning `NestedCells` from
+`new_cell_ignores()`, with Rust's UB check reporting an invalid slice:
+
+```text
+unsafe precondition(s) violated: slice::from_raw_parts requires the pointer
+to be aligned and non-null, and the total size of the slice not to exceed
+isize::MAX
+```
+
+Root cause: `CellResolver::get()` returned references to dynamic
+`CellInstance` values stored inside a `HashMap` after dropping the map lock.
+Later dynamic-cell insertions can rehash the map and invalidate those
+references while async package/file operations still hold them. That explains
+the earlier impossible petabyte allocation sizes: they were symptoms of a
+corrupted `Vec`, not legitimate allocation requests.
+
+Systemic fix: dynamic cells are now stored as leaked `CellInstance`s in the
+dynamic-cell map, so references returned by `CellResolver::get()` remain stable
+even when more dynamic cells are inserted. This matches the previous comment's
+intended lifetime guarantee without relying on invalid `HashMap` references.
+
+- [x] Made dynamic cell instance references stable across map insertions
+- [x] Re-run zeromatter `//sdk:sdk_contents` after dynamic-cell reference fix
+
+## Progress 2026-05-08: confirmed high-RSS analysis phase
+
+After the dynamic-cell reference fix, the impossible petabyte allocation
+failures disappeared. The zeromatter build now consistently reaches package
+loading and then analysis before the daemon dies from real memory pressure.
+
+Confirmed follow-up fixes:
+
+- root `bazel_dep(repo_name = ...)` apparent aliases are now registered in the
+  bzlmod root alias map, fixing early failures such as `@bazel_lib` and
+  `@com_google_protobuf`;
+- root-cell native platform labels now render in Bazel form (`//pkg:tgt`)
+  instead of Kuro cell form (`zeromatter//pkg:tgt`);
+- non-root cells with no local alias list now share the root alias map through
+  `Arc` instead of cloning thousands of aliases per `CellAliasResolver`;
+- toolchain, extension, repo-rule, and extension-aggregation warning payloads
+  are truncated to bounded summaries;
+- extension repo stubs now record a RepoSpec hash in `.kuro_repo_complete`, so
+  repeated accesses to the same failed repo rule can reuse the stub until the
+  RepoSpec changes instead of deleting and re-running the same failing rule.
+
+Measured zeromatter runs from `/var/mnt/dev/zeromatter`:
+
+- `codex-plan51-shared-alias`: alias-map sharing fixed repeated
+  `cell_alias_resolver_new` clones, but package loading still climbed to
+  roughly 14 GiB with checkpoints enabled;
+- `codex-plan51-no-checkpoints`: without checkpoints, package loading reached
+  roughly 21 GiB before toolchain/extension analysis;
+- `codex-plan51-listing-bound`: a package-listing global semaphore was tried
+  and removed because it did not materially reduce peak RSS;
+- `codex-plan51-diag-cap`: diagnostic caps reduced output volume, but the
+  daemon still died near `44,213,512 KiB`;
+- `codex-plan51-extdiag-cap`: extension aggregation warnings were bounded, but
+  the daemon still died near `46,168,728 KiB`;
+- `codex-plan51-stub-hash`: spec-hashed stubs reduced one repeated-failure
+  source but the daemon still died near `43,652,188 KiB`;
+- `codex-plan51-depset-dedupe`: an experimental hashed `depset.to_list()`
+  dedupe was tried but the host OOMed before a useful conclusion; that
+  experiment was removed so the next investigation can focus cleanly on a
+  systemic depset/transitive_set migration.
+
+The current reproducible failure shape is:
+
+```text
+Waiting on rules_rust+0.69.0//ffi/rs:empty_allocator_libraries
+(//bazel/platforms:linux-gnu-host#...) -- running analysis [evaluate_rule],
+and 15 other actions
+```
+
+The target package itself is tiny. The likely remaining systemic issue is the
+analysis representation of large depsets/toolchain providers. `rules_rust`'s
+allocator/toolchain path calls into large toolchain depsets (notably
+`cc_toolchain.all_files.to_list()` and the libstd allocator `CcInfo` assembly),
+and Kuro's current Bazel depset implementation is independent from Buck's
+transitive_set machinery. The next promising line of work is to migrate or wrap
+Bazel `depset` on top of transitive_set so large toolchain DAGs remain shared
+instead of being repeatedly flattened or retained in Starlark heap structures.
+
+At this point the remaining `//sdk:sdk_contents` failure is not an early alias,
+label, package-listing UB, or unbounded diagnostic issue. It is a genuine
+high-RSS analysis problem around large bzlmod/toolchain graphs.

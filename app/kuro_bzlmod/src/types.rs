@@ -50,6 +50,10 @@ pub struct Module {
     /// Defaults to 0.
     pub compatibility_level: u32,
 
+    /// The repository name this module uses to refer to itself
+    /// (`module(repo_name = "...")`). Defaults to `name`.
+    pub repo_name: Option<String>,
+
     /// List of direct dependencies declared via `bazel_dep()`.
     pub bazel_deps: Vec<BazelDep>,
 
@@ -64,6 +68,7 @@ impl Module {
             name,
             version,
             compatibility_level: 0,
+            repo_name: None,
             bazel_deps: Vec::new(),
             overrides: Vec::new(),
         }
@@ -75,6 +80,7 @@ impl Module {
             name: String::new(),
             version: Version::empty(),
             compatibility_level: 0,
+            repo_name: None,
             bazel_deps: Vec::new(),
             overrides: Vec::new(),
         }

@@ -52,6 +52,7 @@ use kuro_core::fs::buck_out_path::BuildArtifactPath;
 use kuro_core::package::source_path::SourcePath;
 use kuro_core::provider::label::ProvidersLabel;
 use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
+use kuro_core::target::label::label::TargetLabel;
 use kuro_error::BuckErrorContext;
 use kuro_error::internal_error;
 use kuro_execute::execute::request::OutputType;
@@ -962,8 +963,10 @@ fn analyze_platform(
     }
     let exec_properties_vec: Vec<(String, String)> = exec_properties.into_iter().collect();
 
-    // The platform label is the unconfigured target label string.
-    let label_str = target.unconfigured().to_string();
+    // Bazel labels name the main repo without a cell prefix (`//pkg:tgt`).
+    // Kuro's internal Display keeps the root cell (`zeromatter//pkg:tgt`),
+    // which is not parseable by the Bazel-shaped validation path.
+    let label_str = bazel_platform_label(target.unconfigured());
 
     // Create PlatformInfo with the merged constraint configuration.
     let platform_info = FrozenPlatformInfo::for_native_platform(
@@ -983,6 +986,14 @@ fn analyze_platform(
     );
 
     make_native_analysis_result(target, heap, providers, 0, 0, RecordedActions::new(0))
+}
+
+fn bazel_platform_label(target: &TargetLabel) -> String {
+    if kuro_core::cells::is_root_cell_name(target.pkg().cell_name().as_str()) {
+        format!("//{}:{}", target.pkg().cell_relative_path(), target.name())
+    } else {
+        target.to_string()
+    }
 }
 
 /// Analyze a `test_suite` target.

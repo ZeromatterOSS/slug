@@ -11,14 +11,11 @@
 use async_trait::async_trait;
 use dice::DiceComputations;
 use dupe::Dupe;
-use futures::FutureExt;
-use futures::future::BoxFuture;
 use kuro_core::cells::cell_path::CellPath;
 use kuro_core::cells::cell_path::CellPathRef;
 use kuro_core::cells::paths::CellRelativePath;
 use kuro_core::package::PackageLabel;
 use kuro_core::package::package_relative_path::PackageRelativePath;
-use kuro_core::package::package_relative_path::PackageRelativePathBuf;
 use kuro_fs::paths::file_name::FileNameBuf;
 use kuro_util::arc_str::ArcS;
 use starlark_map::sorted_set::SortedSet;
@@ -365,27 +362,49 @@ impl<'c, 'd> InterpreterPackageListingResolver<'c, 'd> {
     }
 }
 
-struct Directory {
-    path: ArcS<PackageRelativePath>,
+struct PackageListingBuilder {
     files: Vec<ArcS<PackageRelativePath>>,
-    subdirs: Vec<Directory>,
+    dirs: Vec<ArcS<PackageRelativePath>>,
     subpackages: Vec<ArcS<PackageRelativePath>>,
     buildfile: Option<FileNameBuf>,
-
-    recursive_files_count: usize,
-    recursive_dirs_count: usize,
-    recursive_subpackages_count: usize,
 }
 
-impl Directory {
-    // Ok(None) indicates that the path is a subpackage
-    async fn gather(
-        ctx: &mut DiceComputations<'_>,
-        buildfile_candidates: &[FileNameBuf],
-        root: CellPathRef<'_>,
-        path: &PackageRelativePath,
-        is_root: bool,
-    ) -> Result<Option<Directory>, GatherPackageListingError> {
+impl PackageListingBuilder {
+    fn new() -> Self {
+        Self {
+            files: Vec::new(),
+            dirs: Vec::new(),
+            subpackages: Vec::new(),
+            buildfile: None,
+        }
+    }
+
+    fn finish(self) -> PackageListing {
+        let buildfile = self.buildfile.unwrap();
+        // The files are discovered in a deterministic order but not necessarily sorted.
+        // TODO(cjhopman): Do we require that they be sorted for anything?
+        let files = SortedVec::from(self.files);
+        let dirs = SortedVec::from(self.dirs);
+        let subpackages = SortedVec::from(self.subpackages);
+
+        PackageListing::new(
+            SortedSet::from(files),
+            SortedSet::from(dirs),
+            subpackages,
+            buildfile,
+        )
+    }
+}
+
+async fn gather_into_listing(
+    ctx: &mut DiceComputations<'_>,
+    buildfile_candidates: &[FileNameBuf],
+    root: CellPathRef<'_>,
+    output: &mut PackageListingBuilder,
+) -> Result<(), GatherPackageListingError> {
+    let mut stack = vec![(PackageRelativePath::empty().to_owned(), true)];
+
+    while let Some((path, is_root)) = stack.pop() {
         let cell_path = root.join(path.as_forward_rel_path());
         let entries = DiceFileComputations::read_dir_ext(ctx, cell_path.as_ref())
             .await
@@ -401,119 +420,37 @@ impl Directory {
                 ));
             }
             (false, Some(_)) => {
-                return Ok(None);
+                output.subpackages.push(path.to_arc());
+                continue;
+            }
+            (true, Some(buildfile)) => {
+                output.buildfile = Some(buildfile.to_owned());
             }
             _ => {}
         }
 
-        let mut subdirs = Vec::new();
-        let mut files = Vec::new();
+        if !path.is_empty() {
+            output.dirs.push(path.to_arc());
+        }
 
+        let mut subdirs = Vec::new();
         for d in &*entries {
             let child_path = path.join(&d.file_name);
             if d.file_type.is_dir() {
                 subdirs.push(child_path);
             } else {
-                files.push(child_path.to_arc());
+                output.files.push(child_path.to_arc());
             }
         }
 
-        let (subdirs, subpackages) =
-            Self::gather_subdirs(ctx, buildfile_candidates, root, subdirs).await?;
-
-        let mut recursive_files_count = files.len();
-        let mut recursive_dirs_count = subdirs.len();
-        let mut recursive_subpackages_count = subpackages.len();
-        for d in &subdirs {
-            recursive_files_count += d.recursive_files_count;
-            recursive_dirs_count += d.recursive_dirs_count;
-            recursive_subpackages_count += d.recursive_subpackages_count;
-        }
-
-        Ok(Some(Directory {
-            path: path.to_arc(),
-            files,
-            subdirs,
-            subpackages,
-            buildfile: buildfile.map(|v| v.to_owned()),
-            recursive_files_count,
-            recursive_dirs_count,
-            recursive_subpackages_count,
-        }))
+        // Package listing is already run concurrently across requested
+        // packages. Keep traversal within one package sequential and stream
+        // directly into the final listing vectors instead of retaining a full
+        // recursive directory tree.
+        stack.extend(subdirs.into_iter().rev().map(|path| (path, false)));
     }
 
-    fn gather_subdirs<'a>(
-        ctx: &'a mut DiceComputations<'_>,
-        buildfile_candidates: &'a [FileNameBuf],
-        root: CellPathRef<'a>,
-        subdirs: Vec<PackageRelativePathBuf>,
-    ) -> BoxFuture<
-        'a,
-        Result<(Vec<Directory>, Vec<ArcS<PackageRelativePath>>), GatherPackageListingError>,
-    > {
-        async move {
-            let mut new_subdirs = Vec::new();
-            let mut subpackages = Vec::new();
-
-            for res in ctx
-                .compute_join(subdirs, |ctx: &mut DiceComputations, path| {
-                    async move {
-                        let res = Directory::gather(ctx, buildfile_candidates, root, &path, false)
-                            .await?;
-                        Ok((path, res))
-                    }
-                    .boxed()
-                })
-                .await
-            {
-                let (path, res) = res?;
-                match res {
-                    Some(v) => new_subdirs.push(v),
-                    None => subpackages.push(path.to_arc()),
-                }
-            }
-            Ok((new_subdirs, subpackages))
-        }
-        .boxed()
-    }
-
-    fn collect_into(
-        self,
-        files: &mut Vec<ArcS<PackageRelativePath>>,
-        dirs: &mut Vec<ArcS<PackageRelativePath>>,
-        pkgs: &mut Vec<ArcS<PackageRelativePath>>,
-    ) {
-        files.extend(self.files);
-        pkgs.extend(self.subpackages);
-        if !self.path.is_empty() {
-            dirs.push(self.path);
-        }
-        for d in self.subdirs {
-            d.collect_into(files, dirs, pkgs)
-        }
-    }
-
-    fn flatten(mut self) -> PackageListing {
-        let buildfile = self.buildfile.take().unwrap();
-        let mut files = Vec::with_capacity(self.recursive_files_count);
-        let mut dirs = Vec::with_capacity(self.recursive_dirs_count);
-        let mut subpackages = Vec::with_capacity(self.recursive_subpackages_count);
-
-        self.collect_into(&mut files, &mut dirs, &mut subpackages);
-
-        // The files are discovered in a deterministic order but not necessarily sorted.
-        // TODO(cjhopman): Do we require that they be sorted for anything?
-        let files = SortedVec::from(files);
-        let dirs = SortedVec::from(dirs);
-        let subpackages = SortedVec::from(subpackages);
-
-        PackageListing::new(
-            SortedSet::from(files),
-            SortedSet::from(dirs),
-            subpackages,
-            buildfile,
-        )
-    }
+    Ok(())
 }
 
 async fn gather_package_listing_impl(
@@ -524,14 +461,7 @@ async fn gather_package_listing_impl(
     let buildfile_candidates = DiceFileComputations::buildfiles(ctx, root.cell_name())
         .await
         .map_err(|e| GatherPackageListingError::error(cell_path, e))?;
-    Ok(Directory::gather(
-        ctx,
-        &buildfile_candidates,
-        cell_path,
-        PackageRelativePath::empty(),
-        true,
-    )
-    .await?
-    .unwrap()
-    .flatten())
+    let mut builder = PackageListingBuilder::new();
+    gather_into_listing(ctx, &buildfile_candidates, cell_path, &mut builder).await?;
+    Ok(builder.finish())
 }

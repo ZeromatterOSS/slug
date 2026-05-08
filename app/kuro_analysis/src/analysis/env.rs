@@ -660,9 +660,9 @@ async fn load_and_register_toolchain_packages(
                     Ok(r) => r,
                     Err(e) => {
                         tracing::warn!(
-                            "Toolchain package '{}' load failed (non-fatal): {:#}",
+                            "Toolchain package '{}' load failed (non-fatal): {}",
                             tc_label_str,
-                            e
+                            diagnostic_summary(&e)
                         );
                         return Ok::<_, kuro_error::Error>((tc_label_str, Vec::new()));
                     }
@@ -735,6 +735,25 @@ async fn load_and_register_toolchain_packages(
             );
         }
     }
+}
+
+fn diagnostic_summary(error: &kuro_error::Error) -> String {
+    const MAX_CHARS: usize = 500;
+    let rendered = error.to_string();
+    truncate_diagnostic(rendered, MAX_CHARS)
+}
+
+fn truncate_diagnostic(rendered: String, max_chars: usize) -> String {
+    let mut iter = rendered.char_indices();
+    let Some((idx, _)) = iter.nth(max_chars) else {
+        return rendered;
+    };
+    let omitted = rendered[idx..].chars().count();
+    format!(
+        "{} ... (truncated; {} chars omitted)",
+        &rendered[..idx],
+        omitted
+    )
 }
 
 /// Plan 13 Phase 3: build a `(label_str, PackageLabel)` list from a slice of

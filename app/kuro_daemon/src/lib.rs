@@ -9,6 +9,7 @@
  */
 
 #![feature(error_generic_member_access)]
+#![feature(alloc_error_hook)]
 #![feature(used_with_arg)]
 
 pub mod daemon;

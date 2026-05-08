@@ -622,6 +622,29 @@ pub struct CellAliasResolver {
 }
 
 impl CellAliasResolver {
+    fn current_as_alias(current: CellName) -> kuro_error::Result<NonEmptyCellAlias> {
+        NonEmptyCellAlias::new(current.as_str().to_owned())
+    }
+
+    fn new_with_shared_aliases(
+        current: CellName,
+        aliases: Arc<HashMap<NonEmptyCellAlias, CellName>>,
+    ) -> kuro_error::Result<CellAliasResolver> {
+        let current_as_alias = Self::current_as_alias(current)?;
+        if let Some(alias_target) = aliases.get(&current_as_alias) {
+            if *alias_target != current {
+                return Err(CellError::WrongSelfAlias(current, *alias_target).into());
+            }
+        }
+
+        kuro_util::memory_checkpoint::checkpoint(
+            "cell_alias_resolver_shared",
+            [("aliases", aliases.len())],
+        );
+
+        Ok(CellAliasResolver { current, aliases })
+    }
+
     /// Create an instance of `CellAliasResolver`. The special alias `""` must be present, or
     /// this will fail
     pub fn new(
@@ -629,7 +652,7 @@ impl CellAliasResolver {
         mut aliases: HashMap<NonEmptyCellAlias, CellName>,
     ) -> kuro_error::Result<CellAliasResolver> {
         let input_aliases = aliases.len();
-        let current_as_alias = NonEmptyCellAlias::new(current.as_str().to_owned())?;
+        let current_as_alias = Self::current_as_alias(current)?;
         if let Some(alias_target) = aliases.insert(current_as_alias, current) {
             if alias_target != current {
                 return Err(CellError::WrongSelfAlias(current, alias_target).into());
@@ -651,10 +674,19 @@ impl CellAliasResolver {
         root_aliases: &CellAliasResolver,
         alias_list: impl IntoIterator<Item = (NonEmptyCellAlias, NonEmptyCellAlias)>,
     ) -> kuro_error::Result<CellAliasResolver> {
-        let mut aliases: HashMap<_, _> = root_aliases
-            .mappings()
-            .map(|(x, y)| (x.to_owned(), y))
-            .collect();
+        let mut alias_list = alias_list.into_iter();
+        let Some((first_alias, first_destination)) = alias_list.next() else {
+            return CellAliasResolver::new_with_shared_aliases(
+                current,
+                root_aliases.aliases.dupe(),
+            );
+        };
+
+        let mut aliases: HashMap<_, _> = root_aliases.mappings().collect();
+        let Some(name) = aliases.get(&first_destination) else {
+            return Err(CellError::AliasOnlyCell(first_alias, first_destination).into());
+        };
+        aliases.insert(first_alias, *name);
         for (alias, destination) in alias_list {
             let Some(name) = aliases.get(&destination) else {
                 return Err(CellError::AliasOnlyCell(alias, destination).into());
@@ -669,8 +701,36 @@ impl CellAliasResolver {
         if alias.is_empty() {
             return Ok(self.current);
         }
+        if alias == self.current.as_str() {
+            return Ok(self.current);
+        }
         if let Some(name) = self.aliases.get(alias).duped() {
             return Ok(name);
+        }
+
+        if let Some(canonical_name) = resolve_dynamic_extension_cell_alias(alias) {
+            if let Ok(cell_name) = CellName::unchecked_new(&canonical_name) {
+                return Ok(cell_name);
+            }
+        }
+
+        if get_dynamic_extension_cell(alias).is_some() {
+            if let Ok(cell_name) = CellName::unchecked_new(alias) {
+                return Ok(cell_name);
+            }
+        }
+
+        if let Some(cell_name) = resolve_bzlmod_apparent_alias_from_external_dir(alias) {
+            return Ok(cell_name);
+        }
+
+        if matches!(
+            alias,
+            "bazel_tools" | "kuro_builtins" | "local_config_platform" | "local_config_python"
+        ) {
+            if let Ok(cell_name) = CellName::unchecked_new(alias) {
+                return Ok(cell_name);
+            }
         }
 
         // Fallback: For extension repos, sibling repos in the same extension
@@ -717,9 +777,53 @@ impl CellAliasResolver {
         self.current
     }
 
-    pub fn mappings(&self) -> impl Iterator<Item = (&NonEmptyCellAlias, CellName)> {
-        self.aliases.iter().map(|(alias, name)| (alias, *name))
+    pub fn mappings(&self) -> Box<dyn Iterator<Item = (NonEmptyCellAlias, CellName)> + '_> {
+        let self_alias = Self::current_as_alias(self.current)
+            .expect("CellName must be a valid non-empty cell alias");
+        if self.aliases.contains_key(&self_alias) {
+            Box::new(self.aliases.iter().map(|(alias, name)| (*alias, *name)))
+        } else {
+            Box::new(
+                self.aliases
+                    .iter()
+                    .map(|(alias, name)| (*alias, *name))
+                    .chain(std::iter::once((self_alias, self.current))),
+            )
+        }
     }
+}
+
+fn resolve_bzlmod_apparent_alias_from_external_dir(alias: &str) -> Option<CellName> {
+    let bazel_ext_dir = DYNAMIC_PROJECT_ROOT
+        .get()
+        .map(|root| root.join("bazel-external"))
+        .unwrap_or_else(|| std::path::PathBuf::from("bazel-external"));
+    let prefix = format!("{}+", alias);
+    let mut candidates: Vec<String> = std::fs::read_dir(&bazel_ext_dir)
+        .ok()?
+        .flatten()
+        .filter_map(|entry| {
+            if !entry.path().is_dir() {
+                return None;
+            }
+            let dir_name = entry.file_name();
+            let dir_name = dir_name.to_string_lossy();
+            if !dir_name.starts_with(&prefix) {
+                return None;
+            }
+            let suffix = &dir_name[prefix.len()..];
+            if suffix.is_empty() || suffix.contains('+') {
+                return None;
+            }
+            Some(dir_name.into_owned())
+        })
+        .collect();
+    candidates.sort();
+    let canonical_name = candidates.into_iter().next()?;
+    let path = format!("bazel-external/{}", canonical_name);
+    register_dynamic_extension_cell(canonical_name.clone(), path);
+    register_dynamic_extension_cell_alias(alias.to_owned(), canonical_name.clone());
+    CellName::unchecked_new(&canonical_name).ok()
 }
 
 /// Resolves 'CellName's into 'CellInstance's.
@@ -741,7 +845,7 @@ struct CellResolverInternals {
     cells: HashMap<CellName, CellInstance>,
     /// Dynamically-added cells from extension execution (spoke repos, etc.)
     #[allocative(skip)]
-    dynamic_cells: RwLock<HashMap<CellName, CellInstance>>,
+    dynamic_cells: RwLock<HashMap<CellName, &'static CellInstance>>,
     #[allocative(visit = crate::cells::sequence_trie_allocative::visit_sequence_trie)]
     path_mappings: SequenceTrie<FileNameBuf, CellName>,
     root_cell: CellName,
@@ -877,7 +981,7 @@ impl CellResolver {
                     // Create external/ symlink for action execution
                     ensure_external_symlink(cell.as_str(), &path);
                     if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
-                        dynamic.insert(cell, instance);
+                        dynamic.insert(cell, Box::leak(Box::new(instance)));
                     }
                     return self.get_or_create_dynamic_cell(cell);
                 }
@@ -908,7 +1012,7 @@ impl CellResolver {
                                 // Also register in dynamic registry for future lookups
                                 register_dynamic_extension_cell(dir_name_str.to_string(), path);
                                 if let Ok(mut dynamic) = self.0.dynamic_cells.write() {
-                                    dynamic.insert(cell, instance);
+                                    dynamic.insert(cell, Box::leak(Box::new(instance)));
                                 }
                                 return self.get_or_create_dynamic_cell(cell);
                             }
@@ -924,19 +1028,18 @@ impl CellResolver {
         )))
     }
 
-    /// Helper to get a reference to a dynamic cell, using unsafe to extend the lifetime.
-    /// This is safe because dynamic cells are never removed and the CellResolver outlives
-    /// all references to its cells within a build session.
+    /// Helper to get a reference to a dynamic cell.
+    ///
+    /// Dynamic cells are discovered lazily while other async computations may
+    /// still hold references to earlier dynamic cells. Store leaked
+    /// `CellInstance`s in the dynamic map so HashMap reallocation cannot
+    /// invalidate returned references.
     fn get_or_create_dynamic_cell(&self, cell: CellName) -> kuro_error::Result<&CellInstance> {
         let dynamic = self.0.dynamic_cells.read().map_err(|_| {
             CellError::UnknownCellName(cell, self.0.cells.keys().copied().collect())
         })?;
         if let Some(instance) = dynamic.get(&cell) {
-            // SAFETY: The CellResolver (and its dynamic_cells) lives for the entire build.
-            // Dynamic cells are append-only (never removed). The returned reference will
-            // be valid as long as the CellResolver exists.
-            let instance_ref: &CellInstance = unsafe { &*(instance as *const CellInstance) };
-            Ok(instance_ref)
+            Ok(*instance)
         } else {
             Err(kuro_error::Error::from(CellError::UnknownCellName(
                 cell,

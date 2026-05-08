@@ -385,6 +385,10 @@ impl BuckConfigBasedCells {
                 continue;
             }
             tracing::info!("Adding bzlmod repo_name alias: {} -> {}", alias, target);
+            kuro_core::cells::register_dynamic_extension_cell_alias(
+                alias.as_str().to_owned(),
+                target.as_str().to_owned(),
+            );
             root_aliases.insert(alias, target_alias);
         }
 
@@ -473,6 +477,7 @@ impl BuckConfigBasedCells {
         let mut cells = Vec::new();
         let mut aliases = Vec::new();
         let workspace_root = project_root.root().as_path();
+        let mut resolved_graph_for_aliases = None;
 
         // Resolve local path overrides first
         let local_modules = resolve_local_modules(&parsed.module.overrides, workspace_root)?;
@@ -532,6 +537,7 @@ impl BuckConfigBasedCells {
                 "MVS resolved {} total modules (including transitive)",
                 resolved_graph.modules.len()
             );
+            resolved_graph_for_aliases = Some(resolved_graph.clone());
 
             // Fetch sources for all resolved modules (downloads and extracts).
             // Keep as a warning: partial fetch failures (e.g. one registry URL
@@ -741,15 +747,38 @@ impl BuckConfigBasedCells {
                 }
             }
 
-            // Handle repo_name aliases from root module's direct deps
-            // Transitive repo_name aliasing requires parsing each module's MODULE.bazel
-            // which we defer to a future enhancement
+            if let Some(repo_name) = &parsed.module.repo_name {
+                if repo_name != &parsed.module.name {
+                    let alias_name = NonEmptyCellAlias::new(repo_name.clone())?;
+                    let cell_name = CellName::unchecked_new(&parsed.module.name)?;
+                    tracing::info!(
+                        "Creating root module self repo_name alias: {} -> {}",
+                        repo_name,
+                        parsed.module.name
+                    );
+                    aliases.push((alias_name, cell_name));
+                }
+            }
+
+            // Handle apparent repository names from the root module's direct deps.
+            // In Bazel, every bazel_dep is visible in the declaring module under
+            // repo_name if specified, otherwise under name. Kuro's cell identity
+            // can differ from that apparent name (for example when a selected
+            // module is represented by a disambiguated cell), so register the
+            // apparent name as an alias whenever it is not already the cell name.
             for dep in &parsed.module.bazel_deps {
-                if let Some(repo_name) = &dep.repo_name {
-                    if repo_name != &dep.name {
-                        let cell_name = CellName::unchecked_new(&dep.name)?;
-                        let alias_name = NonEmptyCellAlias::new(repo_name.clone())?;
-                        tracing::info!("Creating repo_name alias: {} -> {}", repo_name, dep.name);
+                let apparent_name = dep.apparent_name();
+                if let Some(target_name) =
+                    selected_bzlmod_cell_name_for_dep(&cells, &dep.name, &resolved_graph)
+                {
+                    if apparent_name != target_name {
+                        let cell_name = CellName::unchecked_new(target_name)?;
+                        let alias_name = NonEmptyCellAlias::new(apparent_name.to_owned())?;
+                        tracing::info!(
+                            "Creating root bazel_dep apparent alias: {} -> {}",
+                            apparent_name,
+                            target_name
+                        );
                         aliases.push((alias_name, cell_name));
                     }
                 }
@@ -802,6 +831,36 @@ impl BuckConfigBasedCells {
                         };
                         parsed_modules.push((module_key, dep_parsed));
                     }
+                }
+            }
+        }
+
+        if let Some(resolved_graph) = &resolved_graph_for_aliases {
+            for (_module_name, parsed_mod) in &parsed_modules {
+                for dep in &parsed_mod.module.bazel_deps {
+                    let apparent_name = dep.apparent_name();
+                    if aliases
+                        .iter()
+                        .any(|(alias, _)| alias.as_str() == apparent_name)
+                    {
+                        continue;
+                    }
+                    let Some(target_name) =
+                        selected_bzlmod_cell_name_for_dep(&cells, &dep.name, resolved_graph)
+                    else {
+                        continue;
+                    };
+                    if apparent_name == target_name {
+                        continue;
+                    }
+                    let alias_name = NonEmptyCellAlias::new(apparent_name.to_owned())?;
+                    let cell_name = CellName::unchecked_new(target_name)?;
+                    tracing::info!(
+                        "Creating bazel_dep apparent alias from module graph: {} -> {}",
+                        apparent_name,
+                        target_name
+                    );
+                    aliases.push((alias_name, cell_name));
                 }
             }
         }
@@ -1415,6 +1474,27 @@ impl BuckConfigBasedCells {
             Err(ExternalCellOriginParseError::Unknown(value.to_owned()).into())
         }
     }
+}
+
+fn selected_bzlmod_cell_name_for_dep<'a>(
+    cells: &'a [(CellName, CellRootPathBuf, Option<BzlmodCellSetup>)],
+    dep_name: &str,
+    resolved_graph: &kuro_bzlmod::ResolvedGraph,
+) -> Option<&'a str> {
+    if let Some((name, _, _)) = cells.iter().find(|(name, _, _)| name.as_str() == dep_name) {
+        return Some(name.as_str());
+    }
+
+    let selected_version = resolved_graph.selected_versions.get(dep_name)?;
+    let versioned_name = format!("{}+{}", dep_name, selected_version);
+    if let Some((name, _, _)) = cells
+        .iter()
+        .find(|(name, _, _)| name.as_str() == versioned_name)
+    {
+        return Some(name.as_str());
+    }
+
+    None
 }
 
 /// Extract the repo name from a toolchain/platform label.

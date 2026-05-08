@@ -122,6 +122,7 @@ pub fn parse_module_bazel_content(
         Some(decl) => {
             let mut module = BzlModule::new(decl.name.clone(), decl.version.clone());
             module.compatibility_level = decl.compatibility_level;
+            module.repo_name = decl.repo_name.clone();
             module.bazel_deps = ctx.bazel_deps.clone();
             module.overrides = ctx.overrides.clone();
             (module, true)

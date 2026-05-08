@@ -50,6 +50,8 @@ use crate::lockfile::Lockfile;
 use crate::lockfile::lockfile_path;
 use crate::module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
 
+const MAX_EXTENSION_IDS_IN_WARNING: usize = 25;
+
 /// Global storage for extension aggregation data, populated during cell resolution.
 ///
 /// This data is needed when extension repos are lazily executed inside DICE.
@@ -62,6 +64,28 @@ struct ExtensionAggregationData {
 }
 
 static EXTENSION_AGGREGATIONS: Mutex<Option<ExtensionAggregationData>> = Mutex::new(None);
+
+fn extension_ids_summary<'a>(extension_ids: impl Iterator<Item = &'a String>) -> String {
+    let mut shown = Vec::new();
+    let mut total = 0;
+    for extension_id in extension_ids {
+        total += 1;
+        if shown.len() < MAX_EXTENSION_IDS_IN_WARNING {
+            shown.push(extension_id.as_str());
+        }
+    }
+
+    if total <= MAX_EXTENSION_IDS_IN_WARNING {
+        return format!("{shown:?} ({total} total)");
+    }
+
+    format!(
+        "{shown:?} (showing {} of {}; {} omitted)",
+        shown.len(),
+        total,
+        total - shown.len()
+    )
+}
 
 /// Store aggregated extension data for later DICE-based execution.
 ///
@@ -99,9 +123,9 @@ pub fn create_extension_execution_key(extension_id: &str) -> Option<ModuleExtens
         Some(a) => a,
         None => {
             tracing::warn!(
-                "create_extension_execution_key: extension '{}' not found in aggregations. Available: {:?}",
+                "create_extension_execution_key: extension '{}' not found in aggregations. Available: {}",
                 extension_id,
-                data.aggregations.keys().collect::<Vec<_>>()
+                extension_ids_summary(data.aggregations.keys())
             );
             return None;
         }

@@ -237,7 +237,9 @@ impl LoadResolver for InterpreterLoadResolver {
             .global_state
             .cell_resolver
             .get_cell_path(&project_path);
-        if reformed_path.cell() != path.cell() {
+        if reformed_path.cell() != path.cell()
+            && !are_bzlmod_alias_equivalent(reformed_path.cell().as_str(), path.cell().as_str())
+        {
             // We actually call resolve_load twice for each loadable - once with all load's up front,
             // then again on each one when we are loading. The second time we don't have a location,
             // so just omit the soft_error that time. Once it is a real error, we should real error on either.
@@ -258,6 +260,12 @@ impl LoadResolver for InterpreterLoadResolver {
             _ => OwnedStarlarkModulePath::LoadFile(import_path),
         })
     }
+}
+
+fn are_bzlmod_alias_equivalent(apparent: &str, canonical: &str) -> bool {
+    kuro_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref() == Some(canonical)
+        || kuro_core::cells::resolve_dynamic_extension_cell_alias(canonical).as_deref()
+            == Some(apparent)
 }
 
 struct EvalResult {

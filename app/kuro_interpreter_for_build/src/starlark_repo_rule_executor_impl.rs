@@ -252,15 +252,31 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
                 Ok(())
             }
             Err(e) => {
-                tracing::error!(
+                let summary = diagnostic_summary(&e);
+                tracing::debug!(
                     "Repository rule '{}' implementation failed: {}",
                     rule_name,
-                    e
+                    summary
                 );
-                Err(StarlarkRepoRuleError::ImplementationError(e.to_string()).into())
+                Err(StarlarkRepoRuleError::ImplementationError(summary).into())
             }
         }
     }
+}
+
+fn diagnostic_summary(error: impl std::fmt::Display) -> String {
+    const MAX_CHARS: usize = 500;
+    let rendered = error.to_string();
+    let mut iter = rendered.char_indices();
+    let Some((idx, _)) = iter.nth(MAX_CHARS) else {
+        return rendered;
+    };
+    let omitted = rendered[idx..].chars().count();
+    format!(
+        "{} ... (truncated; {} chars omitted)",
+        &rendered[..idx],
+        omitted
+    )
 }
 
 /// Initialize the late binding for Starlark repository rule execution.

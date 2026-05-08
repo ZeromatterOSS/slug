@@ -110,6 +110,7 @@ pub struct ModuleDecl {
     pub name: String,
     pub version: Version,
     pub compatibility_level: u32,
+    pub repo_name: Option<String>,
 }
 
 // ============================================================================
@@ -365,10 +366,14 @@ fn register_module_globals(globals: &mut GlobalsBuilder) {
             name: name.to_owned(),
             version: parsed_version,
             compatibility_level: compatibility_level as u32,
+            repo_name: if repo_name.is_empty() {
+                None
+            } else {
+                Some(repo_name.to_owned())
+            },
         });
 
-        // repo_name and bazel_compatibility are currently ignored but accepted
-        let _ = repo_name;
+        // bazel_compatibility is currently accepted for parsing parity only.
         let _ = bazel_compatibility;
 
         Ok(NoneType)
