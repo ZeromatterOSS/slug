@@ -19,6 +19,7 @@ use futures::FutureExt;
 use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::configuration_info::FrozenConfigurationInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::platform_info::FrozenPlatformInfo;
+use kuro_build_api::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 use kuro_common::dice::cells::HasCellResolver;
 use kuro_common::legacy_configs::configs::parse_config_section_and_key;
 use kuro_common::legacy_configs::dice::HasLegacyConfigs;
@@ -37,7 +38,10 @@ use kuro_node::configuration::resolved::ConfigurationNode;
 use kuro_node::configuration::resolved::ConfigurationSettingKey;
 use kuro_node::configuration::resolved::MatchedConfigurationSettingKeys;
 use kuro_node::configuration::resolved::MatchedConfigurationSettingKeysWithCfg;
+use kuro_node::nodes::frontend::TargetGraphCalculation;
 use kuro_node::nodes::unconfigured::TargetNodeRef;
+use kuro_node::rule_type::NativeRuleKind;
+use kuro_node::rule_type::RuleType;
 use ref_cast::RefCast;
 use starlark_map::ordered_map::OrderedMap;
 use starlark_map::unordered_map::UnorderedMap;
@@ -256,6 +260,29 @@ async fn get_configuration_node(
     })
 }
 
+async fn get_configuration_key_providers(
+    ctx: &mut DiceComputations<'_>,
+    target_cfg: &ConfigurationData,
+    cfg_target: &ProvidersLabel,
+) -> kuro_error::Result<FrozenProviderCollectionValue> {
+    let target_node = ctx.get_target_node(cfg_target.target()).await?;
+
+    if matches!(
+        target_node.rule_type(),
+        RuleType::Native(NativeRuleKind::Alias)
+    ) {
+        // Bazel allows alias targets in select keys. For an alias-backed
+        // config_setting_group, the alias `actual` attribute may itself be a
+        // select(), so it must be resolved in the configuration currently being
+        // matched, not in Kuro's unbound configuration-rule analysis cfg.
+        let configured =
+            cfg_target.configure_pair_no_exec(ConfigurationNoExec::new(target_cfg.dupe()));
+        return Ok(ctx.get_providers(&configured).await?.require_compatible()?);
+    }
+
+    ctx.get_configuration_analysis_result(cfg_target).await
+}
+
 #[async_trait]
 impl Key for ConfigurationNodeKey {
     type Value = kuro_error::Result<ConfigurationNode>;
@@ -265,9 +292,8 @@ impl Key for ConfigurationNodeKey {
         ctx: &mut DiceComputations,
         _cancellation: &CancellationContext,
     ) -> Self::Value {
-        let providers = ctx
-            .get_configuration_analysis_result(&self.cfg_target.0)
-            .await?;
+        let providers =
+            get_configuration_key_providers(ctx, &self.target_cfg, &self.cfg_target.0).await?;
 
         // capture the result so the temporaries get dropped before providers
         let result = match providers

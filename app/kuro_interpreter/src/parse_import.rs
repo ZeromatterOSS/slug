@@ -101,6 +101,18 @@ pub fn parse_import_with_config(
     import: &str,
     opts: &ParseImportOptions,
 ) -> kuro_error::Result<CellPath> {
+    if let Some(alias) = import.strip_prefix('@') {
+        if !alias.is_empty() && !alias.contains("//") && !alias.contains(':') {
+            let cell = cell_resolver.resolve(alias)?;
+            let filename = FileName::new(alias)
+                .map_err(|_| ImportParseError::NotAFileName(import.to_owned()))?;
+            return Ok(CellPath::new(
+                cell,
+                CellRelativePath::unchecked_new("").join(filename),
+            ));
+        }
+    }
+
     match import.split_once(':') {
         None => {
             // import without `:`, so just try to parse the cell and cell relative paths
@@ -232,6 +244,10 @@ mod tests {
             NonEmptyCellAlias::new("alias2".to_owned()).unwrap(),
             CellName::testing_new("cell2"),
         );
+        m.insert(
+            NonEmptyCellAlias::new("with_cfg.bzl".to_owned()).unwrap(),
+            CellName::testing_new("with_cfg.bzl"),
+        );
         CellAliasResolver::new(CellName::testing_new("root"), m).expect("valid resolver")
     }
 
@@ -275,6 +291,25 @@ mod tests {
                     ),
                 },
                 "@cell1//package/path:import.bzl"
+            )?
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn repository_root_file_shorthand() -> kuro_error::Result<()> {
+        assert_eq!(
+            path("with_cfg.bzl", "", "with_cfg.bzl"),
+            parse_import(
+                &resolver(),
+                RelativeImports::Allow {
+                    package_dir: None,
+                    current_dir_with_allowed_relative: &CellPathWithAllowedRelativeDir::new(
+                        CellPath::testing_new("root//toolchain/runtimes"),
+                        None,
+                    ),
+                },
+                "@with_cfg.bzl"
             )?
         );
         Ok(())
