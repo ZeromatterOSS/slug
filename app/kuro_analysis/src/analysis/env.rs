@@ -539,7 +539,7 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
     // `ensure_deferred_toolchains_loaded` for a filtered subset.
     let (eager_registered, deferred): (Vec<_>, Vec<_>) = registered
         .into_iter()
-        .partition(|tc| tc.is_root || is_bundled_eager_toolchain(&tc.label));
+        .partition(should_eager_load_registered_toolchain);
     let deferred_pool: Vec<DeferredToolchain> = deferred
         .iter()
         .map(|tc| DeferredToolchain {
@@ -579,19 +579,6 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
             }
         };
 
-        // Skip extension-generated repos (canonical names like "module+ext+repo").
-        // These may not be materialized yet and loading them eagerly triggers
-        // expensive extension execution (downloading SDKs, running repo rules, etc.).
-        // They will be loaded on-demand when actually needed during analysis.
-        if repo_name.contains('+') || repo_name.contains('~') {
-            tracing::debug!(
-                "Skipping extension-generated toolchain repo '{}' (loaded on-demand)",
-                tc_label_str
-            );
-            skipped_count += 1;
-            continue;
-        }
-
         // Resolve cell name (triggers ExtensionRepoCellSetup → lazy materialization)
         let cell_name = match CellName::unchecked_new(&repo_name) {
             Ok(c) => c,
@@ -614,17 +601,14 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
             }
         };
 
-        // Extension repos (paths containing '+' or '~') are loaded the same way
-        // as other cells: via `dice.get_interpreter_results`. If the repo's
-        // content is not yet on disk, the file-ops layer triggers
+        // Extension repos (paths containing '+' or '~') are loaded the same
+        // way as other cells: via `dice.get_interpreter_results`. If the
+        // repo's content is not yet on disk, the file-ops layer triggers
         // `ExtensionRepoExecutionKey::compute` and materialises it on demand.
-        // Previously this path short-circuited with a skip, which meant
-        // toolchain registrations coming from extension-generated repos such
-        // as `rules_cc+cc_configure_extension+local_config_cc_toolchains`
-        // were never fed into the DeclaredToolchainInfo registry — so CC
-        // toolchain resolution failed with "No execution platform found that
-        // provides all mandatory toolchain types". Fall through to the normal
-        // `to_load.push(...)` path below for both in-tree and extension cells.
+        // Root-module registrations must take this path even when they point
+        // at extension-generated repos; Bazel gives root registrations higher
+        // priority than transitive registrations, so deferring them can let a
+        // lower-priority toolchain win before the root toolchain is visible.
         let _ = cell_instance;
 
         let cell_rel_path = CellRelativePath::unchecked_new(&pkg_path);
@@ -659,7 +643,8 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
 
 /// Load a list of `(label_str, package_label)` toolchain packages in
 /// parallel, registering each `toolchain()` target into
-/// `DECLARED_TOOLCHAINS`. Errors are non-fatal — swallowed with a warn.
+/// `DECLARED_TOOLCHAINS` in the original registration order. Errors are
+/// non-fatal — swallowed with a warn.
 async fn load_and_register_toolchain_packages(
     dice: &mut DiceComputations<'_>,
     to_load: Vec<(String, PackageLabel)>,
@@ -668,7 +653,7 @@ async fn load_and_register_toolchain_packages(
         return;
     }
     use futures::FutureExt;
-    let _: Vec<()> = match dice
+    let loaded = match dice
         .try_compute_join(to_load, |ctx, (tc_label_str, package_label)| {
             async move {
                 let eval_result = match ctx.get_interpreter_results(package_label.dupe()).await {
@@ -679,11 +664,11 @@ async fn load_and_register_toolchain_packages(
                             tc_label_str,
                             e
                         );
-                        return Ok::<(), kuro_error::Error>(());
+                        return Ok::<_, kuro_error::Error>((tc_label_str, Vec::new()));
                     }
                 };
 
-                let mut registered_count = 0;
+                let mut toolchains = Vec::new();
                 let mut alias_cache: HashMap<String, String> = HashMap::new();
                 for (_target_name, target_node) in eval_result.targets().iter() {
                     if matches!(
@@ -708,26 +693,12 @@ async fn load_and_register_toolchain_packages(
                                 );
                                 info.toolchain_type = canonical;
                             }
-                            tracing::debug!(
-                                "Registered toolchain '{}': type='{}', impl='{}'",
-                                label,
-                                info.toolchain_type,
-                                info.toolchain_impl
-                            );
-                            register_declared_toolchain(label, info);
-                            registered_count += 1;
+                            toolchains.push((label, info));
                         }
                     }
                 }
 
-                if registered_count > 0 {
-                    tracing::debug!(
-                        "Loaded {} toolchain(s) from '{}'",
-                        registered_count,
-                        tc_label_str
-                    );
-                }
-                Ok(())
+                Ok((tc_label_str, toolchains))
             }
             .boxed()
         })
@@ -739,6 +710,31 @@ async fn load_and_register_toolchain_packages(
             Vec::new()
         }
     };
+
+    // Publish after the parallel package loads complete. Toolchain resolution
+    // is priority-ordered by `register_toolchains()` order; appending from
+    // worker completion order would make "first match wins" nondeterministic.
+    for (tc_label_str, toolchains) in loaded {
+        for (label, info) in &toolchains {
+            tracing::debug!(
+                "Registered toolchain '{}': type='{}', impl='{}'",
+                label,
+                info.toolchain_type,
+                info.toolchain_impl
+            );
+        }
+        let registered_count = toolchains.len();
+        for (label, info) in toolchains {
+            register_declared_toolchain(label, info);
+        }
+        if registered_count > 0 {
+            tracing::debug!(
+                "Loaded {} toolchain(s) from '{}'",
+                registered_count,
+                tc_label_str
+            );
+        }
+    }
 }
 
 /// Plan 13 Phase 3: build a `(label_str, PackageLabel)` list from a slice of
@@ -895,6 +891,10 @@ fn is_bundled_eager_toolchain(label: &str) -> bool {
             | "local_config_cc"
             | "local_config_python"
     ) || repo.starts_with("local_config_")
+}
+
+fn should_eager_load_registered_toolchain(tc: &kuro_bzlmod::RegisteredToolchain) -> bool {
+    tc.is_root || is_bundled_eager_toolchain(&tc.label)
 }
 
 /// Parse a registered toolchain label like `@repo//pkg:target` or `@repo//:all`.
@@ -2165,5 +2165,31 @@ mod tests {
 
         // Invalid: empty target
         assert!(parse_impl_label_to_target_label("@repo//:").is_none());
+    }
+
+    #[test]
+    fn test_root_extension_toolchains_are_eager() {
+        let root_extension = kuro_bzlmod::RegisteredToolchain {
+            module: "zeromatter".to_owned(),
+            label: "@rules_rs+toolchains+default_rust_toolchains//:all".to_owned(),
+            is_root: true,
+        };
+        assert!(should_eager_load_registered_toolchain(&root_extension));
+
+        let transitive_extension = kuro_bzlmod::RegisteredToolchain {
+            module: "rules_rust".to_owned(),
+            label: "@rules_rust+rust+rust_toolchains//:all".to_owned(),
+            is_root: false,
+        };
+        assert!(!should_eager_load_registered_toolchain(
+            &transitive_extension
+        ));
+
+        let bundled_transitive = kuro_bzlmod::RegisteredToolchain {
+            module: "bazel_tools".to_owned(),
+            label: "@local_config_cc//:all".to_owned(),
+            is_root: false,
+        };
+        assert!(should_eager_load_registered_toolchain(&bundled_transitive));
     }
 }
