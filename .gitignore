@@ -2,6 +2,12 @@
 Cargo.lock
 buck-out
 bazel-external
+# Bazel/Kuro generated workspace output links and trees.
+bazel-bin
+bazel-out
+bazel-testlogs
+bazel-*
+execroot
 # Kuro-generated apparent-name symlinks (kuro_core/src/cells.rs::ensure_external_symlink).
 # Bazel keeps externals under <output_base>/external/, not at workspace root —
 # kuro's convenience symlinks here are ephemeral and per-user.
