@@ -643,6 +643,16 @@ where
         self.def_info.name.as_str().to_owned()
     }
 
+    fn collect_repr(&self, collector: &mut String) {
+        write!(
+            collector,
+            "<function {} from {}>",
+            self.def_info.name.as_str(),
+            self.def_info.codemap.filename()
+        )
+        .unwrap()
+    }
+
     fn invoke(
         &self,
         me: Value<'v>,
