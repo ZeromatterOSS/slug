@@ -260,7 +260,8 @@ fn apply_patches(
             for arg in patch_args {
                 cmd.arg(arg);
             }
-            cmd.arg("-i").arg(patch_path);
+            let resolved_patch_path = resolve_build_file_label(patch_path, working_dir);
+            cmd.arg("-i").arg(&resolved_patch_path);
             cmd.current_dir(working_dir);
 
             let output = cmd

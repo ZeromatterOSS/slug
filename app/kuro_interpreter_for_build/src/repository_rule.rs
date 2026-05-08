@@ -113,6 +113,13 @@ enum RepositoryRuleError {
 
 /// Convert a Starlark value to a RepoAttrValue for recording invocations.
 fn starlark_to_repo_attr_value(value: Value) -> RepoAttrValue {
+    starlark_to_repo_attr_value_with_label_context(value, None)
+}
+
+fn starlark_to_repo_attr_value_with_label_context(
+    value: Value,
+    label_context: Option<&RepoLabelContext>,
+) -> RepoAttrValue {
     if value.is_none() {
         return RepoAttrValue::None;
     }
@@ -120,7 +127,7 @@ fn starlark_to_repo_attr_value(value: Value) -> RepoAttrValue {
     if let Some(s) = value.unpack_str() {
         // Check if it looks like a label
         if s.starts_with("//") || s.starts_with("@") || s.starts_with(":") {
-            return RepoAttrValue::Label(s.to_owned());
+            return RepoAttrValue::Label(canonicalize_repo_attr_label(s, label_context));
         }
         return RepoAttrValue::String(s.to_owned());
     }
@@ -149,6 +156,16 @@ fn starlark_to_repo_attr_value(value: Value) -> RepoAttrValue {
             .filter_map(|v| v.unpack_str().map(|s| s.to_owned()))
             .collect();
         if all_strings.len() == items.len() {
+            let all_strings = all_strings
+                .into_iter()
+                .map(|s| {
+                    if s.starts_with("//") || s.starts_with("@") || s.starts_with(":") {
+                        canonicalize_repo_attr_label(&s, label_context)
+                    } else {
+                        s
+                    }
+                })
+                .collect();
             return RepoAttrValue::StringList(all_strings);
         }
         // Otherwise, treat as a list of mixed values - convert recursively
@@ -161,7 +178,10 @@ fn starlark_to_repo_attr_value(value: Value) -> RepoAttrValue {
         let mut map = indexmap::IndexMap::new();
         for (k, v) in dict.iter() {
             if let Some(key) = k.unpack_str() {
-                map.insert(key.to_owned(), starlark_to_repo_attr_value(v));
+                map.insert(
+                    key.to_owned(),
+                    starlark_to_repo_attr_value_with_label_context(v, label_context),
+                );
             }
         }
         return RepoAttrValue::Dict(map);
@@ -169,6 +189,76 @@ fn starlark_to_repo_attr_value(value: Value) -> RepoAttrValue {
 
     // Fallback: convert to string representation
     RepoAttrValue::String(value.to_repr())
+}
+
+#[derive(Debug)]
+struct RepoLabelContext {
+    repo: String,
+    package: String,
+}
+
+fn repo_label_context_from_eval(eval: &mut Evaluator<'_, '_, '_>) -> Option<RepoLabelContext> {
+    let location = eval.call_stack_top_location();
+    let filename = location.as_ref()?.filename();
+    let (repo, package) = extract_repo_and_package_from_filename(filename)?;
+    Some(RepoLabelContext { repo, package })
+}
+
+fn canonicalize_repo_attr_label(label: &str, context: Option<&RepoLabelContext>) -> String {
+    if label.starts_with("@@") {
+        return label.to_owned();
+    }
+    if label.starts_with('@') {
+        return label.to_owned();
+    }
+    let Some(context) = context else {
+        return label.to_owned();
+    };
+    if label.starts_with("//") {
+        return format!("@@{}{}", context.repo, label);
+    }
+    let target = label.strip_prefix(':').unwrap_or(label);
+    format!("@@{}//{}:{}", context.repo, context.package, target)
+}
+
+fn extract_repo_and_package_from_filename(filename: &str) -> Option<(String, String)> {
+    if let Some(rest) = filename.strip_prefix("bazel-external/") {
+        return extract_external_repo_and_package(rest);
+    }
+    if let Some(idx) = filename.find("/external_cells/bzlmod/") {
+        let rest = &filename[idx + "/external_cells/bzlmod/".len()..];
+        let mut parts = rest.splitn(3, '/');
+        let repo = parts.next()?.to_owned();
+        let _version = parts.next()?;
+        let cell_relative = parts.next().unwrap_or("");
+        return Some((repo, package_from_cell_relative_path(cell_relative)));
+    }
+    if let Some(rest) = filename.strip_prefix("bazel_tools/") {
+        return Some((
+            "bazel_tools".to_owned(),
+            package_from_cell_relative_path(rest),
+        ));
+    }
+    Some((String::new(), package_from_cell_relative_path(filename)))
+}
+
+fn extract_external_repo_and_package(rest: &str) -> Option<(String, String)> {
+    let dir_end = rest.find('/')?;
+    let dir_name = &rest[..dir_end];
+    let plus_count = dir_name.matches('+').count();
+    let repo = match plus_count {
+        0 => dir_name.to_owned(),
+        1 => dir_name[..dir_name.find('+').unwrap()].to_owned(),
+        _ => dir_name[dir_name.rfind('+').unwrap() + 1..].to_owned(),
+    };
+    let cell_relative = &rest[dir_end + 1..];
+    Some((repo, package_from_cell_relative_path(cell_relative)))
+}
+
+fn package_from_cell_relative_path(path: &str) -> String {
+    path.rsplit_once('/')
+        .map(|(package, _)| package.to_owned())
+        .unwrap_or_default()
 }
 
 /// Convert a CoercedAttr default value to RepoAttrValue.
@@ -445,7 +535,7 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRepositoryRule {
         &self,
         _me: Value<'v>,
         args: &Arguments<'v, '_>,
-        _eval: &mut Evaluator<'v, '_, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         // When a frozen repository_rule is invoked (e.g., http_archive(name = "foo", ...)),
         // we record the invocation for later execution via DICE.
@@ -471,6 +561,7 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRepositoryRule {
         // In extension context, we capture RepoSpecs for deferred execution.
         // Outside extension context, we record RepositoryInvocations for immediate tracking.
         if in_extension_context() {
+            let label_context = repo_label_context_from_eval(eval);
             // Build a RepoSpec for deferred execution.
             // Use "{bzl_path}%{name}" format so the DICE executor can locate the Starlark
             // implementation. For builtin rules (no bzl_path), just use the rule name.
@@ -485,7 +576,10 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkRepositoryRule {
             for (key, value) in kwargs.iter() {
                 let key_str = key.as_str();
                 if key_str != "name" {
-                    let attr_value = starlark_to_repo_attr_value(*value);
+                    let attr_value = starlark_to_repo_attr_value_with_label_context(
+                        *value,
+                        label_context.as_ref(),
+                    );
                     spec.attributes.insert(key_str.to_owned(), attr_value);
                 }
             }
