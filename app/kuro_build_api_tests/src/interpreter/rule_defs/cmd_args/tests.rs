@@ -134,6 +134,39 @@ fn displays_correctly_replace_regex() {
 }
 
 #[test]
+fn depset_add_all_and_joined_render_after_freeze() -> kuro_error::Result<()> {
+    let mut tester = tester()?;
+    tester.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            strings = depset(["one", "two"])
+
+            add_all_args = cmd_args()
+            add_all_args.add_all(strings)
+            assert_eq(["one", "two"], get_args(add_all_args))
+            assert_eq(True, "depset command line" in str(add_all_args))
+
+            joined_args = cmd_args()
+            joined_args.add_joined(strings, join_with = ":")
+            assert_eq(["one:two"], get_args(joined_args))
+            assert_eq(True, "depset command line" in str(joined_args))
+
+            src = source_artifact("foo", "bar.h")
+            file_args = cmd_args()
+            file_args.add_all(depset([src]))
+            assert_eq(["foo/bar.h"], get_args(file_args))
+            assert_eq(1, len(file_args.inputs))
+
+            joined_file_args = cmd_args()
+            joined_file_args.add_joined(depset([src]), join_with = ":")
+            assert_eq(["foo/bar.h"], get_args(joined_file_args))
+            assert_eq(1, len(joined_file_args.inputs))
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
 fn command_line_builder() -> kuro_error::Result<()> {
     let mut tester = tester()?;
     let content = indoc!(

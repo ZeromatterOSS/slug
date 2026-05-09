@@ -61,7 +61,7 @@ depset_mismatch_rule = rule(
 
 # === Cross-rule depset traversal tests ===
 # Tests that depsets can be passed through providers and traversed in other rules.
-# This exercises the critical fix for FrozenLiveDepset.direct/transitive attributes.
+# This exercises frozen depset traversal without public .direct/.transitive attributes.
 
 ItemsInfo = provider(fields = ["items"])
 
@@ -120,7 +120,7 @@ depset_keyword_rule = rule(
 # === depset | operator (union) ===
 
 def _depset_union_impl(ctx):
-    """Tests depset | depset union operator."""
+    """Bazel 9 rejects the old Kuro prototype depset | depset operator."""
     a = depset(["x", "y"])
     b = depset(["z"])
     c = a | b
@@ -138,7 +138,7 @@ depset_union_rule = rule(
 # === depset .order attribute ===
 
 def _depset_order_attr_impl(ctx):
-    """Tests depset.order attribute access."""
+    """Bazel 9 rejects public depset.order attribute access."""
     a = depset(["x"], order = "preorder")
     b = depset(["y"])  # default order
     out = ctx.actions.declare_file("order_attr.txt")
@@ -155,7 +155,7 @@ depset_order_attr_rule = rule(
 # === len(depset) ===
 
 def _depset_len_impl(ctx):
-    """Tests len(depset) works."""
+    """Bazel 9 rejects len(depset)."""
     a = depset(["x", "y"])
     b = depset(["z"], transitive = [a])
     out = ctx.actions.declare_file("len_depset.txt")
@@ -165,5 +165,35 @@ def _depset_len_impl(ctx):
 
 depset_len_rule = rule(
     implementation = _depset_len_impl,
+    attrs = {},
+)
+
+
+# === depset <-> transitive_set bridge ===
+
+def _depset_bridge_impl(ctx):
+    """Tests Kuro's internal depset/transitive_set bridge shape and roundtrip."""
+    leaf = depset(["a", "b"])
+    parent = depset(["c", "d"], transitive = [leaf])
+    tset = native.transitive_set_from_depset(parent, actions = ctx.actions)
+
+    node_sizes = [str(len(node)) for node in tset.traverse(ordering = "preorder")]
+    roundtrip_default = native.depset_from_transitive_set(tset).to_list()
+    roundtrip_preorder = native.depset_from_transitive_set(tset, order = "preorder").to_list()
+
+    out = ctx.actions.declare_file("depset_bridge.txt")
+    ctx.actions.write(
+        out,
+        "\n".join([
+            "nodes=" + ",".join(node_sizes),
+            "default=" + ",".join(roundtrip_default),
+            "preorder=" + ",".join(roundtrip_preorder),
+        ]),
+    )
+    return [DefaultInfo(default_output = out)]
+
+
+depset_bridge_rule = rule(
+    implementation = _depset_bridge_impl,
     attrs = {},
 )

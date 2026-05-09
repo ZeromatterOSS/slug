@@ -583,6 +583,7 @@ async fn build_configured_label_inner<'a>(
                         EnsureTransitiveSetProjectionKey(key.dupe().dupe()),
                     ),
                 ),
+                ResolvedArtifactGroup::Depset(_) => None,
             })
             .collect();
 

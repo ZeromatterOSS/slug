@@ -21,6 +21,7 @@
 
 use std::fmt;
 use std::fmt::Display;
+use std::hash::Hash;
 use std::sync::Arc;
 use std::sync::OnceLock;
 
@@ -29,6 +30,7 @@ use kuro_core::provider::id::ProviderId;
 use kuro_interpreter::types::provider::callable::ProviderCallableLike;
 use starlark::coerce::Coerce;
 use starlark::collections::SmallMap;
+use starlark::collections::StarlarkHasher;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
@@ -468,6 +470,46 @@ where
             "alwayslink" => Some(Value::new_bool(self.alwayslink)),
             _ => None,
         }
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        let Some(other) = other.downcast_ref::<LibraryToLinkGen<V>>() else {
+            return Ok(false);
+        };
+        Ok(self
+            .static_library
+            .to_value()
+            .equals(other.static_library.to_value())?
+            && self
+                .pic_static_library
+                .to_value()
+                .equals(other.pic_static_library.to_value())?
+            && self
+                .dynamic_library
+                .to_value()
+                .equals(other.dynamic_library.to_value())?
+            && self
+                .interface_library
+                .to_value()
+                .equals(other.interface_library.to_value())?
+            && self.objects.to_value().equals(other.objects.to_value())?
+            && self
+                .pic_objects
+                .to_value()
+                .equals(other.pic_objects.to_value())?
+            && self.alwayslink == other.alwayslink)
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "LibraryToLink".hash(hasher);
+        self.static_library.to_value().write_hash(hasher)?;
+        self.pic_static_library.to_value().write_hash(hasher)?;
+        self.dynamic_library.to_value().write_hash(hasher)?;
+        self.interface_library.to_value().write_hash(hasher)?;
+        self.objects.to_value().write_hash(hasher)?;
+        self.pic_objects.to_value().write_hash(hasher)?;
+        self.alwayslink.hash(hasher);
+        Ok(())
     }
 }
 
@@ -2035,6 +2077,34 @@ where
             }
             _ => None,
         }
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        let Some(other) = other.downcast_ref::<LinkerInputStubGen<V>>() else {
+            return Ok(false);
+        };
+        Ok(self.owner.to_value().equals(other.owner.to_value())?
+            && self
+                .libraries
+                .to_value()
+                .equals(other.libraries.to_value())?
+            && self
+                .user_link_flags
+                .to_value()
+                .equals(other.user_link_flags.to_value())?
+            && self
+                .additional_inputs
+                .to_value()
+                .equals(other.additional_inputs.to_value())?)
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "LinkerInput".hash(hasher);
+        self.owner.to_value().write_hash(hasher)?;
+        self.libraries.to_value().write_hash(hasher)?;
+        self.user_link_flags.to_value().write_hash(hasher)?;
+        self.additional_inputs.to_value().write_hash(hasher)?;
+        Ok(())
     }
 }
 

@@ -6,6 +6,8 @@ load(
     "args_add_two_arg",
     "args_before_each",
     "args_builder",
+    "args_depset_add_all_transforms",
+    "args_depset_add_joined_transforms",
     "args_format_each",
     "args_map_each",
     "args_omit_if_empty",
@@ -62,6 +64,14 @@ args_add_joined_two_arg(
 
 args_add_joined_uniquify(
     name = "args_add_joined_uniquify",
+)
+
+args_depset_add_all_transforms(
+    name = "args_depset_add_all_transforms",
+)
+
+args_depset_add_joined_transforms(
+    name = "args_depset_add_joined_transforms",
 )
 
 output_artifact_in_relative_to(

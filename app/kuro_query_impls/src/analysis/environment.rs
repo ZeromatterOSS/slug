@@ -31,6 +31,7 @@ use kuro_build_api::interpreter::rule_defs::cmd_args::CommandLineArgLike;
 use kuro_build_api::interpreter::rule_defs::cmd_args::CommandLineArtifactVisitor;
 use kuro_build_api::interpreter::rule_defs::cmd_args::SimpleCommandLineArtifactVisitor;
 use kuro_build_api::interpreter::rule_defs::cmd_args::value_as::ValueAsCommandLineLike;
+use kuro_build_api::interpreter::rule_defs::depset::depset_to_artifact_group_inputs;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::template_placeholder_info::FrozenTemplatePlaceholderInfo;
 use kuro_build_api::interpreter::rule_defs::transitive_set::TransitiveSet;
 use kuro_core::configuration::compatibility::MaybeCompatible;
@@ -462,6 +463,11 @@ pub(crate) async fn get_from_template_placeholder_info<'x>(
                             }
                         }
                     }
+                }
+            }
+            ResolvedArtifactGroup::Depset(depset) => {
+                for input in depset_to_artifact_group_inputs(depset.depset.to_value())? {
+                    artifacts.push_back((target.dupe(), input));
                 }
             }
         }

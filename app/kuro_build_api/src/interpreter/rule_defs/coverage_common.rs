@@ -44,6 +44,7 @@ use starlark::values::ValueLifetimeless;
 use starlark::values::ValueLike;
 use starlark::values::starlark_value;
 
+use crate::interpreter::rule_defs::depset::depset_to_list;
 use crate::interpreter::rule_defs::depset::make_depset_from_lists;
 use crate::interpreter::rule_defs::provider::ProviderLike;
 
@@ -241,7 +242,7 @@ fn matches_extensions<'v>(file: Value<'v>, extensions: &[String]) -> bool {
 fn collect_dep_coverage<'v>(
     attr_value: Value<'v>,
     heap: Heap<'v>,
-) -> (Vec<Value<'v>>, Vec<Value<'v>>) {
+) -> starlark::Result<(Vec<Value<'v>>, Vec<Value<'v>>)> {
     let mut instrumented = Vec::new();
     let mut metadata = Vec::new();
 
@@ -250,24 +251,16 @@ fn collect_dep_coverage<'v>(
             // Try to get InstrumentedFilesInfo from the dep's providers
             if let Ok(Some(provider)) = dep.get_attr("InstrumentedFilesInfo", heap) {
                 if let Ok(Some(inst_files)) = provider.get_attr("instrumented_files", heap) {
-                    let mut elems = Vec::new();
-                    crate::interpreter::rule_defs::depset::collect_depset_elements(
-                        inst_files, &mut elems, heap,
-                    );
-                    instrumented.extend(elems);
+                    instrumented.extend(depset_to_list(inst_files, heap)?);
                 }
                 if let Ok(Some(meta_files)) = provider.get_attr("metadata_files", heap) {
-                    let mut elems = Vec::new();
-                    crate::interpreter::rule_defs::depset::collect_depset_elements(
-                        meta_files, &mut elems, heap,
-                    );
-                    metadata.extend(elems);
+                    metadata.extend(depset_to_list(meta_files, heap)?);
                 }
             }
         }
     }
 
-    (instrumented, metadata)
+    Ok((instrumented, metadata))
 }
 
 /// Methods on the coverage_common module.
@@ -342,7 +335,7 @@ fn coverage_common_module_methods(builder: &mut MethodsBuilder) {
                     for attr_name in iter {
                         if let Some(name) = attr_name.unpack_str() {
                             if let Ok(Some(attr_val)) = ctx_attr.get_attr(name, heap) {
-                                let (inst, meta) = collect_dep_coverage(attr_val, heap);
+                                let (inst, meta) = collect_dep_coverage(attr_val, heap)?;
                                 all_instrumented_files.extend(inst);
                                 all_metadata_files.extend(meta);
                             }

@@ -30,11 +30,10 @@ use dupe::Dupe;
 use indexmap::indexset;
 use kuro_build_api::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
-use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkArtifactLike;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
-use kuro_build_api::interpreter::rule_defs::depset::collect_depset_elements;
+use kuro_build_api::interpreter::rule_defs::depset::depset_to_artifact_inputs;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::Runfiles;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::SYNTHESIZE_RUNFILES_TREE;
 use kuro_core::fs::buck_out_path::BuckOutPathKind;
@@ -96,8 +95,8 @@ fn synthesize_runfiles_tree<'v>(
     })?;
 
     // files: depset of File objects. Key by `<workspace>/<short_path>`.
-    let mut collected = Vec::new();
-    collect_depset_elements(runfiles.files().to_value(), &mut collected, heap);
+    let collected = depset_to_artifact_inputs(runfiles.files().to_value(), heap)
+        .map_err(|e| kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{e}"))?;
     for v in collected {
         let artifact_like = <&dyn StarlarkInputArtifactLike<'v>>::unpack_value(v)
             .map_err(|e| kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{e}"))?

@@ -31,6 +31,7 @@ use kuro_build_api::artifact_groups::calculation::ArtifactGroupCalculation;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
+use kuro_build_api::interpreter::rule_defs::depset::depset_to_artifact_group_inputs;
 use kuro_execute::path::artifact_path::ArtifactPath;
 use serde::Serialize;
 use serde::Serializer;
@@ -92,6 +93,9 @@ pub(crate) async fn visit_artifact_path_without_associated_deduped(
             ResolvedArtifactGroup::TransitiveSetProjection(t) => {
                 let set = t.key.lookup(ctx).await?;
                 todo.extend(set.get_projection_sub_inputs(t.projection)?);
+            }
+            ResolvedArtifactGroup::Depset(depset) => {
+                todo.extend(depset_to_artifact_group_inputs(depset.depset.to_value())?);
             }
         }
     }

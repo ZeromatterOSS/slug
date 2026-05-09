@@ -1,5 +1,6 @@
 load(
     ":defs.bzl",
+    "depset_bridge_rule",
     "depset_consumer",
     "depset_default_infer_rule",
     "depset_keyword_rule",
@@ -61,17 +62,21 @@ depset_keyword_rule(
     name = "depset_keyword",
 )
 
-# Test depset | operator (union)
+# Negative parity test for depset | operator (union)
 depset_union_rule(
     name = "depset_union",
 )
 
-# Test depset.order attribute
+# Negative parity test for depset.order attribute
 depset_order_attr_rule(
     name = "depset_order_attr",
 )
 
-# Test len(depset)
+# Negative parity test for len(depset)
 depset_len_rule(
     name = "depset_len",
+)
+
+depset_bridge_rule(
+    name = "depset_bridge",
 )

@@ -122,6 +122,47 @@ async def test_args_add_joined_uniquify(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_cmd_args_data")
+async def test_args_depset_add_all_transforms(buck: Buck) -> None:
+    """Transformed add_all(depset) follows Bazel's deduped depset traversal."""
+    result = await buck.build("//:args_depset_add_all_transforms")
+    output = result.get_build_report().output_for_target(
+        "//:args_depset_add_all_transforms"
+    )
+
+    content = output.read_text().strip().splitlines()
+    assert content == [
+        "--x",
+        "c",
+        "--x",
+        "b",
+        "--x",
+        "a",
+        "SEP",
+        "c",
+        "b1",
+        "b2",
+        "a",
+        "SEP",
+        "c",
+        "b",
+        "a",
+        "END",
+    ]
+
+
+@buck_test(data_dir="test_cmd_args_data")
+async def test_args_depset_add_joined_transforms(buck: Buck) -> None:
+    """Transformed add_joined(depset) follows Bazel's deduped depset traversal."""
+    result = await buck.build("//:args_depset_add_joined_transforms")
+    output = result.get_build_report().output_for_target(
+        "//:args_depset_add_joined_transforms"
+    )
+
+    content = output.read_text().strip().splitlines()
+    assert content == ["[c]:[b]:[a]", "c:b1:b2:a", "<c:b:a>", "c:b:a"]
+
+
+@buck_test(data_dir="test_cmd_args_data")
 async def test_args_add_format_with_artifact(buck: Buck) -> None:
     """args.add with format= applies a format string to an artifact path."""
     result = await buck.build("//:args_output_artifact")

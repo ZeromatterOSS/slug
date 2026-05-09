@@ -58,6 +58,7 @@ use crate::artifact_groups::ArtifactGroup;
 use crate::artifact_groups::ArtifactGroupValues;
 use crate::artifact_groups::ResolvedArtifactGroup;
 use crate::artifact_groups::TransitiveSetProjectionKey;
+use crate::interpreter::rule_defs::depset::depset_to_artifact_group_inputs;
 use crate::keep_going::KeepGoing;
 
 #[async_trait]
@@ -102,10 +103,10 @@ impl ArtifactGroupCalculation for DiceComputations<'_> {
 ///    of the ArtifactGroupValues until `to_group_values()` is called. For callers waiting
 ///    on many inputs, this allows them to only allocate those large values only after all
 ///    inputs are ready.
-pub(crate) fn ensure_artifact_group_staged<'a>(
-    ctx: &'a mut DiceComputations,
+pub(crate) fn ensure_artifact_group_staged<'a, 'd>(
+    ctx: &'a mut DiceComputations<'d>,
     input: ResolvedArtifactGroup<'a>,
-) -> impl Future<Output = kuro_error::Result<EnsureArtifactGroupReady>> + use<'a> {
+) -> impl Future<Output = kuro_error::Result<EnsureArtifactGroupReady>> + use<'a, 'd> {
     match input {
         ResolvedArtifactGroup::Artifact(artifact) => {
             ensure_artifact_staged(ctx, artifact.clone()).left_future()
@@ -113,6 +114,10 @@ pub(crate) fn ensure_artifact_group_staged<'a>(
         ResolvedArtifactGroup::TransitiveSetProjection(key) => ctx
             .compute(EnsureTransitiveSetProjectionKey::ref_cast(key))
             .map(|v| Ok(EnsureArtifactGroupReady::TransitiveSet(v??)))
+            .left_future()
+            .right_future(),
+        ResolvedArtifactGroup::Depset(depset) => ensure_depset_artifact_group_staged(ctx, depset)
+            .right_future()
             .right_future(),
     }
 }
@@ -227,6 +232,9 @@ impl EnsureArtifactGroupReady {
                 ResolvedArtifactGroup::TransitiveSetProjection(_) => {
                     Err(EnsureArtifactStagedError::ExpectedTransitiveSet.into())
                 }
+                ResolvedArtifactGroup::Depset(_) => {
+                    Err(EnsureArtifactStagedError::ExpectedTransitiveSet.into())
+                }
             },
         }
     }
@@ -243,6 +251,52 @@ impl EnsureArtifactGroupReady {
 
 static_assertions::assert_eq_size!(EnsureArtifactGroupReady, [usize; 4]);
 
+fn ensure_depset_artifact_group_staged<'a, 'd>(
+    ctx: &'a mut DiceComputations<'d>,
+    depset: &'a crate::artifact_groups::DepsetArtifactGroup,
+) -> impl Future<Output = kuro_error::Result<EnsureArtifactGroupReady>> + use<'a, 'd> {
+    async move {
+        let artifact_fs = ctx.get_artifact_fs().await?;
+        let sub_inputs = depset_to_artifact_group_inputs(depset.depset.to_value())?;
+
+        let mut resolved_inputs = Vec::with_capacity(sub_inputs.len());
+        for input in sub_inputs.iter() {
+            resolved_inputs.push(input.resolved_artifact(ctx).await?);
+        }
+
+        let mut ready_inputs = Vec::with_capacity(resolved_inputs.len());
+        for input in resolved_inputs.iter() {
+            ready_inputs.push(Box::pin(ensure_artifact_group_staged(ctx, input.clone())).await?);
+        }
+
+        let mut values_count = 0;
+        for input in resolved_inputs.iter() {
+            if let ResolvedArtifactGroup::Artifact(..) = input {
+                values_count += 1;
+            }
+        }
+
+        let mut values = SmallVec::<[_; 1]>::with_capacity(values_count);
+        let mut children = Vec::with_capacity(resolved_inputs.len() - values_count);
+
+        for (group, ready) in zip(resolved_inputs.iter(), ready_inputs) {
+            match group {
+                ResolvedArtifactGroup::Artifact(artifact) => {
+                    values.push((artifact.dupe(), ready.unpack_single()?))
+                }
+                ResolvedArtifactGroup::TransitiveSetProjection(..)
+                | ResolvedArtifactGroup::Depset(..) => children.push(ready.to_group_values(group)?),
+            }
+        }
+
+        let digest_config = ctx.global_data().get_digest_config();
+        let values = ArtifactGroupValues::new(values, children, &artifact_fs, digest_config)
+            .buck_error_context("Failed to construct depset ArtifactGroupValues")?;
+
+        Ok(EnsureArtifactGroupReady::TransitiveSet(values))
+    }
+}
+
 // This assertion assures we don't unknowingly regress the size of this critical future.
 // TODO(cjhopman): We should be able to wrap this in a convenient assertion macro.
 #[allow(unused, clippy::diverging_sub_expression)]
@@ -255,7 +309,7 @@ fn _assert_ensure_artifact_group_future_size() {
     static_assertions::assert_eq_size_ptr!(&v, &e);
 
     let v = ensure_artifact_group_staged(&mut ctx, panic!());
-    let e = [0u8; 1088 / 8];
+    let e = [0u8; 1600 / 8];
     static_assertions::assert_eq_size_ptr!(&v, &e);
 
     // The rest of these are to help understand how changes are impacting the important ones above. Regressing these
@@ -664,6 +718,9 @@ impl Key for EnsureTransitiveSetProjectionKey {
                         values.push((artifact.dupe(), ready.unpack_single()?))
                     }
                     ResolvedArtifactGroup::TransitiveSetProjection(..) => {
+                        children.push(ready.to_group_values(group)?)
+                    }
+                    ResolvedArtifactGroup::Depset(..) => {
                         children.push(ready.to_group_values(group)?)
                     }
                 }

@@ -36,7 +36,7 @@ use kuro_build_api::analysis::calculation::RuleAnalysisCalculation;
 use kuro_build_api::artifact_groups::ArtifactGroup;
 use kuro_build_api::artifact_groups::ResolvedArtifactGroup;
 use kuro_build_api::artifact_groups::TransitiveSetProjectionKey;
-use kuro_build_api::keep_going::KeepGoing;
+use kuro_build_api::interpreter::rule_defs::depset::depset_to_artifact_group_inputs;
 use kuro_core::configuration::compatibility::MaybeCompatible;
 use kuro_core::fs::artifact_path_resolver::ArtifactFs;
 use kuro_core::pattern::pattern::ParsedPattern;
@@ -159,24 +159,23 @@ async fn convert_inputs<'c, 'a, Iter: IntoIterator<Item = &'a ArtifactGroup>>(
     node_cache: DiceAqueryNodesCache,
     inputs: Iter,
 ) -> kuro_error::Result<Vec<ActionInput>> {
-    let resolved_artifacts: Vec<_> = tokio::task::unconstrained(KeepGoing::try_compute_join_all(
-        ctx,
-        inputs,
-        |ctx, input| async move { input.resolved_artifact(ctx).await }.boxed(),
-    ))
-    .await?;
-
-    let (artifacts, projections): (Vec<_>, Vec<_>) = Itertools::partition_map(
-        resolved_artifacts
-            .into_iter()
-            .filter_map(|resolved_artifact| match resolved_artifact {
-                ResolvedArtifactGroup::Artifact(a) => {
-                    a.action_key().map(|a| Either::Left(a.clone()))
+    let mut artifacts = Vec::new();
+    let mut projections = Vec::new();
+    let mut stack: Vec<_> = inputs.into_iter().cloned().collect();
+    while let Some(input) = stack.pop() {
+        match input.resolved_artifact(ctx).await? {
+            ResolvedArtifactGroup::Artifact(a) => {
+                if let Some(action_key) = a.action_key() {
+                    artifacts.push(action_key.clone());
                 }
-                ResolvedArtifactGroup::TransitiveSetProjection(key) => Some(Either::Right(key)),
-            }),
-        |v| v,
-    );
+            }
+            ResolvedArtifactGroup::TransitiveSetProjection(key) => projections.push(key.dupe()),
+            ResolvedArtifactGroup::Depset(depset) => {
+                stack.extend(depset_to_artifact_group_inputs(depset.depset.to_value())?);
+            }
+        }
+    }
+
     let mut deps =
         artifacts.into_map(|a| ActionInput::ActionKey(ActionQueryNodeRef::Action(a.dupe())));
     let projection_deps = ctx

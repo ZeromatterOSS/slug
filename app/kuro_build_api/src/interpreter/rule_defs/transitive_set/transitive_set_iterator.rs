@@ -8,10 +8,9 @@
  * above-listed licenses.
  */
 
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
-use std::collections::hash_map::Entry;
+use std::marker::PhantomData;
 
 use kuro_error::BuckErrorContext;
 use kuro_util::hash::BuckHasherBuilder;
@@ -19,6 +18,10 @@ use starlark::values::Value;
 use starlark::values::ValueIdentity;
 use starlark::values::ValueLike;
 
+use crate::interpreter::rule_defs::nested_set::NestedSetOrder;
+use crate::interpreter::rule_defs::nested_set::NestedSetPreorderDedupe;
+use crate::interpreter::rule_defs::nested_set::nested_set_node_iter;
+use crate::interpreter::rule_defs::nested_set::preorder_nested_set_node_iter;
 use crate::interpreter::rule_defs::transitive_set::TransitiveSetGen;
 use crate::interpreter::rule_defs::transitive_set::TransitiveSetLike;
 use crate::interpreter::rule_defs::transitive_set::transitive_set::NodeGen;
@@ -48,98 +51,41 @@ where
         .unwrap()
 }
 
-/// Preorder depth-first traversal, visiting parent node first, then children in an unspecified
-/// order that minimizes memory usage during traversal.
-pub struct PreorderTransitiveSetIteratorGen<'a, 'v, V: ValueLike<'v>> {
-    stack: Vec<&'a TransitiveSetGen<V>>,
-    seen: HashSet<ValueIdentity<'v>, BuckHasherBuilder>,
+pub struct NestedOrderTransitiveSetIteratorGen<'a, 'v, V: ValueLike<'v>> {
+    inner: Box<dyn Iterator<Item = &'a TransitiveSetGen<V>> + 'a>,
+    _marker: PhantomData<&'v ()>,
 }
 
-impl<'a, 'v, V> PreorderTransitiveSetIteratorGen<'a, 'v, V>
+impl<'a, 'v, V> NestedOrderTransitiveSetIteratorGen<'a, 'v, V>
 where
     V: 'v + Copy + ValueLike<'v>,
     TransitiveSetGen<V>: TransitiveSetLike<'v>,
     'v: 'a,
 {
-    pub fn new(set: &'a TransitiveSetGen<V>) -> Self {
+    pub fn new(set: &'a TransitiveSetGen<V>, order: NestedSetOrder) -> Self {
+        let identity = |set| set as *const TransitiveSetGen<V>;
+        let children = transitive_set_children::<V>;
         Self {
-            stack: vec![set],
-            seen: Default::default(),
-        }
-    }
-
-    fn enqueue_children(&mut self, children: &'a [V]) {
-        for child in children.iter().rev() {
-            let child = child.to_value();
-
-            if self.seen.insert(child.identity()) {
-                self.stack.push(assert_transitive_set(child));
-            }
-        }
-    }
-}
-
-impl<'a, 'v, V> TransitiveSetIteratorLike<'a, 'v, V> for PreorderTransitiveSetIteratorGen<'a, 'v, V>
-where
-    V: 'v + Copy + ValueLike<'v>,
-    TransitiveSetGen<V>: TransitiveSetLike<'v>,
-    'v: 'a,
-{
-    fn values(self: Box<Self>) -> TransitiveSetValuesIteratorGen<'a, 'v, V> {
-        TransitiveSetValuesIteratorGen { inner: self }
-    }
-}
-
-impl<'a, 'v, V> Iterator for PreorderTransitiveSetIteratorGen<'a, 'v, V>
-where
-    V: 'v + Copy + ValueLike<'v>,
-    TransitiveSetGen<V>: TransitiveSetLike<'v>,
-    'v: 'a,
-{
-    type Item = &'a TransitiveSetGen<V>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let next = self.stack.pop()?;
-        self.enqueue_children(&next.children);
-        Some(next)
-    }
-}
-
-/// Postorder depth-first traversal, visiting children left-to-right before visiting their parent
-/// node.
-pub struct PostorderTransitiveSetIteratorGen<'a, 'v, V: ValueLike<'v>> {
-    stack: Vec<(&'a TransitiveSetGen<V>, PostorderMark<'v>)>,
-    seen: HashSet<ValueIdentity<'v>, BuckHasherBuilder>,
-}
-
-impl<'a, 'v, V> PostorderTransitiveSetIteratorGen<'a, 'v, V>
-where
-    V: 'v + Copy + ValueLike<'v>,
-    TransitiveSetGen<V>: TransitiveSetLike<'v>,
-    'v: 'a,
-{
-    pub fn new(set: &'a TransitiveSetGen<V>) -> Self {
-        let mut iterator = Self {
-            stack: vec![(set, PostorderMark::Ready)],
-            seen: Default::default(),
-        };
-        iterator.enqueue_children(&set.children);
-        iterator
-    }
-
-    fn enqueue_children(&mut self, children: &'a [V]) {
-        for child in children.iter().rev() {
-            let child = child.to_value();
-            self.stack.push((
-                assert_transitive_set(child),
-                PostorderMark::Pending(child.identity()),
-            ));
+            inner: match order {
+                NestedSetOrder::Preorder => Box::new(preorder_nested_set_node_iter(
+                    set,
+                    NestedSetPreorderDedupe::OnChildEnqueue,
+                    identity,
+                    children,
+                )),
+                NestedSetOrder::Default
+                | NestedSetOrder::Postorder
+                | NestedSetOrder::Topological => {
+                    nested_set_node_iter(set, order, identity, children)
+                }
+            },
+            _marker: PhantomData,
         }
     }
 }
 
 impl<'a, 'v, V> TransitiveSetIteratorLike<'a, 'v, V>
-    for PostorderTransitiveSetIteratorGen<'a, 'v, V>
+    for NestedOrderTransitiveSetIteratorGen<'a, 'v, V>
 where
     V: 'v + Copy + ValueLike<'v>,
     TransitiveSetGen<V>: TransitiveSetLike<'v>,
@@ -150,15 +96,7 @@ where
     }
 }
 
-enum PostorderMark<'v> {
-    /// When the stack returns to this position, children have been visited.
-    Ready,
-    /// The stack may return to this position with some children not yet having
-    /// been visited. Check `seen`.
-    Pending(ValueIdentity<'v>),
-}
-
-impl<'a, 'v, V> Iterator for PostorderTransitiveSetIteratorGen<'a, 'v, V>
+impl<'a, 'v, V> Iterator for NestedOrderTransitiveSetIteratorGen<'a, 'v, V>
 where
     V: 'v + Copy + ValueLike<'v>,
     TransitiveSetGen<V>: TransitiveSetLike<'v>,
@@ -167,114 +105,20 @@ where
     type Item = &'a TransitiveSetGen<V>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match self.stack.pop()? {
-                (tset, PostorderMark::Ready) => return Some(tset),
-                (tset, PostorderMark::Pending(identity)) => {
-                    if self.seen.insert(identity) {
-                        self.stack.push((tset, PostorderMark::Ready));
-                        self.enqueue_children(&tset.children);
-                    }
-                }
-            }
-        }
+        self.inner.next()
     }
 }
 
-/// Topological sort order, such that nodes are visited after all nodes that have them as
-/// descendants.
-///
-/// This is similar to the pre-order traversal, except that when nodes are shared with more than one
-/// parent it is returned in the order of its last occurrence.
-pub struct TopologicalTransitiveSetIteratorGen<'a, 'v, V: ValueLike<'v>> {
-    output_stack: Vec<&'a TransitiveSetGen<V>>,
-    instance_counts: HashMap<ValueIdentity<'v>, u32, BuckHasherBuilder>,
-}
-
-impl<'a, 'v, V> TopologicalTransitiveSetIteratorGen<'a, 'v, V>
+fn transitive_set_children<'a, 'v, V>(set: &'a TransitiveSetGen<V>) -> Vec<&'a TransitiveSetGen<V>>
 where
     V: 'v + Copy + ValueLike<'v>,
     TransitiveSetGen<V>: TransitiveSetLike<'v>,
     'v: 'a,
 {
-    pub fn new(set: &'a TransitiveSetGen<V>) -> Self {
-        Self {
-            output_stack: vec![set],
-            instance_counts: TopologicalTransitiveSetIteratorGen::count_instances(set),
-        }
-    }
-
-    fn count_instances(
-        set: &'a TransitiveSetGen<V>,
-    ) -> HashMap<ValueIdentity<'v>, u32, BuckHasherBuilder> {
-        let mut stack = vec![set];
-        let mut instance_counts = HashMap::<ValueIdentity<'v>, u32, BuckHasherBuilder>::default();
-
-        while let Some(next) = stack.pop() {
-            for child in next.children.iter().rev() {
-                let child = child.to_value();
-
-                match instance_counts.entry(child.identity()) {
-                    Entry::Occupied(mut o) => {
-                        *o.get_mut() += 1;
-                    }
-                    Entry::Vacant(v) => {
-                        v.insert(1);
-                        stack.push(assert_transitive_set(child));
-                    }
-                }
-            }
-        }
-
-        instance_counts
-    }
-
-    fn enqueue_children(&mut self, children: &'a [V]) {
-        for child in children.iter().rev() {
-            let child = child.to_value();
-
-            // It's safe to unwrap since instance_counts is populated during construction and contains
-            // all nodes in the tree. `unwrap()` would only fail if the tree was modified.
-            let count: &mut u32 = self.instance_counts.get_mut(&child.identity()).unwrap();
-
-            // If this fails, the tree either contains cycles or was modified after construction.
-            assert!(*count > 0, "Unexpected node when traversing tree");
-
-            if *count == 1 {
-                // Push the last occurrence of the node onto the output stack.
-                self.output_stack.push(assert_transitive_set(child));
-            }
-
-            *count -= 1;
-        }
-    }
-}
-
-impl<'a, 'v, V> TransitiveSetIteratorLike<'a, 'v, V>
-    for TopologicalTransitiveSetIteratorGen<'a, 'v, V>
-where
-    V: 'v + Copy + ValueLike<'v>,
-    TransitiveSetGen<V>: TransitiveSetLike<'v>,
-    'v: 'a,
-{
-    fn values(self: Box<Self>) -> TransitiveSetValuesIteratorGen<'a, 'v, V> {
-        TransitiveSetValuesIteratorGen { inner: self }
-    }
-}
-
-impl<'a, 'v, V> Iterator for TopologicalTransitiveSetIteratorGen<'a, 'v, V>
-where
-    V: 'v + Copy + ValueLike<'v>,
-    TransitiveSetGen<V>: TransitiveSetLike<'v>,
-    'v: 'a,
-{
-    type Item = &'a TransitiveSetGen<V>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let next = self.output_stack.pop()?;
-        self.enqueue_children(&next.children);
-        Some(next)
-    }
+    set.children
+        .iter()
+        .map(|child| assert_transitive_set(child.to_value()))
+        .collect()
 }
 
 /// Preorder breadth-first-search (BFS), visits parent node, then eagerly visits all children

@@ -166,13 +166,16 @@ The `Args` object is returned by `ctx.actions.args()`. In Kuro this is `Starlark
 
 ### 6a.5: depset / TransitiveSet
 
-This section is unchanged from the original plan. Key items:
+This section was refreshed by Plan 54. Key items:
 
-- [x] `depset()` global function implemented (alias for transitive_set)
+- [x] `depset()` global function implemented as a Bazel-compatible facade (not
+      a `transitive_set` alias)
 - [x] `depset.to_list()` works
-- [x] `depset.direct` and `depset.transitive` attributes work for frozen depsets
+- [x] Frozen depsets preserve graph shape internally while public
+      `.direct`/`.transitive` attributes remain absent for Bazel 9 parity
 - [x] Deduplication in depset traversal (HashSet-based)
-- [ ] depset ↔ TransitiveSet bridge (explicit conversion helpers) — **deferred, not currently blocking**
+- [x] depset ↔ TransitiveSet bridge has explicit Kuro-only lossy conversion
+      helpers; no implicit coercion
 
 ### 6a.6: Built-in Providers
 

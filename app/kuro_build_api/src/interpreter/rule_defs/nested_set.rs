@@ -69,6 +69,14 @@ pub enum NestedSetDedup {
     ValueHashEq,
 }
 
+#[derive(
+    Debug, Clone, Dupe, Copy, Trace, Freeze, PartialEq, Eq, Hash, Allocative
+)]
+pub enum NestedSetPreorderDedupe {
+    OnVisit,
+    OnChildEnqueue,
+}
+
 /// Collect the items stored in a nested DAG with Bazel-style traversal orders.
 ///
 /// This is intentionally representation-agnostic: callers provide node
@@ -129,7 +137,7 @@ pub fn collect_nested_set_node_dedup<N, I, Id, Direct, Children, Identity>(
     root: N,
     order: NestedSetOrder,
     identity: Identity,
-    direct_items: Direct,
+    mut direct_items: Direct,
     children: Children,
 ) -> Vec<I>
 where
@@ -139,13 +147,11 @@ where
     Children: FnMut(N) -> Vec<N>,
     Identity: FnMut(N) -> Id,
 {
-    match order {
-        NestedSetOrder::Default | NestedSetOrder::Postorder => {
-            collect_postorder(root, identity, direct_items, children)
-        }
-        NestedSetOrder::Preorder => collect_preorder(root, identity, direct_items, children),
-        NestedSetOrder::Topological => collect_topological(root, identity, direct_items, children),
+    let mut result = Vec::new();
+    for node in nested_set_node_iter(root, order, identity, children) {
+        result.extend(direct_items(node));
     }
+    result
 }
 
 pub fn collect_nested_set_value_dedup_by<
@@ -187,107 +193,240 @@ where
     result
 }
 
-fn collect_preorder<N, I, Id, Direct, Children, Identity>(
+pub fn nested_set_node_iter<'a, N, Id, Children, Identity>(
     root: N,
-    mut identity: Identity,
-    mut direct_items: Direct,
-    mut children: Children,
-) -> Vec<I>
+    order: NestedSetOrder,
+    identity: Identity,
+    children: Children,
+) -> Box<dyn Iterator<Item = N> + 'a>
 where
-    N: Copy,
-    Id: Copy + Eq + Hash,
-    Direct: FnMut(N) -> Vec<I>,
-    Children: FnMut(N) -> Vec<N>,
-    Identity: FnMut(N) -> Id,
+    N: Copy + 'a,
+    Id: Copy + Eq + Hash + 'a,
+    Children: FnMut(N) -> Vec<N> + 'a,
+    Identity: FnMut(N) -> Id + 'a,
 {
-    let mut result = Vec::new();
-    let mut seen = HashSet::new();
-    let mut stack = vec![root];
-
-    while let Some(node) = stack.pop() {
-        if !seen.insert(identity(node)) {
-            continue;
-        }
-        result.extend(direct_items(node));
-        for child in children(node).into_iter().rev() {
-            stack.push(child);
-        }
+    match order {
+        NestedSetOrder::Default | NestedSetOrder::Postorder => Box::new(
+            PostorderNestedSetNodeIterator::new(root, identity, children),
+        ),
+        NestedSetOrder::Preorder => Box::new(preorder_nested_set_node_iter(
+            root,
+            NestedSetPreorderDedupe::OnVisit,
+            identity,
+            children,
+        )),
+        NestedSetOrder::Topological => Box::new(TopologicalNestedSetNodeIterator::new(
+            root, identity, children,
+        )),
     }
-
-    result
 }
 
-fn collect_postorder<N, I, Id, Direct, Children, Identity>(
+pub fn preorder_nested_set_node_iter<'a, N, Id, Children, Identity>(
     root: N,
-    mut identity: Identity,
-    mut direct_items: Direct,
-    mut children: Children,
-) -> Vec<I>
+    dedupe: NestedSetPreorderDedupe,
+    identity: Identity,
+    children: Children,
+) -> impl Iterator<Item = N> + 'a
+where
+    N: Copy + 'a,
+    Id: Copy + Eq + Hash + 'a,
+    Children: FnMut(N) -> Vec<N> + 'a,
+    Identity: FnMut(N) -> Id + 'a,
+{
+    PreorderNestedSetNodeIterator::new(root, dedupe, identity, children)
+}
+
+struct PreorderNestedSetNodeIterator<N, Id, Identity, Children>
 where
     N: Copy,
     Id: Copy + Eq + Hash,
-    Direct: FnMut(N) -> Vec<I>,
     Children: FnMut(N) -> Vec<N>,
     Identity: FnMut(N) -> Id,
 {
-    enum Mark<N> {
-        Enter(N),
-        Exit(N),
+    stack: Vec<N>,
+    seen: HashSet<Id>,
+    dedupe: NestedSetPreorderDedupe,
+    identity: Identity,
+    children: Children,
+}
+
+impl<N, Id, Identity, Children> PreorderNestedSetNodeIterator<N, Id, Identity, Children>
+where
+    N: Copy,
+    Id: Copy + Eq + Hash,
+    Children: FnMut(N) -> Vec<N>,
+    Identity: FnMut(N) -> Id,
+{
+    pub fn new(
+        root: N,
+        dedupe: NestedSetPreorderDedupe,
+        identity: Identity,
+        children: Children,
+    ) -> Self {
+        Self {
+            stack: vec![root],
+            seen: HashSet::new(),
+            dedupe,
+            identity,
+            children,
+        }
     }
+}
 
-    let mut result = Vec::new();
-    let mut seen = HashSet::new();
-    let mut stack = vec![Mark::Enter(root)];
+impl<N, Id, Identity, Children> Iterator
+    for PreorderNestedSetNodeIterator<N, Id, Identity, Children>
+where
+    N: Copy,
+    Id: Copy + Eq + Hash,
+    Children: FnMut(N) -> Vec<N>,
+    Identity: FnMut(N) -> Id,
+{
+    type Item = N;
 
-    while let Some(mark) = stack.pop() {
-        match mark {
-            Mark::Enter(node) => {
-                if !seen.insert(identity(node)) {
-                    continue;
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let node = self.stack.pop()?;
+            match self.dedupe {
+                NestedSetPreorderDedupe::OnVisit => {
+                    if !self.seen.insert((self.identity)(node)) {
+                        continue;
+                    }
+                    for child in (self.children)(node).into_iter().rev() {
+                        self.stack.push(child);
+                    }
                 }
-                stack.push(Mark::Exit(node));
-                for child in children(node).into_iter().rev() {
-                    stack.push(Mark::Enter(child));
+                NestedSetPreorderDedupe::OnChildEnqueue => {
+                    for child in (self.children)(node).into_iter().rev() {
+                        if self.seen.insert((self.identity)(child)) {
+                            self.stack.push(child);
+                        }
+                    }
                 }
             }
-            Mark::Exit(node) => result.extend(direct_items(node)),
+            return Some(node);
         }
     }
-
-    result
 }
 
-fn collect_topological<N, I, Id, Direct, Children, Identity>(
-    root: N,
-    mut identity: Identity,
-    mut direct_items: Direct,
-    mut children: Children,
-) -> Vec<I>
+enum PostorderNestedSetNodeMark<N> {
+    Enter(N),
+    Exit(N),
+}
+
+struct PostorderNestedSetNodeIterator<N, Id, Identity, Children>
 where
     N: Copy,
     Id: Copy + Eq + Hash,
-    Direct: FnMut(N) -> Vec<I>,
     Children: FnMut(N) -> Vec<N>,
     Identity: FnMut(N) -> Id,
 {
-    let mut result = Vec::new();
-    let mut output_stack = vec![root];
-    let mut instance_counts = count_child_instances(root, &mut identity, &mut children);
+    stack: Vec<PostorderNestedSetNodeMark<N>>,
+    seen: HashSet<Id>,
+    identity: Identity,
+    children: Children,
+}
 
-    while let Some(node) = output_stack.pop() {
-        result.extend(direct_items(node));
-        for child in children(node).into_iter().rev() {
-            let Some(count) = instance_counts.get_mut(&identity(child)) else {
+impl<N, Id, Identity, Children> PostorderNestedSetNodeIterator<N, Id, Identity, Children>
+where
+    N: Copy,
+    Id: Copy + Eq + Hash,
+    Children: FnMut(N) -> Vec<N>,
+    Identity: FnMut(N) -> Id,
+{
+    pub fn new(root: N, identity: Identity, children: Children) -> Self {
+        Self {
+            stack: vec![PostorderNestedSetNodeMark::Enter(root)],
+            seen: HashSet::new(),
+            identity,
+            children,
+        }
+    }
+}
+
+impl<N, Id, Identity, Children> Iterator
+    for PostorderNestedSetNodeIterator<N, Id, Identity, Children>
+where
+    N: Copy,
+    Id: Copy + Eq + Hash,
+    Children: FnMut(N) -> Vec<N>,
+    Identity: FnMut(N) -> Id,
+{
+    type Item = N;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.stack.pop()? {
+                PostorderNestedSetNodeMark::Enter(node) => {
+                    if !self.seen.insert((self.identity)(node)) {
+                        continue;
+                    }
+                    self.stack.push(PostorderNestedSetNodeMark::Exit(node));
+                    for child in (self.children)(node).into_iter().rev() {
+                        self.stack.push(PostorderNestedSetNodeMark::Enter(child));
+                    }
+                }
+                PostorderNestedSetNodeMark::Exit(node) => return Some(node),
+            }
+        }
+    }
+}
+
+struct TopologicalNestedSetNodeIterator<N, Id, Identity, Children>
+where
+    N: Copy,
+    Id: Copy + Eq + Hash,
+    Children: FnMut(N) -> Vec<N>,
+    Identity: FnMut(N) -> Id,
+{
+    output_stack: Vec<N>,
+    instance_counts: HashMap<Id, u32>,
+    identity: Identity,
+    children: Children,
+}
+
+impl<N, Id, Identity, Children> TopologicalNestedSetNodeIterator<N, Id, Identity, Children>
+where
+    N: Copy,
+    Id: Copy + Eq + Hash,
+    Children: FnMut(N) -> Vec<N>,
+    Identity: FnMut(N) -> Id,
+{
+    pub fn new(root: N, mut identity: Identity, mut children: Children) -> Self {
+        let instance_counts = count_child_instances(root, &mut identity, &mut children);
+        Self {
+            output_stack: vec![root],
+            instance_counts,
+            identity,
+            children,
+        }
+    }
+}
+
+impl<N, Id, Identity, Children> Iterator
+    for TopologicalNestedSetNodeIterator<N, Id, Identity, Children>
+where
+    N: Copy,
+    Id: Copy + Eq + Hash,
+    Children: FnMut(N) -> Vec<N>,
+    Identity: FnMut(N) -> Id,
+{
+    type Item = N;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let node = self.output_stack.pop()?;
+
+        for child in (self.children)(node).into_iter().rev() {
+            let Some(count) = self.instance_counts.get_mut(&(self.identity)(child)) else {
                 continue;
             };
             if *count == 1 {
-                output_stack.push(child);
+                self.output_stack.push(child);
             }
             *count = count.saturating_sub(1);
         }
-    }
 
-    result
+        Some(node)
+    }
 }
 
 fn count_child_instances<N, Id, Children, Identity>(

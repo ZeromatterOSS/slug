@@ -98,7 +98,7 @@ impl CopyAction {
         // TODO: Exclude other variants once they become available here. For now, this is a noop.
         match src {
             ArtifactGroup::Artifact(..) | ArtifactGroup::Promise(..) => {}
-            ArtifactGroup::TransitiveSetProjection(..) => {
+            ArtifactGroup::TransitiveSetProjection(..) | ArtifactGroup::Depset(..) => {
                 return Err(CopyActionValidationError::UnsupportedInput(src.dupe()).into());
             }
         };

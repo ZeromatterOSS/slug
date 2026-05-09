@@ -64,6 +64,9 @@ use crate::interpreter::rule_defs::cc_common::providers::HeaderInfoStub;
 use crate::interpreter::rule_defs::cc_common::providers::LibraryToLinkGen;
 use crate::interpreter::rule_defs::cc_common::providers::LinkerInputStubGen;
 use crate::interpreter::rule_defs::cc_common::providers::LinkingContextWithInputsGen;
+use crate::interpreter::rule_defs::depset::depset_to_artifact_inputs;
+use crate::interpreter::rule_defs::depset::depset_to_list;
+use crate::interpreter::rule_defs::depset::is_depset_value;
 
 // ============================================================================
 // CcCommonInternal - Internal API returned by internal_DO_NOT_USE()
@@ -89,6 +92,33 @@ fn compilation_mode_from_features(feature_configuration: Value<'_>) -> String {
         }
     }
     crate::interpreter::rule_defs::build_config::get_compilation_mode()
+}
+
+fn depset_values<'v>(value: Value<'v>, heap: Heap<'v>) -> starlark::Result<Vec<Value<'v>>> {
+    if value.is_none() {
+        Ok(Vec::new())
+    } else {
+        depset_to_list(value, heap)
+    }
+}
+
+fn depset_or_iterable_values<'v>(
+    value: Value<'v>,
+    heap: Heap<'v>,
+) -> starlark::Result<Vec<Value<'v>>> {
+    if value.is_none() {
+        return Ok(Vec::new());
+    }
+    if is_depset_value(value) {
+        return depset_to_list(value, heap);
+    }
+    let mut values = Vec::new();
+    if let Ok(iter) = value.iterate(heap) {
+        for item in iter {
+            values.push(item);
+        }
+    }
+    Ok(values)
 }
 
 /// Returns whether an action name describes a C/C++ compile action.
@@ -396,13 +426,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             ] {
                 if let Ok(Some(includes_val)) = cc_compilation_context.get_attr(attr_name, heap) {
                     if !includes_val.is_none() {
-                        let mut elements = Vec::new();
-                        crate::interpreter::rule_defs::depset::collect_depset_elements(
-                            includes_val,
-                            &mut elements,
-                            heap,
-                        );
-                        for elem in &elements {
+                        for elem in depset_values(includes_val, heap)? {
                             let dir = elem.to_str();
                             if dir.is_empty() || !seen_include_dirs.insert(dir.to_string()) {
                                 continue;
@@ -482,13 +506,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
             for attr_name in &["defines", "local_defines"] {
                 if let Ok(Some(defines_val)) = cc_compilation_context.get_attr(attr_name, heap) {
                     if !defines_val.is_none() {
-                        let mut elements = Vec::new();
-                        crate::interpreter::rule_defs::depset::collect_depset_elements(
-                            defines_val,
-                            &mut elements,
-                            heap,
-                        );
-                        for elem in &elements {
+                        for elem in depset_values(defines_val, heap)? {
                             let def = elem.to_str();
                             if !def.is_empty() {
                                 args_vec.push(
@@ -534,24 +552,20 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                 }
                 None
             };
-            let mut collect_flags = |val: Value<'v>| -> Vec<String> {
+            let collect_flags = |val: Value<'v>| -> Vec<String> {
                 let mut out = Vec::new();
-                // `to_list()` for depsets; falls through to plain iter for
-                // lists/tuples. Mirrors `iterate_value` in get_memory_
-                // inefficient_command_line.
-                if let Ok(Some(to_list)) = val.get_attr("to_list", heap) {
-                    if let Ok(listed) = eval.eval_function(to_list, &[], &[]) {
-                        if let Ok(iter) = listed.iterate(heap) {
-                            for f in iter {
-                                if let Some(s) = f.unpack_str() {
-                                    if !s.is_empty() {
-                                        out.push(s.to_owned());
-                                    }
+                if is_depset_value(val) {
+                    if let Ok(listed) = depset_to_list(val, heap) {
+                        for f in listed {
+                            if let Some(s) = f.unpack_str() {
+                                if !s.is_empty() {
+                                    out.push(s.to_owned());
                                 }
                             }
-                            return out;
                         }
+                        return out;
                     }
+                    return out;
                 }
                 if let Ok(iter) = val.iterate(heap) {
                     for f in iter {
@@ -641,15 +655,7 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         if !cc_compilation_context.is_none() {
             if let Ok(Some(headers)) = cc_compilation_context.get_attr("headers", heap) {
                 if !headers.is_none() {
-                    let mut elements = Vec::new();
-                    crate::interpreter::rule_defs::depset::collect_depset_elements(
-                        headers,
-                        &mut elements,
-                        heap,
-                    );
-                    for h in elements {
-                        compile_inputs.push(h);
-                    }
+                    compile_inputs.extend(depset_to_artifact_inputs(headers, heap)?);
                 }
             }
         }
@@ -1064,27 +1070,22 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         let mut artifact_map: std::collections::HashMap<String, Value<'v>> =
             std::collections::HashMap::new();
         if !input_artifacts.is_none() {
-            let artifacts_iter =
-                if let Ok(Some(to_list)) = input_artifacts.get_attr("to_list", heap) {
-                    if let Ok(list_val) = eval.eval_function(to_list, &[], &[]) {
-                        list_val.iterate(heap).ok()
-                    } else {
-                        None
+            let artifacts = if is_depset_value(input_artifacts) {
+                depset_to_list(input_artifacts, heap).unwrap_or_default()
+            } else if let Ok(iter) = input_artifacts.iterate(heap) {
+                iter.collect()
+            } else {
+                Vec::new()
+            };
+            for artifact in artifacts {
+                if let Ok(Some(short_path)) = artifact.get_attr("short_path", heap) {
+                    if let Some(path_str) = short_path.unpack_str() {
+                        artifact_map.insert(path_str.to_owned(), artifact);
                     }
-                } else {
-                    input_artifacts.iterate(heap).ok()
-                };
-            if let Some(iter) = artifacts_iter {
-                for artifact in iter {
-                    if let Ok(Some(short_path)) = artifact.get_attr("short_path", heap) {
-                        if let Some(path_str) = short_path.unpack_str() {
-                            artifact_map.insert(path_str.to_owned(), artifact);
-                        }
-                    }
-                    if let Ok(Some(path_attr)) = artifact.get_attr("path", heap) {
-                        if let Some(path_str) = path_attr.unpack_str() {
-                            artifact_map.insert(path_str.to_owned(), artifact);
-                        }
+                }
+                if let Ok(Some(path_attr)) = artifact.get_attr("path", heap) {
+                    if let Some(path_str) = path_attr.unpack_str() {
+                        artifact_map.insert(path_str.to_owned(), artifact);
                     }
                 }
             }
@@ -1159,19 +1160,12 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         }
 
         // Helper: iterate a value that may be a list or depset
-        // For depsets, call .to_list() first to get an iterable
         let iterate_value =
             |val: Value<'v>, eval_ref: &mut Evaluator<'v, '_, '_>| -> Vec<Value<'v>> {
                 let h = eval_ref.heap();
-                // Try to_list() for depsets
-                if let Ok(Some(to_list_method)) = val.get_attr("to_list", h) {
-                    if let Ok(list_val) = eval_ref.eval_function(to_list_method, &[], &[]) {
-                        if let Ok(iter) = list_val.iterate(h) {
-                            return iter.collect();
-                        }
-                    }
+                if is_depset_value(val) {
+                    return depset_to_list(val, h).unwrap_or_default();
                 }
-                // Fall back to direct iteration (for lists)
                 if let Ok(iter) = val.iterate(h) {
                     iter.collect()
                 } else {
@@ -1999,13 +1993,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             ("-F", framework_includes),
         ] {
             if !val.is_none() {
-                let mut elements = Vec::new();
-                crate::interpreter::rule_defs::depset::collect_depset_elements(
-                    *val,
-                    &mut elements,
-                    heap,
-                );
-                for elem in &elements {
+                for elem in depset_values(*val, heap)? {
                     let dir = elem.to_str();
                     if !dir.is_empty() {
                         extra_flags.push(flag.to_string());
@@ -2018,13 +2006,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // Add defines
         for def_val in &[defines, local_defines] {
             if !def_val.is_none() {
-                let mut elements = Vec::new();
-                crate::interpreter::rule_defs::depset::collect_depset_elements(
-                    *def_val,
-                    &mut elements,
-                    heap,
-                );
-                for elem in &elements {
+                for elem in depset_values(*def_val, heap)? {
                     let d = elem.to_str();
                     if !d.is_empty() {
                         extra_flags.push(format!("-D{}", d));
@@ -2082,13 +2064,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     ] {
                         if let Ok(Some(includes_val)) = ctx.get_attr(attr_name, heap) {
                             if !includes_val.is_none() {
-                                let mut elements = Vec::new();
-                                crate::interpreter::rule_defs::depset::collect_depset_elements(
-                                    includes_val,
-                                    &mut elements,
-                                    heap,
-                                );
-                                for elem in &elements {
+                                for elem in depset_values(includes_val, heap)? {
                                     let dir = elem.to_str();
                                     if !dir.is_empty() {
                                         extra_flags.push(flag.to_string());
@@ -2208,47 +2184,30 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         //
         // Two shapes need handling:
         //   1. plain `list` of `(artifact, label)` tuples — what
-        //      `_get_public_hdrs` returns. `collect_depset_elements`
-        //      no-ops on lists, so we must iterate them directly.
+        //      `_get_public_hdrs` returns. Iterate those directly.
         //   2. `depset` of bare artifacts — what
-        //      `CcCompilationContext.headers` is built from. Use the
-        //      depset traversal helper as before.
+        //      `CcCompilationContext.headers` is built from.
         //
         // After collecting, unwrap any tuple to its first element so the
         // artifact lands in `compile_inputs` (no-op for bare artifacts).
         let unwrap_artifact_tuple =
             |v: Value<'v>| -> Value<'v> { v.at(heap.alloc(0i32).to_value(), heap).unwrap_or(v) };
-        let collect_hdr_value = |hdr_val: Value<'v>, out: &mut Vec<Value<'v>>| {
-            if hdr_val.is_none() {
-                return;
-            }
-            // Try depset path first.
-            let mut tmp: Vec<Value<'v>> = Vec::new();
-            crate::interpreter::rule_defs::depset::collect_depset_elements(hdr_val, &mut tmp, heap);
-            if !tmp.is_empty() {
-                for h in tmp {
+        let collect_hdr_value =
+            |hdr_val: Value<'v>, out: &mut Vec<Value<'v>>| -> starlark::Result<()> {
+                for h in depset_or_iterable_values(hdr_val, heap)? {
                     out.push(unwrap_artifact_tuple(h));
                 }
-                return;
-            }
-            // Fall back to plain iteration (lists, tuples, sets).
-            // `collect_depset_elements` returns silently for non-depsets,
-            // so an empty `tmp` here just means the value isn't a depset.
-            if let Ok(iter) = hdr_val.iterate(heap) {
-                for h in iter {
-                    out.push(unwrap_artifact_tuple(h));
-                }
-            }
-        };
+                Ok(())
+            };
         let mut compile_inputs: Vec<Value<'v>> = Vec::new();
         for hdr_val in &[public_hdrs, private_hdrs, textual_hdrs] {
-            collect_hdr_value(*hdr_val, &mut compile_inputs);
+            collect_hdr_value(*hdr_val, &mut compile_inputs)?;
         }
         if !compilation_contexts.is_none() {
             if let Ok(iter) = compilation_contexts.iterate(heap) {
                 for ctx in iter {
                     if let Ok(Some(headers)) = ctx.get_attr("headers", heap) {
-                        collect_hdr_value(headers, &mut compile_inputs);
+                        compile_inputs.extend(depset_to_artifact_inputs(headers, heap)?);
                     }
                 }
             }
@@ -2510,22 +2469,16 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // mechanism — see Plan 29 for the rationale.
         let includes = if let Some(ref dir) = strip_include_dir {
             let mut direct: Vec<Value<'v>> = vec![heap.alloc_str(dir).to_value()];
-            let transitive: Vec<Value<'v>> = if includes.is_none() {
-                Vec::new()
-            } else {
-                let mut existing = Vec::new();
-                crate::interpreter::rule_defs::depset::collect_depset_elements(
-                    includes,
-                    &mut existing,
-                    heap,
-                );
-                for v in existing {
+            if !includes.is_none() {
+                for v in depset_values(includes, heap)? {
                     direct.push(v);
                 }
-                Vec::new()
-            };
+            }
             crate::interpreter::rule_defs::depset::make_depset_from_lists(
-                heap, direct, transitive, "default",
+                heap,
+                direct,
+                Vec::new(),
+                "default",
             )
             .unwrap_or(includes)
         } else {
@@ -2742,25 +2695,12 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                         // Each linking_context has linker_inputs (a depset)
                         if let Ok(Some(linker_inputs)) = ctx_val.get_attr("linker_inputs", heap) {
                             if !linker_inputs.is_none() {
-                                // Try to iterate through linker inputs (depset)
-                                let mut elements = Vec::new();
-                                crate::interpreter::rule_defs::depset::collect_depset_elements(
-                                    linker_inputs,
-                                    &mut elements,
-                                    heap,
-                                );
-                                for input in elements {
+                                for input in depset_values(linker_inputs, heap)? {
                                     // Each linker input may have libraries
                                     if let Ok(Some(libraries)) = input.get_attr("libraries", heap) {
                                         if !libraries.is_none() {
                                             // Libraries can be a depset or list
-                                            let mut lib_elements = Vec::new();
-                                            crate::interpreter::rule_defs::depset::collect_depset_elements(
-                                                libraries,
-                                                &mut lib_elements,
-                                                heap,
-                                            );
-                                            for lib in lib_elements {
+                                            for lib in depset_or_iterable_values(libraries, heap)? {
                                                 // Library_to_link has static_library, dynamic_library, objects, etc.
                                                 // Respect link_deps_statically to choose between static/dynamic.
                                                 let mut linked = false;
@@ -2843,13 +2783,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                         input.get_attr("user_link_flags", heap)
                                     {
                                         if !dep_link_flags.is_none() {
-                                            let mut flag_elements = Vec::new();
-                                            crate::interpreter::rule_defs::depset::collect_depset_elements(
-                                                dep_link_flags,
-                                                &mut flag_elements,
-                                                heap,
-                                            );
-                                            for flag in flag_elements {
+                                            for flag in depset_values(dep_link_flags, heap)? {
                                                 args.push(flag);
                                             }
                                         }
@@ -3104,12 +3038,8 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         let iterate_value =
             |val: Value<'v>, eval_ref: &mut Evaluator<'v, '_, '_>| -> Vec<Value<'v>> {
                 let h = eval_ref.heap();
-                if let Ok(Some(to_list_method)) = val.get_attr("to_list", h) {
-                    if let Ok(list_val) = eval_ref.eval_function(to_list_method, &[], &[]) {
-                        if let Ok(iter) = list_val.iterate(h) {
-                            return iter.collect();
-                        }
-                    }
+                if is_depset_value(val) {
+                    return depset_to_list(val, h).unwrap_or_default();
                 }
                 if let Ok(iter) = val.iterate(h) {
                     iter.collect()
@@ -3718,13 +3648,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             for attr_name in &["includes", "system_includes", "quote_includes"] {
                 if let Ok(Some(includes_val)) = compilation_context.get_attr(attr_name, heap) {
                     if !includes_val.is_none() {
-                        let mut elements = Vec::new();
-                        crate::interpreter::rule_defs::depset::collect_depset_elements(
-                            includes_val,
-                            &mut elements,
-                            heap,
-                        );
-                        for elem in &elements {
+                        for elem in depset_values(includes_val, heap)? {
                             let dir = elem.to_str();
                             if !dir.is_empty() {
                                 let flag = include_flag_for_dir_impl(&dir, msvc);
@@ -3767,10 +3691,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // Store user_link_flags as-is (depset or list); wrap list in depset if needed
         let user_flags = if user_link_flags.is_none() {
             Value::new_none()
-        } else if user_link_flags
-            .request_value::<crate::interpreter::rule_defs::depset::Depset>()
-            .is_some()
-        {
+        } else if is_depset_value(user_link_flags) {
             // Already a depset
             user_link_flags
         } else {
@@ -3892,7 +3813,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             }
         }
 
-        let merge_field = |direct_val: Value<'v>, attr: &str| -> Value<'v> {
+        let merge_field = |direct_val: Value<'v>, attr: &str| -> starlark::Result<Value<'v>> {
             let mut transitive_depsets: Vec<Value<'v>> = Vec::new();
             for c in &all_dep_contexts {
                 if let Ok(Some(v)) = c.get_attr(attr, heap) {
@@ -3905,43 +3826,30 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             // (collected here) and whose transitive children are the dep
             // contexts' depsets. If only transitives, return a depset
             // wrapping just those; if neither, return None.
-            let mut direct_elems: Vec<Value<'v>> = Vec::new();
-            if !direct_val.is_none() {
-                let mut elems = Vec::new();
-                crate::interpreter::rule_defs::depset::collect_depset_elements(
-                    direct_val, &mut elems, heap,
-                );
-                if elems.is_empty() {
-                    if let Ok(it) = direct_val.iterate(heap) {
-                        for e in it {
-                            direct_elems.push(e);
-                        }
-                    }
-                } else {
-                    direct_elems = elems;
-                }
-            }
+            let direct_elems = depset_or_iterable_values(direct_val, heap)?;
 
             if direct_elems.is_empty() && transitive_depsets.is_empty() {
-                return Value::new_none();
+                return Ok(Value::new_none());
             }
-            crate::interpreter::rule_defs::depset::make_depset_from_lists(
-                heap,
-                direct_elems,
-                transitive_depsets,
-                "default",
+            Ok(
+                crate::interpreter::rule_defs::depset::make_depset_from_lists(
+                    heap,
+                    direct_elems,
+                    transitive_depsets,
+                    "default",
+                )
+                .unwrap_or(Value::new_none()),
             )
-            .unwrap_or(Value::new_none())
         };
 
         Ok(heap.alloc(CcCompilationContextGen {
-            headers: merge_field(headers, "headers"),
-            includes: merge_field(includes, "includes"),
-            quote_includes: merge_field(quote_includes, "quote_includes"),
-            system_includes: merge_field(system_includes, "system_includes"),
-            external_includes: merge_field(external_includes, "external_includes"),
-            framework_includes: merge_field(framework_includes, "framework_includes"),
-            defines: merge_field(defines, "defines"),
+            headers: merge_field(headers, "headers")?,
+            includes: merge_field(includes, "includes")?,
+            quote_includes: merge_field(quote_includes, "quote_includes")?,
+            system_includes: merge_field(system_includes, "system_includes")?,
+            external_includes: merge_field(external_includes, "external_includes")?,
+            framework_includes: merge_field(framework_includes, "framework_includes")?,
+            defines: merge_field(defines, "defines")?,
             local_defines,
         }))
     }

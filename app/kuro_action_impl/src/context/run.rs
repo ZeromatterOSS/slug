@@ -34,6 +34,8 @@ use kuro_build_api::interpreter::rule_defs::cmd_args::value_as::ValueAsCommandLi
 use kuro_build_api::interpreter::rule_defs::command_executor_config::parse_custom_re_image;
 use kuro_build_api::interpreter::rule_defs::command_executor_config::parse_meta_internal_extra_params;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
+use kuro_build_api::interpreter::rule_defs::depset::depset_to_list;
+use kuro_build_api::interpreter::rule_defs::depset::is_depset_value;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::run_info::RunInfo;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::worker_run_info::WorkerRunInfo;
 use kuro_core::category::CategoryRef;
@@ -794,26 +796,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
         let mut collected_bazel_inputs: Vec<Value<'v>> = vec![];
 
         if let NoneOr::Other(bazel_inputs) = inputs {
-            // Try to get the to_list method (for depset) or iterate directly (for list)
-            let items_to_process: Vec<Value<'v>> =
-                if let Ok(Some(to_list)) = bazel_inputs.get_attr("to_list", eval.heap()) {
-                    // It's a depset - call to_list() to get the items
-                    if let Ok(list_val) = eval.eval_function(to_list, &[], &[]) {
-                        if let Ok(iter) = list_val.iterate(eval.heap()) {
-                            iter.collect()
-                        } else {
-                            vec![]
-                        }
-                    } else {
-                        vec![]
-                    }
-                } else if let Ok(iter) = bazel_inputs.iterate(eval.heap()) {
-                    // It's already iterable (list, tuple, etc.)
-                    iter.collect()
-                } else {
-                    // Single value - wrap in vec
-                    vec![bazel_inputs]
-                };
+            let items_to_process = collect_items_from_value(bazel_inputs, eval)?;
 
             // Collect the bazel inputs for passing to StarlarkRunActionValues
             // This allows visit_artifacts to include them as dependencies
@@ -860,22 +843,7 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
         // Tools are extra executable binaries needed by the action (e.g., protoc plugins).
         // They must be added as bazel_inputs so visit_artifacts tracks them as dependencies.
         if let NoneOr::Other(bazel_tools) = tools {
-            let tool_items: Vec<Value<'v>> =
-                if let Ok(Some(to_list)) = bazel_tools.get_attr("to_list", eval.heap()) {
-                    if let Ok(list_val) = eval.eval_function(to_list, &[], &[]) {
-                        if let Ok(iter) = list_val.iterate(eval.heap()) {
-                            iter.collect()
-                        } else {
-                            vec![]
-                        }
-                    } else {
-                        vec![]
-                    }
-                } else if let Ok(iter) = bazel_tools.iterate(eval.heap()) {
-                    iter.collect()
-                } else {
-                    vec![bazel_tools]
-                };
+            let tool_items = collect_items_from_value(bazel_tools, eval)?;
 
             collected_bazel_inputs.extend(tool_items);
         }
@@ -1358,23 +1326,16 @@ pub(crate) fn analysis_actions_methods_run(methods: &mut MethodsBuilder) {
     }
 }
 
-/// Collect items from a depset, list, or single value into a Vec<Value<'v>>.
+/// Collect items from a depset, iterable, or single value into a Vec<Value<'v>>.
 fn collect_items_from_value<'v>(
     val: Value<'v>,
     eval: &mut Evaluator<'v, '_, '_>,
-) -> kuro_error::Result<Vec<Value<'v>>> {
-    // Check if it's a depset (has to_list method)
-    if let Ok(Some(to_list)) = val.get_attr("to_list", eval.heap()) {
-        if let Ok(list_val) = eval.eval_function(to_list, &[], &[]) {
-            if let Ok(iter) = list_val.iterate(eval.heap()) {
-                return Ok(iter.collect());
-            }
-        }
+) -> starlark::Result<Vec<Value<'v>>> {
+    if is_depset_value(val) {
+        return depset_to_list(val, eval.heap());
     }
-    // Try to iterate (list, tuple, other iterables)
     if let Ok(iter) = val.iterate(eval.heap()) {
         return Ok(iter.collect());
     }
-    // Single value
     Ok(vec![val])
 }

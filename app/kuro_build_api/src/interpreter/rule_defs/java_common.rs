@@ -177,7 +177,7 @@ fn java_common_module_methods(builder: &mut MethodsBuilder) {
         let neverlink_val = Value::new_bool(neverlink.into_option().unwrap_or(false));
 
         // Create empty depsets for transitive jars (would be populated by real compilation)
-        let empty_depset = heap.alloc(AllocList::EMPTY);
+        let empty_depset = heap.alloc(Depset::empty());
 
         let pairs: Vec<(Value<'v>, Value<'v>)> = vec![
             (heap.alloc_str("compile_jar").to_value(), output_val),

@@ -502,6 +502,18 @@ impl<'v> StarlarkValue<'v> for CtxCheatLabelStub {
             _ => None,
         }
     }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        Ok(CtxCheatLabelStub::from_value(other).is_some())
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "Label".hash(hasher);
+        "".hash(hasher);
+        "stub".hash(hasher);
+        "stub".hash(hasher);
+        Ok(())
+    }
 }
 
 #[starlark_module]
@@ -560,6 +572,23 @@ impl<'v> StarlarkValue<'v> for CtxCheatLabelDynamic {
             "workspace_name" => Some(heap.alloc_str(&self.workspace_name).to_value()),
             _ => None,
         }
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        match CtxCheatLabelDynamic::from_value(other) {
+            Some(other) => Ok(self.name == other.name
+                && self.package == other.package
+                && self.workspace_name == other.workspace_name),
+            None => Ok(false),
+        }
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "Label".hash(hasher);
+        self.workspace_name.hash(hasher);
+        self.package.hash(hasher);
+        self.name.hash(hasher);
+        Ok(())
     }
 }
 

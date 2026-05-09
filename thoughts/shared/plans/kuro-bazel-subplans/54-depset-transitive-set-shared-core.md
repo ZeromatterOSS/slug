@@ -4,9 +4,46 @@
 >
 > Related: [Plan 51](./51-kurod-memory-profiling.md)
 
-## Status: IN PROGRESS
+## Status: COMPLETE
 
 ## Progress Notes
+
+### 2026-05-09 Phase 7 final cleanup
+
+- Treated Phase 6 as closed with documented limits: simple safe depset args
+  are lazy; frozen File depsets reached from those args have narrow
+  `ArtifactGroup::Depset` support; transformed `add_all`/`add_joined` depset
+  forms intentionally flatten per Bazel 9.1.0 probes; live depsets
+  intentionally flatten because they lack a durable `AnalysisValueStorage`
+  owner/key; and `ArtifactGroup::TransitiveSetProjection` remains tset-only.
+- Confirmed `DepsetWithListGen` remains deleted and active app/test scans have
+  no `collect_depset_elements` or `request_value::<.*Depset>` bridge callers.
+- Confirmed there is no active fallback that treats arbitrary Starlark values
+  as depset-like by scraping `.direct`/`.transitive`.
+- Removed the remaining broad action-input fallback that treated any value with
+  a `to_list` attribute as depset-like. Action inputs/tools and touched
+  cc_common helpers now branch on the depset facade before flattening depsets.
+- Refreshed negative parity test wording for `.order`, `len(depset)`, and
+  `depset | depset`; these tests remain negative Bazel 9 parity coverage, not
+  Kuro-only positive behavior.
+- Updated the parent plan bridge section to point here and to document the
+  current explicit, Kuro-only, lossy bridge semantics. Refreshed the older
+  rule-primitives plan note that still described depset as a transitive_set
+  alias.
+- User docs did not need depset edits; the user-facing docs only compare
+  Kuro/Buck transitive sets to Bazel depset at a high level.
+- Verified:
+  `cargo fmt`;
+  `cargo check -p kuro`;
+  `cargo build -p kuro`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `cargo test -p kuro_build_api_tests transitive_sets_iteration -- --nocapture`;
+  `cargo test -p kuro_build_api_tests transitive_set -- --nocapture`;
+  `pytest -q tests/core/analysis/test_depset_order.py`;
+  `pytest -q tests/core/analysis/test_cmd_args.py`;
+  `pytest -q tests/core/analysis/test_runfiles.py`;
+  `pytest -q tests/core/transitive_sets/test_transitive_sets.py`;
+  `git diff --check`.
 
 ### 2026-05-08 Phase 0 first slice
 
@@ -117,19 +154,499 @@
   `cargo fmt`;
   `cargo test -p kuro_build_api nested_set -- --nocapture`.
 
-Remaining for Phase 2:
+### 2026-05-08 Phase 2 depset storage slice
 
-- Replace the separate frozen-only `Depset` shape and live `LiveDepsetGen`
-  storage with a single `DepsetGen<V>` facade over shared nested-DAG mechanics.
-- Store parsed `NestedSetOrder`, direct values, transitive children, element
-  type metadata, emptiness, and approximate depth at construction rather than
-  reinterpreting Starlark list values during traversal.
-- Replace `make_depset_from_lists`, `Depset::empty`, and
-  `Depset::from_frozen_values` with a unified builder that validates type,
-  order, hashability, and depth.
-- Match Bazel 9 error wording more exactly for every validation branch.
+- Replaced the live depset payload from Starlark list values with a shared
+  `DepsetGen<V>` facade that stores direct values, transitive child depsets,
+  parsed `NestedSetOrder`, top-level element type metadata, O(1) emptiness, and
+  approximate nested-DAG depth at construction.
+- Kept a thin native `Depset` wrapper around `DepsetGen<FrozenValue>` so
+  existing Rust-created empty/frozen depsets remain allocable on live heaps;
+  this wrapper no longer owns a separate depset graph shape.
+- Reworked depset construction through the unified live/frozen builders. Direct
+  duplicates are suppressed during construction, transitive order/type checks
+  use stored child metadata instead of list-valued reinterpretation, and
+  `DefaultInfo.files`/runfiles helper paths now allocate the normal depset
+  builder rather than constructing `LiveDepsetGen` from list values.
+- Preserved the separate Bazel depset facade and left `TransitiveSet`
+  streaming projection/reduction/action-input paths unchanged.
+- Verified:
+  `cargo fmt`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `cargo test -p kuro_build_api nested_set -- --nocapture`;
+  `cargo test -p kuro_build_api_tests transitive_sets_iteration -- --nocapture`;
+  `pytest -q tests/core/analysis/test_depset_order.py`;
+  `pytest -q tests/core/transitive_sets/test_transitive_sets.py`;
+  `pytest -q tests/core/analysis/test_runfiles.py`;
+  `cargo check -p kuro`;
+  `cargo build -p kuro`;
+  `git diff --check`.
+
+### 2026-05-08 Phase 2 native construction decision slice
+
+- Inspected the remaining native `heap.alloc(Depset::empty())` call sites in
+  C++ provider stubs, rule context helpers, Java helpers, and runfiles/default
+  info construction. Migrating every empty depset to a live helper would expand
+  this storage slice across unrelated provider surfaces, so keep the thin
+  native `Depset` wrapper as the stable Rust construction API for empty/frozen
+  native depsets.
+- Keep `Depset::empty()` for existing native empty depset construction and
+  narrow `Depset::from_frozen_values` to crate-local frozen native construction
+  paths such as `DefaultInfo.files`. Removed the unused public
+  `Depset::new(...)` constructor rather than preserving another native frozen
+  construction entry point. A future cleanup can rename the remaining helpers
+  to explicit builder helpers after consumer APIs are narrowed in Phase 3.
+- No Bazel 9 error wording changes were made in this slice; those should stay
+  paired with focused Bazel probes/tests for each validation branch.
+- Verified:
+  `cargo fmt`;
+  `cargo test -p kuro_build_api nested_set -- --nocapture`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `cargo test -p kuro_build_api_tests transitive_sets_iteration -- --nocapture`;
+  `pytest -q tests/core/analysis/test_depset_order.py`;
+  `pytest -q tests/core/transitive_sets/test_transitive_sets.py`;
+  `pytest -q tests/core/analysis/test_runfiles.py`;
+  `cargo check -p kuro`;
+  `cargo build -p kuro`;
+  `git diff --check`.
+
+### 2026-05-08 Phase 2 depset error wording slice
+
+- Ran focused black-box probes against installed Bazel 9.1.0 for depset
+  validation failures: invalid order, non-depset transitive element, mixed
+  direct element types, direct/transitive type mismatch, mutable list/dict
+  elements, order mismatch, `len(depset)`, and `depset | depset`.
+- Tightened only the probed depset validation strings: invalid order now uses
+  `Invalid order: ...`; transitive type errors include the failing index and
+  Starlark type; order incompatibility uses Bazel's `Order '...' is
+  incompatible with order '...'` shape; type mismatch uses single-quoted type
+  names.
+- Added exact Rust assertions for the newly probed invalid-order branch and for
+  the tightened transitive/type/order mismatch wording in
+  `app/kuro_build_api_tests/src/interpreter/rule_defs/depset.rs`.
+- Considered renaming `make_depset_from_lists`, but kept the helper name stable
+  because its current public Rust call sites span cc/coverage/default-info
+  provider surfaces and would make this wording slice broader than intended.
+- Preserved the separate Bazel depset facade and left `TransitiveSet`
+  streaming projection/reduction/action-input paths unchanged.
+- Verified:
+  `cargo fmt`;
+  `cargo test -p kuro_build_api nested_set -- --nocapture`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `cargo test -p kuro_build_api_tests transitive_sets_iteration -- --nocapture`;
+  `pytest -q tests/core/analysis/test_depset_order.py`;
+  `pytest -q tests/core/transitive_sets/test_transitive_sets.py`;
+  `pytest -q tests/core/analysis/test_runfiles.py`;
+  `cargo check -p kuro`;
+  `cargo build -p kuro`;
+  `git diff --check`.
+
+### 2026-05-08 Phase 2 public-surface error assertion slice
+
+- Re-ran focused Bazel 9.1.0 black-box probes for remaining covered depset
+  public-surface/mutability failures: mutable list direct element, mutable dict
+  direct element, `len(depset)`, and `depset | depset`.
+- Confirmed the current Kuro mutable-element wording already matches Bazel's
+  `depset elements must not be mutable values` message for both list and dict
+  direct elements, so no depset implementation change was needed for that
+  branch.
+- Tightened the Rust public-surface assertions for `len(depset)` and
+  `depset | depset` to the full Bazel 9.1.0-observed wording:
+  `in call to len(), parameter 'x' got value of type 'depset', want 'iterable or string'`
+  and `unsupported binary operation: depset | depset`.
+- Preserved the separate Bazel depset facade and left `TransitiveSet`
+  streaming projection/reduction/action-input paths unchanged.
+- Verified:
+  `cargo fmt`;
+  `cargo test -p kuro_build_api nested_set -- --nocapture`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `cargo test -p kuro_build_api_tests transitive_sets_iteration -- --nocapture`;
+  `pytest -q tests/core/analysis/test_depset_order.py`;
+  `pytest -q tests/core/transitive_sets/test_transitive_sets.py`;
+  `pytest -q tests/core/analysis/test_runfiles.py`;
+  `cargo check -p kuro`;
+  `cargo build -p kuro`;
+  `git diff --check`.
+
+### 2026-05-08 Phase 2 constructor depth validation slice
+
+- Ran focused Bazel 9.1.0 black-box probes for depset nested-DAG depth during
+  analysis. A direct-containing chain with final depth 3500 passes, while the
+  next direct-containing parent fails at construction with
+  `depset depth 3501 exceeds limit (3500)`.
+- Confirmed with the same probes that `depset(transitive = [child])` does not
+  increase the effective depth in Bazel 9.1.0, so the Kuro depth metadata now
+  preserves child depth for transitive-only parents and only increments when
+  the new depset has direct elements.
+- Added the Bazel 3500 depth limit and exact depth-limit error wording to the
+  shared live/frozen depset builder path. This covers live Starlark depsets and
+  frozen/native depsets without adding another graph representation.
+- Added focused Rust parity coverage for the passing 3500-depth construction,
+  transitive-only non-deepening behavior, and failing 3501-depth construction.
+- Preserved the separate Bazel depset facade and left `TransitiveSet`
+  streaming projection/reduction/action-input paths unchanged.
+- Phase 2 is complete for Plan 54 depset storage and constructor/error parity:
+  depset now uses the shared live/frozen storage facade, stores parsed order,
+  element type, emptiness, and depth metadata at construction, validates the
+  currently probed Bazel 9.1.0 constructor/error branches, and keeps tset
+  streaming paths separate.
+
+Remaining Plan 51 follow-up, outside the completed Phase 2 implementation:
+
 - Revisit the Plan 51 zeromatter memory repro after package-file-tree loading can
   advance far enough to hit analysis-time depset flattening checkpoints.
+
+### 2026-05-08 Phase 3 consumer-helper first slice
+
+- Added typed depset consumer helpers in
+  `app/kuro_build_api/src/interpreter/rule_defs/depset.rs`:
+  `depset_to_list(value, heap) -> starlark::Result<Vec<Value>>`,
+  `depset_to_artifact_inputs(value, heap) -> starlark::Result<Vec<Value>>`,
+  and `is_depset_value(value)`. `depset_to_list` now owns the Bazel-style
+  flattening plus value-equality dedupe path used by Starlark `to_list`.
+- Kept `collect_depset_elements` as a temporary bridge for unconverted
+  cc/coverage call sites, preserving its previous non-deduping behavior while
+  the remaining consumers are migrated. Kept `depset_direct_and_transitive`
+  public only as a documented native Rust graph-shape bridge used by
+  `native.transitive_set_from_depset`, not as a Starlark-visible behavior
+  dependency.
+- Converted `cmd_args.add_all` and `cmd_args.add_joined` to detect depsets via
+  `is_depset_value` and flatten through `depset_to_list` instead of the ad hoc
+  `collect_depset_elements` path.
+- Converted runfiles tree synthesis to use `depset_to_artifact_inputs` for
+  `runfiles.files`, so depset flattening and artifact validation are centralized
+  before the tree action maps files to runfile paths.
+- Converted the touched DefaultInfo/Runfiles paths away from local depset type
+  string checks and old live depset construction: DefaultInfo `files` extraction
+  uses `depset_to_artifact_inputs` for depsets, `ctx.runfiles` uses
+  `is_depset_value`, and runfiles unions/builders go through
+  `make_depset_from_lists`.
+- Preserved the separate Bazel depset facade and left `TransitiveSet`
+  streaming projection/reduction/action-input paths unchanged.
+- Phase 3 remains incomplete. Remaining consumers include the
+  `collect_depset_elements` call sites in cc_common actions/providers and
+  coverage_common, plus java_common and any remaining native construction or
+  bridge call sites that should move to typed helper APIs.
+- Verified:
+  `cargo fmt`;
+  `cargo test -p kuro_build_api nested_set -- --nocapture`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `cargo test -p kuro_build_api_tests transitive_sets_iteration -- --nocapture`;
+  `pytest -q tests/core/analysis/test_depset_order.py`;
+  `pytest -q tests/core/transitive_sets/test_transitive_sets.py`;
+  `pytest -q tests/core/analysis/test_runfiles.py`;
+  `cargo check -p kuro`;
+  `git diff --check`.
+
+### 2026-05-08 Phase 3 coverage consumer slice
+
+- Migrated `coverage_common` transitive dependency collection away from the
+  temporary `collect_depset_elements` bridge. `InstrumentedFilesInfo`
+  dependency fields now flatten through `depset_to_list`, sharing the same
+  Bazel-style depset traversal and value-dedupe behavior as other typed
+  consumers.
+- Changed `collect_dep_coverage` to return `starlark::Result` and propagate
+  typed depset helper errors when an `InstrumentedFilesInfo` field exists but
+  is not a depset. No new Bazel wording probe was run, so this slice did not
+  add or tighten any error-message assertions.
+- Preserved the separate Bazel depset facade and left `TransitiveSet`
+  streaming projection/reduction/action-input paths unchanged.
+- Phase 3 remains incomplete. Remaining known consumers are the
+  `collect_depset_elements` call sites in `cc_common/actions.rs`, plus
+  java_common and any remaining native construction or bridge call sites that
+  should move to typed helper APIs.
+- Verified:
+  `cargo fmt`;
+  `cargo test -p kuro_build_api nested_set -- --nocapture`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `pytest -q tests/core/analysis/test_native_rules.py -k instrumented_files_info`;
+  `cargo check -p kuro`;
+  `git diff --check`.
+
+### 2026-05-08 Phase 3 cc_common/actions completion slice
+
+- Migrated the remaining `cc_common/actions.rs` depset consumers away from
+  `collect_depset_elements`. Provider depset fields now flatten through
+  `depset_to_list`, action-input/header paths use
+  `depset_to_artifact_inputs`, and mixed list/depset header/linking paths use a
+  local helper that preserves the previous iterable fallback for non-depset
+  values.
+- Replaced the last `request_value::<Depset>()` check in the touched cc_common
+  group with `is_depset_value`, so live, frozen-live, and frozen depsets all go
+  through the same facade check.
+- Fixed `java_common.compile`'s empty JavaInfo transitive jar fields to expose
+  actual empty depsets instead of empty lists, completing the remaining Phase 3
+  checklist item for java_common.
+- Focused Bazel 9.1.0 probes on 2026-05-08 showed that direct depset elements
+  may be `struct`, providers, and depsets when their fields are immutable, while
+  a provider containing a mutable list still errors with
+  `depset elements must not be mutable values`. Based on that probe, made
+  `LibraryToLink`, `LinkerInput`, ctx-cheat label stubs, and depsets hashable in
+  the Starlark sense without weakening mutable-field rejection.
+- Preserved the separate Bazel depset facade and left `TransitiveSet`
+  streaming projection/reduction/action-input paths unchanged.
+- Phase 3 is complete: `rg "collect_depset_elements|request_value::<.*Depset|DepsetWithListGen" app -g '*.rs'`
+  now finds only the temporary helper definition in `depset.rs`, and the only
+  remaining `depset_direct_and_transitive` users are the documented
+  native/tolist bridge paths reserved for Phase 5.
+- Verified:
+  `cargo fmt`;
+  `cargo check -p kuro`;
+  `cargo build -p kuro`;
+  `cargo test -p kuro_build_api nested_set -- --nocapture`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `cargo test -p kuro_build_api_tests transitive_sets_iteration -- --nocapture`;
+  `pytest -q tests/core/cc_common`;
+  `pytest -q tests/core/analysis/test_native_rules.py -k 'cc_common or cc_library or java_common'`.
+
+### 2026-05-08 Phase 3 final audit/cleanup
+
+- Audited the remaining Phase 3 scan hit and confirmed
+  `collect_depset_elements` had no Rust callers under `app`; it was only the
+  temporary bridge definition left behind after the consumer migrations.
+- Removed the `collect_depset_elements` API so wrong-type depset consumers can
+  no longer silently flatten to an empty collection through its
+  `unwrap_or_default()` path.
+- Kept `depset_direct_and_transitive` as the documented native graph-shape
+  bridge used by `native.transitive_set_from_depset` and memory-checkpoint
+  to-list metadata; this preserves TransitiveSet streaming behavior and leaves
+  Phase 4 untouched.
+- Phase 3 is complete after this audit: the typed helper replacements cover the
+  listed consumers, the temporary bridge API is removed, and the only remaining
+  depset graph-shape bridge is the explicitly documented native path.
+- Verified:
+  `cargo fmt`;
+  `cargo check -p kuro`;
+  `cargo test -p kuro_build_api nested_set -- --nocapture`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `rg -n "collect_depset_elements|request_value::<.*Depset|DepsetWithListGen" app -g '*.rs'`
+  (no matches);
+  `git diff --check`.
+
+### 2026-05-08 Phase 4 transitive-set shared traversal slice
+
+- Added shared streaming nested-set node iterators in
+  `app/kuro_build_api/src/interpreter/rule_defs/nested_set.rs`. The existing
+  materializing `collect_nested_set_node_dedup` path now collects by consuming
+  the same streaming node iterators, so depset flattening and tset shared-order
+  traversal use the same preorder/postorder/topological traversal machinery
+  without changing depset's public facade.
+- Reworked `TransitiveSetGen`'s `preorder`, `postorder`, and `topological`
+  iterators to use the shared nested-set streaming node iterator adapter. The
+  tset iterator still yields `&TransitiveSetGen` nodes lazily, so
+  projection/reduction/action-input streaming behavior is preserved.
+- Preserved tset-only `bfs` and `dfs` iterators locally. They are not Bazel
+  depset orders and do not belong in the shared Bazel-order nested-set core.
+- Kept tset's existing preorder enqueue-dedupe behavior via an explicit
+  `NestedSetPreorderDedupe::OnChildEnqueue` mode. The broader
+  `transitive_set` Rust filter caught that a plain Bazel-style
+  visit-dedupe preorder changes the documented tset ordering for shared
+  sibling nodes, so depset and tset now share the streaming helper while each
+  preserves its existing preorder semantics.
+- Kept `TransitiveSetGen` storage unchanged. A full physical storage unification
+  would be broader than Phase 4 and is not needed after the depset facade and
+  shared traversal paths are correct.
+- Phase 4 is complete: shared traversal now covers all tset orderings that
+  overlap with Bazel nested-set order vocabulary, while tset-only traversal and
+  public semantics remain unchanged. Phase 5 bridge semantics and Phase 6 lazy
+  depset action expansion remain future work.
+- Verified:
+  `cargo fmt`;
+  `cargo check -p kuro`;
+  `cargo test -p kuro_build_api_tests transitive_sets_iteration -- --nocapture`;
+  `cargo test -p kuro_build_api_tests transitive_set -- --nocapture`;
+  `pytest -q tests/core/transitive_sets/test_transitive_sets.py`;
+  `cargo test -p kuro_build_api nested_set -- --nocapture`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `git diff --check`.
+
+### 2026-05-08 Phase 5 bridge semantics slice
+
+- Reworked `native.transitive_set_from_depset` so the internal
+  `BazelDepsetTset` bridge now creates one transitive-set node per depset node,
+  not one node per direct depset element. Because `TransitiveSet` nodes can
+  carry only zero or one value, each bridged depset node stores its direct
+  values as one immutable tuple-valued tset payload.
+- Added a per-call depset identity cache while converting depset nodes to tset
+  nodes. The cache lifetime is limited to one bridge invocation, so it preserves
+  shared depset child identity within that conversion without introducing
+  cross-analysis or frozen-heap lifetime questions.
+- Kept the bridge explicitly lossy and documented it at the native helper
+  boundary: `depset -> transitive_set` uses the internal tuple payload shape,
+  and `transitive_set -> depset` still materializes values and loses
+  projections, reductions, definition identity, and tset node-identity
+  semantics.
+- Taught `native.depset_from_transitive_set` to recognize the internal
+  `BazelDepsetTset` definition and expand tuple payloads back into direct
+  depset values. For that internal bridge only, `order = "default"` now uses the
+  Bazel depset default/postorder-like traversal instead of the legacy generic
+  tset `bfs` default, so default roundtrips preserve Bazel 9.1.0-observed
+  depset order.
+- Added focused e2e coverage in `tests/core/analysis/test_depset_order.py` and
+  `test_depset_order_data` for the internal bridge shape and default/preorder
+  roundtrip ordering.
+- Preserved the separate Bazel depset facade and did not make depset a public
+  alias for `TransitiveSet`. `TransitiveSet` projection, reduction, action-input
+  streaming paths remain unchanged.
+- Phase 5 is complete. Phase 6 lazy depset action expansion remains future
+  work.
+- Verified:
+  `cargo fmt`;
+  `cargo build -p kuro`;
+  `cargo check -p kuro`;
+  `cargo test -p kuro_build_api_tests transitive_sets_iteration -- --nocapture`;
+  `cargo test -p kuro_build_api_tests transitive_set -- --nocapture`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `pytest -q tests/core/transitive_sets/test_transitive_sets.py`;
+  `pytest -q tests/core/analysis/test_depset_order.py`;
+  `git diff --check`.
+
+### 2026-05-08 Phase 6 deferred command-line prep slice
+
+- Inspected the current `cmd_args` rendering and action-input path before
+  adding a lazy representation. `cmd_args` stores `CommandLineArgLike` values,
+  while execution input sharing is currently expressed through
+  `ArtifactGroup::TransitiveSetProjection`; there is no depset-shaped
+  artifact group today.
+- Added an internal `DepsetCommandLineArg` wrapper for the safe Phase 6 subset:
+  plain `ctx.actions.args().add_all(depset)` and plain
+  `add_joined(depset)` over depsets whose stored top-level type is known to be
+  command-line safe (`string`, `File`, or `OutputArtifact`, plus empty depsets).
+  These calls now store the depset value in `cmd_args` and expand it when the
+  command line or artifact visitor is evaluated, instead of flattening during
+  the Starlark `add_all`/`add_joined` call.
+- Kept existing eager behavior for transformed forms (`before_each`,
+  `format_each`, `map_each`, `uniquify`, `terminate_with`, and
+  `format_joined`) because those paths either need analysis-time Starlark
+  callbacks or have stringification details that should not be changed without
+  Bazel parity probes.
+- Added depset metadata/flattening helpers for command-line consumers without
+  exposing depset as a public `TransitiveSet` alias.
+- Deferred a true `ArtifactGroup::Depset`/shared action-input representation.
+  The existing action registration and execution code assumes artifact groups
+  resolve through single artifacts, promises, or transitive-set projections.
+  Routing depsets through `ArtifactGroup::TransitiveSetProjection` would not
+  preserve Bazel depset value-dedup/order semantics, and adding a new artifact
+  group variant needs a separate design through `ResolvedArtifactGroup`,
+  `ensure_artifact_group_staged`, action input dedupe, content-based path
+  eligibility, and detailed metrics traversal.
+- Preserved `ArtifactGroup::TransitiveSetProjection` for tset projections only
+  and did not make Bazel depset a public alias for `TransitiveSet`.
+- Phase 6 is partially complete: safe command-line flattening has moved out of
+  `add_all`/`add_joined` construction for the common simple depset cases, but
+  shared deferred artifact input expansion remains future work.
+- Verified:
+  `cargo fmt`;
+  `cargo check -p kuro_build_api`;
+  `cargo check -p kuro`;
+  `cargo build -p kuro`;
+  `cargo test -p kuro_build_api_tests depset_add_all_and_joined_render_after_freeze -- --nocapture`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `cargo test -p kuro_build_api_tests transitive_sets_iteration -- --nocapture`;
+  `pytest -q tests/core/analysis/test_depset_order.py`;
+  `pytest -q tests/core/transitive_sets/test_transitive_sets.py`;
+  `pytest -q tests/core/analysis/test_cmd_args.py`;
+  `git diff --check`.
+
+### 2026-05-08 Phase 6 deferred artifact-input slice
+
+- Added a narrow `ArtifactGroup::Depset` representation for the safe action
+  input subset: frozen depsets whose element type is `File`, reached from the
+  lazy `DepsetCommandLineArg` artifact visitor. Empty depsets and string
+  depsets visit no inputs; live depsets, `OutputArtifact` depsets, and
+  transformed `add_all`/`add_joined` forms keep the existing flattening paths.
+- Preserved Bazel depset value-dedup/order semantics by expanding the depset
+  with depset traversal helpers when the artifact group is materialized, not by
+  routing through `ArtifactGroup::TransitiveSetProjection`. Tset projections
+  remain tset-only.
+- Threaded the new group through `ResolvedArtifactGroup`,
+  `ensure_artifact_group_staged`, `ArtifactGroupValues` construction,
+  content-based path metadata, target-platform-aware input dedupe eligibility,
+  detailed action input metrics traversal, aquery/BXL/query input expansion,
+  and the copy action's unsupported grouped-input match.
+- The representation intentionally stores only a frozen depset value plus
+  identity/metadata. Arbitrary live depsets still do not have a durable
+  analysis-storage key/owner comparable to tset projection keys, so action
+  registration-time visits for live depsets still flatten rather than creating
+  an unsafe long-lived group.
+- `ensure_artifact_group_staged` grew from the previous checked future size of
+  1088 bits to 1600 bits after adding the depset staging branch. This is a
+  deliberate size regression for the new branch, not an accidental unbounded
+  future from recursive async calls.
+- Phase 6 is further along but still incomplete: frozen `File` depsets have a
+  shared deferred action-input representation, while transformed
+  `add_all`/`add_joined` forms and live depset input registration remain future
+  work pending separate Bazel probes and/or a durable depset storage key.
+- Verified:
+  `cargo fmt`;
+  `cargo check -p kuro_build_api`;
+  `cargo check -p kuro`;
+  `cargo build -p kuro`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `cargo test -p kuro_build_api_tests transitive_sets_iteration -- --nocapture`;
+  `pytest -q tests/core/analysis/test_cmd_args.py`;
+  `pytest -q tests/core/analysis/test_runfiles.py`;
+  `pytest -q tests/core/transitive_sets/test_transitive_sets.py`;
+  `git diff --check`.
+
+### 2026-05-09 Phase 6 live-storage and transformed-args closure slice
+
+- Investigated whether arbitrary live depsets can be assigned a durable
+  `AnalysisValueStorage`-style owner/key comparable to transitive-set
+  projections. They cannot be represented safely with the current storage
+  shape. `AnalysisValueStorage` records actions and transitive sets; a
+  `TransitiveSetKey` is minted by `AnalysisRegistry::create_transitive_set`
+  from the current `DeferredHolderKey` plus a stable per-analysis index, and
+  the frozen analysis storage can later look that key up. Bazel depsets are
+  constructed by the global `depset()` function as ordinary Starlark heap
+  values, are not registered in `AnalysisValueStorage`, and currently have
+  only Starlark value identity until they freeze. Reusing that live identity as
+  an action-input key would not survive the analysis freeze/lookup boundary and
+  would not provide the owner checks used by tset projection lookup.
+- Did not add live-depset `ArtifactGroup::Depset` support. Making it safe would
+  require a new registered depset storage architecture analogous to tsets:
+  per-analysis depset indexes/keys, constructor access to the owning analysis
+  registry, frozen lookup plumbing, and action/input metadata threading. That is
+  broader than this Phase 6 slice and should only be reopened with Plan 51
+  evidence that live depset flattening is a dominant memory problem.
+- Ran a fresh Bazel 9.1.0 probe in `/tmp/kuro-plan54-args-probe` for
+  transformed `ctx.actions.args().add_all(depset)` and `add_joined(depset)`
+  forms. Observed behavior for `depset(["a", "b", "a"], transitive =
+  [depset(["c", "b"])])` is that Bazel first uses the depset's deduped default
+  traversal (`c`, `b`, `a`), then applies the command-line transform:
+  `before_each` interleaves before each item, `format_each` formats each item,
+  `map_each` may drop `None` or splice returned lists, `terminate_with` appends
+  after non-empty `add_all`, `format_joined` wraps the final joined string, and
+  `uniquify` is a no-op after depset dedupe for this probe. Example probe
+  outputs included `--x c --x b --x a`, `c b1 b2 a`,
+  `[c]:[b]:[a]`, `c:b1:b2:a`, and `<c:b:a>`.
+- Kept transformed `add_all`/`add_joined` depset forms on the existing eager
+  flattening path. The implementation already needs analysis-time Starlark
+  callbacks for `map_each`, and the Bazel probe confirms the current eager
+  model is the conservative parity-preserving behavior. Only the existing
+  simple untransformed safe forms remain lazy.
+- Added focused e2e coverage in
+  `tests/core/analysis/test_cmd_args_data/{defs.bzl,BUILD.bazel}` and
+  `tests/core/analysis/test_cmd_args.py` for transformed depset
+  `add_all`/`add_joined` semantics against the Bazel 9.1.0 probe results.
+- Phase 6 is closed with documented limits: simple safe depset command-line
+  forms are lazy, frozen `File` depsets reached from those forms have narrow
+  deferred action-input support, transformed forms intentionally flatten for
+  parity, live depsets intentionally flatten until a durable registered depset
+  storage design exists, and `ArtifactGroup::TransitiveSetProjection` remains
+  tset-only.
+- Verified:
+  `USE_BAZEL_VERSION=9.1.0 bazelisk build //...` in
+  `/tmp/kuro-plan54-args-probe`;
+  `cargo fmt`;
+  `cargo check -p kuro`;
+  `cargo build -p kuro`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `cargo test -p kuro_build_api_tests transitive_sets_iteration -- --nocapture`;
+  `pytest -q tests/core/analysis/test_cmd_args.py`;
+  `pytest -q tests/core/analysis/test_runfiles.py`;
+  `pytest -q tests/core/transitive_sets/test_transitive_sets.py`;
+  `git diff --check`.
 
 ## Problem
 
@@ -552,10 +1069,11 @@ This phase is behavior-preserving for tsets and allows depset to call the same
 preorder/postorder/topological traversal code without making depset a public
 alias for `TransitiveSet`.
 
-### Phase 2: replace depset internals
+### Phase 2: replace depset internals (complete)
 
-Create `DepsetGen<V>` and remove the separate frozen-only `Depset` shape once
-live/frozen handling is proven.
+Create `DepsetGen<V>` and remove the separate frozen-only graph shape once
+live/frozen handling is proven. A thin native `Depset` wrapper may remain for
+Rust-created empty/frozen depsets as long as it delegates to `DepsetGen`.
 
 Phase 2 guardrails:
 
@@ -609,7 +1127,7 @@ Update methods:
 - Keep Rust-only accessors for direct/transitive only if bridge/internal code
   still needs them.
 
-### Phase 3: fix depset consumers
+### Phase 3: fix depset consumers (complete)
 
 Replace ad hoc collection APIs with typed helpers:
 
@@ -696,17 +1214,16 @@ depset facade is semantically correct.
 
 ### Phase 7: remove obsolete code and docs
 
-Once the new depset facade and shared traversal are stable:
+Complete as of 2026-05-09:
 
-- Confirm `DepsetWithListGen` remains deleted.
-- Delete any remaining old fallback code that treats arbitrary values as
-  depset-like by scraping `.direct` and `.transitive`.
-- Delete Kuro-only depset tests for `.order`, `len`, and `|`, or rewrite them
+- Confirmed `DepsetWithListGen` remains deleted.
+- Confirmed there is no remaining old fallback code that treats arbitrary
+  values as depset-like by scraping `.direct` and `.transitive`.
+- Rewrote Kuro-only depset tests for `.order`, `len`, and `|` to keep them
   as negative parity tests.
-- Update the bridge section in the parent plan, which currently describes a
-  best-effort conversion strategy, to point to this shared-core plan.
-- Update user docs only if `depset` behavior is documented anywhere outside
-  Bazel parity docs.
+- Updated the bridge section in the parent plan to point to this shared-core
+  plan and document the explicit lossy bridge.
+- Audited user docs; no depset behavior edits were needed outside parity docs.
 
 ## Technical tradeoffs
 

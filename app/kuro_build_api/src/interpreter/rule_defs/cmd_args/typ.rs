@@ -17,6 +17,7 @@ use std::fmt::Debug;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 use allocative::Allocative;
 use display_container::display_pair;
@@ -33,6 +34,7 @@ use kuro_fs::paths::RelativePathBuf;
 use serde::Serialize;
 use serde::Serializer;
 use starlark::any::ProvidesStaticType;
+use starlark::coerce::Coerce;
 use starlark::coerce::coerce;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
@@ -40,6 +42,7 @@ use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::eval::Arguments;
 use starlark::eval::Evaluator;
+use starlark::starlark_complex_value;
 use starlark::typing::Ty;
 use starlark::values::AllocStaticSimple;
 use starlark::values::AllocValue;
@@ -56,6 +59,7 @@ use starlark::values::ThinBoxSliceFrozenValue;
 use starlark::values::Trace;
 use starlark::values::UnpackValue;
 use starlark::values::Value;
+use starlark::values::ValueLifetimeless;
 use starlark::values::ValueLike;
 use starlark::values::ValueOf;
 use starlark::values::list::ListRef;
@@ -67,6 +71,7 @@ use starlark::values::type_repr::StarlarkTypeRepr;
 use static_assertions::assert_eq_size;
 
 use crate::artifact_groups::ArtifactGroup;
+use crate::artifact_groups::DepsetArtifactGroup;
 use crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
 use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use crate::interpreter::rule_defs::artifact::starlark_output_artifact::StarlarkOutputArtifact;
@@ -88,6 +93,7 @@ use crate::interpreter::rule_defs::cmd_args::traits::SimpleCommandLineArtifactVi
 use crate::interpreter::rule_defs::cmd_args::traits::WriteToFileMacroVisitor;
 use crate::interpreter::rule_defs::cmd_args::value::CommandLineArg;
 use crate::interpreter::rule_defs::cmd_args::value::FrozenCommandLineArg;
+use crate::interpreter::rule_defs::cmd_args::value_as::ValueAsCommandLineLike;
 
 /// Format for param file entries (used during Starlark evaluation).
 #[derive(Debug, Clone, Copy, Dupe, Default, Trace, Freeze, Allocative)]
@@ -134,6 +140,165 @@ pub enum CommandLineError {
     #[error("Unknown param file format `{0}`. Expected one of: multiline, flag_per_line, shell")]
     #[kuro(input)]
     UnknownParamFileFormat(String),
+}
+
+#[derive(Debug, Clone, Trace, Freeze, Allocative)]
+enum DepsetCommandLineArgMode {
+    AddAll,
+    AddJoined { join_with: String },
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Trace,
+    Coerce,
+    Freeze,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative
+)]
+#[repr(C)]
+struct DepsetCommandLineArgGen<V: ValueLifetimeless> {
+    depset: V,
+    mode: DepsetCommandLineArgMode,
+}
+
+starlark_complex_value!(DepsetCommandLineArg);
+
+impl<'v, V: ValueLike<'v>> Display for DepsetCommandLineArgGen<V> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match &self.mode {
+            DepsetCommandLineArgMode::AddAll => {
+                write!(f, "<depset command line {}>", self.depset.to_value())
+            }
+            DepsetCommandLineArgMode::AddJoined { join_with } => write!(
+                f,
+                "<depset command line {} joined with {:?}>",
+                self.depset.to_value(),
+                join_with
+            ),
+        }
+    }
+}
+
+#[starlark_value(type = "DepsetCommandLineArg")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for DepsetCommandLineArgGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn CommandLineArgLike>(self);
+    }
+}
+
+impl<'v, V: ValueLike<'v>> CommandLineArgLike<'v> for DepsetCommandLineArgGen<V> {
+    fn register_me(&self) {}
+
+    fn add_to_command_line(
+        &self,
+        cli: &mut dyn CommandLineBuilder,
+        context: &mut dyn CommandLineContext,
+        artifact_path_mapping: &dyn ArtifactPathMapper,
+    ) -> kuro_error::Result<()> {
+        let values = crate::interpreter::rule_defs::depset::depset_to_list_without_heap(
+            self.depset.to_value(),
+        )?;
+        match &self.mode {
+            DepsetCommandLineArgMode::AddAll => {
+                for value in values {
+                    ValueAsCommandLineLike::unpack_value_err(value)?
+                        .0
+                        .add_to_command_line(cli, context, artifact_path_mapping)?;
+                }
+            }
+            DepsetCommandLineArgMode::AddJoined { join_with } => {
+                let mut rendered = Vec::new();
+                for value in values {
+                    ValueAsCommandLineLike::unpack_value_err(value)?
+                        .0
+                        .add_to_command_line(&mut rendered, context, artifact_path_mapping)?;
+                }
+                cli.push_arg(rendered.join(join_with));
+            }
+        }
+        Ok(())
+    }
+
+    fn visit_artifacts(
+        &self,
+        visitor: &mut dyn CommandLineArtifactVisitor<'v>,
+    ) -> kuro_error::Result<()> {
+        let depset_value = self.depset.to_value();
+        match crate::interpreter::rule_defs::depset::depset_element_type_name(depset_value)?
+            .as_deref()
+        {
+            None | Some("string" | "str") => return Ok(()),
+            Some("File") => {
+                if let Some(frozen) = depset_value.unpack_frozen() {
+                    let has_content_based_path =
+                        crate::interpreter::rule_defs::depset::depset_artifact_group_has_content_based_path(
+                            depset_value,
+                        )?;
+                    visitor.visit_input(
+                        ArtifactGroup::Depset(Arc::new(DepsetArtifactGroup::new(
+                            frozen,
+                            has_content_based_path,
+                        ))),
+                        vec![],
+                    );
+                    return Ok(());
+                }
+            }
+            _ => {}
+        }
+
+        for value in
+            crate::interpreter::rule_defs::depset::depset_to_list_without_heap(depset_value)?
+        {
+            ValueAsCommandLineLike::unpack_value_err(value)?
+                .0
+                .visit_artifacts(visitor)?;
+        }
+        Ok(())
+    }
+
+    fn contains_arg_attr(&self) -> bool {
+        false
+    }
+
+    fn visit_write_to_file_macros(
+        &self,
+        visitor: &mut dyn WriteToFileMacroVisitor,
+        artifact_path_mapping: &dyn ArtifactPathMapper,
+    ) -> kuro_error::Result<()> {
+        for value in crate::interpreter::rule_defs::depset::depset_to_list_without_heap(
+            self.depset.to_value(),
+        )? {
+            ValueAsCommandLineLike::unpack_value_err(value)?
+                .0
+                .visit_write_to_file_macros(visitor, artifact_path_mapping)?;
+        }
+        Ok(())
+    }
+}
+
+fn depset_command_line_arg<'v>(
+    heap: Heap<'v>,
+    depset: Value<'v>,
+    mode: DepsetCommandLineArgMode,
+) -> Value<'v> {
+    heap.alloc_complex(DepsetCommandLineArgGen { depset, mode })
+}
+
+fn can_defer_depset_command_line(value: Value) -> starlark::Result<bool> {
+    if !crate::interpreter::rule_defs::depset::is_depset_value(value) {
+        return Ok(false);
+    }
+    Ok(matches!(
+        crate::interpreter::rule_defs::depset::depset_element_type_name(value)?.as_deref(),
+        None | Some("string" | "str" | "File" | "OutputArtifact")
+    ))
 }
 
 /// Fields of `cmd_args`. Abstract mutable and frozen versions.
@@ -1023,17 +1188,36 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
             return Ok(this);
         }
 
+        let can_defer_depset = before_each.is_empty()
+            && format_each.is_empty()
+            && map_each.is_none()
+            && !uniquify
+            && terminate_with.unpack_str().is_none()
+            && can_defer_depset_command_line(values)?;
+        if can_defer_depset {
+            if omit_if_empty && crate::interpreter::rule_defs::depset::depset_is_empty(values)? {
+                return Ok(this);
+            }
+            if let Some(ref name) = arg_name {
+                if !name.is_empty() {
+                    this.borrow.add_value(heap.alloc_str(name).to_value())?;
+                }
+            }
+            if !crate::interpreter::rule_defs::depset::depset_is_empty(values)? {
+                this.borrow.add_value(depset_command_line_arg(
+                    heap,
+                    values,
+                    DepsetCommandLineArgMode::AddAll,
+                ))?;
+            }
+            return Ok(this);
+        }
+
         // Collect values from list or depset
         let items: Vec<Value<'v>> = if let Some(list) = ListRef::from_value(values) {
             list.iter().collect()
-        } else if values.get_type() == "depset" {
-            let mut elements = Vec::new();
-            crate::interpreter::rule_defs::depset::collect_depset_elements(
-                values,
-                &mut elements,
-                heap,
-            );
-            elements
+        } else if crate::interpreter::rule_defs::depset::is_depset_value(values) {
+            crate::interpreter::rule_defs::depset::depset_to_list(values, heap)?
         } else if let Ok(iter) = values.iterate(heap) {
             iter.collect()
         } else {
@@ -1156,16 +1340,34 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
             return Ok(this);
         }
 
+        let can_defer_depset = format_each.is_empty()
+            && format_joined.is_empty()
+            && map_each.is_none()
+            && !uniquify
+            && can_defer_depset_command_line(values)?;
+        if can_defer_depset {
+            if omit_if_empty && crate::interpreter::rule_defs::depset::depset_is_empty(values)? {
+                return Ok(this);
+            }
+            if let Some(name) = arg_name {
+                if !name.is_empty() {
+                    this.borrow.add_value(heap.alloc_str(&name).to_value())?;
+                }
+            }
+            this.borrow.add_value(depset_command_line_arg(
+                heap,
+                values,
+                DepsetCommandLineArgMode::AddJoined {
+                    join_with: join_with.to_owned(),
+                },
+            ))?;
+            return Ok(this);
+        }
+
         let raw_items: Vec<Value<'v>> = if let Some(list) = ListRef::from_value(values) {
             list.iter().collect()
-        } else if values.get_type() == "depset" {
-            let mut elements = Vec::new();
-            crate::interpreter::rule_defs::depset::collect_depset_elements(
-                values,
-                &mut elements,
-                heap,
-            );
-            elements
+        } else if crate::interpreter::rule_defs::depset::is_depset_value(values) {
+            crate::interpreter::rule_defs::depset::depset_to_list(values, heap)?
         } else if let Ok(iter) = values.iterate(heap) {
             iter.collect()
         } else {

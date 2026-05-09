@@ -27,6 +27,7 @@ use crate::deferred::calculation::ActionLookup;
 use crate::deferred::calculation::DeferredHolder;
 use crate::interpreter::rule_defs::artifact_tagging::ArtifactTag;
 use crate::interpreter::rule_defs::cmd_args::CommandLineArtifactVisitor;
+use crate::interpreter::rule_defs::depset::depset_to_artifact_group_inputs;
 use crate::interpreter::rule_defs::transitive_set::FrozenTransitiveSet;
 
 #[derive(Clone, Dupe, Debug, Eq, PartialEq, Hash)]
@@ -127,6 +128,28 @@ impl<'a> Graph<'a> {
                 .unwrap()
                 .action_key()
                 .map(|key| Key::Action(key.dupe()))),
+            ArtifactGroup::Depset(_) => Ok(None),
+        }
+    }
+
+    fn visit_artifact_group_deps(
+        &self,
+        artifact: &ArtifactGroup,
+        visit_dep: &mut impl FnMut(Key),
+    ) -> kuro_error::Result<()> {
+        match artifact {
+            ArtifactGroup::Depset(depset) => {
+                for input in depset_to_artifact_group_inputs(depset.depset.to_value())? {
+                    self.visit_artifact_group_deps(&input, visit_dep)?;
+                }
+                Ok(())
+            }
+            _ => {
+                if let Some(v) = self.lookup_artifact(artifact)? {
+                    visit_dep(v);
+                }
+                Ok(())
+            }
         }
     }
 
@@ -134,9 +157,7 @@ impl<'a> Graph<'a> {
         match node {
             Node::Action(action) => {
                 for artifact in action.inputs()?.iter() {
-                    if let Some(v) = self.lookup_artifact(artifact)? {
-                        visit_dep(v);
-                    }
+                    self.visit_artifact_group_deps(artifact, &mut visit_dep)?;
                 }
                 if action.key().holder_key().is_dynamic() {
                     // TODO(cjhopman): Should traverse to the dynamic node's inputs and parent dynamic node.
@@ -162,10 +183,14 @@ impl<'a> Graph<'a> {
                         }
 
                         match self.1.lookup_artifact(&input) {
-                            Ok(Some(v)) => {
-                                self.0(v);
+                            Ok(Some(v)) => self.0(v),
+                            Ok(None) => {
+                                if let Err(e) =
+                                    self.1.visit_artifact_group_deps(&input, &mut self.0)
+                                {
+                                    self.2 = Err(e);
+                                }
                             }
-                            Ok(None) => {}
                             Err(e) => {
                                 self.2 = Err(e);
                             }

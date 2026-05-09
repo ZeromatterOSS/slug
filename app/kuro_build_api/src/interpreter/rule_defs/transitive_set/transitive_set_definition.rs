@@ -340,6 +340,12 @@ pub struct FrozenTransitiveSetDefinition {
     operations: TransitiveSetOperationsGen<FrozenValue>,
 }
 
+impl FrozenTransitiveSetDefinition {
+    pub fn name(&self) -> &str {
+        &self.exported.id.name
+    }
+}
+
 impl fmt::Debug for FrozenTransitiveSetDefinition {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

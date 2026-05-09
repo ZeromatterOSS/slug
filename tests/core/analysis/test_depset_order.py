@@ -49,9 +49,8 @@ async def test_depset_order_mismatch(buck: Buck) -> None:
 async def test_depset_cross_rule_traversal(buck: Buck) -> None:
     """Depsets passed through providers can be traversed in consumer rules.
 
-    This tests the critical fix for FrozenLiveDepset.direct/transitive
-    attributes which allows depset.to_list() to work on frozen depsets
-    received via providers from other rules.
+    This verifies that frozen depsets keep their internal graph shape when
+    passed through providers, without exposing Starlark .direct/.transitive.
     """
     result = await buck.build("//:depset_consumer")
     output = result.get_build_report().output_for_target("//:depset_consumer")
@@ -95,3 +94,14 @@ async def test_depset_len(buck: Buck) -> None:
         buck.build("//:depset_len"),
         stderr_regex="iterable or string",
     )
+
+
+@buck_test(data_dir="test_depset_order_data")
+async def test_depset_transitive_set_bridge(buck: Buck) -> None:
+    """The explicit Kuro bridge is lossy but deterministic for basic values."""
+    result = await buck.build("//:depset_bridge")
+    assert _read_lines(buck, "//:depset_bridge", result) == [
+        "nodes=2,2",
+        "default=a,b,c,d",
+        "preorder=c,d,a,b",
+    ]

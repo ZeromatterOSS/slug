@@ -24,6 +24,8 @@ use dupe::Dupe;
 use gazebo::variants::UnpackVariants;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_core::configuration::data::ConfigurationData;
+use starlark::values::FrozenValue;
+use starlark::values::ValueIdentity;
 use static_assertions::assert_eq_size;
 
 use self::calculation::EnsureTransitiveSetProjectionKey;
@@ -70,6 +72,38 @@ impl TransitiveSetProjectionWrapper {
     }
 }
 
+#[derive(Clone, Debug, Display, Dupe, Allocative)]
+#[display("Depset({:?})", identity)]
+pub struct DepsetArtifactGroup {
+    pub depset: FrozenValue,
+    identity: ValueIdentity<'static>,
+    pub has_content_based_path: bool,
+}
+
+impl DepsetArtifactGroup {
+    pub fn new(depset: FrozenValue, has_content_based_path: bool) -> Self {
+        Self {
+            depset,
+            identity: depset.to_value().identity(),
+            has_content_based_path,
+        }
+    }
+}
+
+impl PartialEq for DepsetArtifactGroup {
+    fn eq(&self, other: &Self) -> bool {
+        self.identity == other.identity
+    }
+}
+
+impl Eq for DepsetArtifactGroup {}
+
+impl Hash for DepsetArtifactGroup {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.identity.hash(state);
+    }
+}
+
 /// An [ArtifactGroup] can expand to one or more [Artifact]. Those Artifacts will be made available
 /// to Actions when they execute.
 #[derive(
@@ -86,6 +120,7 @@ impl TransitiveSetProjectionWrapper {
 pub enum ArtifactGroup {
     Artifact(Artifact),
     TransitiveSetProjection(Arc<TransitiveSetProjectionWrapper>),
+    Depset(Arc<DepsetArtifactGroup>),
     Promise(Arc<PromiseArtifactWrapper>),
 }
 
@@ -107,6 +142,7 @@ impl ArtifactGroup {
             ArtifactGroup::TransitiveSetProjection(a) => {
                 ResolvedArtifactGroup::TransitiveSetProjection(&a.key)
             }
+            ArtifactGroup::Depset(a) => ResolvedArtifactGroup::Depset(a),
             ArtifactGroup::Promise(p) => match p.promise_artifact.get() {
                 Some(a) => ResolvedArtifactGroup::Artifact(a.clone()),
                 None => {
@@ -121,6 +157,7 @@ impl ArtifactGroup {
         match self {
             ArtifactGroup::Artifact(a) => a.has_content_based_path(),
             ArtifactGroup::TransitiveSetProjection(a) => a.has_content_based_path,
+            ArtifactGroup::Depset(a) => a.has_content_based_path,
             ArtifactGroup::Promise(p) => p.has_content_based_path,
         }
     }
@@ -140,6 +177,13 @@ impl ArtifactGroup {
         let is_artifact_group_eligible_for_dedupe = match self {
             ArtifactGroup::Artifact(a) => !a.has_configuration_based_path(),
             ArtifactGroup::TransitiveSetProjection(p) => p.is_eligible_for_dedupe,
+            ArtifactGroup::Depset(p) => {
+                return crate::interpreter::rule_defs::depset::depset_artifact_group_is_eligible_for_dedupe(
+                    p.depset.to_value(),
+                    target_platform,
+                )
+                .unwrap_or(false);
+            }
             ArtifactGroup::Promise(p) => p.has_content_based_path,
         };
 
@@ -153,6 +197,7 @@ impl ArtifactGroup {
                     "Artifact must have an owner, otherwise it would be eligible for dedupe",
                 ),
                 ArtifactGroup::TransitiveSetProjection(p) => p.key.key.holder_key().owner(),
+                ArtifactGroup::Depset(_) => return false,
                 // We have to assume that anonymous targets are not eligible for dedupe unless they are content-based,
                 // since they have a hash based on their inputs, which will very likely be different across configurations.
                 ArtifactGroup::Promise(_) => return false,
@@ -175,6 +220,7 @@ impl ArtifactGroup {
 pub enum ResolvedArtifactGroup<'a> {
     Artifact(Artifact),
     TransitiveSetProjection(&'a TransitiveSetProjectionKey),
+    Depset(&'a DepsetArtifactGroup),
 }
 
 pub enum ResolvedArtifactGroupBuildSignalsKey {

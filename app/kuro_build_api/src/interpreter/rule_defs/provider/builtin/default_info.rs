@@ -67,7 +67,9 @@ use crate::interpreter::rule_defs::cmd_args::value_as::ValueAsCommandLineLike;
 use crate::interpreter::rule_defs::context::AnalysisActions;
 use crate::interpreter::rule_defs::context::AnalysisContext;
 use crate::interpreter::rule_defs::depset::Depset;
-use crate::interpreter::rule_defs::depset::LiveDepsetGen;
+use crate::interpreter::rule_defs::depset::depset_to_artifact_inputs;
+use crate::interpreter::rule_defs::depset::is_depset_value;
+use crate::interpreter::rule_defs::depset::make_depset_from_lists;
 use crate::interpreter::rule_defs::provider::ProviderCollection;
 use crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 
@@ -667,12 +669,8 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
             // Synthetic DefaultInfo can hold unfrozen outputs during evaluation.
             // Keep the public value on the normal depset facade so flattening,
             // validation, and truthiness follow the same path as other depsets.
-            let transitive = heap.alloc(AllocList::EMPTY);
-            Ok(heap.alloc(LiveDepsetGen::new(
-                outputs_value,
-                transitive,
-                "default".to_owned(),
-            )))
+            let direct = outputs_list.iter().collect();
+            make_depset_from_lists(heap, direct, Vec::new(), "default")
         }
     }
 
@@ -745,31 +743,27 @@ fn default_info_methods(builder: &mut MethodsBuilder) {
     }
 }
 
-/// Extract elements from a Bazel depset value.
-/// Handles all depset types: live LiveDepsetGen<Value>, frozen LiveDepsetGen<FrozenValue>,
-/// and Buck2's Depset type. Delegates to collect_depset_elements for consistent handling.
-fn extract_depset_elements<'v>(depset_val: Value<'v>, heap: Heap<'v>) -> Vec<Value<'v>> {
-    use crate::interpreter::rule_defs::depset::collect_depset_elements;
-
-    let mut elements = Vec::new();
-    collect_depset_elements(depset_val, &mut elements, heap);
-
-    if !elements.is_empty() {
-        return elements;
+/// Extract elements from a Bazel depset value, with temporary list/iterable
+/// fallback for older internal callers that have not migrated to depset inputs.
+fn extract_default_outputs<'v>(
+    depset_val: Value<'v>,
+    heap: Heap<'v>,
+) -> starlark::Result<Vec<Value<'v>>> {
+    if is_depset_value(depset_val) {
+        return depset_to_artifact_inputs(depset_val, heap);
     }
-
     // If it's already a list, just collect its elements
     if let Some(list) = ListRef::from_value(depset_val) {
-        return list.iter().collect();
+        return Ok(list.iter().collect());
     }
 
     // Fallback: try to iterate the value directly
     if let Ok(iter) = depset_val.iterate(heap) {
-        return iter.collect();
+        return Ok(iter.collect());
     }
 
     // Last resort: return empty
-    Vec::new()
+    Ok(Vec::new())
 }
 
 #[starlark_module]
@@ -820,7 +814,7 @@ fn default_info_creator(builder: &mut GlobalsBuilder) {
                     // Bazel compatibility: if 'files' was provided, use it as default_outputs
                     if let Some(files_depset) = files_val {
                         // Convert the files depset to a list of outputs
-                        let elements: Vec<Value<'v>> = extract_depset_elements(files_depset, heap);
+                        let elements: Vec<Value<'v>> = extract_default_outputs(files_depset, heap)?;
                         ValueOfUnchecked::<ListType<_>>::new(heap.alloc(AllocList(elements)))
                     } else {
                         ValueOfUnchecked::<ListType<_>>::new(eval.heap().alloc(AllocList::EMPTY))
@@ -1089,16 +1083,12 @@ enum RunfilesError {
     ExpectedIterable(&'static str, String, String),
 }
 
-fn is_depset(value: Value) -> bool {
-    value.get_type() == "depset"
-}
-
 fn normalize_runfiles_files<'v>(
     files: Value<'v>,
     transitive_files: Value<'v>,
     heap: Heap<'v>,
 ) -> starlark::Result<Value<'v>> {
-    let files_is_depset = is_depset(files);
+    let files_is_depset = is_depset_value(files);
     if files_is_depset && transitive_files.is_none() {
         return Ok(files);
     }
@@ -1124,7 +1114,7 @@ fn normalize_runfiles_files<'v>(
         transitive_items.push(files);
     }
     if !transitive_files.is_none() {
-        if is_depset(transitive_files) {
+        if is_depset_value(transitive_files) {
             transitive_items.push(transitive_files);
         } else if let Some(list) = ListRef::from_value(transitive_files) {
             transitive_items.extend(list.iter());
@@ -1144,13 +1134,7 @@ fn normalize_runfiles_files<'v>(
         return Ok(heap.alloc(Depset::empty()));
     }
 
-    let direct_list = heap.alloc(AllocList(direct_items));
-    let transitive_list = heap.alloc(AllocList(transitive_items));
-    Ok(heap.alloc(LiveDepsetGen::new(
-        direct_list,
-        transitive_list,
-        "default".to_owned(),
-    )))
+    make_depset_from_lists(heap, direct_items, transitive_items, "default")
 }
 
 fn normalize_runfiles_dict<'v>(
@@ -1173,20 +1157,14 @@ fn normalize_runfiles_dict<'v>(
     }
 }
 
-fn union_depsets<'v>(heap: Heap<'v>, depsets: Vec<Value<'v>>) -> Value<'v> {
+fn union_depsets<'v>(heap: Heap<'v>, depsets: Vec<Value<'v>>) -> starlark::Result<Value<'v>> {
     if depsets.is_empty() {
-        return heap.alloc(Depset::empty());
+        return Ok(heap.alloc(Depset::empty()));
     }
     if depsets.len() == 1 {
-        return depsets[0];
+        return Ok(depsets[0]);
     }
-    let transitive_list = heap.alloc(AllocList(depsets));
-    let direct_list = heap.alloc(AllocList::EMPTY);
-    heap.alloc(LiveDepsetGen::new(
-        direct_list,
-        transitive_list,
-        "default".to_owned(),
-    ))
+    make_depset_from_lists(heap, Vec::new(), depsets, "default")
 }
 
 fn merge_runfiles_dicts<'v>(
@@ -1226,14 +1204,14 @@ fn merge_runfiles<'v>(
     left: &Runfiles<'v>,
     right: &Runfiles<'v>,
 ) -> starlark::Result<Value<'v>> {
-    let files = union_depsets(heap, vec![left.files.to_value(), right.files.to_value()]);
+    let files = union_depsets(heap, vec![left.files.to_value(), right.files.to_value()])?;
     let empty_filenames = union_depsets(
         heap,
         vec![
             left.empty_filenames.to_value(),
             right.empty_filenames.to_value(),
         ],
-    );
+    )?;
     let symlinks = merge_runfiles_dicts(
         "symlinks",
         heap,

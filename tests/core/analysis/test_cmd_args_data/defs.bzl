@@ -68,6 +68,12 @@ def _to_upper(s):
     return s.upper()
 
 
+def _split_b(s):
+    if s == "b":
+        return ["b1", "b2"]
+    return s
+
+
 def _args_map_each_impl(ctx):
     out = ctx.actions.declare_file("args_map_each.txt")
 
@@ -205,6 +211,49 @@ def _args_add_joined_uniquify_impl(ctx):
 
 args_add_joined_uniquify = rule(
     implementation = _args_add_joined_uniquify_impl,
+    attrs = {},
+)
+
+
+def _depset_values():
+    return depset(["a", "b", "a"], transitive = [depset(["c", "b"])])
+
+
+def _args_depset_add_all_transforms_impl(ctx):
+    out = ctx.actions.declare_file("args_depset_add_all_transforms.txt")
+
+    args = ctx.actions.args()
+    args.add_all(_depset_values(), before_each = "--x")
+    args.add("SEP")
+    args.add_all(_depset_values(), map_each = _split_b)
+    args.add("SEP")
+    args.add_all(_depset_values(), terminate_with = "END")
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_depset_add_all_transforms = rule(
+    implementation = _args_depset_add_all_transforms_impl,
+    attrs = {},
+)
+
+
+def _args_depset_add_joined_transforms_impl(ctx):
+    out = ctx.actions.declare_file("args_depset_add_joined_transforms.txt")
+
+    args = ctx.actions.args()
+    args.add_joined(_depset_values(), join_with = ":", format_each = "[%s]")
+    args.add_joined(_depset_values(), join_with = ":", map_each = _split_b)
+    args.add_joined(_depset_values(), join_with = ":", format_joined = "<%s>")
+    args.add_joined(_depset_values(), join_with = ":", uniquify = True)
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_depset_add_joined_transforms = rule(
+    implementation = _args_depset_add_joined_transforms_impl,
     attrs = {},
 )
 

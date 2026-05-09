@@ -492,3 +492,38 @@ existing `to_list()` behavior is unchanged.
 - [x] Added depset flattening memory checkpoints
 - [x] Ran `cargo fmt -- app/kuro_build_api/src/interpreter/rule_defs/depset.rs`
 - [x] Ran `cargo check -p kuro_build_api`
+
+## Progress 2026-05-09: post-Plan-54 memory follow-up
+
+After completing Plan 54's depset/shared traversal/action-input work, reran
+the zeromatter memory repro from `/var/mnt/dev/zeromatter`:
+
+```sh
+KURO_MEMORY_CHECKPOINTS=1 /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+  --interval 5 \
+  --include-pgrep 'kurod\[zeromatter\].*plan54-followup' \
+  -- /var/mnt/dev/kuro/target/debug/kuro \
+     --isolation-dir plan54-followup \
+     build //sdk:sdk_contents
+```
+
+The run was manually stopped before OOM risk. Evidence captured in
+`/tmp/plan54-followup-memory.log`:
+
+- sampled client+daemon RSS reached `14893728 KiB` at `09:22:52-07:00`;
+- max checkpoint RSS reached at least `15334957056` bytes before shutdown;
+- `depset_to_list_live` appeared 73 times;
+- `depset_to_list_frozen` did not appear;
+- `cell_alias_resolver_shared` appeared 541 times;
+- status output was still in package-file-tree loading, for example
+  `crates__windows-sys-0.61.2// -- loading package file tree`.
+
+The important conclusion is that Plan 54 did not by itself close the zeromatter
+RSS issue. The remaining blocker is still owned by this Plan 51 memory work.
+The observed checkpoints suggest many repeated root-alias resolver creations
+or lookups during external package loading, with only small live depset
+flattening checkpoints (`direct_len=4`, `transitive_len=0`) at the sampled
+peak. The next implementation slice should investigate why
+`cell_alias_resolver_shared` is emitted hundreds of times during package tree
+loading and whether resolver/package-loading state is being retained or rebuilt
+per external package.

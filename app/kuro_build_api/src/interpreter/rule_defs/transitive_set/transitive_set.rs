@@ -63,12 +63,11 @@ use crate::interpreter::rule_defs::artifact_tagging::ArtifactTag;
 use crate::interpreter::rule_defs::cmd_args::CommandLineArgLike;
 use crate::interpreter::rule_defs::cmd_args::CommandLineArtifactVisitor;
 use crate::interpreter::rule_defs::cmd_args::SimpleCommandLineArtifactVisitor;
+use crate::interpreter::rule_defs::nested_set::NestedSetOrder;
 use crate::interpreter::rule_defs::transitive_set::BfsTransitiveSetIteratorGen;
 use crate::interpreter::rule_defs::transitive_set::DfsTransitiveSetIteratorGen;
 use crate::interpreter::rule_defs::transitive_set::FrozenTransitiveSetDefinition;
-use crate::interpreter::rule_defs::transitive_set::PostorderTransitiveSetIteratorGen;
-use crate::interpreter::rule_defs::transitive_set::PreorderTransitiveSetIteratorGen;
-use crate::interpreter::rule_defs::transitive_set::TopologicalTransitiveSetIteratorGen;
+use crate::interpreter::rule_defs::transitive_set::NestedOrderTransitiveSetIteratorGen;
 use crate::interpreter::rule_defs::transitive_set::TransitiveSetArgsProjection;
 use crate::interpreter::rule_defs::transitive_set::TransitiveSetDefinition;
 use crate::interpreter::rule_defs::transitive_set::TransitiveSetError;
@@ -180,6 +179,10 @@ impl<'v, V: ValueLike<'v>> Serialize for TransitiveSetGen<V> {
 impl<V: ValueLifetimeless> TransitiveSetGen<V> {
     pub fn key(&self) -> &TransitiveSetKey {
         &self.key
+    }
+
+    pub fn definition_name(&self) -> &str {
+        self.definition.as_ref().name()
     }
 }
 
@@ -299,15 +302,17 @@ where
         'v: 'a,
     {
         match ordering {
-            TransitiveSetOrdering::Preorder => {
-                Box::new(PreorderTransitiveSetIteratorGen::new(self))
-            }
-            TransitiveSetOrdering::Postorder => {
-                Box::new(PostorderTransitiveSetIteratorGen::new(self))
-            }
-            TransitiveSetOrdering::Topological => {
-                Box::new(TopologicalTransitiveSetIteratorGen::new(self))
-            }
+            TransitiveSetOrdering::Preorder => Box::new(NestedOrderTransitiveSetIteratorGen::new(
+                self,
+                NestedSetOrder::Preorder,
+            )),
+            TransitiveSetOrdering::Postorder => Box::new(NestedOrderTransitiveSetIteratorGen::new(
+                self,
+                NestedSetOrder::Postorder,
+            )),
+            TransitiveSetOrdering::Topological => Box::new(
+                NestedOrderTransitiveSetIteratorGen::new(self, NestedSetOrder::Topological),
+            ),
             TransitiveSetOrdering::Bfs => Box::new(BfsTransitiveSetIteratorGen::new(self)),
             TransitiveSetOrdering::Dfs => Box::new(DfsTransitiveSetIteratorGen::new(self)),
         }

@@ -10,9 +10,9 @@
 
 use kuro_build_api::interpreter::rule_defs::bazel_label::BazelLabel;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisActions;
-use kuro_build_api::interpreter::rule_defs::depset::Depset;
 use kuro_build_api::interpreter::rule_defs::depset::bazel_depset_tset_definition;
 use kuro_build_api::interpreter::rule_defs::depset::depset_direct_and_transitive;
+use kuro_build_api::interpreter::rule_defs::depset::is_depset_value;
 use kuro_build_api::interpreter::rule_defs::depset::make_depset_from_lists;
 use kuro_build_api::interpreter::rule_defs::transitive_set::FrozenTransitiveSet;
 use kuro_build_api::interpreter::rule_defs::transitive_set::FrozenTransitiveSetDefinition;
@@ -26,15 +26,16 @@ use starlark::starlark_module;
 use starlark::values::FrozenValueTyped;
 use starlark::values::StringValue;
 use starlark::values::Value;
+use starlark::values::ValueIdentity;
 use starlark::values::ValueLike;
 use starlark::values::ValueOfUnchecked;
-use starlark::values::ValueTyped;
 use starlark::values::dict::AllocDict;
 use starlark::values::list::AllocList;
 use starlark::values::list::UnpackList;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
+use starlark::values::tuple::AllocTuple;
 
 use crate::interpreter::build_context::BuildContext;
 use crate::interpreter::build_context::PerFileTypeContext;
@@ -46,23 +47,22 @@ fn depset_to_transitive_set<'v>(
     depset: Value<'v>,
     actions: &AnalysisActions<'v>,
     definition: FrozenValueTyped<'v, FrozenTransitiveSetDefinition>,
+    cache: &mut std::collections::HashMap<ValueIdentity<'v>, Value<'v>>,
     eval: &mut Evaluator<'v, '_, '_>,
-) -> starlark::Result<ValueTyped<'v, TransitiveSet<'v>>> {
+) -> starlark::Result<Value<'v>> {
     let heap = eval.heap();
+    let identity = depset.identity();
+    if let Some(tset) = cache.get(&identity) {
+        return Ok(*tset);
+    }
+
     let (direct, transitive) = depset_direct_and_transitive(depset, heap)?;
     let mut child_sets = Vec::new();
 
-    for item in direct {
-        let tset = {
-            let mut state = actions.state()?;
-            state.create_transitive_set(definition, Some(item), None, eval)?
-        };
-        child_sets.push(tset.to_value());
-    }
-
     for child in transitive {
-        let tset = depset_to_transitive_set(child, actions, definition, eval)?;
-        child_sets.push(tset.to_value());
+        child_sets.push(depset_to_transitive_set(
+            child, actions, definition, cache, eval,
+        )?);
     }
 
     let children_value = if child_sets.is_empty() {
@@ -71,11 +71,52 @@ fn depset_to_transitive_set<'v>(
         Some(heap.alloc(AllocList(child_sets)).to_value())
     };
 
-    let root = {
+    // `TransitiveSet` nodes have zero or one value, while Bazel depset nodes
+    // have zero or more direct values. For the internal BazelDepsetTset bridge,
+    // the node value is an immutable tuple of that depset node's direct values.
+    // The reverse bridge expands this tuple again; ordinary tset traversal still
+    // sees it as one node value, so this remains a lossy Kuro-specific bridge
+    // rather than a public alias between depset and TransitiveSet.
+    let direct_value = heap.alloc(AllocTuple(direct)).to_value();
+    let tset = {
         let mut state = actions.state()?;
-        state.create_transitive_set(definition, None, children_value, eval)?
+        state.create_transitive_set(definition, Some(direct_value), children_value, eval)?
     };
-    Ok(root)
+    let tset = tset.to_value();
+    cache.insert(identity, tset);
+    Ok(tset)
+}
+
+fn parse_depset_from_transitive_set_order(
+    order: &str,
+    bazel_depset_tset: bool,
+) -> starlark::Result<TransitiveSetOrdering> {
+    match order {
+        // For the internal depset-shaped tset bridge, `default` must preserve
+        // Bazel depset default flattening, which is postorder-like in the
+        // Bazel 9.1.0 probes. Keep the legacy generic tset bridge behavior for
+        // non-BazelDepsetTset inputs.
+        "default" if bazel_depset_tset => Ok(TransitiveSetOrdering::Postorder),
+        "default" => Ok(TransitiveSetOrdering::Bfs),
+        "preorder" => Ok(TransitiveSetOrdering::Preorder),
+        "postorder" => Ok(TransitiveSetOrdering::Postorder),
+        "topological" => Ok(TransitiveSetOrdering::Topological),
+        _ => Err(kuro_error::kuro_error!(
+            kuro_error::ErrorTag::Input,
+            "expected order to be one of `default`, `preorder`, `postorder`, `topological`, got `{order}`"
+        )
+        .into()),
+    }
+}
+
+fn append_bazel_depset_tset_values<'v>(
+    values: &mut Vec<Value<'v>>,
+    direct_tuple: Value<'v>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> starlark::Result<()> {
+    let direct = direct_tuple.iterate(eval.heap())?;
+    values.extend(direct);
+    Ok(())
 }
 
 /// Convert a serde_json::Value to a Starlark Value on the given heap.
@@ -710,8 +751,11 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
 
     /// Convert a depset to a transitive_set.
     ///
-    /// This is a Kuro-specific bridge to preserve transitive_set performance internally
-    /// while exposing Bazel-compatible depset APIs to rules.
+    /// Kuro-specific bridge. This is not part of Bazel's public `native`
+    /// surface and is lossy: the returned internal `BazelDepsetTset` preserves
+    /// depset node shape and shared child identity within this conversion call,
+    /// but stores each depset node's direct values as one tuple-valued tset
+    /// node. It does not make depset a public alias for `TransitiveSet`.
     fn transitive_set_from_depset<'v>(
         depset: Value<'v>,
         #[starlark(require = named, default = "default")] order: &str,
@@ -748,40 +792,44 @@ fn bazel_native_module(registry: &mut GlobalsBuilder) {
 
         let definition = bazel_depset_tset_definition()?;
         let definition = definition.owned_frozen_value_typed(eval.frozen_heap());
-        let tset = depset_to_transitive_set(depset, actions, definition, eval)?;
-        Ok(tset.to_value())
+        let mut cache = std::collections::HashMap::new();
+        depset_to_transitive_set(depset, actions, definition, &mut cache, eval)
     }
 
     /// Convert a transitive_set to a depset by materializing its traversal.
+    ///
+    /// This is a lossy Kuro-specific bridge: projections, reductions,
+    /// definition identity, and transitive_set node identity are not preserved.
+    /// For the internal `BazelDepsetTset` shape created by
+    /// `native.transitive_set_from_depset`, tuple-valued node payloads are
+    /// expanded back to direct depset values before constructing the depset.
     fn depset_from_transitive_set<'v>(
         tset: Value<'v>,
         #[starlark(require = named, default = "default")] order: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        let ordering = match order {
-            "default" => TransitiveSetOrdering::Bfs,
-            "preorder" => TransitiveSetOrdering::Preorder,
-            "postorder" => TransitiveSetOrdering::Postorder,
-            "topological" => TransitiveSetOrdering::Topological,
-            _ => {
-                return Err(kuro_error::kuro_error!(
-                    kuro_error::ErrorTag::Input,
-                    "expected order to be one of `default`, `preorder`, `postorder`, `topological`, got `{order}`"
-                )
-                .into());
-            }
-        };
-
         let mut values = Vec::new();
         if let Some(transitive) = TransitiveSet::from_value(tset) {
+            let bazel_depset_tset = transitive.definition_name() == "BazelDepsetTset";
+            let ordering = parse_depset_from_transitive_set_order(order, bazel_depset_tset)?;
             for value in transitive.iter_values(ordering)? {
-                values.push(value);
+                if bazel_depset_tset {
+                    append_bazel_depset_tset_values(&mut values, value, eval)?;
+                } else {
+                    values.push(value);
+                }
             }
         } else if let Some(transitive) = FrozenTransitiveSet::from_value(tset) {
+            let bazel_depset_tset = transitive.definition_name() == "BazelDepsetTset";
+            let ordering = parse_depset_from_transitive_set_order(order, bazel_depset_tset)?;
             for value in transitive.iter_values(ordering)? {
-                values.push(value);
+                if bazel_depset_tset {
+                    append_bazel_depset_tset_values(&mut values, value, eval)?;
+                } else {
+                    values.push(value);
+                }
             }
-        } else if tset.downcast_ref::<Depset>().is_some() {
+        } else if is_depset_value(tset) {
             // Already a depset; return it directly.
             return Ok(tset);
         } else {

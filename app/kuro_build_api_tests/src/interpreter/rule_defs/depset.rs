@@ -49,7 +49,7 @@ fn depset_public_surface_rejects_kuro_prototype_extensions() {
                 len(depset(["x"]))
             "#
         ),
-        "want 'iterable or string'",
+        "in call to len(), parameter 'x' got value of type 'depset', want 'iterable or string'",
     );
 
     let mut tester = depset_tester();
@@ -60,7 +60,7 @@ fn depset_public_surface_rejects_kuro_prototype_extensions() {
                 depset(["x"]) | depset(["y"])
             "#
         ),
-        "unsupported binary operation",
+        "unsupported binary operation: depset | depset",
     );
 }
 
@@ -115,10 +115,21 @@ fn depset_validation_matches_bazel_9_1_0_probe() {
         indoc!(
             r#"
             def test():
+                depset(["x"], order = "stable")
+            "#
+        ),
+        "Invalid order: stable",
+    );
+
+    let mut tester = depset_tester();
+    tester.run_starlark_bzl_test_expecting_error(
+        indoc!(
+            r#"
+            def test():
                 depset(transitive = ["x"])
             "#
         ),
-        "transitive elements must be depsets",
+        "at index 0 of transitive, got element of type string, want depset",
     );
 
     let mut tester = depset_tester();
@@ -129,7 +140,7 @@ fn depset_validation_matches_bazel_9_1_0_probe() {
                 depset(["x", 1])
             "#
         ),
-        "cannot add an item of type",
+        "cannot add an item of type 'int' to a depset of 'string'",
     );
 
     let mut tester = depset_tester();
@@ -140,7 +151,7 @@ fn depset_validation_matches_bazel_9_1_0_probe() {
                 depset([1], transitive = [depset(["x"])])
             "#
         ),
-        "cannot add an item of type",
+        "cannot add an item of type 'string' to a depset of 'int'",
     );
 
     let mut tester = depset_tester();
@@ -183,6 +194,41 @@ fn depset_validation_matches_bazel_9_1_0_probe() {
                 depset(["x"], order = "preorder", transitive = [depset(["y"], order = "postorder")])
             "#
         ),
-        "incompatible",
+        "Order 'preorder' is incompatible with order 'postorder'",
     );
+}
+
+#[test]
+fn depset_depth_validation_matches_bazel_9_1_0_probe() -> kuro_error::Result<()> {
+    let mut tester = depset_tester();
+    tester.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            d = depset(["0"])
+            for i in range(3499):
+                d = depset([str(i + 1)], transitive = [d])
+            assert_eq(["0"], d.to_list()[:1])
+
+            # Bazel does not increase depset depth for a parent with only
+            # transitive children.
+            for _ in range(3501):
+                d = depset(transitive = [d])
+            assert_eq(["0"], d.to_list()[:1])
+        "#
+    ))?;
+
+    let mut tester = depset_tester();
+    tester.run_starlark_bzl_test_expecting_error(
+        indoc!(
+            r#"
+            def test():
+                d = depset(["0"])
+                for i in range(3500):
+                    d = depset([str(i + 1)], transitive = [d])
+            "#
+        ),
+        "depset depth 3501 exceeds limit (3500)",
+    );
+
+    Ok(())
 }
