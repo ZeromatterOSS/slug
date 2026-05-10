@@ -1,0 +1,9 @@
+load(":defs.bzl", "declare_directory_path_shape_rule", "declare_file_path_shape_rule")
+
+declare_file_path_shape_rule(
+    name = "declare_file_path_shape",
+)
+
+declare_directory_path_shape_rule(
+    name = "declare_directory_path_shape",
+)

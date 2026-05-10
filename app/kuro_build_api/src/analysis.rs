@@ -16,6 +16,7 @@ use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_interpreter::starlark_profiler::data::StarlarkProfileDataAndStats;
 
+use crate::analysis::registry::RecordedAnalysisValueCounts;
 use crate::analysis::registry::RecordedAnalysisValues;
 use crate::artifact_groups::promise::PromiseArtifactId;
 
@@ -86,5 +87,17 @@ impl AnalysisResult {
 
     pub fn analysis_values(&self) -> &RecordedAnalysisValues {
         &self.analysis_values
+    }
+
+    pub fn retained_memory(&self) -> kuro_error::Result<usize> {
+        self.analysis_values.retained_memory()
+    }
+
+    pub fn counts(&self) -> RecordedAnalysisValueCounts {
+        self.analysis_values.counts()
+    }
+
+    pub fn provider_count(&self) -> kuro_error::Result<usize> {
+        Ok(self.providers()?.value().provider_names().len())
     }
 }

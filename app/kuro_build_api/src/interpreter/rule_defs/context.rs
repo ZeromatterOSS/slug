@@ -18,6 +18,7 @@ use std::sync::Arc;
 use allocative::Allocative;
 use derive_more::Display;
 use dice::DiceComputations;
+use dupe::Dupe;
 use futures::FutureExt;
 use kuro_core::configuration::build_setting::BuildSettingLabel;
 use kuro_core::configuration::build_setting::BuildSettingValue;
@@ -42,8 +43,10 @@ use starlark::eval::Arguments;
 use starlark::eval::Evaluator;
 use starlark::typing::Ty;
 use starlark::values::AllocValue;
+use starlark::values::FrozenHeap;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
+use starlark::values::OwnedFrozenValueTyped;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::UnpackValue;
@@ -52,11 +55,13 @@ use starlark::values::ValueLike;
 use starlark::values::ValueOfUnchecked;
 use starlark::values::ValueTyped;
 use starlark::values::ValueTypedComplex;
+use starlark::values::dict::AllocDict;
 use starlark::values::dict::Dict;
 use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark::values::starlark_value_as_type::StarlarkValueAsType;
+use starlark::values::structs::AllocStruct;
 use starlark::values::structs::StructRef;
 use starlark::values::type_repr::StarlarkTypeRepr;
 
@@ -65,11 +70,16 @@ use crate::analysis::registry::AnalysisRegistry;
 use crate::deferred::calculation::GET_PROMISED_ARTIFACT;
 use crate::interpreter::rule_defs::artifact::methods::ArtifactRoot;
 use crate::interpreter::rule_defs::bazel_label::BazelLabel;
+use crate::interpreter::rule_defs::cc_common::CcToolchainFeatures;
 use crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider;
+use crate::interpreter::rule_defs::depset::Depset;
 use crate::interpreter::rule_defs::fragments::ConfigurationFragments;
 use crate::interpreter::rule_defs::fragments::CppFragment;
+use crate::interpreter::rule_defs::platform_common::ToolchainInfoInstanceGen;
+use crate::interpreter::rule_defs::platform_common::ToolchainInfoProvider;
 use crate::interpreter::rule_defs::plugins::AnalysisPlugins;
 use crate::interpreter::rule_defs::provider::ProviderLike;
+use crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use crate::interpreter::rule_defs::provider::collection::FrozenProviderCollectionValue;
 
 /// Functions to allow users to interact with the Actions registry.
@@ -1844,6 +1854,245 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
 // ResolvedToolchains - Real toolchain resolution results for ctx.toolchains
 // ============================================================================
 
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct SyntheticCcInfo;
+
+impl std::fmt::Display for SyntheticCcInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CcInfo(...)")
+    }
+}
+
+starlark::starlark_simple_value!(SyntheticCcInfo);
+
+#[starlark::values::starlark_value(type = "CcInfo")]
+impl<'v> StarlarkValue<'v> for SyntheticCcInfo {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(attribute, "compilation_context" | "linking_context")
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        match attribute {
+            "compilation_context" => Some(heap.alloc(EmptyCompilationContext)),
+            "linking_context" => Some(heap.alloc(EmptyLinkingContext)),
+            _ => None,
+        }
+    }
+}
+
+/// Cycle-breaker for C++ toolchain provider lookups.
+///
+/// This is intentionally minimal: it exposes the CcToolchainInfo fields that
+/// rules_cc consults while analyzing support/header/runtime deps inside the
+/// selected C++ toolchain's own dependency cone. The real cc_toolchain target is
+/// still analyzed normally once its deps are available.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct SyntheticCcToolchainInfo {
+    toolchain_label: String,
+}
+
+impl std::fmt::Display for SyntheticCcToolchainInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "CcToolchainInfo({})", self.toolchain_label)
+    }
+}
+
+starlark::starlark_simple_value!(SyntheticCcToolchainInfo);
+
+#[starlark::starlark_module]
+fn synthetic_cc_toolchain_methods(builder: &mut MethodsBuilder) {
+    fn needs_pic_for_dynamic_libraries(
+        #[starlark(this)] _this: &SyntheticCcToolchainInfo,
+        #[starlark(require = named)] feature_configuration: Value,
+    ) -> starlark::Result<bool> {
+        let _ = feature_configuration;
+        Ok(true)
+    }
+
+    fn static_runtime_lib<'v>(
+        #[starlark(this)] _this: &SyntheticCcToolchainInfo,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = feature_configuration;
+        Ok(heap.alloc(Depset::empty()))
+    }
+
+    fn dynamic_runtime_lib<'v>(
+        #[starlark(this)] _this: &SyntheticCcToolchainInfo,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        heap: Heap<'v>,
+    ) -> starlark::Result<Value<'v>> {
+        let _ = feature_configuration;
+        Ok(heap.alloc(Depset::empty()))
+    }
+}
+
+#[starlark::values::starlark_value(type = "CcToolchainInfo")]
+impl<'v> StarlarkValue<'v> for SyntheticCcToolchainInfo {
+    fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
+        matches!(
+            attribute,
+            "compiler"
+                | "compiler_executable"
+                | "preprocessor_executable"
+                | "nm_executable"
+                | "objdump_executable"
+                | "ar_executable"
+                | "strip_executable"
+                | "ld_executable"
+                | "gcov_executable"
+                | "objcopy_executable"
+                | "generate_modmap"
+                | "cpu"
+                | "libc"
+                | "target_gnu_system_name"
+                | "toolchain_id"
+                | "dynamic_runtime_solib_dir"
+                | "built_in_include_directories"
+                | "all_files"
+                | "sysroot"
+                | "_as_files"
+                | "_ar_files"
+                | "_strip_files"
+                | "_tool_paths"
+                | "_solib_dir"
+                | "_linker_files"
+                | "_coverage_files"
+                | "_fdo_context"
+                | "_compiler_files"
+                | "_dwp_files"
+                | "_builtin_include_files"
+                | "_legacy_cc_flags_make_variable"
+                | "_additional_make_variables"
+                | "_all_files_including_libc"
+                | "_abi"
+                | "_abi_glibc_version"
+                | "_crosstool_top_path"
+                | "_build_info_files"
+                | "_build_variables_dict"
+                | "_build_variables"
+                | "_supports_header_parsing"
+                | "_supports_param_files"
+                | "_toolchain_features"
+                | "_toolchain_label"
+                | "_cpp_configuration"
+                | "_link_dynamic_library_tool"
+                | "_grep_includes"
+                | "_if_so_builder"
+                | "_is_tool_configuration"
+                | "_is_sibling_repository_layout"
+                | "_stamp_binaries"
+                | "_static_runtime_lib_depset"
+                | "_dynamic_runtime_lib_depset"
+                | "_compiler_files_without_includes"
+                | "_allowlist_for_layering_check"
+                | "_cc_info"
+                | "_objcopy_files"
+                | "_aggregate_ddi"
+                | "_extra_allowlisted_feature_layering_check_macros"
+                | "_force_layering_check_features"
+        )
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        let empty_depset = || heap.alloc(Depset::empty());
+        let empty_list = || heap.alloc(Vec::<Value<'v>>::new());
+        let empty_dict = || heap.alloc(AllocDict::EMPTY);
+        let empty_string = || heap.alloc_str("").to_value();
+        match attribute {
+            "compiler" => Some(heap.alloc_str("clang").to_value()),
+            "compiler_executable" | "preprocessor_executable" => {
+                Some(heap.alloc_str("clang").to_value())
+            }
+            "nm_executable" => Some(heap.alloc_str("nm").to_value()),
+            "objdump_executable" => Some(heap.alloc_str("objdump").to_value()),
+            "ar_executable" => Some(heap.alloc_str("ar").to_value()),
+            "strip_executable" => Some(heap.alloc_str("strip").to_value()),
+            "ld_executable" => Some(heap.alloc_str("ld").to_value()),
+            "gcov_executable" => Some(heap.alloc_str("gcov").to_value()),
+            "objcopy_executable" => Some(heap.alloc_str("objcopy").to_value()),
+            "generate_modmap" => Some(Value::new_none()),
+            "cpu" => Some(heap.alloc_str(&host_target_cpu()).to_value()),
+            "libc" | "target_gnu_system_name" | "toolchain_id" => Some(empty_string()),
+            "dynamic_runtime_solib_dir" => Some(heap.alloc_str("_solib").to_value()),
+            "built_in_include_directories" => Some(empty_list()),
+            "all_files"
+            | "_as_files"
+            | "_ar_files"
+            | "_strip_files"
+            | "_linker_files"
+            | "_coverage_files"
+            | "_compiler_files"
+            | "_dwp_files"
+            | "_builtin_include_files"
+            | "_all_files_including_libc"
+            | "_build_info_files"
+            | "_static_runtime_lib_depset"
+            | "_dynamic_runtime_lib_depset"
+            | "_compiler_files_without_includes"
+            | "_objcopy_files" => Some(empty_depset()),
+            "sysroot"
+            | "_link_dynamic_library_tool"
+            | "_grep_includes"
+            | "_if_so_builder"
+            | "_allowlist_for_layering_check"
+            | "_aggregate_ddi" => Some(Value::new_none()),
+            "_tool_paths" | "_additional_make_variables" | "_build_variables_dict" => {
+                Some(empty_dict())
+            }
+            "_solib_dir" => Some(heap.alloc_str("_solib").to_value()),
+            "_fdo_context" => Some(heap.alloc(AllocStruct::EMPTY)),
+            "_legacy_cc_flags_make_variable"
+            | "_abi"
+            | "_abi_glibc_version"
+            | "_crosstool_top_path" => Some(empty_string()),
+            "_build_variables" => Some(empty_depset()),
+            "_supports_header_parsing" | "_supports_param_files" => Some(Value::new_bool(true)),
+            "_toolchain_features" => Some(heap.alloc(CcToolchainFeatures::empty())),
+            "_toolchain_label" => Some(heap.alloc_str(&self.toolchain_label).to_value()),
+            "_cpp_configuration" => Some(heap.alloc(CppFragment::default())),
+            "_is_tool_configuration"
+            | "_is_sibling_repository_layout"
+            | "_stamp_binaries"
+            | "_force_layering_check_features" => Some(Value::new_bool(false)),
+            "_cc_info" => Some(heap.alloc(SyntheticCcInfo)),
+            "_extra_allowlisted_feature_layering_check_macros" => Some(empty_list()),
+            _ => None,
+        }
+    }
+
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(synthetic_cc_toolchain_methods)
+    }
+}
+
+pub fn synthetic_cc_toolchain_provider_collection(
+    toolchain_label: &str,
+) -> FrozenProviderCollectionValue {
+    let heap = FrozenHeap::new();
+    let cc = heap.alloc(SyntheticCcToolchainInfo {
+        toolchain_label: toolchain_label.to_owned(),
+    });
+    let cc_provider_in_toolchain = heap.alloc(true);
+    let fields = heap.alloc(AllocDict([
+        ("cc", cc),
+        ("cc_provider_in_toolchain", cc_provider_in_toolchain),
+    ]));
+    let toolchain_info = heap.alloc(ToolchainInfoInstanceGen::new(fields));
+    let providers = FrozenProviderCollection::new(SmallMap::from_iter([
+        (ToolchainInfoProvider::provider_id().dupe(), toolchain_info),
+        (CcToolchainInfoProvider::provider_id().dupe(), cc),
+    ]));
+    let provider_collection =
+        starlark::values::FrozenValueTyped::new_err(heap.alloc(providers)).unwrap();
+    let heap_ref = heap.into_ref();
+    FrozenProviderCollectionValue::from_value(unsafe {
+        OwnedFrozenValueTyped::new(heap_ref, provider_collection)
+    })
+}
+
 /// Real resolved toolchains from the toolchain resolution algorithm.
 ///
 /// Real resolved toolchains from the toolchain resolution algorithm.
@@ -1938,10 +2187,67 @@ impl<'v> StarlarkValue<'v> for ResolvedToolchains {
 }
 
 /// Normalize a toolchain type label for matching.
-/// Strips @@ prefix, handles common variations.
+/// Strips `@` / `@@` prefixes and treats Bzlmod module-version canonical
+/// repo names as equivalent to their apparent module name. Extension repos
+/// such as `rules_rust+rust+rust_linux_x86_64` keep their full name.
 fn normalize_toolchain_type_label(label: &str) -> String {
     let label = label.trim_start_matches('@');
-    label.to_owned()
+    let Some((repo, rest)) = label.split_once("//") else {
+        return label.to_owned();
+    };
+    let repo = normalize_bzlmod_module_repo_name(repo);
+    format!("{repo}//{rest}")
+}
+
+fn normalize_bzlmod_module_repo_name(repo: &str) -> &str {
+    if let Some(module_name) = repo.strip_suffix('+') {
+        return module_name;
+    }
+
+    let Some((module_name, suffix)) = repo.split_once('+') else {
+        return repo;
+    };
+
+    if suffix
+        .as_bytes()
+        .first()
+        .is_some_and(|b| b.is_ascii_digit())
+    {
+        module_name
+    } else {
+        repo
+    }
+}
+
+#[cfg(test)]
+mod resolved_toolchains_tests {
+    use super::normalize_toolchain_type_label;
+
+    #[test]
+    fn toolchain_type_lookup_normalizes_bzlmod_module_versions() {
+        assert_eq!(
+            normalize_toolchain_type_label("@@rules_rust+0.69.0//rust:toolchain_type"),
+            "rules_rust//rust:toolchain_type"
+        );
+        assert_eq!(
+            normalize_toolchain_type_label("@@rules_rust//rust:toolchain_type"),
+            "rules_rust//rust:toolchain_type"
+        );
+        assert_eq!(
+            normalize_toolchain_type_label("@rules_cc+0.2.17//cc:toolchain_type"),
+            "rules_cc//cc:toolchain_type"
+        );
+    }
+
+    #[test]
+    fn toolchain_type_lookup_keeps_extension_repo_names() {
+        assert_eq!(
+            normalize_toolchain_type_label(
+                "@rules_rust+rust+rust_linux_x86_64__x86_64-unknown-linux-gnu__stable_tools//:rust_toolchain"
+            ),
+            "rules_rust+rust+rust_linux_x86_64__x86_64-unknown-linux-gnu__stable_tools//:rust_toolchain"
+        );
+    }
 }
 
 // ============================================================================

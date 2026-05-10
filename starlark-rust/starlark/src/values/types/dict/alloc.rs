@@ -27,7 +27,9 @@ use crate::values::FrozenValue;
 use crate::values::Heap;
 use crate::values::Value;
 use crate::values::dict::Dict;
+use crate::values::dict::value::DictGen;
 use crate::values::dict::value::FrozenDictData;
+use crate::values::dict::value::HashableDictData;
 use crate::values::layout::value::ValueLike;
 use crate::values::type_repr::StarlarkTypeRepr;
 use crate::values::types::dict::dict_type::DictType;
@@ -53,6 +55,12 @@ use crate::values::types::dict::dict_type::DictType;
 /// # }
 /// ```
 pub struct AllocDict<D>(pub D);
+
+/// Utility to allocate an immutable, hashable dict from an iterator.
+///
+/// This is intended for native implementations that must expose a dict-shaped
+/// value while also using it inside immutable aggregate values.
+pub struct AllocHashableDict<D>(pub D);
 
 impl AllocDict<iter::Empty<(FrozenValue, FrozenValue)>> {
     /// Allocate an empty dict.
@@ -107,5 +115,37 @@ where
             );
         }
         heap.alloc(FrozenDictData { content: map })
+    }
+}
+
+impl<D, K, V> StarlarkTypeRepr for AllocHashableDict<D>
+where
+    D: IntoIterator<Item = (K, V)>,
+    K: StarlarkTypeRepr,
+    V: StarlarkTypeRepr,
+{
+    type Canonical = DictType<K::Canonical, V::Canonical>;
+
+    fn starlark_type_repr() -> Ty {
+        DictType::<K, V>::starlark_type_repr()
+    }
+}
+
+impl<'v, D, K, V> AllocValue<'v> for AllocHashableDict<D>
+where
+    D: IntoIterator<Item = (K, V)>,
+    K: AllocValue<'v>,
+    V: AllocValue<'v>,
+{
+    fn alloc_value(self, heap: Heap<'v>) -> Value<'v> {
+        let iter = self.0.into_iter();
+        let mut map = SmallMap::with_capacity(iter.size_hint().0);
+        for (k, v) in iter {
+            map.insert_hashed(
+                k.alloc_value(heap).get_hashed().unwrap(),
+                v.alloc_value(heap),
+            );
+        }
+        heap.alloc_complex(DictGen(HashableDictData(Dict::new(map))))
     }
 }

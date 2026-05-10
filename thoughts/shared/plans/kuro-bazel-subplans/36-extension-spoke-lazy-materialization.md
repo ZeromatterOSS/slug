@@ -31,6 +31,246 @@ remaining follow-ups are extension correctness gaps, not cleanup:
 3. Phase 5: replace confusing downstream `No such file` errors from
    stubbed sub-extension spokes with a direct extension-failure error.
 
+2026-05-09 follow-up: `module_ctx.execute([Label(...), ...])` and
+`repository_ctx.execute([Label(...), ...])` now use the same resolved
+Label materialization path as `ctx.path(Label)`. The shared Label
+filesystem resolver also resolves dynamic extension apparent aliases
+(notably `use_repo_rule` repos such as `@toml2json_linux_amd64`) to
+their canonical `bazel-external/<canonical>` directories, and
+precomputed `use_repo_rule` RepoSpecs are seeded into the lazy
+materialization registry. This removes the rules_rs
+`toml2json.bzl:6` `No such file or directory` failure in the bounded
+zeromatter run. Phase 3b remains partially open for the broader
+repository_ctx method audit/stub-failure cleanup, but Label execute tool
+materialization is covered.
+
+2026-05-09 follow-up 2: the next zeromatter smoke reached
+`aspect_tools_telemetry+telemetry+aspect_tools_telemetry_report` lazy
+materialization. That repository rule exercises Bazel's
+`repository_ctx.workspace_root` to probe/read the root workspace
+`MODULE.bazel(.lock)`. Kuro was exposing `workspace_root` as the
+generated repository working directory, causing the telemetry rule to
+look for root files inside the repo it was creating and then stub.
+Bazel source of truth:
+`StarlarkRepositoryContext.getWorkspaceRoot()` returns
+`directories.getWorkspace()`, while `StarlarkBaseExternalContext.path`
+keeps string-relative paths anchored at the repository working
+directory. Kuro now passes the invocation project root into
+`RepositoryContext` and keeps `repository_ctx.path("relative")`
+relative to the repo dir. This is a Phase 3b repository_ctx parity
+fix; Phase 5 loud-fail/stub cleanup remains open.
+
+2026-05-09 follow-up 3: after rebuilding `kuro`, the bounded zeromatter
+smoke in `/tmp/plan55-workspace-root-1.log` advanced past the previous
+telemetry point into later extension/repository-rule work. A second run
+after deleting the stale generated telemetry stub
+(`/tmp/plan55-workspace-root-2.log`) did not recreate that repo before
+failing later, so it did not directly re-exercise the telemetry
+repository rule. The next systemic blocker observed in that second log
+is Starlark provider field presence semantics: rules_kotlin defines a
+provider with optional field `strip_prefix_template`, then checks
+`hasattr(version, "strip_prefix_template")`; Kuro reports true for a
+field whose value is absent/`None`, causing `.format(...)` on `None`.
+Verify Bazel's provider-field/`hasattr` behavior before changing it,
+then fix that as a Starlark-provider parity issue rather than a
+rules_kotlin special case.
+
+2026-05-09 follow-up 4: Bazel 9 provider-field presence was verified
+against both source and a focused Bazel 9.1.0 repro. In
+`StarlarkInfoWithSchema`, `getFieldNames()` only returns schema fields
+whose table slot is non-null, and `Starlark.hasattr` only reports
+structure fields where `getValue(name) != null`; the repro confirmed
+`P(a="x")` for `provider(fields = ["a", "b"])` has `dir(p) == ["a"]`,
+`hasattr(p, "b") == False`, and `getattr(p, "b", "fallback") ==
+"fallback"`, while explicit `b = None` remains present. Kuro provider
+instances now track field presence separately from stored values, so
+missing optional provider fields are absent but explicit `None` remains
+present. The bounded zeromatter smoke in
+`/tmp/plan56-provider-presence-1.log` advanced past the previous
+rules_kotlin `strip_prefix_template` failure. It timed out later while
+waiting on `crates__github.com_ZeroMatter_diplomat.git_99406ff1//runtime`
+package file tree loading, with Gazelle `go_repository` cache/stub
+failures and non-host JDK download timeouts as concurrent later noise.
+
+2026-05-09 follow-up 5: the diplomat package-file-tree wait was not a
+Plan 36 spoke-materialization failure. The missing package triggered
+`extended_ignore_error`, whose cross-cell suggestion scan probed every
+registered cell; probing extension cells can lazily materialize unrelated
+repos. Kuro now skips external cells for that diagnostic suggestion path.
+The bounded smoke in `/tmp/plan57-missing-dir-suggestion-1.log` advanced
+past the diplomat wait into `zeromatter//sdk:sdk_contents` analysis and
+failed later on `platforms+1.1.0//:BUILD` because `module_version()` is
+missing as a BUILD-file global. That next blocker belongs to Bazel 9
+BUILD/prelude parity, not Plan 36.
+
+2026-05-09 follow-up 6: the `platforms+1.1.0//:BUILD`
+`module_version()` blocker was Bazel 9 BUILD-global parity, not a spoke
+materialization issue. Bazel 9 exposes all non-rule `native` module methods
+as direct BUILD-file globals via `StarlarkNativeModule.BINDINGS_FOR_BUILD_FILES`
+and `StarlarkGlobalsImpl.getFixedBuildFileToplevelsSharedWithNative()`. Kuro
+now exposes direct `module_name()` and `module_version()` BUILD globals backed
+by the same module metadata as `native.module_name()` /
+`native.module_version()`. The bounded smoke in
+`/tmp/plan58-module-build-globals-1.log` advanced past the previous
+`platforms+1.1.0//:BUILD` missing-symbol error and analyzed platforms targets.
+It failed later with a missing package in another generated crate repo:
+`crates__github.com_Aleph-Alpha_ts-rs.git_a6bbbd18//ts-rs` does not exist.
+That is the next narrow blocker.
+
+2026-05-09 follow-up 7: the missing `ts-rs` package was not a
+crate-spoke registration or lockfile RepoSpec gap. The lockfile had a
+`git_cargo_workspace_repository` RepoSpec for
+`crates__github.com_Aleph-Alpha_ts-rs.git_a6bbbd18`, but an earlier failed
+lazy materialization left a stub in the shared `bazel-external/` tree. Kuro
+now discards any prior stub marker when a non-empty RepoSpec is available and
+retries real repository-rule execution. The actual repo-rule failure was
+repository_ctx parity in Bazel's git worker: `ctx.path(".")` stringifies as an
+absolute repository path, `ctx.delete(ctx.path("."))` deletes the repository
+root when present, and a following `ctx.execute(..., working_directory=root)`
+recreates that missing directory. Kuro now stringifies `RepositoryPath` as an
+absolute normalized path, creates missing `repository_ctx.execute`
+working directories, unsets `environment` entries whose value is `None`, returns
+Bazel-style booleans from `repository_ctx.delete`, and normalizes delete paths
+so `repo/.` does not hit Linux `EINVAL`. The bounded smoke in
+`/tmp/plan64-repoctx-delete-root-2.log` advanced past the previous missing
+`crates__github.com_Aleph-Alpha_ts-rs.git_a6bbbd18//ts-rs` package: the git repo
+materialized, including `ts-rs/BUILD.bazel`. The next blocker is load-label
+canonicalization for generated BUILD files:
+`@crates__ts-rs-12.0.1//:crate.bzl` must be accepted or rewritten as the
+canonical `@rules_rs+crate+crates__ts-rs-12.0.1//:crate.bzl`.
+
+2026-05-09 follow-up 8: the load-label canonicalization blocker was a
+Bazel repo-mapping parity issue, not a ts-rs special case. Bazel's
+`Label.parseWithPackageContext` applies the current package's
+`RepositoryMapping` to single-`@` labels, `BzlLoadFunction` fetches
+the mapping for the repository containing the loaded file, and
+`ModuleExtensionRepoMappingEntriesFunction` gives extension-generated
+repos visibility to all repos generated by the same extension by
+internal name. Kuro now accepts those apparent names during load
+resolution and immediately rewrites the resolved `CellPath` to the
+canonical reformed path so `.bzl` module identity stays canonical.
+Focused tests cover registered dynamic aliases and same-extension
+internal repo names. The bounded smoke in
+`/tmp/plan65-load-repo-mapping-1.log` advanced past the previous
+`@crates__ts-rs-12.0.1//:crate.bzl` failure. The next blocker is later
+analysis of zstd's generated crate dependency:
+`zstd+1.5.7//:zstd+1.5.7` is requested, but the materialized package
+only exposes `:zstd`.
+
+2026-05-09 follow-up 9: corrected the follow-up-8 smoke reading. The
+bounded `/tmp/plan66-label-shorthand-zstd-1.log` did not stop at the
+temporary `aspect_tools_telemetry` idle; it eventually failed in
+`crates__zstd-sys-2.0.16-zstd.1.5.7` attr coercion because the already
+materialized generated BUILD still contained `deps = ["@@zstd//:"]`.
+The source include file
+`external_cells/bzlmod/rules_rs/override/3rd_party/zstd-sys/include.MODULE.bazel`
+has the Bazel-valid shorthand `deps = ["@zstd"]`, and the zeromatter
+`MODULE.bazel.lock` cache now has the correct regenerated value
+`"@@zstd//:zstd"`. Bazel 9.1.0 repros confirm bare `@zstd` resolves to
+the root target named `zstd` (`@@zstd+//:zstd` in Bazel's canonical
+form), while `@zstd//:` is rejected as an empty target.
+
+Kuro changes in this slice:
+
+- repository-rule attr label capture has focused coverage that bare
+  `@zstd` canonicalizes to `@@zstd//:zstd`;
+- extension repo successful materialization writes
+  `.kuro_repo_complete` as `complete:<RepoSpec hash>` for future
+  invalidation;
+- existing legacy `complete` markers are still accepted so Kuro does
+  not re-run every old crate repository;
+- legacy generated BUILD files containing invalid empty-target label
+  strings are repaired from the current RepoSpec label attrs and then
+  stamped with the current spec hash. This fixes stale `@@zstd//:` style
+  output without re-executing the crate repository rule.
+
+Verification:
+
+```sh
+cargo fmt
+cargo test -p kuro_external_cells extension_repo::tests:: --lib
+cargo test -p kuro_bzlmod test_extension_repo_complete_marker_includes_spec_hash --lib
+cargo test -p kuro_interpreter_for_build repository_rule::tests::repository_attr_bare_repo_label_uses_repo_name_as_target --lib
+cargo check -p kuro_external_cells
+cargo build -p kuro
+git diff --check
+```
+
+Bounded smoke:
+
+```sh
+cd /var/mnt/dev/zeromatter
+timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/target/debug/kuro \
+    --isolation-dir plan67-zstd-spec-hash-2 \
+    build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan67-zstd-spec-hash-2.log
+```
+
+The smoke did not reach zstd because the previous
+`plan67-zstd-spec-hash-1` attempt used an overly broad invalidation rule
+and contaminated the shared `bazel-external` tree: several crate repos
+were re-run, failed at `ctx.execute([Label("@toml2json_...")])` with
+`No such file or directory`, and were replaced by stubs. The second
+smoke now fails earlier at `crates__clap-4.5.60//:clap` because that
+repo's generated BUILD is a stub with zero targets. The next narrow
+frontier is repository_ctx Label-tool materialization for
+use_repo_rule-generated tools such as `@toml2json_linux_amd64`, plus
+cleaning/restoring the stale stubbed crate repos in the shared external
+tree before using zeromatter `//sdk:sdk_contents` as a zstd signal again.
+
+2026-05-09 follow-up 10: completed the repository_ctx Label-tool
+materialization gap for `use_repo_rule()` repos. Bazel source
+`StarlarkBaseExternalContext.execute` converts Label argv entries via
+`getPathFromLabel(label).toString()`, and `getPathFromLabel` obtains a
+`RootedPath` from Skyframe before returning. Kuro already converted Label
+argv values through `resolve_label_to_filesystem_path()` and called the
+lazy spoke materializer, but precomputed `use_repo_rule()` repos were only
+present in the static `CellResolver`. They were not mirrored into the
+dynamic extension-cell registry that Label filesystem resolution consults.
+
+Kuro now registers every precomputed extension repo with
+`register_dynamic_extension_cell_with_setup()` while building bzlmod cells,
+so apparent aliases such as `@toml2json_linux_amd64` resolve to the
+canonical `bazel-external/rules_rs+http_file+toml2json_linux_amd64` path
+before `repository_ctx.execute` runs. The existing stale-stub invalidation
+then retries real crate repository execution from the valid RepoSpec; no
+manual broad cleanup of `zeromatter/bazel-external` was needed. A
+focused `use_repo_rule()` precompute test now asserts that the serialized
+RepoSpec is present for lazy materialization.
+
+Verification:
+
+```sh
+cargo fmt
+cargo test -p kuro_bzlmod pending_repo_cells::tests::test_precompute_use_repo_rule_uses_canonical_name_and_apparent_alias --lib
+cargo test -p kuro_interpreter_for_build label_filesystem::tests::resolves_dynamic_extension_apparent_alias_to_canonical_path --lib
+cargo check -p kuro_common
+cargo build -p kuro
+git diff --check
+```
+
+Bounded smoke:
+
+```sh
+cd /var/mnt/dev/zeromatter
+timeout 240s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/target/debug/kuro \
+    --isolation-dir plan68-label-tool-2 \
+    build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan68-label-tool-2.log
+```
+
+The smoke advanced past both the previous `toml2json.bzl:6`
+`No such file or directory` failures and the stale
+`crates__clap-4.5.60//:clap` zero-target failure. It materialized
+`rules_rs+http_file+toml2json_linux_amd64/file/downloaded`, analyzed
+`crates__clap-4.5.60//:clap`, reached `zeromatter//sdk:sdk_info_json`, and
+timed out later waiting on the already-tracked
+`rules_rust//ffi/rs:empty_allocator_libraries` analysis/toolchain cycle.
+That next blocker belongs to Plan 15 / Plan 51 toolchain-analysis work, not
+Plan 36 spoke materialization.
+
 ## Scope
 
 When a module extension calls `mctx.path(Label("@spoke_repo//pkg:file"))`

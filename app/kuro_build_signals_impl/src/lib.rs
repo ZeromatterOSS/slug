@@ -27,7 +27,6 @@ use dice::DynKey;
 use dupe::Dupe;
 use gazebo::prelude::SliceExt;
 use gazebo::variants::VariantName;
-use itertools::Itertools;
 use kuro_analysis::analysis::calculation::AnalysisKey;
 use kuro_analysis::analysis::calculation::AnalysisKeyActivationData;
 use kuro_analysis::analysis::calculation::AnalysisWithExtraData;
@@ -64,7 +63,6 @@ use kuro_events::dispatch::with_dispatcher_async;
 use kuro_events::span::SpanId;
 use kuro_interpreter_for_build::interpreter::calculation::InterpreterResultsKey;
 use kuro_interpreter_for_build::interpreter::calculation::InterpreterResultsKeyActivationData;
-use kuro_node::nodes::eval_result::EvaluationResult;
 use kuro_util::time_span::TimeSpan;
 use smallvec::SmallVec;
 use static_assertions::assert_eq_size;
@@ -465,7 +463,7 @@ impl ActivationTracker for BuildSignalSender {
                 signal.waiting_data = waiting_data;
             } else if let Some(InterpreterResultsKeyActivationData {
                 time_span,
-                result,
+                dep_packages,
                 spans,
             }) = downcast_and_take(&mut activation_data)
             {
@@ -475,7 +473,7 @@ impl ActivationTracker for BuildSignalSender {
                     queue: None,
                 };
 
-                signal.extra_data = NodeExtraData::Load(result.ok());
+                signal.extra_data = NodeExtraData::Load(LoadNodeData { dep_packages });
                 signal.spans = spans;
             } else if let Some(PackageListingKeyActivationData { time_span, spans }) =
                 downcast_and_take(&mut activation_data)
@@ -664,30 +662,22 @@ where
         );
     }
 
-    /// If the evaluation is a load (InterpreterResultsKey) and carries a load_result, then inject
-    /// some extra edges that indicate which packages have now become visible as a result of this
-    /// load.
+    /// If the evaluation is a load (InterpreterResultsKey) and carries dependency package data,
+    /// then inject some extra edges that indicate which packages have now become visible as a
+    /// result of this load.
     fn enrich_load(&mut self, evaluation: &mut Evaluation) {
         let pkg = match &evaluation.key {
             NodeKey::InterpreterResultsKey(InterpreterResultsKey(pkg)) => pkg,
             _ => return,
         };
 
-        if let NodeExtraData::Load(Some(load_result)) = &evaluation.extra_data {
-            let deps_pkg = load_result
-                .targets()
-                .values()
-                .flat_map(|target| target.deps().map(|t| t.pkg()))
-                .unique()
-                .map(|pkg| pkg.dupe());
-
-            for dep_pkg in deps_pkg {
-                if dep_pkg == *pkg {
-                    continue;
-                }
-
+        if let NodeExtraData::Load(LoadNodeData {
+            dep_packages: Some(dep_packages),
+        }) = &evaluation.extra_data
+        {
+            for dep_pkg in dep_packages {
                 self.first_edge_to_load
-                    .entry(dep_pkg)
+                    .entry(dep_pkg.dupe())
                     .or_insert_with(|| pkg.dupe());
             }
         }
@@ -917,10 +907,15 @@ enum NodeExtraData {
     /// The data that corresponds to a `NodeKey::BuildKey` Evaluation.
     Action(ActionNodeData),
     Analysis(AnalysisNodeData),
-    /// The Load result that corresponds to a `NodeKey::InterpreterResultsKey` Evaluation if evaluation was successful.
-    Load(Option<Arc<EvaluationResult>>),
+    /// Compact load metadata for a `NodeKey::InterpreterResultsKey` evaluation.
+    Load(LoadNodeData),
     /// No extra data (used for other node types or when data is not available).
     None,
+}
+
+#[derive(Clone)]
+struct LoadNodeData {
+    dep_packages: Option<Vec<PackageLabel>>,
 }
 
 /// Extra data specific to action nodes.

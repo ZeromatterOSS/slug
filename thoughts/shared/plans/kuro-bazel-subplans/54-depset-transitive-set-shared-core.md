@@ -8,6 +8,358 @@
 
 ## Progress Notes
 
+### 2026-05-09 follow-up: BazelOutput path blocker cleared
+
+- Plan 54 remains complete. The Plan 44 declared-output path slice did not
+  weaken depset validation or the deferred TransitiveSet streaming behavior.
+- Focused verification passed:
+  `pytest -q tests/core/analysis/test_ctx_actions.py::test_actions_declare_file_bazel_path_shape tests/core/analysis/test_ctx_actions.py::test_actions_declare_file_external_bazel_path_shape tests/core/analysis/test_ctx_actions.py::test_actions_declare_directory_bazel_path_shape tests/core/analysis/test_ctx_actions.py::test_actions_declare_directory_external_bazel_path_shape`,
+  `pytest -q tests/core/analysis/test_cmd_args.py::test_args_add_all_map_each_sequence_returns tests/core/analysis/test_cmd_args.py::test_args_add_joined_map_each_sequence_returns tests/core/analysis/test_cmd_args.py::test_args_depset_add_all_transforms tests/core/analysis/test_cmd_args.py::test_args_depset_add_joined_transforms`,
+  `cargo test -p kuro_build_api_tests --lib interpreter::rule_defs::cmd_args::tests::map_each_sequence_returns_expand_as_items`,
+  `cargo build -p kuro`, and `git diff --check`.
+- Fresh bounded smoke from `/var/mnt/dev/zeromatter`:
+
+  ```sh
+  bash -o pipefail -c 'timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+      --interval 5 \
+      --include-pgrep '\''kurod\[zeromatter\].*plan44-bazel-output-path-1'\'' \
+      -- \
+      /var/mnt/dev/kuro/target/debug/kuro \
+        --isolation-dir plan44-bazel-output-path-1 \
+        build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan44-bazel-output-path-1.log'
+  ```
+
+  Result: Kuro exited status `3` after 158s with
+  `memory_smoke_summary elapsed_s=158 peak_rss_kib=802136 final_rss_kib=644308`.
+  The previous glibc `select_file` path blocker did not recur. The run advanced
+  to a new Plan 15 blocker in rules_cc:
+  `rules_cc+0.2.17/cc/private/link/cpp_link_action.bzl:127` rejects
+  `object_files = object_files + additional_object_files` because the operands
+  are `tuple` and `list`.
+- Current blocker is not Plan 54. Continue in Plan 15 with systemic
+  Bazel-compatible Starlark sequence addition behavior.
+
+### 2026-05-09 follow-up: cmd_args map_each tuple blocker cleared
+
+- Plan 54 remains complete. The focused Plan 15 work preserved depset
+  validation and the deferred depset/TransitiveSet streaming behavior; transformed
+  `cmd_args.add_all`/`add_joined` still materialize values because Bazel-style
+  `map_each` callbacks must run at analysis time.
+- Focused verification for the current Plan 15 slice passed:
+  `cargo fmt -- app/kuro_build_api/src/interpreter/rule_defs/cmd_args/typ.rs app/kuro_build_api_tests/src/interpreter/rule_defs/cmd_args/tests.rs`,
+  `cargo test -p kuro_build_api_tests map_each_sequence_returns_expand_as_items -- --nocapture`,
+  `pytest -q tests/core/analysis/test_cmd_args.py -k map_each`,
+  `cargo build -p kuro`, and `git diff --check`.
+- Fresh bounded smoke from `/var/mnt/dev/zeromatter`:
+
+  ```sh
+  bash -o pipefail -c 'timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+      --interval 5 \
+      --include-pgrep '\''kurod\[zeromatter\].*plan15-map-each-seq-1'\'' \
+      -- \
+      /var/mnt/dev/kuro/target/debug/kuro \
+        --isolation-dir plan15-map-each-seq-1 \
+        build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan15-map-each-seq-1.log'
+  ```
+
+  Result: Kuro exited status `3` after 190s with
+  `memory_smoke_summary elapsed_s=190 peak_rss_kib=891896 final_rss_kib=668632`.
+  The previous rules_cc `tuple (repr: ())` map_each blocker did not recur.
+  The run advanced to a new Plan 15 blocker in
+  `bazel_skylib+1.9.0/rules/select_file.bzl:36`: `llvm+0.7.0//runtimes/glibc:libc.s`
+  cannot find the requested file among `generate_glibc_stubs` generated outputs.
+- Current blocker is not Plan 54. Continue in Plan 15 with systemic generated
+  artifact/path selection parity for `select_file`, avoiding target-name
+  special cases.
+
+### 2026-05-09 follow-up: provider-callable key blocker cleared
+
+- Plan 54 remains complete. The depset/transitive_set validation and streaming
+  behavior were preserved; the latest focused work did not weaken depset
+  validation.
+- Focused verification for the current Plan 15 slice passed:
+  `cargo fmt -- app/kuro_build_api_tests/src/interpreter/rule_defs/provider/collection.rs`,
+  `cargo test -p kuro_build_api_tests provider_collection_contains_native_provider_keys -- --nocapture`,
+  `cargo test -p kuro_build_api_tests provider_collection_contains_methods_and_in_operator -- --nocapture`,
+  `cargo test -p kuro_build_api_tests test_schema_provider_missing_fields_are_absent -- --nocapture`,
+  `pytest -q tests/core/configurations/test_configuration_dep_uquery_correctness.py`,
+  `pytest -q tests/core/configurations/transition/test_attr.py`,
+  `cargo build -p kuro`, and `git diff --check`.
+- Fresh bounded smoke from `/var/mnt/dev/zeromatter`:
+
+  ```sh
+  bash -o pipefail -c 'timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+      --interval 5 \
+      --include-pgrep '\''kurod\[zeromatter\].*plan15-provider-callable-1'\'' \
+      -- \
+      /var/mnt/dev/kuro/target/debug/kuro \
+        --isolation-dir plan15-provider-callable-1 \
+        build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan15-provider-callable-1.log'
+  ```
+
+  Result: Kuro exited status `3` after 184s with
+  `memory_smoke_summary elapsed_s=184 peak_rss_kib=902404 final_rss_kib=710988`.
+  The previous `AnalysisTestResultInfo ... got function` provider-key blocker
+  at `with_cfg/private/transitioning_alias.bzl:55` did not recur. The run
+  advanced to a new Plan 15 blocker in rules_cc command-line handling:
+  `rules_cc+0.2.17/cc/private/rules_impl/cc_static_library.bzl:174`
+  rejects `tuple (repr: ())` from `actions.args().add_all(..., map_each = ...)`.
+- Current blocker is not Plan 54. Continue in Plan 15 with
+  Bazel-compatible `cmd_args.add_all(map_each=...)` sequence return handling.
+
+### 2026-05-09 follow-up: Plan 15 toolchain label blocker cleared
+
+- Plan 54 remains complete. The depset/transitive_set provider blockers and the
+  configured-node wait did not recur in the latest smoke.
+- Focused verification for the current Plan 15 slice passed:
+  `cargo fmt -- app/kuro_build_api/src/interpreter/rule_defs/context.rs`,
+  `cargo test -p kuro_build_api toolchain_type_lookup --lib`,
+  `cargo test -p kuro_analysis test_normalize_constraint_label --lib`,
+  `cargo build -p kuro`, and `git diff --check`.
+- Fresh bounded smoke from `/var/mnt/dev/zeromatter`:
+
+  ```sh
+  bash -o pipefail -c 'timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+      --interval 5 \
+      --include-pgrep '\''kurod\[zeromatter\].*plan15-toolchain-label-canon-1'\'' \
+      -- \
+      /var/mnt/dev/kuro/target/debug/kuro \
+        --isolation-dir plan15-toolchain-label-canon-1 \
+        build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan15-toolchain-label-canon-1.log'
+  ```
+
+  Result: Kuro exited status `3` after 164s with
+  `memory_smoke_summary elapsed_s=164 peak_rss_kib=785084 final_rss_kib=605488`.
+  The previous
+  `Toolchain type '@@rules_rust+0.69.0//rust:toolchain_type' was not resolved`
+  blocker did not recur. The run advanced into C++ toolchain analysis and failed
+  through `llvm+toolchain+llvm_toolchains//:linux_x86_64_cc_toolchain`.
+- Current blocker is not Plan 54. Continue in Plan 15 with the
+  `with_cfg.bzl+0.12.0/with_cfg/private/transitioning_alias.bzl:51`
+  `ctx.attr.exports[0]` provider collection indexing error:
+  `provider collection operation [] parameter type must be a provider type ...
+  got int`.
+
+### 2026-05-09 follow-up: provider blocker cleared, configured wait narrowed
+
+- Inspected `/tmp/plan54-provider-frozen-fields-1.log`: the previous
+  `rules_rust+0.69.0/rust/private/rust_allocator_libraries.bzl:118`
+  `LibraryToLinkInfo` depset mutability blocker did not recur, and the run
+  reached `zeromatter//sdk:sdk_contents` analysis.
+- Added gated diagnostics for the post-provider frontier:
+  `app/kuro_analysis/src/analysis/calculation.rs` now logs analysis dep
+  request phases, `app/kuro_analysis/src/analysis/env.rs` serializes/logs
+  eager registered-toolchain loading, and `app/kuro_configured/src/nodes.rs`
+  logs configured-node/gather-deps phases under `KURO_MEMORY_CHECKPOINTS=1`.
+- Fresh bounded smoke from `/var/mnt/dev/zeromatter`:
+
+  ```sh
+  bash -o pipefail -c 'timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+      --interval 5 \
+      --include-pgrep '\''kurod\[zeromatter\].*plan54-configured-gather-probe-1'\'' \
+      -- \
+      /var/mnt/dev/kuro/target/debug/kuro \
+        --isolation-dir plan54-configured-gather-probe-1 \
+        build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan54-configured-gather-probe-1.log'
+  ```
+
+  Result: Kuro exited status `3` after 158s with
+  `memory_smoke_summary elapsed_s=158 peak_rss_kib=653752 final_rss_kib=578572`.
+  The configured-node wait is cleared enough to expose analysis deps:
+  `zeromatter//sdk:sdk_contents` logged `analysis_dep_request_complete` for
+  `zeromatter//sdk:sdk_with_configs` and failed later through
+  `rules_rust//ffi/rs:empty_allocator_libraries`.
+- Current blocker is no longer Plan 54 depset/provider mutability. The failing
+  message is:
+
+  ```text
+  Toolchain type '@@rules_rust+0.69.0//rust:toolchain_type' was not resolved.
+  Ensure the toolchain is registered via register_toolchains() and the rule declares it in toolchains=[...]
+  ```
+
+  This should continue in Plan 15's Bazel 9 toolchain resolution work,
+  specifically Rust toolchain type label canonicalization/registration parity
+  for `ctx.toolchains[Label("//rust:toolchain_type")]`.
+
+### 2026-05-09 follow-up: hashable dict freeze verified, next allocator LTL blocker
+
+- Verified the current `_cc_internal.freeze` finish slice where frozen dicts
+  remain dict-shaped while becoming immutable/hashable. This preserves
+  `.keys()`, `.get()`, truthiness, iteration, membership, `dict.update`, and
+  depset membership for the focused cc_common e2e.
+- Hygiene/verification before the zeromatter smoke:
+  `git diff --check` passed. Earlier focused verification for this local patch
+  had already passed: `cargo fmt`, `cargo build -p kuro`,
+  `pytest -q tests/core/cc_common/test_link.py -k frozen_dict_depset_element`,
+  and
+  `cargo test -p kuro_build_api_tests depset_validation_matches_bazel_9_1_0_probe -- --nocapture`.
+- Bounded zeromatter smoke from `/var/mnt/dev/zeromatter`:
+
+  ```sh
+  timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+      --interval 5 \
+      --include-pgrep 'kurod\[zeromatter\].*plan54-hashable-dict-freeze-1' \
+      -- \
+      /var/mnt/dev/kuro/target/debug/kuro \
+        --isolation-dir plan54-hashable-dict-freeze-1 \
+        build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan54-hashable-dict-freeze-1.log
+  ```
+
+  The command exited with Kuro status `3` after 179s
+  (`memory_smoke_summary elapsed_s=179 peak_rss_kib=771808 final_rss_kib=611132`).
+  The previous
+  `create_library_to_link.bzl:106 Object of type tuple has no attribute keys`
+  blocker did not recur, confirming the dict-shaped freeze behavior advanced
+  the smoke beyond that point.
+- The new concrete blocker is still a depset/provider hashability shape, now
+  in `rules_rust+0.69.0/rust/private/rust_allocator_libraries.bzl:118`.
+  `make_libstd_and_allocator_ccinfo` creates depsets of `_ltl(...)` values;
+  `_ltl` calls `cc_common.create_library_to_link(static_library = library,
+  pic_static_library = library)`. Kuro rejects those direct `LibraryToLink`
+  provider elements with `depset elements must not be mutable values` while
+  analyzing
+  `rules_rust+rust+rust_linux_x86_64__x86_64-unknown-linux-gnu__stable_tools//:rust_toolchain`.
+  Next slice should identify which `LibraryToLinkInfo` field remains
+  non-hashable/mutable instead of weakening depset validation.
+
+### 2026-05-09 follow-up: LibraryToLink dict field immutability fixed
+
+- Inspected the `LibraryToLink` path exposed by `zstd//:zstd`: rules_cc
+  freezes list/dict fields in `create_library_to_link.bzl` before
+  `create_linking_context_from_compilation_outputs.bzl` wraps
+  `cc_linking_outputs.library_to_link` in `depset([..])`.
+- Kuro's `_cc_internal.freeze` already normalized lists/tuples to tuples, but
+  still returned dicts unchanged. That left provider/library fields with
+  mutable dict values and preserved the depset mutable-value rejection.
+- `app/kuro_build_api/src/interpreter/rule_defs/cc_common/actions.rs` now
+  recursively normalizes dicts as immutable, hashable dict-shaped values at
+  the existing cc freeze boundary. The depset mutable-value rejection was not
+  weakened, and TransitiveSet streaming behavior was untouched.
+- Focused verification passed:
+  `cargo fmt`;
+  `cargo check -p kuro_build_api`;
+  `cargo test -p kuro_build_api_tests depset -- --nocapture`;
+  `cargo build -p kuro`;
+  `pytest -q tests/core/cc_common/test_link.py`;
+  `git diff --check`.
+- Bounded fresh zeromatter smoke:
+  `/tmp/plan54-library-dict-freeze-1.log`, isolation
+  `plan54-library-dict-freeze-1`, ran from `/var/mnt/dev/zeromatter` with
+  `timeout 180s env KURO_MEMORY_CHECKPOINTS=1 ... build //sdk:sdk_contents`.
+  The old `cc_linking_outputs.library_to_link` depset mutability failure did
+  not recur. The run reached `zeromatter//sdk:sdk_contents` analysis and timed
+  out at the already-tracked
+  `rules_rust//ffi/rs:empty_allocator_libraries` analysis wait. It also logged
+  a non-terminal `llvm+llvm_source+llvm-raw` `http_bsdtar_archive`
+  `rctx.execute([rctx.path(host_bsdtar)] + args)` `No such file or directory`
+  repository-rule failure before creating a stub.
+
+### 2026-05-09 follow-up: LibraryToLink mutability exposed by zstd
+
+- A fresh zeromatter `//sdk:sdk_contents` smoke after the lockfile spoke
+  pre-seed guard advanced past the stale `@@zstd//:` generated BUILD error
+  and reached `zstd//:zstd`.
+- The new blocker is another Plan 54 immutability shape:
+  `rules_cc+0.2.17/cc/private/link/create_linking_context_from_compilation_outputs.bzl`
+  constructs `depset([cc_linking_outputs.library_to_link])`, and Kuro still
+  reports `depset elements must not be mutable values` for that
+  `LibraryToLink` value.
+- This differs from the completed `LinkerInput` slice: the failing value is
+  `cc_linking_outputs.library_to_link` returned by
+  `cc_common.create_linking_context_from_compilation_outputs` while analyzing
+  `zstd//:zstd`. Next subagent should inspect the Rust/Starlark
+  representation of `LibraryToLink` and freeze/normalize any list/dict fields
+  at construction boundaries without weakening depset mutable-value rejection
+  or changing TransitiveSet streaming behavior.
+- Evidence: `/tmp/plan15-lockfile-preseed-zstd-1.log`, isolation
+  `plan15-lockfile-preseed-zstd-1`, peak RSS about 599 MiB, final RSS about
+  516 MiB.
+
+### 2026-05-09 cc provider immutability slice
+
+- Investigated the zeromatter `//sdk:sdk_contents` failure in
+  `rules_cc+0.2.17//:link_extra_lib` where
+  `cc_common.create_linking_context(linker_inputs = depset([linker_input]))`
+  failed with `depset elements must not be mutable values`.
+- Confirmed the Bazel/rules_cc source shape: rules_cc's
+  `create_linker_input.bzl` freezes provider fields via
+  `_cc_internal.freeze(...)` before constructing `_LinkerInputInfo`; Kuro's
+  no-op `cc_internal.freeze` left list-valued fields mutable, so hashable
+  provider-like values still failed depset membership.
+- Implemented recursive tuple freezing for `_cc_internal.freeze`, normalized
+  native `cc_common.create_linker_input`,
+  `cc_common.create_library_to_link`, `create_compilation_outputs`, and the
+  NativeShim linking paths to store immutable sequence fields, and adjusted
+  `cc_common.link` to consume tuple/list/depset user link flags instead of
+  requiring a depset-only shape.
+- Added focused coverage for a `LinkerInput` with nested `user_link_flags`
+  being accepted as a direct depset element and then passed through
+  `cc_common.create_linking_context`.
+- Verification passed:
+  `cargo fmt`;
+  `cargo check -p kuro`;
+  `cargo build -p kuro`;
+  `pytest -q tests/core/cc_common/test_link.py -k 'linker_input or linking_contexts or link_deps_statically'`;
+  `git diff --check`.
+- Bounded zeromatter reruns now pass the old mutable-`LinkerInput` frontier.
+  `/tmp/plan54-cc-provider-immutability-3-memory.log` fails later in the
+  real LLVM/glibc C++ toolchain dependency chain on rules_cc's
+  `implementation_deps` gate:
+  `fail: requires --experimental_cc_implementation_deps`.
+
+### 2026-05-09 cc implementation_deps flag/parity follow-up
+
+- Investigated the `implementation_deps` gate exposed after the Plan 54
+  immutability fix. Bazel source of truth:
+  `src/main/java/com/google/devtools/build/lib/rules/cpp/CppOptions.java`
+  still defines `--experimental_cc_implementation_deps`, but Bazel 9 defaults
+  it to `true`; `CppConfiguration.java` exposes the value to Starlark as
+  `ctx.fragments.cpp.experimental_cc_implementation_deps()`.
+- Implemented Kuro plumbing instead of special-casing rules_cc:
+  `.bazelrc`/CLI normalization now preserves this Starlark-visible
+  experimental flag, clap accepts both
+  `--experimental_cc_implementation_deps` and
+  `--noexperimental_cc_implementation_deps` with last-one-wins behavior, the
+  client context carries the resolved boolean, server build config stores it,
+  and `CppFragment` returns it. Default is now Bazel 9 parity: enabled.
+- Focused verification passed:
+  `cargo fmt`;
+  `cargo test -p kuro_client_ctx experimental_cc_implementation_deps --lib`;
+  `cargo test -p kuro_client_ctx bazelrc --lib`;
+  `cargo check -p kuro`;
+  `cargo build -p kuro`;
+  `git diff --check`.
+- Bounded zeromatter smoke from `/var/mnt/dev/zeromatter`:
+
+  ```sh
+  timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan54-cc-implementation-deps-1 \
+      build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan54-cc-implementation-deps-1.log
+  ```
+
+  The old `requires --experimental_cc_implementation_deps` failure is gone.
+  The run reached `zeromatter//sdk:sdk_contents` analysis, logged a rules_rs
+  module extension failure while executing
+  `rules_rs+override/rs/private/toml2json.bzl:6`
+  (`ctx.execute([Label(toml2json), toml_file])`, `No such file or directory`),
+  then stayed in the daemon wait loop until the 180s timeout. The command
+  pipeline masked the timeout through `tee`; the remaining daemon for
+  `plan54-cc-implementation-deps-1` was killed with `kuro --nobazelrc ... kill`.
+
 ### 2026-05-09 Phase 7 final cleanup
 
 - Treated Phase 6 as closed with documented limits: simple safe depset args
@@ -117,8 +469,8 @@
   `collect_nested_set` walk as `to_list` while still leaving value-level
   dedupe to `to_list`. This keeps extraction order consistent for frozen and
   live depsets without making depset a public `TransitiveSet` alias.
-- Removed the separate `DepsetWithListGen` wrapper used by synthetic
-  `DefaultInfo.files`; unfrozen synthetic default outputs now allocate the
+- Removed the separate `DepsetWithListGen` wrapper used by native
+  `DefaultInfo.files`; unfrozen native default outputs now allocate the
   normal live depset facade with direct outputs and no transitive children.
 - Kept the existing streaming `TransitiveSet` preorder/postorder/topological
   iterators separate for now. They are still used by projection and action
@@ -185,11 +537,11 @@
 ### 2026-05-08 Phase 2 native construction decision slice
 
 - Inspected the remaining native `heap.alloc(Depset::empty())` call sites in
-  C++ provider stubs, rule context helpers, Java helpers, and runfiles/default
-  info construction. Migrating every empty depset to a live helper would expand
-  this storage slice across unrelated provider surfaces, so keep the thin
-  native `Depset` wrapper as the stable Rust construction API for empty/frozen
-  native depsets.
+  C++ provider NativeShim helpers, rule context helpers, Java helpers, and
+  runfiles/default info construction. Migrating every empty depset to a live
+  helper would expand this storage slice across unrelated provider surfaces, so
+  keep the thin native `Depset` wrapper as the stable Rust construction API for
+  empty/frozen native depsets.
 - Keep `Depset::empty()` for existing native empty depset construction and
   narrow `Depset::from_frozen_values` to crate-local frozen native construction
   paths such as `DefaultInfo.files`. Removed the unused public
@@ -796,7 +1148,7 @@ Current local behavior after Phase 1:
   during traversal.
 - `DepsetView` provides an internal facade over frozen `Depset`, live
   `LiveDepsetGen<Value>`, and frozen-live `LiveDepsetGen<FrozenValue>`.
-- `DefaultInfo.files` now uses the normal live depset facade for synthetic
+- `DefaultInfo.files` now uses the normal live depset facade for native
   default outputs; the old `DepsetWithListGen` wrapper is gone.
 - `collect_depset_elements` silently ignores non-depsets in some call paths.
 - `to_list` uses the shared nested-set traversal helper and then dedupes by
@@ -809,6 +1161,26 @@ Current local behavior after Phase 1:
   projection/reduction/action-input behavior. It shares the common
   preorder/postorder/topological order vocabulary but not a materializing
   execution path.
+
+### NativeShim boundary follow-up
+
+The current `//sdk:sdk_contents` frontier is again a depset mutable-element
+failure:
+
+```text
+rules_rust+0.69.0/rust/private/rustc.bzl:1374
+deps = depset(deps)
+error: depset elements must not be mutable values
+```
+
+Before adding another local conversion, identify whether the mutable value
+crossed a NativeShim or intrinsic provider boundary. If so, fix the shared
+freezing/hashability contract at that boundary and add focused Bazel 9 parity
+coverage for the provider value that enters the depset. The systemic plan for
+these boundaries is tracked in
+[56-native-intrinsic-provider-shims.md](56-native-intrinsic-provider-shims.md);
+this depset plan should keep enforcing Bazel's mutable-value rejection rather
+than adding allowlists.
 
 Plan 51 added `KURO_MEMORY_CHECKPOINTS`-gated depset flattening checkpoints
 around current `depset.to_list()` paths:

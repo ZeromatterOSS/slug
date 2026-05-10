@@ -74,6 +74,18 @@ def _split_b(s):
     return s
 
 
+def _sequence_map(s):
+    if s == "skip_none":
+        return None
+    if s == "skip_tuple":
+        return ()
+    if s == "tuple":
+        return ("tuple1", "tuple2")
+    if s == "list":
+        return ["list1", "list2"]
+    return s
+
+
 def _args_map_each_impl(ctx):
     out = ctx.actions.declare_file("args_map_each.txt")
 
@@ -86,6 +98,22 @@ def _args_map_each_impl(ctx):
 
 args_map_each = rule(
     implementation = _args_map_each_impl,
+    attrs = {},
+)
+
+
+def _args_map_each_sequence_impl(ctx):
+    out = ctx.actions.declare_file("args_map_each_sequence.txt")
+
+    args = ctx.actions.args()
+    args.add_all(["skip_none", "skip_tuple", "tuple", "list", "scalar"], map_each = _sequence_map)
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_map_each_sequence = rule(
+    implementation = _args_map_each_sequence_impl,
     attrs = {},
 )
 
@@ -211,6 +239,22 @@ def _args_add_joined_uniquify_impl(ctx):
 
 args_add_joined_uniquify = rule(
     implementation = _args_add_joined_uniquify_impl,
+    attrs = {},
+)
+
+
+def _args_add_joined_map_each_sequence_impl(ctx):
+    out = ctx.actions.declare_file("args_add_joined_map_each_sequence.txt")
+
+    args = ctx.actions.args()
+    args.add_joined(["skip_none", "skip_tuple", "tuple", "list", "scalar"], join_with = ":", map_each = _sequence_map)
+
+    ctx.actions.write(out, args)
+    return [DefaultInfo(default_output = out)]
+
+
+args_add_joined_map_each_sequence = rule(
+    implementation = _args_add_joined_map_each_sequence_impl,
     attrs = {},
 )
 

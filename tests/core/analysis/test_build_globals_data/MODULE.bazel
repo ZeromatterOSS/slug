@@ -1,1 +1,8 @@
-module(name = "root")
+module(name = "root", version = "1.2.3")
+
+bazel_dep(name = "dep", version = "2.3.4")
+
+local_path_override(
+    module_name = "dep",
+    path = "dep",
+)

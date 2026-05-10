@@ -148,6 +148,10 @@ pub struct StarlarkRuleCallable<'v> {
     /// Names of attributes that are `attr.output()` type.
     /// Used to register output file labels for Bazel-compatible dep resolution.
     output_attr_names: Vec<String>,
+    /// Names of attributes whose defaults were supplied by Kuro's Bazel attr
+    /// compatibility layer, not explicitly by Starlark code. Symbolic macros
+    /// inheriting these attrs receive None for omitted values, matching Bazel.
+    implicit_default_attr_names: Vec<String>,
     /// Rule-level output declarations from `rule(outputs={...})`.
     /// Maps output attribute name → file name pattern (e.g., "output" → "%{name}.binpb").
     /// `%{name}` in patterns is substituted with the target name at analysis time.
@@ -267,8 +271,9 @@ impl<'v> StarlarkRuleCallable<'v> {
             ),
         };
 
-        // Collect names of output attrs before sorting/consuming
+        // Collect names that need Starlark-attribute metadata before sorting/consuming.
         let mut output_attr_names: Vec<String> = Vec::new();
+        let mut implicit_default_attr_names: Vec<String> = Vec::new();
         let sorted_validated_attrs = attrs
             .entries
             .into_iter()
@@ -279,6 +284,9 @@ impl<'v> StarlarkRuleCallable<'v> {
                 } else {
                     if value.is_output {
                         output_attr_names.push(name.to_owned());
+                    }
+                    if value.implicit_default {
+                        implicit_default_attr_names.push(name.to_owned());
                     }
                     Ok((name.to_owned(), value.clone_attribute()))
                 }
@@ -410,6 +418,7 @@ impl<'v> StarlarkRuleCallable<'v> {
             is_executable,
             provides,
             output_attr_names,
+            implicit_default_attr_names,
             rule_outputs,
             toolchain_types,
             exec_group_defs,
@@ -641,6 +650,7 @@ impl<'v> Freeze for StarlarkRuleCallable<'v> {
             ignore_attrs_for_profiling: self.ignore_attrs_for_profiling,
             artifact_promise_mappings,
             output_attr_names: self.output_attr_names,
+            implicit_default_attr_names: self.implicit_default_attr_names,
             rule_outputs: self.rule_outputs,
             toolchain_types: self.toolchain_types,
             exec_group_defs: self.exec_group_defs,
@@ -670,6 +680,9 @@ pub struct FrozenStarlarkRuleCallable {
     /// Names of `attr.output()` attributes. Used to register output file labels for
     /// Bazel-compatible output file label resolution.
     output_attr_names: Vec<String>,
+    /// Names of attrs whose defaults were implicit in the original `attr.*()`
+    /// declarations.
+    implicit_default_attr_names: Vec<String>,
     /// Rule-level output declarations from `rule(outputs={...})`.
     rule_outputs: Vec<(String, String)>,
     /// Toolchain type requirements declared via `rule(toolchains=[...])`.
@@ -739,6 +752,12 @@ impl FrozenStarlarkRuleCallable {
     /// convention; e.g. bazel_skylib's `expand_template`).
     pub fn output_attr_names(&self) -> &[String] {
         &self.output_attr_names
+    }
+
+    pub fn has_implicit_default_attr(&self, name: &str) -> bool {
+        self.implicit_default_attr_names
+            .iter()
+            .any(|attr_name| attr_name == name)
     }
 
     /// Returns the toolchain type requirements declared on this rule.

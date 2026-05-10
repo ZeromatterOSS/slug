@@ -1,4 +1,4 @@
-load(":defs.bzl", "multi_target_macro", "no_attrs_macro", "simple_macro")
+load(":defs.bzl", "inherits_rule_attrs_macro", "multi_target_macro", "no_attrs_macro", "simple_macro")
 
 # === Basic symbolic macro ===
 
@@ -24,4 +24,10 @@ no_attrs_macro(
 
 simple_macro(
     name = "default_attr_test",
+)
+
+# === Macro with inherited rule attrs ===
+
+inherits_rule_attrs_macro(
+    name = "inherited_attr_default_test",
 )

@@ -1086,6 +1086,41 @@ impl BuckConfigBasedCells {
                 repo_spec_json: Arc::from(cell.repo_spec_json.as_str()),
                 materialized: false,
             };
+            // repository_ctx.execute/path(Label) resolves through the dynamic
+            // extension-cell registry, not the static CellResolver being built
+            // here. Mirror every precomputed extension repo there so
+            // use_repo_rule tools (for example @toml2json_linux_amd64) have a
+            // canonical filesystem path before lazy materialization runs.
+            kuro_core::cells::register_dynamic_extension_cell_with_setup(
+                cell.canonical_name.clone(),
+                cell.path.clone(),
+                setup.clone(),
+            );
+            if !cell.repo_spec_json.is_empty() {
+                match serde_json::from_str::<kuro_bzlmod::RepoSpec>(&cell.repo_spec_json) {
+                    Ok(repo_spec) => {
+                        let registration = kuro_bzlmod::SpokeRegistration {
+                            extension_id: Arc::from(cell.extension_id.as_str()),
+                            repo_spec: Arc::new(repo_spec),
+                            project_root: Arc::new(project_root.root().to_path_buf()),
+                        };
+                        kuro_bzlmod::register_spoke(
+                            cell.canonical_name.clone(),
+                            registration.clone(),
+                        );
+                        if cell.internal_name != cell.canonical_name {
+                            kuro_bzlmod::register_spoke(cell.internal_name.clone(), registration);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to parse precomputed RepoSpec for '{}': {}",
+                            cell.canonical_name,
+                            e
+                        );
+                    }
+                }
+            }
             ext_cells.push((cell_name, cell_path, setup));
         }
 

@@ -12,6 +12,9 @@
 
 use std::iter;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 use allocative::Allocative;
 use async_trait::async_trait;
@@ -85,6 +88,148 @@ use crate::configuration::get_matched_cfg_keys_for_node;
 use crate::cycle::ConfiguredGraphCycleDescriptor;
 use crate::execution::find_execution_platform_by_configuration;
 use crate::execution::resolve_execution_platform;
+
+static CONFIGURED_NODE_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+static CONFIGURED_NODE_MAX_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+static CONFIGURED_NODE_COMPLETED: AtomicUsize = AtomicUsize::new(0);
+
+struct ConfiguredNodeActiveGuard;
+
+impl ConfiguredNodeActiveGuard {
+    fn new() -> (Self, usize, usize) {
+        let active = CONFIGURED_NODE_ACTIVE.fetch_add(1, Ordering::SeqCst) + 1;
+        let max_active = update_max_active(&CONFIGURED_NODE_MAX_ACTIVE, active);
+        (Self, active, max_active)
+    }
+}
+
+impl Drop for ConfiguredNodeActiveGuard {
+    fn drop(&mut self) {
+        CONFIGURED_NODE_ACTIVE.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+fn update_max_active(max: &AtomicUsize, active: usize) -> usize {
+    let mut old = max.load(Ordering::Relaxed);
+    while active > old {
+        match max.compare_exchange_weak(old, active, Ordering::SeqCst, Ordering::Relaxed) {
+            Ok(_) => return active,
+            Err(next) => old = next,
+        }
+    }
+    old
+}
+
+fn configured_checkpoint(
+    checkpoint: &'static str,
+    target_label: &ConfiguredTargetLabel,
+    started: Instant,
+    fields: impl IntoIterator<Item = (&'static str, usize)> + Clone,
+) {
+    if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
+    let mut checkpoint_fields = vec![
+        ("active", CONFIGURED_NODE_ACTIVE.load(Ordering::Relaxed)),
+        (
+            "completed",
+            CONFIGURED_NODE_COMPLETED.load(Ordering::Relaxed),
+        ),
+        (
+            "max_active",
+            CONFIGURED_NODE_MAX_ACTIVE.load(Ordering::Relaxed),
+        ),
+        ("elapsed_ms", elapsed_ms),
+        ("target_len", target_label.to_string().len()),
+    ];
+    checkpoint_fields.extend(fields.clone());
+    kuro_util::memory_checkpoint::checkpoint(checkpoint, checkpoint_fields);
+    tracing::warn!(
+        target: "kuro_memory",
+        checkpoint,
+        target_label = %target_label,
+        elapsed_ms,
+        "configured node checkpoint {checkpoint} target={target_label} elapsed_ms={elapsed_ms}"
+    );
+}
+
+fn gather_checkpoint(
+    checkpoint: &'static str,
+    target_label: &TargetConfiguredTargetLabel,
+    started: Instant,
+    fields: impl IntoIterator<Item = (&'static str, usize)> + Clone,
+) {
+    if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
+    let mut checkpoint_fields = vec![
+        ("active", CONFIGURED_NODE_ACTIVE.load(Ordering::Relaxed)),
+        (
+            "completed",
+            CONFIGURED_NODE_COMPLETED.load(Ordering::Relaxed),
+        ),
+        (
+            "max_active",
+            CONFIGURED_NODE_MAX_ACTIVE.load(Ordering::Relaxed),
+        ),
+        ("elapsed_ms", elapsed_ms),
+        ("target_len", target_label.to_string().len()),
+    ];
+    checkpoint_fields.extend(fields.clone());
+    kuro_util::memory_checkpoint::checkpoint(checkpoint, checkpoint_fields);
+    tracing::warn!(
+        target: "kuro_memory",
+        checkpoint,
+        target_label = %target_label,
+        elapsed_ms,
+        "configured gather checkpoint {checkpoint} target={target_label} elapsed_ms={elapsed_ms}"
+    );
+}
+
+fn gather_dep_checkpoint(
+    checkpoint: &'static str,
+    target_label: &TargetConfiguredTargetLabel,
+    dep_label: &ConfiguredTargetLabel,
+    index: usize,
+    total: usize,
+    started: Instant,
+) {
+    if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
+    kuro_util::memory_checkpoint::checkpoint(
+        checkpoint,
+        [
+            ("active", CONFIGURED_NODE_ACTIVE.load(Ordering::Relaxed)),
+            (
+                "completed",
+                CONFIGURED_NODE_COMPLETED.load(Ordering::Relaxed),
+            ),
+            (
+                "max_active",
+                CONFIGURED_NODE_MAX_ACTIVE.load(Ordering::Relaxed),
+            ),
+            ("elapsed_ms", elapsed_ms),
+            ("index", index),
+            ("total", total),
+            ("target_len", target_label.to_string().len()),
+            ("dep_len", dep_label.to_string().len()),
+        ],
+    );
+    tracing::warn!(
+        target: "kuro_memory",
+        checkpoint,
+        target_label = %target_label,
+        dep_label = %dep_label,
+        index,
+        total,
+        elapsed_ms,
+        "configured gather dep checkpoint {checkpoint} target={target_label} dep={dep_label} index={index}/{total} elapsed_ms={elapsed_ms}"
+    );
+}
 
 #[derive(Debug, kuro_error::Error)]
 #[kuro(tag = Input)]
@@ -442,6 +587,9 @@ pub(crate) async fn gather_deps(
     attr_cfg_ctx: &(dyn AttrConfigurationContext + Sync),
     ctx: &mut DiceComputations<'_>,
 ) -> kuro_error::Result<(GatheredDeps, ErrorsAndIncompatibilities)> {
+    let started = Instant::now();
+    gather_checkpoint("configured_gather_start", target_label, started, []);
+
     #[derive(Default)]
     struct Traversal {
         deps: OrderedMap<ConfiguredProvidersLabel, SmallSet<PluginKindSet>>,
@@ -507,6 +655,19 @@ pub(crate) async fn gather_deps(
         configured_attr.traverse(target_node.label().pkg(), &mut traversal)?;
     }
     traversal.current_implicit = false;
+    gather_checkpoint(
+        "configured_gather_attrs_traversed",
+        target_label,
+        started,
+        [
+            ("attrs", target_node.attrs(AttrInspectOptions::All).count()),
+            ("deps", traversal.deps.len()),
+            ("implicit_deps", traversal.implicit_deps.len()),
+            ("exec_deps", traversal.exec_deps.len()),
+            ("toolchain_deps", traversal.toolchain_deps.len()),
+            ("uses_plugins", target_node.uses_plugins().len()),
+        ],
+    );
 
     // Phase 8c: Collect aspects that need to be applied to dependencies
     let mut aspect_keys = Vec::new();
@@ -572,9 +733,21 @@ pub(crate) async fn gather_deps(
             }
         }
     }
+    gather_checkpoint(
+        "configured_gather_aspect_keys",
+        target_label,
+        started,
+        [("aspect_keys", aspect_keys.len())],
+    );
 
     // Compute all aspects in parallel via DICE (following pattern from lines 499-503)
     let aspect_results = if !aspect_keys.is_empty() {
+        gather_checkpoint(
+            "configured_gather_aspects_start",
+            target_label,
+            started,
+            [("aspect_keys", aspect_keys.len())],
+        );
         ctx.compute_join(aspect_keys.iter(), |ctx, key| {
             async move {
                 // Returns Result<AspectValue>
@@ -586,15 +759,54 @@ pub(crate) async fn gather_deps(
     } else {
         Vec::new()
     };
+    gather_checkpoint(
+        "configured_gather_aspects_complete",
+        target_label,
+        started,
+        [("aspect_results", aspect_results.len())],
+    );
 
     // Store aspect results temporarily, will process errors after errors_and_incompats is created
     let aspect_results_with_keys: Vec<_> = aspect_keys.into_iter().zip(aspect_results).collect();
 
+    let normal_deps_total = traversal.deps.len();
+    gather_checkpoint(
+        "configured_gather_normal_deps_start",
+        target_label,
+        started,
+        [("deps", normal_deps_total)],
+    );
     let dep_results = ctx
-        .compute_join(traversal.deps.iter(), |ctx, v| {
-            async move { ctx.get_internal_configured_target_node(v.0.target()).await }.boxed()
+        .compute_join(traversal.deps.iter().enumerate(), |ctx, (index, v)| {
+            async move {
+                gather_dep_checkpoint(
+                    "configured_gather_dep_request_start",
+                    target_label,
+                    v.0.target(),
+                    index,
+                    normal_deps_total,
+                    started,
+                );
+                let result = ctx.get_internal_configured_target_node(v.0.target()).await;
+                gather_dep_checkpoint(
+                    "configured_gather_dep_request_complete",
+                    target_label,
+                    v.0.target(),
+                    index,
+                    normal_deps_total,
+                    started,
+                );
+                result
+            }
+            .boxed()
         })
         .await;
+    gather_checkpoint(
+        "configured_gather_normal_deps_complete",
+        target_label,
+        started,
+        [("deps", dep_results.len())],
+    );
 
     let mut plugin_lists = traversal.plugin_lists;
     let implicit_deps = traversal.implicit_deps;
@@ -646,6 +858,16 @@ pub(crate) async fn gather_deps(
                 .or_insert(CheckVisibility::No);
         }
     }
+    gather_checkpoint(
+        "configured_gather_plugins_complete",
+        target_label,
+        started,
+        [
+            ("deps", deps.len()),
+            ("exec_deps", exec_deps.len()),
+            ("toolchain_deps", traversal.toolchain_deps.len()),
+        ],
+    );
 
     // Process aspect results and handle errors (Phase 8c)
     let mut aspect_results_map = std::collections::HashMap::new();
@@ -665,6 +887,18 @@ pub(crate) async fn gather_deps(
             }
         }
     }
+    gather_checkpoint(
+        "configured_gather_complete",
+        target_label,
+        started,
+        [
+            ("deps", deps.len()),
+            ("exec_deps", exec_deps.len()),
+            ("toolchain_deps", traversal.toolchain_deps.len()),
+            ("aspects", aspect_results_map.len()),
+            ("errors", errors_and_incompats.errs.len()),
+        ],
+    );
 
     Ok((
         GatheredDeps {
@@ -889,6 +1123,13 @@ async fn compute_configured_target_node_no_transition(
     target_node: TargetNode,
     ctx: &mut DiceComputations<'_>,
 ) -> kuro_error::Result<MaybeCompatible<ConfiguredTargetNode>> {
+    let started = Instant::now();
+    configured_checkpoint(
+        "configured_node_no_transition_start",
+        target_label,
+        started,
+        [],
+    );
     let partial_target_label =
         &TargetConfiguredTargetLabel::new_without_exec_cfg(target_label.dupe());
     let target_cfg = target_label.cfg();
@@ -903,15 +1144,33 @@ async fn compute_configured_target_node_no_transition(
     .with_buck_error_context(|| {
         format!("Error resolving configuration deps of `{target_label}`")
     })?;
+    configured_checkpoint(
+        "configured_node_matched_cfg_ready",
+        target_label,
+        started,
+        [],
+    );
 
     // Must check for compatibility before evaluating non-compatibility attributes.
     if let MaybeCompatible::Incompatible(reason) =
         check_compatible(target_label, target_node.as_ref(), &resolved_configuration)?
     {
+        configured_checkpoint(
+            "configured_node_incompatible",
+            target_label,
+            started,
+            [("dependency_incompatible", 0)],
+        );
         return Ok(MaybeCompatible::Incompatible(reason));
     }
 
     let platform_cfgs = compute_platform_cfgs(ctx, target_node.as_ref()).await?;
+    configured_checkpoint(
+        "configured_node_platform_cfgs_ready",
+        target_label,
+        started,
+        [("platform_cfgs", platform_cfgs.len())],
+    );
 
     let mut resolved_transitions = OrderedMap::new();
     let attrs = resolve_transition_attrs(
@@ -923,6 +1182,15 @@ async fn compute_configured_target_node_no_transition(
     )
     .boxed()
     .await?;
+    configured_checkpoint(
+        "configured_node_transition_attrs_ready",
+        target_label,
+        started,
+        [
+            ("transition_deps", target_node.transition_deps().count()),
+            ("attrs", attrs.len()),
+        ],
+    );
     for (_dep, tr) in target_node.transition_deps() {
         let resolved_cfg = TRANSITION_CALCULATION
             .get()?
@@ -950,10 +1218,28 @@ async fn compute_configured_target_node_no_transition(
     )
     .boxed()
     .await?;
+    configured_checkpoint(
+        "configured_node_gather_deps_ready",
+        target_label,
+        started,
+        [
+            ("deps", gathered_deps.deps.len()),
+            ("exec_deps", gathered_deps.exec_deps.len()),
+            ("toolchain_deps", gathered_deps.toolchain_deps.len()),
+            ("aspects", gathered_deps.aspect_results.len()),
+            ("errors", errors_and_incompats.errs.len()),
+        ],
+    );
 
     check_plugin_deps(ctx, target_label, &gathered_deps.plugin_lists)
         .boxed()
         .await?;
+    configured_checkpoint(
+        "configured_node_plugin_deps_checked",
+        target_label,
+        started,
+        [],
+    );
 
     let execution_platform_resolution = if target_cfg.is_unbound() {
         // The unbound configuration is used when evaluation configuration nodes.
@@ -987,6 +1273,19 @@ async fn compute_configured_target_node_no_transition(
         .boxed()
         .await?
     };
+    configured_checkpoint(
+        "configured_node_exec_platform_ready",
+        target_label,
+        started,
+        [
+            (
+                "skipped_platforms",
+                execution_platform_resolution.skipped().len(),
+            ),
+            ("toolchain_deps", gathered_deps.toolchain_deps.len()),
+            ("exec_deps", gathered_deps.exec_deps.len()),
+        ],
+    );
     let execution_platform = execution_platform_resolution.cfg();
 
     // We now need to replace the dummy exec config we used above with the real one
@@ -1038,6 +1337,15 @@ async fn compute_configured_target_node_no_transition(
 
     let (toolchain_dep_results, exec_dep_results): (Vec<_>, Vec<_>) =
         ctx.compute2(get_toolchain_deps, get_exec_deps).await;
+    configured_checkpoint(
+        "configured_node_toolchain_exec_deps_ready",
+        target_label,
+        started,
+        [
+            ("toolchain_deps", toolchain_dep_results.len()),
+            ("exec_deps", exec_dep_results.len()),
+        ],
+    );
 
     let mut deps = gathered_deps.deps;
     let mut exec_deps = Vec::with_capacity(gathered_deps.exec_deps.len());
@@ -1060,9 +1368,21 @@ async fn compute_configured_target_node_no_transition(
     }
 
     if let Some(ret) = errors_and_incompats.finalize() {
+        configured_checkpoint(
+            "configured_node_dependency_incompatible",
+            target_label,
+            started,
+            [("deps", deps.len()), ("exec_deps", exec_deps.len())],
+        );
         return ret;
     }
 
+    configured_checkpoint(
+        "configured_node_no_transition_complete",
+        target_label,
+        started,
+        [("deps", deps.len()), ("exec_deps", exec_deps.len())],
+    );
     Ok(MaybeCompatible::Compatible(ConfiguredTargetNode::new(
         target_label.dupe(),
         target_node.dupe(),
@@ -1321,15 +1641,47 @@ impl Key for ConfiguredTargetNodeKey {
         ctx: &mut DiceComputations,
         _cancellation: &CancellationContext,
     ) -> Self::Value {
+        let (_active_guard, active, max_active) = ConfiguredNodeActiveGuard::new();
+        let started = Instant::now();
+        configured_checkpoint(
+            "configured_node_key_start",
+            &self.0,
+            started,
+            [
+                ("active", active),
+                (
+                    "completed",
+                    CONFIGURED_NODE_COMPLETED.load(Ordering::Relaxed),
+                ),
+                ("max_active", max_active),
+            ],
+        );
         let res = CycleGuard::<ConfiguredGraphCycleDescriptor>::new(ctx)?
             .guard_this(compute_configured_target_node(self, ctx))
             .await
             .into_result(ctx)
             .await??;
-        Ok(LookingUpConfiguredNodeContext::add_context(
-            res,
-            self.0.dupe(),
-        )?)
+        let res = LookingUpConfiguredNodeContext::add_context(res, self.0.dupe())?;
+        let completed = CONFIGURED_NODE_COMPLETED.fetch_add(1, Ordering::SeqCst) + 1;
+        match &res {
+            MaybeCompatible::Compatible(node) => configured_checkpoint(
+                "configured_node_key_complete",
+                &self.0,
+                started,
+                [
+                    ("completed", completed),
+                    ("deps", node.deps().count()),
+                    ("exec_deps", node.exec_deps().count()),
+                ],
+            ),
+            MaybeCompatible::Incompatible(_) => configured_checkpoint(
+                "configured_node_key_incompatible",
+                &self.0,
+                started,
+                [("completed", completed)],
+            ),
+        }
+        Ok(res)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {

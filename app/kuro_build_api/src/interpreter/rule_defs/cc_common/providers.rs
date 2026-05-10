@@ -53,9 +53,34 @@ use starlark::values::ValueLifetimeless;
 use starlark::values::ValueLike;
 use starlark::values::dict::DictRef;
 use starlark::values::list::AllocList;
+use starlark::values::list::ListRef;
 use starlark::values::starlark_value;
+use starlark::values::tuple::TupleRef;
 
 use crate::interpreter::rule_defs::provider::ProviderLike;
+
+fn write_cc_hashable_value<'v>(
+    value: Value<'v>,
+    hasher: &mut StarlarkHasher,
+) -> starlark::Result<()> {
+    if let Some(list) = ListRef::from_value(value) {
+        "list".hash(hasher);
+        list.len().hash(hasher);
+        for item in list.iter() {
+            write_cc_hashable_value(item, hasher)?;
+        }
+        return Ok(());
+    }
+    if let Some(tuple) = TupleRef::from_value(value) {
+        "tuple".hash(hasher);
+        tuple.len().hash(hasher);
+        for item in tuple.iter() {
+            write_cc_hashable_value(item, hasher)?;
+        }
+        return Ok(());
+    }
+    value.write_hash(hasher)
+}
 // ============================================================================
 // CcCompilationContext - Compilation context for C++ builds
 // ============================================================================
@@ -394,6 +419,24 @@ where
         static RES: MethodsStatic = MethodsStatic::new();
         RES.methods(compilation_outputs_methods)
     }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        let Some(other) = other.downcast_ref::<CompilationOutputsGen<V>>() else {
+            return Ok(false);
+        };
+        Ok(self.objects.to_value().equals(other.objects.to_value())?
+            && self
+                .pic_objects
+                .to_value()
+                .equals(other.pic_objects.to_value())?)
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "CompilationOutputs".hash(hasher);
+        write_cc_hashable_value(self.objects.to_value(), hasher)?;
+        write_cc_hashable_value(self.pic_objects.to_value(), hasher)?;
+        Ok(())
+    }
 }
 
 // ============================================================================
@@ -506,8 +549,8 @@ where
         self.pic_static_library.to_value().write_hash(hasher)?;
         self.dynamic_library.to_value().write_hash(hasher)?;
         self.interface_library.to_value().write_hash(hasher)?;
-        self.objects.to_value().write_hash(hasher)?;
-        self.pic_objects.to_value().write_hash(hasher)?;
+        write_cc_hashable_value(self.objects.to_value(), hasher)?;
+        write_cc_hashable_value(self.pic_objects.to_value(), hasher)?;
         self.alwayslink.hash(hasher);
         Ok(())
     }
@@ -2101,9 +2144,9 @@ where
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
         "LinkerInput".hash(hasher);
         self.owner.to_value().write_hash(hasher)?;
-        self.libraries.to_value().write_hash(hasher)?;
-        self.user_link_flags.to_value().write_hash(hasher)?;
-        self.additional_inputs.to_value().write_hash(hasher)?;
+        write_cc_hashable_value(self.libraries.to_value(), hasher)?;
+        write_cc_hashable_value(self.user_link_flags.to_value(), hasher)?;
+        write_cc_hashable_value(self.additional_inputs.to_value(), hasher)?;
         Ok(())
     }
 }

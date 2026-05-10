@@ -295,6 +295,14 @@ impl ExtensionRepoExecutionKey {
     }
 }
 
+fn complete_marker(spec_hash: &str) -> String {
+    if spec_hash.is_empty() {
+        "complete".to_owned()
+    } else {
+        format!("complete:{spec_hash}")
+    }
+}
+
 #[async_trait]
 impl Key for ExtensionRepoExecutionKey {
     type Value = kuro_error::Result<Arc<RepositoryRuleResult>>;
@@ -371,7 +379,7 @@ impl Key for ExtensionRepoExecutionKey {
                                 }
                                 let _ = std::fs::write(
                                     working_dir.join(".kuro_repo_complete"),
-                                    "complete",
+                                    complete_marker(&self.spec_hash),
                                 );
                                 return Ok(Arc::new(RepositoryRuleResult::success(
                                     self.canonical_name.to_string(),
@@ -723,6 +731,12 @@ mod tests {
         let display = format!("{}", key);
         assert!(display.starts_with("ExtensionRepoKey(_main+ext+repo, sha256-"));
         assert!(display.ends_with(")"));
+    }
+
+    #[test]
+    fn test_extension_repo_complete_marker_includes_spec_hash() {
+        assert_eq!(complete_marker(""), "complete");
+        assert_eq!(complete_marker("sha256-abc123"), "complete:sha256-abc123");
     }
 
     #[test]

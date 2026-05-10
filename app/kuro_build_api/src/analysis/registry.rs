@@ -471,6 +471,14 @@ impl FrozenAnalysisValueStorage {
             result_value,
         }
     }
+
+    pub fn action_data_len(&self) -> usize {
+        self.action_data.len()
+    }
+
+    pub fn transitive_sets_len(&self) -> usize {
+        self.transitive_sets.len()
+    }
 }
 
 unsafe impl<'v> Trace<'v> for AnalysisValueStorage<'v> {
@@ -690,6 +698,14 @@ pub struct RecordedAnalysisValues {
     actions: RecordedActions,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct RecordedAnalysisValueCounts {
+    pub actions: usize,
+    pub action_data: usize,
+    pub transitive_sets: usize,
+    pub has_provider_collection: bool,
+}
+
 impl RecordedAnalysisValues {
     /// Create a new RecordedAnalysisValues for native rule analysis.
     /// Used when creating analysis results from Rust code rather than Starlark.
@@ -821,12 +837,32 @@ impl RecordedAnalysisValues {
         }
     }
 
-    pub(crate) fn retained_memory(&self) -> kuro_error::Result<usize> {
+    pub fn retained_memory(&self) -> kuro_error::Result<usize> {
         Ok(self
             .analysis_storage
             .as_ref()
             .internal_error("missing analysis storage")?
             .owner()
             .allocated_bytes())
+    }
+
+    pub fn counts(&self) -> RecordedAnalysisValueCounts {
+        let (action_data, transitive_sets, has_provider_collection) = self
+            .analysis_storage
+            .as_ref()
+            .map(|storage| {
+                (
+                    storage.as_ref().value.action_data_len(),
+                    storage.as_ref().value.transitive_sets_len(),
+                    storage.as_ref().value.result_value.is_some(),
+                )
+            })
+            .unwrap_or((0, 0, false));
+        RecordedAnalysisValueCounts {
+            actions: self.actions.len(),
+            action_data,
+            transitive_sets,
+            has_provider_collection,
+        }
     }
 }

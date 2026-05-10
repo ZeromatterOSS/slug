@@ -40,6 +40,7 @@ use crate::coerce::Coerce;
 use crate::coerce::coerce;
 use crate::collections::Hashed;
 use crate::collections::SmallMap;
+use crate::collections::StarlarkHasher;
 use crate::environment::Methods;
 use crate::environment::MethodsStatic;
 use crate::hint::unlikely;
@@ -62,6 +63,7 @@ use crate::values::Value;
 use crate::values::ValueLike;
 use crate::values::comparison::equals_small_map;
 use crate::values::dict::DictRef;
+use crate::values::error::ControlError;
 use crate::values::error::ValueError;
 use crate::values::string::str_type::hash_string_value;
 use crate::values::type_repr::StarlarkTypeRepr;
@@ -110,12 +112,25 @@ pub(crate) type FrozenDict = DictGen<FrozenDictData>;
 
 pub(crate) type MutableDict<'v> = DictGen<RefCell<Dict<'v>>>;
 
+#[derive(Clone, Default, Trace, Debug, ProvidesStaticType, Allocative)]
+#[repr(transparent)]
+pub(crate) struct HashableDictData<'v>(pub(crate) Dict<'v>);
+
+#[derive(Clone, Default, Debug, ProvidesStaticType, Allocative)]
+#[repr(transparent)]
+pub(crate) struct FrozenHashableDictData {
+    /// The data stored by the dictionary. The keys must all be hashable values.
+    pub(crate) content: SmallMap<FrozenValue, FrozenValue>,
+}
+
 pub(crate) static VALUE_EMPTY_FROZEN_DICT: AllocStaticSimple<DictGen<FrozenDictData>> =
     AllocStaticSimple::alloc(DictGen(FrozenDictData {
         content: SmallMap::new(),
     }));
 
 unsafe impl<'v> Coerce<Dict<'v>> for FrozenDictData {}
+unsafe impl<'v> Coerce<Dict<'v>> for FrozenHashableDictData {}
+unsafe impl Coerce<FrozenDictData> for FrozenHashableDictData {}
 
 impl<'v> AllocValue<'v> for Dict<'v> {
     fn alloc_value(self, heap: Heap<'v>) -> Value<'v> {
@@ -144,6 +159,8 @@ impl AllocFrozenValue for FrozenDictData {
 impl<'v> Dict<'v> {
     pub(crate) fn is_dict_type(x: TypeId) -> bool {
         x == TypeId::of::<DictGen<FrozenDictData>>()
+            || x == TypeId::of::<DictGen<FrozenHashableDictData>>()
+            || x == TypeId::of::<DictGen<HashableDictData<'static>>>()
             || x == TypeId::of::<DictGen<RefCell<Dict<'static>>>>()
     }
 
@@ -314,6 +331,34 @@ impl<'v> Freeze for DictGen<RefCell<Dict<'v>>> {
     }
 }
 
+impl<'v> Freeze for DictGen<HashableDictData<'v>> {
+    type Frozen = DictGen<FrozenHashableDictData>;
+    fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
+        let content = self.0.0.content.freeze(freezer)?;
+        Ok(DictGen(FrozenHashableDictData { content }))
+    }
+}
+
+fn write_hashable_dict_hash<'v>(
+    content: &SmallMap<Value<'v>, Value<'v>>,
+    hasher: &mut StarlarkHasher,
+) -> crate::Result<()> {
+    "dict".hash(hasher);
+    content.len().hash(hasher);
+    let mut entry_hashes = Vec::with_capacity(content.len());
+    for (key, value) in content {
+        let mut entry_hasher = StarlarkHasher::new();
+        key.write_hash(&mut entry_hasher)?;
+        value.write_hash(&mut entry_hasher)?;
+        entry_hashes.push(entry_hasher.finish());
+    }
+    entry_hashes.sort_unstable();
+    for hash in entry_hashes {
+        hash.hash(hasher);
+    }
+    Ok(())
+}
+
 trait DictLike<'v>: Debug + Allocative {
     type ContentRef<'a>: Deref<Target = SmallMap<Value<'v>, Value<'v>>>
     where
@@ -326,6 +371,7 @@ trait DictLike<'v>: Debug + Allocative {
     unsafe fn content_unchecked(&self) -> &SmallMap<Value<'v>, Value<'v>>;
     unsafe fn iter_stop(&self);
     fn set_at(&self, index: Hashed<Value<'v>>, value: Value<'v>) -> crate::Result<()>;
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> crate::Result<()>;
 }
 
 impl<'v> DictLike<'v> for RefCell<Dict<'v>> {
@@ -368,6 +414,12 @@ impl<'v> DictLike<'v> for RefCell<Dict<'v>> {
             Err(_) => Err(crate::Error::new_other(ValueError::MutationDuringIteration)),
         }
     }
+
+    fn write_hash(&self, _hasher: &mut StarlarkHasher) -> crate::Result<()> {
+        Err(crate::Error::new_other(ControlError::NotHashableValue(
+            Dict::TYPE.to_owned(),
+        )))
+    }
 }
 
 impl<'v> DictLike<'v> for FrozenDictData {
@@ -393,6 +445,72 @@ impl<'v> DictLike<'v> for FrozenDictData {
         Err(crate::Error::new_other(
             ValueError::CannotMutateImmutableValue,
         ))
+    }
+
+    fn write_hash(&self, _hasher: &mut StarlarkHasher) -> crate::Result<()> {
+        Err(crate::Error::new_other(ControlError::NotHashableValue(
+            Dict::TYPE.to_owned(),
+        )))
+    }
+}
+
+impl<'v> DictLike<'v> for HashableDictData<'v> {
+    type ContentRef<'a>
+        = &'a SmallMap<Value<'v>, Value<'v>>
+    where
+        Self: 'a,
+        'v: 'a;
+
+    fn content<'a>(&'a self) -> &'a SmallMap<Value<'v>, Value<'v>> {
+        &self.0.content
+    }
+
+    unsafe fn iter_start(&self) {}
+
+    unsafe fn iter_stop(&self) {}
+
+    unsafe fn content_unchecked(&self) -> &SmallMap<Value<'v>, Value<'v>> {
+        &self.0.content
+    }
+
+    fn set_at(&self, _index: Hashed<Value<'v>>, _value: Value<'v>) -> crate::Result<()> {
+        Err(crate::Error::new_other(
+            ValueError::CannotMutateImmutableValue,
+        ))
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> crate::Result<()> {
+        write_hashable_dict_hash(&self.0.content, hasher)
+    }
+}
+
+impl<'v> DictLike<'v> for FrozenHashableDictData {
+    type ContentRef<'a>
+        = &'a SmallMap<Value<'v>, Value<'v>>
+    where
+        Self: 'a,
+        'v: 'a;
+
+    fn content<'a>(&'a self) -> &'a SmallMap<Value<'v>, Value<'v>> {
+        coerce(&self.content)
+    }
+
+    unsafe fn iter_start(&self) {}
+
+    unsafe fn iter_stop(&self) {}
+
+    unsafe fn content_unchecked(&self) -> &SmallMap<Value<'v>, Value<'v>> {
+        coerce(&self.content)
+    }
+
+    fn set_at(&self, _index: Hashed<Value<'v>>, _value: Value<'v>) -> crate::Result<()> {
+        Err(crate::Error::new_other(
+            ValueError::CannotMutateImmutableValue,
+        ))
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> crate::Result<()> {
+        write_hashable_dict_hash(coerce(&self.content), hasher)
     }
 }
 
@@ -489,6 +607,10 @@ where
     fn set_at(&self, index: Value<'v>, alloc_value: Value<'v>) -> crate::Result<()> {
         let index = index.get_hashed()?;
         self.0.set_at(index, alloc_value)
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> crate::Result<()> {
+        self.0.write_hash(hasher)
     }
 
     fn bit_or(&self, rhs: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {

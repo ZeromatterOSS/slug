@@ -63,6 +63,56 @@ async def test_actions_declare_directory(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_ctx_actions_data")
+async def test_actions_declare_file_bazel_path_shape(buck: Buck) -> None:
+    """ctx.actions.declare_file().path is Bazel-shaped, without __target__."""
+    result = await buck.build("//:declare_file_path_shape")
+    output = result.get_build_report().output_for_target("//:declare_file_path_shape")
+    content = output.read_text().strip()
+    assert "__declare_file_path_shape__" not in content
+    assert content.endswith("/build/c.s")
+    assert "__declare_file_path_shape__" not in str(output)
+
+
+@buck_test(data_dir="test_ctx_actions_data")
+async def test_actions_declare_file_external_bazel_path_shape(buck: Buck) -> None:
+    """External repo ctx.actions.declare_file().path is Bazel-shaped."""
+    result = await buck.build("//:external_declare_file_path_shape")
+    output = result.get_build_report().output_for_target(
+        "//:external_declare_file_path_shape"
+    )
+    content = output.read_text().strip()
+    assert "__declare_file_path_shape__" not in content
+    assert content.endswith("/pkg/build/c.s")
+    assert "__declare_file_path_shape__" not in str(output)
+
+
+@buck_test(data_dir="test_ctx_actions_data")
+async def test_actions_declare_directory_bazel_path_shape(buck: Buck) -> None:
+    """ctx.actions.declare_directory().path is Bazel-shaped, without __target__."""
+    result = await buck.build("//:declare_directory_path_shape")
+    output = result.get_build_report().output_for_target(
+        "//:declare_directory_path_shape"
+    )
+    content = output.read_text().strip()
+    assert "__declare_directory_path_shape__" not in content
+    assert content.endswith("/build/tree")
+    assert "__declare_directory_path_shape__" not in str(output)
+
+
+@buck_test(data_dir="test_ctx_actions_data")
+async def test_actions_declare_directory_external_bazel_path_shape(buck: Buck) -> None:
+    """External repo ctx.actions.declare_directory().path is Bazel-shaped."""
+    result = await buck.build("//:external_declare_directory_path_shape")
+    output = result.get_build_report().output_for_target(
+        "//:external_declare_directory_path_shape"
+    )
+    content = output.read_text().strip()
+    assert "__declare_directory_path_shape__" not in content
+    assert content.endswith("/pkg/build/tree")
+    assert "__declare_directory_path_shape__" not in str(output)
+
+
+@buck_test(data_dir="test_ctx_actions_data")
 async def test_actions_write_multiline(buck: Buck) -> None:
     """ctx.actions.write() with multi-line content preserves all lines."""
     result = await buck.build("//:multiline_write")

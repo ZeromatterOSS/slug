@@ -1,5 +1,19 @@
 """Test rules for cc_common.link() functionality."""
 
+LtoCompilationContextInfo = provider(fields = {
+    "lto_bitcode_inputs": "Maps each bitcode file to LTO metadata.",
+})
+
+LibraryToLinkInfo = provider(fields = {
+    "static_library": "Static library artifact.",
+    "pic_static_library": "PIC static library artifact.",
+    "_lto_compilation_context": "LTO context.",
+    "_pic_lto_compilation_context": "PIC LTO context.",
+})
+
+EMPTY_LTO_COMPILATION_CONTEXT = LtoCompilationContextInfo(lto_bitcode_inputs = {})
+
+
 def _link_executable_test_impl(ctx):
     """Tests that cc_common.link() with output_type='executable' works."""
     fc = cc_common.configure_features(cc_toolchain = None, ctx = ctx)
@@ -219,7 +233,7 @@ def _linker_input_test_impl(ctx):
 
     out = ctx.actions.declare_file(ctx.label.name + ".txt")
     flags = linker_input.user_link_flags
-    flags_list = sorted(flags.to_list())
+    flags_list = sorted([flag for flag in flags])
     lines = [
         "type=" + type(linker_input),
         "has_user_link_flags=" + str(hasattr(linker_input, "user_link_flags")),
@@ -234,4 +248,119 @@ def _linker_input_test_impl(ctx):
 linker_input_test = rule(
     implementation = _linker_input_test_impl,
     attrs = {},
+)
+
+
+def _linker_input_nested_user_flags_test_impl(ctx):
+    """Tests LinkerInput depset membership after nested user_link_flags flattening."""
+    linker_input = cc_common.create_linker_input(
+        owner = ctx.label,
+        user_link_flags = ["-lz", ["-lssl", "-lcrypto"]],
+    )
+    linking_context = cc_common.create_linking_context(
+        linker_inputs = depset([linker_input]),
+    )
+
+    linker_inputs = linking_context.linker_inputs.to_list()
+    flags = []
+    for input in linker_inputs:
+        for flag in input.user_link_flags:
+            flags.append(flag)
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    lines = [
+        "type=" + type(linking_context),
+        "inputs_count=" + str(len(linker_inputs)),
+        "flags=" + ",".join(sorted(flags)),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+linker_input_nested_user_flags_test = rule(
+    implementation = _linker_input_nested_user_flags_test_impl,
+    attrs = {},
+)
+
+
+def _frozen_dict_depset_test_impl(ctx):
+    """Tests that cc_internal.freeze preserves immutable dict APIs."""
+    cc_internal = cc_common.internal_DO_NOT_USE()
+    payload = cc_internal.freeze({
+        "backend": ["one.o", "two.o"],
+    })
+    merged = {}
+    merged.update(payload)
+    payloads = depset([payload]).to_list()
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    lines = [
+        "payloads_count=" + str(len(payloads)),
+        "payload_type=" + type(payload),
+        "payload_truthy=" + str(bool(payload)),
+        "payload_keys=" + ",".join(payload.keys()),
+        "payload_get_type=" + type(payload.get("backend")),
+        "payload_get_len=" + str(len(payload.get("backend"))),
+        "payload_contains_backend=" + str("backend" in payload),
+        "payload_iter=" + ",".join([k for k in payload]),
+        "merged_get_len=" + str(len(merged.get("backend"))),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+frozen_dict_depset_test = rule(
+    implementation = _frozen_dict_depset_test_impl,
+    attrs = {},
+)
+
+
+def _starlark_library_to_link_depset_test_impl(ctx):
+    """Tests rules_cc-shaped LibraryToLink provider depset membership."""
+    library = ctx.file.library
+    library_to_link = LibraryToLinkInfo(
+        static_library = library,
+        pic_static_library = library,
+        _lto_compilation_context = EMPTY_LTO_COMPILATION_CONTEXT,
+        _pic_lto_compilation_context = EMPTY_LTO_COMPILATION_CONTEXT,
+    )
+    libraries = depset([library_to_link]).to_list()
+
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    lines = [
+        "libraries_count=" + str(len(libraries)),
+        "static_basename=" + libraries[0].static_library.basename,
+        "lto_inputs_count=" + str(len(libraries[0]._lto_compilation_context.lto_bitcode_inputs)),
+    ]
+    ctx.actions.write(out, "\n".join(lines) + "\n")
+    return [DefaultInfo(default_output = out)]
+
+
+starlark_library_to_link_depset_test = rule(
+    implementation = _starlark_library_to_link_depset_test_impl,
+    attrs = {
+        "library": attrs.source(),
+    },
+)
+
+
+def _mutable_library_to_link_depset_test_impl(ctx):
+    """A LibraryToLink provider with analysis-time mutable fields remains invalid."""
+    library = ctx.file.library
+    mutable_lto = LtoCompilationContextInfo(lto_bitcode_inputs = {})
+    library_to_link = LibraryToLinkInfo(
+        static_library = library,
+        pic_static_library = library,
+        _lto_compilation_context = mutable_lto,
+        _pic_lto_compilation_context = mutable_lto,
+    )
+    depset([library_to_link])
+    return []
+
+
+mutable_library_to_link_depset_test = rule(
+    implementation = _mutable_library_to_link_depset_test_impl,
+    attrs = {
+        "library": attrs.source(),
+    },
 )

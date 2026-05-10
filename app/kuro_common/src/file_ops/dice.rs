@@ -12,6 +12,8 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 use allocative::Allocative;
 use async_trait::async_trait;
@@ -34,6 +36,7 @@ use crate::file_ops::error::FileReadError;
 use crate::file_ops::error::extended_ignore_error;
 use crate::file_ops::metadata::RawPathMetadata;
 use crate::file_ops::metadata::ReadDirOutput;
+use crate::file_ops::metadata::SimpleDirEntry;
 use crate::ignores::file_ignores::FileIgnoreResult;
 use crate::io::ReadDirError;
 
@@ -150,6 +153,38 @@ impl DiceFileComputations {
 pub(crate) enum CheckIgnores {
     Yes,
     No,
+}
+
+static READ_DIR_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+static READ_DIR_COMPLETED: AtomicUsize = AtomicUsize::new(0);
+static READ_DIR_MAX_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+
+fn record_max_active(max: &AtomicUsize, active: usize) {
+    let mut current = max.load(Ordering::Relaxed);
+    while active > current {
+        match max.compare_exchange_weak(current, active, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => break,
+            Err(next) => current = next,
+        }
+    }
+}
+
+fn read_dir_entry_stats(entries: &[SimpleDirEntry]) -> (usize, usize, usize, usize) {
+    let mut files = 0;
+    let mut dirs = 0;
+    let mut symlinks = 0;
+    let mut name_bytes = 0;
+    for entry in entries {
+        name_bytes += entry.file_name.as_str().len();
+        if entry.file_type.is_dir() {
+            dirs += 1;
+        } else if entry.file_type.is_symlink() {
+            symlinks += 1;
+        } else {
+            files += 1;
+        }
+    }
+    (files, dirs, symlinks, name_bytes)
 }
 
 #[derive(Allocative)]
@@ -322,11 +357,50 @@ impl Key for ReadDirKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let file_ops = get_delegated_file_ops(ctx, self.path.cell(), self.check_ignores).await?;
-        file_ops
-            .read_dir(ctx, self.path.as_ref().path())
-            .await
-            .map_err(kuro_error::Error::from)
+        let memory_checkpoints = kuro_util::memory_checkpoint::enabled();
+        let active = READ_DIR_ACTIVE.fetch_add(1, Ordering::Relaxed) + 1;
+        record_max_active(&READ_DIR_MAX_ACTIVE, active);
+        let result = match get_delegated_file_ops(ctx, self.path.cell(), self.check_ignores).await {
+            Ok(file_ops) => file_ops
+                .read_dir(ctx, self.path.as_ref().path())
+                .await
+                .map_err(kuro_error::Error::from),
+            Err(e) => Err(e),
+        };
+        let active = READ_DIR_ACTIVE.fetch_sub(1, Ordering::Relaxed) - 1;
+        let completed = READ_DIR_COMPLETED.fetch_add(1, Ordering::Relaxed) + 1;
+
+        if memory_checkpoints {
+            let entries = result.as_ref().ok().map_or(0, |v| v.included.len());
+            if entries >= 512 || completed.is_multiple_of(1000) {
+                let (files, dirs, symlinks, name_bytes, ok) = match &result {
+                    Ok(output) => {
+                        let (files, dirs, symlinks, name_bytes) =
+                            read_dir_entry_stats(&output.included);
+                        (files, dirs, symlinks, name_bytes, 1)
+                    }
+                    Err(_) => (0, 0, 0, 0, 0),
+                };
+                kuro_util::memory_checkpoint::checkpoint(
+                    "read_dir_key",
+                    [
+                        ("active", active),
+                        ("completed", completed),
+                        ("max_active", READ_DIR_MAX_ACTIVE.load(Ordering::Relaxed)),
+                        ("ok", ok),
+                        ("entries", entries),
+                        ("files", files),
+                        ("dirs", dirs),
+                        ("symlinks", symlinks),
+                        ("name_bytes", name_bytes),
+                        ("path_len", self.path.path().as_str().len()),
+                        ("check_ignores", self.check_ignores as usize),
+                    ],
+                );
+            }
+        }
+
+        result
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {

@@ -2893,13 +2893,23 @@ can reach `ctx_toolchain_provider_analysis_start` before the selected toolchain
 impl analysis key is active, and because runtime-library edges cross
 configurations.
 
-Kuro now uses the existing synthetic C++ toolchain provider at the
+Kuro now uses the existing C++ NativeShim provider facade at the
 `ctx.toolchains` provider boundary for
 `@bazel_tools//tools/cpp:toolchain_type`, instead of recursively analyzing the
 C++ toolchain implementation there. This keeps toolchain resolution intact and
-limits the shortcut to the C++ provider surface Kuro already synthesizes.
+limits the shortcut to the C++ provider surface Kuro already constructs
+intrinsically.
 `app/kuro_analysis/src/analysis/calculation.rs` also drops the now-unused
 active-analysis-key lookup helper while retaining the checkpoint count.
+
+Terminology follow-up: this area must use `Native`, `Intrinsic`, or
+`NativeShim` naming. The current implementation still has legacy C++ provider
+type/function/checkpoint names from the earlier wording; rename those as part
+of the systemic NativeShim work in
+[56-native-intrinsic-provider-shims.md](56-native-intrinsic-provider-shims.md).
+That work is broader than C++: every Bazel-native provider/API surface that Kuro
+exposes through Starlark must be inventoried and modeled as an explicit
+NativeShim boundary instead of an ad hoc per-label escape hatch.
 
 Focused verification:
 
@@ -2909,13 +2919,13 @@ cargo check -p kuro_analysis
 cargo build -p kuro
 timeout 90s env KURO_MEMORY_CHECKPOINTS=1 \
   /var/mnt/dev/kuro/target/debug/kuro \
-    --isolation-dir plan15-cpp-toolchain-synthetic-all-1 \
+    --isolation-dir plan15-cpp-toolchain-native-shim-all-1 \
     build bazel_tools//tools/cpp:malloc \
-  2>&1 | tee /tmp/plan15-cpp-toolchain-synthetic-all-1.log
+  2>&1 | tee /tmp/plan15-cpp-toolchain-native-shim-all-1.log
 ```
 
-The focused build succeeded. The log shows
-`status=cc_toolchain_synthetic` for `bazel_tools//tools/cpp:malloc`, followed by
+The focused build succeeded. The C++ NativeShim checkpoint should report
+`status=cc_toolchain_native_shim` after the terminology cleanup, followed by
 `analysis_key_complete` and `BUILD SUCCEEDED`.
 
 Bounded SDK smoke:
@@ -2924,12 +2934,12 @@ Bounded SDK smoke:
 timeout 260s env KURO_MEMORY_CHECKPOINTS=1 \
   /var/mnt/dev/kuro/scripts/memory_smoke.sh \
     --interval 5 \
-    --include-pgrep 'kurod\[zeromatter\].*plan15-cpp-toolchain-synthetic-sdk-1' \
+    --include-pgrep 'kurod\[zeromatter\].*plan15-cpp-toolchain-native-shim-sdk-1' \
     -- \
     /var/mnt/dev/kuro/target/debug/kuro \
-      --isolation-dir plan15-cpp-toolchain-synthetic-sdk-1 \
+      --isolation-dir plan15-cpp-toolchain-native-shim-sdk-1 \
       build //sdk:sdk_contents \
-  2>&1 | tee /tmp/plan15-cpp-toolchain-synthetic-sdk-1.log
+  2>&1 | tee /tmp/plan15-cpp-toolchain-native-shim-sdk-1.log
 ```
 
 The SDK smoke advanced past the old `bazel_tools//tools/cpp:malloc` wait and

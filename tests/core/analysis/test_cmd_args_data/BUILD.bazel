@@ -1,6 +1,7 @@
 load(
     ":defs.bzl",
     "args_add_all_two_arg",
+    "args_add_joined_map_each_sequence",
     "args_add_joined_two_arg",
     "args_add_joined_uniquify",
     "args_add_two_arg",
@@ -10,6 +11,7 @@ load(
     "args_depset_add_joined_transforms",
     "args_format_each",
     "args_map_each",
+    "args_map_each_sequence",
     "args_omit_if_empty",
     "args_output_artifact",
     "args_terminate_with",
@@ -35,6 +37,10 @@ args_format_each(
 
 args_map_each(
     name = "args_map_each",
+)
+
+args_map_each_sequence(
+    name = "args_map_each_sequence",
 )
 
 args_uniquify(
@@ -64,6 +70,10 @@ args_add_joined_two_arg(
 
 args_add_joined_uniquify(
     name = "args_add_joined_uniquify",
+)
+
+args_add_joined_map_each_sequence(
+    name = "args_add_joined_map_each_sequence",
 )
 
 args_depset_add_all_transforms(

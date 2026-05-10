@@ -486,6 +486,10 @@ fn is_bazel_transitional_flag(arg: &str) -> bool {
     let flag_name = flag_name.split('=').next().unwrap_or(flag_name);
     // Strip leading "no" prefix for boolean flags
     let base = flag_name.strip_prefix("no").unwrap_or(flag_name);
+    let normalized_base = base.replace('-', "_");
+    if normalized_base == "experimental_cc_implementation_deps" {
+        return false;
+    }
     // Check against transitional prefixes
     if base.starts_with("incompatible_")
         || base.starts_with("incompatible-")
@@ -980,16 +984,45 @@ mod tests {
         // legacy_* flags are stripped
         assert!(is_bazel_transitional_flag("--legacy_whole_archive"));
         assert!(is_bazel_transitional_flag("--nolegacy_whole_archive"));
-        // experimental_* flags are stripped
+        // experimental_* flags are stripped unless Kuro models their Starlark-visible semantics.
         assert!(is_bazel_transitional_flag(
-            "--experimental_cc_implementation_deps"
+            "--experimental_check_external_repository_files"
         ));
         // Normal flags are NOT stripped
-        assert!(!is_bazel_transitional_flag("--keep-going"));
+        assert!(is_bazel_transitional_flag("--keep-going"));
         assert!(!is_bazel_transitional_flag("--verbose_failures"));
         assert!(!is_bazel_transitional_flag("--jobs=8"));
         assert!(!is_bazel_transitional_flag("//my:target"));
         assert!(!is_bazel_transitional_flag("-c"));
+    }
+
+    #[test]
+    fn experimental_cc_implementation_deps_is_preserved() {
+        assert!(!is_bazel_transitional_flag(
+            "--experimental_cc_implementation_deps"
+        ));
+        assert!(!is_bazel_transitional_flag(
+            "--noexperimental_cc_implementation_deps"
+        ));
+
+        let args = vec![
+            "kuro".to_owned(),
+            "build".to_owned(),
+            "--experimental_cc_implementation_deps".to_owned(),
+            "--noexperimental_cc_implementation_deps".to_owned(),
+            "//...".to_owned(),
+        ];
+        let result = normalize_args(args);
+        assert_eq!(
+            result,
+            vec![
+                "kuro",
+                "build",
+                "--experimental-cc-implementation-deps",
+                "--noexperimental-cc-implementation-deps",
+                "//..."
+            ]
+        );
     }
 
     #[test]
@@ -1003,7 +1036,7 @@ mod tests {
             "//...".to_owned(),
         ];
         let result = normalize_args(args);
-        assert_eq!(result, vec!["kuro", "build", "--keep-going", "//..."]);
+        assert_eq!(result, vec!["kuro", "build", "//..."]);
     }
 
     fn strs(v: Vec<&str>) -> Vec<String> {

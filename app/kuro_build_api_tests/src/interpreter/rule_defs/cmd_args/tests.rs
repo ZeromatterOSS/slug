@@ -167,6 +167,39 @@ fn depset_add_all_and_joined_render_after_freeze() -> kuro_error::Result<()> {
 }
 
 #[test]
+fn map_each_sequence_returns_expand_as_items() -> kuro_error::Result<()> {
+    let mut tester = tester()?;
+    tester.run_starlark_bzl_test(indoc!(
+        r#"
+        def map_value(value):
+            if value == "none":
+                return None
+            if value == "empty_tuple":
+                return ()
+            if value == "tuple":
+                return ("tuple-1", "tuple-2")
+            if value == "list":
+                return ["list-1", "list-2"]
+            if value == "frozen_list":
+                return cc_common.internal_DO_NOT_USE.freeze(["frozen-1", "frozen-2"])
+            if value == "frozen_empty":
+                return cc_common.internal_DO_NOT_USE.freeze([])
+            return value
+
+        def test():
+            add_all_args = cmd_args()
+            add_all_args.add_all(["none", "empty_tuple", "tuple", "list", "frozen_list", "frozen_empty", "scalar"], map_each = map_value)
+            assert_eq(["tuple-1", "tuple-2", "list-1", "list-2", "frozen-1", "frozen-2", "scalar"], get_args(add_all_args))
+
+            joined_args = cmd_args()
+            joined_args.add_joined(["none", "empty_tuple", "tuple", "list", "frozen_list", "frozen_empty", "scalar"], join_with = ":", map_each = map_value)
+            assert_eq(["tuple-1:tuple-2:list-1:list-2:frozen-1:frozen-2:scalar"], get_args(joined_args))
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
 fn command_line_builder() -> kuro_error::Result<()> {
     let mut tester = tester()?;
     let content = indoc!(

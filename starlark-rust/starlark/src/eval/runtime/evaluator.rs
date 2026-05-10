@@ -166,6 +166,9 @@ pub struct Evaluator<'v, 'a, 'e> {
     pub(crate) print_handler: &'a (dyn PrintHandler + 'a),
     /// Deprecation handler.
     pub(crate) soft_error_handler: &'a (dyn SoftErrorHandler + 'a),
+    /// Optional low-overhead callback for embedders that need sparse
+    /// progress checkpoints while Starlark code is running.
+    call_stack_checkpoint: Option<Box<dyn CallStackCheckpoint<'e> + 'a>>,
     /// Max size of starlark stack
     pub(crate) max_callstack_size: Option<usize>,
     // The Starlark-level call-stack of functions.
@@ -194,9 +197,22 @@ fn _check_variance() {
         let _: &Option<&'a2 mut dyn AnyLifetime<'_>> = &a.extra_mut;
         let _: &&'a2 (dyn PrintHandler + 'a2) = &a.print_handler;
         let _: &&'a2 (dyn SoftErrorHandler + 'a2) = &a.soft_error_handler;
+        let _: &Option<Box<dyn CallStackCheckpoint<'_> + 'a2>> = &a.call_stack_checkpoint;
         let _: &Box<dyn Fn() -> bool + 'a2> = &a.is_cancelled;
         let _: &Evaluator<'v, 'a2, 'e> = &a;
     }
+}
+
+/// Callback invoked after a Starlark call-stack frame is pushed.
+///
+/// This hook is intentionally narrow: embedders can sample current stack
+/// metadata without changing Starlark semantics or traversing user values.
+pub trait CallStackCheckpoint<'e> {
+    /// Invoked after the evaluator pushes a call-stack frame.
+    fn on_call_stack_push<'v>(&self, eval: &Evaluator<'v, '_, 'e>);
+
+    /// Invoked from the evaluator's existing infrequent bytecode check path.
+    fn on_infrequent_instr_check<'v>(&self, _eval: &Evaluator<'v, '_, 'e>) {}
 }
 
 /// Just holds things that require using EvaluationCallbacksEnabled so that we can cache whether that needs to be enabled or not.
@@ -265,6 +281,7 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
             breakpoint_handler: None,
             print_handler: &StderrPrintHandler,
             soft_error_handler: &HardErrorSoftErrorHandler,
+            call_stack_checkpoint: None,
             verbose_gc: false,
             static_typechecking: false,
             max_callstack_size: None,
@@ -491,6 +508,11 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
         self.soft_error_handler = handler;
     }
 
+    /// Set an embedder-owned callback invoked after call-stack pushes.
+    pub fn set_call_stack_checkpoint(&mut self, checkpoint: Box<dyn CallStackCheckpoint<'e> + 'a>) {
+        self.call_stack_checkpoint = Some(checkpoint);
+    }
+
     /// Set canceled-checking function. This function is called periodically to check if the evaluator should return early (with an error condition).
     pub fn set_check_cancelled(&mut self, is_canceled: Box<dyn Fn() -> bool + 'a>) {
         self.is_cancelled = is_canceled
@@ -514,6 +536,9 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
         }
 
         self.call_stack.push(function, span)?;
+        if let Some(checkpoint) = self.call_stack_checkpoint.as_ref() {
+            checkpoint.on_call_stack_push(self);
+        }
         // Must always call .pop regardless
         let res = within(self).map_err(|e| add_diagnostics(e, self));
         self.call_stack.pop();
@@ -935,6 +960,9 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
     pub(crate) fn run_infrequent_instr_checks(&mut self) -> crate::Result<()> {
         self.infrequent_instr_check_counter += 1;
         if self.infrequent_instr_check_counter >= INFREQUENT_INSTRUCTION_CHECK_PERIOD {
+            if let Some(checkpoint) = self.call_stack_checkpoint.as_ref() {
+                checkpoint.on_infrequent_instr_check(self);
+            }
             if (self.is_cancelled)() {
                 return Err(crate::Error::new_other(EvaluatorError::Cancelled));
             }

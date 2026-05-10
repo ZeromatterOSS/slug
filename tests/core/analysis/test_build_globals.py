@@ -122,6 +122,39 @@ async def test_module_name(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_build_globals_data")
+async def test_module_metadata_direct_globals(buck: Buck) -> None:
+    """module_name() and module_version() are BUILD-file globals."""
+    result = await buck.build("//:module_metadata_direct_test")
+    output = result.get_build_report().output_for_target(
+        "//:module_metadata_direct_test"
+    )
+    content = output.read_text().strip()
+    assert content == "root@1.2.3", f"Expected 'root@1.2.3', got '{content}'"
+
+
+@buck_test(data_dir="test_build_globals_data")
+async def test_module_metadata_native_globals(buck: Buck) -> None:
+    """native.module_name() and native.module_version() share BUILD metadata."""
+    result = await buck.build("//:module_metadata_native_test")
+    output = result.get_build_report().output_for_target(
+        "//:module_metadata_native_test"
+    )
+    content = output.read_text().strip()
+    assert content == "root@1.2.3", f"Expected 'root@1.2.3', got '{content}'"
+
+
+@buck_test(data_dir="test_build_globals_data")
+async def test_external_module_metadata_direct_globals(buck: Buck) -> None:
+    """BUILD globals report metadata for an external bzlmod module repo."""
+    result = await buck.build("//:external_module_metadata_direct_test")
+    output = result.get_build_report().output_for_target(
+        "//:external_module_metadata_direct_test"
+    )
+    content = output.read_text().strip()
+    assert content == "dep@2.3.4", f"Expected 'dep@2.3.4', got '{content}'"
+
+
+@buck_test(data_dir="test_build_globals_data")
 async def test_repo_name_direct(buck: Buck) -> None:
     """repo_name() BUILD global returns the canonical repository name."""
     result = await buck.build("//:repo_name_direct_test")

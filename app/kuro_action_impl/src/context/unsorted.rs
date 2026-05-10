@@ -189,7 +189,7 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
             filename,
             OutputType::FileOrDirectory,
             eval.call_stack_top_location(),
-            BuckOutPathKind::Configuration,
+            BuckOutPathKind::BazelOutput,
             eval.heap(),
         )?;
 
@@ -218,7 +218,7 @@ pub(crate) fn analysis_actions_methods_unsorted(builder: &mut MethodsBuilder) {
             filename,
             OutputType::Directory,
             eval.call_stack_top_location(),
-            BuckOutPathKind::Configuration,
+            BuckOutPathKind::BazelOutput,
             eval.heap(),
         )?;
 

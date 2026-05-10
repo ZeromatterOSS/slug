@@ -256,6 +256,7 @@ impl<'a> ClientCommandContext<'a> {
                 && !config_opts.nocollect_code_coverage,
             force_pic: config_opts.force_pic,
             starlark_flags: crate::bazelrc::get_starlark_flags_from_args().to_vec(),
+            experimental_cc_implementation_deps: !config_opts.noexperimental_cc_implementation_deps,
             ..self.empty_client_context(cmd.logging_name())?
         })
     }
@@ -313,6 +314,7 @@ impl<'a> ClientCommandContext<'a> {
             collect_code_coverage: false,
             force_pic: false,
             starlark_flags: Vec::new(),
+            experimental_cc_implementation_deps: true,
         })
     }
 

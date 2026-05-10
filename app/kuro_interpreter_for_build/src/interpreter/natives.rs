@@ -14,6 +14,7 @@ use kuro_build_api::interpreter::rule_defs::depset::bazel_depset_tset_definition
 use kuro_build_api::interpreter::rule_defs::depset::depset_direct_and_transitive;
 use kuro_build_api::interpreter::rule_defs::depset::is_depset_value;
 use kuro_build_api::interpreter::rule_defs::depset::make_depset_from_lists;
+use kuro_build_api::interpreter::rule_defs::py_common::AnalysisTestResultInfoProvider;
 use kuro_build_api::interpreter::rule_defs::transitive_set::FrozenTransitiveSet;
 use kuro_build_api::interpreter::rule_defs::transitive_set::FrozenTransitiveSetDefinition;
 use kuro_build_api::interpreter::rule_defs::transitive_set::TransitiveSet;
@@ -396,19 +397,7 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
     }
 
     /// Bazel's `AnalysisTestResultInfo` provider for analysis test results.
-    ///
-    /// Used by bazel_skylib's unittest framework to return test results.
-    fn AnalysisTestResultInfo<'v>(
-        #[starlark(require = named, default = false)] success: bool,
-        #[starlark(require = named, default = "")] message: &str,
-        eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<Value<'v>> {
-        let entries = vec![
-            ("success", eval.heap().alloc(success)),
-            ("message", eval.heap().alloc(message)),
-        ];
-        Ok(eval.heap().alloc(AllocDict(entries)))
-    }
+    const AnalysisTestResultInfo: AnalysisTestResultInfoProvider = AnalysisTestResultInfoProvider;
 
     /// Bazel 8.0+ symbolic macro definition.
     ///
@@ -427,8 +416,6 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] finalizer: bool,
         #[allow(unused_variables)] eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<StarlarkMacroCallable<'v>> {
-        // TODO(macro): Wire inherit_attrs for attribute validation.
-        let _ = inherit_attrs;
         let doc_str = match doc {
             NoneOr::Other(d) if !d.is_empty() => Some(d.to_owned()),
             _ => None,
@@ -437,11 +424,16 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
             NoneOr::Other(v) => Some(v),
             NoneOr::None => None,
         };
+        let inherit_attrs_val = match inherit_attrs {
+            NoneOr::Other(v) => Some(v),
+            NoneOr::None => None,
+        };
         Ok(StarlarkMacroCallable::new(
             implementation,
             finalizer,
             doc_str,
             attrs_val,
+            inherit_attrs_val,
         ))
     }
 

@@ -367,6 +367,9 @@ struct PackageListingBuilder {
     dirs: Vec<ArcS<PackageRelativePath>>,
     subpackages: Vec<ArcS<PackageRelativePath>>,
     buildfile: Option<FileNameBuf>,
+    dirs_read: usize,
+    dir_entries: usize,
+    max_dir_entries: usize,
 }
 
 impl PackageListingBuilder {
@@ -376,6 +379,9 @@ impl PackageListingBuilder {
             dirs: Vec::new(),
             subpackages: Vec::new(),
             buildfile: None,
+            dirs_read: 0,
+            dir_entries: 0,
+            max_dir_entries: 0,
         }
     }
 
@@ -410,6 +416,9 @@ async fn gather_into_listing(
             .await
             .map_err(|e| GatherPackageListingError::from_read_dir(cell_path.as_ref(), e))?
             .included;
+        output.dirs_read += 1;
+        output.dir_entries += entries.len();
+        output.max_dir_entries = output.max_dir_entries.max(entries.len());
         let buildfile = find_buildfile(buildfile_candidates, &entries);
 
         match (is_root, buildfile) {
@@ -463,5 +472,19 @@ async fn gather_package_listing_impl(
         .map_err(|e| GatherPackageListingError::error(cell_path, e))?;
     let mut builder = PackageListingBuilder::new();
     gather_into_listing(ctx, &buildfile_candidates, cell_path, &mut builder).await?;
+    if kuro_util::memory_checkpoint::enabled() {
+        kuro_util::memory_checkpoint::checkpoint(
+            "package_listing_walk",
+            [
+                ("files", builder.files.len()),
+                ("dirs", builder.dirs.len()),
+                ("subpackages", builder.subpackages.len()),
+                ("dirs_read", builder.dirs_read),
+                ("dir_entries", builder.dir_entries),
+                ("max_dir_entries", builder.max_dir_entries),
+                ("package_path_len", cell_path.path().as_str().len()),
+            ],
+        );
+    }
     Ok(builder.finish())
 }

@@ -1,1 +1,8 @@
 module(name = "root")
+
+bazel_dep(name = "dep", version = "1.0.0")
+
+local_path_override(
+    module_name = "dep",
+    path = "dep",
+)

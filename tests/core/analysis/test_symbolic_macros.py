@@ -48,3 +48,14 @@ async def test_symbolic_macro_default_attr(buck: Buck) -> None:
     output = result.get_build_report().output_for_target("//:default_attr_test")
     content = output.read_text().strip()
     assert content == "hello", f"Expected 'hello', got '{content}'"
+
+
+@buck_test(data_dir="test_symbolic_macros_data")
+async def test_symbolic_macro_inherited_rule_attr_default(buck: Buck) -> None:
+    """macro(inherit_attrs = rule) passes omitted inherited attrs as None."""
+    result = await buck.build("//:inherited_attr_default_test")
+    output = result.get_build_report().output_for_target(
+        "//:inherited_attr_default_test"
+    )
+    content = output.read_text().strip()
+    assert content == "none", f"Expected 'none', got '{content}'"

@@ -48,3 +48,28 @@ def _no_attrs_macro_impl(name, visibility = None):
 no_attrs_macro = macro(
     implementation = _no_attrs_macro_impl,
 )
+
+def _inherited_rule_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, ctx.attr.inherited or "rule")
+    return [DefaultInfo(files = depset([out]))]
+
+inherited_rule = rule(
+    implementation = _inherited_rule_impl,
+    attrs = {
+        "inherited": attr.string(),
+    },
+)
+
+def _inherits_rule_attrs_macro_impl(name, visibility, inherited, **kwargs):
+    native.genrule(
+        name = name,
+        outs = [name + ".txt"],
+        cmd = "echo {} > $@".format("none" if inherited == None else inherited),
+        visibility = visibility,
+    )
+
+inherits_rule_attrs_macro = macro(
+    implementation = _inherits_rule_attrs_macro_impl,
+    inherit_attrs = inherited_rule,
+)

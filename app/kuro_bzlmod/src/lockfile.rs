@@ -348,6 +348,39 @@ pub fn json_to_attr_value(value: &serde_json::Value) -> AttrValue {
     }
 }
 
+fn first_invalid_empty_target_label(
+    specs: &fxhash::FxHashMap<String, RepoSpec>,
+) -> Option<(&str, &str, &str)> {
+    specs.iter().find_map(|(repo_name, spec)| {
+        spec.attributes.iter().find_map(|(attr_name, value)| {
+            first_invalid_empty_target_label_attr(value)
+                .map(|label| (repo_name.as_str(), attr_name.as_str(), label))
+        })
+    })
+}
+
+fn first_invalid_empty_target_label_attr(value: &AttrValue) -> Option<&str> {
+    match value {
+        AttrValue::Label(label) => invalid_empty_target_label(label).then_some(label.as_str()),
+        AttrValue::String(s) => invalid_empty_target_label(s).then_some(s.as_str()),
+        AttrValue::StringList(items) => items
+            .iter()
+            .find(|item| invalid_empty_target_label(item))
+            .map(String::as_str),
+        AttrValue::Dict(entries) => entries
+            .values()
+            .find_map(first_invalid_empty_target_label_attr),
+        AttrValue::Int(_) | AttrValue::Bool(_) | AttrValue::None => None,
+    }
+}
+
+fn invalid_empty_target_label(value: &str) -> bool {
+    if !(value.starts_with('@') || value.starts_with("//") || value.starts_with(':')) {
+        return false;
+    }
+    crate::repo_mapping::canonicalize_label_with_package_context(value, "", "", None).is_none()
+}
+
 /// Lock entry for a repository rule execution result.
 ///
 /// This caches the result of executing a repository rule (like `http_archive`
@@ -511,10 +544,21 @@ impl Lockfile {
             return None;
         }
 
-        let result = repo_specs
+        let result: fxhash::FxHashMap<String, RepoSpec> = repo_specs
             .iter()
             .map(|(name, spec)| (name.clone(), spec.to_repo_spec()))
             .collect();
+
+        if let Some((repo_name, attr_name, label)) = first_invalid_empty_target_label(&result) {
+            tracing::debug!(
+                "Extension cache miss for '{}': cached RepoSpec '{}' attr '{}' contains invalid empty-target label '{}'",
+                extension_id,
+                repo_name,
+                attr_name,
+                label
+            );
+            return None;
+        }
 
         tracing::debug!(
             "Extension cache hit for '{}': {} repo specs",
@@ -1036,6 +1080,38 @@ mod tests {
         assert_eq!(
             numpy_spec.repo_rule_id,
             "@@rules_python//pip:pip.bzl%pip_install"
+        );
+    }
+
+    #[test]
+    fn extension_cache_misses_on_invalid_empty_target_label() {
+        use crate::repository_invocations::AttrValue;
+
+        let mut lockfile = Lockfile::new();
+        let mut repo_specs = FxHashMap::default();
+        repo_specs.insert(
+            "zstd-sys".to_owned(),
+            RepoSpec::new("@@rules_rs//rs:crate.bzl%crate_repository".to_owned()).with_attr(
+                "deps".to_owned(),
+                AttrValue::StringList(vec!["@@zstd//:".to_owned()]),
+            ),
+        );
+
+        lockfile.set_extension_cache(
+            "@@rules_rs//rs:extensions.bzl%crate".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &repo_specs,
+        );
+
+        assert!(
+            lockfile
+                .get_extension_cache(
+                    "@@rules_rs//rs:extensions.bzl%crate",
+                    "bzl-digest",
+                    "usages-digest",
+                )
+                .is_none()
         );
     }
 

@@ -15,10 +15,13 @@
 //! a different API.
 
 use std::collections::HashSet;
+use std::convert::Infallible;
 use std::fmt;
 use std::fmt::Display;
 use std::hash::Hash;
 use std::sync::OnceLock;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 use allocative::Allocative;
 use kuro_artifact::artifact::artifact_type::Artifact;
@@ -38,6 +41,7 @@ use starlark::environment::MethodsStatic;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
+use starlark::typing::Ty;
 use starlark::values::Freeze;
 use starlark::values::FrozenHeap;
 use starlark::values::FrozenValue;
@@ -57,10 +61,12 @@ use starlark::values::list::AllocList;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneOr;
 use starlark::values::starlark_value;
+use starlark::values::type_repr::StarlarkTypeRepr;
 
 use crate::artifact_groups::ArtifactGroup;
 use crate::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
 use crate::interpreter::rule_defs::artifact_tagging::ArtifactTag;
+use crate::interpreter::rule_defs::cc_common::cc_frozen_list_items;
 use crate::interpreter::rule_defs::cmd_args::CommandLineArtifactVisitor;
 use crate::interpreter::rule_defs::cmd_args::SimpleCommandLineArtifactVisitor;
 use crate::interpreter::rule_defs::cmd_args::value_as::ValueAsCommandLineLike;
@@ -103,6 +109,100 @@ enum DepsetError {
 }
 
 const MAX_DEPSET_DEPTH: u32 = 3500;
+
+#[derive(Debug)]
+struct DepsetListOrTuple<'v> {
+    items: Vec<Value<'v>>,
+}
+
+impl<'v> StarlarkTypeRepr for DepsetListOrTuple<'v> {
+    type Canonical = <UnpackListOrTuple<Value<'v>> as StarlarkTypeRepr>::Canonical;
+
+    fn starlark_type_repr() -> Ty {
+        UnpackListOrTuple::<Value<'_>>::starlark_type_repr()
+    }
+}
+
+impl<'v> UnpackValue<'v> for DepsetListOrTuple<'v> {
+    type Error = Infallible;
+
+    fn unpack_value_impl(value: Value<'v>) -> Result<Option<Self>, Self::Error> {
+        if let Some(list) = UnpackListOrTuple::<Value<'v>>::unpack_value_opt(value) {
+            return Ok(Some(Self { items: list.items }));
+        }
+        Ok(cc_frozen_list_items(value).map(|items| Self { items }))
+    }
+}
+
+static DEPSET_CREATE_COUNT: AtomicUsize = AtomicUsize::new(0);
+static DEPSET_CREATE_MAX_DIRECT: AtomicUsize = AtomicUsize::new(0);
+static DEPSET_CREATE_MAX_TRANSITIVE: AtomicUsize = AtomicUsize::new(0);
+static DEPSET_CREATE_MAX_DEPTH: AtomicUsize = AtomicUsize::new(0);
+
+#[derive(Clone, Copy, Debug)]
+pub struct DepsetSummary {
+    pub direct_len: usize,
+    pub transitive_len: usize,
+    pub depth: u32,
+    pub is_empty: bool,
+}
+
+fn update_max_usize(max: &AtomicUsize, value: usize) -> usize {
+    let mut old = max.load(Ordering::Relaxed);
+    while value > old {
+        match max.compare_exchange_weak(old, value, Ordering::SeqCst, Ordering::Relaxed) {
+            Ok(_) => return value,
+            Err(next) => old = next,
+        }
+    }
+    old
+}
+
+fn depset_order_id(order: NestedSetOrder) -> usize {
+    match order {
+        NestedSetOrder::Default => 0,
+        NestedSetOrder::Postorder => 1,
+        NestedSetOrder::Preorder => 2,
+        NestedSetOrder::Topological => 3,
+    }
+}
+
+fn depset_create_checkpoint(
+    direct_len: usize,
+    transitive_len: usize,
+    deduped_direct_len: usize,
+    order: NestedSetOrder,
+    element_type_present: bool,
+    is_empty: bool,
+    depth: u32,
+) {
+    if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    let create_count = DEPSET_CREATE_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
+    let max_direct = update_max_usize(&DEPSET_CREATE_MAX_DIRECT, deduped_direct_len);
+    let max_transitive = update_max_usize(&DEPSET_CREATE_MAX_TRANSITIVE, transitive_len);
+    let max_depth = update_max_usize(&DEPSET_CREATE_MAX_DEPTH, depth as usize);
+    if direct_len + transitive_len < 16 && depth < 16 && !create_count.is_power_of_two() {
+        return;
+    }
+    kuro_util::memory_checkpoint::checkpoint(
+        "depset_create_live",
+        [
+            ("create_count", create_count),
+            ("direct_len", direct_len),
+            ("deduped_direct_len", deduped_direct_len),
+            ("transitive_len", transitive_len),
+            ("order", depset_order_id(order)),
+            ("element_type_present", element_type_present as usize),
+            ("is_empty", is_empty as usize),
+            ("depth", depth as usize),
+            ("max_direct_len", max_direct),
+            ("max_transitive_len", max_transitive),
+            ("max_depth", max_depth),
+        ],
+    );
+}
 
 pub fn bazel_depset_tset_definition()
 -> kuro_error::Result<&'static OwnedFrozenValueTyped<FrozenTransitiveSetDefinition>> {
@@ -519,6 +619,29 @@ impl<'v> DepsetView<'v> {
             Self::Frozen(depset) => depset.depth(),
         }
     }
+
+    fn summary(&self) -> DepsetSummary {
+        match self {
+            Self::Live(live) => DepsetSummary {
+                direct_len: live.direct.len(),
+                transitive_len: live.transitive.len(),
+                depth: live.depth(),
+                is_empty: live.is_empty(),
+            },
+            Self::FrozenLive(live) => DepsetSummary {
+                direct_len: live.direct.len(),
+                transitive_len: live.transitive.len(),
+                depth: live.depth(),
+                is_empty: live.is_empty(),
+            },
+            Self::Frozen(depset) => DepsetSummary {
+                direct_len: depset.direct_values().len(),
+                transitive_len: depset.children_values().len(),
+                depth: depset.depth(),
+                is_empty: depset.is_empty(),
+            },
+        }
+    }
 }
 
 /// Bridge helper for native Rust code that still needs to preserve depset graph
@@ -541,6 +664,10 @@ pub fn depset_direct_and_transitive<'v>(
 
 pub fn is_depset_value(value: Value) -> bool {
     DepsetView::from_value(value).is_some()
+}
+
+pub fn depset_summary(value: Value) -> Option<DepsetSummary> {
+    DepsetView::from_value(value).map(|depset| depset.summary())
 }
 
 pub fn depset_is_empty(value: Value) -> starlark::Result<bool> {
@@ -878,9 +1005,20 @@ fn make_live_depset_from_values<'v>(
     transitive: Vec<Value<'v>>,
     order: &str,
 ) -> starlark::Result<LiveDepsetGen<Value<'v>>> {
+    let direct_len = direct.len();
+    let transitive_len = transitive.len();
     let direct = dedupe_values_preserving_order(direct)?;
     let effective_order = validate_depset_order(order, &transitive)?;
     let (element_type, is_empty, depth) = validate_depset_elements(&direct, &transitive)?;
+    depset_create_checkpoint(
+        direct_len,
+        transitive_len,
+        direct.len(),
+        effective_order,
+        element_type.is_some(),
+        is_empty,
+        depth,
+    );
     Ok(DepsetGen::from_validated_parts(
         direct,
         transitive,
@@ -940,13 +1078,13 @@ pub fn register_depset(globals: &mut GlobalsBuilder) {
     /// Returns:
     ///     A new depset containing the specified elements.
     fn depset<'v>(
-        #[starlark(default = NoneOr::None)] direct: NoneOr<UnpackListOrTuple<Value<'v>>>,
+        #[starlark(default = NoneOr::None)] direct: NoneOr<DepsetListOrTuple<'v>>,
         // Accept `None` for `transitive` as equivalent to an empty list —
         // bazel's `depset(transitive = None)` works, kuro's used to reject
         // it. rules_rust's `make_libstd_and_allocator_ccinfo` passes
         // through `transitive = allocator_inputs` which can be `None`.
         #[starlark(require = named, default = NoneOr::None)] transitive: NoneOr<
-            UnpackListOrTuple<Value<'v>>,
+            DepsetListOrTuple<'v>,
         >,
         #[starlark(require = named, default = "default")] order: &str,
         eval: &mut Evaluator<'v, '_, '_>,

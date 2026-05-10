@@ -4,8 +4,12 @@ load(":defs.bzl",
     "link_with_user_flags_test",
     "link_with_linking_contexts_test",
     "create_library_to_link_test",
+    "frozen_dict_depset_test",
     "linker_input_test",
+    "linker_input_nested_user_flags_test",
     "link_deps_statically_test",
+    "mutable_library_to_link_depset_test",
+    "starlark_library_to_link_depset_test",
 )
 
 link_executable_test(
@@ -32,6 +36,24 @@ linker_input_test(
     name = "linker_input",
 )
 
+linker_input_nested_user_flags_test(
+    name = "linker_input_nested_user_flags",
+)
+
+frozen_dict_depset_test(
+    name = "frozen_dict_depset",
+)
+
 link_deps_statically_test(
     name = "link_deps_statically",
+)
+
+starlark_library_to_link_depset_test(
+    name = "starlark_library_to_link_depset",
+    library = "lib.c",
+)
+
+mutable_library_to_link_depset_test(
+    name = "mutable_library_to_link_depset",
+    library = "lib.c",
 )

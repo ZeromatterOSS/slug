@@ -23,6 +23,7 @@ use kuro_node::provider_id_set::ProviderIdSet;
 use starlark::environment::Module;
 use starlark::values::FrozenValueTyped;
 use starlark::values::Value;
+use starlark::values::list::AllocList;
 
 use crate::attrs::resolve::ctx::AttrResolutionContext;
 
@@ -153,7 +154,17 @@ pub(crate) trait TransitionDepAttrTypeExt {
         ctx: &mut dyn AttrResolutionContext<'v>,
         dep_attr: &ConfiguredTransitionDep,
     ) -> kuro_error::Result<Value<'v>> {
-        DepAttrType::resolve_single_impl(ctx, &dep_attr.dep, &dep_attr.required_providers, false)
+        let dep = DepAttrType::resolve_single_impl(
+            ctx,
+            &dep_attr.dep,
+            &dep_attr.required_providers,
+            false,
+        )?;
+        if dep_attr.resolve_as_list {
+            Ok(ctx.starlark_module().heap().alloc(AllocList([dep])))
+        } else {
+            Ok(dep)
+        }
     }
 }
 

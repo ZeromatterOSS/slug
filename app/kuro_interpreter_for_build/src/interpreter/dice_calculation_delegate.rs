@@ -9,6 +9,9 @@
  */
 
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 use allocative::Allocative;
 use async_trait::async_trait;
@@ -52,8 +55,10 @@ use kuro_interpreter::paths::path::StarlarkPath;
 use kuro_node::nodes::eval_result::EvaluationResult;
 use kuro_node::super_package::SuperPackage;
 use kuro_util::time_span::TimeSpan;
+use once_cell::sync::Lazy;
 use starlark::codemap::FileSpan;
 use starlark::syntax::AstModule;
+use tokio::sync::Semaphore;
 
 use crate::interpreter::buckconfig::ConfigsOnDiceViewForStarlark;
 use crate::interpreter::cell_info::InterpreterCellInfo;
@@ -64,6 +69,28 @@ use crate::interpreter::interpreter_for_dir::InterpreterForDir;
 use crate::interpreter::interpreter_for_dir::ParseData;
 use crate::interpreter::interpreter_for_dir::ParseResult;
 use crate::super_package::package_value::SuperPackageValuesImpl;
+
+static MODULE_EVALUATION_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+static MODULE_EVALUATION_QUEUED: AtomicUsize = AtomicUsize::new(0);
+static MODULE_EVALUATION_COMPLETED: AtomicUsize = AtomicUsize::new(0);
+static MODULE_EVALUATION_MAX_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+static MODULE_EVALUATION_MAX_QUEUED: AtomicUsize = AtomicUsize::new(0);
+static MODULE_EVALUATION_SEMAPHORE: Lazy<Semaphore> =
+    Lazy::new(|| Semaphore::new(module_evaluation_concurrency_limit()));
+
+fn module_evaluation_concurrency_limit() -> usize {
+    kuro_util::threads::available_parallelism().max(1)
+}
+
+fn record_max_active(max: &AtomicUsize, active: usize) {
+    let mut current = max.load(Ordering::Relaxed);
+    while active > current {
+        match max.compare_exchange_weak(current, active, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => break,
+            Err(next) => current = next,
+        }
+    }
+}
 
 fn toml_value_to_json(value: toml::Value) -> serde_json::Value {
     match value {
@@ -155,6 +182,7 @@ impl<'c, 'd> HasCalculationDelegate<'c, 'd> for DiceComputations<'d> {
                     implicit_import_paths,
                     dirs_allowing_relative_paths,
                     package_dir,
+                    ctx.is_bzlmod().await?,
                 )?))
             }
 
@@ -163,7 +191,12 @@ impl<'c, 'd> HasCalculationDelegate<'c, 'd> for DiceComputations<'d> {
             }
         }
 
-        let build_file_cell = path.borrow().build_file_cell();
+        let is_bzlmod = self.is_bzlmod().await?;
+        let build_file_cell = if is_bzlmod {
+            BuildFileCell::new(path.borrow().path().cell())
+        } else {
+            path.borrow().build_file_cell()
+        };
         let configs = self
             .compute(&InterpreterConfigForDirKey(
                 path.borrow()
@@ -246,11 +279,23 @@ impl<'c, 'd: 'c> DiceCalculationDelegate<'c, 'd> {
         starlark_file: StarlarkPath<'_>,
     ) -> kuro_error::Result<(AstModule, ModuleDeps)> {
         let ParseData(ast, imports) = self.parse_file(starlark_file).await??;
+        let mut ast = Some(ast);
+        let reparses_after_deps = !imports.is_empty();
+        let imports_for_deps = imports.clone();
+        if reparses_after_deps {
+            drop(ast.take());
+        }
         let deps = CycleGuard::<LoadCycleDescriptor>::new(self.ctx)?
-            .guard_this(Self::eval_deps(self.ctx, &imports))
+            .guard_this(Self::eval_deps(self.ctx, &imports_for_deps))
             .await
             .into_result(self.ctx)
             .await???;
+        let ast = if reparses_after_deps {
+            let ParseData(ast, _) = self.parse_file(starlark_file).await??;
+            ast
+        } else {
+            ast.expect("AST was retained when no dependency reparse was needed")
+        };
         Ok((ast, deps))
     }
 
@@ -337,30 +382,113 @@ impl<'c, 'd: 'c> DiceCalculationDelegate<'c, 'd> {
     ) -> kuro_error::Result<LoadedModule> {
         let (ast, deps) = self.prepare_eval(starlark_file.into()).await?;
         let loaded_modules = deps.get_loaded_modules();
+        let direct_imports = loaded_modules.map.keys().cloned().collect::<Vec<_>>();
+        let direct_import_count = direct_imports.len();
+        let direct_import_path_bytes = direct_imports
+            .iter()
+            .map(|path| path.to_string().len())
+            .sum::<usize>();
         let buckconfig = self.get_legacy_buck_config_for_starlark().await?;
         let root_buckconfig = self.ctx.get_legacy_root_config_on_dice().await?;
 
         let configs = &self.configs;
         let ctx = &mut *self.ctx;
 
+        let memory_checkpoints = kuro_util::memory_checkpoint::enabled();
+        let queued = MODULE_EVALUATION_QUEUED.fetch_add(1, Ordering::Relaxed) + 1;
+        record_max_active(&MODULE_EVALUATION_MAX_QUEUED, queued);
+        let wait_started = Instant::now();
+        let permit = MODULE_EVALUATION_SEMAPHORE.acquire().await.unwrap();
+        let wait_us = wait_started.elapsed().as_micros().min(usize::MAX as u128) as usize;
+        let queued = MODULE_EVALUATION_QUEUED.fetch_sub(1, Ordering::Relaxed) - 1;
+        let active = MODULE_EVALUATION_ACTIVE.fetch_add(1, Ordering::Relaxed) + 1;
+        record_max_active(&MODULE_EVALUATION_MAX_ACTIVE, active);
+
         let eval_kind = StarlarkEvalKind::Load(Arc::new(starlark_file.to_owned()));
-        let provider = StarlarkEvaluatorProvider::new(ctx, eval_kind).await?;
+        let provider = match StarlarkEvaluatorProvider::new(ctx, eval_kind).await {
+            Ok(provider) => provider,
+            Err(e) => {
+                drop(permit);
+                let active = MODULE_EVALUATION_ACTIVE.fetch_sub(1, Ordering::Relaxed) - 1;
+                let completed = MODULE_EVALUATION_COMPLETED.fetch_add(1, Ordering::Relaxed) + 1;
+                if memory_checkpoints {
+                    kuro_util::memory_checkpoint::checkpoint(
+                        "module_evaluation_phase",
+                        [
+                            ("active", active),
+                            ("completed", completed),
+                            (
+                                "max_active",
+                                MODULE_EVALUATION_MAX_ACTIVE.load(Ordering::Relaxed),
+                            ),
+                            ("queued", queued),
+                            (
+                                "max_queued",
+                                MODULE_EVALUATION_MAX_QUEUED.load(Ordering::Relaxed),
+                            ),
+                            ("concurrency_limit", module_evaluation_concurrency_limit()),
+                            ("wait_us", wait_us),
+                            ("ok", 0),
+                            ("direct_imports", direct_import_count),
+                            ("import_path_bytes", direct_import_path_bytes),
+                            (
+                                "module_path_len",
+                                starlark_file.path().path().as_str().len(),
+                            ),
+                        ],
+                    );
+                }
+                return Err(e);
+            }
+        };
 
         let mut buckconfigs = ConfigsOnDiceViewForStarlark::new(ctx, buckconfig, root_buckconfig);
-        let evaluation = configs
-            .eval_module(
-                starlark_file,
-                &mut buckconfigs,
-                ast,
-                loaded_modules.clone(),
-                provider,
-                cancellation,
-            )
+        let evaluation = configs.eval_module(
+            starlark_file,
+            &mut buckconfigs,
+            ast,
+            loaded_modules,
+            provider,
+            cancellation,
+        );
+        drop(permit);
+        let active = MODULE_EVALUATION_ACTIVE.fetch_sub(1, Ordering::Relaxed) - 1;
+        let completed = MODULE_EVALUATION_COMPLETED.fetch_add(1, Ordering::Relaxed) + 1;
+        if memory_checkpoints
+            && (completed <= 10 || completed % 1000 == 0 || direct_import_count >= 50)
+        {
+            kuro_util::memory_checkpoint::checkpoint(
+                "module_evaluation_phase",
+                [
+                    ("active", active),
+                    ("completed", completed),
+                    (
+                        "max_active",
+                        MODULE_EVALUATION_MAX_ACTIVE.load(Ordering::Relaxed),
+                    ),
+                    ("queued", queued),
+                    (
+                        "max_queued",
+                        MODULE_EVALUATION_MAX_QUEUED.load(Ordering::Relaxed),
+                    ),
+                    ("concurrency_limit", module_evaluation_concurrency_limit()),
+                    ("wait_us", wait_us),
+                    ("ok", usize::from(evaluation.is_ok())),
+                    ("direct_imports", direct_import_count),
+                    ("import_path_bytes", direct_import_path_bytes),
+                    (
+                        "module_path_len",
+                        starlark_file.path().path().as_str().len(),
+                    ),
+                ],
+            );
+        }
+        let evaluation = evaluation
             .with_buck_error_context(|| format!("Error evaluating module: `{}`", starlark_file))?;
 
-        Ok(LoadedModule::new(
+        Ok(LoadedModule::new_with_direct_imports(
             OwnedStarlarkModulePath::new(starlark_file),
-            loaded_modules,
+            direct_imports,
             evaluation,
         ))
     }

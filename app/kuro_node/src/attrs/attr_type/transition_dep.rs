@@ -30,13 +30,19 @@ use crate::provider_id_set::ProviderIdSet;
 pub struct TransitionDepAttrType {
     pub required_providers: ProviderIdSet,
     pub transition: Option<Arc<TransitionId>>,
+    pub resolve_as_list: bool,
 }
 
 impl TransitionDepAttrType {
-    pub fn new(required_providers: ProviderIdSet, transition: Option<Arc<TransitionId>>) -> Self {
+    pub fn new(
+        required_providers: ProviderIdSet,
+        transition: Option<Arc<TransitionId>>,
+        resolve_as_list: bool,
+    ) -> Self {
         TransitionDepAttrType {
             required_providers,
             transition,
+            resolve_as_list,
         }
     }
 
@@ -49,6 +55,7 @@ impl TransitionDepAttrType {
             ConfiguredTransitionDep {
                 dep: ctx.configure_transition_target(&attr.dep, self.get_transition(attr))?,
                 required_providers: self.required_providers.dupe(),
+                resolve_as_list: self.resolve_as_list,
             },
         )))
     }
@@ -68,6 +75,7 @@ impl TransitionDepAttrType {
 pub struct ConfiguredTransitionDep {
     pub dep: ConfiguredProvidersLabel,
     pub required_providers: ProviderIdSet,
+    pub resolve_as_list: bool,
 }
 
 impl Display for ConfiguredTransitionDep {

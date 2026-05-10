@@ -15,6 +15,8 @@ use std::fmt::Formatter;
 use std::hash::BuildHasher;
 use std::hash::Hasher;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 use allocative::Allocative;
 use dupe::Dupe;
@@ -81,6 +83,9 @@ use crate::interpreter::rule_defs::provider::user::UserProvider;
 use crate::interpreter::rule_defs::provider::user::user_provider_creator;
 use crate::interpreter::rule_defs::provider::user::user_provider_creator_schemaless;
 
+static INIT_PROVIDER_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
+static RULES_CC_INIT_PROVIDER_CALL_COUNT: AtomicUsize = AtomicUsize::new(0);
+
 #[derive(Debug, kuro_error::Error)]
 #[kuro(tag = Input)]
 enum ProviderCallableError {
@@ -143,9 +148,12 @@ fn create_callable_function_signature(
         fields.iter().map(|(name, field)| {
             (
                 name.as_str(),
-                match field.default {
-                    None => ParametersSpecParam::Required,
-                    Some(default) => ParametersSpecParam::Defaulted(default),
+                if let Some(default) = field.default {
+                    ParametersSpecParam::Defaulted(default)
+                } else if field.required {
+                    ParametersSpecParam::Required
+                } else {
+                    ParametersSpecParam::Optional
                 },
                 field.ty.as_ty().dupe(),
             )
@@ -306,6 +314,83 @@ impl ProviderCallableLike for FrozenInitProviderConstructor {
     }
 }
 
+fn provider_path_is_rules_cc_cc_private(provider_id: &ProviderId) -> bool {
+    let Some(path) = &provider_id.path else {
+        return false;
+    };
+    path.cell().as_str().starts_with("rules_cc+") && path.path().as_str().contains("cc/private")
+}
+
+fn init_provider_checkpoint<'v>(
+    checkpoint: &'static str,
+    provider: Value<'v>,
+    eval: &Evaluator<'v, '_, '_>,
+    result_fields: Option<usize>,
+) {
+    if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    let Some(provider_like) = provider.request_value::<&dyn ProviderCallableLike>() else {
+        return;
+    };
+    let Ok(provider_id) = provider_like.id() else {
+        return;
+    };
+    if !provider_path_is_rules_cc_cc_private(provider_id) {
+        return;
+    }
+
+    let call_count = INIT_PROVIDER_CALL_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
+    let rules_cc_call_count = RULES_CC_INIT_PROVIDER_CALL_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
+    if rules_cc_call_count > 32 && !rules_cc_call_count.is_power_of_two() {
+        return;
+    }
+
+    let location = eval.call_stack_top_location();
+    let (call_file_len, call_line, call_column) = location
+        .as_ref()
+        .map(|location| {
+            let resolved = location.resolve_span();
+            (
+                location.filename().len(),
+                resolved.begin.line + 1,
+                resolved.begin.column + 1,
+            )
+        })
+        .unwrap_or((0, 0, 0));
+
+    kuro_util::memory_checkpoint::checkpoint(
+        checkpoint,
+        [
+            ("call_count", call_count),
+            ("rules_cc_call_count", rules_cc_call_count),
+            ("result_fields", result_fields.unwrap_or(0)),
+            ("has_result", result_fields.is_some() as usize),
+            ("stack_depth", eval.call_stack_count()),
+            ("call_file_len", call_file_len),
+            ("call_line", call_line),
+            ("call_column", call_column),
+        ],
+    );
+    tracing::warn!(
+        target: "kuro_memory",
+        checkpoint,
+        provider_name = provider_id.name.as_str(),
+        provider_path = ?provider_id.path,
+        call_file = location
+            .as_ref()
+            .map(|location| location.filename())
+            .unwrap_or("<unknown>"),
+        call_line,
+        rules_cc_call_count,
+        result_fields,
+        "rules_cc init provider checkpoint provider={} count={} result_fields={:?}",
+        provider_id.name,
+        rules_cc_call_count,
+        result_fields
+    );
+}
+
 /// Shared implementation for invoking init provider constructor
 fn invoke_init_provider_constructor<'v>(
     init_fn: Value<'v>,
@@ -313,6 +398,8 @@ fn invoke_init_provider_constructor<'v>(
     args: &Arguments<'v, '_>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> starlark::Result<Value<'v>> {
+    init_provider_checkpoint("init_provider_call_start", provider, eval, None);
+
     // Call the init function with all the provided arguments
     let init_result = init_fn.invoke(args, eval)?;
 
@@ -337,6 +424,12 @@ fn invoke_init_provider_constructor<'v>(
         })?;
         named_args.push((key_str, v));
     }
+    init_provider_checkpoint(
+        "init_provider_call_result",
+        provider,
+        eval,
+        Some(named_args.len()),
+    );
 
     // Call the provider with the dict as keyword arguments
     eval.eval_function(provider, &[], &named_args)
@@ -391,8 +484,10 @@ impl UserProviderCallableNamed {
 pub(crate) struct UserProviderField {
     /// Field type.
     pub(crate) ty: TypeCompiled<FrozenValue>,
-    /// Default value. If `None`, the field is required.
+    /// Default value to store when the field is omitted.
     pub(crate) default: Option<FrozenValue>,
+    /// Whether the field must be supplied when there is no default.
+    pub(crate) required: bool,
 }
 
 impl<'v> AllocValue<'v> for UserProviderField {
@@ -406,18 +501,21 @@ impl Display for UserProviderField {
         write!(f, "ProviderField({}, ", self.ty)?;
         if let Some(default) = &self.default {
             write!(f, "default = {default}")?;
-        } else {
+        } else if self.required {
             write!(f, "required")?;
+        } else {
+            write!(f, "optional")?;
         }
         write!(f, ")")
     }
 }
 
 impl UserProviderField {
-    pub(crate) fn default() -> UserProviderField {
+    pub(crate) fn optional_any() -> UserProviderField {
         UserProviderField {
             ty: TypeCompiled::any(),
-            default: Some(FrozenValue::new_none()),
+            default: None,
+            required: false,
         }
     }
 }
@@ -462,6 +560,8 @@ fn user_provider_callable_display(
         write!(f, "\"{}\": provider_field({}", name, ty.ty)?;
         if let Some(default) = ty.default {
             write!(f, ", default={default}")?;
+        } else if ty.required {
+            write!(f, ", required=True")?;
         }
         write!(f, ")")?;
     }
@@ -784,7 +884,11 @@ pub fn register_provider(builder: &mut GlobalsBuilder) {
                 .into());
             }
         }
-        Ok(UserProviderField { ty, default })
+        Ok(UserProviderField {
+            ty,
+            default,
+            required: default.is_none(),
+        })
     }
 
     /// Create a `"provider"` type that can be returned from `rule` implementations.
@@ -832,7 +936,7 @@ pub fn register_provider(builder: &mut GlobalsBuilder) {
                     > = fields
                         .items
                         .iter()
-                        .map(|name| (name.clone(), UserProviderField::default()))
+                        .map(|name| (name.clone(), UserProviderField::optional_any()))
                         .collect();
                     if new_fields.len() != fields.items.len() {
                         return Err(kuro_error::Error::from(
@@ -853,11 +957,18 @@ pub fn register_provider(builder: &mut GlobalsBuilder) {
                         } else if field.unpack_str().is_some() {
                             // Bazel compatibility: field value can be a doc string
                             // In this case, the field has no type constraint
-                            new_fields.insert(name, UserProviderField::default());
+                            new_fields.insert(name, UserProviderField::optional_any());
                         } else {
                             let ty = provider_field_parse_type(field, eval)
                             .with_buck_error_context(|| format!("Field `{name}` type `{field}` is not created with `provider_field`, and cannot be evaluated as a type"))?;
-                            new_fields.insert(name, UserProviderField { ty, default: None });
+                            new_fields.insert(
+                                name,
+                                UserProviderField {
+                                    ty,
+                                    default: None,
+                                    required: true,
+                                },
+                            );
                         }
                     }
                     new_fields

@@ -34,6 +34,7 @@ static BUILD_CONFIG: RwLock<BuildConfig> = RwLock::new(BuildConfig {
     stamp: false,
     collect_code_coverage: false,
     force_pic: false,
+    experimental_cc_implementation_deps: true,
     starlark_flags: None,
 });
 
@@ -64,6 +65,8 @@ struct BuildConfig {
     collect_code_coverage: bool,
     /// --force_pic flag.
     force_pic: bool,
+    /// --experimental_cc_implementation_deps flag.
+    experimental_cc_implementation_deps: bool,
     /// Starlark build flags from --//pkg:target=value on the command line.
     /// Keys are fully-qualified target labels (e.g., "//pkg:my_bool_flag"),
     /// values are the string representation of the flag value.
@@ -340,6 +343,22 @@ pub fn get_force_pic() -> bool {
         .ok()
         .map(|c| c.force_pic)
         .unwrap_or(false)
+}
+
+/// Set --experimental_cc_implementation_deps for the current build.
+pub fn set_experimental_cc_implementation_deps(enabled: bool) {
+    if let Ok(mut config) = BUILD_CONFIG.write() {
+        config.experimental_cc_implementation_deps = enabled;
+    }
+}
+
+/// Get --experimental_cc_implementation_deps. Bazel 9 defaults this to true.
+pub fn get_experimental_cc_implementation_deps() -> bool {
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .map(|c| c.experimental_cc_implementation_deps)
+        .unwrap_or(true)
 }
 
 /// Set Starlark build flags from --//pkg:target=value on the command line.

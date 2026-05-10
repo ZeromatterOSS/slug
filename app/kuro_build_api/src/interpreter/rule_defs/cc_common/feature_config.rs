@@ -206,6 +206,17 @@ pub struct CcToolchainFeatures {
     pub(crate) tools_directory: String,
 }
 
+impl CcToolchainFeatures {
+    pub fn empty() -> Self {
+        Self {
+            feature_names: Vec::new(),
+            default_enabled_features: Vec::new(),
+            action_config_names: Vec::new(),
+            tools_directory: String::new(),
+        }
+    }
+}
+
 impl Display for CcToolchainFeatures {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

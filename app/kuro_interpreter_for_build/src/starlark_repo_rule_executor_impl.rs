@@ -38,6 +38,7 @@ use dice::DiceComputations;
 use kuro_bzlmod::StarlarkRepoRuleExecutorImpl;
 use kuro_bzlmod::repository_invocations::RepositoryInvocation;
 use kuro_common::dice::cells::HasCellResolver;
+use kuro_common::dice::data::HasIoProvider;
 use kuro_error::BuckErrorContext;
 use kuro_error::conversion::from_any_with_tag;
 use kuro_interpreter::load_module::InterpreterCalculation;
@@ -215,10 +216,13 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
         let repo_attr = RepositoryAttr::new_with_name(invocation.name.clone(), ctx_attrs);
 
         // 7. Create the RepositoryContext
-        let repo_ctx = RepositoryContext::new(
+        let io = ctx.global_data().get_io_provider();
+        let workspace_root = io.project_root();
+        let repo_ctx = RepositoryContext::new_with_workspace_root(
             invocation.name.clone(),
             repo_attr,
             working_dir.to_path_buf(),
+            workspace_root.root().to_path_buf(),
         );
 
         // 8. Execute the implementation function in Starlark
@@ -265,7 +269,7 @@ impl StarlarkRepoRuleExecutorImpl for ConcreteStarlarkRepoRuleExecutor {
 }
 
 fn diagnostic_summary(error: impl std::fmt::Display) -> String {
-    const MAX_CHARS: usize = 500;
+    const MAX_CHARS: usize = 2000;
     let rendered = error.to_string();
     let mut iter = rendered.char_indices();
     let Some((idx, _)) = iter.nth(MAX_CHARS) else {

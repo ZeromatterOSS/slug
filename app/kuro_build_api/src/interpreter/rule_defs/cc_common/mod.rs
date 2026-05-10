@@ -36,6 +36,7 @@ use std::sync::OnceLock;
 
 pub use actions::CcCommonInternal;
 pub use actions::CcCommonModule;
+pub(crate) use actions::cc_frozen_list_items;
 use allocative::Allocative;
 pub use ctx_cheat::CtxCheatActionsStub;
 pub use ctx_cheat::CtxCheatArtifactRootStub;

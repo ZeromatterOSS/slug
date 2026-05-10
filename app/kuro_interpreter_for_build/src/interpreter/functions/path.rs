@@ -150,6 +150,37 @@ pub(crate) fn register_path(builder: &mut GlobalsBuilder) {
         }
     }
 
+    /// Returns the name of the Bazel module associated with the repository where
+    /// this package is being evaluated.
+    ///
+    /// Bazel-compatible: available as a direct global in BUILD files.
+    ///
+    /// See: https://bazel.build/rules/lib/globals/build#module_name
+    fn module_name(eval: &mut Evaluator) -> starlark::Result<NoneOr<String>> {
+        let cell_name = BuildContext::from_context(eval)?
+            .cell_info()
+            .name()
+            .to_string();
+        Ok(NoneOr::Other(cell_name))
+    }
+
+    /// Returns the version of the Bazel module associated with the repository where
+    /// this package is being evaluated.
+    ///
+    /// Bazel-compatible: available as a direct global in BUILD files.
+    ///
+    /// See: https://bazel.build/rules/lib/globals/build#module_version
+    fn module_version(eval: &mut Evaluator) -> starlark::Result<NoneOr<String>> {
+        let cell_name = BuildContext::from_context(eval)?
+            .cell_info()
+            .name()
+            .to_string();
+        match kuro_bzlmod::get_module_version(&cell_name) {
+            Some(version) => Ok(NoneOr::Other(version)),
+            None => Ok(NoneOr::None),
+        }
+    }
+
     /// `get_cell_name()` can be called from either a `BUCK` file or a `.bzl` file,
     /// and returns the name of the cell where the `BUCK` file that started the call
     /// lives.

@@ -11,6 +11,45 @@ Phase 2.5's shared synthesized execroot stopgap has landed and Phase 2.6's
 per-action execroot narrowing has landed through commit `16191ed9`. Phase 3
 (real Bazel-shaped execroot and external-repo layout) remains proposed.
 
+## Progress 2026-05-09: Bazel-shaped declared output paths
+
+Plan 15's latest zeromatter blocker was traced to generated output path shape:
+`bazel_skylib` `select_file` looked for `glibc/build/c.s`, while Kuro's
+Starlark `File.path` for `ctx.actions.declare_file("build/c.s")` still exposed
+`.../runtimes/glibc/__generate_glibc_stubs__/build/c.s`. The current local tree
+routes `ctx.actions.declare_file` and `declare_directory` through
+`BuckOutPathKind::BazelOutput`, whose physical and Starlark `File.path` shape
+omits the `__<target>__/` segment for root and external repos.
+
+Focused verification:
+
+- `pytest -q tests/core/analysis/test_ctx_actions.py::test_actions_declare_file_bazel_path_shape tests/core/analysis/test_ctx_actions.py::test_actions_declare_file_external_bazel_path_shape tests/core/analysis/test_ctx_actions.py::test_actions_declare_directory_bazel_path_shape tests/core/analysis/test_ctx_actions.py::test_actions_declare_directory_external_bazel_path_shape`
+- `cargo build -p kuro`
+- `git diff --check`
+
+Fresh bounded zeromatter smoke:
+`/tmp/plan44-bazel-output-path-1.log`, isolation
+`plan44-bazel-output-path-1`, command:
+
+```sh
+bash -o pipefail -c 'timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep '\''kurod\[zeromatter\].*plan44-bazel-output-path-1'\'' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan44-bazel-output-path-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan44-bazel-output-path-1.log'
+```
+
+Outcome: status `3` after 158s, peak RSS 802136 KiB, final RSS 644308 KiB.
+The glibc `select_file` failure did not recur. The next blocker moved back to
+Plan 15/rules_cc Starlark parity:
+`rules_cc+0.2.17/cc/private/link/cpp_link_action.bzl:127` performs
+`object_files = object_files + additional_object_files`, and Kuro rejects
+`tuple + list`.
+
 ## Context
 
 Discovered while investigating MODULE.bazel.lock churn (commit

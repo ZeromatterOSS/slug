@@ -749,6 +749,26 @@ pub struct CommonBuildConfigurationOptions {
     #[clap(long = "force-pic", alias = "force_pic", hide = true)]
     pub force_pic: bool,
 
+    /// Enable cc_library implementation_deps (Bazel compatibility).
+    #[clap(
+        long = "experimental-cc-implementation-deps",
+        alias = "experimental_cc_implementation_deps",
+        hide = true,
+        action = clap::ArgAction::SetTrue,
+        overrides_with = "noexperimental_cc_implementation_deps"
+    )]
+    pub experimental_cc_implementation_deps: bool,
+
+    /// Disable cc_library implementation_deps (Bazel compatibility).
+    #[clap(
+        long = "noexperimental-cc-implementation-deps",
+        alias = "noexperimental_cc_implementation_deps",
+        hide = true,
+        action = clap::ArgAction::SetTrue,
+        overrides_with = "experimental_cc_implementation_deps"
+    )]
+    pub noexperimental_cc_implementation_deps: bool,
+
     /// Per-file compiler options (Bazel compatibility, accepted but ignored).
     #[clap(
         long = "per-file-copt",
@@ -1449,6 +1469,8 @@ impl CommonBuildConfigurationOptions {
             host_cxxopt: vec![],
             host_linkopt: vec![],
             force_pic: false,
+            experimental_cc_implementation_deps: false,
+            noexperimental_cc_implementation_deps: false,
             per_file_copt: vec![],
             local_cpu_resources: None,
             local_ram_resources: None,
@@ -1567,6 +1589,8 @@ impl CommonBuildConfigurationOptions {
             host_cxxopt: vec![],
             host_linkopt: vec![],
             force_pic: false,
+            experimental_cc_implementation_deps: false,
+            noexperimental_cc_implementation_deps: false,
             per_file_copt: vec![],
             local_cpu_resources: None,
             local_ram_resources: None,
@@ -1956,6 +1980,27 @@ mod tests {
     use kuro_fs::paths::forward_rel_path::ForwardRelativePathBuf;
 
     use super::*;
+
+    #[test]
+    fn experimental_cc_implementation_deps_clap_flags_override_in_order() {
+        let opts = <CommonBuildConfigurationOptions as clap::Parser>::try_parse_from([
+            "kuro",
+            "--noexperimental_cc_implementation_deps",
+            "--experimental_cc_implementation_deps",
+        ])
+        .unwrap();
+        assert!(opts.experimental_cc_implementation_deps);
+        assert!(!opts.noexperimental_cc_implementation_deps);
+
+        let opts = <CommonBuildConfigurationOptions as clap::Parser>::try_parse_from([
+            "kuro",
+            "--experimental-cc-implementation-deps",
+            "--noexperimental-cc-implementation-deps",
+        ])
+        .unwrap();
+        assert!(!opts.experimental_cc_implementation_deps);
+        assert!(opts.noexperimental_cc_implementation_deps);
+    }
 
     #[test]
     fn test_get_representative_config_flags() -> kuro_error::Result<()> {

@@ -17,6 +17,7 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use kuro_common::dice::cells::HasCellResolver;
+use kuro_common::legacy_configs::configs::LegacyBuckConfig;
 use kuro_common::legacy_configs::dice::HasLegacyConfigs;
 use kuro_common::legacy_configs::view::LegacyBuckConfigView;
 use kuro_core::bzl::ImportPath;
@@ -82,15 +83,27 @@ impl HasImportPaths for DiceComputations<'_> {
                 ctx: &mut DiceComputations,
                 _cancellation: &CancellationContext,
             ) -> Self::Value {
-                let config = ctx.get_legacy_config_on_dice(self.cell_name.name()).await?;
                 let cell_alias_resolver =
                     ctx.get_cell_alias_resolver(self.cell_name.name()).await?;
 
-                Ok(Arc::new(ImplicitImportPaths::parse(
-                    config.view(ctx),
-                    self.cell_name,
-                    &cell_alias_resolver,
-                )?))
+                if ctx.is_bzlmod().await? {
+                    // Bazel 9/Bzlmod has no legacy package implicit import
+                    // configuration. Avoid retaining one buckconfig DICE node
+                    // per external repo solely to pass an ignored config view.
+                    let config = LegacyBuckConfig::empty();
+                    Ok(Arc::new(ImplicitImportPaths::parse(
+                        &config,
+                        self.cell_name,
+                        &cell_alias_resolver,
+                    )?))
+                } else {
+                    let config = ctx.get_legacy_config_on_dice(self.cell_name.name()).await?;
+                    Ok(Arc::new(ImplicitImportPaths::parse(
+                        config.view(ctx),
+                        self.cell_name,
+                        &cell_alias_resolver,
+                    )?))
+                }
             }
 
             fn equality(x: &Self::Value, y: &Self::Value) -> bool {

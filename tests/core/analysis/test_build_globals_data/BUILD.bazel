@@ -98,7 +98,23 @@ write_value_rule(
     value = str(native.module_name()),
 )
 
-# === Test 12: repo_name() (BUILD global) ===
+# === Test 12: module_name() and module_version() (BUILD globals) ===
+write_value_rule(
+    name = "module_metadata_direct_test",
+    value = "{}@{}".format(module_name(), module_version()),
+)
+
+write_value_rule(
+    name = "module_metadata_native_test",
+    value = "{}@{}".format(native.module_name(), native.module_version()),
+)
+
+alias(
+    name = "external_module_metadata_direct_test",
+    actual = "@dep//:module_metadata_direct_test",
+)
+
+# === Test 13: repo_name() (BUILD global) ===
 write_value_rule(
     name = "repo_name_direct_test",
     value = repo_name(),

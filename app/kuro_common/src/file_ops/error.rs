@@ -13,6 +13,7 @@ use dupe::Dupe;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use kuro_core::cells::cell_path::CellPathRef;
+use kuro_core::cells::instance::CellInstance;
 
 use crate::dice::cells::HasCellResolver;
 use crate::file_ops::dice::DiceFileComputations;
@@ -34,6 +35,10 @@ pub(crate) enum FileOpsError {
 pub enum FileReadError {
     NotFound(String),
     Buck(kuro_error::Error),
+}
+
+fn should_probe_cell_for_missing_path_suggestion(cell: &CellInstance) -> bool {
+    cell.external().is_none()
 }
 
 impl FileReadError {
@@ -104,7 +109,10 @@ pub(super) fn extended_ignore_error<'a>(
                         Some(file_name) if !v.contains(file_name) => {
                             let mut cell_suggestion = vec![];
                             if let Ok(cell_resolver) = ctx.get_cell_resolver().await {
-                                for (cell_name, _) in cell_resolver.cells() {
+                                for (cell_name, cell) in cell_resolver.cells() {
+                                    if !should_probe_cell_for_missing_path_suggestion(cell) {
+                                        continue;
+                                    }
                                     let cell_path = CellPathRef::new(cell_name, path.path());
 
                                     if DiceFileComputations::read_path_metadata_if_exists(
@@ -170,4 +178,32 @@ pub(super) fn extended_ignore_error<'a>(
         }
     }
     .boxed()
+}
+
+#[cfg(test)]
+mod tests {
+    use kuro_core::cells::cell_root_path::CellRootPathBuf;
+    use kuro_core::cells::external::ExternalCellOrigin;
+    use kuro_core::cells::instance::CellInstance;
+    use kuro_core::cells::name::CellName;
+    use kuro_core::cells::nested::NestedCells;
+
+    use super::should_probe_cell_for_missing_path_suggestion;
+
+    fn cell_instance(name: &str, external: bool) -> CellInstance {
+        let name = CellName::testing_new(name);
+        let path = CellRootPathBuf::testing_new(name.as_str());
+        let nested = NestedCells::from_cell_roots(&[], path.as_path());
+        let origin = external.then(|| ExternalCellOrigin::Bundled(name));
+        CellInstance::new(name, path, origin, nested).unwrap()
+    }
+
+    #[test]
+    fn missing_path_suggestion_probe_skips_external_cells() {
+        let local = cell_instance("local", false);
+        let external = cell_instance("external", true);
+
+        assert!(should_probe_cell_for_missing_path_suggestion(&local));
+        assert!(!should_probe_cell_for_missing_path_suggestion(&external));
+    }
 }

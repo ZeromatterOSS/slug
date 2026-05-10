@@ -280,11 +280,13 @@ impl AttrType {
     pub fn transition_dep(
         required_providers: ProviderIdSet,
         cfg: Option<Arc<TransitionId>>,
+        resolve_as_list: bool,
     ) -> Self {
         Self(Arc::new(AttrTypeInner2 {
             inner: AttrTypeInner::TransitionDep(TransitionDepAttrType::new(
                 required_providers,
                 cfg,
+                resolve_as_list,
             )),
             may_have_queries: false,
         }))

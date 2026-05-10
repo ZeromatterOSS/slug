@@ -10,6 +10,160 @@
 
 ## Status: IN PROGRESS
 
+## Current Status 2026-05-09
+
+Latest bounded smoke after the Plan 44/BazelOutput declared-path slice:
+
+```sh
+bash -o pipefail -c 'timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep '\''kurod\[zeromatter\].*plan44-bazel-output-path-1'\'' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan44-bazel-output-path-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan44-bazel-output-path-1.log'
+```
+
+Result: Kuro status `3` after 158s,
+`memory_smoke_summary elapsed_s=158 peak_rss_kib=802136 final_rss_kib=644308`.
+This is still not a Plan 51 memory-retention conclusion: RSS stayed below 1 GiB
+and the build failed with a concrete analysis error. The previous
+`bazel_skylib` `select_file`/`__generate_glibc_stubs__` output-path blocker did
+not recur. The current blocker belongs to Plan 15/rules_cc Starlark parity:
+`rules_cc+0.2.17/cc/private/link/cpp_link_action.bzl:127` rejects
+`object_files + additional_object_files` because Kuro does not support
+`tuple + list`.
+
+Keep Plan 51 parked unless a later Plan 15/54 smoke returns to unbounded RSS or
+an unexplained daemon wait. The memory checkpoints remain useful for locating
+the next analysis frontier.
+
+### Previous status
+
+Latest bounded smoke after the Plan 15 `cmd_args.add_all(map_each=...)`
+sequence-return fix:
+
+```sh
+bash -o pipefail -c 'timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep '\''kurod\[zeromatter\].*plan15-map-each-seq-1'\'' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan15-map-each-seq-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan15-map-each-seq-1.log'
+```
+
+Result: Kuro status `3` after 190s,
+`memory_smoke_summary elapsed_s=190 peak_rss_kib=891896 final_rss_kib=668632`.
+This is still not a Plan 51 memory-retention conclusion: RSS stayed below 1 GiB
+and the build failed with a concrete analysis error. The previous
+`rules_cc` `cmd_args.add_all(..., map_each = ...)` `tuple (repr: ())` blocker
+did not recur. The current blocker belongs to Plan 15:
+`bazel_skylib+1.9.0/rules/select_file.bzl:36` cannot find the requested
+`llvm+0.7.0//runtimes/glibc:libc.s` file among the
+`generate_glibc_stubs` generated outputs.
+
+Keep Plan 51 parked unless a later Plan 15/54 smoke returns to unbounded RSS or
+an unexplained daemon wait. The memory checkpoints remain useful for locating
+the next analysis frontier.
+
+### Previous status
+
+Latest bounded smoke after the Plan 15 provider-callable key fix:
+
+```sh
+bash -o pipefail -c 'timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep '\''kurod\[zeromatter\].*plan15-provider-callable-1'\'' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan15-provider-callable-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan15-provider-callable-1.log'
+```
+
+Result: Kuro status `3` after 184s,
+`memory_smoke_summary elapsed_s=184 peak_rss_kib=902404 final_rss_kib=710988`.
+This is still not a Plan 51 memory-retention conclusion: RSS stayed below 1 GiB
+and the build failed with a concrete analysis error. The previous
+`with_cfg/private/transitioning_alias.bzl:55 if provider in target` /
+`AnalysisTestResultInfo ... got function` blocker did not recur. The current
+blocker belongs to Plan 15: rules_cc calls
+`actions.args().add_all(linker_inputs, map_each = map_each)` in
+`rules_cc+0.2.17/cc/private/rules_impl/cc_static_library.bzl:174`; Kuro rejects
+the map_each result `tuple (repr: ())` as a command-line item.
+
+Keep Plan 51 parked unless a later Plan 15/54 smoke returns to unbounded RSS or
+an unexplained daemon wait. The memory checkpoints remain useful for locating
+the next analysis frontier.
+
+## Previous Status 2026-05-09
+
+Latest bounded smoke after the Plan 15 `ctx.toolchains` lookup normalization:
+
+```sh
+bash -o pipefail -c 'timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep '\''kurod\[zeromatter\].*plan15-toolchain-label-canon-1'\'' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan15-toolchain-label-canon-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan15-toolchain-label-canon-1.log'
+```
+
+Result: Kuro status `3` after 164s,
+`memory_smoke_summary elapsed_s=164 peak_rss_kib=785084 final_rss_kib=605488`.
+This is still not a Plan 51 memory-retention conclusion: RSS stayed below 1 GiB
+and the build failed with a concrete analysis error. The previous
+`@@rules_rust+0.69.0//rust:toolchain_type` unresolved lookup did not recur.
+The current blocker belongs to Plan 15: C++ toolchain analysis reaches
+`with_cfg.bzl+0.12.0/with_cfg/private/transitioning_alias.bzl:51` and fails on
+`ctx.attr.exports[0]` with
+`provider collection operation [] parameter type must be a provider type ... got int`.
+
+Keep Plan 51 parked unless a later Plan 15/54 smoke returns to unbounded RSS or
+an unexplained daemon wait. The memory checkpoints remain useful for locating
+the next analysis frontier.
+
+### Previous status
+
+The latest Plan 54 smoke did not reproduce the prior indefinite low-RSS daemon
+wait. With configured-node and analysis-dep checkpoints enabled, Kuro exited
+with a real analysis error:
+
+```sh
+bash -o pipefail -c 'timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep '\''kurod\[zeromatter\].*plan54-configured-gather-probe-1'\'' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan54-configured-gather-probe-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan54-configured-gather-probe-1.log'
+```
+
+Result: Kuro status `3` after 158s,
+`memory_smoke_summary elapsed_s=158 peak_rss_kib=653752 final_rss_kib=578572`.
+This is not a Plan 51 memory-retention conclusion. The current blocker belongs
+to Plan 15: `rules_rust//ffi/rs:empty_allocator_libraries` reaches
+`ctx.toolchains` and reports that
+`@@rules_rust+0.69.0//rust:toolchain_type` was not resolved, even though the
+provider checkpoint used `@@rules_rust//rust:toolchain_type`.
+
+Keep Plan 51 parked unless a later Plan 15/54 smoke returns to unbounded RSS or
+an unexplained daemon wait. The added checkpoints in
+`app/kuro_configured/src/nodes.rs` and
+`app/kuro_analysis/src/analysis/calculation.rs` should remain useful for the
+next bounded zeromatter smoke.
+
 ## Goal
 
 Profile and reduce `kurod` memory usage during large bzlmod/zeromatter
@@ -527,3 +681,1158 @@ peak. The next implementation slice should investigate why
 `cell_alias_resolver_shared` is emitted hundreds of times during package tree
 loading and whether resolver/package-loading state is being retained or rebuilt
 per external package.
+
+## Progress 2026-05-09: bzlmod alias resolver fast path
+
+Investigated the repeated `cell_alias_resolver_shared` checkpoints during
+zeromatter package-file-tree loading. The checkpoint is emitted when Kuro builds a
+per-cell `CellAliasResolver` for an external repo cell. In bzlmod mode this is
+not a root alias map clone: non-root resolvers use the root alias map through
+the shared `Arc`, and the per-cell object is needed because `resolve("")`
+depends on the current cell. The high RSS visible at that checkpoint is
+therefore mostly ambient package-loading state, not the resolver allocation
+itself.
+
+The clear avoidable work was adjacent to those resolver creations:
+
+- `CellAliasResolverKey::compute` fetched `LegacyBuckConfigForCellKey` before
+  checking `is_bzlmod`, even though Bazel 9/Bzlmod ignores per-repository
+  `.buckconfig` alias sections.
+- `ImportPathsKey::compute` fetched an opaque legacy config for every cell only
+  to pass a config view into `ImplicitImportPaths::parse`, whose Q1=B path does
+  not read the config.
+
+Implemented bzlmod fast paths that skip per-cell legacy buckconfig DICE nodes
+in both places while preserving the per-cell resolver and existing memory
+checkpoints.
+
+Focused verification:
+
+- `cargo fmt -- app/kuro_common/src/dice/cells.rs app/kuro_interpreter/src/import_paths.rs`
+- `cargo check -p kuro_common -p kuro_interpreter`
+- `cargo test -p kuro_common dice::cells --lib` (compiled; 0 matching tests)
+- `cargo test -p kuro_interpreter import_paths --lib` (compiled; 0 matching
+  tests)
+- `cargo check -p kuro`
+- `cargo build -p kuro`
+- `git diff --check`
+
+Bounded zeromatter rerun from `/var/mnt/dev/zeromatter`:
+
+```sh
+KURO_MEMORY_CHECKPOINTS=1 /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+  --interval 5 \
+  --include-pgrep 'kurod\[zeromatter\].*plan51-bzlmod-fast-path' \
+  -- timeout --signal=INT --kill-after=15s 180s \
+     /var/mnt/dev/kuro/target/debug/kuro \
+       --isolation-dir plan51-bzlmod-fast-path \
+       build //sdk:sdk_contents
+```
+
+The run was stopped manually before OOM risk. Evidence is in
+`/tmp/plan51-bzlmod-fast-path-memory.log`:
+
+- sampled RSS reached `7585552 KiB` after `80s`;
+- max checkpoint RSS reached `6858244096` bytes;
+- `cell_alias_resolver_shared` appeared `417` times;
+- `depset_to_list_live` appeared `45` times;
+- `depset_to_list_frozen` did not appear;
+- live depset checkpoints were still tiny (`direct_len=4`,
+  `transitive_len=0`, `deduped_len=4` near the sampled peak);
+- status was still package-file-tree loading, ending at
+  `crates__windows-sys-0.61.2// -- loading package file tree`.
+
+Conclusion: this slice removes unnecessary retained legacy-config state from
+the bzlmod external-cell path, but `//sdk:sdk_contents` still does not build.
+The next blocker is not root alias map reconstruction. It is the package-file
+tree loading phase retaining or allocating several GiB while many external
+repo packages are in flight. The next investigation should instrument or
+profile package-listing/package-loading retained values directly (for example
+`PackageListingKey`, directory reads, package listings by files/dirs/subpackage
+counts, and DICE retained value sizes) instead of treating
+`cell_alias_resolver_shared` as the allocation source.
+
+## Progress 2026-05-09: package loading retained-memory instrumentation
+
+Added `KURO_MEMORY_CHECKPOINTS`-gated instrumentation for the package-file-tree
+path without deleting any existing checkpoints:
+
+- `PackageListingKey` active/completed/max-active counters plus listing file,
+  dir, subpackage, and approximate path-text sizes.
+- Package listing builder counters for directories read, total entries read,
+  and largest single directory.
+- `ReadDirKey` active/completed/max-active counters plus entry/file/dir/symlink
+  counts, name-byte totals, path length, and ignore-check mode. To keep output
+  bounded, this checkpoint emits for large directories and each 1000th completed
+  read.
+- `InterpreterResultsKey` active/completed/max-active counters plus target
+  count, import count, target-name bytes, and package-path length. This measures
+  the package/build-file evaluation layer above package-file-tree listing.
+
+Bounded package-listing/read-dir run from `/var/mnt/dev/zeromatter`:
+
+```sh
+KURO_MEMORY_CHECKPOINTS=1 /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+  --interval 5 \
+  --include-pgrep 'kurod\[zeromatter\].*plan51-package-loading-instrumented' \
+  -- timeout --signal=INT --kill-after=15s 95s \
+     /var/mnt/dev/kuro/target/debug/kuro \
+       --isolation-dir plan51-package-loading-instrumented \
+       build //sdk:sdk_contents
+```
+
+Evidence in `/tmp/plan51-package-loading-instrumented-memory.log`:
+
+- `memory_smoke_summary elapsed_s=86 peak_rss_kib=8884144 final_rss_kib=8884144`
+- `package_listing_key_count=501`
+- `package_completed=501`
+- `package_max_active=91`
+- `package_max_files=1532`
+- `package_max_dirs=178`
+- `package_max_path_bytes=96400`
+- `package_max_dirs_read=179`
+- `package_max_dir_entries_total=1586`
+- `package_max_single_dir_entries=1127`
+- `read_dir_checkpoint_count=5`
+- `read_dir_completed=4000`
+- `read_dir_max_active=135`
+- `read_dir_max_entries=1127`
+- `read_dir_max_name_bytes=22134`
+- `depset_live_count=46`
+- `cell_alias_resolver_shared_count=419`
+
+The daemon was manually stopped after the run to avoid OOM risk. This ruled out
+raw package listings and directory-entry vectors as the direct multi-GiB
+retained value: the largest observed listing had under 100 KiB of path text,
+and only 501 package listings plus 4000 directory reads had completed while RSS
+was already near 8.9 GiB.
+
+Bounded rerun with `InterpreterResultsKey` instrumentation:
+
+```sh
+KURO_MEMORY_CHECKPOINTS=1 /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+  --interval 5 \
+  --include-pgrep 'kurod\[zeromatter\].*plan51-interpreter-results-instrumented' \
+  -- timeout --signal=INT --kill-after=15s 60s \
+     /var/mnt/dev/kuro/target/debug/kuro \
+       --isolation-dir plan51-interpreter-results-instrumented \
+       build //sdk:sdk_contents
+```
+
+Evidence in `/tmp/plan51-interpreter-results-instrumented-memory.log`:
+
+- `memory_smoke_summary elapsed_s=65 peak_rss_kib=6803056 final_rss_kib=6688300`
+- `package_listing_key_count=486`
+- `package_completed=486`
+- `package_max_active=90`
+- `package_max_files=1532`
+- `package_max_dirs=153`
+- `package_max_subpackages=15`
+- `package_max_path_bytes=96400`
+- `package_max_dirs_read=154`
+- `package_max_dir_entries_total=1586`
+- `package_max_single_dir_entries=1127`
+- `read_dir_checkpoint_count=4`
+- `read_dir_completed=3000`
+- `read_dir_max_active=105`
+- `read_dir_max_entries=1127`
+- `read_dir_max_name_bytes=22134`
+- `interpreter_results_key_count=267`
+- `interpreter_completed=267`
+- `interpreter_max_active=251`
+- `interpreter_max_targets=1536`
+- `interpreter_max_imports=9`
+- `interpreter_max_target_name_bytes=59699`
+- `depset_live_count=44`
+- `cell_alias_resolver_shared_count=431`
+
+This run stopped at the time cap and the daemon was interrupted afterward. It
+did not build `//sdk:sdk_contents`. The important new signal is that package
+evaluation, not package listing payloads, is massively in flight:
+`InterpreterResultsKey` reached 251 active computations while each completed
+package result still reported modest target/import/name-byte counts. The next
+slice should inspect why external package loading allows hundreds of concurrent
+Starlark package evaluations and whether DICE retains evaluator/heaps/import
+modules or transient package-evaluation state until the whole burst drains.
+If the package-evaluation values themselves remain small under heap profiling,
+the systemic fix is likely a bounded package-loading/evaluation concurrency
+gate that preserves Bazel 9/Bzlmod semantics while preventing unbounded
+external-repo fanout.
+
+Focused verification for this slice:
+
+- `cargo fmt -- app/kuro_common/src/file_ops/dice.rs app/kuro_common/src/package_listing/dice.rs app/kuro_common/src/package_listing/interpreter.rs app/kuro_common/src/package_listing/listing.rs app/kuro_interpreter_for_build/src/interpreter/calculation.rs`
+- `cargo check -p kuro_common`
+- `cargo check -p kuro_interpreter_for_build -p kuro_common`
+- `cargo check -p kuro`
+- `cargo build -p kuro`
+- `cargo test -p kuro_common package_listing --lib`
+- `cargo test -p kuro_common file_ops --lib`
+- `cargo test -p kuro_interpreter_for_build interpreter::calculation --lib`
+- `git diff --check`
+
+## Progress 2026-05-09: package-evaluation concurrency gate and load-signal retention
+
+Followed the previous `InterpreterResultsKey max_active=251` signal into
+package/build-file evaluation. Bazel 9's source of truth for the relevant
+shape is `src/main/java/com/google/devtools/build/lib/runtime/LoadingPhaseThreadsOption.java`
+and `QuiescingExecutorsImpl.java`: `--loading_phase_threads=auto` is
+host-resource based and feeds loading/analysis parallelism. Kuro currently
+accepts `--loading_phase_threads` for Bazel CLI compatibility but marks it
+ignored in `app/kuro_client_ctx/src/common.rs`, so this slice implemented only
+the Bazel-style auto shape, not explicit flag plumbing.
+
+Changes:
+
+- Added a process-global package/build-file evaluation semaphore in
+  `InterpreterResultsKey::compute`, sized to
+  `kuro_util::threads::available_parallelism().max(1)`.
+- Extended `interpreter_results_key` memory checkpoints with `queued`,
+  `max_queued`, `concurrency_limit`, `wait_us`, and `dep_packages`.
+- Removed one avoidable retained copy of successful package evaluation
+  results from build-signal/critical-path metadata. `InterpreterResultsKey`
+  activation data now stores only the compact cross-package dependency package
+  list needed by `BuildSignalReceiver::enrich_load`; it no longer dupes and
+  stores `Arc<EvaluationResult>` in `NodeExtraData::Load`.
+
+The intermediate gated-only smoke,
+`/tmp/plan51-package-eval-gated-memory.log`, confirmed the gate worked but did
+not solve memory:
+
+- `memory_smoke_summary elapsed_s=118 peak_rss_kib=16851400 final_rss_kib=16851400`
+- `interpreter_max_active=16`
+- `interpreter_max_queued=235`
+- `interpreter_completed=593`
+- `package_max_active=8`
+- `package_completed=603`
+- `read_dir_max_active=14`
+- `read_dir_completed=5000`
+
+The next compact-load run used:
+
+```sh
+KURO_MEMORY_CHECKPOINTS=1 /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+  --interval 5 \
+  --include-pgrep 'kurod\[zeromatter\].*plan51-package-eval-gated-compact-load' \
+  -- timeout --signal=INT --kill-after=15s 180s \
+     /var/mnt/dev/kuro/target/debug/kuro \
+       --isolation-dir plan51-package-eval-gated-compact-load \
+       build //sdk:sdk_contents
+```
+
+It was manually interrupted at about 81s to avoid OOM risk; because the shell
+pipeline was interrupted, `memory_smoke_summary` was not emitted. Evidence in
+`/tmp/plan51-package-eval-gated-compact-load-memory.log`:
+
+- sampled peak total RSS before interrupt: `12806228 KiB`;
+- `interpreter_completed=469`;
+- `interpreter_max_active=16`;
+- `interpreter_max_queued=232`;
+- `interpreter_max_targets=1536`;
+- `interpreter_max_imports=9`;
+- `interpreter_max_dep_packages=1246`;
+- `package_completed=480`;
+- `package_max_active=9`;
+- `package_max_path_bytes=96400`;
+- `package_max_files=1532`;
+- `read_dir_completed=4000`;
+- `read_dir_max_active=14`;
+- `depset_max_collected=4`;
+- `depset_max_deduped=4`.
+
+Interpretation:
+
+- The unbounded package/build-file evaluation fanout was real. The concurrency
+  gate reliably caps active `InterpreterResultsKey` work at 16 on this host,
+  with queued work making the fanout visible instead of creating hundreds of
+  simultaneous evaluators/heaps.
+- The build-signal `Arc<EvaluationResult>` retention was also real and worth
+  removing: after compacting it, the run reached 469 completed package
+  evaluations at ~12.8 GiB, compared with the gated-only run's 593 completed
+  evaluations at ~16.9 GiB. This is a material reduction but not enough.
+- Package-listing payloads, directory reads, and depset expansion remain ruled
+  out as the direct multi-GiB payload source. Listings are still tiny, and
+  depset checkpoints remain at length 4.
+- The remaining memory growth tracks completed package evaluations even when
+  active evaluation is capped and build signals no longer retain full
+  `EvaluationResult`s. The next likely source is DICE-retained completed
+  package values, Starlark modules/heaps/import module retention associated
+  with those values, or DICE activation/dep graph state for the external
+  package burst.
+
+Focused verification for this slice:
+
+- `cargo fmt -- app/kuro_interpreter_for_build/src/interpreter/calculation.rs app/kuro_build_signals_impl/src/lib.rs`
+- `cargo check -p kuro_interpreter_for_build -p kuro_build_signals_impl`
+- `cargo test -p kuro_build_signals_impl -p kuro_interpreter_for_build interpreter::calculation --lib`
+- `cargo build -p kuro`
+- `git diff --check`
+
+## Progress 2026-05-09: loaded-module compaction and import-fanout signal
+
+Followed the package-value retention signal into completed Starlark load
+values and their import graph. `LoadedModule` used to retain a full
+`LoadedModules` map for its direct imports. Because each imported module is
+itself a DICE-cached `LoadedModule`, that made every completed module value
+hold handles into a recursively expanded loaded-module graph. This slice
+compacted `LoadedModule` so cached values retain only the frozen environment
+and direct import paths. The audit server's `kuro audit starlark package-deps`
+walk now reloads direct imports through DICE when it needs the postorder list,
+instead of relying on cached recursive handles.
+
+Added `EvalImportKey` memory checkpoints to distinguish package BUILD-file
+evaluation from `.bzl` module loading. The first compact-module smoke,
+`/tmp/plan51-loaded-module-compact-memory.log`, still timed out:
+
+- `memory_smoke_summary elapsed_s=123 peak_rss_kib=16246220 final_rss_kib=16246220`
+- `eval_import_key max_active=1091`
+- `eval_import_key completed` reached about `69590`
+- `interpreter_results_key max_active=16`
+
+The new signal is that `.bzl` import evaluation has a much larger in-flight
+burst than package BUILD-file evaluation. The compacted `LoadedModule` removes
+one real completed-value retention edge, but the run still grew to about
+15.5 GiB RSS before the timeout.
+
+The next attempt reduced transient parse retention while modules wait for
+their imports. `prepare_eval` now parses once to discover imports, drops that
+AST before awaiting loaded deps, and reparses from the same DICE file content
+only when the module has imports. This avoids retaining parsed `AstModule`
+trees in parent load tasks while child modules evaluate.
+`/tmp/plan51-ast-drop-compact-load-memory.log` still timed out:
+
+- `memory_smoke_summary elapsed_s=102 peak_rss_kib=15767964 final_rss_kib=15767964`
+- `eval_import_key max_active=1079`
+- `eval_import_key completed=67000` at about `16023232512` RSS bytes
+- `interpreter_results_key max_active=16`, `completed=560`, `max_queued=236`
+- `package_listing_key max_active=7`, with tiny listing payloads
+- depset expansion remained tiny (`direct_len=4`, `deduped_len=4`)
+
+Interpretation:
+
+- Recursive `LoadedModule` handle retention was real and is now removed from
+  cached loaded-module values, but it was not the whole multi-GiB source.
+- Retaining parsed ASTs while waiting on import deps was a plausible transient
+  source and is now reduced, but it also did not materially change peak RSS in
+  the bounded smoke.
+- The strongest remaining signal is the unbounded `.bzl` import load burst:
+  over one thousand active `EvalImportKey` computations and about 67k completed
+  loaded modules by the 100s cap, while package evaluation remains capped at
+  16 active computations and package/listing/depset payloads stay small.
+- The next systemic fix should target DICE-retained loaded `.bzl`
+  `FrozenModule` heaps and the activation/import graph. A naive semaphore held
+  across `EvalImportKey::compute` would risk deadlocking recursive imports,
+  because parent modules can wait for child modules while holding permits. Any
+  loading-phase gate needs to be deadlock-safe: release before awaiting import
+  deps, gate only the actual non-recursive parse/eval subphase, or introduce a
+  scheduler that respects import ordering.
+
+Focused verification for this slice:
+
+- `cargo fmt -- app/kuro_interpreter/src/file_loader.rs app/kuro_interpreter_for_build/src/interpreter/calculation.rs`
+- `cargo check -p kuro_interpreter -p kuro_interpreter_for_build`
+- `cargo test -p kuro_interpreter file_loader --lib`
+- `cargo test -p kuro_interpreter_for_build interpreter::calculation --lib`
+- `cargo build -p kuro`
+- `cargo fmt -- app/kuro_interpreter/src/file_loader.rs app/kuro_cmd_audit_server/src/starlark/package_deps.rs`
+- `cargo check -p kuro_cmd_audit_server -p kuro_interpreter`
+- `cargo fmt -- app/kuro_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs app/kuro_interpreter_for_build/src/interpreter/calculation.rs`
+- `cargo check -p kuro_interpreter_for_build`
+- `cargo build -p kuro`
+
+## Progress 2026-05-09: deadlock-safe module-evaluation gate
+
+Added a loading-phase gate at the ready-to-evaluate module subphase, after
+`prepare_eval` has loaded recursive imports. This avoids the deadlock shape
+called out above: parent modules do not hold permits while waiting for child
+`EvalImportKey` computations. The gate covers `StarlarkEvaluatorProvider`
+construction plus `InterpreterForDir::eval_module`/freeze, and emits a new
+`module_evaluation_phase` checkpoint with active/completed/max-active,
+queued/max-queued, wait time, direct import count, and module path length.
+
+This slice also removed a transient `LoadedModules` map clone from
+`eval_starlark_module_uncached`: direct import paths are extracted before
+evaluation and `LoadedModule::new_with_direct_imports` stores those paths in
+the cached result after the evaluator's file-loader map has been consumed and
+dropped.
+
+Bounded zeromatter rerun from `/var/mnt/dev/zeromatter`:
+
+```sh
+KURO_MEMORY_CHECKPOINTS=1 /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+  --interval 5 \
+  --include-pgrep 'kurod\[zeromatter\].*plan51-module-eval-gate' \
+  -- timeout --signal=INT --kill-after=15s 180s \
+     /var/mnt/dev/kuro/target/debug/kuro \
+       --isolation-dir plan51-module-eval-gate \
+       build //sdk:sdk_contents
+```
+
+Evidence is in `/tmp/plan51-module-eval-gate-memory.log`:
+
+- `memory_smoke_summary elapsed_s=183 peak_rss_kib=23021976 final_rss_kib=23021976`
+- `module_evaluation_phase max_active=16`, `max_queued=5`,
+  `completed=100000`
+- `eval_import_key max_active=1059`, `completed=100000`
+- `interpreter_results_key max_active=16`, `max_queued=242`,
+  `completed=818`
+- `package_listing_key max_active=8`, `completed=833`; listings remained
+  small
+- `depset_to_list_live`/`depset_to_list_frozen` appeared near the end but with
+  zero collected elements in the sampled checkpoints
+
+Interpretation:
+
+- The gate is deadlock-safe and correctly bounds the ready module
+  parse/eval/freeze subphase.
+- It does not solve the main RSS growth. Completed DICE-cached `.bzl`
+  modules still reached 100k by the 180s timeout, and RSS climbed to about
+  22 GiB. The strongest remaining signal is no longer simultaneous evaluator
+  heap pressure; it is retained completed module state and/or duplicate module
+  keying across generated external repos.
+- The next slice should inspect why zeromatter reaches 100k completed
+  `EvalImportKey`/`module_evaluation_phase` values. In particular, identify
+  whether keys are semantically duplicate loads under different generated
+  repo/cell paths, and whether Starlark loads that are only needed for package
+  evaluation can avoid DICE-retaining full `FrozenModule` heaps after their
+  dependent BUILD evaluation completes.
+
+Focused verification for this slice:
+
+- `cargo fmt -- app/kuro_interpreter/src/file_loader.rs app/kuro_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs`
+- `cargo check -p kuro_interpreter -p kuro_interpreter_for_build`
+- `cargo test -p kuro_interpreter file_loader --lib`
+- `cargo test -p kuro_interpreter_for_build interpreter::calculation --lib`
+- `cargo build -p kuro`
+
+## Progress 2026-05-09: bzlmod canonical loaded-module keys
+
+Investigated the 100k completed `EvalImportKey`/`module_evaluation_phase`
+smoke result. The root cause was that loaded `.bzl` module identity still
+included Buck's top-level `BuildFileCell` dimension. In bzlmod mode the module
+identity must be the canonical file label. Carrying the consuming BUILD file's
+cell caused the same external `.bzl` file to be evaluated and DICE-retained
+once per consuming generated repo/cell.
+
+Implemented bzlmod canonicalization for loaded-module keys:
+
+- `InterpreterCalculationImpl::get_loaded_module` now canonicalizes
+  `LoadFile`/`JsonFile`/`TomlFile` import paths to
+  `BuildFileCell::new(path.path().cell())` when `ctx.is_bzlmod()` is true.
+  Legacy non-bzlmod behavior is unchanged.
+- `InterpreterLoadResolver::resolve_load` creates canonical import paths in
+  bzlmod mode, instead of threading the consuming package's
+  `build_file_cell` into every load.
+- `get_interpreter_calculator` normalizes the interpreter config key's
+  `BuildFileCell` in bzlmod mode so package and `.bzl` evaluation agree on the
+  same canonical module identity.
+- `rules_cc` and `@kuro_builtins` autoloads are bzlmod-only and use canonical
+  import paths. Legacy tests explicitly inject `is_bzlmod=false`.
+- `eval_import_key` memory checkpoints now include `cross_cell`, which is 1
+  when the loaded file cell differs from the build-file cell.
+
+Focused verification for this slice:
+
+- `cargo fmt -- app/kuro_interpreter_for_build/src/interpreter/calculation.rs app/kuro_interpreter_for_build/src/interpreter/dice_calculation_delegate.rs app/kuro_interpreter_for_build/src/interpreter/interpreter_for_dir.rs app/kuro_interpreter_for_build/src/interpreter/testing.rs app/kuro_interpreter_for_build_tests/src/tests.rs`
+- `cargo check -p kuro_interpreter_for_build`
+- `cargo test -p kuro_interpreter_for_build_tests test_eval_import -- --nocapture`
+- `cargo test -p kuro_interpreter_for_build_tests test_load -- --nocapture`
+- `cargo build -p kuro`
+
+Bounded zeromatter rerun from `/var/mnt/dev/zeromatter`:
+
+```sh
+timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan51-bzlmod-import-key-2' \
+    -- /var/mnt/dev/kuro/target/debug/kuro \
+         --isolation-dir plan51-bzlmod-import-key-2 \
+         build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan51-bzlmod-import-key-2-memory.log
+```
+
+Evidence is in `/tmp/plan51-bzlmod-import-key-2-memory.log`:
+
+- `memory_smoke_summary elapsed_s=142 peak_rss_kib=30713916 final_rss_kib=30206784`
+- No `completed=100000` checkpoint was emitted.
+- No `cross_cell=1` checkpoint was emitted; sampled `eval_import_key`
+  checkpoints all had `cross_cell=0`.
+- `eval_import_key` reached only about `completed=805`,
+  `max_active=104`, down from the prior 100k completed / 1059 max-active
+  shape.
+- `module_evaluation_phase` stayed at the earlier bounded ready-evaluation
+  shape instead of racing to 100k completed modules.
+- The RSS spike now starts after the build reports:
+  `Waiting on zeromatter//sdk:sdk_info_json (...) -- running analysis [evaluate_rule], and 15 other actions`.
+
+Interpretation:
+
+- The duplicate loaded-module retention problem for bzlmod cross-cell loads is
+  fixed systemically by canonical keying, without holding the
+  module-evaluation semaphore across recursive `eval_deps`.
+- `//sdk:sdk_contents` still does not build under Kuro. The bounded smoke was
+  stopped before OOM and peaked at about 30.7 GiB RSS during analysis, after
+  module loading had largely settled.
+- The next Plan 51 slice should move from loaded `.bzl` module retention to
+  analysis retention/concurrency: provider values, configured target/action
+  graph state, depset/list materialization, and any DICE keys retained by
+  `evaluate_rule` for the `zeromatter//sdk:sdk_info_json` analysis frontier.
+- The smoke also still shows bzlmod/module-extension semantic warnings such
+  as missing extension aggregation entries and a `bazel_gazelle`/`gazelle`
+  alias self-check failure. Those are covered by the existing module-extension
+  ownership area (Plans 10/23/36/38), while the memory evidence in this slice
+  points at analysis retention as the current Plan 51 blocker.
+
+## Progress 2026-05-09: analysis live-heap and result-size checkpoints
+
+Added analysis checkpoints around `AnalysisKey::compute`,
+`get_dep_analysis`, and Starlark `evaluate_rule` completion. The checkpoints
+report active/completed/max-active analysis keys plus result sizes:
+retained/profile bytes, provider count, recorded action/action-data counts,
+transitive-set count, and declared action/artifact counts. The underlying
+helpers now expose recorded action counts and analysis result counts without
+changing analysis semantics.
+
+Also added a conservative immediate-dependency fanout batch in
+`get_dep_analysis` (`128` deps per join-all chunk). This is intentionally not a
+global semaphore and does not hold any permit across recursive dependency
+analysis; it only prevents a single configured target from scheduling an
+unbounded immediate dep vector at once. Query resolution now runs after direct
+dependency analysis rather than racing in the same `try_compute2` call.
+
+Focused verification for this slice:
+
+- `cargo fmt -- app/kuro_analysis/src/analysis/calculation.rs app/kuro_build_api/src/analysis.rs app/kuro_build_api/src/analysis/registry.rs app/kuro_build_api/src/actions/registry.rs`
+- `cargo check -p kuro_analysis -p kuro_build_api`
+- `cargo check -p kuro_analysis`
+- `cargo build -p kuro`
+
+Bounded zeromatter smoke with checkpoints before the fanout batch:
+
+```sh
+timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan51-analysis-retention-1' \
+    -- /var/mnt/dev/kuro/target/debug/kuro \
+         --isolation-dir plan51-analysis-retention-1 \
+         build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan51-analysis-retention-1-memory.log
+```
+
+Evidence from `/tmp/plan51-analysis-retention-1-memory.log`:
+
+- The bounded run timed out before a clean build.
+- Peak sampled RSS was about `36444952` KiB.
+- The waiting frontier moved to
+  `rules_rust+0.69.0//ffi/rs:empty_allocator_libraries (...) -- running analysis [evaluate_rule], and 15 other actions`.
+- `analysis_key_start` reached about `max_active=2214` and
+  `completed=5840` before the large spike.
+- Completed `analysis_evaluate_rule_result`/`analysis_key_complete` samples
+  near the spike were small: mostly `retained_bytes` under a few KiB, tiny
+  provider counts, and usually no recorded actions. The completed-result
+  checkpoints do not explain the 30+ GiB RSS.
+- There were no large depset/list materialization checkpoints during the
+  rising part of the spike.
+
+Bounded zeromatter smoke after the immediate-dependency batch:
+
+```sh
+timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan51-analysis-batched-deps-1' \
+    -- /var/mnt/dev/kuro/target/debug/kuro \
+         --isolation-dir plan51-analysis-batched-deps-1 \
+         build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan51-analysis-batched-deps-1-memory.log
+```
+
+Evidence from `/tmp/plan51-analysis-batched-deps-1-memory.log`:
+
+- The bounded run timed out before a clean build.
+- Peak sampled RSS was `38574352` KiB at `2026-05-09T10:50:32-07:00`.
+  The `kuro_memory` max RSS checkpoint recorded `max_rss_bytes=39520804864`.
+- After the live spike unwound, RSS fell quickly to about `197160` KiB and
+  then hovered around `250000-300000` KiB while still waiting on the same
+  target. This shows the 38 GiB shape is a live allocation burst, not retained
+  completed analysis results or retained DICE module state.
+- The waiting frontier remained
+  `rules_rust+0.69.0//ffi/rs:empty_allocator_libraries (...) -- running analysis [evaluate_rule], and 15 other actions`.
+- `analysis_key_start` reached `max_active=2216`.
+- No `analysis_dep_batch_complete` checkpoint was emitted, so no immediate dep
+  list on this path exceeded the `128`-dep batch threshold.
+- Completed rule results after the live spike were still tiny. Representative
+  samples include `retained_bytes=928`, `providers=2`, `actions=0`, and the
+  largest repeated toolchain sample was `retained_bytes=4800`,
+  `providers=2`, `actions=27`.
+
+Interpretation:
+
+- The bzlmod loaded-module duplicate retention problem remains fixed; this
+  slice did not reintroduce `EvalImportKey` blowup.
+- The current Plan 51 blocker is not completed analysis result retention and
+  not a single huge immediate dependency fanout. It is a live heap burst while
+  evaluating `rules_rust+0.69.0//ffi/rs:empty_allocator_libraries` and 15
+  sibling analysis actions.
+- The next slice should instrument inside the rule-evaluation live heap,
+  especially `cc_common` and depset construction used by
+  `rules_rust` allocator/toolchain helpers:
+  `cc_common.create_library_to_link`, `create_linker_input`,
+  `create_linking_context`, `merge_cc_infos`, and depset creation/union paths
+  before `to_list`.
+- The likely source Starlark path is
+  `bazel-external/rules_rust+0.69.0/rust/private/rust_allocator_libraries.bzl`,
+  where `_rust_allocator_libraries_impl` calls
+  `toolchain.make_libstd_and_allocator_ccinfo(...)`; that helper builds
+  `library_to_link` values, nested depsets, linking contexts, and merged
+  `CcInfo` providers. A fix should be systemic in Kuro's provider/depset/
+  `cc_common` representation, not a one-off `rules_rust` or zeromatter special
+  case.
+
+## Progress 2026-05-09: cc_common/depset live-heap checkpoints
+
+Added `KURO_MEMORY_CHECKPOINTS`-gated live-heap checkpoints around the native
+`cc_common` entry points that were suspected in the allocator/toolchain path:
+
+- `cc_common_create_library_to_link`
+- `cc_common_create_linker_input_start`
+- `cc_common_create_linker_input_result`
+- `cc_common_create_linking_context`
+- `cc_common_create_linking_context_from_outputs`
+- `cc_common_merge_linking_contexts`
+- `cc_common_merge_cc_infos_collected`
+- `cc_common_merge_cc_infos_result`
+
+Also added depset creation metadata through `depset_create_live`, including
+total create count, direct length before/after direct-element dedupe,
+transitive child count, order id, element-type presence, emptiness, depth, and
+max observed direct/transitive/depth values. The checkpoint is sampled at
+powers of two and forced for depsets with at least 16 direct+transitive entries
+or depth at least 16, so it stays lower volume than logging every tiny depset.
+
+Because the `rules_rust` path loads `@rules_cc//cc/common:cc_common.bzl`,
+which in `rules_cc+0.2.17` re-exports pure Starlark wrappers from
+`cc/private/cc_common.bzl`, the native `CcCommonModule` methods above are not
+the hot path for this target. Added `cc_internal_freeze` around
+`_cc_internal.freeze(...)`, which those Starlark wrappers use after
+`depset.to_list()` for pure-Starlark provider fields.
+
+Focused verification for this slice:
+
+- `cargo fmt -- app/kuro_build_api/src/interpreter/rule_defs/depset.rs app/kuro_build_api/src/interpreter/rule_defs/cc_common/actions.rs`
+- `cargo check -p kuro_build_api`
+- `cargo check -p kuro_analysis`
+- `cargo build -p kuro`
+
+Bounded zeromatter smoke with native cc/depset checkpoints:
+
+```sh
+timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan51-cc-liveheap-1' \
+    -- /var/mnt/dev/kuro/target/debug/kuro \
+         --isolation-dir plan51-cc-liveheap-1 \
+         build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan51-cc-liveheap-1-memory.log
+```
+
+Evidence from `/tmp/plan51-cc-liveheap-1-memory.log`:
+
+- The bounded run timed out before a clean build.
+- Sampled total RSS peaked at `772492` KiB.
+- The daemon `max_rss_bytes` checkpoint peaked at `717438976`.
+- The waiting frontier stayed
+  `rules_rust+0.69.0//ffi/rs:empty_allocator_libraries (...) -- running analysis [evaluate_rule], and 15 other actions`.
+- Native `cc_common_*` checkpoints did not fire; matches for `cc_common` in
+  the log were target labels such as
+  `rules_rust+0.69.0//rust/settings:experimental_use_cc_common_link`, not
+  checkpoint names.
+- `depset_create_live` max values were tiny:
+  `create_count=230`, `direct_len=64`, `deduped_direct_len=64`,
+  `max_transitive_len=2`, `max_depth=1`.
+- `depset_to_list_*` remained tiny:
+  `direct_len=9`, `transitive_len=1`, `collected_len=9`, `deduped_len=9`.
+
+Bounded zeromatter smoke after adding `_cc_internal.freeze` checkpointing:
+
+```sh
+timeout 150s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan51-cc-freeze-1' \
+    -- /var/mnt/dev/kuro/target/debug/kuro \
+         --isolation-dir plan51-cc-freeze-1 \
+         build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan51-cc-freeze-1-memory.log
+```
+
+Evidence from `/tmp/plan51-cc-freeze-1-memory.log`:
+
+- The bounded run timed out before a clean build.
+- Sampled total RSS peaked at `790084` KiB.
+- The daemon `max_rss_bytes` checkpoint peaked at `708857856`.
+- The waiting frontier stayed
+  `rules_rust+0.69.0//ffi/rs:empty_allocator_libraries (...) -- running analysis [evaluate_rule], and 14 other actions`.
+- `cc_internal_freeze` fired 11 times, but observed payloads were small or
+  non-iterable (`iterable_len=0`, no depset payload).
+- Native `cc_common_*` checkpoints still did not fire.
+- `depset_create_live` max values stayed tiny:
+  `create_count=228`, `direct_len=64`, `deduped_direct_len=64`,
+  `max_transitive_len=2`, `max_depth=1`.
+- `depset_to_list_*` stayed tiny:
+  `direct_len=9`, `transitive_len=1`, `collected_len=9`, `deduped_len=9`.
+
+Interpretation:
+
+- The previous 38 GiB live heap burst did not reproduce under the added
+  checkpointing. The instrumentation is likely perturbing enough scheduling or
+  allocation timing to avoid the spike, so this is not evidence of a semantic
+  fix.
+- The current stuck target still does not build under Kuro. The failure shape
+  in these bounded runs is now a stalled analysis frontier with low steady RSS,
+  not a retained-result or depset/list blowup.
+- The suspected `cc_common.create_*` calls in
+  `rules_rust+0.69.0/rust/private/rust_allocator_libraries.bzl` route through
+  `rules_cc+0.2.17`'s Starlarkified `cc_common` provider wrappers, not Kuro's
+  native `CcCommonModule` methods. Future instrumentation should target
+  Starlark evaluation of those wrapper functions and provider construction,
+  especially:
+  `rules_cc+0.2.17/cc/private/link/create_linker_input.bzl`,
+  `create_library_to_link.bzl`,
+  `create_linking_context_from_compilation_outputs.bzl`, and
+  `cc/private/cc_info.bzl`.
+- The next useful Plan 51 step is a lower-perturbation stack/progress
+  checkpoint for live `evaluate_rule`: record the current Starlark call stack
+  or function-name counters for long-running analysis tasks, plus native
+  provider construction sizes for pure Starlark providers. That should explain
+  whether `empty_allocator_libraries` is spinning, blocked, or repeatedly
+  traversing provider/depset values before any native `cc_common` method is
+  reached.
+
+## Progress 2026-05-09: Starlark rules_cc provider/call-stack checkpoints
+
+Implemented the next lower-perturbation checkpointing slice:
+
+- Added an embedder-owned `CallStackCheckpoint` hook to the vendored Starlark
+  evaluator. Kuro installs it only when `KURO_MEMORY_CHECKPOINTS=1`.
+- Added `analysis_starlark_call_sample` in analysis evaluation. It samples
+  Starlark call-stack pushes for targeted wrapper files:
+  `rules_cc+0.2.17/cc/private/link/create_linker_input.bzl`,
+  `create_library_to_link.bzl`,
+  `create_linking_context_from_compilation_outputs.bzl`,
+  `cc/private/cc_info.bzl`,
+  `rules_rust+0.69.0/rust/private/rust_allocator_libraries.bzl`, and
+  `rust/private/cc/cc_utils.bzl`.
+- Added pure Starlark provider construction checkpoints:
+  `init_provider_call_start`, `init_provider_call_result`,
+  `user_provider_create`, and `user_provider_create_schemaless`, scoped to
+  providers defined under `rules_cc+0.2.17/cc/private`.
+
+Focused verification:
+
+```sh
+cargo fmt -- \
+  starlark-rust/starlark/src/eval/runtime/evaluator.rs \
+  starlark-rust/starlark/src/eval.rs \
+  app/kuro_analysis/src/analysis/env.rs \
+  app/kuro_build_api/src/interpreter/rule_defs/provider/user.rs \
+  app/kuro_build_api/src/interpreter/rule_defs/provider/callable.rs
+
+cargo check -p starlark -p kuro_analysis -p kuro_build_api
+cargo build -p kuro
+```
+
+Bounded zeromatter smoke:
+
+```sh
+timeout 110s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan51-starlark-progress-2' \
+    -- /var/mnt/dev/kuro/target/debug/kuro \
+         --isolation-dir plan51-starlark-progress-2 \
+         build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan51-starlark-progress-2-memory.log
+```
+
+Evidence from `/tmp/plan51-starlark-progress-2-memory.log`:
+
+- The bounded run still did not complete `//sdk:sdk_contents`.
+- Build ID: `cf5b7b40-7ace-403b-8f0f-93bd9a493381`.
+- Sampled total RSS peaked at `821628` KiB.
+- The daemon `max_rss_bytes` checkpoint peaked at `748875776`.
+- The waiting frontier again stayed
+  `rules_rust+0.69.0//ffi/rs:empty_allocator_libraries (...) -- running analysis [evaluate_rule], and 15 other actions`.
+- The Starlark sampler fired: `38` structured
+  `analysis_starlark_call_sample` events, plus matching trace lines.
+  Sampled files were:
+  - `rules_cc+0.2.17/cc/private/cc_info.bzl`: `36` trace lines.
+  - `rules_rust+0.69.0/rust/private/cc/cc_utils.bzl`: `2` trace lines.
+- The hot sampled source locations in `cc_info.bzl` were the `_flat_depset`
+  helper and `_merge_compilation_contexts` construction path:
+  lines `397`, `400`, `405`, `406`, and the `CcCompilationContextInfo(...)`
+  field construction around lines `448`-`464`.
+- Pure Starlark provider construction was confirmed but remained small:
+  `16` structured `user_provider_create` events, `4` start/result init-provider
+  pairs, and no schemaless provider construction events.
+- Provider names observed in the trace were limited to `CcInfo`,
+  `_UnboundValueProviderDoNotUse`, `CcCompilationContextInfo`,
+  `CcLinkingContextInfo`, `CcCompilationOutputsInfo`,
+  `CcNativeLibraryInfo`, `CcDebugContextInfo`,
+  `ExtraLinkTimeLibrariesInfo`, and `LtoCompilationContextInfo`.
+- The largest observed provider schema/value width was
+  `CcCompilationContextInfo` with `26` fields. `CcInfo` init-provider results
+  had `4` fields.
+
+Interpretation:
+
+- The Starlarkified `rules_cc` provider wrappers are definitely on the path,
+  and `cc_info.bzl`'s `_flat_depset` logic is visible in the live samples.
+- The run still does not reproduce the earlier 38 GiB burst. The new
+  checkpointing stayed under roughly 0.8 GiB RSS, so this remains diagnostic
+  evidence, not a semantic or memory fix.
+- The provider construction counts and field widths are too small to explain a
+  large heap burst by themselves.
+- The persistent blocker is still the live `evaluate_rule` for
+  `rules_rust+0.69.0//ffi/rs:empty_allocator_libraries`. The next useful slice
+  is to distinguish "actively executing Starlark bytecode" from "blocked inside
+  an awaited DICE dependency" for that target, preferably by adding a bounded
+  per-target live-evaluator heartbeat/checkpoint that can report the current
+  stack/location while the wait frontier is stuck, without relying only on
+  call-stack pushes.
+
+## Progress 2026-05-09: evaluate_rule phase heartbeat and DICE-wait boundary
+
+Added a bounded live-evaluator heartbeat/checkpoint for Starlark bytecode:
+
+- The vendored Starlark `CallStackCheckpoint` hook now also has an
+  `on_infrequent_instr_check` callback from the evaluator's existing
+  infrequent bytecode check path. It is inert unless an embedder installs the
+  checkpoint.
+- Analysis installs the callback only under `KURO_MEMORY_CHECKPOINTS=1`.
+  `analysis_starlark_eval_heartbeat` reports target, current top
+  file/function/line/column, stack depth, bytecode check count, and elapsed
+  time at bounded intervals.
+- Added `analysis_evaluate_rule_phase` checkpoints across the
+  `evaluate_rule` body: attr eval, execution platform lookup, toolchain
+  resolution, context toolchain-provider analysis, Starlark provider setup,
+  rule impl invocation, promise resolution, provider collection, and freeze.
+
+Focused verification:
+
+```sh
+cargo fmt -- app/kuro_analysis/src/analysis/env.rs starlark-rust/starlark/src/eval/runtime/evaluator.rs
+cargo check -p starlark -p kuro_analysis
+cargo check -p kuro_build_api
+cargo build -p kuro
+git diff --check
+```
+
+Bounded zeromatter smokes from `/var/mnt/dev/zeromatter`:
+
+```sh
+timeout 120s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan51-eval-heartbeat-1' \
+    -- /var/mnt/dev/kuro/target/debug/kuro \
+         --isolation-dir plan51-eval-heartbeat-1 \
+         build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan51-eval-heartbeat-1-memory.log
+
+timeout 75s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan51-eval-heartbeat-2' \
+    -- /var/mnt/dev/kuro/target/debug/kuro \
+         --isolation-dir plan51-eval-heartbeat-2 \
+         build //sdk:sdk_contents \
+  > /tmp/plan51-eval-heartbeat-2-memory.log 2>&1
+
+timeout 60s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan51-eval-heartbeat-3' \
+    -- /var/mnt/dev/kuro/target/debug/kuro \
+         --isolation-dir plan51-eval-heartbeat-3 \
+         build //sdk:sdk_contents \
+  > /tmp/plan51-eval-heartbeat-3-memory.log 2>&1
+```
+
+Evidence:
+
+- `//sdk:sdk_contents` still did not complete under Kuro.
+- The latest build ID was `48b28345-cc83-4518-b6b5-835b0d93986b`.
+- The waiting frontier remained
+  `rules_rust+0.69.0//ffi/rs:empty_allocator_libraries (...) -- running
+  analysis [evaluate_rule], and 14 other actions`.
+- `analysis_starlark_eval_heartbeat` count was `0` while the target was stuck.
+  That means the stuck frontier was not actively executing Starlark bytecode,
+  so there is no current Starlark stack/location to report for the target.
+- Both configurations of `empty_allocator_libraries` reached
+  `ctx_toolchain_provider_analysis_start` immediately after
+  `toolchain_resolution_complete` and never reached
+  `ctx_toolchain_provider_analysis_complete`,
+  `starlark_provider_start`, or any rule-impl phase before the timeout.
+- Latest sampled RSS was low and stable relative to the earlier live burst:
+  `/tmp/plan51-eval-heartbeat-3-memory.log` peaked at `772480 KiB` total RSS
+  and ended at `729228 KiB`.
+
+Interpretation:
+
+- The current low-RSS stall is not a Starlark bytecode spin in
+  `empty_allocator_libraries`; it is an awaited DICE dependency inside the
+  context toolchain-provider analysis block that prepares `ctx.toolchains`
+  values after toolchain resolution.
+- The next slice should instrument that block per resolved toolchain type and
+  implementation label, then inspect the dependency cycle/frontier for the
+  toolchain impl analysis requested by `empty_allocator_libraries`. The likely
+  immediate area is `run_analysis_with_env_underlying` in
+  `app/kuro_analysis/src/analysis/env.rs`, specifically the loop that calls
+  `dice.get_analysis_result(&configured).await` while constructing
+  `resolved_toolchains_for_ctx`.
+
+## Progress 2026-05-09: ctx.toolchains DICE await frontier
+
+Instrumented the `resolved_toolchains_for_ctx` loop in
+`app/kuro_analysis/src/analysis/env.rs` with
+`analysis_ctx_toolchain_provider` checkpoints. Each record names the
+requesting target, resolved toolchain type, implementation label, configured
+implementation target, mandatory bit, self-edge bit, loop index, and whether
+the awaited analysis completed.
+
+Focused verification:
+
+```sh
+cargo fmt -- app/kuro_analysis/src/analysis/env.rs
+cargo check -p kuro_analysis
+cargo build -p kuro
+git diff --check
+```
+
+Bounded zeromatter smoke from `/var/mnt/dev/zeromatter`:
+
+```sh
+timeout 90s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan51-toolchain-await-1' \
+    -- /var/mnt/dev/kuro/target/debug/kuro \
+         --isolation-dir plan51-toolchain-await-1 \
+         build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan51-toolchain-await-1-memory.log
+```
+
+Evidence from `/tmp/plan51-toolchain-await-1-memory.log`:
+
+- `//sdk:sdk_contents` still did not complete under Kuro.
+- Build ID: `187c01d4-c3bb-494a-b348-53ba21022d67`.
+- Sampled total RSS peaked at `819664 KiB`; daemon checkpoint max RSS peaked
+  at `716673024` bytes. This was again a low-RSS stall, not a high-RSS burst.
+- Structured provider-await status counts were `18` `analysis_start`, `3`
+  `analysis_compatible`, and `1` `unresolved_optional`.
+- The displayed stuck frontier remained
+  `rules_rust+0.69.0//ffi/rs:empty_allocator_libraries (...) -- running
+  analysis [evaluate_rule], and 14 other actions`.
+- The new await records show the immediate waits:
+  - `empty_allocator_libraries` in the target configuration waits on mandatory
+    Rust toolchain providers from
+    `rules_rust+rust+rust_linux_x86_64__x86_64-unknown-linux-gnu__stable_tools//:rust_toolchain`;
+  - `empty_allocator_libraries` in the exec/host configuration waits directly
+    on optional C++ toolchain providers from
+    `llvm+toolchain+llvm_toolchains//:linux_x86_64_cc_toolchain`;
+  - that Rust toolchain target itself waits on optional C++ toolchain providers
+    from the same configured LLVM C++ toolchain.
+- The deeper frontier is the LLVM C++ toolchain analysis:
+  `analysis_key_start` appears for
+  `llvm+toolchain+llvm_toolchains//:linux_x86_64_cc_toolchain` in both
+  configurations, but there is no `analysis_deps_ready`,
+  `analysis_aspects_ready`, or `analysis_evaluate_rule_phase` for either
+  configured key before timeout.
+- Other in-flight targets such as `bazel_tools//tools/cpp:malloc`,
+  `bazel_tools//tools/cpp:link_extra_lib`,
+  `rules_cc+0.2.17//:link_extra_lib`,
+  `glibc_headers_x86_64-linux-gnu.2.28//:gnu_libc_headers`, and
+  `linux_kernel_headers_x86.4.19.325//:kernel_headers` also started
+  `ctx.toolchains` provider awaits on the same configured LLVM C++ toolchain.
+
+Interpretation:
+
+- The current blocker is not a Starlark bytecode spin and not a memory
+  retention problem. It is a DICE dependency cycle/frontier around C++ toolchain
+  analysis:
+  `empty_allocator_libraries -> rust_toolchain/cc toolchain provider ->
+  llvm_toolchains//:linux_x86_64_cc_toolchain -> cc_library/toolchain support
+  deps -> same llvm C++ toolchain provider`.
+- This is outside Plan 51's memory scope. Existing Plan 15 owns the relevant
+  Bazel 9 parity gap because Kuro still treats `cc_toolchain` as a native
+  minimal stub and lacks Bazel's real C++ toolchain analysis/provider behavior.
+  Plan 15 now has a note for this dependency-cycle failure shape.
+
+## Progress 2026-05-09: Plan 15 cycle breaker result
+
+Plan 15 took over the C++ toolchain await frontier and added a systemic
+cycle-safe path for Bazel's C++ toolchain type during `ctx.toolchains` provider
+construction. When the selected configured C++ toolchain implementation is
+already an active analysis key, Kuro now returns a minimal synthetic
+`ToolchainInfo(cc=..., cc_provider_in_toolchain=True)` / `CcToolchainInfo`
+provider instead of awaiting that same analysis result.
+
+Focused verification from `/var/mnt/dev/kuro`:
+
+```sh
+cargo fmt -- app/kuro_analysis/src/analysis/calculation.rs app/kuro_analysis/src/analysis/env.rs app/kuro_build_api/src/interpreter/rule_defs/context.rs app/kuro_build_api/src/interpreter/rule_defs/cc_common/feature_config.rs app/kuro_build_api/src/interpreter/rule_defs/platform_common.rs
+cargo check -p kuro_build_api
+cargo check -p kuro_analysis
+cargo build -p kuro
+```
+
+Bounded zeromatter smoke from `/var/mnt/dev/zeromatter`:
+
+```sh
+timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/target/debug/kuro \
+    --isolation-dir plan15-cc-toolchain-cycle-1 \
+    build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan15-cc-toolchain-cycle-1-memory.log
+```
+
+Evidence:
+
+- `//sdk:sdk_contents` no longer hangs at the old low-RSS LLVM C++ toolchain
+  provider frontier.
+- `/tmp/plan15-cc-toolchain-cycle-1-memory.log` contains
+  `active_cc_toolchain_synthetic` records for the prior support-dep path:
+  `bazel_tools//tools/cpp:link_extra_lib` and
+  `rules_cc+0.2.17//:link_extra_lib` both request
+  `@@bazel_tools//tools/cpp:toolchain_type` and receive the synthetic provider
+  while the same configured
+  `llvm+toolchain+llvm_toolchains//:linux_x86_64_cc_toolchain` key is active.
+- The run advances into `rules_cc+0.2.17//:link_extra_lib` rule analysis and
+  fails with:
+
+  ```text
+  error: depset elements must not be mutable values
+    bazel-external/rules_cc+0.2.17/cc/private/rules_impl/cc_library.bzl:221
+  ```
+
+Interpretation:
+
+- Plan 51's memory work is still not the owner for the current blocker. The
+  former DICE await frontier is addressed enough to expose the next semantic
+  failure.
+- The current failure is covered by Plan 54's depset/provider immutability and
+  `cc_common.create_linking_context` work. Continue there before returning to
+  a full Plan 51 smoke.
+
+## Progress 2026-05-09: current smoke after lockfile pre-seed guard
+
+A fresh bounded smoke from `/var/mnt/dev/zeromatter` using
+`--isolation-dir plan15-lockfile-preseed-zstd-1` and log
+`/tmp/plan15-lockfile-preseed-zstd-1.log` did not reproduce the earlier
+`rules_rust//ffi/rs:empty_allocator_libraries` low-RSS timeout. It ran to
+the 180s bound and exited with Kuro status `3` after analysis produced a
+real error:
+
+```text
+Error running analysis for `zstd//:zstd`
+error: depset elements must not be mutable values
+  bazel-external/rules_cc+0.2.17/cc/private/link/create_linking_context_from_compilation_outputs.bzl:127
+```
+
+The old `@@zstd//:` package-load failure is gone; the materialized
+`crates__zstd-sys` BUILD now references `@@zstd//:zstd`. Peak RSS was about
+599 MiB and final RSS about 516 MiB. This is still not a Plan 51 memory
+retention issue; the active blocker remains Plan 54 provider/depset
+immutability, specifically the `LibraryToLink` value returned from
+`cc_common.create_linking_context_from_compilation_outputs`.
+
+## Progress 2026-05-09: post-Plan 54 LibraryToLink freeze smoke
+
+Plan 54 added recursive dict normalization to `_cc_internal.freeze`, covering
+the `LibraryToLink` mutable field shape exposed at `zstd//:zstd`.
+
+Focused verification from `/var/mnt/dev/kuro` passed:
+
+```sh
+cargo fmt
+cargo check -p kuro_build_api
+cargo test -p kuro_build_api_tests depset -- --nocapture
+cargo build -p kuro
+pytest -q tests/core/cc_common/test_link.py
+git diff --check
+```
+
+Fresh bounded zeromatter smoke from `/var/mnt/dev/zeromatter`:
+
+```sh
+timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/target/debug/kuro \
+    --isolation-dir plan54-library-dict-freeze-1 \
+    build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan54-library-dict-freeze-1.log
+```
+
+Result: the old
+`rules_cc+0.2.17/cc/private/link/create_linking_context_from_compilation_outputs.bzl`
+`depset([cc_linking_outputs.library_to_link])` mutable-value error is gone.
+The run reached `zeromatter//sdk:sdk_contents` analysis and timed out at the
+already-tracked `rules_rust//ffi/rs:empty_allocator_libraries` analysis wait
+with 5 other actions. A repository-rule side signal also appeared:
+`llvm+llvm_source+llvm-raw` failed `http_bsdtar_archive` at
+`rctx.execute([rctx.path(host_bsdtar)] + args)` with `No such file or
+directory`, then Kuro created a stub. This still leaves Plan 51/15's
+`empty_allocator_libraries` toolchain-analysis wait as the active frontier,
+not a completed `//sdk:sdk_contents` build.
+
+## Progress 2026-05-09: optional toolchain retry predicate slice
+
+Plan 15 investigated the current
+`rules_rust//ffi/rs:empty_allocator_libraries` frontier and found that
+`rust_allocator_libraries` declares an optional C++ toolchain with
+`mandatory = False`. Kuro's deferred toolchain retry predicate treated any
+unresolved toolchain as retry-worthy, including optional misses; Bazel 9 only
+blocks on missing mandatory toolchains. The predicate now preserves optional
+misses without forcing a deferred-load retry.
+
+Fresh bounded smoke log:
+`/tmp/plan15-optional-toolchain-retry-1.log`. Result: the build still timed
+out at `empty_allocator_libraries`, and observed instances still stopped before
+`toolchain_resolution_complete`; no Starlark heartbeat or call samples appeared
+for that rule, and the earlier LLVM `http_bsdtar_archive` side signal did not
+recur. This remains a toolchain-resolution await frontier, not a Plan 51 memory
+retention conclusion. The next owner should add checkpoints inside
+`resolve_toolchain_types()` before pursuing another semantic fix.
+
+## Progress 2026-05-09: hashable dict freeze smoke exposes allocator LTL mutability
+
+Plan 54's hashable dict-shaped `_cc_internal.freeze` smoke was run from
+`/var/mnt/dev/zeromatter` with fresh isolation
+`plan54-hashable-dict-freeze-1`:
+
+```sh
+timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan54-hashable-dict-freeze-1' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan54-hashable-dict-freeze-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan54-hashable-dict-freeze-1.log
+```
+
+Result: Kuro exited status `3` after 179s, with
+`memory_smoke_summary elapsed_s=179 peak_rss_kib=771808 final_rss_kib=611132`.
+This was not a Plan 51 memory-retention conclusion. The old
+`create_library_to_link.bzl:106 Object of type tuple has no attribute keys`
+failure is cleared. The run advanced to a new semantic blocker:
+`rules_rust+0.69.0/rust/private/rust_allocator_libraries.bzl:118` creates
+depsets of `_ltl(...)` values, where `_ltl` returns
+`cc_common.create_library_to_link(static_library = library,
+pic_static_library = library)`. Kuro rejects those direct `LibraryToLink`
+provider elements as mutable. Keep Plan 51 parked until Plan 54 identifies and
+fixes the remaining non-hashable provider field.

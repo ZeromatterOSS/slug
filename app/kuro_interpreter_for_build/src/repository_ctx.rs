@@ -207,7 +207,7 @@ pub struct RepositoryPath {
 
 impl std::fmt::Display for RepositoryPath {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.path)
+        write!(f, "{}", self.absolute_path().to_string_lossy())
     }
 }
 
@@ -230,7 +230,7 @@ impl RepositoryPath {
 
     /// Get the absolute path.
     pub fn absolute_path(&self) -> PathBuf {
-        if let Some(base) = &self.base_dir {
+        let path = if let Some(base) = &self.base_dir {
             if Path::new(&self.path).is_absolute() {
                 PathBuf::from(&self.path)
             } else {
@@ -238,13 +238,32 @@ impl RepositoryPath {
             }
         } else {
             PathBuf::from(&self.path)
-        }
+        };
+        normalize_path_lexically(path)
     }
 
     /// Get the path string.
     pub fn path_str(&self) -> &str {
         &self.path
     }
+}
+
+fn normalize_path_lexically(path: PathBuf) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                if !normalized.pop() {
+                    normalized.push(component.as_os_str());
+                }
+            }
+            std::path::Component::Prefix(_)
+            | std::path::Component::RootDir
+            | std::path::Component::Normal(_) => normalized.push(component.as_os_str()),
+        }
+    }
+    normalized
 }
 
 #[starlark_value(type = "repository_path")]
@@ -592,19 +611,38 @@ pub struct RepositoryContext {
     /// Files are created relative to this directory.
     #[allocative(skip)]
     working_dir: Arc<PathBuf>,
+    /// The root workspace of the build invocation.
+    ///
+    /// Bazel exposes this as `repository_ctx.workspace_root`; it is not the
+    /// generated repository directory.
+    #[allocative(skip)]
+    workspace_root: Arc<PathBuf>,
 }
 
 starlark_simple_value!(RepositoryContext);
 
 impl RepositoryContext {
     /// Create a new repository context.
-    pub fn new(name: String, mut attr: RepositoryAttr, working_dir: PathBuf) -> Self {
+    pub fn new(name: String, attr: RepositoryAttr, working_dir: PathBuf) -> Self {
+        let workspace_root =
+            kuro_core::cells::get_dynamic_project_root().unwrap_or_else(|| working_dir.clone());
+        Self::new_with_workspace_root(name, attr, working_dir, workspace_root)
+    }
+
+    /// Create a new repository context with an explicit root workspace path.
+    pub fn new_with_workspace_root(
+        name: String,
+        mut attr: RepositoryAttr,
+        working_dir: PathBuf,
+        workspace_root: PathBuf,
+    ) -> Self {
         attr.set_name(name.clone());
         Self {
             original_name: name.clone(),
             name,
             attr,
             working_dir: Arc::new(working_dir),
+            workspace_root: Arc::new(workspace_root),
         }
     }
 
@@ -614,6 +652,7 @@ impl RepositoryContext {
         original_name: String,
         mut attr: RepositoryAttr,
         working_dir: PathBuf,
+        workspace_root: PathBuf,
     ) -> Self {
         attr.set_name(name.clone());
         Self {
@@ -621,6 +660,7 @@ impl RepositoryContext {
             original_name,
             attr,
             working_dir: Arc::new(working_dir),
+            workspace_root: Arc::new(workspace_root),
         }
     }
 
@@ -634,6 +674,9 @@ impl RepositoryContext {
             name: name.to_owned(),
             attr: RepositoryAttr::empty(),
             working_dir: Arc::new(temp_dir),
+            workspace_root: Arc::new(
+                std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+            ),
         }
     }
 
@@ -655,6 +698,17 @@ impl RepositoryContext {
 // ============================================================================
 // Helper functions for I/O operations
 // ============================================================================
+
+fn prepare_execute_working_directory(work_dir: &Path) -> starlark::Result<()> {
+    std::fs::create_dir_all(work_dir).map_err(|e| {
+        starlark::Error::from(kuro_error::kuro_error!(
+            kuro_error::ErrorTag::Input,
+            "Failed to create working directory '{}': {}",
+            work_dir.display(),
+            e
+        ))
+    })
+}
 
 /// Resolve a Bazel label string to a file system path.
 ///
@@ -680,6 +734,36 @@ fn resolve_label_to_filesystem_path(label_str: &str, workspace_root: &Path) -> P
     } else {
         path
     }
+}
+
+/// Ensure an extension repo referenced by a resolved Label path exists on disk.
+///
+/// Bazel's `getPathFromLabel()` fetches the repository directory before
+/// returning a path. Kuro resolves Labels syntactically, so callers that then
+/// execute or read the path must trigger the same lazy materialization here.
+pub(crate) fn ensure_label_path_materialized(path: &Path) {
+    let Some(canonical) = canonical_name_from_bazel_external_path(path) else {
+        return;
+    };
+    if let Err(e) = kuro_bzlmod::materialize_spoke_sync(&canonical) {
+        tracing::warn!(
+            "Lazy materialization of extension repo '{}' failed (continuing with path): {}",
+            canonical,
+            e
+        );
+    }
+}
+
+fn canonical_name_from_bazel_external_path(path: &Path) -> Option<String> {
+    let mut components = path.components();
+    while let Some(c) = components.next() {
+        if c.as_os_str() == "bazel-external" {
+            if let Some(next) = components.next() {
+                return Some(next.as_os_str().to_string_lossy().to_string());
+            }
+        }
+    }
+    None
 }
 
 /// Download a file from a URL synchronously.
@@ -1261,12 +1345,15 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             if repo.is_empty() {
                 return;
             }
-            let canonical =
-                if let Some(cell_path) = kuro_core::cells::get_dynamic_extension_cell(repo) {
-                    cell_path.rsplit('/').next().unwrap_or(repo).to_owned()
-                } else {
-                    repo.to_owned()
-                };
+            let resolved_repo = kuro_core::cells::resolve_dynamic_extension_cell_alias(repo)
+                .unwrap_or_else(|| repo.to_owned());
+            let canonical = if let Some(cell_path) =
+                kuro_core::cells::get_dynamic_extension_cell(&resolved_repo)
+            {
+                cell_path.rsplit('/').next().unwrap_or(repo).to_owned()
+            } else {
+                resolved_repo
+            };
             if let Err(e) = kuro_bzlmod::materialize_spoke_sync(&canonical) {
                 tracing::debug!(
                     "rctx.path: lazy materialization of '{}' failed (continuing): {}",
@@ -1471,7 +1558,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             path.to_repr()
         };
 
-        let file_path = this.resolve_path(&path_str);
+        let file_path = normalize_path_lexically(this.resolve_path(&path_str));
 
         // Create parent directories
         if let Some(parent) = file_path.parent() {
@@ -1544,7 +1631,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                 } else if v.get_type() == "Label" {
                     // Label: resolve to filesystem path via cell paths
                     let label_str = v.to_str();
-                    resolve_label_to_path(&label_str, &this.working_dir)
+                    let path = resolve_label_to_filesystem_path(&label_str, &this.working_dir);
+                    ensure_label_path_materialized(&path);
+                    path.to_string_lossy().to_string()
                 } else {
                     // Other: convert to string
                     v.to_str()
@@ -1568,6 +1657,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         } else {
             this.resolve_path(working_directory)
         };
+        prepare_execute_working_directory(&work_dir)?;
 
         // Build the command
         let mut cmd = Command::new(program);
@@ -1578,8 +1668,12 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         if let Some(env_val) = environment {
             if let Some(env_dict) = starlark::values::dict::DictRef::from_value(env_val) {
                 for (k, v) in env_dict.iter() {
-                    if let (Some(key), Some(val)) = (k.unpack_str(), v.unpack_str()) {
-                        cmd.env(key, val);
+                    if let Some(key) = k.unpack_str() {
+                        if v.is_none() {
+                            cmd.env_remove(key);
+                        } else if let Some(val) = v.unpack_str() {
+                            cmd.env(key, val);
+                        }
                     }
                 }
             }
@@ -1627,7 +1721,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             // string form (which would stringify as
             // `@@cell//templates:foo.bzl` and be a dangling link).
             let label_str = format!("{target}");
-            resolve_label_to_path(&label_str, &this.working_dir)
+            let path = resolve_label_to_filesystem_path(&label_str, &this.working_dir);
+            ensure_label_path_materialized(&path);
+            path.to_string_lossy().to_string()
         } else {
             target.to_repr()
         };
@@ -1774,7 +1870,8 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             // form ("@@cell//templates:foo.tpl") as if it were the
             // template body, corrupting every generated file.
             let label_str = format!("{template}");
-            let template_path = PathBuf::from(resolve_label_to_path(&label_str, &this.working_dir));
+            let template_path = resolve_label_to_filesystem_path(&label_str, &this.working_dir);
+            ensure_label_path_materialized(&template_path);
             std::fs::read_to_string(&template_path).map_err(|e| {
                 starlark::Error::from(kuro_error::kuro_error!(
                     kuro_error::ErrorTag::Input,
@@ -1858,7 +1955,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         let _ = watch;
         let file_path = if let Some(s) = path.unpack_str() {
             if is_bazel_label_string(s) {
-                resolve_label_to_filesystem_path(s, &this.working_dir)
+                let path = resolve_label_to_filesystem_path(s, &this.working_dir);
+                ensure_label_path_materialized(&path);
+                path
             } else {
                 this.resolve_path(s)
             }
@@ -1866,7 +1965,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             repo_path.absolute_path()
         } else if path.get_type() == "Label" {
             let label_str = path.to_str();
-            resolve_label_to_filesystem_path(&label_str, &this.working_dir)
+            let path = resolve_label_to_filesystem_path(&label_str, &this.working_dir);
+            ensure_label_path_materialized(&path);
+            path
         } else {
             this.resolve_path(&path.to_str())
         };
@@ -1893,9 +1994,9 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             path.to_repr()
         };
 
-        let file_path = this.resolve_path(&path_str);
+        let file_path = normalize_path_lexically(this.resolve_path(&path_str));
 
-        if file_path.is_dir() {
+        let deleted = if file_path.is_dir() {
             std::fs::remove_dir_all(&file_path).map_err(|e| {
                 starlark::Error::from(kuro_error::kuro_error!(
                     kuro_error::ErrorTag::Input,
@@ -1903,6 +2004,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                     e
                 ))
             })?;
+            true
         } else if file_path.exists() {
             std::fs::remove_file(&file_path).map_err(|e| {
                 starlark::Error::from(kuro_error::kuro_error!(
@@ -1911,9 +2013,12 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                     e
                 ))
             })?;
-        }
+            true
+        } else {
+            false
+        };
 
-        Ok(Value::new_none())
+        Ok(Value::new_bool(deleted))
     }
 
     /// Apply a patch file. Bazel signature accepts `strip` either positionally
@@ -1938,17 +2043,24 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         let patch_path = if let Some(repo_path) = patch_file.downcast_ref::<RepositoryPath>() {
             repo_path.absolute_path().to_path_buf()
         } else if patch_file.get_type() == "Label" {
-            resolve_label_to_filesystem_path(&format!("{patch_file}"), &this.working_dir)
+            let path =
+                resolve_label_to_filesystem_path(&format!("{patch_file}"), &this.working_dir);
+            ensure_label_path_materialized(&path);
+            path
         } else if let Some(s) = patch_file.unpack_str() {
             if is_bazel_label_string(s) {
-                resolve_label_to_filesystem_path(s, &this.working_dir)
+                let path = resolve_label_to_filesystem_path(s, &this.working_dir);
+                ensure_label_path_materialized(&path);
+                path
             } else {
                 std::path::PathBuf::from(this.resolve_path(s))
             }
         } else {
             let repr = patch_file.to_repr();
             if is_bazel_label_string(&repr) {
-                resolve_label_to_filesystem_path(&repr, &this.working_dir)
+                let path = resolve_label_to_filesystem_path(&repr, &this.working_dir);
+                ensure_label_path_materialized(&path);
+                path
             } else {
                 std::path::PathBuf::from(this.resolve_path(&repr))
             }
@@ -2211,8 +2323,8 @@ impl<'v> StarlarkValue<'v> for RepositoryContext {
             "attr" => Some(heap.alloc(self.attr.clone())),
             "os" => Some(heap.alloc(RepositoryOs::new())),
             "workspace_root" => Some(heap.alloc(RepositoryPath::with_base_dir(
-                self.working_dir.to_string_lossy().to_string(),
-                self.working_dir.clone(),
+                self.workspace_root.to_string_lossy().to_string(),
+                self.workspace_root.clone(),
             ))),
             _ => None,
         }
@@ -2273,6 +2385,21 @@ mod tests {
 
         assert!(file_path.exists());
         assert_eq!(std::fs::read_to_string(&file_path).unwrap(), "hello world");
+    }
+
+    #[test]
+    fn test_workspace_root_is_separate_from_repository_working_dir() {
+        let workspace = TempDir::new().unwrap();
+        let repo_dir = TempDir::new().unwrap();
+        let ctx = RepositoryContext::new_with_workspace_root(
+            "test_repo".to_owned(),
+            RepositoryAttr::empty(),
+            repo_dir.path().to_path_buf(),
+            workspace.path().to_path_buf(),
+        );
+
+        assert_eq!(ctx.working_dir(), repo_dir.path());
+        assert_eq!(ctx.workspace_root.as_ref().as_path(), workspace.path());
     }
 
     #[test]
@@ -2353,5 +2480,38 @@ mod tests {
         let abs_path = path.absolute_path();
 
         assert_eq!(abs_path, temp_dir.path().join("subdir/file.txt"));
+    }
+
+    #[test]
+    fn test_repository_path_displays_absolute_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let base_dir = Arc::new(temp_dir.path().to_path_buf());
+
+        let root = RepositoryPath::with_base_dir(".".to_owned(), base_dir.clone());
+        assert_eq!(format!("{root}"), temp_dir.path().to_string_lossy());
+
+        let child = RepositoryPath::with_base_dir("subdir/file.txt".to_owned(), base_dir);
+        assert_eq!(
+            format!("{child}"),
+            temp_dir.path().join("subdir/file.txt").to_string_lossy()
+        );
+    }
+
+    #[test]
+    fn test_prepare_execute_working_directory_creates_missing_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let work_dir = temp_dir.path().join("repo").join("subdir");
+
+        assert!(!work_dir.exists());
+        prepare_execute_working_directory(&work_dir).unwrap();
+        assert!(work_dir.is_dir());
+    }
+
+    #[test]
+    fn test_normalize_path_lexically_removes_curdir() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path().join("repo").join(".");
+
+        assert_eq!(normalize_path_lexically(path), temp_dir.path().join("repo"));
     }
 }

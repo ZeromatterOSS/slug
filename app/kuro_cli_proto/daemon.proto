@@ -237,6 +237,10 @@ message ClientContext {
   /// Starlark build flags from --//pkg:target=value on the command line.
   /// Each entry is "//pkg:target=value" format.
   repeated string starlark_flags = 39;
+
+  /// Bazel-compatible --experimental_cc_implementation_deps /
+  /// --noexperimental_cc_implementation_deps flag.
+  bool experimental_cc_implementation_deps = 40;
 }
 
 message TargetsRequest {

@@ -195,7 +195,7 @@ impl BazelLabel {
         } else if stripped.starts_with("//") {
             (String::new(), &stripped[2..])
         } else if !stripped.is_empty() && !stripped.contains('/') && !stripped.contains(':') {
-            (stripped.to_owned(), "")
+            (stripped.to_owned(), stripped)
         } else {
             (String::new(), stripped)
         };
@@ -205,6 +205,8 @@ impl BazelLabel {
                 rest[..colon_idx].to_owned(),
                 rest[colon_idx + 1..].to_owned(),
             )
+        } else if !workspace.is_empty() && rest == workspace {
+            (String::new(), workspace.clone())
         } else if rest.is_empty() {
             (String::new(), String::new())
         } else {
@@ -246,5 +248,30 @@ impl BazelLabel {
     /// Get the workspace/repo name.
     pub fn workspace_name(&self) -> &str {
         &self.workspace_name
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bare_repo_label_defaults_target_to_repo_name() {
+        let label = BazelLabel::parse("@zstd");
+
+        assert_eq!(label.full(), "@@zstd//:zstd");
+        assert_eq!(label.name(), "zstd");
+        assert_eq!(label.package(), "");
+        assert_eq!(label.workspace_name(), "zstd");
+    }
+
+    #[test]
+    fn explicit_empty_target_label_stays_empty() {
+        let label = BazelLabel::parse("@@zstd//:");
+
+        assert_eq!(label.full(), "@@zstd//:");
+        assert_eq!(label.name(), "");
+        assert_eq!(label.package(), "");
+        assert_eq!(label.workspace_name(), "zstd");
     }
 }

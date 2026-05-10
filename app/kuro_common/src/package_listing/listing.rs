@@ -100,6 +100,39 @@ impl PackageListing {
     pub fn buildfile(&self) -> &FileName {
         &self.listing.buildfile
     }
+
+    pub(crate) fn file_count(&self) -> usize {
+        self.listing.files.files.iter().count()
+    }
+
+    pub(crate) fn directory_count(&self) -> usize {
+        self.listing.directories.iter().count()
+    }
+
+    pub(crate) fn subpackage_count(&self) -> usize {
+        self.listing.subpackages.iter().count()
+    }
+
+    pub(crate) fn approximate_path_bytes(&self) -> usize {
+        self.listing
+            .files
+            .files
+            .iter()
+            .map(|path| path.as_ref().as_str().len())
+            .sum::<usize>()
+            + self
+                .listing
+                .directories
+                .iter()
+                .map(|path| path.as_ref().as_str().len())
+                .sum::<usize>()
+            + self
+                .listing
+                .subpackages
+                .iter()
+                .map(|path| path.as_ref().as_str().len())
+                .sum::<usize>()
+    }
 }
 
 pub mod testing {

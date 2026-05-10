@@ -169,6 +169,10 @@ pub(crate) struct InterpreterForDir {
     /// from this bundled module are imported into every BUILD and `.bzl`
     /// env regardless of workspace configuration.
     bazel_builtins_autoload: Option<OwnedStarlarkModulePath>,
+    /// In bzlmod, loaded module identity is the canonical file label. Buck's
+    /// legacy top-level build-file cell dimension would duplicate the same
+    /// `.bzl` module once per consuming repository.
+    bzlmod_mode: bool,
 }
 
 struct InterpreterLoadResolver {
@@ -202,7 +206,7 @@ impl LoadResolver for InterpreterLoadResolver {
             current_dir_with_allowed_relative: &self.config.current_dir_with_allowed_relative_dirs,
             package_dir: self.config.package_dir.as_ref(),
         };
-        let path = parse_import(
+        let mut path = parse_import(
             &self.config.cell_info.cell_alias_resolver(),
             relative_import_option,
             path,
@@ -237,23 +241,30 @@ impl LoadResolver for InterpreterLoadResolver {
             .global_state
             .cell_resolver
             .get_cell_path(&project_path);
-        if reformed_path.cell() != path.cell()
-            && !are_bzlmod_alias_equivalent(reformed_path.cell().as_str(), path.cell().as_str())
-        {
-            // We actually call resolve_load twice for each loadable - once with all load's up front,
-            // then again on each one when we are loading. The second time we don't have a location,
-            // so just omit the soft_error that time. Once it is a real error, we should real error on either.
-            if let Some(location) = location {
-                return Err(LoadResolutionError::WrongCell {
-                    got: path,
-                    wanted: reformed_path,
-                    location: location.to_string(),
+        if reformed_path.cell() != path.cell() {
+            if are_bzlmod_alias_equivalent(reformed_path.cell().as_str(), path.cell().as_str()) {
+                path = reformed_path;
+            } else {
+                // We actually call resolve_load twice for each loadable - once with all load's up front,
+                // then again on each one when we are loading. The second time we don't have a location,
+                // so just omit the soft_error that time. Once it is a real error, we should real error on either.
+                if let Some(location) = location {
+                    return Err(LoadResolutionError::WrongCell {
+                        got: path,
+                        wanted: reformed_path,
+                        location: location.to_string(),
+                    }
+                    .into());
                 }
-                .into());
             }
         }
 
-        let import_path = ImportPath::new_with_build_file_cells(path, self.build_file_cell)?;
+        let build_file_cell = if self.config.bzlmod_mode {
+            BuildFileCell::new(path.cell())
+        } else {
+            self.build_file_cell
+        };
+        let import_path = ImportPath::new_with_build_file_cells(path, build_file_cell)?;
         Ok(match import_path.path().path().extension() {
             Some("json") => OwnedStarlarkModulePath::JsonFile(import_path),
             Some("toml") => OwnedStarlarkModulePath::TomlFile(import_path),
@@ -263,9 +274,59 @@ impl LoadResolver for InterpreterLoadResolver {
 }
 
 fn are_bzlmod_alias_equivalent(apparent: &str, canonical: &str) -> bool {
-    kuro_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref() == Some(canonical)
+    apparent == canonical
+        || kuro_core::cells::resolve_dynamic_extension_cell_alias(apparent).as_deref()
+            == Some(canonical)
         || kuro_core::cells::resolve_dynamic_extension_cell_alias(canonical).as_deref()
             == Some(apparent)
+        || extension_repo_internal_name(apparent) == Some(canonical)
+        || extension_repo_internal_name(canonical) == Some(apparent)
+}
+
+fn extension_repo_internal_name(canonical: &str) -> Option<&str> {
+    let mut parts = canonical.splitn(3, '+');
+    parts.next()?;
+    parts.next()?;
+    let internal_name = parts.next()?;
+    (!internal_name.is_empty()).then_some(internal_name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_cell_equivalence_accepts_registered_dynamic_alias() {
+        let apparent = "interpreter_load_alias_test";
+        let canonical = "owner+ext+interpreter_load_alias_test";
+        kuro_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            canonical.to_owned(),
+        );
+
+        assert!(are_bzlmod_alias_equivalent(apparent, canonical));
+        assert!(are_bzlmod_alias_equivalent(canonical, apparent));
+    }
+
+    #[test]
+    fn load_cell_equivalence_accepts_same_extension_internal_repo_name() {
+        assert!(are_bzlmod_alias_equivalent(
+            "rules_rs+crate+crates__ts-rs-12.0.1",
+            "crates__ts-rs-12.0.1"
+        ));
+        assert!(are_bzlmod_alias_equivalent(
+            "crates__ts-rs-12.0.1",
+            "rules_rs+crate+crates__ts-rs-12.0.1"
+        ));
+    }
+
+    #[test]
+    fn extension_repo_internal_name_preserves_plus_in_internal_repo_name() {
+        assert_eq!(
+            extension_repo_internal_name("owner+ext+internal+with+plus"),
+            Some("internal+with+plus")
+        );
+    }
 }
 
 struct EvalResult {
@@ -306,50 +367,65 @@ impl InterpreterForDir {
         implicit_import_paths: Arc<ImplicitImportPaths>,
         current_dir_with_allowed_relative_dirs: Arc<CellPathWithAllowedRelativeDir>,
         package_dir: Option<CellPath>,
+        bzlmod_mode: bool,
     ) -> kuro_error::Result<Self> {
         // Auto-load rules_cc for BUILD files so that cc_library /
         // cc_binary / cc_test calls resolve to rules_cc's Starlark
         // implementations instead of empty native stubs.
-        let rules_cc_autoload = cell_info
-            .cell_alias_resolver()
-            .resolve("rules_cc")
-            .ok()
-            .and_then(|_| {
-                parse_import(
-                    cell_info.cell_alias_resolver(),
-                    RelativeImports::Disallow,
-                    "@rules_cc//cc:defs.bzl",
-                )
-                .ok()
-                .and_then(|cell_path| {
-                    ImportPath::new_with_build_file_cells(cell_path, cell_info.name())
+        let rules_cc_autoload = bzlmod_mode
+            .then(|| {
+                cell_info
+                    .cell_alias_resolver()
+                    .resolve("rules_cc")
+                    .ok()
+                    .and_then(|_| {
+                        parse_import(
+                            cell_info.cell_alias_resolver(),
+                            RelativeImports::Disallow,
+                            "@rules_cc//cc:defs.bzl",
+                        )
                         .ok()
-                        .map(OwnedStarlarkModulePath::LoadFile)
-                })
-            });
+                        .and_then(|cell_path| {
+                            ImportPath::new_with_build_file_cells(
+                                cell_path.clone(),
+                                BuildFileCell::new(cell_path.cell()),
+                            )
+                            .ok()
+                            .map(OwnedStarlarkModulePath::LoadFile)
+                        })
+                    })
+            })
+            .flatten();
 
         // Resolve `@kuro_builtins//:exports.bzl` once per InterpreterForDir.
         // The cell is auto-registered by
         // `kuro_common::legacy_configs::cells` for every bzlmod project.
         // Legacy non-bzlmod workspaces without `[external_cells]
         // kuro_builtins = bundled` in `.buckconfig` skip the autoload.
-        let bazel_builtins_autoload = cell_info
-            .cell_alias_resolver()
-            .resolve("kuro_builtins")
-            .ok()
-            .and_then(|_| {
-                parse_import(
-                    cell_info.cell_alias_resolver(),
-                    RelativeImports::Disallow,
-                    "@kuro_builtins//:exports.bzl",
-                )
-                .ok()
-                .and_then(|cell_path| {
-                    ImportPath::new_with_build_file_cells(cell_path, cell_info.name())
+        let bazel_builtins_autoload = bzlmod_mode
+            .then(|| {
+                cell_info
+                    .cell_alias_resolver()
+                    .resolve("kuro_builtins")
+                    .ok()
+                    .and_then(|_| {
+                        parse_import(
+                            cell_info.cell_alias_resolver(),
+                            RelativeImports::Disallow,
+                            "@kuro_builtins//:exports.bzl",
+                        )
                         .ok()
-                        .map(OwnedStarlarkModulePath::LoadFile)
-                })
-            });
+                        .and_then(|cell_path| {
+                            ImportPath::new_with_build_file_cells(
+                                cell_path.clone(),
+                                BuildFileCell::new(cell_path.cell()),
+                            )
+                            .ok()
+                            .map(OwnedStarlarkModulePath::LoadFile)
+                        })
+                    })
+            })
+            .flatten();
 
         Ok(Self {
             global_state,
@@ -361,6 +437,7 @@ impl InterpreterForDir {
             package_dir,
             rules_cc_autoload,
             bazel_builtins_autoload,
+            bzlmod_mode,
         })
     }
 

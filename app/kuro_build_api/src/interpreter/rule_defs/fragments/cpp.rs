@@ -28,6 +28,8 @@ use starlark::values::list::AllocList;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 
+use crate::interpreter::rule_defs::build_config::get_experimental_cc_implementation_deps;
+
 // ============================================================================
 // CppFragment - C++ configuration fragment
 // ============================================================================
@@ -48,6 +50,8 @@ pub struct CppFragment {
     use_llvm_coverage_map_format: bool,
     /// Whether to generate dSYM files on macOS
     apple_generate_dsym: bool,
+    /// Whether cc_library implementation_deps is enabled.
+    experimental_cc_implementation_deps: bool,
 }
 
 impl Default for CppFragment {
@@ -58,6 +62,7 @@ impl Default for CppFragment {
             force_pic: false,
             use_llvm_coverage_map_format: false,
             apple_generate_dsym: false,
+            experimental_cc_implementation_deps: get_experimental_cc_implementation_deps(),
         }
     }
 }
@@ -321,10 +326,8 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
 
     /// Whether experimental CC implementation deps is enabled.
     /// This controls visibility of implementation-only dependencies.
-    fn experimental_cc_implementation_deps(
-        #[allow(unused_variables)] this: &CppFragment,
-    ) -> starlark::Result<bool> {
-        Ok(false)
+    fn experimental_cc_implementation_deps(this: &CppFragment) -> starlark::Result<bool> {
+        Ok(this.experimental_cc_implementation_deps)
     }
 
     /// Whether disable_nocopts is active.
@@ -609,6 +612,7 @@ impl CppFragment {
             force_pic,
             use_llvm_coverage_map_format,
             apple_generate_dsym,
+            experimental_cc_implementation_deps: get_experimental_cc_implementation_deps(),
         }
     }
 }
@@ -620,6 +624,7 @@ impl Clone for CppFragment {
             force_pic: self.force_pic,
             use_llvm_coverage_map_format: self.use_llvm_coverage_map_format,
             apple_generate_dsym: self.apple_generate_dsym,
+            experimental_cc_implementation_deps: self.experimental_cc_implementation_deps,
         }
     }
 }

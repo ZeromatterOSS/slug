@@ -87,6 +87,7 @@ pub fn provider_id_for_idx(idx: u32) -> &'static Arc<ProviderId> {
             crate::interpreter::rule_defs::proto_common::ProtoLangToolchainInfoProvider::provider_id(
             )
         }
+        8 => AnalysisTestResultInfoProvider::provider_id(),
         _ => panic!("Invalid provider index: {}", idx),
     }
 }
@@ -101,6 +102,7 @@ pub fn provider_name_for_idx(idx: u32) -> &'static str {
         5 => "JavaToolchainInfo",
         6 => "ProtoInfo",
         7 => "ProtoLangToolchainInfo",
+        8 => "AnalysisTestResultInfo",
         _ => "Unknown",
     }
 }
@@ -281,6 +283,55 @@ impl<'v> StarlarkValue<'v> for PyRuntimeInfoProvider {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         create_native_provider_instance(1, args, eval)
+    }
+
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+// ============================================================================
+// AnalysisTestResultInfo - Provider for analysis test results
+// ============================================================================
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct AnalysisTestResultInfoProvider;
+
+impl AnalysisTestResultInfoProvider {
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "AnalysisTestResultInfo".to_owned(),
+            })
+        })
+    }
+}
+
+impl Display for AnalysisTestResultInfoProvider {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<provider AnalysisTestResultInfo>")
+    }
+}
+
+starlark_simple_value!(AnalysisTestResultInfoProvider);
+
+impl ProviderCallableLike for AnalysisTestResultInfoProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
+
+#[starlark_value(type = "AnalysisTestResultInfo")]
+impl<'v> StarlarkValue<'v> for AnalysisTestResultInfoProvider {
+    fn invoke(
+        &self,
+        _me: Value<'v>,
+        args: &Arguments<'v, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        create_native_provider_instance(8, args, eval)
     }
 
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {

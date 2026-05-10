@@ -66,7 +66,7 @@ pub struct LoadedModule(Arc<LoadedModuleData>);
 struct LoadedModuleData {
     path: OwnedStarlarkModulePath,
     #[derivative(Debug = "ignore")]
-    loaded_modules: LoadedModules,
+    imports: Vec<OwnedStarlarkModulePath>,
     #[derivative(Debug = "ignore")]
     env: FrozenModule,
 }
@@ -77,19 +77,41 @@ impl LoadedModule {
         loaded_modules: LoadedModules,
         env: FrozenModule,
     ) -> Self {
-        Self(Arc::new(LoadedModuleData {
-            path,
-            loaded_modules,
-            env,
-        }))
+        let imports = loaded_modules.map.keys().cloned().collect();
+        Self::new_with_direct_imports(path, imports, env)
     }
 
-    pub fn loaded_modules(&self) -> &LoadedModules {
-        &self.0.loaded_modules
+    pub fn new_with_direct_imports(
+        path: OwnedStarlarkModulePath,
+        imports: Vec<OwnedStarlarkModulePath>,
+        env: FrozenModule,
+    ) -> Self {
+        Self(Arc::new(LoadedModuleData { path, imports, env }))
     }
 
     pub fn imports(&self) -> impl Iterator<Item = &ImportPath> {
-        self.0.loaded_modules.imports()
+        self.0.imports.iter().map(|path| match path.borrow() {
+            StarlarkModulePath::LoadFile(path)
+            | StarlarkModulePath::JsonFile(path)
+            | StarlarkModulePath::TomlFile(path) => path,
+            StarlarkModulePath::BxlFile(_) => panic!("imports should not contain bxl files"),
+        })
+    }
+
+    pub fn direct_imports(&self) -> &[OwnedStarlarkModulePath] {
+        &self.0.imports
+    }
+
+    pub fn import_count(&self) -> usize {
+        self.0.imports.len()
+    }
+
+    pub fn import_path_bytes(&self) -> usize {
+        self.0
+            .imports
+            .iter()
+            .map(|path| path.to_string().len())
+            .sum()
     }
 
     pub fn path(&self) -> StarlarkModulePath<'_> {

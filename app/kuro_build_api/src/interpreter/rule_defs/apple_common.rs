@@ -92,6 +92,18 @@ impl<'v> StarlarkValue<'v> for AppleToolchain {}
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct ObjcProvider;
 
+impl ObjcProvider {
+    pub fn provider_id() -> &'static Arc<ProviderId> {
+        static PROVIDER_ID: OnceLock<Arc<ProviderId>> = OnceLock::new();
+        PROVIDER_ID.get_or_init(|| {
+            Arc::new(ProviderId {
+                path: None,
+                name: "Objc".to_owned(),
+            })
+        })
+    }
+}
+
 impl Display for ObjcProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<provider Objc>")
@@ -101,7 +113,17 @@ impl Display for ObjcProvider {
 starlark_simple_value!(ObjcProvider);
 
 #[starlark_value(type = "Objc")]
-impl<'v> StarlarkValue<'v> for ObjcProvider {}
+impl<'v> StarlarkValue<'v> for ObjcProvider {
+    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
+        demand.provide_value::<&dyn ProviderCallableLike>(self);
+    }
+}
+
+impl ProviderCallableLike for ObjcProvider {
+    fn id(&self) -> kuro_error::Result<&Arc<ProviderId>> {
+        Ok(Self::provider_id())
+    }
+}
 
 /// Methods on the apple_common module.
 #[starlark_module]

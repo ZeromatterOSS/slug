@@ -420,20 +420,43 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
             crate::extension_execution_dice::extract_owning_module(ext_id, root_module_name);
         let ext_name = crate::extension_execution_dice::extract_extension_name(ext_id);
 
+        let canonicalized_specs: Vec<_> = general
+            .generated_repo_specs
+            .iter()
+            .map(|(repo_name, lock_spec)| {
+                (
+                    repo_name.clone(),
+                    canonicalize_lockfile_repo_spec_labels(
+                        lock_spec.to_repo_spec(),
+                        ext_id,
+                        root_module_name,
+                    ),
+                )
+            })
+            .collect();
+
+        if let Some((repo_name, attr_name, label)) =
+            first_invalid_empty_target_label(&canonicalized_specs)
+        {
+            tracing::debug!(
+                "Skipping lockfile spoke pre-seed for '{}': cached RepoSpec '{}' attr '{}' contains invalid empty-target label '{}'",
+                ext_id,
+                repo_name,
+                attr_name,
+                label
+            );
+            continue;
+        }
+
         // The lockfile entry pins down every spoke this extension generated;
         // mark the extension as seeded so the runtime path in
         // `extension_repo::get_file_ops_delegate` skips its DICE compute.
-        if !general.generated_repo_specs.is_empty() {
+        if !canonicalized_specs.is_empty() {
             crate::spoke_materialization::mark_extension_spokes_seeded(ext_id);
         }
 
-        for (repo_name, lock_spec) in &general.generated_repo_specs {
+        for (repo_name, repo_spec) in canonicalized_specs {
             let canonical = format!("{}+{}+{}", owner, ext_name, repo_name);
-            let repo_spec = canonicalize_lockfile_repo_spec_labels(
-                lock_spec.to_repo_spec(),
-                ext_id,
-                root_module_name,
-            );
             let repo_spec_json = match serde_json::to_string(&repo_spec) {
                 Ok(s) => s,
                 Err(e) => {
@@ -456,7 +479,7 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
                 }
                 register_lockfile_seeded_spoke(
                     ext_id,
-                    repo_name,
+                    &repo_name,
                     &canonical,
                     repo_spec,
                     project_root,
@@ -473,7 +496,7 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
                 path: format!("bazel-external/{}", canonical),
             });
 
-            register_lockfile_seeded_spoke(ext_id, repo_name, &canonical, repo_spec, project_root);
+            register_lockfile_seeded_spoke(ext_id, &repo_name, &canonical, repo_spec, project_root);
 
             // Caller (kuro_common::cells) is expected to also register
             // these in the dynamic-extension-cell map so
@@ -497,6 +520,37 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
     );
 
     new_cells
+}
+
+fn first_invalid_empty_target_label(specs: &[(String, RepoSpec)]) -> Option<(&str, &str, &str)> {
+    specs.iter().find_map(|(repo_name, spec)| {
+        spec.attributes.iter().find_map(|(attr_name, value)| {
+            first_invalid_empty_target_label_attr(value)
+                .map(|label| (repo_name.as_str(), attr_name.as_str(), label))
+        })
+    })
+}
+
+fn first_invalid_empty_target_label_attr(value: &AttrValue) -> Option<&str> {
+    match value {
+        AttrValue::Label(label) => invalid_empty_target_label(label).then_some(label.as_str()),
+        AttrValue::String(s) => invalid_empty_target_label(s).then_some(s.as_str()),
+        AttrValue::StringList(items) => items
+            .iter()
+            .find(|item| invalid_empty_target_label(item))
+            .map(String::as_str),
+        AttrValue::Dict(entries) => entries
+            .values()
+            .find_map(first_invalid_empty_target_label_attr),
+        AttrValue::Int(_) | AttrValue::Bool(_) | AttrValue::None => None,
+    }
+}
+
+fn invalid_empty_target_label(value: &str) -> bool {
+    if !(value.starts_with('@') || value.starts_with("//") || value.starts_with(':')) {
+        return false;
+    }
+    crate::repo_mapping::canonicalize_label_with_package_context(value, "", "", None).is_none()
 }
 
 fn canonicalize_lockfile_repo_spec_labels(
@@ -1002,11 +1056,16 @@ mod tests {
     #[test]
     fn test_precompute_use_repo_rule_uses_canonical_name_and_apparent_alias() {
         let mut module = parsed_module("ape");
+        let mut attrs = indexmap::IndexMap::new();
+        attrs.insert(
+            "url".to_owned(),
+            crate::types::TagValue::String("https://example.invalid/tool".to_owned()),
+        );
         module.repo_rule_invocations.push(RepoRuleInvocation {
             name: "launcher".to_owned(),
             rule_source: "@toolchain_utils//toolchain/local/select:defs.bzl%toolchain_local_select"
                 .to_owned(),
-            attrs: indexmap::IndexMap::new(),
+            attrs,
         });
 
         let (cells, aliases) =
@@ -1022,6 +1081,17 @@ mod tests {
         assert_eq!(
             cells[0].path,
             "bazel-external/ape+toolchain_local_select+launcher"
+        );
+        let repo_spec: RepoSpec = serde_json::from_str(&cells[0].repo_spec_json).unwrap();
+        assert_eq!(
+            repo_spec.repo_rule_id,
+            "@toolchain_utils//toolchain/local/select:defs.bzl%toolchain_local_select"
+        );
+        assert_eq!(
+            repo_spec.attributes.get("url"),
+            Some(&AttrValue::String(
+                "https://example.invalid/tool".to_owned()
+            ))
         );
         assert_eq!(aliases.len(), 1);
         assert_eq!(aliases[0].apparent_name, "launcher");
@@ -1052,6 +1122,45 @@ mod tests {
         assert_eq!(aliases.len(), 1);
         assert_eq!(aliases[0].apparent_name, "public");
         assert_eq!(aliases[0].canonical_name, "actual_dep");
+    }
+
+    #[test]
+    fn lockfile_preseed_skips_invalid_empty_target_label_specs() {
+        let mut lockfile = crate::lockfile::Lockfile::new();
+        let mut specs = fxhash::FxHashMap::default();
+        specs.insert(
+            "crates__zstd-sys-2.0.16-zstd.1.5.7".to_owned(),
+            RepoSpec::new("rules_rs//rs/private/crate_repository.bzl%crate_repository".to_owned())
+                .with_attr(
+                    "deps".to_owned(),
+                    AttrValue::StringList(vec!["@@zstd//:".to_owned()]),
+                ),
+        );
+        lockfile.set_extension_cache(
+            "@@rules_rs//rs:extensions.bzl%crate".to_owned(),
+            "bzl-digest".to_owned(),
+            "usages-digest".to_owned(),
+            &specs,
+        );
+
+        let temp = std::env::temp_dir().join(format!(
+            "kuro-lockfile-invalid-preseed-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&temp);
+        std::fs::create_dir_all(&temp).unwrap();
+        let mut existing = Vec::new();
+
+        let cells = pre_compute_extension_repo_cells_from_lockfile(
+            &lockfile,
+            "_main",
+            &mut existing,
+            &temp,
+        );
+
+        assert!(cells.is_empty());
+        assert!(existing.is_empty());
+        let _ = std::fs::remove_dir_all(&temp);
     }
 
     #[test]

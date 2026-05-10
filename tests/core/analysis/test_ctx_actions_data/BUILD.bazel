@@ -1,5 +1,5 @@
-load(":defs.bzl", "bin_dir_rule", "declare_dir_rule", "expand_template_rule",
-     "label_info_rule", "progress_message_rule", "provider_consumer_rule",
+load(":defs.bzl", "bin_dir_rule", "declare_dir_rule", "declare_directory_path_shape_rule", "expand_template_rule",
+     "declare_file_path_shape_rule", "label_info_rule", "progress_message_rule", "provider_consumer_rule",
      "provider_test_rule", "run_shell_inputs_rule", "run_shell_env_rule",
      "run_shell_string_rule", "write_multiline_rule", "runfiles_rule",
      "write_exec_rule")
@@ -30,6 +30,24 @@ run_shell_inputs_rule(
 # Test 5: ctx.actions.declare_directory
 declare_dir_rule(
     name = "declared_dir",
+)
+
+declare_file_path_shape_rule(
+    name = "declare_file_path_shape",
+)
+
+declare_directory_path_shape_rule(
+    name = "declare_directory_path_shape",
+)
+
+alias(
+    name = "external_declare_file_path_shape",
+    actual = "@dep//pkg:declare_file_path_shape",
+)
+
+alias(
+    name = "external_declare_directory_path_shape",
+    actual = "@dep//pkg:declare_directory_path_shape",
 )
 
 # Test 6: ctx.actions.write with multiple lines

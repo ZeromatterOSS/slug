@@ -835,4 +835,8 @@ impl RecordedActions {
             ActionLookup::Deferred(_) => None,
         })
     }
+
+    pub fn len(&self) -> usize {
+        self.actions.len()
+    }
 }

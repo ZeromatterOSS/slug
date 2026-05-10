@@ -10,6 +10,7 @@
 
 pub(crate) mod artifact;
 pub(crate) mod artifact_tagging;
+pub(crate) mod cc_common;
 pub(crate) mod cmd_args;
 pub(crate) mod depset;
 pub(crate) mod provider;

@@ -590,6 +590,12 @@ impl<V: starlark::values::ValueLifetimeless> Display for ToolchainInfoInstanceGe
     }
 }
 
+impl<V: starlark::values::ValueLifetimeless> ToolchainInfoInstanceGen<V> {
+    pub fn new(fields: V) -> Self {
+        Self { fields }
+    }
+}
+
 impl<'v, V: starlark::values::ValueLike<'v>> ProviderLike<'v> for ToolchainInfoInstanceGen<V>
 where
     Self: Debug,

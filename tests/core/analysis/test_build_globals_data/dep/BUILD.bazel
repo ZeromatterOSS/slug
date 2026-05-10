@@ -1,0 +1,6 @@
+load(":defs.bzl", "write_value_rule")
+
+write_value_rule(
+    name = "module_metadata_direct_test",
+    value = "{}@{}".format(module_name(), module_version()),
+)

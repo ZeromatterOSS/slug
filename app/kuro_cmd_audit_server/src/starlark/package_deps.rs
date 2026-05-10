@@ -14,7 +14,6 @@ use std::io::Write;
 use kuro_cli_proto::ClientContext;
 use kuro_cmd_audit_client::starlark::package_deps::StarlarkPackageDepsCommand;
 use kuro_common::dice::cells::HasCellResolver;
-use kuro_core::bzl::ImportPath;
 use kuro_core::pattern::parse_package::parse_package;
 use kuro_error::kuro_error;
 use kuro_interpreter::file_loader::LoadedModule;
@@ -47,14 +46,49 @@ pub(crate) async fn server_execute(
                 .await?;
 
             let mut stdout = stdout.as_writer();
+            let mut visited = HashSet::new();
+            let mut ordered_modules = Vec::new();
+            let mut stack = module_deps
+                .0
+                .into_iter()
+                .map(|module| (module, false))
+                .collect::<Vec<_>>();
+
+            while let Some((module, expanded)) = stack.pop() {
+                let path = match module.path() {
+                    StarlarkModulePath::LoadFile(path)
+                    | StarlarkModulePath::JsonFile(path)
+                    | StarlarkModulePath::TomlFile(path) => path,
+                    StarlarkModulePath::BxlFile(_) => {
+                        return Err(kuro_error!(kuro_error::ErrorTag::Tier0, "bxl be here"));
+                    }
+                };
+
+                if expanded {
+                    ordered_modules.push(module);
+                    continue;
+                }
+
+                if !visited.insert(path.clone()) {
+                    continue;
+                }
+
+                stack.push((module.clone(), true));
+                for import in module.direct_imports().iter().rev() {
+                    let import_module = INTERPRETER_CALCULATION_IMPL
+                        .get()?
+                        .get_loaded_module(&mut dice_ctx, import.borrow())
+                        .await?;
+                    stack.push((import_module, false));
+                }
+            }
 
             struct Printer {
                 first: bool,
-                visited: HashSet<ImportPath>,
             }
 
             impl Printer {
-                fn print_module_and_deps(
+                fn print_module(
                     &mut self,
                     module: &LoadedModule,
                     stdout: &mut dyn Write,
@@ -67,14 +101,6 @@ pub(crate) async fn server_execute(
                             return Err(kuro_error!(kuro_error::ErrorTag::Tier0, "bxl be here"));
                         }
                     };
-
-                    if !self.visited.insert(path.clone()) {
-                        return Ok(());
-                    }
-
-                    for import in module.loaded_modules().map.values() {
-                        self.print_module_and_deps(import, stdout)?;
-                    }
 
                     if !self.first {
                         writeln!(stdout)?;
@@ -90,13 +116,10 @@ pub(crate) async fn server_execute(
                 }
             }
 
-            let mut printer = Printer {
-                first: true,
-                visited: HashSet::new(),
-            };
+            let mut printer = Printer { first: true };
 
-            for module in module_deps.0.into_iter() {
-                printer.print_module_and_deps(&module, &mut stdout)?;
+            for module in ordered_modules {
+                printer.print_module(&module, &mut stdout)?;
             }
 
             Ok(())

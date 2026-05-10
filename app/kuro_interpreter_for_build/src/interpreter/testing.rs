@@ -203,6 +203,7 @@ impl Tester {
             Arc::new(import_paths),
             self.current_dir_with_allowed_relative_dirs.dupe(),
             None,
+            false,
         )?))
     }
 

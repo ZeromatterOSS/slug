@@ -87,7 +87,7 @@ pub enum ExtensionRepoError {
 }
 
 fn diagnostic_summary(error: impl Display) -> String {
-    const MAX_CHARS: usize = 500;
+    const MAX_CHARS: usize = 2000;
     let rendered = error.to_string();
     let mut iter = rendered.char_indices();
     let Some((idx, _)) = iter.nth(MAX_CHARS) else {
@@ -129,6 +129,113 @@ fn stub_marker(repo_spec_json: Option<&str>) -> String {
         Some(json) => format!("stub:{}", blake3::hash(json.as_bytes()).to_hex()),
         None => "stub".to_owned(),
     }
+}
+
+fn is_stub_marker(marker: &str) -> bool {
+    let marker = marker.trim();
+    marker == "stub" || marker.starts_with("stub:")
+}
+
+fn complete_marker(spec_hash: &str) -> String {
+    if spec_hash.is_empty() {
+        "complete".to_owned()
+    } else {
+        format!("complete:{spec_hash}")
+    }
+}
+
+fn is_complete_marker(marker: &str) -> bool {
+    let marker = marker.trim();
+    marker == "complete" || marker.starts_with("complete:")
+}
+
+fn complete_marker_matches(marker: &str, spec_hash: &str) -> bool {
+    let marker = marker.trim();
+    if spec_hash.is_empty() {
+        is_complete_marker(marker)
+    } else if marker == "complete" {
+        // Legacy materializations predate spec-hashed complete markers. Treat
+        // them as current unless a narrower stale-output check below proves
+        // otherwise.
+        true
+    } else {
+        marker == complete_marker(spec_hash)
+    }
+}
+
+fn build_file_has_invalid_empty_target_label(repo_path: &std::path::Path) -> bool {
+    ["BUILD.bazel", "BUILD"].into_iter().any(|name| {
+        std::fs::read_to_string(repo_path.join(name))
+            .ok()
+            .is_some_and(|content| content.contains("//:\"") || content.contains("//:'"))
+    })
+}
+
+fn collect_label_repairs(value: &RepoAttrValue, repairs: &mut Vec<(String, String)>) {
+    match value {
+        RepoAttrValue::Label(label) | RepoAttrValue::String(label) => {
+            if let Some(colon) = label.rfind(':')
+                && colon + 1 < label.len()
+                && (label.starts_with('@') || label.starts_with("//"))
+            {
+                repairs.push((label[..=colon].to_owned(), label.clone()));
+            }
+        }
+        RepoAttrValue::StringList(items) => {
+            for item in items {
+                collect_label_repairs(&RepoAttrValue::String(item.clone()), repairs);
+            }
+        }
+        RepoAttrValue::Dict(entries) => {
+            for value in entries.values() {
+                collect_label_repairs(value, repairs);
+            }
+        }
+        RepoAttrValue::Int(_) | RepoAttrValue::Bool(_) | RepoAttrValue::None => {}
+    }
+}
+
+fn repair_invalid_empty_target_labels_from_repo_spec(
+    repo_path: &std::path::Path,
+    repo_spec_json: &str,
+    spec_hash: &str,
+) -> bool {
+    let Ok(repo_spec) = serde_json::from_str::<RepoSpec>(repo_spec_json) else {
+        return false;
+    };
+    let mut repairs = Vec::new();
+    for value in repo_spec.attributes.values() {
+        collect_label_repairs(value, &mut repairs);
+    }
+    repairs.sort();
+    repairs.dedup();
+    if repairs.is_empty() {
+        return false;
+    }
+
+    let mut repaired_any = false;
+    for name in ["BUILD.bazel", "BUILD"] {
+        let path = repo_path.join(name);
+        let Ok(mut content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let original = content.clone();
+        for (empty_label, full_label) in &repairs {
+            content = content.replace(&format!("\"{empty_label}\""), &format!("\"{full_label}\""));
+            content = content.replace(&format!("'{empty_label}'"), &format!("'{full_label}'"));
+        }
+        if content != original && std::fs::write(&path, content).is_ok() {
+            repaired_any = true;
+        }
+    }
+
+    if repaired_any {
+        let _ = std::fs::write(
+            repo_path.join(".kuro_repo_complete"),
+            complete_marker(spec_hash),
+        );
+    }
+    repaired_any
 }
 
 /// File operations delegate for extension-generated repositories.
@@ -494,19 +601,36 @@ pub(crate) async fn get_file_ops_delegate(
     // — typically because the lockfile pre-seed populated it — a stub from a
     // prior failed run can be discarded and re-materialized cleanly.
     let marker_path = source_path.join(".kuro_repo_complete");
-    let expected_stub_marker = stub_marker(Some(&setup.repo_spec_json));
-    let is_stale_stub = marker_path.exists()
-        && !setup.repo_spec_json.is_empty()
-        && std::fs::read_to_string(&marker_path).ok().is_some_and(|s| {
-            let marker = s.trim();
-            marker == "stub" || marker.starts_with("stub:") && marker != expected_stub_marker
+    let marker_contents = marker_path
+        .exists()
+        .then(|| std::fs::read_to_string(&marker_path).ok())
+        .flatten();
+    let is_stale_stub =
+        !setup.repo_spec_json.is_empty() && marker_contents.as_deref().is_some_and(is_stub_marker);
+    let is_stale_complete = !setup.repo_spec_json.is_empty()
+        && !setup.spec_hash.is_empty()
+        && marker_contents.as_deref().is_some_and(|s| {
+            is_complete_marker(s) && !complete_marker_matches(s, &setup.spec_hash)
         });
+    let is_stale_invalid_empty_target_label = !setup.repo_spec_json.is_empty()
+        && marker_contents.as_deref().is_some_and(is_complete_marker)
+        && build_file_has_invalid_empty_target_label(&source_path);
+    let repaired_invalid_empty_target_label = is_stale_invalid_empty_target_label
+        && repair_invalid_empty_target_labels_from_repo_spec(
+            &source_path,
+            &setup.repo_spec_json,
+            &setup.spec_hash,
+        );
     let is_stale_missing_build = marker_path.exists()
         && !setup.repo_spec_json.is_empty()
         && repo_spec_requires_build_file(&setup.repo_spec_json)
         && !source_path.join("BUILD.bazel").exists()
         && !source_path.join("BUILD").exists();
-    if is_stale_stub || is_stale_missing_build {
+    if is_stale_stub
+        || is_stale_complete
+        || (is_stale_invalid_empty_target_label && !repaired_invalid_empty_target_label)
+        || is_stale_missing_build
+    {
         tracing::info!(
             "Extension repo '{}' has stale materialization with a valid RepoSpec available; \
              discarding it and re-materializing",
@@ -991,14 +1115,78 @@ fn materialize_stub_repo(
         })?;
     }
 
-    // Mark as complete. For a failed repo rule with a known RepoSpec, include
-    // the spec hash so subsequent accesses reuse the same stub instead of
-    // repeatedly re-running the same failing repository rule. A changed spec
-    // still invalidates the stub and gets a fresh materialization attempt.
+    // Mark as a stub. For a failed repo rule with a known RepoSpec, include
+    // the spec hash for diagnostics; callers with a valid RepoSpec will
+    // discard this placeholder and retry real materialization.
     let marker = dest.join(".kuro_repo_complete");
     let _ = std::fs::write(&marker, stub_marker(repo_spec_json));
 
     tracing::info!("Created stub repo for '{}' at {:?}", canonical_name, dest);
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stub_marker_detection_accepts_plain_and_hashed_stubs() {
+        assert!(is_stub_marker("stub"));
+        assert!(is_stub_marker("stub:abc123\n"));
+        assert!(!is_stub_marker("complete"));
+        assert!(!is_stub_marker("notstub:abc123"));
+    }
+
+    #[test]
+    fn complete_marker_detection_requires_current_spec_hash_when_available() {
+        assert!(complete_marker_matches("complete", ""));
+        assert!(complete_marker_matches(
+            "complete:sha256-new\n",
+            "sha256-new"
+        ));
+        assert!(complete_marker_matches("complete", "sha256-new"));
+        assert!(!complete_marker_matches(
+            "complete:sha256-old",
+            "sha256-new"
+        ));
+        assert!(is_complete_marker("complete"));
+        assert!(is_complete_marker("complete:sha256-old"));
+        assert!(!is_complete_marker("stub:sha256-old"));
+    }
+
+    #[test]
+    fn repairs_legacy_empty_target_labels_from_current_repo_spec() {
+        let dir =
+            std::env::temp_dir().join(format!("kuro-empty-label-repair-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("BUILD.bazel"),
+            "rust_crate(name = \"x\", deps = [\"@@zstd//:\", \"@@zstd//:zstd\"])\n",
+        )
+        .unwrap();
+
+        let spec = RepoSpec::new("@@rules_rs//rs:crate.bzl%crate_repository".to_owned()).with_attr(
+            "deps".to_owned(),
+            RepoAttrValue::StringList(vec!["@@zstd//:zstd".to_owned()]),
+        );
+        let spec_json = serde_json::to_string(&spec).unwrap();
+
+        assert!(repair_invalid_empty_target_labels_from_repo_spec(
+            &dir,
+            &spec_json,
+            "sha256-new"
+        ));
+        assert_eq!(
+            std::fs::read_to_string(dir.join("BUILD.bazel")).unwrap(),
+            "rust_crate(name = \"x\", deps = [\"@@zstd//:zstd\", \"@@zstd//:zstd\"])\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join(".kuro_repo_complete")).unwrap(),
+            "complete:sha256-new"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

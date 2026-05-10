@@ -77,26 +77,47 @@ impl<'a> LabelFilesystemResolver<'a> {
             };
         }
 
-        if let Some(repo_path) = self.cell_path_for_repo(repo) {
-            return join_label_fragment(repo_path, label.package(), label.target());
-        }
+        let resolved_repo = kuro_core::cells::resolve_dynamic_extension_cell_alias(repo)
+            .unwrap_or_else(|| repo.to_owned());
+        let repo_names = || {
+            if resolved_repo == repo {
+                [Some(repo), None]
+            } else {
+                [Some(resolved_repo.as_str()), Some(repo)]
+            }
+        };
 
-        if let Some(cell_path) = kuro_core::cells::get_dynamic_extension_cell(repo) {
-            if let Some(project_root) = self.project_root_path() {
-                return join_label_fragment(
-                    project_root.join(cell_path),
-                    label.package(),
-                    label.target(),
-                );
+        for repo_name in repo_names().into_iter().flatten() {
+            if let Some(repo_path) = self.cell_path_for_repo(repo_name) {
+                return join_label_fragment(repo_path, label.package(), label.target());
             }
         }
 
-        if let Some(path) = self.scan_bazel_external_fallback(repo, label.package(), label.target())
-        {
-            return path;
+        for repo_name in repo_names().into_iter().flatten() {
+            if let Some(cell_path) = kuro_core::cells::get_dynamic_extension_cell(repo_name) {
+                if let Some(project_root) = self.project_root_path() {
+                    return join_label_fragment(
+                        project_root.join(cell_path),
+                        label.package(),
+                        label.target(),
+                    );
+                }
+            }
         }
 
-        join_label_fragment(PathBuf::from(repo), label.package(), label.target())
+        for repo_name in [resolved_repo.as_str(), repo] {
+            if let Some(path) =
+                self.scan_bazel_external_fallback(repo_name, label.package(), label.target())
+            {
+                return path;
+            }
+        }
+
+        join_label_fragment(
+            PathBuf::from(resolved_repo),
+            label.package(),
+            label.target(),
+        )
     }
 
     fn project_root_path(&self) -> Option<PathBuf> {
@@ -208,4 +229,41 @@ fn join_label_fragment(mut base: PathBuf, package: &str, target: &str) -> PathBu
     }
     base.push(target);
     base
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolves_dynamic_extension_apparent_alias_to_canonical_path() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let project_root = temp.path();
+        let apparent = "label_fs_alias_tool_test";
+        let canonical = "label_fs_alias_owner+http_file+tool_test";
+        kuro_core::cells::set_dynamic_project_root(project_root.to_path_buf());
+        kuro_core::cells::register_dynamic_extension_cell(
+            canonical.to_owned(),
+            format!("bazel-external/{canonical}"),
+        );
+        kuro_core::cells::register_dynamic_extension_cell_alias(
+            apparent.to_owned(),
+            canonical.to_owned(),
+        );
+
+        let resolved = LabelFilesystemResolver::new(project_root)
+            .with_project_root(Some(project_root))
+            .with_root_label_resolution(RootLabelResolution::ProjectAbsolute)
+            .resolve_label_string(&format!("@{apparent}//file:downloaded"))
+            .unwrap();
+
+        assert_eq!(
+            resolved,
+            project_root
+                .join("bazel-external")
+                .join(canonical)
+                .join("file")
+                .join("downloaded")
+        );
+    }
 }

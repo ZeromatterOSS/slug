@@ -35,13 +35,13 @@ fn creates_providers() -> kuro_error::Result<()> {
     #frozen_foo_1 = FooInfo(bar="bar_f1", baz="baz_f1")
     #frozen_foo_2 = FooInfo(bar="bar_f2")
 
-    assert_eq('provider(fields={"f1": provider_field(typing.Any, default=None)})', repr(provider(fields=["f1"])))
-    assert_eq('provider[FooInfo](fields={"bar": provider_field(typing.Any, default=None), "baz": provider_field(typing.Any, default=None)})', repr(FooInfo))
-    assert_eq('provider[FooInfo](fields={"bar": provider_field(typing.Any, default=None), "baz": provider_field(typing.Any, default=None)})', repr(FooInfo2))
+    assert_eq('provider(fields={"f1": provider_field(typing.Any)})', repr(provider(fields=["f1"])))
+    assert_eq('provider[FooInfo](fields={"bar": provider_field(typing.Any), "baz": provider_field(typing.Any)})', repr(FooInfo))
+    assert_eq('provider[FooInfo](fields={"bar": provider_field(typing.Any), "baz": provider_field(typing.Any)})', repr(FooInfo2))
 
     def test():
-        assert_eq('provider[FooInfo](fields={"bar": provider_field(typing.Any, default=None), "baz": provider_field(typing.Any, default=None)})', repr(FooInfo))
-        assert_eq('provider[FooInfo](fields={"bar": provider_field(typing.Any, default=None), "baz": provider_field(typing.Any, default=None)})', repr(FooInfo2))
+        assert_eq('provider[FooInfo](fields={"bar": provider_field(typing.Any), "baz": provider_field(typing.Any)})', repr(FooInfo))
+        assert_eq('provider[FooInfo](fields={"bar": provider_field(typing.Any), "baz": provider_field(typing.Any)})', repr(FooInfo2))
 
         #assert_eq("FooInfo(bar=\"bar_f1\", baz=\"baz_f1\")", repr(frozen_foo1))
         #assert_eq("bar_f1", frozen_foo1.bar)
@@ -53,13 +53,14 @@ fn creates_providers() -> kuro_error::Result<()> {
         foo_1 = FooInfo(bar="bar_1", baz="baz_1")
         foo_2 = FooInfo(bar="bar_2")
 
-        assert_eq('provider[FooInfo](fields={"bar": provider_field(typing.Any, default=None), "baz": provider_field(typing.Any, default=None)})', repr(FooInfo))
+        assert_eq('provider[FooInfo](fields={"bar": provider_field(typing.Any), "baz": provider_field(typing.Any)})', repr(FooInfo))
         assert_eq("FooInfo(bar=\"bar_1\", baz=\"baz_1\")", repr(foo_1))
         assert_eq("bar_1", foo_1.bar)
         assert_eq("baz_1", foo_1.baz)
-        assert_eq("FooInfo(bar=\"bar_2\", baz=None)", repr(foo_2))
+        assert_eq("FooInfo(bar=\"bar_2\")", repr(foo_2))
         assert_eq("bar_2", foo_2.bar)
-        assert_eq(None, foo_2.baz)
+        assert_eq(False, hasattr(foo_2, "baz"))
+        assert_eq("fallback", getattr(foo_2, "baz", "fallback"))
 
         assert_eq("{\"bar\":\"bar_1\",\"baz\":\"baz_1\"}", json.encode(foo_1))
     "#
@@ -118,6 +119,33 @@ fn creates_providers() -> kuro_error::Result<()> {
         "#
     ))?;
 
+    Ok(())
+}
+
+#[test]
+fn test_schema_provider_missing_fields_are_absent() -> kuro_error::Result<()> {
+    let mut tester = provider_tester();
+    tester.run_starlark_test(indoc!(
+        r#"
+    ListInfo = provider(fields=["present", "missing"])
+    DictInfo = provider(fields={"present": "doc", "missing": "doc"})
+
+    def test():
+        list_info = ListInfo(present="yes")
+        dict_info = DictInfo(present="yes")
+        explicit_none = ListInfo(present="yes", missing=None)
+
+        for info in [list_info, dict_info]:
+            assert_eq(["present"], dir(info))
+            assert_eq(True, hasattr(info, "present"))
+            assert_eq(False, hasattr(info, "missing"))
+            assert_eq("fallback", getattr(info, "missing", "fallback"))
+
+        assert_eq(["missing", "present"], dir(explicit_none))
+        assert_eq(True, hasattr(explicit_none, "missing"))
+        assert_eq(None, explicit_none.missing)
+    "#
+    ))?;
     Ok(())
 }
 

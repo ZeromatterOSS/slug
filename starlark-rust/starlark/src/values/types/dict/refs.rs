@@ -34,6 +34,8 @@ use crate::values::ValueLike;
 use crate::values::dict::Dict;
 use crate::values::dict::value::DictGen;
 use crate::values::dict::value::FrozenDictData;
+use crate::values::dict::value::FrozenHashableDictData;
+use crate::values::dict::value::HashableDictData;
 use crate::values::type_repr::StarlarkTypeRepr;
 use crate::values::types::dict::dict_type::DictType;
 
@@ -76,6 +78,16 @@ impl<'v> DictRef<'v> {
                 .map(|x| DictRef {
                     aref: Either::Right(coerce(&x.0)),
                 })
+                .or_else(|| {
+                    x.downcast_ref::<DictGen<FrozenHashableDictData>>()
+                        .map(|x| DictRef {
+                            aref: Either::Right(coerce(&x.0)),
+                        })
+                })
+        } else if let Some(ptr) = x.downcast_ref::<DictGen<HashableDictData<'v>>>() {
+            Some(DictRef {
+                aref: Either::Right(&ptr.0.0),
+            })
         } else {
             let ptr = x.downcast_ref::<DictGen<RefCell<Dict<'v>>>>()?;
             Some(DictRef {
@@ -96,7 +108,11 @@ impl<'v> DictMut<'v> {
         #[cold]
         #[inline(never)]
         fn error<'v>(x: Value<'v>) -> anyhow::Error {
-            if x.downcast_ref::<DictGen<FrozenDictData>>().is_some() {
+            if x.downcast_ref::<DictGen<FrozenDictData>>().is_some()
+                || x.downcast_ref::<DictGen<FrozenHashableDictData>>()
+                    .is_some()
+                || x.downcast_ref::<DictGen<HashableDictData<'v>>>().is_some()
+            {
                 ValueError::CannotMutateImmutableValue.into()
             } else {
                 NotDictError(x.get_type()).into()
@@ -119,6 +135,10 @@ impl FrozenDictRef {
     pub fn from_frozen_value(x: FrozenValue) -> Option<FrozenDictRef> {
         x.downcast_ref::<DictGen<FrozenDictData>>()
             .map(|x| FrozenDictRef { dict: &x.0 })
+            .or_else(|| {
+                x.downcast_ref::<DictGen<FrozenHashableDictData>>()
+                    .map(|x| FrozenDictRef { dict: coerce(&x.0) })
+            })
     }
 
     /// Get value by a string key.

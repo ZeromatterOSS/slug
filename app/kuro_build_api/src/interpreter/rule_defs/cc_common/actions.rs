@@ -14,27 +14,37 @@
 
 use std::fmt;
 use std::fmt::Display;
+use std::hash::Hash;
 
 use allocative::Allocative;
+use starlark::coerce::Coerce;
 use starlark::collections::SmallMap;
+use starlark::collections::StarlarkHasher;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
 use starlark::environment::MethodsStatic;
 use starlark::eval::Evaluator;
 use starlark::starlark_module;
 use starlark::starlark_simple_value;
+use starlark::values::Freeze;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::ProvidesStaticType;
 use starlark::values::StarlarkValue;
+use starlark::values::Trace;
 use starlark::values::Value;
+use starlark::values::ValueError;
+use starlark::values::ValueLifetimeless;
 use starlark::values::ValueLike;
+use starlark::values::dict::AllocHashableDict;
 use starlark::values::dict::Dict;
 use starlark::values::dict::DictRef;
 use starlark::values::list::AllocList;
+use starlark::values::list::ListRef;
 use starlark::values::none::NoneOr;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
+use starlark::values::tuple::TupleRef;
 
 use crate::interpreter::rule_defs::cc_common::ctx_cheat::CtxCheatArtifactStub;
 use crate::interpreter::rule_defs::cc_common::ctx_cheat::CtxCheatWithActions;
@@ -64,6 +74,7 @@ use crate::interpreter::rule_defs::cc_common::providers::HeaderInfoStub;
 use crate::interpreter::rule_defs::cc_common::providers::LibraryToLinkGen;
 use crate::interpreter::rule_defs::cc_common::providers::LinkerInputStubGen;
 use crate::interpreter::rule_defs::cc_common::providers::LinkingContextWithInputsGen;
+use crate::interpreter::rule_defs::depset::depset_summary;
 use crate::interpreter::rule_defs::depset::depset_to_artifact_inputs;
 use crate::interpreter::rule_defs::depset::depset_to_list;
 use crate::interpreter::rule_defs::depset::is_depset_value;
@@ -119,6 +130,229 @@ fn depset_or_iterable_values<'v>(
         }
     }
     Ok(values)
+}
+
+#[derive(
+    Debug,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative,
+    Trace,
+    Coerce,
+    Freeze
+)]
+#[repr(C)]
+struct CcFrozenListGen<V: ValueLifetimeless> {
+    items: Vec<V>,
+}
+
+starlark::starlark_complex_value!(CcFrozenList);
+
+impl<V: ValueLifetimeless + Display> Display for CcFrozenListGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("[")?;
+        for (index, item) in self.items.iter().enumerate() {
+            if index != 0 {
+                f.write_str(", ")?;
+            }
+            write!(f, "{item}")?;
+        }
+        f.write_str("]")
+    }
+}
+
+pub(crate) fn cc_frozen_list_items<'v>(value: Value<'v>) -> Option<Vec<Value<'v>>> {
+    if let Some(list) = ListRef::from_value(value) {
+        return Some(list.iter().collect());
+    }
+    CcFrozenList::from_value(value)
+        .map(|list| list.items.iter().map(|item| item.to_value()).collect())
+}
+
+#[starlark::values::starlark_value(type = "list")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for CcFrozenListGen<V>
+where
+    Self: ProvidesStaticType<'v> + Display,
+{
+    fn collect_repr(&self, collector: &mut String) {
+        collector.push('[');
+        for (index, item) in self.items.iter().enumerate() {
+            if index != 0 {
+                collector.push_str(", ");
+            }
+            item.to_value().collect_repr(collector);
+        }
+        collector.push(']');
+    }
+
+    fn to_bool(&self) -> bool {
+        !self.items.is_empty()
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        let Some(other_items) = cc_frozen_list_items(other) else {
+            return Ok(false);
+        };
+        if self.items.len() != other_items.len() {
+            return Ok(false);
+        }
+        for (left, right) in self.items.iter().zip(other_items) {
+            if !left.to_value().equals(right)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
+    fn at(&self, index: Value<'v>, _heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        let Some(index) = index.unpack_i32() else {
+            return ValueError::unsupported_with(self, "[]", index);
+        };
+        let len = self.items.len() as i32;
+        let index = if index < 0 { len + index } else { index };
+        if index < 0 || index >= len {
+            return Err(starlark::Error::new_other(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "list index out of range",
+            )));
+        }
+        Ok(self.items[index as usize].to_value())
+    }
+
+    fn length(&self) -> starlark::Result<i32> {
+        Ok(self.items.len() as i32)
+    }
+
+    fn iterate_collect(&self, _heap: Heap<'v>) -> starlark::Result<Vec<Value<'v>>> {
+        Ok(self.items.iter().map(|item| item.to_value()).collect())
+    }
+
+    fn add(&self, rhs: Value<'v>, heap: Heap<'v>) -> Option<starlark::Result<Value<'v>>> {
+        let rhs_items = cc_frozen_list_items(rhs)?;
+        let mut items = self
+            .items
+            .iter()
+            .map(|item| item.to_value())
+            .collect::<Vec<_>>();
+        items.extend(rhs_items);
+        Some(Ok(heap.alloc(AllocList(items))))
+    }
+
+    fn radd(&self, lhs: Value<'v>, heap: Heap<'v>) -> Option<starlark::Result<Value<'v>>> {
+        let mut items = cc_frozen_list_items(lhs)?;
+        items.extend(self.items.iter().map(|item| item.to_value()));
+        Some(Ok(heap.alloc(AllocList(items))))
+    }
+
+    fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
+        for item in &self.items {
+            if item.to_value().equals(other)? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "list".hash(hasher);
+        self.items.len().hash(hasher);
+        for item in &self.items {
+            item.to_value().write_hash(hasher)?;
+        }
+        Ok(())
+    }
+}
+
+fn cc_internal_freeze_value<'v>(value: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+    if let Some(list) = ListRef::from_value(value) {
+        return cc_internal_freeze_values(list.iter(), heap);
+    }
+    if let Some(tuple) = TupleRef::from_value(value) {
+        return cc_internal_freeze_values(tuple.iter(), heap);
+    }
+    if let Some(dict) = DictRef::from_value(value) {
+        let mut entries = Vec::new();
+        for (key, value) in dict.iter() {
+            let key = cc_internal_freeze_value(key, heap)?;
+            let value = cc_internal_freeze_value(value, heap)?;
+            entries.push((key, value));
+        }
+        return Ok(heap.alloc(AllocHashableDict(entries)));
+    }
+    Ok(value)
+}
+
+fn cc_internal_freeze_values<'v>(
+    values: impl IntoIterator<Item = Value<'v>>,
+    heap: Heap<'v>,
+) -> starlark::Result<Value<'v>> {
+    let mut frozen = Vec::new();
+    for value in values {
+        frozen.push(cc_internal_freeze_value(value, heap)?);
+    }
+    Ok(heap.alloc(CcFrozenListGen { items: frozen }))
+}
+
+fn cc_internal_freeze_depset_or_iterable<'v>(
+    value: Value<'v>,
+    heap: Heap<'v>,
+) -> starlark::Result<Value<'v>> {
+    if value.is_none() {
+        return cc_internal_freeze_values(Vec::new(), heap);
+    }
+    if is_depset_value(value) {
+        return cc_internal_freeze_values(depset_to_list(value, heap)?, heap);
+    }
+    cc_internal_freeze_value(value, heap)
+}
+
+fn cc_freeze_user_link_flags<'v>(
+    user_link_flags: Value<'v>,
+    heap: Heap<'v>,
+) -> starlark::Result<Value<'v>> {
+    if user_link_flags.is_none() {
+        return cc_internal_freeze_values(Vec::new(), heap);
+    }
+    if is_depset_value(user_link_flags) {
+        return cc_internal_freeze_values(depset_to_list(user_link_flags, heap)?, heap);
+    }
+    let Some(flags) = ListRef::from_value(user_link_flags) else {
+        return cc_internal_freeze_value(user_link_flags, heap);
+    };
+    let mut options = Vec::new();
+    for flag in flags.iter() {
+        if flag.unpack_str().is_some() {
+            options.push(flag);
+        } else if let Some(nested) = ListRef::from_value(flag) {
+            options.extend(nested.iter());
+        } else {
+            return Err(starlark::Error::new_other(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Elements of list in user_link_flags must be either Strings or lists.",
+            )));
+        }
+    }
+    cc_internal_freeze_values(options, heap)
+}
+
+fn cc_common_checkpoint(
+    name: &'static str,
+    fields: impl IntoIterator<Item = (&'static str, usize)>,
+) {
+    kuro_util::memory_checkpoint::checkpoint(name, fields);
+}
+
+fn depset_shape(value: Value<'_>) -> (usize, usize, usize, usize) {
+    depset_summary(value)
+        .map(|summary| {
+            (
+                summary.direct_len,
+                summary.transitive_len,
+                summary.depth as usize,
+                summary.is_empty as usize,
+            )
+        })
+        .unwrap_or((0, 0, 0, value.is_none() as usize))
 }
 
 /// Returns whether an action name describes a C/C++ compile action.
@@ -925,15 +1159,36 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
         Ok(eval.heap().alloc(CcToolchainVariablesGen { vars }))
     }
 
-    /// Freezes a list to an immutable tuple.
+    /// Freezes nested Starlark containers for rules_cc provider fields.
     fn freeze<'v>(
         #[starlark(this)] _this: &CcCommonInternal,
         value: Value<'v>,
-        #[allow(unused_variables)] eval: &mut Evaluator<'v, '_, '_>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        // TODO(cc_common): Properly convert list to tuple for immutability
-        // For now, just return the value as-is since this is a stub
-        Ok(value)
+        if kuro_util::memory_checkpoint::enabled() {
+            let (direct, transitive, depth, is_empty) = depset_shape(value);
+            let iterable_len = if value.is_none() || is_depset_value(value) {
+                0
+            } else {
+                value
+                    .iterate(eval.heap())
+                    .map(|iter| iter.count())
+                    .unwrap_or(0)
+            };
+            cc_common_checkpoint(
+                "cc_internal_freeze",
+                [
+                    ("is_depset", is_depset_value(value) as usize),
+                    ("depset_direct", direct),
+                    ("depset_transitive", transitive),
+                    ("depset_depth", depth),
+                    ("depset_empty", is_empty),
+                    ("iterable_len", iterable_len),
+                    ("is_none", value.is_none() as usize),
+                ],
+            );
+        }
+        cc_internal_freeze_value(value, eval.heap())
     }
 
     /// Returns the execution requirements for a given action.
@@ -2496,10 +2751,10 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             local_defines,
         });
 
-        // Create compilation outputs
-        // Return lists of object files - these support len() which is needed by rules_cc
-        let objects_list = heap.alloc(object_files.clone());
-        let pic_objects_list = heap.alloc(pic_object_files.clone());
+        // Create immutable compilation-output sequences. These support len()
+        // and iteration while remaining valid inside provider/depset values.
+        let objects_list = cc_internal_freeze_values(object_files.clone(), heap)?;
+        let pic_objects_list = cc_internal_freeze_values(pic_object_files.clone(), heap)?;
         let compilation_outputs = heap.alloc(CompilationOutputsGen {
             objects: objects_list,
             pic_objects: pic_objects_list,
@@ -2783,7 +3038,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                                         input.get_attr("user_link_flags", heap)
                                     {
                                         if !dep_link_flags.is_none() {
-                                            for flag in depset_values(dep_link_flags, heap)? {
+                                            for flag in
+                                                depset_or_iterable_values(dep_link_flags, heap)?
+                                            {
                                                 args.push(flag);
                                             }
                                         }
@@ -3685,38 +3942,68 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] user_link_flags: Value<'v>,
         #[starlark(require = named, default = NoneType)] additional_inputs: Value<'v>,
         #[starlark(require = named, default = NoneType)] linkstamps: Value<'v>,
-        heap: Heap<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
         let _ = (this, linkstamps);
-        // Store user_link_flags as-is (depset or list); wrap list in depset if needed
-        let user_flags = if user_link_flags.is_none() {
-            Value::new_none()
-        } else if is_depset_value(user_link_flags) {
-            // Already a depset
-            user_link_flags
-        } else {
-            // Wrap list/iterable in a depset
-            match user_link_flags.iterate(heap) {
-                Ok(iter) => {
-                    match crate::interpreter::rule_defs::depset::make_depset_from_lists(
-                        heap,
-                        iter.collect(),
-                        Vec::new(),
-                        "default",
-                    ) {
-                        Ok(ds) => ds,
-                        Err(_) => user_link_flags,
-                    }
-                }
-                Err(_) => user_link_flags,
-            }
-        };
-        Ok(heap.alloc(LinkerInputStubGen {
+        if kuro_util::memory_checkpoint::enabled() {
+            let (libraries_direct, libraries_transitive, libraries_depth, libraries_empty) =
+                depset_shape(libraries);
+            let (flags_direct, flags_transitive, flags_depth, flags_empty) =
+                depset_shape(user_link_flags);
+            let (inputs_direct, inputs_transitive, inputs_depth, inputs_empty) =
+                depset_shape(additional_inputs);
+            cc_common_checkpoint(
+                "cc_common_create_linker_input_start",
+                [
+                    ("libraries_is_depset", is_depset_value(libraries) as usize),
+                    ("libraries_direct", libraries_direct),
+                    ("libraries_transitive", libraries_transitive),
+                    ("libraries_depth", libraries_depth),
+                    ("libraries_empty", libraries_empty),
+                    (
+                        "user_flags_is_depset",
+                        is_depset_value(user_link_flags) as usize,
+                    ),
+                    ("user_flags_direct", flags_direct),
+                    ("user_flags_transitive", flags_transitive),
+                    ("user_flags_depth", flags_depth),
+                    ("user_flags_empty", flags_empty),
+                    (
+                        "additional_inputs_is_depset",
+                        is_depset_value(additional_inputs) as usize,
+                    ),
+                    ("additional_inputs_direct", inputs_direct),
+                    ("additional_inputs_transitive", inputs_transitive),
+                    ("additional_inputs_depth", inputs_depth),
+                    ("additional_inputs_empty", inputs_empty),
+                ],
+            );
+        }
+        let libraries = cc_internal_freeze_depset_or_iterable(libraries, heap)?;
+        let user_flags = cc_freeze_user_link_flags(user_link_flags, heap)?;
+        let additional_inputs = cc_internal_freeze_depset_or_iterable(additional_inputs, heap)?;
+        let value = heap.alloc(LinkerInputStubGen {
             owner,
             libraries,
             user_link_flags: user_flags,
             additional_inputs,
-        }))
+        });
+        if kuro_util::memory_checkpoint::enabled() {
+            let (flags_direct, flags_transitive, flags_depth, flags_empty) =
+                depset_shape(user_flags);
+            cc_common_checkpoint(
+                "cc_common_create_linker_input_result",
+                [
+                    ("user_flags_is_depset", is_depset_value(user_flags) as usize),
+                    ("user_flags_direct", flags_direct),
+                    ("user_flags_transitive", flags_transitive),
+                    ("user_flags_depth", flags_depth),
+                    ("user_flags_empty", flags_empty),
+                ],
+            );
+        }
+        Ok(value)
     }
 
     /// Creates a linking context.
@@ -3727,6 +4014,22 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] owner: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
+        if kuro_util::memory_checkpoint::enabled() {
+            let (direct, transitive, depth, is_empty) = depset_shape(linker_inputs);
+            cc_common_checkpoint(
+                "cc_common_create_linking_context",
+                [
+                    (
+                        "linker_inputs_is_depset",
+                        is_depset_value(linker_inputs) as usize,
+                    ),
+                    ("linker_inputs_direct", direct),
+                    ("linker_inputs_transitive", transitive),
+                    ("linker_inputs_depth", depth),
+                    ("linker_inputs_empty", is_empty),
+                ],
+            );
+        }
         Ok(heap.alloc(LinkingContextWithInputsGen { linker_inputs }))
     }
 
@@ -3861,11 +4164,12 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = NoneType)] objects: Value<'v>,
         #[starlark(require = named, default = NoneType)] pic_objects: Value<'v>,
         #[starlark(require = named, default = NoneType)] lto_compilation_context: Value<'v>,
-        heap: Heap<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
         Ok(heap.alloc(CompilationOutputsGen {
-            objects,
-            pic_objects,
+            objects: cc_internal_freeze_depset_or_iterable(objects, heap)?,
+            pic_objects: cc_internal_freeze_depset_or_iterable(pic_objects, heap)?,
         }))
     }
 
@@ -3874,8 +4178,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
     fn merge_compilation_outputs<'v>(
         #[starlark(this)] this: &CcCommonModule,
         #[starlark(require = named, default = NoneType)] compilation_outputs: Value<'v>,
-        heap: Heap<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
         // Collect all objects and pic_objects from the list of compilation outputs
         let mut all_objects: Vec<Value<'v>> = Vec::new();
         let mut all_pic_objects: Vec<Value<'v>> = Vec::new();
@@ -3903,14 +4208,14 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 
         Ok(heap.alloc(CompilationOutputsGen {
             objects: if all_objects.is_empty() {
-                Value::new_none()
+                cc_internal_freeze_values(Vec::new(), heap)?
             } else {
-                heap.alloc(all_objects)
+                cc_internal_freeze_values(all_objects, heap)?
             },
             pic_objects: if all_pic_objects.is_empty() {
-                Value::new_none()
+                cc_internal_freeze_values(Vec::new(), heap)?
             } else {
-                heap.alloc(all_pic_objects)
+                cc_internal_freeze_values(all_pic_objects, heap)?
             },
         }))
     }
@@ -3940,8 +4245,9 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] alwayslink: bool,
         #[starlark(require = named, default = NoneType)] variables_extension: Value<'v>,
         #[starlark(require = named, default = NoneType)] main_output: Value<'v>,
-        heap: Heap<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
         // Create library_to_link from compilation outputs
         let library_to_link = if compilation_outputs.is_none() {
             Value::new_none()
@@ -3962,8 +4268,8 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 pic_static_library: Value::new_none(),
                 dynamic_library: Value::new_none(),
                 interface_library: Value::new_none(),
-                objects,
-                pic_objects,
+                objects: cc_internal_freeze_depset_or_iterable(objects, heap)?,
+                pic_objects: cc_internal_freeze_depset_or_iterable(pic_objects, heap)?,
                 alwayslink,
             })
         };
@@ -3974,43 +4280,14 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             executable: Value::new_none(),
         });
 
-        // Create a LinkerInput wrapping the library_to_link
         let libraries_depset = if library_to_link.is_none() {
-            heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())
+            cc_internal_freeze_values(Vec::new(), heap)?
         } else {
-            crate::interpreter::rule_defs::depset::make_depset_from_lists(
-                heap,
-                vec![library_to_link],
-                Vec::new(),
-                "default",
-            )?
+            cc_internal_freeze_values([library_to_link], heap)?
         };
-
-        // Wrap user_link_flags in a depset if provided as a list
-        let user_link_flags_depset = if user_link_flags.is_none() {
-            heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())
-        } else {
-            match user_link_flags.iterate(heap) {
-                Ok(iter) => {
-                    match crate::interpreter::rule_defs::depset::make_depset_from_lists(
-                        heap,
-                        iter.collect(),
-                        Vec::new(),
-                        "default",
-                    ) {
-                        Ok(ds) => ds,
-                        Err(_) => user_link_flags,
-                    }
-                }
-                Err(_) => user_link_flags,
-            }
-        };
-
-        let additional_inputs_depset = if additional_inputs.is_none() {
-            heap.alloc(crate::interpreter::rule_defs::depset::Depset::empty())
-        } else {
-            additional_inputs
-        };
+        let user_link_flags_depset = cc_freeze_user_link_flags(user_link_flags, heap)?;
+        let additional_inputs_depset =
+            cc_internal_freeze_depset_or_iterable(additional_inputs, heap)?;
 
         let linker_input = heap.alloc(LinkerInputStubGen {
             owner: Value::new_none(), // No owner label available in this context
@@ -4043,6 +4320,32 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
 
         // Create linking context
         let linking_context = heap.alloc(LinkingContextWithInputsGen { linker_inputs });
+        if kuro_util::memory_checkpoint::enabled() {
+            let (libraries_direct, libraries_transitive, libraries_depth, libraries_empty) =
+                depset_shape(libraries_depset);
+            let (flags_direct, flags_transitive, flags_depth, flags_empty) =
+                depset_shape(user_link_flags_depset);
+            let (linker_direct, linker_transitive, linker_depth, linker_empty) =
+                depset_shape(linker_inputs);
+            cc_common_checkpoint(
+                "cc_common_create_linking_context_from_outputs",
+                [
+                    ("has_library_to_link", (!library_to_link.is_none()) as usize),
+                    ("libraries_direct", libraries_direct),
+                    ("libraries_transitive", libraries_transitive),
+                    ("libraries_depth", libraries_depth),
+                    ("libraries_empty", libraries_empty),
+                    ("user_flags_direct", flags_direct),
+                    ("user_flags_transitive", flags_transitive),
+                    ("user_flags_depth", flags_depth),
+                    ("user_flags_empty", flags_empty),
+                    ("linker_inputs_direct", linker_direct),
+                    ("linker_inputs_transitive", linker_transitive),
+                    ("linker_inputs_depth", linker_depth),
+                    ("linker_inputs_empty", linker_empty),
+                ],
+            );
+        }
 
         // Return tuple
         Ok(heap.alloc((linking_context, linking_outputs)))
@@ -4060,10 +4363,12 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         // Collect all linker_inputs depsets as transitive children
         let mut transitive_depsets: Vec<Value<'v>> = Vec::new();
+        let mut input_context_count = 0usize;
 
         if !linking_contexts.is_none() {
             if let Ok(iter) = linking_contexts.iterate(heap) {
                 for ctx_val in iter {
+                    input_context_count += 1;
                     if let Ok(Some(linker_inputs)) = ctx_val.get_attr("linker_inputs", heap) {
                         if !linker_inputs.is_none() {
                             transitive_depsets.push(linker_inputs);
@@ -4071,6 +4376,23 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     }
                 }
             }
+        }
+
+        if kuro_util::memory_checkpoint::enabled() {
+            let max_child_depth = transitive_depsets
+                .iter()
+                .filter_map(|value| depset_summary(*value))
+                .map(|summary| summary.depth as usize)
+                .max()
+                .unwrap_or(0);
+            cc_common_checkpoint(
+                "cc_common_merge_linking_contexts",
+                [
+                    ("input_contexts", input_context_count),
+                    ("transitive_depsets", transitive_depsets.len()),
+                    ("max_child_depth", max_child_depth),
+                ],
+            );
         }
 
         // Create merged depset with all inputs as transitive children
@@ -4100,15 +4422,51 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] alwayslink: bool,
         #[starlark(require = named, default = NoneType)] dynamic_library_symlink_path: Value<'v>,
         #[starlark(require = named, default = NoneType)] interface_library_symlink_path: Value<'v>,
-        heap: Heap<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
+        if kuro_util::memory_checkpoint::enabled() {
+            let (objects_direct, objects_transitive, objects_depth, objects_empty) =
+                depset_shape(objects);
+            let (pic_objects_direct, pic_objects_transitive, pic_objects_depth, pic_objects_empty) =
+                depset_shape(pic_objects);
+            cc_common_checkpoint(
+                "cc_common_create_library_to_link",
+                [
+                    ("has_static_library", (!static_library.is_none()) as usize),
+                    (
+                        "has_pic_static_library",
+                        (!pic_static_library.is_none()) as usize,
+                    ),
+                    ("has_dynamic_library", (!dynamic_library.is_none()) as usize),
+                    (
+                        "has_interface_library",
+                        (!interface_library.is_none()) as usize,
+                    ),
+                    ("objects_is_depset", is_depset_value(objects) as usize),
+                    ("objects_direct", objects_direct),
+                    ("objects_transitive", objects_transitive),
+                    ("objects_depth", objects_depth),
+                    ("objects_empty", objects_empty),
+                    (
+                        "pic_objects_is_depset",
+                        is_depset_value(pic_objects) as usize,
+                    ),
+                    ("pic_objects_direct", pic_objects_direct),
+                    ("pic_objects_transitive", pic_objects_transitive),
+                    ("pic_objects_depth", pic_objects_depth),
+                    ("pic_objects_empty", pic_objects_empty),
+                    ("alwayslink", alwayslink as usize),
+                ],
+            );
+        }
         Ok(heap.alloc(LibraryToLinkGen {
             static_library,
             pic_static_library,
             dynamic_library,
             interface_library,
-            objects,
-            pic_objects,
+            objects: cc_internal_freeze_depset_or_iterable(objects, heap)?,
+            pic_objects: cc_internal_freeze_depset_or_iterable(pic_objects, heap)?,
             alwayslink,
         }))
     }
@@ -4337,6 +4695,8 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         let mut defines_depsets: Vec<Value<'v>> = Vec::new();
         let mut local_defines_depsets: Vec<Value<'v>> = Vec::new();
         let mut external_includes_depsets: Vec<Value<'v>> = Vec::new();
+        let mut cc_infos_count = 0usize;
+        let mut direct_cc_infos_count = 0usize;
 
         // Helper closure to extract contexts from a CcInfo
         let mut process_info = |info: Value<'v>| {
@@ -4396,6 +4756,7 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         if !cc_infos.is_none() {
             if let Ok(iter) = cc_infos.iterate(heap) {
                 for info in iter {
+                    cc_infos_count += 1;
                     process_info(info);
                 }
             }
@@ -4405,9 +4766,68 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         if !direct_cc_infos.is_none() {
             if let Ok(iter) = direct_cc_infos.iterate(heap) {
                 for info in iter {
+                    direct_cc_infos_count += 1;
                     process_info(info);
                 }
             }
+        }
+        drop(process_info);
+
+        if kuro_util::memory_checkpoint::enabled() {
+            let compilation_depsets = headers_depsets
+                .len()
+                .saturating_add(includes_depsets.len())
+                .saturating_add(quote_includes_depsets.len())
+                .saturating_add(system_includes_depsets.len())
+                .saturating_add(external_includes_depsets.len())
+                .saturating_add(framework_includes_depsets.len())
+                .saturating_add(defines_depsets.len())
+                .saturating_add(local_defines_depsets.len());
+            let max_compilation_child_depth = [
+                &headers_depsets,
+                &includes_depsets,
+                &quote_includes_depsets,
+                &system_includes_depsets,
+                &external_includes_depsets,
+                &framework_includes_depsets,
+                &defines_depsets,
+                &local_defines_depsets,
+            ]
+            .into_iter()
+            .flat_map(|depsets| depsets.iter())
+            .filter_map(|value| depset_summary(*value))
+            .map(|summary| summary.depth as usize)
+            .max()
+            .unwrap_or(0);
+            let max_linking_child_depth = linking_contexts
+                .iter()
+                .filter_map(|ctx_val| ctx_val.get_attr("linker_inputs", heap).ok().flatten())
+                .filter_map(depset_summary)
+                .map(|summary| summary.depth as usize)
+                .max()
+                .unwrap_or(0);
+            cc_common_checkpoint(
+                "cc_common_merge_cc_infos_collected",
+                [
+                    ("cc_infos", cc_infos_count),
+                    ("direct_cc_infos", direct_cc_infos_count),
+                    ("linking_contexts", linking_contexts.len()),
+                    ("compilation_depsets", compilation_depsets),
+                    ("headers_depsets", headers_depsets.len()),
+                    ("includes_depsets", includes_depsets.len()),
+                    ("quote_includes_depsets", quote_includes_depsets.len()),
+                    ("system_includes_depsets", system_includes_depsets.len()),
+                    ("external_includes_depsets", external_includes_depsets.len()),
+                    (
+                        "framework_includes_depsets",
+                        framework_includes_depsets.len(),
+                    ),
+                    ("defines_depsets", defines_depsets.len()),
+                    ("local_defines_depsets", local_defines_depsets.len()),
+                    ("max_compilation_child_depth", max_compilation_child_depth),
+                    ("max_linking_child_depth", max_linking_child_depth),
+                ],
+            );
         }
 
         // Merge compilation contexts by combining all depset fields
@@ -4471,6 +4891,33 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 linker_inputs: merged_linker_inputs,
             })
         };
+
+        if kuro_util::memory_checkpoint::enabled() {
+            let (linker_direct, linker_transitive, linker_depth, linker_empty) =
+                merged_linking_context
+                    .get_attr("linker_inputs", heap)
+                    .ok()
+                    .flatten()
+                    .map(depset_shape)
+                    .unwrap_or((0, 0, 0, merged_linking_context.is_none() as usize));
+            cc_common_checkpoint(
+                "cc_common_merge_cc_infos_result",
+                [
+                    (
+                        "has_compilation_context",
+                        (!merged_compilation_context.is_none()) as usize,
+                    ),
+                    (
+                        "has_linking_context",
+                        (!merged_linking_context.is_none()) as usize,
+                    ),
+                    ("linker_inputs_direct", linker_direct),
+                    ("linker_inputs_transitive", linker_transitive),
+                    ("linker_inputs_depth", linker_depth),
+                    ("linker_inputs_empty", linker_empty),
+                ],
+            );
+        }
 
         Ok(heap.alloc(CcInfoInstanceGen {
             compilation_context: merged_compilation_context,

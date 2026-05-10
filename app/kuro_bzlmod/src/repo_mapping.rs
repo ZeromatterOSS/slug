@@ -390,12 +390,7 @@ impl<'a> ParsedPackageContextLabel<'a> {
                     target: rest,
                 });
             };
-            let (package, target) = parse_package_and_target(rest);
-            let target = if package.is_empty() && target.is_empty() {
-                repo
-            } else {
-                target
-            };
+            let (package, target) = parse_package_and_target(rest)?;
             return Some(Self {
                 repo: ParsedRepo::Canonical(repo),
                 package,
@@ -411,12 +406,7 @@ impl<'a> ParsedPackageContextLabel<'a> {
                     target: rest,
                 });
             };
-            let (package, target) = parse_package_and_target(rest);
-            let target = if package.is_empty() && target.is_empty() {
-                repo
-            } else {
-                target
-            };
+            let (package, target) = parse_package_and_target(rest)?;
             return Some(Self {
                 repo: ParsedRepo::Apparent(repo),
                 package,
@@ -425,7 +415,7 @@ impl<'a> ParsedPackageContextLabel<'a> {
         }
 
         if let Some(rest) = label.strip_prefix("//") {
-            let (package, target) = parse_package_and_target(rest);
+            let (package, target) = parse_package_and_target(rest)?;
             return Some(Self {
                 repo: ParsedRepo::Current,
                 package,
@@ -443,7 +433,7 @@ impl<'a> ParsedPackageContextLabel<'a> {
 
         if let Some((repo, rest)) = label.split_once("//") {
             if !repo.is_empty() {
-                let (package, target) = parse_package_and_target(rest);
+                let (package, target) = parse_package_and_target(rest)?;
                 return Some(Self {
                     repo: ParsedRepo::Apparent(repo),
                     package,
@@ -460,15 +450,18 @@ fn parse_repo_and_rest_or_shorthand(label_without_at: &str) -> Option<(&str, &st
     label_without_at.split_once("//")
 }
 
-fn parse_package_and_target(rest: &str) -> (&str, &str) {
+fn parse_package_and_target(rest: &str) -> Option<(&str, &str)> {
     if let Some((package, target)) = rest.split_once(':') {
-        return (package, target);
+        if target.is_empty() {
+            return None;
+        }
+        return Some((package, target));
     }
     if rest.is_empty() {
-        return ("", "");
+        return None;
     }
     let target = rest.rsplit('/').next().unwrap_or(rest);
-    (rest, target)
+    Some((rest, target))
 }
 
 #[cfg(test)]
@@ -684,10 +677,14 @@ mod tests {
     }
 
     #[test]
-    fn package_context_supports_empty_target_repo_shorthand() {
-        let label =
-            canonicalize_label_with_package_context("@rules_cc//:", "owner", "ext", None).unwrap();
-
-        assert_eq!(label.to_unambiguous_string(), "@@rules_cc//:rules_cc");
+    fn package_context_rejects_explicit_empty_target_labels() {
+        assert!(
+            canonicalize_label_with_package_context("@rules_cc//:", "owner", "ext", None).is_none()
+        );
+        assert!(
+            canonicalize_label_with_package_context("@@rules_cc//:", "owner", "ext", None)
+                .is_none()
+        );
+        assert!(canonicalize_label_with_package_context("//:", "owner", "ext", None).is_none());
     }
 }

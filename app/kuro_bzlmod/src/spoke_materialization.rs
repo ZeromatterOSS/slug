@@ -170,13 +170,21 @@ pub fn materialize_spoke_sync(canonical_name: &str) -> kuro_error::Result<bool> 
             return Ok(false);
         }
     };
-    let marker = registration
+    let repo_dir = registration
         .project_root
         .join("bazel-external")
-        .join(canonical_name)
-        .join(".kuro_repo_complete");
+        .join(canonical_name);
+    let marker = repo_dir.join(".kuro_repo_complete");
     if marker.exists() {
-        return Ok(true);
+        let expected = complete_marker(&registration.repo_spec.compute_hash());
+        let marker_matches = std::fs::read_to_string(&marker).ok().is_some_and(|s| {
+            let marker = s.trim();
+            marker == "complete" || marker == expected
+        });
+        if marker_matches {
+            return Ok(true);
+        }
+        let _ = std::fs::remove_dir_all(&repo_dir);
     }
 
     let raw = match EXTENSION_DICE_PTR.with(|c| c.get()) {
@@ -218,6 +226,14 @@ pub fn materialize_spoke_sync(canonical_name: &str) -> kuro_error::Result<bool> 
             }
         })
     })
+}
+
+fn complete_marker(spec_hash: &str) -> String {
+    if spec_hash.is_empty() {
+        "complete".to_owned()
+    } else {
+        format!("complete:{spec_hash}")
+    }
 }
 
 #[cfg(test)]

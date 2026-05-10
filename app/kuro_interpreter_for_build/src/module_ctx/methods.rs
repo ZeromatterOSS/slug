@@ -28,47 +28,10 @@ use crate::repository_ctx::DownloadInfo;
 use crate::repository_ctx::DownloadToken;
 use crate::repository_ctx::ExecutionResult;
 use crate::repository_ctx::RepositoryPath;
+use crate::repository_ctx::ensure_label_path_materialized;
 use crate::repository_ctx::extract_archive;
 use crate::repository_ctx::get_urls_from_value;
 use crate::repository_ctx::resolve_label_to_path;
-
-/// Plan 36: ensure the spoke repo containing `path` is materialized on disk.
-///
-/// `path` is the result of resolving a Label argument (typically inside
-/// `mctx.path(Label)` or `mctx.read(Label)`). If it lives under
-/// `<project_root>/bazel-external/<canonical_name>/...`, drive lazy DICE
-/// materialization for that spoke before the caller dereferences it.
-///
-/// Best-effort: when no extension-dice scope is active (e.g. a unit test
-/// builds a `ModuleContext` directly), or no registration exists, returns
-/// silently and lets the caller proceed with the path it already has.
-fn ensure_spoke_materialized(path: &Path) {
-    let Some(canonical) = canonical_name_from_path(path) else {
-        return;
-    };
-    if let Err(e) = kuro_bzlmod::materialize_spoke_sync(&canonical) {
-        tracing::warn!(
-            "Lazy materialization of spoke '{}' failed (continuing with stale path): {}",
-            canonical,
-            e
-        );
-    }
-}
-
-/// Extract the canonical spoke name from a path that points into
-/// `bazel-external/<canonical>/...`. Returns `None` for paths that don't
-/// match this shape.
-fn canonical_name_from_path(path: &Path) -> Option<String> {
-    let mut components = path.components();
-    while let Some(c) = components.next() {
-        if c.as_os_str() == "bazel-external" {
-            if let Some(next) = components.next() {
-                return Some(next.as_os_str().to_string_lossy().to_string());
-            }
-        }
-    }
-    None
-}
 
 /// Module context methods for Bazel module extensions.
 /// I/O operations (download, execute, file) are fully implemented.
@@ -131,7 +94,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
                 PathBuf::from(resolve_label_to_path(&label_str, workspace_root))
             };
             // Plan 36: drive lazy spoke materialization before the read.
-            ensure_spoke_materialized(&resolved);
+            ensure_label_path_materialized(&resolved);
             resolved
         } else {
             return Err(kuro_error::kuro_error!(
@@ -367,9 +330,12 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
                 if v.get_type() == "Label" {
                     // Resolve Labels via cell path map (Bazel's getPathFromLabel)
                     let label_str = v.to_str();
-                    this.resolve_label_to_filesystem_path(&label_str)
-                        .map(|p| p.to_string_lossy().to_string())
-                        .unwrap_or(label_str)
+                    if let Some(path) = this.resolve_label_to_filesystem_path(&label_str) {
+                        ensure_label_path_materialized(&path);
+                        path.to_string_lossy().to_string()
+                    } else {
+                        label_str
+                    }
                 } else if let Some(rp) = v.downcast_ref::<crate::repository_ctx::RepositoryPath>() {
                     // RepositoryPath objects (from mctx.path()) → extract path string
                     rp.path_str().to_owned()
@@ -528,7 +494,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
             if let Some(resolved) = this.resolve_label_to_filesystem_path(&label_str) {
                 // Plan 36: ensure the spoke is on disk before the caller
                 // dereferences the returned path (e.g. with `mctx.execute`).
-                ensure_spoke_materialized(&resolved);
+                ensure_label_path_materialized(&resolved);
                 return Ok(heap.alloc(RepositoryPath::new(resolved.to_string_lossy().to_string())));
             }
             // Fallback to legacy resolution if cell paths not available
@@ -538,7 +504,7 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
                 .map(|wd| wd.as_ref().as_path())
                 .unwrap_or_else(|| Path::new("."));
             let legacy = resolve_label_to_path(&label_str, workspace_root);
-            ensure_spoke_materialized(Path::new(&legacy));
+            ensure_label_path_materialized(Path::new(&legacy));
             legacy
         } else {
             return Err(kuro_error::kuro_error!(

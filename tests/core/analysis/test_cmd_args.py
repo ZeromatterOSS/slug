@@ -62,6 +62,28 @@ async def test_args_add_all_map_each(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_cmd_args_data")
+async def test_args_add_all_map_each_sequence_returns(buck: Buck) -> None:
+    """args.add_all with map_each expands list and tuple returns."""
+    result = await buck.build("//:args_map_each_sequence")
+    output = result.get_build_report().output_for_target("//:args_map_each_sequence")
+
+    content = output.read_text().strip().splitlines()
+    assert content == ["tuple1", "tuple2", "list1", "list2", "scalar"]
+
+
+@buck_test(data_dir="test_cmd_args_data")
+async def test_args_add_joined_map_each_sequence_returns(buck: Buck) -> None:
+    """args.add_joined with map_each expands list and tuple returns."""
+    result = await buck.build("//:args_add_joined_map_each_sequence")
+    output = result.get_build_report().output_for_target(
+        "//:args_add_joined_map_each_sequence"
+    )
+
+    content = output.read_text().strip()
+    assert content == "tuple1:tuple2:list1:list2:scalar"
+
+
+@buck_test(data_dir="test_cmd_args_data")
 async def test_args_add_all_uniquify(buck: Buck) -> None:
     """args.add_all with uniquify=True deduplicates the list while preserving order."""
     result = await buck.build("//:args_uniquify")

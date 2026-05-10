@@ -10,6 +10,7 @@
 
 import pytest
 
+from buck2.tests.e2e_util.asserts import expect_failure
 from buck2.tests.e2e_util.api.buck import Buck
 from buck2.tests.e2e_util.buck_workspace import buck_test
 
@@ -106,3 +107,59 @@ async def test_linker_input(buck: Buck) -> None:
     assert "-lssl" in lines["flags"]
     assert "-L/usr/local/lib" in lines["flags"]
     assert lines["has_owner"] == "True"
+
+
+@buck_test(data_dir="test_link_data")
+async def test_linker_input_nested_user_flags_depset_element(buck: Buck) -> None:
+    """LinkerInput with nested user_link_flags is immutable enough for depset membership."""
+    result = await buck.build("//:linker_input_nested_user_flags")
+    output = result.get_build_report().output_for_target("//:linker_input_nested_user_flags")
+    content = output.read_text().replace("\r\n", "\n")
+    lines = dict(line.split("=", 1) for line in content.strip().split("\n") if "=" in line)
+
+    assert lines["type"] == "LinkingContext"
+    assert lines["inputs_count"] == "1"
+    assert lines["flags"] == "-lcrypto,-lssl,-lz"
+
+
+@buck_test(data_dir="test_link_data")
+async def test_frozen_dict_depset_element(buck: Buck) -> None:
+    """cc_internal.freeze preserves dict APIs while allowing depset membership."""
+    result = await buck.build("//:frozen_dict_depset")
+    output = result.get_build_report().output_for_target("//:frozen_dict_depset")
+    content = output.read_text().replace("\r\n", "\n")
+    lines = dict(line.split("=", 1) for line in content.strip().split("\n") if "=" in line)
+
+    assert lines["payloads_count"] == "1"
+    assert lines["payload_type"] == "dict"
+    assert lines["payload_truthy"] == "True"
+    assert lines["payload_keys"] == "backend"
+    assert lines["payload_get_type"] == "tuple"
+    assert lines["payload_get_len"] == "2"
+    assert lines["payload_contains_backend"] == "True"
+    assert lines["payload_iter"] == "backend"
+    assert lines["merged_get_len"] == "2"
+
+
+@buck_test(data_dir="test_link_data")
+async def test_starlark_library_to_link_provider_depset_element(buck: Buck) -> None:
+    """rules_cc-shaped LibraryToLink providers with frozen fields are depset-safe."""
+    result = await buck.build("//:starlark_library_to_link_depset")
+    output = result.get_build_report().output_for_target("//:starlark_library_to_link_depset")
+    content = output.read_text().replace("\r\n", "\n")
+    lines = dict(line.split("=", 1) for line in content.strip().split("\n") if "=" in line)
+
+    assert lines["libraries_count"] == "1"
+    assert lines["static_basename"] == "lib.c"
+    assert lines["lto_inputs_count"] == "0"
+
+
+@buck_test(data_dir="test_link_data")
+async def test_starlark_library_to_link_provider_with_mutable_field_rejected(
+    buck: Buck,
+) -> None:
+    """Analysis-time mutable provider fields still fail depset validation."""
+    await expect_failure(
+        buck.build("//:mutable_library_to_link_depset"),
+        stderr_regex="depset elements must not be mutable values",
+    )

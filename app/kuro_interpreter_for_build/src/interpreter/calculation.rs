@@ -11,6 +11,9 @@
 //! Interpreter related Dice calculations
 
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 use allocative::Allocative;
 use async_trait::async_trait;
@@ -21,9 +24,12 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use futures::FutureExt;
 use futures::future::BoxFuture;
+use itertools::Itertools;
+use kuro_common::dice::cells::HasCellResolver;
 use kuro_common::package_listing::dice::DicePackageListingResolver;
 use kuro_core::build_file_path::BuildFilePath;
 use kuro_core::bzl::ImportPath;
+use kuro_core::cells::build_file_cell::BuildFileCell;
 use kuro_core::package::PackageLabel;
 use kuro_events::dispatch::async_record_root_spans;
 use kuro_events::span::SpanId;
@@ -44,9 +50,11 @@ use kuro_node::nodes::frontend::TargetGraphCalculationImpl;
 use kuro_node::package_values_calculation::PACKAGE_VALUES_CALCULATION;
 use kuro_node::package_values_calculation::PackageValuesCalculation;
 use kuro_util::time_span::TimeSpan;
+use once_cell::sync::Lazy;
 use smallvec::SmallVec;
 use starlark::environment::Globals;
 use starlark_map::small_map::SmallMap;
+use tokio::sync::Semaphore;
 
 use crate::interpreter::dice_calculation_delegate::HasCalculationDelegate;
 use crate::interpreter::dice_calculation_delegate::testing::EvalImportKey;
@@ -56,6 +64,53 @@ use crate::interpreter::package_file_calculation::EvalPackageFile;
 // Key for 'InterpreterCalculation::get_interpreter_results'
 #[derive(Clone, Dupe, Display, Debug, Eq, Hash, PartialEq, Allocative)]
 pub struct InterpreterResultsKey(pub PackageLabel);
+
+static INTERPRETER_RESULTS_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+static INTERPRETER_RESULTS_QUEUED: AtomicUsize = AtomicUsize::new(0);
+static INTERPRETER_RESULTS_COMPLETED: AtomicUsize = AtomicUsize::new(0);
+static INTERPRETER_RESULTS_MAX_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+static INTERPRETER_RESULTS_MAX_QUEUED: AtomicUsize = AtomicUsize::new(0);
+static EVAL_IMPORT_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+static EVAL_IMPORT_COMPLETED: AtomicUsize = AtomicUsize::new(0);
+static EVAL_IMPORT_MAX_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+
+static PACKAGE_EVALUATION_SEMAPHORE: Lazy<Semaphore> =
+    Lazy::new(|| Semaphore::new(package_evaluation_concurrency_limit()));
+
+fn canonicalize_bzlmod_module_path(
+    path: StarlarkModulePath<'_>,
+) -> kuro_error::Result<OwnedStarlarkModulePath> {
+    fn import_path(path: &ImportPath) -> kuro_error::Result<ImportPath> {
+        ImportPath::new_with_build_file_cells(
+            path.path().clone(),
+            BuildFileCell::new(path.path().cell()),
+        )
+    }
+
+    Ok(match path {
+        StarlarkModulePath::LoadFile(path) => OwnedStarlarkModulePath::LoadFile(import_path(path)?),
+        StarlarkModulePath::JsonFile(path) => OwnedStarlarkModulePath::JsonFile(import_path(path)?),
+        StarlarkModulePath::TomlFile(path) => OwnedStarlarkModulePath::TomlFile(import_path(path)?),
+        StarlarkModulePath::BxlFile(path) => OwnedStarlarkModulePath::BxlFile(path.clone()),
+    })
+}
+
+fn package_evaluation_concurrency_limit() -> usize {
+    // Bazel's --loading_phase_threads=auto is host-resource based. Use the same
+    // shape here so DICE cannot fan package/build-file evaluation out to every
+    // discovered external package at once.
+    kuro_util::threads::available_parallelism().max(1)
+}
+
+fn record_max_active(max: &AtomicUsize, active: usize) {
+    let mut current = max.load(Ordering::Relaxed);
+    while active > current {
+        match max.compare_exchange_weak(current, active, Ordering::Relaxed, Ordering::Relaxed) {
+            Ok(_) => break,
+            Err(next) => current = next,
+        }
+    }
+}
 
 struct TargetGraphCalculationInstance;
 
@@ -71,14 +126,81 @@ impl Key for InterpreterResultsKey {
         ctx: &mut DiceComputations,
         cancellation: &CancellationContext,
     ) -> Self::Value {
+        let memory_checkpoints = kuro_util::memory_checkpoint::enabled();
+        let queued = INTERPRETER_RESULTS_QUEUED.fetch_add(1, Ordering::Relaxed) + 1;
+        record_max_active(&INTERPRETER_RESULTS_MAX_QUEUED, queued);
+        let wait_started = Instant::now();
+        let _permit = PACKAGE_EVALUATION_SEMAPHORE.acquire().await.unwrap();
+        let wait_us = wait_started.elapsed().as_micros().min(usize::MAX as u128) as usize;
+        let queued = INTERPRETER_RESULTS_QUEUED.fetch_sub(1, Ordering::Relaxed) - 1;
+        let active = INTERPRETER_RESULTS_ACTIVE.fetch_add(1, Ordering::Relaxed) + 1;
+        record_max_active(&INTERPRETER_RESULTS_MAX_ACTIVE, active);
         let ((time_span, result), spans) = async_record_root_spans(
             ctx.get_interpreter_results_uncached(self.0.dupe(), cancellation),
         )
         .await;
+        let active = INTERPRETER_RESULTS_ACTIVE.fetch_sub(1, Ordering::Relaxed) - 1;
+        let completed = INTERPRETER_RESULTS_COMPLETED.fetch_add(1, Ordering::Relaxed) + 1;
+
+        let dep_packages = result.as_ref().ok().map(|result| {
+            result
+                .targets()
+                .values()
+                .flat_map(|target| target.deps().map(|target| target.pkg()))
+                .filter(|dep_pkg| dep_pkg != &self.0)
+                .unique()
+                .collect::<Vec<_>>()
+        });
+
+        if memory_checkpoints {
+            let (targets, imports, target_name_bytes, ok) = match &result {
+                Ok(result) => (
+                    result.targets().len(),
+                    result.imports().len(),
+                    result
+                        .targets()
+                        .keys()
+                        .map(|name| name.as_str().len())
+                        .sum::<usize>(),
+                    1,
+                ),
+                Err(_) => (0, 0, 0, 0),
+            };
+            kuro_util::memory_checkpoint::checkpoint(
+                "interpreter_results_key",
+                [
+                    ("active", active),
+                    ("completed", completed),
+                    (
+                        "max_active",
+                        INTERPRETER_RESULTS_MAX_ACTIVE.load(Ordering::Relaxed),
+                    ),
+                    ("queued", queued),
+                    (
+                        "max_queued",
+                        INTERPRETER_RESULTS_MAX_QUEUED.load(Ordering::Relaxed),
+                    ),
+                    ("concurrency_limit", package_evaluation_concurrency_limit()),
+                    ("wait_us", wait_us),
+                    ("ok", ok),
+                    ("targets", targets),
+                    ("imports", imports),
+                    (
+                        "dep_packages",
+                        dep_packages.as_ref().map_or(0, |packages| packages.len()),
+                    ),
+                    ("target_name_bytes", target_name_bytes),
+                    (
+                        "package_path_len",
+                        self.0.as_cell_path().path().as_str().len(),
+                    ),
+                ],
+            );
+        }
 
         ctx.store_evaluation_data(InterpreterResultsKeyActivationData {
             time_span,
-            result: result.dupe(),
+            dep_packages,
             spans,
         })?;
 
@@ -145,14 +267,51 @@ impl Key for EvalImportKey {
         ctx: &mut DiceComputations,
         cancellation: &CancellationContext,
     ) -> Self::Value {
+        let memory_checkpoints = kuro_util::memory_checkpoint::enabled();
+        let active = EVAL_IMPORT_ACTIVE.fetch_add(1, Ordering::Relaxed) + 1;
+        record_max_active(&EVAL_IMPORT_MAX_ACTIVE, active);
         let starlark_path = self.0.borrow();
         // We cannot just use the inner default delegate's eval_import
         // because that wouldn't delegate back to us for inner eval_import calls.
-        Ok(ctx
-            .get_interpreter_calculator(OwnedStarlarkPath::new(starlark_path.starlark_path()))
-            .await?
-            .eval_module_uncached(starlark_path, cancellation)
-            .await?)
+        let result = async {
+            ctx.get_interpreter_calculator(OwnedStarlarkPath::new(starlark_path.starlark_path()))
+                .await?
+                .eval_module_uncached(starlark_path, cancellation)
+                .await
+        }
+        .await;
+        let active = EVAL_IMPORT_ACTIVE.fetch_sub(1, Ordering::Relaxed) - 1;
+        let completed = EVAL_IMPORT_COMPLETED.fetch_add(1, Ordering::Relaxed) + 1;
+        if memory_checkpoints {
+            let (ok, direct_imports, import_path_bytes) = match &result {
+                Ok(module) => (1, module.import_count(), module.import_path_bytes()),
+                Err(_) => (0, 0, 0),
+            };
+            let cross_cell = match self.0.borrow() {
+                StarlarkModulePath::LoadFile(path)
+                | StarlarkModulePath::JsonFile(path)
+                | StarlarkModulePath::TomlFile(path) => {
+                    usize::from(path.build_file_cell().name() != path.path().cell())
+                }
+                StarlarkModulePath::BxlFile(_) => 0,
+            };
+            if completed <= 10 || completed % 1000 == 0 || direct_imports >= 50 || ok == 0 {
+                kuro_util::memory_checkpoint::checkpoint(
+                    "eval_import_key",
+                    [
+                        ("active", active),
+                        ("completed", completed),
+                        ("max_active", EVAL_IMPORT_MAX_ACTIVE.load(Ordering::Relaxed)),
+                        ("ok", ok),
+                        ("direct_imports", direct_imports),
+                        ("import_path_bytes", import_path_bytes),
+                        ("module_path_len", self.0.path().path().as_str().len()),
+                        ("cross_cell", cross_cell),
+                    ],
+                );
+            }
+        }
+        Ok(result?)
     }
 
     fn equality(_: &Self::Value, _: &Self::Value) -> bool {
@@ -174,8 +333,12 @@ impl InterpreterCalculationImpl for InterpreterCalculationInstance {
         ctx: &mut DiceComputations<'_>,
         starlark_path: StarlarkModulePath<'_>,
     ) -> kuro_error::Result<LoadedModule> {
-        ctx.compute(&EvalImportKey(OwnedStarlarkModulePath::new(starlark_path)))
-            .await?
+        let key = if ctx.is_bzlmod().await? {
+            canonicalize_bzlmod_module_path(starlark_path)?
+        } else {
+            OwnedStarlarkModulePath::new(starlark_path)
+        };
+        ctx.compute(&EvalImportKey(key)).await?
     }
 
     async fn get_module_deps(
@@ -250,6 +413,6 @@ impl PackageValuesCalculation for PackageValuesCalculationInstance {
 pub struct InterpreterResultsKeyActivationData {
     /// TimeSpan of just the starlark evaluation of the build file.
     pub time_span: TimeSpan,
-    pub result: kuro_error::Result<Arc<EvaluationResult>>,
+    pub dep_packages: Option<Vec<PackageLabel>>,
     pub spans: SmallVec<[SpanId; 1]>,
 }

@@ -140,16 +140,26 @@ impl Key for CellAliasResolverKey {
     ) -> Self::Value {
         let resolver = ctx.get_cell_resolver().await?;
         let root_aliases = resolver.root_cell_cell_alias_resolver();
-        let config = ctx.get_legacy_config_for_cell(self.0).await?;
         let is_bzlmod = ctx.is_bzlmod().await?;
+
+        if is_bzlmod {
+            // Bazel 9/Bzlmod does not read per-repository .buckconfig alias
+            // sections. Keep the per-cell current-cell resolver, but do not
+            // materialize one LegacyBuckConfigForCellKey per external repo.
+            return CellAliasResolver::new_for_non_root_cell(
+                self.0,
+                root_aliases,
+                std::iter::empty(),
+            )
+            .map_err(Into::into);
+        }
+
+        let config = ctx.get_legacy_config_for_cell(self.0).await?;
 
         // Cell alias resolvers that are parsed within dice differ from those outside of dice in
         // that they cannot create new cells, and so respect only their `cell_aliases` section, not
         // their `cells` section. This is the expected behavior for external cells, moving other
         // cell resolver parsing into dice would require this code to be adjusted.
-        //
-        // In bzlmod mode, all cell aliases come from MODULE.bazel. Per-cell .buckconfig
-        // [repository_aliases] may reference cell names that don't exist in bzlmod, so skip them.
         let cell_aliases: Box<
             dyn Iterator<
                 Item = (
@@ -157,11 +167,7 @@ impl Key for CellAliasResolverKey {
                     kuro_core::cells::alias::NonEmptyCellAlias,
                 ),
             >,
-        > = if is_bzlmod {
-            Box::new(std::iter::empty())
-        } else {
-            Box::new(BuckConfigBasedCells::get_cell_aliases_from_config(&config)?)
-        };
+        > = Box::new(BuckConfigBasedCells::get_cell_aliases_from_config(&config)?);
 
         CellAliasResolver::new_for_non_root_cell(self.0, root_aliases, cell_aliases)
             .map_err(Into::into)

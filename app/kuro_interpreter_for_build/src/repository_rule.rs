@@ -705,3 +705,13 @@ pub fn register_repository_rule_function(builder: &mut GlobalsBuilder) {
     const repository_rule_type: StarlarkValueAsType<StarlarkRepositoryRule> =
         StarlarkValueAsType::new();
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn repository_attr_bare_repo_label_uses_repo_name_as_target() {
+        assert_eq!(canonicalize_repo_attr_label("@zstd", None), "@@zstd//:zstd");
+    }
+}

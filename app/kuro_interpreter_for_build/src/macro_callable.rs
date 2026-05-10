@@ -61,6 +61,7 @@ use starlark::values::list::AllocList;
 use starlark::values::starlark_value;
 
 use crate::attrs::starlark_attribute::StarlarkAttribute;
+use crate::rule::FrozenStarlarkRuleCallable;
 
 /// Errors around macro declaration and invocation.
 #[derive(Debug, kuro_error::Error)]
@@ -87,6 +88,8 @@ pub struct StarlarkMacroCallable<'v> {
     /// The `attrs` dict from `macro(attrs={...})`. Used to apply defaults for
     /// parameters not provided by the caller.
     attrs: Option<Value<'v>>,
+    /// Rule or macro whose public attributes are inherited by this macro.
+    inherit_attrs: Option<Value<'v>>,
 }
 
 impl<'v> fmt::Display for StarlarkMacroCallable<'v> {
@@ -144,6 +147,8 @@ pub struct FrozenStarlarkMacroCallable {
     doc: Option<String>,
     /// The `attrs` dict from `macro(attrs={...})`. Used to apply defaults.
     attrs: Option<FrozenValue>,
+    /// Frozen rule or macro whose public attributes are inherited by this macro.
+    inherit_attrs: Option<FrozenValue>,
 }
 
 starlark::starlark_simple_value!(FrozenStarlarkMacroCallable);
@@ -165,6 +170,7 @@ impl<'v> Freeze for StarlarkMacroCallable<'v> {
             finalizer: self.finalizer,
             doc: self.doc,
             attrs: self.attrs.freeze(freezer)?,
+            inherit_attrs: self.inherit_attrs.freeze(freezer)?,
         })
     }
 }
@@ -188,67 +194,68 @@ impl<'v> StarlarkValue<'v> for FrozenStarlarkMacroCallable {
         // Bazel's macro framework automatically injects `visibility` if not
         // provided by the caller, and applies defaults from attrs={...} for
         // any declared attributes not provided by the caller.
+        let heap = eval.heap();
         let names_map = args.names_map()?;
-        let has_visibility = names_map.keys().any(|k| k.as_str() == "visibility");
-
-        // Collect attr defaults that need injection
-        let mut need_defaults = false;
-        if !has_visibility {
-            need_defaults = true;
+        let positional: Vec<Value<'v>> = args.positions(heap)?.collect();
+        let mut named: Vec<(&str, Value<'v>)> = Vec::new();
+        for (k, v) in names_map.iter() {
+            named.push((k.as_str(), *v));
         }
+        if !named.iter().any(|(name, _)| *name == "visibility") {
+            named.push(("visibility", Value::new_none()));
+        }
+
         if let Some(attrs_val) = &self.attrs {
             if let Some(dict) = DictRef::from_value(attrs_val.to_value()) {
-                for (k, _) in dict.iter() {
-                    if let Some(name) = k.unpack_str() {
-                        if !names_map.keys().any(|n| n.as_str() == name) {
-                            need_defaults = true;
-                            break;
-                        }
+                for (k, v) in dict.iter() {
+                    let Some(attr_name) = k.unpack_str() else {
+                        continue;
+                    };
+                    if named.iter().any(|(name, _)| *name == attr_name) {
+                        continue;
+                    }
+                    if let Some(sa) = v.downcast_ref::<StarlarkAttribute>() {
+                        let default_val = if sa.implicit_default {
+                            Value::new_none()
+                        } else {
+                            sa.default().map_or_else(Value::new_none, |default| {
+                                coerced_attr_default_to_value(default.as_ref(), heap)
+                            })
+                        };
+                        let name_ref = heap.alloc_str(attr_name);
+                        named.push((name_ref.as_str(), default_val));
                     }
                 }
             }
         }
 
-        if !need_defaults {
-            self.implementation.invoke(args, eval)
-        } else {
-            // Collect attr defaults that need to be injected (name, CoercedAttr pairs)
-            let mut attr_defaults: Vec<(String, &CoercedAttr)> = Vec::new();
-            if let Some(attrs_val) = &self.attrs {
-                if let Some(dict) = DictRef::from_value(attrs_val.to_value()) {
-                    for (k, v) in dict.iter() {
-                        if let Some(attr_name) = k.unpack_str() {
-                            if names_map.keys().any(|n| n.as_str() == attr_name) {
-                                continue;
-                            }
-                            if let Some(sa) = v.downcast_ref::<StarlarkAttribute>() {
-                                if let Some(default) = sa.default() {
-                                    attr_defaults.push((attr_name.to_owned(), default.as_ref()));
-                                }
-                            }
-                        }
+        if let Some(inherit_attrs) = &self.inherit_attrs {
+            if let Some(rule) = inherit_attrs
+                .to_value()
+                .downcast_ref::<FrozenStarlarkRuleCallable>()
+            {
+                for (attr_name, _attr_id, attr) in rule.attributes().attr_specs() {
+                    if attr_name == "name" || attr_name == "visibility" {
+                        continue;
                     }
+                    if named.iter().any(|(name, _)| *name == attr_name) {
+                        continue;
+                    }
+                    let default_val = if rule.has_implicit_default_attr(attr_name) {
+                        Value::new_none()
+                    } else {
+                        attr.default().map_or_else(Value::new_none, |default| {
+                            coerced_attr_default_to_value(default.as_ref(), heap)
+                        })
+                    };
+                    let name_ref = heap.alloc_str(attr_name);
+                    named.push((name_ref.as_str(), default_val));
                 }
             }
-
-            let heap = eval.heap();
-            let positional: Vec<Value<'v>> = args.positions(heap)?.collect();
-            let mut named: Vec<(&str, Value<'v>)> = Vec::new();
-            for (k, v) in names_map.iter() {
-                named.push((k.as_str(), *v));
-            }
-            if !has_visibility {
-                named.push(("visibility", Value::new_none()));
-            }
-            // Inject collected defaults
-            for (attr_name, default) in &attr_defaults {
-                let default_val = coerced_attr_default_to_value(default, heap);
-                let name_ref = heap.alloc_str(attr_name);
-                named.push((name_ref.as_str(), default_val));
-            }
-            eval.eval_function(self.implementation.to_value(), &positional, &named)
-                .map_err(Into::into)
         }
+
+        eval.eval_function(self.implementation.to_value(), &positional, &named)
+            .map_err(Into::into)
     }
 
     fn get_type_starlark_repr() -> Ty {
@@ -274,6 +281,7 @@ impl<'v> StarlarkMacroCallable<'v> {
         finalizer: bool,
         doc: Option<String>,
         attrs: Option<Value<'v>>,
+        inherit_attrs: Option<Value<'v>>,
     ) -> StarlarkMacroCallable<'v> {
         StarlarkMacroCallable {
             name: RefCell::new(None),
@@ -281,6 +289,7 @@ impl<'v> StarlarkMacroCallable<'v> {
             finalizer,
             doc,
             attrs,
+            inherit_attrs,
         }
     }
 }

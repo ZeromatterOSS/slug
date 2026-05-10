@@ -320,6 +320,37 @@ fn dep_like_attr_handle_providers_arg(providers: Vec<Value>) -> kuro_error::Resu
     Ok(ProviderIdSet::from(result))
 }
 
+enum BazelDepCfg {
+    Target,
+    Exec,
+    Transition(Arc<TransitionId>),
+}
+
+fn parse_bazel_dep_cfg(cfg: Option<Value<'_>>) -> kuro_error::Result<BazelDepCfg> {
+    let Some(cfg) = cfg else {
+        return Ok(BazelDepCfg::Target);
+    };
+    if cfg.is_none() {
+        return Ok(BazelDepCfg::Target);
+    }
+    if let Some(s) = cfg.unpack_str() {
+        return Ok(match s {
+            "exec" | "host" => BazelDepCfg::Exec,
+            "target" => BazelDepCfg::Target,
+            _ => BazelDepCfg::Transition(transition_id_from_value(cfg)?),
+        });
+    }
+    if cfg.get_type() == "config_transition" {
+        let repr = cfg.to_repr();
+        return Ok(if repr.contains("exec") {
+            BazelDepCfg::Exec
+        } else {
+            BazelDepCfg::Target
+        });
+    }
+    Ok(BazelDepCfg::Transition(transition_id_from_value(cfg)?))
+}
+
 /// Helper to parse allow_files/allow_single_file parameters.
 /// These can be:
 /// - None/unset -> false
@@ -443,7 +474,7 @@ fn attr_module(registry: &mut GlobalsBuilder) {
             None
         };
 
-        let coercer = AttrType::transition_dep(required_providers, transition_id);
+        let coercer = AttrType::transition_dep(required_providers, transition_id, false);
         let coerced_default = match default {
             None => None,
             Some(default) => {
@@ -1022,18 +1053,7 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         }
 
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
-        // Handle cfg parameter: "exec" or config.exec(...) means use exec_dep, otherwise use regular dep
-        let is_exec = match cfg {
-            Some(v) => {
-                if let Some(s) = v.unpack_str() {
-                    s == "exec"
-                } else {
-                    // Check if it's a config.exec transition (contains "exec" in repr)
-                    v.to_repr().contains("exec")
-                }
-            }
-            None => false,
-        };
+        let dep_cfg = parse_bazel_dep_cfg(cfg)?;
         // Build the coercer based on cfg and allow_files
         // IMPORTANT: Try dep first, then source. Both accept label strings like ":foo",
         // but deps (targets) should take precedence over source files.
@@ -1047,10 +1067,12 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
             required_providers
         };
         let coercer = if accept_files {
-            let dep_type = if is_exec {
-                AttrType::exec_dep(effective_providers)
-            } else {
-                AttrType::dep(effective_providers, PluginKindSet::EMPTY)
+            let dep_type = match dep_cfg {
+                BazelDepCfg::Exec => AttrType::exec_dep(effective_providers),
+                BazelDepCfg::Target => AttrType::dep(effective_providers, PluginKindSet::EMPTY),
+                BazelDepCfg::Transition(cfg) => {
+                    AttrType::transition_dep(effective_providers, Some(cfg), true)
+                }
             };
             // Bazel's `allow_files=True` accepts package directory paths in
             // file-carrying attrs such as rules_cc `hdrs`; list contexts expand
@@ -1059,10 +1081,14 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
             // silently bind a directory.
             let allow_directory = allow_files_bool && !allow_single_file_bool;
             AttrType::one_of(vec![dep_type, AttrType::source(allow_directory)])
-        } else if is_exec {
-            AttrType::exec_dep(effective_providers)
         } else {
-            AttrType::dep(effective_providers, PluginKindSet::EMPTY)
+            match dep_cfg {
+                BazelDepCfg::Exec => AttrType::exec_dep(effective_providers),
+                BazelDepCfg::Target => AttrType::dep(effective_providers, PluginKindSet::EMPTY),
+                BazelDepCfg::Transition(cfg) => {
+                    AttrType::transition_dep(effective_providers, Some(cfg), true)
+                }
+            }
         };
 
         // Create attribute with aspects attached (Phase 8c)
@@ -1152,26 +1178,18 @@ fn bazel_attr_module(registry: &mut GlobalsBuilder) {
         }
 
         let required_providers = dep_like_attr_handle_providers_arg(providers.items)?;
-        // Handle cfg parameter: "exec" or config.exec(...) means use exec_dep
-        let is_exec = match cfg {
-            Some(v) => {
-                if let Some(s) = v.unpack_str() {
-                    s == "exec"
-                } else {
-                    v.to_repr().contains("exec")
-                }
-            }
-            None => false,
-        };
+        let dep_cfg = parse_bazel_dep_cfg(cfg)?;
         // When allow_files = True, accept both source files and deps
         // This is critical for srcs attributes which can contain "file.c" or ":target"
         // IMPORTANT: Try dep first, then source. Both accept label strings like ":foo",
         // but deps (targets) should take precedence over source files. Source files
         // are typically specified as bare filenames like "file.c", not labels.
-        let dep_type = if is_exec {
-            AttrType::exec_dep(required_providers)
-        } else {
-            AttrType::dep(required_providers, PluginKindSet::EMPTY)
+        let dep_type = match dep_cfg {
+            BazelDepCfg::Exec => AttrType::exec_dep(required_providers),
+            BazelDepCfg::Target => AttrType::dep(required_providers, PluginKindSet::EMPTY),
+            BazelDepCfg::Transition(cfg) => {
+                AttrType::transition_dep(required_providers, Some(cfg), false)
+            }
         };
         let inner = if allow_files_bool {
             AttrType::one_of(vec![

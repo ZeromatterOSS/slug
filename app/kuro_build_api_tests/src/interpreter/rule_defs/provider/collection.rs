@@ -9,14 +9,23 @@
  */
 
 use indoc::indoc;
+use kuro_build_api::interpreter::rule_defs::apple_common::register_apple_common;
 use kuro_build_api::interpreter::rule_defs::provider::callable::register_provider;
 use kuro_build_api::interpreter::rule_defs::provider::collection::tester::collection_creator;
+use kuro_build_api::interpreter::rule_defs::py_common::AnalysisTestResultInfoProvider;
 use kuro_build_api::interpreter::rule_defs::register_rule_defs;
 use kuro_core::bzl::ImportPath;
 use kuro_interpreter_for_build::interpreter::testing::Tester;
 use kuro_interpreter_for_build::interpreter::testing::expect_error;
+use starlark::environment::GlobalsBuilder;
+use starlark::starlark_module;
 
 use crate::interpreter::rule_defs::artifact::testing::artifactory;
+
+#[starlark_module]
+fn native_provider_keys(builder: &mut GlobalsBuilder) {
+    const AnalysisTestResultInfo: AnalysisTestResultInfoProvider = AnalysisTestResultInfoProvider;
+}
 
 fn provider_collection_tester() -> kuro_error::Result<Tester> {
     let mut tester = Tester::new()?;
@@ -24,6 +33,8 @@ fn provider_collection_tester() -> kuro_error::Result<Tester> {
     tester.additional_globals(artifactory);
     tester.additional_globals(register_rule_defs);
     tester.additional_globals(register_provider);
+    tester.additional_globals(register_apple_common);
+    tester.additional_globals(native_provider_keys);
     tester.add_import(
         &ImportPath::testing_new("root//provider:defs1.bzl"),
         indoc!(
@@ -172,6 +183,24 @@ fn provider_collection_contains_methods_and_in_operator() -> kuro_error::Result<
                 assert_eq(False, BarInfo in c1)
                 assert_eq(["DefaultInfo", "FooInfo", "BarInfo"], providers_list(c2))
             "#
+    ))
+}
+
+#[test]
+fn provider_collection_contains_native_provider_keys() -> kuro_error::Result<()> {
+    let mut tester = provider_collection_tester()?;
+    tester.run_starlark_bzl_test(indoc!(
+        r#"
+            analysis_result = AnalysisTestResultInfo(success = True, message = "")
+            c = create_collection([DefaultInfo(), analysis_result])
+
+            def test():
+                assert_eq(True, contains_provider(c, AnalysisTestResultInfo))
+                assert_eq(True, AnalysisTestResultInfo in c)
+                assert_eq(True, c[AnalysisTestResultInfo].success)
+                assert_eq(False, contains_provider(c, apple_common.Objc))
+                assert_eq(False, apple_common.Objc in c)
+        "#
     ))
 }
 

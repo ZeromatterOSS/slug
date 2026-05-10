@@ -66,6 +66,7 @@ use starlark::values::list::ListRef;
 use starlark::values::list::UnpackList;
 use starlark::values::starlark_value;
 use starlark::values::starlark_value_as_type::StarlarkValueAsType;
+use starlark::values::tuple::TupleRef;
 use starlark::values::tuple::UnpackTuple;
 use starlark::values::type_repr::StarlarkTypeRepr;
 use static_assertions::assert_eq_size;
@@ -76,6 +77,7 @@ use crate::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
 use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
 use crate::interpreter::rule_defs::artifact::starlark_output_artifact::StarlarkOutputArtifact;
 use crate::interpreter::rule_defs::artifact_tagging::ArtifactTag;
+use crate::interpreter::rule_defs::cc_common::cc_frozen_list_items;
 use crate::interpreter::rule_defs::cmd_args::ArtifactPathMapper;
 use crate::interpreter::rule_defs::cmd_args::command_line_arg_like_type::command_line_arg_like_impl;
 use crate::interpreter::rule_defs::cmd_args::options::CommandLineOptions;
@@ -299,6 +301,23 @@ fn can_defer_depset_command_line(value: Value) -> starlark::Result<bool> {
         crate::interpreter::rule_defs::depset::depset_element_type_name(value)?.as_deref(),
         None | Some("string" | "str" | "File" | "OutputArtifact")
     ))
+}
+
+fn append_map_each_result<'v>(result: &mut Vec<Value<'v>>, mapped: Value<'v>) {
+    if mapped.is_none() {
+        return;
+    }
+    if let Some(items) = cc_frozen_list_items(mapped) {
+        result.extend(items);
+        return;
+    }
+    if let Some(list) = ListRef::from_value(mapped) {
+        result.extend(list.iter());
+    } else if let Some(tuple) = TupleRef::from_value(mapped) {
+        result.extend(tuple.iter());
+    } else {
+        result.push(mapped);
+    }
 }
 
 /// Fields of `cmd_args`. Abstract mutable and frozen versions.
@@ -1213,9 +1232,11 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
             return Ok(this);
         }
 
-        // Collect values from list or depset
+        // Collect values from list, tuple, or depset.
         let items: Vec<Value<'v>> = if let Some(list) = ListRef::from_value(values) {
             list.iter().collect()
+        } else if let Some(tuple) = TupleRef::from_value(values) {
+            tuple.iter().collect()
         } else if crate::interpreter::rule_defs::depset::is_depset_value(values) {
             crate::interpreter::rule_defs::depset::depset_to_list(values, heap)?
         } else if let Ok(iter) = values.iterate(heap) {
@@ -1230,16 +1251,7 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
             let mut result = Vec::new();
             for item in &items {
                 let mapped = eval.eval_function(map_each, &[*item], &[])?;
-                // map_each can return a string, a list of strings, or None
-                if mapped.is_none() {
-                    continue;
-                } else if let Some(list) = ListRef::from_value(mapped) {
-                    for elem in list.iter() {
-                        result.push(elem);
-                    }
-                } else {
-                    result.push(mapped);
-                }
+                append_map_each_result(&mut result, mapped);
             }
             result
         } else {
@@ -1366,6 +1378,8 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
 
         let raw_items: Vec<Value<'v>> = if let Some(list) = ListRef::from_value(values) {
             list.iter().collect()
+        } else if let Some(tuple) = TupleRef::from_value(values) {
+            tuple.iter().collect()
         } else if crate::interpreter::rule_defs::depset::is_depset_value(values) {
             crate::interpreter::rule_defs::depset::depset_to_list(values, heap)?
         } else if let Ok(iter) = values.iterate(heap) {
@@ -1378,17 +1392,8 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
         let mapped_items: Vec<Value<'v>> = if !map_each.is_none() {
             let mut result = Vec::new();
             for item in &raw_items {
-                if let Ok(mapped) = eval.eval_function(map_each, &[*item], &[]) {
-                    if mapped.is_none() {
-                        continue;
-                    } else if let Some(list) = ListRef::from_value(mapped) {
-                        result.extend(list.iter());
-                    } else {
-                        result.push(mapped);
-                    }
-                } else {
-                    result.push(*item);
-                }
+                let mapped = eval.eval_function(map_each, &[*item], &[])?;
+                append_map_each_result(&mut result, mapped);
             }
             result
         } else {
@@ -1397,19 +1402,20 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
 
         let items: Vec<String> = mapped_items
             .iter()
-            .map(|v| {
+            .map(|v| -> starlark::Result<String> {
+                ValueAsCommandLineLike::unpack_value_err(*v)?;
                 let val_str = if let Ok(Some(path_val)) = v.get_attr("path", heap) {
                     path_val.to_str()
                 } else {
                     v.to_str()
                 };
-                if !format_each.is_empty() {
+                Ok(if !format_each.is_empty() {
                     format_each.replace("%s", &val_str)
                 } else {
                     val_str
-                }
+                })
             })
-            .collect();
+            .collect::<starlark::Result<_>>()?;
 
         // Deduplicate if requested
         let items = if uniquify {
