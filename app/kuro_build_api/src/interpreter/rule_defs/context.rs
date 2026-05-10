@@ -13,6 +13,7 @@ use std::cell::RefMut;
 use std::convert::Infallible;
 use std::fmt;
 use std::fmt::Formatter;
+use std::hash::Hash;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -35,6 +36,7 @@ use kuro_interpreter::types::configured_providers_label::StarlarkConfiguredProvi
 use kuro_util::late_binding::LateBinding;
 use starlark::any::ProvidesStaticType;
 use starlark::collections::SmallMap;
+use starlark::collections::StarlarkHasher;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
 use starlark::environment::MethodsBuilder;
@@ -1855,18 +1857,18 @@ impl<'v> StarlarkValue<'v> for CtxOutputs<'v> {
 // ============================================================================
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-struct SyntheticCcInfo;
+struct CcInfoNativeShim;
 
-impl std::fmt::Display for SyntheticCcInfo {
+impl std::fmt::Display for CcInfoNativeShim {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "CcInfo(...)")
     }
 }
 
-starlark::starlark_simple_value!(SyntheticCcInfo);
+starlark::starlark_simple_value!(CcInfoNativeShim);
 
 #[starlark::values::starlark_value(type = "CcInfo")]
-impl<'v> StarlarkValue<'v> for SyntheticCcInfo {
+impl<'v> StarlarkValue<'v> for CcInfoNativeShim {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(attribute, "compilation_context" | "linking_context")
     }
@@ -1878,6 +1880,11 @@ impl<'v> StarlarkValue<'v> for SyntheticCcInfo {
             _ => None,
         }
     }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "CcInfoNativeShim".hash(hasher);
+        Ok(())
+    }
 }
 
 /// Cycle-breaker for C++ toolchain provider lookups.
@@ -1887,22 +1894,22 @@ impl<'v> StarlarkValue<'v> for SyntheticCcInfo {
 /// selected C++ toolchain's own dependency cone. The real cc_toolchain target is
 /// still analyzed normally once its deps are available.
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-struct SyntheticCcToolchainInfo {
+struct CcToolchainInfoNativeShim {
     toolchain_label: String,
 }
 
-impl std::fmt::Display for SyntheticCcToolchainInfo {
+impl std::fmt::Display for CcToolchainInfoNativeShim {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "CcToolchainInfo({})", self.toolchain_label)
     }
 }
 
-starlark::starlark_simple_value!(SyntheticCcToolchainInfo);
+starlark::starlark_simple_value!(CcToolchainInfoNativeShim);
 
 #[starlark::starlark_module]
-fn synthetic_cc_toolchain_methods(builder: &mut MethodsBuilder) {
+fn cc_toolchain_native_shim_methods(builder: &mut MethodsBuilder) {
     fn needs_pic_for_dynamic_libraries(
-        #[starlark(this)] _this: &SyntheticCcToolchainInfo,
+        #[starlark(this)] _this: &CcToolchainInfoNativeShim,
         #[starlark(require = named)] feature_configuration: Value,
     ) -> starlark::Result<bool> {
         let _ = feature_configuration;
@@ -1910,7 +1917,7 @@ fn synthetic_cc_toolchain_methods(builder: &mut MethodsBuilder) {
     }
 
     fn static_runtime_lib<'v>(
-        #[starlark(this)] _this: &SyntheticCcToolchainInfo,
+        #[starlark(this)] _this: &CcToolchainInfoNativeShim,
         #[starlark(require = named)] feature_configuration: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
@@ -1919,7 +1926,7 @@ fn synthetic_cc_toolchain_methods(builder: &mut MethodsBuilder) {
     }
 
     fn dynamic_runtime_lib<'v>(
-        #[starlark(this)] _this: &SyntheticCcToolchainInfo,
+        #[starlark(this)] _this: &CcToolchainInfoNativeShim,
         #[starlark(require = named)] feature_configuration: Value<'v>,
         heap: Heap<'v>,
     ) -> starlark::Result<Value<'v>> {
@@ -1929,7 +1936,7 @@ fn synthetic_cc_toolchain_methods(builder: &mut MethodsBuilder) {
 }
 
 #[starlark::values::starlark_value(type = "CcToolchainInfo")]
-impl<'v> StarlarkValue<'v> for SyntheticCcToolchainInfo {
+impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
         matches!(
             attribute,
@@ -2056,7 +2063,7 @@ impl<'v> StarlarkValue<'v> for SyntheticCcToolchainInfo {
             | "_is_sibling_repository_layout"
             | "_stamp_binaries"
             | "_force_layering_check_features" => Some(Value::new_bool(false)),
-            "_cc_info" => Some(heap.alloc(SyntheticCcInfo)),
+            "_cc_info" => Some(heap.alloc(CcInfoNativeShim)),
             "_extra_allowlisted_feature_layering_check_macros" => Some(empty_list()),
             _ => None,
         }
@@ -2064,15 +2071,21 @@ impl<'v> StarlarkValue<'v> for SyntheticCcToolchainInfo {
 
     fn get_methods() -> Option<&'static Methods> {
         static RES: MethodsStatic = MethodsStatic::new();
-        RES.methods(synthetic_cc_toolchain_methods)
+        RES.methods(cc_toolchain_native_shim_methods)
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "CcToolchainInfoNativeShim".hash(hasher);
+        self.toolchain_label.hash(hasher);
+        Ok(())
     }
 }
 
-pub fn synthetic_cc_toolchain_provider_collection(
+pub fn cc_toolchain_native_shim_provider_collection(
     toolchain_label: &str,
 ) -> FrozenProviderCollectionValue {
     let heap = FrozenHeap::new();
-    let cc = heap.alloc(SyntheticCcToolchainInfo {
+    let cc = heap.alloc(CcToolchainInfoNativeShim {
         toolchain_label: toolchain_label.to_owned(),
     });
     let cc_provider_in_toolchain = heap.alloc(true);
@@ -2366,6 +2379,12 @@ impl<'v> StarlarkValue<'v> for EmptyCompilationContext {
             _ => None,
         }
     }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "CompilationContext".hash(hasher);
+        "empty".hash(hasher);
+        Ok(())
+    }
 }
 
 /// A stub for HeaderInfo for CompilationContext.
@@ -2408,6 +2427,12 @@ impl<'v> StarlarkValue<'v> for EmptyHeaderInfo {
             _ => None,
         }
     }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "HeaderInfo".hash(hasher);
+        "empty".hash(hasher);
+        Ok(())
+    }
 }
 
 /// A stub for LinkingContext.
@@ -2436,6 +2461,12 @@ impl<'v> StarlarkValue<'v> for EmptyLinkingContext {
             "_extra_link_time_libraries" => Some(Value::new_none()),
             _ => None,
         }
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "LinkingContext".hash(hasher);
+        "empty".hash(hasher);
+        Ok(())
     }
 }
 
@@ -2479,6 +2510,7 @@ impl<'v> StarlarkValue<'v> for CtxFiles<'v> {
 
         use crate::interpreter::rule_defs::provider::dependency::Dependency;
         use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
+        use crate::interpreter::rule_defs::provider::dependency::SourceFileTarget;
 
         let attr_value = self.attrs.get_attr(attribute, heap).ok().flatten()?;
 
@@ -2503,6 +2535,8 @@ impl<'v> StarlarkValue<'v> for CtxFiles<'v> {
                         }
                     }
                 }
+            } else if let Some(source_target) = v.downcast_ref::<SourceFileTarget>() {
+                files.push(source_target.artifact_value(heap));
             } else {
                 files.push(v);
             }
@@ -2564,6 +2598,7 @@ impl<'v> StarlarkValue<'v> for CtxFile<'v> {
 
         use crate::interpreter::rule_defs::provider::dependency::Dependency;
         use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
+        use crate::interpreter::rule_defs::provider::dependency::SourceFileTarget;
 
         let attr_value = self.attrs.get_attr(attribute, heap).ok().flatten()?;
 
@@ -2589,6 +2624,8 @@ impl<'v> StarlarkValue<'v> for CtxFile<'v> {
                     }
                 }
                 Value::new_none()
+            } else if let Some(source_target) = v.downcast_ref::<SourceFileTarget>() {
+                source_target.artifact_value(heap)
             } else {
                 v
             }

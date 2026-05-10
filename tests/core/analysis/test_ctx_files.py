@@ -43,6 +43,22 @@ async def test_ctx_files_deps_from_source(buck: Buck) -> None:
 
 
 @buck_test(data_dir="test_ctx_files_data")
+async def test_ctx_attr_allow_files_source_entries_are_targets(buck: Buck) -> None:
+    """Bazel label attrs expose source-file entries as Targets in ctx.attr."""
+    result = await buck.build("//:ctx_attr_source_targets")
+    output = result.get_build_report().output_for_target("//:ctx_attr_source_targets")
+
+    lines = dict(
+        line.split("=", 1) for line in output.read_text().strip().splitlines()
+    )
+    assert lines["attr_types"] == "Target,Target"
+    assert set(lines["attr_labels"].split(",")) == {"defs.bzl", "single_dep"}
+    assert lines["depset_count"] == "2"
+    assert set(lines["default_files"].split(",")) == {"defs.bzl", "single.txt"}
+    assert set(lines["projected_files"].split(",")) == {"defs.bzl", "single.txt"}
+
+
+@buck_test(data_dir="test_ctx_files_data")
 async def test_ctx_file_dep_single_file(buck: Buck) -> None:
     """ctx.file.dep gets a single File object from a dep with one output."""
     result = await buck.build("//:single_from_dep")

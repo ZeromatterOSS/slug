@@ -22,6 +22,7 @@
 use std::fmt;
 use std::fmt::Display;
 use std::hash::Hash;
+use std::hash::Hasher;
 use std::sync::Arc;
 use std::sync::OnceLock;
 
@@ -52,9 +53,12 @@ use starlark::values::Value;
 use starlark::values::ValueLifetimeless;
 use starlark::values::ValueLike;
 use starlark::values::dict::DictRef;
+use starlark::values::dict::FrozenDictRef;
 use starlark::values::list::AllocList;
+use starlark::values::list::FrozenListRef;
 use starlark::values::list::ListRef;
 use starlark::values::starlark_value;
+use starlark::values::tuple::FrozenTupleRef;
 use starlark::values::tuple::TupleRef;
 
 use crate::interpreter::rule_defs::provider::ProviderLike;
@@ -78,6 +82,58 @@ fn write_cc_hashable_value<'v>(
             write_cc_hashable_value(item, hasher)?;
         }
         return Ok(());
+    }
+    if let Some(dict) = DictRef::from_value(value) {
+        "dict".hash(hasher);
+        let entries: Vec<_> = dict.iter().collect();
+        entries.len().hash(hasher);
+        let mut entry_hashes = Vec::with_capacity(entries.len());
+        for (key, value) in entries {
+            let mut entry_hasher = StarlarkHasher::new();
+            write_cc_hashable_value(key, &mut entry_hasher)?;
+            write_cc_hashable_value(value, &mut entry_hasher)?;
+            entry_hashes.push(entry_hasher.finish());
+        }
+        entry_hashes.sort_unstable();
+        for hash in entry_hashes {
+            hash.hash(hasher);
+        }
+        return Ok(());
+    }
+    if let Some(list) = FrozenListRef::from_value(value) {
+        "list".hash(hasher);
+        list.len().hash(hasher);
+        for item in list.iter() {
+            write_cc_hashable_value(item.to_value(), hasher)?;
+        }
+        return Ok(());
+    }
+    if let Some(frozen_value) = value.unpack_frozen() {
+        if let Some(tuple) = FrozenTupleRef::from_frozen_value(frozen_value) {
+            "tuple".hash(hasher);
+            tuple.len().hash(hasher);
+            for item in tuple.iter() {
+                write_cc_hashable_value(item.to_value(), hasher)?;
+            }
+            return Ok(());
+        }
+        if let Some(dict) = FrozenDictRef::from_frozen_value(frozen_value) {
+            "dict".hash(hasher);
+            let entries: Vec<_> = dict.iter().collect();
+            entries.len().hash(hasher);
+            let mut entry_hashes = Vec::with_capacity(entries.len());
+            for (key, value) in entries {
+                let mut entry_hasher = StarlarkHasher::new();
+                write_cc_hashable_value(key.to_value(), &mut entry_hasher)?;
+                write_cc_hashable_value(value.to_value(), &mut entry_hasher)?;
+                entry_hashes.push(entry_hasher.finish());
+            }
+            entry_hashes.sort_unstable();
+            for hash in entry_hashes {
+                hash.hash(hasher);
+            }
+            return Ok(());
+        }
     }
     value.write_hash(hasher)
 }
@@ -235,6 +291,19 @@ where
             _ => None,
         }
     }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "CcCompilationContext".hash(hasher);
+        write_cc_hashable_value(self.headers.to_value(), hasher)?;
+        write_cc_hashable_value(self.includes.to_value(), hasher)?;
+        write_cc_hashable_value(self.quote_includes.to_value(), hasher)?;
+        write_cc_hashable_value(self.system_includes.to_value(), hasher)?;
+        write_cc_hashable_value(self.external_includes.to_value(), hasher)?;
+        write_cc_hashable_value(self.framework_includes.to_value(), hasher)?;
+        write_cc_hashable_value(self.defines.to_value(), hasher)?;
+        write_cc_hashable_value(self.local_defines.to_value(), hasher)?;
+        Ok(())
+    }
 }
 
 // ============================================================================
@@ -347,6 +416,12 @@ impl<'v> StarlarkValue<'v> for HeaderInfoStub {
             }
             _ => None,
         }
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "HeaderInfo".hash(hasher);
+        "empty".hash(hasher);
+        Ok(())
     }
 }
 
@@ -803,6 +878,13 @@ where
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
         demand.provide_value::<&dyn ProviderLike>(self);
     }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "CcInfo".hash(hasher);
+        write_cc_hashable_value(self.compilation_context.to_value(), hasher)?;
+        write_cc_hashable_value(self.linking_context.to_value(), hasher)?;
+        Ok(())
+    }
 }
 
 /// A stub CcInfo instance (returned when CcInfo(...) is called with no data).
@@ -860,6 +942,12 @@ impl<'v> StarlarkValue<'v> for CcInfoInstanceStub {
 
     fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
         demand.provide_value::<&dyn ProviderLike>(self);
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "CcInfo".hash(hasher);
+        "empty".hash(hasher);
+        Ok(())
     }
 }
 
@@ -2198,5 +2286,11 @@ where
             }
             _ => None,
         }
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "LinkingContext".hash(hasher);
+        write_cc_hashable_value(self.linker_inputs.to_value(), hasher)?;
+        Ok(())
     }
 }

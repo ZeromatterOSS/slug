@@ -14,11 +14,13 @@ use std::hash::Hash;
 use std::mem;
 
 use allocative::Allocative;
+use dupe::Dupe;
 use kuro_core::execution_types::execution::ExecutionPlatformResolution;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
 use kuro_core::provider::label::ProviderName;
 use kuro_error::BuckErrorContext;
 use kuro_interpreter::types::configured_providers_label::StarlarkConfiguredProvidersLabel;
+use kuro_interpreter::types::provider::callable::ValueAsProviderCallableLike;
 use starlark::any::ProvidesStaticType;
 use starlark::coerce::Coerce;
 use starlark::environment::GlobalsBuilder;
@@ -41,8 +43,12 @@ use starlark::values::ValueOfUncheckedGeneric;
 use starlark::values::none::NoneOr;
 use starlark::values::starlark_value;
 use starlark::values::starlark_value_as_type::StarlarkValueAsType;
+use starlark::values::structs::AllocStruct;
 use starlark_map::StarlarkHasher;
 
+use crate::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
+use crate::interpreter::rule_defs::provider::builtin::default_info::DefaultInfo;
+use crate::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
 use crate::interpreter::rule_defs::provider::collection::FrozenProviderCollection;
 use crate::interpreter::rule_defs::provider::execution_platform::StarlarkExecutionPlatformResolution;
 use crate::interpreter::rule_defs::provider::ty::abstract_provider::AbstractProvider;
@@ -76,6 +82,41 @@ pub struct DependencyGen<V: ValueLifetimeless> {
 }
 
 starlark_complex_value!(pub Dependency);
+
+/// Bazel source files appear in `ctx.attr` for `attr.label(..., allow_files=True)`
+/// as `Target` values whose `DefaultInfo.files` contains the underlying file.
+#[derive(Debug, Clone, Dupe, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct SourceFileTarget {
+    label: ConfiguredProvidersLabel,
+    artifact: StarlarkArtifact,
+}
+
+starlark::starlark_simple_value!(SourceFileTarget);
+
+impl SourceFileTarget {
+    pub fn new(label: ConfiguredProvidersLabel, artifact: StarlarkArtifact) -> Self {
+        Self { label, artifact }
+    }
+
+    pub fn artifact_value<'v>(&self, heap: Heap<'v>) -> Value<'v> {
+        heap.alloc(self.artifact.dupe())
+    }
+
+    fn default_info_value<'v>(&self, heap: Heap<'v>) -> Value<'v> {
+        let artifact_value = self.artifact_value(heap);
+        heap.alloc(DefaultInfo::from_artifact_value(heap, artifact_value))
+    }
+
+    pub fn label(&self) -> &ConfiguredProvidersLabel {
+        &self.label
+    }
+}
+
+impl Display for SourceFileTarget {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<source file target {}>", self.label)
+    }
+}
 
 impl<V: ValueLifetimeless> Display for DependencyGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -201,6 +242,98 @@ where
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
         self.label().inner().hash(hasher);
         Ok(())
+    }
+}
+
+#[starlark_value(type = "Target")]
+impl<'v> StarlarkValue<'v> for SourceFileTarget {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(source_file_target_methods)
+    }
+
+    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        match index.as_provider_callable() {
+            Some(callable) => {
+                let provider_id = callable.id()?;
+                if provider_id == DefaultInfoCallable::provider_id() {
+                    Ok(self.default_info_value(heap))
+                } else {
+                    Err(kuro_error::Error::from(DependencyError::UnknownSubtarget(
+                        provider_id.name.clone(),
+                    ))
+                    .into())
+                }
+            }
+            None => Err(
+                kuro_error::Error::from(ProviderIndexError::IndexTypeNotProvider(index.get_type()))
+                    .into(),
+            ),
+        }
+    }
+
+    fn is_in(&self, other: Value<'v>) -> starlark::Result<bool> {
+        match other.as_provider_callable() {
+            Some(callable) => {
+                let provider_id = callable.id()?;
+                Ok(provider_id == DefaultInfoCallable::provider_id())
+            }
+            None => Err(
+                kuro_error::Error::from(ProviderIndexError::IndexTypeNotProvider(other.get_type()))
+                    .into(),
+            ),
+        }
+    }
+
+    fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
+        if let Some(other) = other.downcast_ref::<SourceFileTarget>() {
+            return Ok(self.label == other.label);
+        }
+        if let Some(other) = other.downcast_ref::<Dependency<'v>>() {
+            return Ok(&self.label == other.label().inner());
+        }
+        if let Some(other) = other.downcast_ref::<FrozenDependency>() {
+            return Ok(&self.label == other.label().inner());
+        }
+        Ok(false)
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        self.label.hash(hasher);
+        Ok(())
+    }
+}
+
+#[derive(Debug, kuro_error::Error)]
+#[kuro(tag = Input)]
+enum ProviderIndexError {
+    #[error("target[<provider>] operation requires a provider type, got `{0}`")]
+    IndexTypeNotProvider(&'static str),
+}
+
+#[starlark_module]
+fn source_file_target_methods(builder: &mut MethodsBuilder) {
+    #[starlark(attribute)]
+    fn label<'v>(this: &SourceFileTarget, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        Ok(heap.alloc(StarlarkConfiguredProvidersLabel::new(this.label.dupe())))
+    }
+
+    #[starlark(attribute)]
+    fn files<'v>(this: &SourceFileTarget, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        Ok(this
+            .default_info_value(heap)
+            .get_attr("files", heap)?
+            .unwrap_or_else(Value::new_none))
+    }
+
+    #[starlark(attribute)]
+    fn files_to_run<'v>(this: &SourceFileTarget, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        Ok(heap.alloc(AllocStruct([
+            ("executable", Value::new_none()),
+            ("runfiles_manifest", Value::new_none()),
+            ("repo_mapping_manifest", Value::new_none()),
+            ("_source", this.artifact_value(heap)),
+        ])))
     }
 }
 

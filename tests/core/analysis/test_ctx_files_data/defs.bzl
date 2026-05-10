@@ -45,6 +45,31 @@ collect_from_deps = rule(
 )
 
 
+def _ctx_attr_source_targets_impl(ctx):
+    """Verifies allow_files source entries are Targets in ctx.attr."""
+    out = ctx.actions.declare_file("ctx_attr_source_targets.txt")
+    attr_types = [type(t) for t in ctx.attr.deps]
+    attr_labels = [t.label.name for t in ctx.attr.deps]
+    default_files = [f.basename for t in ctx.attr.deps for f in t[DefaultInfo].files.to_list()]
+    projected_files = [f.basename for f in ctx.files.deps]
+    ctx.actions.write(out, "\n".join([
+        "attr_types=" + ",".join(attr_types),
+        "attr_labels=" + ",".join(attr_labels),
+        "depset_count=" + str(len(depset(ctx.attr.deps).to_list())),
+        "default_files=" + ",".join(sorted(default_files)),
+        "projected_files=" + ",".join(sorted(projected_files)),
+    ]))
+    return [DefaultInfo(default_output = out)]
+
+
+ctx_attr_source_targets = rule(
+    implementation = _ctx_attr_source_targets_impl,
+    attrs = {
+        "deps": attr.label_list(allow_files = True, default = []),
+    },
+)
+
+
 def _single_file_from_dep_impl(ctx):
     """Accesses a single file from dep using ctx.file.dep."""
     out = ctx.actions.declare_file("single_from_dep.txt")

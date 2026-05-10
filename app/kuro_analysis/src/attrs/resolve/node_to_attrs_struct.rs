@@ -25,7 +25,12 @@ pub(crate) fn node_to_attrs_struct<'v>(
     let attrs_iter = node.attrs(AttrInspectOptions::All);
     let mut resolved_attrs = Vec::with_capacity(attrs_iter.size_hint().0);
     for a in attrs_iter {
-        let resolved = a.value.resolve_single(node.label().pkg(), ctx)?;
+        let resolved = a.value.resolve_single_for_ctx_attr(
+            node.label().pkg(),
+            a.attr.coercer(),
+            node.label().cfg_pair(),
+            ctx,
+        )?;
         resolved_attrs.push((a.name, resolved));
     }
     Ok(ctx

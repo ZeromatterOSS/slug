@@ -20,8 +20,8 @@ fn tester() -> kuro_error::Result<Tester> {
 
 #[test]
 fn cc_internal_freeze_preserves_list_type() -> kuro_error::Result<()> {
-    let mut tester = tester()?;
-    tester.run_starlark_bzl_test(indoc!(
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
         r#"
         P = provider(fields = ["x"])
 
@@ -64,8 +64,8 @@ fn cc_internal_freeze_preserves_list_type() -> kuro_error::Result<()> {
 
 #[test]
 fn cc_common_create_linker_input_is_depset_eligible() -> kuro_error::Result<()> {
-    let mut tester = tester()?;
-    tester.run_starlark_bzl_test(indoc!(
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
         r#"
         def test():
             library_to_link = cc_common.create_library_to_link(
@@ -93,5 +93,63 @@ fn cc_common_create_linker_input_is_depset_eligible() -> kuro_error::Result<()> 
             assert_eq([linker_input], linking_context.linker_inputs.to_list())
         "#
     ))?;
+    Ok(())
+}
+
+#[test]
+fn cc_info_values_are_depset_eligible_inside_rust_dep_variant_shape() -> kuro_error::Result<()> {
+    let mut positive_tester = tester()?;
+    positive_tester.run_starlark_bzl_test(indoc!(
+        r#"
+        DepVariantInfo = provider(fields = [
+            "crate_info",
+            "dep_info",
+            "build_info",
+            "cc_info",
+            "crate_group_info",
+        ])
+        CcCompilationContextInfo = provider(fields = ["_header_info"])
+        RulesCcInfo = provider(fields = ["compilation_context"])
+
+        def test():
+            cc = CcInfo()
+            depset([cc])
+
+            dep = DepVariantInfo(
+                crate_info = None,
+                dep_info = None,
+                build_info = None,
+                cc_info = cc,
+                crate_group_info = None,
+            )
+            assert_eq([dep], depset([dep]).to_list())
+
+            header_info = cc_common.internal_DO_NOT_USE.create_header_info()
+            compilation_context = CcCompilationContextInfo(_header_info = header_info)
+            rules_cc_info = RulesCcInfo(compilation_context = compilation_context)
+            rules_cc_dep = DepVariantInfo(
+                crate_info = None,
+                dep_info = None,
+                build_info = None,
+                cc_info = rules_cc_info,
+                crate_group_info = None,
+            )
+            assert_eq([rules_cc_dep], depset([rules_cc_dep]).to_list())
+        "#
+    ))?;
+
+    let mut negative = tester()?;
+    negative.run_starlark_bzl_test_expecting_error(
+        indoc!(
+            r#"
+            PlainInfo = provider(fields = ["items"])
+
+            def test():
+                depset([PlainInfo(items = [])])
+            "#
+        ),
+        "depset elements must not be mutable values",
+    );
+
     Ok(())
 }

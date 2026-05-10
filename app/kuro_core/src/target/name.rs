@@ -20,7 +20,6 @@ use serde::Serialize;
 use strong_hash::StrongHash;
 
 use crate::ascii_char_set::AsciiCharSet;
-use crate::soft_error;
 
 pub const EQ_SIGN_SUBST: &str = "_eqsb_";
 
@@ -49,7 +48,7 @@ pub struct TargetName(#[pagable(flatten_serde)] ThinArcStr);
 enum TargetNameError {
     #[error(
         "Invalid target name `{}`. Target names are non-empty strings and can only contain alpha numeric characters, and symbols \
-        `,`, `.`, `=`, `-`, `/`, `~`, `@`, `!`, `+`, `$`, and `_`. No other characters are allowed.",
+        `!%-@^_\"#$&'()*-+,;<=>?[]{{|}}~/.`. No other characters are allowed.",
         _0
     )]
     InvalidName(String),
@@ -58,8 +57,6 @@ enum TargetNameError {
         _0
     )]
     FoundProvidersLabel(String),
-    #[error("Target name `{0}` has special character `{1}`, which is discouraged")]
-    LabelHasSpecialCharacter(String, char),
     #[error("Target name must not be equal to `...`")]
     DotDotDot,
     #[error("Target name `{0}` should not contain pattern: `{1}`")]
@@ -87,8 +84,9 @@ impl TargetName {
     }
 
     fn verify(name: &str) -> kuro_error::Result<()> {
-        const VALID_CHARS: &str =
-            r"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_,.=-\/~@!+$";
+        // Bazel 9 target names use the same punctuation set for rule targets
+        // and file targets. See https://bazel.build/versions/9.0.0/concepts/labels.
+        const VALID_CHARS: &str = r##"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!%-@^_"#$&'()*-+,;<=>?[]{|}~/."##;
         const SET: AsciiCharSet = AsciiCharSet::new(VALID_CHARS);
 
         if name.is_empty() || !name.as_bytes().iter().all(|&b| SET.contains(b)) {
@@ -104,23 +102,6 @@ impl TargetName {
         if name == "..." {
             return Err(TargetNameError::DotDotDot.into());
         }
-        if name.contains(',') {
-            soft_error!(
-                "label_has_comma",
-                TargetNameError::LabelHasSpecialCharacter(name.to_owned(), ',').into(),
-                deprecation: true,
-                quiet: true
-            )?;
-        }
-        if name.contains('$') {
-            soft_error!(
-                "label_has_dollar_sign",
-                TargetNameError::LabelHasSpecialCharacter(name.to_owned(), '$').into(),
-                deprecation: true,
-                quiet: true
-            )?;
-        }
-
         Ok(())
     }
 
@@ -238,22 +219,16 @@ mod tests {
             TargetName(ThinArcStr::from("foo"))
         );
         assert_eq!(
-            // Copied allowed symbols from above.
-            // `.`, `-`, `/`, `~`, `@`, `!`, `+` and `_`
-            // `,`, `$`, and `=` are currently soft errors and should eventually be removed.
-            TargetName::new("foo.-/~@!+_1").unwrap(),
-            TargetName(ThinArcStr::from("foo.-/~@!+_1"))
+            // Bazel 9 target-name punctuation set.
+            TargetName::new(r##"foo!%-@^_"#$&'()*-+,;<=>?[]{|}~/.1"##).unwrap(),
+            TargetName(ThinArcStr::from(r##"foo!%-@^_"#$&'()*-+,;<=>?[]{|}~/.1"##,))
         );
         assert!(TargetName::new("foo bar").is_err());
-        assert!(TargetName::new("foo?bar").is_err());
         assert!(TargetName::new("foo_eqsb_bar").is_err());
-
-        if let Err(e) = TargetName::new("target[label]") {
-            let msg = format!("{e:#}");
-            assert!(msg.contains("found inner providers label when target names are expected. remove `[...]` portion of the target name from `target[label]`"), "{}", msg);
-        } else {
-            panic!("should have gotten an error")
-        }
+        assert!(
+            TargetName::new("src/output_tests/expected/into_bytes_enum.repr(C).expected.rs")
+                .is_ok()
+        );
     }
 
     #[test]

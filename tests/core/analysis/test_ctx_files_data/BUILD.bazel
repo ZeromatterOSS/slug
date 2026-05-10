@@ -1,6 +1,7 @@
 load(
     ":defs.bzl",
     "collect_from_deps",
+    "ctx_attr_source_targets",
     "expand_location_rule",
     "expand_rlocationpath_rule",
     "expand_rootpath_rule",
@@ -30,6 +31,11 @@ collect_from_deps(
 collect_from_deps(
     name = "files_from_source",
     deps = ["defs.bzl", "MODULE.bazel"],
+)
+
+ctx_attr_source_targets(
+    name = "ctx_attr_source_targets",
+    deps = ["defs.bzl", ":single_dep"],
 )
 
 # === ctx.file.dep gets single file from label dep ===

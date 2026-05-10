@@ -13,6 +13,51 @@ subsystems that currently diverge. Each phase is independently
 shippable. Each phase's "parity source" cites the exact Bazel source
 location that defines the target behaviour.
 
+## Latest Slice 2026-05-10: `ctx.attr` Source-File Targets
+
+The Plan 56 NativeShim depset-hashability slice cleared the
+`rules_rust+0.69.0/rust/private/rustc.bzl:1374 deps = depset(deps)` blocker.
+The next bounded SDK smoke advanced to:
+
+```text
+rules_rust+0.69.0/rust/private/rust.bzl:220
+compile_data_targets = depset(ctx.attr.compile_data)
+error: cannot add an item of type 'File' to a depset of 'Target'
+```
+
+This is a systemic Bazel label-attribute boundary, not a rules_rust special
+case. Bazel 9 docs define `attr.label_list` as a dependency attribute whose
+`ctx.attr` value is a list of `Target`s, and define `allow_files` as allowing
+`File` targets. Bazel 9 `ctx.files` is the projection
+`[f for t in ctx.attr.<ATTR> for f in t.files]`, while `ctx.file` is the
+single-file projection for `allow_single_file` label attrs. Therefore Kuro must
+not place raw `File` values in `ctx.attr` for Bazel `attr.label` /
+`attr.label_list` source-file entries. It should expose target-like source-file
+values with `DefaultInfo.files`, while preserving raw file values for Buck-style
+`attrs.source()` attributes.
+
+Parity references:
+
+- Bazel 9.0 `attr.label_list`: `ctx.attr` is a list of `Target`s and
+  `allow_files` allows `File` targets.
+- Bazel 9.0 `ctx.files`: a projection from `ctx.attr.<ATTR>` targets to files.
+- Bazel 9.0 `ctx.file`: the single-file projection for `allow_single_file`.
+- Bazel 9.0 label syntax: file target names are package-relative paths and
+  target-name punctuation includes characters such as `(` and `)`.
+
+Follow-up smoke after this source-file target change advanced past
+`rules_rust+0.69.0/rust/private/rust.bzl:220` and failed while creating a
+source-file target label for:
+
+```text
+src/output_tests/expected/into_bytes_enum.repr(C).expected.rs
+```
+
+Kuro's target-name validator still used an older, narrower punctuation set and
+rejected the parentheses. The systemic fix is to align `TargetName` validation
+with Bazel 9's target-name punctuation set so source file labels and rule target
+names share the same label grammar.
+
 ## Latest Slice 2026-05-09: cc_common LinkerInput depset eligibility
 
 The rules_cc `link_extra_lib` blocker from `/tmp/plan15-cc-list-hash-1.log`
@@ -2955,6 +3000,36 @@ This is a Plan 54-class depset/frozen-value boundary. Continue there by
 identifying which `rustc_compile_action` dependency value remains mutable and
 fixing the systemic freezing/hashability path without weakening depset
 validation or changing TransitiveSet streaming behavior.
+
+2026-05-10 follow-up: Plan 56 C++ provider hashability and Plan 15
+`ctx.attr` source-file target parity removed the `rustc.bzl:1374
+depset(deps)` mutable-value failure. A focused fixture confirms
+`attr.label_list(..., allow_files=True)` exposes both source files and rule deps
+as depset-eligible `Target` values, with source-file `DefaultInfo.files` and
+`ctx.files` projecting back to the underlying files.
+
+The next SDK smoke from `/var/mnt/dev/zeromatter`:
+
+```sh
+timeout 420s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan15-target-name-punctuation-zeromatter-1' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan15-target-name-punctuation-zeromatter-1 \
+      build //sdk:sdk_contents
+```
+
+timed out rather than failing. The old source-file `Target`/`File` mismatch and
+the rules_rust generated source path
+`src/output_tests/expected/into_bytes_enum.repr(C).expected.rs` target-name
+validation failure did not recur. The run was still making analysis progress
+near `crates__arrow-54.3.1//:arrow`, `zeromatter//sdk/zeromatter_ffi`, and related
+AWS/Arrow/Rust dependency targets; last sampled total RSS was ~873 MiB and max
+Kuro checkpoint RSS was ~815 MiB. The smoke wrapper killed the
+`kurod[zeromatter]` daemon after timeout, and no `kurod[...]` process
+remained.
 
 ## Dependencies and ordering
 

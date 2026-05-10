@@ -77,6 +77,51 @@ surface; this plan generalizes the model and naming.
    - bounded `//sdk:sdk_contents` smoke with `KURO_MEMORY_CHECKPOINTS=1`;
    - compare depset flattening checkpoints before and after the change.
 
+## Progress Notes
+
+### 2026-05-09: C++ NativeShim depset hashability boundary
+
+Fresh SDK reproduction was started with isolation
+`plan56-rustc-depset-frontier-1` from `/var/mnt/dev/zeromatter`.
+The known frontier is still treated as this plan's boundary issue:
+
+```text
+rules_rust+0.69.0/rust/private/rustc.bzl:1374
+deps = depset(deps)
+error: depset elements must not be mutable values
+```
+
+The Starlark shape at that site is not a raw mutable list/dict. `rules_rust`
+first calls `transform_deps`, which wraps each dependency target into a live
+`DepVariantInfo` provider. For C/C++ dependencies that provider carries a
+`cc_info` field. A focused Bazel 9.1.0 probe showed:
+
+- `depset([P(items = [], mapping = {})])` still fails with
+  `depset elements must not be mutable values`.
+- `depset([CcInfo()])` succeeds.
+- `depset([P(cc_info = CcInfo())])` also succeeds.
+
+So Kuro must not relax arbitrary mutable user-provider fields. The systemic
+fix is that C++ intrinsic provider values exposed through Kuro's NativeShim
+boundary, and ordinary `CcInfo` values, must be hashable/depset-eligible when
+they cross into wrappers such as `rules_rust`'s `DepVariantInfo`.
+
+A gated Kuro diagnostic on the same SDK frontier showed the remaining mutable
+value was not `DepVariantInfo` itself and not arbitrary user-provider
+mutability. The failing chain was:
+
+```text
+DepVariantInfo.cc_info
+  -> rules_cc CcInfo.compilation_context
+  -> rules_cc CcCompilationContextInfo._header_info
+  -> HeaderInfo
+```
+
+That `HeaderInfo` is produced by Kuro's implementation of
+`cc_common.internal_DO_NOT_USE.create_header_info`, so it is part of the same
+C++ intrinsic provider boundary. It must be hashable/depset-eligible when
+rules_cc stores it inside provider fields.
+
 ## Bazel Sources of Truth
 
 - C++ intrinsic provider semantics:

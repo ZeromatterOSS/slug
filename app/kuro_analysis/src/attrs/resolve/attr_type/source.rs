@@ -8,10 +8,16 @@
  * above-listed licenses.
  */
 
+use dupe::Dupe;
 use kuro_artifact::artifact::source_artifact::SourceArtifact;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
+use kuro_build_api::interpreter::rule_defs::provider::dependency::SourceFileTarget;
+use kuro_core::configuration::pair::Configuration;
 use kuro_core::package::source_path::SourcePath;
 use kuro_core::provider::label::ConfiguredProvidersLabel;
+use kuro_core::provider::label::ProvidersName;
+use kuro_core::target::label::label::TargetLabel;
+use kuro_core::target::name::TargetNameRef;
 use kuro_node::attrs::attr_type::source::SourceAttrType;
 use starlark::values::Value;
 use starlark::values::list::ListRef;
@@ -32,6 +38,18 @@ pub(crate) trait SourceAttrTypeExt {
     ) -> Value<'v> {
         ctx.heap()
             .alloc(StarlarkArtifact::new(SourceArtifact::new(path).into()))
+    }
+
+    fn resolve_single_file_target<'v>(
+        ctx: &mut dyn AttrResolutionContext<'v>,
+        path: SourcePath,
+        cfg_pair: &Configuration,
+    ) -> kuro_error::Result<Value<'v>> {
+        let target_name = TargetNameRef::new(path.path().as_str())?;
+        let target = TargetLabel::new(path.package(), target_name).configure_pair(cfg_pair.dupe());
+        let label = ConfiguredProvidersLabel::new(target, ProvidersName::Default);
+        let artifact = StarlarkArtifact::new(SourceArtifact::new(path).into());
+        Ok(ctx.heap().alloc(SourceFileTarget::new(label, artifact)))
     }
 
     fn resolve_label<'v>(

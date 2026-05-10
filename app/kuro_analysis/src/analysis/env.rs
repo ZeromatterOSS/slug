@@ -28,7 +28,7 @@ use kuro_build_api::analysis::registry::AnalysisRegistry;
 use kuro_build_api::interpreter::rule_defs::cmd_args::value::FrozenCommandLineArg;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisContext;
 use kuro_build_api::interpreter::rule_defs::context::ResolvedToolchains;
-use kuro_build_api::interpreter::rule_defs::context::synthetic_cc_toolchain_provider_collection;
+use kuro_build_api::interpreter::rule_defs::context::cc_toolchain_native_shim_provider_collection;
 use kuro_build_api::interpreter::rule_defs::provider::FrozenBuiltinProviderLike;
 use kuro_build_api::interpreter::rule_defs::provider::ValueAsProviderLike;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
@@ -1860,9 +1860,9 @@ async fn run_analysis_with_env_underlying(
                                         "analysis_start",
                                         evaluate_rule_started,
                                     );
-                                    let use_synthetic_cc_toolchain =
+                                    let use_cpp_native_shim =
                                         is_cpp_toolchain_type_label(type_label);
-                                    if use_synthetic_cc_toolchain {
+                                    if use_cpp_native_shim {
                                         analysis_ctx_toolchain_provider_checkpoint(
                                             &analysis_env.label,
                                             type_label,
@@ -1873,10 +1873,10 @@ async fn run_analysis_with_env_underlying(
                                             is_mandatory,
                                             is_self_dependency,
                                             8,
-                                            "cc_toolchain_synthetic",
+                                            "cc_toolchain_native_shim",
                                             evaluate_rule_started,
                                         );
-                                        Some(synthetic_cc_toolchain_provider_collection(
+                                        Some(cc_toolchain_native_shim_provider_collection(
                                             &tc.toolchain_impl,
                                         ))
                                     } else {
