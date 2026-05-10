@@ -13,6 +13,285 @@ subsystems that currently diverge. Each phase is independently
 shippable. Each phase's "parity source" cites the exact Bazel source
 location that defines the target behaviour.
 
+## Latest Slice 2026-05-09: cc_common LinkerInput depset eligibility
+
+The rules_cc `link_extra_lib` blocker from `/tmp/plan15-cc-list-hash-1.log`
+was another instance of cc_common value objects carrying Bazel-immutable data
+through Kuro live Starlark list values:
+
+```text
+contexts_to_merge.append(cc_common.create_linking_context(linker_inputs = depset([linker_input])))
+error: depset elements must not be mutable values
+```
+
+Kuro still validates direct depset elements with `Value::get_hashed()` and
+still rejects raw mutable lists/dicts. The narrow fix is on cc_common value
+objects: `CompilationOutputs`, `LibraryToLink`, and `LinkerInput` hash their
+cc_common-owned list/tuple fields by content, so those provider values are
+depset-eligible without making arbitrary mutable lists depset-eligible.
+`_cc_internal.freeze` continues to return Starlark lists for list/tuple inputs
+because rules_cc relies on Bazel's list type and `list + list` behavior.
+
+Do not revive the unsafe frozen-heap copying experiment. It attempted to force
+live heap values through Starlark `Freezer` from analysis-time code and caused
+`assertion failed: !self.is_forward()` panics. The parity-compatible direction
+is explicit immutable/hashable cc_common value representation, not globally
+relaxing depset validation or copying live values into a frozen heap.
+
+Focused coverage added/updated in
+`app/kuro_build_api_tests/src/interpreter/rule_defs/cc_common.rs`:
+
+- `_cc_internal.freeze` preserves list type and `+` behavior for list, tuple,
+  depset-derived values, and `CompilationOutputs`.
+- `cc_common.create_linker_input` accepts a `Label` owner, library depset,
+  nested user link flag lists, and additional-input depset, then allows
+  `depset([linker_input])` and `create_linking_context(linker_inputs = ...)`.
+- Existing depset tests continue to reject raw mutable list/dict elements.
+
+## Previous Frontier 2026-05-09: rules_cc `tuple + list` in C++ link action
+
+The Plan 44/BazelOutput path slice cleared the glibc `select_file` blocker.
+`ctx.actions.declare_file` and `declare_directory` now use Bazel-shaped
+generated output paths without the `__<target>__/` segment, including external
+repo package paths. Focused verification:
+
+- `pytest -q tests/core/analysis/test_ctx_actions.py::test_actions_declare_file_bazel_path_shape tests/core/analysis/test_ctx_actions.py::test_actions_declare_file_external_bazel_path_shape tests/core/analysis/test_ctx_actions.py::test_actions_declare_directory_bazel_path_shape tests/core/analysis/test_ctx_actions.py::test_actions_declare_directory_external_bazel_path_shape`
+- `pytest -q tests/core/analysis/test_cmd_args.py::test_args_add_all_map_each_sequence_returns tests/core/analysis/test_cmd_args.py::test_args_add_joined_map_each_sequence_returns tests/core/analysis/test_cmd_args.py::test_args_depset_add_all_transforms tests/core/analysis/test_cmd_args.py::test_args_depset_add_joined_transforms`
+- `cargo test -p kuro_build_api_tests --lib interpreter::rule_defs::cmd_args::tests::map_each_sequence_returns_expand_as_items`
+- `cargo build -p kuro`
+- `git diff --check`
+
+Fresh bounded smoke from `/var/mnt/dev/zeromatter`:
+
+```sh
+bash -o pipefail -c 'timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep '\''kurod\[zeromatter\].*plan44-bazel-output-path-1'\'' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan44-bazel-output-path-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan44-bazel-output-path-1.log'
+```
+
+Outcome: Kuro exited status `3` after 158s
+(`memory_smoke_summary elapsed_s=158 peak_rss_kib=802136 final_rss_kib=644308`).
+The previous `bazel_skylib+1.9.0/rules/select_file.bzl:36` failure for
+`llvm+0.7.0//runtimes/glibc:libc.s` did not recur. The run advanced through
+glibc shared library selection and failed later in rules_cc dynamic linking:
+
+```text
+bazel-external/rules_cc+0.2.17/cc/private/link/cpp_link_action.bzl:127
+object_files = object_files + additional_object_files
+error: Operation `+` not supported for types `tuple` and `list`
+```
+
+The concrete next blocker is systemic Bazel-compatible sequence `+` behavior
+for Starlark tuples/lists in rules_cc, not a rules_cc target-name workaround.
+There was also a side warning from `@rules_rs//rs:extensions.bzl%crate` about
+missing root `Cargo.toml` metadata for `diplomat`; the terminal build failure
+is the rules_cc tuple/list operation above.
+
+## Previous Frontier 2026-05-09: glibc `select_file` cannot find `libc.s`
+
+The rules_cc `cmd_args.add_all(map_each=...)` tuple-output blocker is cleared.
+Kuro now expands list and tuple values returned by `map_each` for
+`cmd_args.add_all`/`add_joined`, preserves scalar values as single command-line
+items, skips `None`, and keeps the deferred depset streaming path gated on the
+no-transform case.
+
+Focused verification:
+
+- `cargo fmt -- app/kuro_build_api/src/interpreter/rule_defs/cmd_args/typ.rs app/kuro_build_api_tests/src/interpreter/rule_defs/cmd_args/tests.rs`
+- `cargo test -p kuro_build_api_tests map_each_sequence_returns_expand_as_items -- --nocapture`
+- `pytest -q tests/core/analysis/test_cmd_args.py -k map_each`
+- `cargo build -p kuro`
+- `git diff --check`
+
+Fresh bounded smoke from `/var/mnt/dev/zeromatter`:
+
+```sh
+bash -o pipefail -c 'timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep '\''kurod\[zeromatter\].*plan15-map-each-seq-1'\'' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan15-map-each-seq-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan15-map-each-seq-1.log'
+```
+
+Outcome: Kuro exited status `3` after 190s
+(`memory_smoke_summary elapsed_s=190 peak_rss_kib=891896 final_rss_kib=668632`).
+The previous
+`rules_cc+0.2.17/cc/private/rules_impl/cc_static_library.bzl:174`
+`tuple (repr: ())` failure did not recur. The run advanced through the C++
+toolchain/glibc path and failed in
+`bazel_skylib+1.9.0/rules/select_file.bzl:36` while analyzing
+`llvm+0.7.0//runtimes/glibc:libc.s`:
+
+```text
+fail("Can not find specified file in [%s]" % files_str)
+error: fail: Can not find specified file in [
+  buck-out/v2/gen/llvm+0.7.0/.../__generate_glibc_stubs__/build/c.s,
+  buck-out/v2/gen/llvm+0.7.0/.../__generate_glibc_stubs__/build/dl.s,
+  ...
+  buck-out/v2/gen/llvm+0.7.0/.../__generate_glibc_stubs__/build/all.map]
+```
+
+The concrete next blocker is systemic file/path selection parity for generated
+outputs consumed by `bazel_skylib` `select_file`, not a target-name workaround.
+Investigate how Bazel represents the requested `libc.s` file from
+`generate_glibc_stubs` relative to the listed generated outputs and fix Kuro's
+artifact/path matching or output-group/default-output behavior accordingly.
+
+## Previous Frontier 2026-05-09: rules_cc `cmd_args.add_all(map_each=...)` tuple output
+
+The `with_cfg` provider-key blocker is cleared. A focused provider collection
+regression now covers native provider keys:
+
+- `cargo fmt -- app/kuro_build_api_tests/src/interpreter/rule_defs/provider/collection.rs`
+- `cargo test -p kuro_build_api_tests provider_collection_contains_native_provider_keys -- --nocapture`
+- `cargo test -p kuro_build_api_tests provider_collection_contains_methods_and_in_operator -- --nocapture`
+- `cargo test -p kuro_build_api_tests test_schema_provider_missing_fields_are_absent -- --nocapture`
+- `pytest -q tests/core/configurations/test_configuration_dep_uquery_correctness.py`
+- `pytest -q tests/core/configurations/transition/test_attr.py`
+- `cargo build -p kuro`
+- `git diff --check`
+
+Additional note: `pytest -q
+tests/core/configurations/transition/test_select_in_transition_attr.py` ran 3/4
+passing; the only failure was the expected-failure regex still looking for
+`old: root//:iphone#...` while Kuro now prints `old: //:iphone#...`.
+
+Fresh bounded smoke from `/var/mnt/dev/zeromatter`:
+
+```sh
+bash -o pipefail -c 'timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep '\''kurod\[zeromatter\].*plan15-provider-callable-1'\'' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan15-provider-callable-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan15-provider-callable-1.log'
+```
+
+Outcome: Kuro exited status `3` after 184s
+(`memory_smoke_summary elapsed_s=184 peak_rss_kib=902404 final_rss_kib=710988`).
+The previous
+`with_cfg/private/transitioning_alias.bzl:55 if provider in target` /
+`AnalysisTestResultInfo ... got function` failure did not recur. The run
+advanced through the glibc `with_cfg` alias and failed later under
+`rules_cc+0.2.17/cc/private/rules_impl/cc_static_library.bzl:174`:
+
+```text
+args = actions.args().add_all(linker_inputs, map_each = map_each)
+error: Expected `CellPath | CellRoot | File | Label | OutputArtifact |
+ProjectRoot | ResolvedStringWithMacros | TaggedCommandLine | TargetLabel |
+TransitiveSetArgsProjection | WriteJsonCliArgs | cmd_args | str | list |
+RunInfo`, but got `tuple (repr: ())`
+```
+
+The concrete next blocker is systemic `cmd_args.add_all(map_each=...)` return
+parity. In this rules_cc path `_linkopts_map_each(linker_input)` returns
+`linker_input.user_link_flags`, which can be an empty tuple. Next owner should
+teach Kuro's `cmd_args.add_all` map_each handling to accept Bazel-compatible
+sequence outputs, especially tuples, instead of special-casing this target.
+
+## Previous Frontier 2026-05-09: C++ toolchain `with_cfg` provider lookup
+
+The Rust toolchain type label canonicalization blocker is cleared. Kuro now
+normalizes Bzlmod module-version canonical repo names while indexing
+`ctx.toolchains`, so the provider resolved under
+`@@rules_rust//rust:toolchain_type` is found when rules_rust looks up
+`@@rules_rust+0.69.0//rust:toolchain_type`.
+
+Focused verification:
+
+- `cargo fmt -- app/kuro_build_api/src/interpreter/rule_defs/context.rs`
+- `cargo test -p kuro_build_api toolchain_type_lookup --lib`
+- `cargo test -p kuro_analysis test_normalize_constraint_label --lib`
+- `cargo build -p kuro`
+- `git diff --check`
+
+Fresh bounded smoke from `/var/mnt/dev/zeromatter`:
+
+```sh
+bash -o pipefail -c 'timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep '\''kurod\[zeromatter\].*plan15-toolchain-label-canon-1'\'' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan15-toolchain-label-canon-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan15-toolchain-label-canon-1.log'
+```
+
+Outcome: Kuro exited status `3` after 164s
+(`memory_smoke_summary elapsed_s=164 peak_rss_kib=785084 final_rss_kib=605488`).
+The prior `Toolchain type '@@rules_rust+0.69.0//rust:toolchain_type' was not
+resolved` error did not recur. The run advanced into the C++ toolchain path:
+
+```text
+Failed to analyze mandatory toolchain impl
+'llvm+toolchain+llvm_toolchains//:linux_x86_64_cc_toolchain'
+for toolchain type '@@bazel_tools//tools/cpp:toolchain_type'
+```
+
+The concrete next blocker is a provider collection indexing error under
+`with_cfg.bzl+0.12.0/with_cfg/private/transitioning_alias.bzl:51` while
+analyzing the glibc C++ toolchain dependency chain:
+
+```text
+ctx.attr.exports[0]
+provider collection operation [] parameter type must be a provider type but not
+and instance of provider (for example, `RunInfo` or user defined provider type),
+got `int`
+```
+
+Next owner should fix provider collection `[]`/dependency indexing parity for
+transitioning aliases and provider forwarding in the `with_cfg`/glibc toolchain
+path. Avoid target-name special cases and preserve depset validation.
+
+Previous frontier, now cleared:
+
+```sh
+bash -o pipefail -c 'timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep '\''kurod\[zeromatter\].*plan54-configured-gather-probe-1'\'' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan54-configured-gather-probe-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan54-configured-gather-probe-1.log'
+```
+
+Outcome: Kuro exited status `3` after 158s
+(`memory_smoke_summary elapsed_s=158 peak_rss_kib=653752 final_rss_kib=578572`).
+The run reached `zeromatter//sdk:sdk_contents` analysis deps, completed configured
+node/gather-deps for the SDK aggregation chain, reached
+`rules_rust//ffi/rs:empty_allocator_libraries`, completed toolchain resolution,
+and then failed in `ctx.toolchains`:
+
+```text
+Toolchain type '@@rules_rust+0.69.0//rust:toolchain_type' was not resolved.
+Ensure the toolchain is registered via register_toolchains() and the rule declares it in toolchains=[...]
+```
+
+The instrumentation shows Kuro resolved/analyzed a provider for
+`@@rules_rust//rust:toolchain_type`, while Starlark later looked up
+`@@rules_rust+0.69.0//rust:toolchain_type` from
+`Label("//rust:toolchain_type")` in
+`rules_rust+0.69.0/rust/private/utils.bzl`. This was fixed by normalizing
+Bzlmod module-version repo names in `ctx.toolchains` lookup; do not reintroduce
+target-name special cases or weaken depset validation.
+
 This plan supersedes two prior workarounds:
 - kuro's "using lockfile specs anyway" digest-mismatch fallback
   (masked Bazel-compat bugs elsewhere — remove).
@@ -472,6 +751,435 @@ Target:
 - `@rules_cc//cc/common/cc_helper.bzl:583` (`_lookup_var` — order:
   `additional_vars` first, then `ctx.var`)
 - Bazel CcToolchain impl: `src/main/java/com/google/devtools/build/lib/rules/cpp/`
+
+### 15.5.2 CC toolchain analysis dependency cycle (PARTIAL 2026-05-09)
+
+Plan 51's 2026-05-09 `ctx.toolchains` await instrumentation narrowed the
+zeromatter `//sdk:sdk_contents` low-RSS stall to C++ toolchain analysis, not
+memory growth.
+
+Evidence from `/tmp/plan51-toolchain-await-1-memory.log`:
+
+- The stuck displayed frontier remains
+  `rules_rust+0.69.0//ffi/rs:empty_allocator_libraries (...) -- running
+  analysis [evaluate_rule]`.
+- `empty_allocator_libraries` waits while preparing `ctx.toolchains` provider
+  values. Its target-configuration edge waits on
+  `rules_rust+rust+rust_linux_x86_64__x86_64-unknown-linux-gnu__stable_tools//:rust_toolchain`;
+  that Rust toolchain then waits on
+  `llvm+toolchain+llvm_toolchains//:linux_x86_64_cc_toolchain`.
+- `analysis_key_start` appears for
+  `llvm+toolchain+llvm_toolchains//:linux_x86_64_cc_toolchain` in both
+  configurations, but neither key reaches `analysis_deps_ready` or
+  `analysis_evaluate_rule_phase`.
+- Several support/header targets that are likely dependencies of the LLVM
+  `cc_toolchain` also wait on the same C++ toolchain provider, including
+  `bazel_tools//tools/cpp:malloc`,
+  `bazel_tools//tools/cpp:link_extra_lib`,
+  `rules_cc+0.2.17//:link_extra_lib`,
+  `glibc_headers_x86_64-linux-gnu.2.28//:gnu_libc_headers`, and
+  `linux_kernel_headers_x86.4.19.325//:kernel_headers`.
+
+Working hypothesis:
+
+Kuro's eager `ctx.toolchains` provider construction plus minimal native
+`cc_toolchain` handling creates a cycle:
+`cc_toolchain` analysis needs deps such as C++ header/support `cc_library`
+targets; those targets prepare `ctx.toolchains`; provider construction asks
+DICE for the same configured `cc_toolchain` analysis result.
+
+2026-05-09 refresh from `/tmp/plan68-label-tool-2.log`: after Plan 36's
+`repository_ctx.execute([Label(...)])`/`use_repo_rule` dynamic-cell fix,
+zeromatter `//sdk:sdk_contents` advanced past the previous `toml2json`
+ENOENT and stale `crates__clap-4.5.60//:clap` zero-target failures. The
+bounded smoke timed out at the same `rules_rust//ffi/rs:empty_allocator_libraries`
+analysis wait, with the target stuck after `toolchain_resolution_start` and
+before later rule implementation phases. Continue this blocker under the
+toolchain-analysis cycle investigation rather than extension spoke
+materialization.
+
+Next work:
+
+1. Compare Bazel's `cc_toolchain` analysis dependency shape for this LLVM
+   toolchain. In particular, determine whether support deps are analyzed before
+   the C++ toolchain provider is available, or whether native C++ toolchain
+   analysis treats them specially.
+2. Implement the Bazel-parity behavior in Kuro's C++ toolchain path. Likely
+   candidates are real native `cc_toolchain` provider construction, lazy
+   `ctx.toolchains` provider realization, or a cycle-safe treatment for C++
+   toolchain implementation/support deps.
+3. Re-run the Plan 51 zeromatter smoke after the C++ toolchain cycle is fixed.
+
+2026-05-09 Plan 15 slice:
+
+- Added active-analysis-key tracking and used it while constructing
+  `ctx.toolchains` provider values. If the requested toolchain type is
+  Bazel's C++ toolchain type and the selected implementation target is already
+  in analysis, Kuro now returns a cycle-safe minimal C++ toolchain provider for
+  that `ctx.toolchains` access instead of awaiting the same configured
+  `cc_toolchain` key. Normal non-cyclic C++ toolchain provider construction
+  still analyzes the selected toolchain implementation through DICE.
+- Added the minimal provider surface needed by rules_cc support deps inside
+  the cycle: `ToolchainInfo(cc=..., cc_provider_in_toolchain=True)` plus a
+  direct `CcToolchainInfo` provider exposing empty file depsets, basic tool
+  path strings, empty `CcInfo`, empty feature data, and C++ fragment defaults.
+- Bounded zeromatter smoke:
+
+  ```sh
+  timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan15-cc-toolchain-cycle-1 \
+      build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan15-cc-toolchain-cycle-1-memory.log
+  ```
+
+  The run no longer stalls at the previous low-RSS
+  `llvm+toolchain+llvm_toolchains//:linux_x86_64_cc_toolchain` await
+  frontier. The log records `active_cc_toolchain_synthetic` for
+  `bazel_tools//tools/cpp:link_extra_lib` and
+  `rules_cc+0.2.17//:link_extra_lib` in both observed configurations, and the
+  build advances into rules_cc analysis.
+- Plan 54's 2026-05-09 cc provider immutability slice fixed that remaining
+  `LinkerInput` depset element failure. A small follow-on in this Plan 15
+  area also aligned the synthetic `CcToolchainInfo` cycle-breaker callback
+  method names with rules_cc's keyword-only API
+  (`feature_configuration`, not `_feature_configuration`) for
+  `needs_pic_for_dynamic_libraries`, `static_runtime_lib`, and
+  `dynamic_runtime_lib`.
+- Latest bounded zeromatter smoke:
+
+  ```sh
+  timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan54-cc-provider-immutability-3 \
+      build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan54-cc-provider-immutability-3-memory.log
+  ```
+
+  The build no longer fails at `rules_cc+0.2.17//:link_extra_lib` with mutable
+  depset elements and no longer fails on the synthetic C++ toolchain method
+  signature. The later rules_cc `implementation_deps` gate has also been
+  addressed in the 2026-05-09 Plan 54 follow-up: Bazel 9 defaults
+  `--experimental_cc_implementation_deps` to true, and Kuro now preserves,
+  parses, propagates, and exposes the flag through
+  `ctx.fragments.cpp.experimental_cc_implementation_deps()`.
+
+  Latest bounded smoke:
+
+  ```sh
+  timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan54-cc-implementation-deps-1 \
+      build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan54-cc-implementation-deps-1.log
+  ```
+
+  That run advanced past the old `requires
+  --experimental_cc_implementation_deps` failure and reached
+  `zeromatter//sdk:sdk_contents` analysis. The next observed frontier is no
+  longer C++ implementation deps: rules_rs's `@rules_rs//rs:extensions.bzl%crate`
+  extension failed to execute `toml2json` from
+  `rules_rs+override/rs/private/toml2json.bzl:6` with `No such file or
+  directory`, then the bounded client timed out in the daemon wait loop.
+
+  2026-05-09 Label execute follow-up:
+
+  ```sh
+  set -o pipefail
+  timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan55-label-execute-1 \
+      build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan55-label-execute-1.log
+  ```
+
+  The previous rules_rs `toml2json.bzl:6` `ctx.execute([Label(...), ...])`
+  `No such file or directory` failure no longer appears. The run still
+  timed out after reaching `zeromatter//sdk:sdk_contents` analysis; the
+  latest visible frontier is the same low-activity daemon wait pattern
+  after `aspect_tools_telemetry+telemetry+aspect_tools_telemetry_report`
+  stubs and later package/interpreter work. Continue from the timeout
+  rather than reopening the C++ implementation-deps or toml2json slices.
+
+  2026-05-09 `repository_ctx.workspace_root` follow-up:
+
+  ```sh
+  set -o pipefail
+  timeout 90s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan55-workspace-root-2 \
+      build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan55-workspace-root-2.log
+  ```
+
+  Kuro now passes the invocation workspace root to repository rules for
+  `repository_ctx.workspace_root`, matching Bazel's
+  `StarlarkRepositoryContext.getWorkspaceRoot()` behavior while keeping
+  relative `repository_ctx.path("...")` resolution anchored in the generated
+  repository directory. The old `toml2json` failure remains gone. The run
+  reached later extension/repository-rule work and then failed with a daemon
+  event-bus broken pipe after earlier rules_kotlin provider-field and Gazelle
+  repo-rule failures. The next narrow parity blocker is provider field
+  presence: rules_kotlin expects `hasattr(provider_instance,
+  "strip_prefix_template")` to be false when that optional provider field was
+  not supplied, but Kuro currently exposes it as present with value `None`.
+
+  2026-05-09 provider-field presence follow-up:
+
+  Bazel 9 parity was checked against
+  `src/main/java/com/google/devtools/build/lib/packages/StarlarkInfoWithSchema.java`
+  and `src/main/java/net/starlark/java/eval/Starlark.java`, plus a focused
+  Bazel 9.1.0 repro. Missing optional schema provider fields are absent from
+  `dir`, make `hasattr` false, and make `getattr(x, name, default)` return the
+  fallback; explicitly supplied `None` remains present. Kuro now tracks provider
+  field presence separately from the stored field value in
+  `app/kuro_build_api/src/interpreter/rule_defs/provider/user.rs`, treats
+  Bazel-style list/doc schema fields as optional in
+  `app/kuro_build_api/src/interpreter/rule_defs/provider/callable.rs`, and has
+  focused tests in
+  `app/kuro_build_api_tests/src/interpreter/rule_defs/provider/tests.rs`.
+
+  Verification passed:
+
+  ```sh
+  cargo fmt
+  cargo test -p kuro_build_api_tests creates_providers -- --nocapture
+  cargo test -p kuro_build_api_tests test_schema_provider_missing_fields_are_absent -- --nocapture
+  cargo test -p kuro_build_api_tests test_runtime_constructor_error_on_missing_required -- --nocapture
+  cargo test -p kuro_build_api_tests interpreter::rule_defs::provider::tests -- --nocapture
+  cargo check -p kuro_build_api
+  cargo build -p kuro
+  git diff --check
+  ```
+
+  A broader provider-filter test still has the pre-existing unrelated
+  `interpreter::rule_defs::provider::builtin::validation_spec::test_attributes`
+  artifact-path golden mismatch.
+
+  Bounded zeromatter smoke:
+
+  ```sh
+  set -o pipefail
+  LOG=/tmp/plan56-provider-presence-1.log
+  ISOLATION=plan56-provider-presence-1
+  timeout 120s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir "$ISOLATION" \
+      build //sdk:sdk_contents \
+    2>&1 | tee "$LOG"
+  ```
+
+  The smoke timed out with exit 124, but the prior rules_kotlin
+  `strip_prefix_template` provider-field failure is gone. The next visible
+  frontier is waiting on
+  `crates__github.com_ZeroMatter_diplomat.git_99406ff1//runtime` package file
+  tree loading, with Gazelle `go_repository` cache/stub failures and non-host
+  JDK download timeouts as concurrent later noise.
+
+2026-05-09 follow-up slice:
+
+- Investigated the apparent
+  `crates__github.com_ZeroMatter_diplomat.git_99406ff1//runtime` package-file
+  tree stall. The package itself was missing from a stubbed extension repo, but
+  the actual stall was Kuro's missing-directory diagnostic path:
+  `extended_ignore_error` scanned every registered cell looking for same-path
+  suggestions. Metadata probes on extension cells call `get_file_ops_delegate`,
+  which can lazily materialize unrelated repos, explaining the concurrent
+  Gazelle and JDK fetch noise. Bazel 9 package loading diagnostics do not fetch
+  unrelated repositories to generate "did you mean another cell?" suggestions.
+- Fixed the diagnostic path in `app/kuro_common/src/file_ops/error.rs` by
+  skipping external cells during cross-cell missing-path suggestion probes.
+  Focused coverage:
+
+  ```sh
+  cargo test -p kuro_common missing_path_suggestion_probe_skips_external_cells -- --nocapture
+  ```
+
+- Rebuilt and reran a targeted repro:
+
+  ```sh
+  cd /var/mnt/dev/zeromatter
+  timeout 30s /var/mnt/dev/kuro/target/debug/kuro \
+    --isolation-dir plan57-diplomat-targeted-after \
+    build @crates__github.com_ZeroMatter_diplomat.git_99406ff1//runtime:all
+  ```
+
+  It now fails quickly with the real missing-package error instead of waiting
+  while materializing unrelated repos.
+- Bounded zeromatter smoke:
+
+  ```sh
+  set -o pipefail
+  LOG=/tmp/plan57-missing-dir-suggestion-1.log
+  ISOLATION=plan57-missing-dir-suggestion-1
+  timeout 120s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir "$ISOLATION" \
+      build //sdk:sdk_contents \
+    2>&1 | tee "$LOG"
+  ```
+
+  The smoke advanced past the prior diplomat package-file-tree wait and reached
+  `zeromatter//sdk:sdk_contents` analysis. It failed later at
+  `platforms+1.1.0//:BUILD` because `module_version()` is missing as a
+  BUILD-file global:
+
+  ```text
+  error: Variable `module_version` not found
+   --> bazel-external/platforms+1.1.0/BUILD:21:10
+  ```
+
+2026-05-09 BUILD module metadata globals follow-up:
+
+- Bazel 9 parity source: `StarlarkNativeModule.BINDINGS_FOR_BUILD_FILES`
+  adds every non-rule native-module method directly to BUILD-file globals, and
+  `StarlarkGlobalsImpl.getFixedBuildFileToplevelsSharedWithNative()` returns
+  that binding map. The `module_name()` / `module_version()` implementations
+  in `StarlarkNativeModule` read `TargetDefinitionContext`'s associated module
+  name/version. Kuro already exposed `native.module_name()` and
+  `native.module_version()`, but omitted the direct BUILD global forms.
+- Fixed the systemic gap in
+  `app/kuro_interpreter_for_build/src/interpreter/functions/path.rs` by adding
+  direct BUILD globals `module_name()` and `module_version()` backed by the same
+  cell/module metadata used by `native.*`.
+- Focused coverage in `tests/core/analysis/test_build_globals.py` now verifies:
+  direct root BUILD globals (`root@1.2.3`), matching native-module values, and
+  direct globals while evaluating a local external bzlmod module repo via
+  `@dep`.
+- Verification:
+
+  ```sh
+  cargo fmt
+  cargo check -p kuro_interpreter_for_build
+  cargo build -p kuro
+  pytest tests/core/analysis/test_build_globals.py::test_module_metadata_direct_globals \
+    tests/core/analysis/test_build_globals.py::test_module_metadata_native_globals \
+    tests/core/analysis/test_build_globals.py::test_external_module_metadata_direct_globals -q
+  git diff --check
+  ```
+
+- Bounded zeromatter smoke:
+
+  ```sh
+  cd /var/mnt/dev/zeromatter
+  timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan58-module-build-globals-1 \
+      build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan58-module-build-globals-1.log
+  ```
+
+  The smoke failed quickly with exit 3, but the previous
+  `platforms+1.1.0//:BUILD` `module_version()` missing-symbol error is gone.
+  The log shows `platforms+1.1.0` targets reaching analysis. The next observed
+  blocker is a missing package in another generated crate repo:
+
+  ```text
+  package `crates__github.com_Aleph-Alpha_ts-rs.git_a6bbbd18//ts-rs:` does not exist
+  dir `crates__github.com_Aleph-Alpha_ts-rs.git_a6bbbd18//ts-rs` does not exist.
+  ```
+
+2026-05-09 symbolic macro inherited-attrs follow-up:
+
+- Plan 55 fixed Kuro's missing symbolic macro `inherit_attrs = <rule>` handling
+  for omitted inherited attrs. The immediate ZeroMatter failure was
+  `copy_to_resource_directory(...): Missing parameter target_triple`, where
+  `target_triple` came from an inherited `attr.string()` on the backing rule.
+  Kuro now stores `inherit_attrs`, injects omitted inherited rule attrs into
+  the macro implementation call, and preserves `StarlarkAttribute` implicit
+  default metadata so omitted inherited `attr.string()` becomes `None` for the
+  macro implementation while normal rule attr coercion still sees the existing
+  coerced default.
+- Focused verification passed:
+
+  ```sh
+  cargo fmt -- app/kuro_interpreter_for_build/src/rule.rs \
+    app/kuro_interpreter_for_build/src/macro_callable.rs \
+    app/kuro_interpreter_for_build/src/interpreter/natives.rs
+  cargo check -p kuro_interpreter_for_build
+  cargo test -p kuro_build_api_tests map_each_sequence_returns_expand_as_items -- --nocapture
+  cargo build -p kuro
+  pytest -q tests/core/analysis/test_symbolic_macros.py::test_symbolic_macro_inherited_rule_attr_default
+  git diff --check
+  ```
+- Bounded ZeroMatter smoke:
+
+  ```sh
+  timeout 260s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+      --interval 5 \
+      --include-pgrep 'kurod\[zeromatter\].*plan55-symbolic-macro-inherit-1' \
+      -- /var/mnt/dev/kuro/target/debug/kuro \
+        --isolation-dir plan55-symbolic-macro-inherit-1 \
+        build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan55-symbolic-macro-inherit-1.log
+  ```
+
+  The old `copy_to_resource_directory` / missing `target_triple` load-time
+  error is gone. The smoke timed out with exit `124` after reaching analysis;
+  sampled total RSS peaked around `864 MiB`. Latest visible frontier returned
+  to the C++ toolchain-analysis wait shape:
+
+  ```text
+  Waiting on bazel_tools//tools/cpp:malloc (...#8d4033f8c19b9f73) -- running analysis [evaluate_rule], and 9 other actions
+  ```
+
+  Continue under the Plan 15 C++ toolchain-analysis/cycle investigation rather
+  than reopening the symbolic-macro inherited-attrs blocker.
+
+### 15.5.1.1 Repository-rule path/delete parity for generated git crate repos (2026-05-09)
+
+- Follow-up on the missing
+  `crates__github.com_Aleph-Alpha_ts-rs.git_a6bbbd18//ts-rs` package from the
+  previous smoke.
+- Compared Bazel 9.1.0 behavior with focused repository-rule repros:
+  `repository_ctx.path(".")` stringifies to the absolute external repository
+  path; `ctx.delete(ctx.path("."))` returns `False` when the root is absent,
+  deletes the repository root and returns `True` when it is present; and
+  `ctx.execute(..., working_directory = str(ctx.path(".")))` creates a missing
+  working directory before launching the command.
+- Kuro parity changes:
+  - `RepositoryPath` display now uses the normalized absolute path.
+  - `repository_ctx.execute` creates missing working directories and treats
+    `environment = {"KEY": None}` as an unset request.
+  - `repository_ctx.delete` returns a bool and normalizes paths before removal,
+    avoiding `remove_dir_all("repo/.")` `EINVAL`.
+  - Extension repo lazy materialization now discards prior stub markers when a
+    valid RepoSpec is present, so a shared `bazel-external/` stub from an earlier
+    failed run does not mask the real repo rule.
+  - Repo-rule diagnostic summaries are wider so failures include the actionable
+    Starlark frame and filesystem/command error.
+- Verification:
+
+  ```sh
+  cargo fmt
+  cargo test -p kuro_interpreter_for_build repository_ctx::tests::test_ --lib
+  cargo test -p kuro_external_cells extension_repo::tests::stub_marker_detection_accepts_plain_and_hashed_stubs --lib
+  cargo check -p kuro_interpreter_for_build
+  cargo build -p kuro
+  ```
+
+- Bounded zeromatter smoke:
+
+  ```sh
+  cd /var/mnt/dev/zeromatter
+  timeout 240s env KURO_MEMORY_CHECKPOINTS=1 \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan64-repoctx-delete-root-2 \
+      build //sdk:sdk_contents \
+    2>&1 | tee /tmp/plan64-repoctx-delete-root-2.log
+  ```
+
+  The smoke still failed, but advanced past the previous missing `ts-rs`
+  package: the generated git crate repo materialized and
+  `ts-rs/BUILD.bazel` exists. The next observed blocker is canonical load-label
+  parity for an apparent repo name in that generated BUILD file:
+
+  ```text
+  Error loading `load` of `@crates__ts-rs-12.0.1//:crate.bzl`
+  The `load` ... of `crates__ts-rs-12.0.1//crate.bzl` should use the canonical name
+  `rules_rs+crate+crates__ts-rs-12.0.1//crate.bzl`
+  ```
 
 **Est. effort:** 2-3 days for (1) + (2a); 1-2 weeks for (2b).
 
@@ -1904,6 +2612,339 @@ stores the `StarlarkDefinedConfigTransition` inline on the `Rule`
 class; lookup is by direct reference, not by module path + global
 name. Kuro's detour through `(path, name)` is a kuro-specific
 approximation that doesn't handle inline definitions.
+
+## Bzlmod Load Labels and Apparent Repository Names
+
+**Status:** fixed for the current zeromatter blocker on 2026-05-09.
+
+**Observed.** A generated rules_rs git crate repo contained:
+
+```
+load("@crates__ts-rs-12.0.1//:crate.bzl", "crate")
+```
+
+Kuro resolved that load to the canonical repo
+`rules_rs+crate+crates__ts-rs-12.0.1`, then rejected the apparent
+spelling with the Buck-era "should use the canonical name" guard.
+Bazel accepts this pattern because single-`@` repo names are apparent
+names interpreted in the context repo's repository mapping.
+
+**Parity source.**
+
+- `Label.parseWithPackageContext` rewrites a present `@repo` through
+  `packageContext.repoMapping()`.
+- `BzlLoadFunction.getRepositoryMapping()` uses
+  `RepositoryMappingValue.key(repoName)` for `.bzl` loads.
+- `ModuleExtensionRepoMappingEntriesFunction` gives a repo generated
+  by a module extension mappings for all repos generated by the same
+  extension, keyed by their internal names, plus mappings visible to
+  the module hosting the extension.
+
+**Kuro fix.** In bzlmod load resolution, equivalent apparent/canonical
+cells are now accepted, and the resolved `CellPath` is rewritten to
+the reformed canonical path before constructing the load module path.
+This preserves canonical `.bzl` identity while allowing Bazel-valid
+apparent load labels from generated external BUILD files.
+
+**2026-05-09 zstd label follow-up.** The first smoke read of
+`/tmp/plan66-label-shorthand-zstd-1.log` was incomplete. The corrected
+blocker was not just `zstd+1.5.7//:zstd+1.5.7`: the run eventually
+failed coercing `crates__zstd-sys-2.0.16-zstd.1.5.7` deps because the
+already materialized generated BUILD contained `deps = ["@@zstd//:"]`.
+The source include file had the Bazel-valid shorthand `deps = ["@zstd"]`,
+and the regenerated zeromatter lockfile entry now stores
+`"@@zstd//:zstd"`. Bazel 9.1.0 repros confirm bare `@zstd` resolves to
+the repo-root target named `zstd`, while explicit `@zstd//:` is an
+invalid empty-target label.
+
+Kuro now has focused repository-rule attr coverage for bare repo-label
+canonicalization, extension repo successes write spec-hashed complete
+markers, legacy `complete` markers remain accepted to avoid a global
+crate-repo rerun, and legacy generated BUILD files with quoted
+empty-target labels are repaired from current RepoSpec label attrs and
+restamped. The bounded smoke
+`/tmp/plan67-zstd-spec-hash-2.log` did not reach zstd because an earlier
+over-broad invalidation attempt contaminated the shared zeromatter
+`bazel-external` tree with stubbed crate repos; the observed failure is
+now `crates__clap-4.5.60//:clap` resolving to a stub with zero targets.
+The next narrow frontier is repository_ctx Label-tool materialization
+for use_repo_rule-generated tools such as `@toml2json_linux_amd64`, plus
+restoring/cleaning stale stubbed crate repos before using
+`//sdk:sdk_contents` as a zstd signal again.
+
+2026-05-09 update: Plan 36 follow-up 10 resolved that Label-tool
+materialization frontier by registering precomputed `use_repo_rule()` repos
+in the dynamic extension-cell registry. `/tmp/plan68-label-tool-2.log`
+materialized `rules_rs+http_file+toml2json_linux_amd64/file/downloaded`,
+advanced past `crates__clap-4.5.60//:clap`, and timed out later in the
+already-tracked `rules_rust//ffi/rs:empty_allocator_libraries` toolchain
+analysis wait.
+
+2026-05-09 follow-up: the current dirty checkout already contained the
+Plan 15 C++ toolchain cycle breaker, so a fresh bounded smoke no longer
+reproduced the old `empty_allocator_libraries` timeout. It instead exposed
+that startup lockfile spoke pre-seeding bypassed the existing invalid
+empty-target-label cache guard: `MODULE.bazel.lock` still had
+`deps = ["@@zstd//:"]` for
+`crates__zstd-sys-2.0.16-zstd.1.5.7`, so Kuro pre-registered a bad
+RepoSpec even though `Lockfile::get_extension_cache` would have rejected
+the same cache. `app/kuro_bzlmod/src/pending_repo_cells.rs` now
+canonicalizes lockfile spoke specs first and skips pre-seeding an extension
+when any cached generated RepoSpec contains an invalid empty-target label.
+That leaves the extension unseeded so the normal extension execution path
+can regenerate the current RepoSpec from source. Focused verification:
+`cargo test -p kuro_bzlmod invalid_empty_target_label -- --nocapture`,
+`cargo build -p kuro`.
+
+Bounded zeromatter smoke:
+`/tmp/plan15-lockfile-preseed-zstd-1.log` with isolation
+`plan15-lockfile-preseed-zstd-1` advanced past the previous zstd label
+coercion. The materialized
+`rules_rs+crate+crates__zstd-sys-2.0.16-zstd.1.5.7/BUILD.bazel` now has
+`deps = ["@@zstd//:zstd"]` and a spec-hashed complete marker. The next
+blocker is the existing Plan 54 class, now at `zstd//:zstd`:
+`cc_common.create_linking_context_from_compilation_outputs` wraps
+`cc_linking_outputs.library_to_link` in a depset and Kuro reports
+`depset elements must not be mutable values`.
+
+2026-05-09 follow-up: Plan 54 fixed the `LibraryToLink` mutable field shape by
+recursively normalizing dicts in `_cc_internal.freeze` alongside the existing
+list/tuple normalization. Focused cc_common/depset checks and
+`cargo build -p kuro` passed. A fresh bounded zeromatter smoke from
+`/var/mnt/dev/zeromatter`:
+
+```sh
+timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/target/debug/kuro \
+    --isolation-dir plan54-library-dict-freeze-1 \
+    build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan54-library-dict-freeze-1.log
+```
+
+The old `zstd//:zstd`
+`cc_linking_outputs.library_to_link` depset mutability failure did not recur.
+The run reached `zeromatter//sdk:sdk_contents` analysis and timed out at the
+already-tracked `rules_rust//ffi/rs:empty_allocator_libraries` analysis wait.
+It also logged a non-terminal `llvm+llvm_source+llvm-raw`
+`http_bsdtar_archive` `rctx.execute([rctx.path(host_bsdtar)] + args)` `No such
+file or directory` repository-rule failure before creating a stub.
+
+2026-05-09 follow-up: investigated the
+`rules_rust//ffi/rs:empty_allocator_libraries` wait. The rule comes from
+`rules_rust`'s `rust_allocator_libraries`; it requests the Rust toolchain and
+an optional C++ toolchain via
+`config_common.toolchain_type("@bazel_tools//tools/cpp:toolchain_type",
+mandatory = False)`. Bazel 9's `ToolchainTypeRequirement` defaults
+`mandatory` to true, preserves explicit optional requirements, and
+`ResolvedToolchainContext` only rejects missing mandatory toolchains. Kuro was
+using any unresolved toolchain, including optional misses, as a reason to load
+the deferred toolchain pool and retry resolution. `resolve_toolchain_types()`
+now retries only for a first-pass error, a missing exec group result, or a
+missing mandatory requested type.
+
+Focused verification passed:
+
+```sh
+cargo fmt -- app/kuro_analysis/src/analysis/env.rs
+cargo test -p kuro_analysis deferred_retry --lib
+cargo check -p kuro_analysis
+cargo build -p kuro
+```
+
+A fresh bounded zeromatter smoke from `/var/mnt/dev/zeromatter`:
+
+```sh
+timeout 180s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/target/debug/kuro \
+    --isolation-dir plan15-optional-toolchain-retry-1 \
+    build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan15-optional-toolchain-retry-1.log
+```
+
+The build still timed out before completing `//sdk:sdk_contents`. The visible
+frontier remained `rules_rust//ffi/rs:empty_allocator_libraries`, now with 6
+other actions, and every observed `empty_allocator_libraries` configured target
+still stopped at `toolchain_resolution_start` without reaching
+`toolchain_resolution_complete`. No `analysis_starlark_eval_heartbeat` or
+`analysis_starlark_call_sample` appeared for the stuck rule, so the wait is not
+inside the Starlark rule implementation. The earlier LLVM `http_bsdtar_archive`
+`No such file or directory` side signal did not recur in this smoke. Next slice:
+add narrow checkpoints inside `resolve_toolchain_types()` around label
+canonicalization, first multi-group resolution, deferred-load retry decision,
+`ensure_deferred_toolchains_loaded`, and the retry resolution pass.
+
+2026-05-09 follow-up: Plan 54's hashable dict-shaped `_cc_internal.freeze`
+advanced the zeromatter smoke beyond the previous
+`create_library_to_link.bzl:106 Object of type tuple has no attribute keys`
+failure. Fresh bounded smoke from `/var/mnt/dev/zeromatter`:
+
+```sh
+timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan54-hashable-dict-freeze-1' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan54-hashable-dict-freeze-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan54-hashable-dict-freeze-1.log
+```
+
+The command exited with Kuro status `3` after 179s, peak RSS 771808 KiB.
+`//sdk:sdk_contents` reached analysis and failed through
+`rules_rust+0.69.0//ffi/rs:empty_allocator_libraries`: the mandatory Rust
+toolchain impl analyzed far enough to enter
+`rules_rust+0.69.0/rust/private/rust_allocator_libraries.bzl`, where line 118
+builds depsets of `_ltl(...)` results. `_ltl` calls
+`cc_common.create_library_to_link(static_library = library,
+pic_static_library = library)`, and Kuro still reports
+`depset elements must not be mutable values` for those direct
+`LibraryToLink` provider elements. This supersedes the prior
+toolchain-resolution wait as the current concrete frontier; continue in Plan 54
+by finding the remaining non-hashable `LibraryToLinkInfo` field without
+weakening depset validation.
+
+2026-05-10 follow-up: fixed the next `_cc_internal.freeze` frozen-list
+interop blocker. `rules_cc`'s `cc_static_library.bzl` called
+`depset(lib.pic_objects)`, where `lib.pic_objects` was Kuro's hashable
+list-shaped cc_common frozen-list wrapper. It reported `type = "list"`, but
+the `depset()` Rust signature still only accepted native Starlark list/tuple
+via `UnpackListOrTuple`, so the call failed before depset construction with:
+`Type of parameter direct doesn't match, expected None | list | tuple, actual
+list`.
+
+The narrow fix keeps depset validation intact and does not accept arbitrary
+iterables: `depset()` now uses a depset-local unpacker that accepts native
+list/tuple first, then only the cc_common frozen-list wrapper. The same wrapper
+is accepted for `transitive`, so `depset(transitive =
+cc_internal.freeze([depset([...])]))` works without making raw mutable lists
+depset-hashable or changing transitive-set streaming behavior.
+
+Focused verification passed:
+
+```sh
+cargo fmt -- app/kuro_build_api/src/interpreter/rule_defs/depset.rs \
+  app/kuro_build_api/src/interpreter/rule_defs/cc_common/actions.rs \
+  app/kuro_build_api/src/interpreter/rule_defs/cc_common/mod.rs \
+  app/kuro_build_api_tests/src/interpreter/rule_defs/cc_common.rs
+cargo test -p kuro_build_api_tests interpreter::rule_defs::cc_common -- --nocapture
+cargo test -p kuro_build_api_tests interpreter::rule_defs::depset -- --nocapture
+cargo build -p kuro
+```
+
+A bounded zeromatter smoke from `/var/mnt/dev/zeromatter`:
+
+```sh
+timeout 220s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan15-depset-frozen-list-direct-1' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan15-depset-frozen-list-direct-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan15-depset-frozen-list-direct-1.log
+```
+
+The old `cc_static_library.bzl:46 depset(lib.pic_objects)` parameter-type
+failure did not recur. The smoke failed later through the same glibc
+`c_nonshared` static-library path at `cc_static_library.bzl:174`, where
+`actions.args().add_all(linker_inputs, map_each = map_each)` rejected a
+list-shaped frozen value: `Expected ... str | list | RunInfo, but got list
+(repr: [])`. Next slice: keep the fix narrow and make command-line/list
+unpacking accept the cc_common frozen-list wrapper as a list-shaped value in
+the `cmd_args.add_all(map_each=...)` path, without accepting arbitrary
+iterables or changing raw mutable-list depset eligibility.
+
+2026-05-09 follow-up: implemented that narrow command-line boundary fix in
+`cmd_args` map_each sequence expansion. `append_map_each_result` now expands
+the cc_common frozen-list wrapper in the same place it already expands built-in
+list and tuple returns. This keeps direct command-line value validation intact
+and does not broaden depset element hashability or TransitiveSet streaming.
+Focused verification:
+
+```sh
+cargo fmt -- app/kuro_build_api/src/interpreter/rule_defs/cmd_args/typ.rs \
+  app/kuro_build_api_tests/src/interpreter/rule_defs/cmd_args/tests.rs
+cargo test -p kuro_build_api_tests map_each_sequence_returns_expand_as_items -- --nocapture
+cargo test -p kuro_build_api_tests cc_common -- --nocapture
+cargo test -p kuro_build_api_tests depset -- --nocapture
+```
+
+Next: rebuild and rerun a bounded zeromatter smoke. The expected signal is that
+the `cc_static_library.bzl:174` `actions.args().add_all(..., map_each=...)`
+failure is gone; continue from the next terminal `//sdk:sdk_contents` blocker.
+
+2026-05-09 smoke follow-up: `/tmp/plan15-cmdargs-frozen-list-1.log` confirmed
+the `cc_static_library.bzl:174` command-line frozen-list failure is gone. The
+next terminal blocker is symbolic macro inherited-attribute parity in
+`llvm+0.7.0//runtimes:BUILD.bazel`: `copy_to_resource_directory(...)` omits
+the inherited `target_triple` attr, and Kuro reports a missing implementation
+parameter. This is now tracked in
+[55-symbolic-macro-inherit-attrs.md](55-symbolic-macro-inherit-attrs.md).
+
+2026-05-10 follow-up: after Plan 55 removed the symbolic macro inherited-attr
+blocker, the next visible SDK frontier was again the C++ toolchain-provider
+cycle around `bazel_tools//tools/cpp:malloc`. Focused probes showed `malloc`
+completed toolchain resolution, then stalled trying to analyze the selected C++
+toolchain impl only to populate `ctx.toolchains`. The narrower active-key and
+configured dependency-closure cycle breakers were racy because the first waiter
+can reach `ctx_toolchain_provider_analysis_start` before the selected toolchain
+impl analysis key is active, and because runtime-library edges cross
+configurations.
+
+Kuro now uses the existing synthetic C++ toolchain provider at the
+`ctx.toolchains` provider boundary for
+`@bazel_tools//tools/cpp:toolchain_type`, instead of recursively analyzing the
+C++ toolchain implementation there. This keeps toolchain resolution intact and
+limits the shortcut to the C++ provider surface Kuro already synthesizes.
+`app/kuro_analysis/src/analysis/calculation.rs` also drops the now-unused
+active-analysis-key lookup helper while retaining the checkpoint count.
+
+Focused verification:
+
+```sh
+cargo fmt -- app/kuro_analysis/src/analysis/env.rs app/kuro_analysis/src/analysis/calculation.rs
+cargo check -p kuro_analysis
+cargo build -p kuro
+timeout 90s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/target/debug/kuro \
+    --isolation-dir plan15-cpp-toolchain-synthetic-all-1 \
+    build bazel_tools//tools/cpp:malloc \
+  2>&1 | tee /tmp/plan15-cpp-toolchain-synthetic-all-1.log
+```
+
+The focused build succeeded. The log shows
+`status=cc_toolchain_synthetic` for `bazel_tools//tools/cpp:malloc`, followed by
+`analysis_key_complete` and `BUILD SUCCEEDED`.
+
+Bounded SDK smoke:
+
+```sh
+timeout 260s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep 'kurod\[zeromatter\].*plan15-cpp-toolchain-synthetic-sdk-1' \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir plan15-cpp-toolchain-synthetic-sdk-1 \
+      build //sdk:sdk_contents \
+  2>&1 | tee /tmp/plan15-cpp-toolchain-synthetic-sdk-1.log
+```
+
+The SDK smoke advanced past the old `bazel_tools//tools/cpp:malloc` wait and
+failed later in `rules_rust//util/process_wrapper:process_wrapper`:
+
+```text
+bazel-external/rules_rust+0.69.0/rust/private/rustc.bzl:1374
+deps = depset(deps)
+error: depset elements must not be mutable values
+```
+
+This is a Plan 54-class depset/frozen-value boundary. Continue there by
+identifying which `rustc_compile_action` dependency value remains mutable and
+fixing the systemic freezing/hashability path without weakening depset
+validation or changing TransitiveSet streaming behavior.
 
 ## Dependencies and ordering
 

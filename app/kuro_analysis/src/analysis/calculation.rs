@@ -9,7 +9,13 @@
  */
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::Arc;
+use std::sync::LazyLock;
+use std::sync::Mutex;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 use allocative::Allocative;
 use async_trait::async_trait;
@@ -80,6 +86,148 @@ use crate::attrs::resolve::ctx::AnalysisQueryResult;
 
 struct RuleAnalysisCalculationInstance;
 
+static ANALYSIS_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+static ANALYSIS_MAX_ACTIVE: AtomicUsize = AtomicUsize::new(0);
+static ANALYSIS_COMPLETED: AtomicUsize = AtomicUsize::new(0);
+
+const ANALYSIS_DEP_BATCH_SIZE: usize = 128;
+
+struct AnalysisActiveGuard;
+
+impl AnalysisActiveGuard {
+    fn new() -> (Self, usize, usize) {
+        let active = ANALYSIS_ACTIVE.fetch_add(1, Ordering::SeqCst) + 1;
+        let max_active = update_max_active(&ANALYSIS_MAX_ACTIVE, active);
+        (Self, active, max_active)
+    }
+}
+
+impl Drop for AnalysisActiveGuard {
+    fn drop(&mut self) {
+        ANALYSIS_ACTIVE.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+fn update_max_active(max: &AtomicUsize, active: usize) -> usize {
+    let mut old = max.load(Ordering::Relaxed);
+    while active > old {
+        match max.compare_exchange_weak(old, active, Ordering::SeqCst, Ordering::Relaxed) {
+            Ok(_) => return active,
+            Err(next) => old = next,
+        }
+    }
+    old
+}
+
+fn analysis_checkpoint(
+    checkpoint: &'static str,
+    target: &ConfiguredTargetLabel,
+    fields: impl IntoIterator<Item = (&'static str, usize)> + Clone,
+) {
+    if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    kuro_util::memory_checkpoint::checkpoint(checkpoint, fields.clone());
+    tracing::warn!(
+        target: "kuro_memory",
+        checkpoint,
+        target_label = %target,
+        "analysis checkpoint {checkpoint} target={target}"
+    );
+}
+
+fn analysis_result_checkpoint(
+    checkpoint: &'static str,
+    target: &ConfiguredTargetLabel,
+    result: &AnalysisResult,
+    active: usize,
+    completed: usize,
+    max_active: usize,
+) {
+    let counts = result.counts();
+    let retained_bytes = result.retained_memory().unwrap_or(0);
+    let provider_count = result.provider_count().unwrap_or(0);
+    let profile_retained_bytes = result
+        .profile_data
+        .as_ref()
+        .map(|p| p.total_retained_bytes())
+        .unwrap_or(0);
+    analysis_checkpoint(
+        checkpoint,
+        target,
+        [
+            ("active", active),
+            ("completed", completed),
+            ("max_active", max_active),
+            ("retained_bytes", retained_bytes),
+            ("profile_retained_bytes", profile_retained_bytes),
+            ("providers", provider_count),
+            ("actions", counts.actions),
+            ("action_data", counts.action_data),
+            ("transitive_sets", counts.transitive_sets),
+            (
+                "has_provider_collection",
+                counts.has_provider_collection as usize,
+            ),
+            ("declared_actions", result.num_declared_actions as usize),
+            ("declared_artifacts", result.num_declared_artifacts as usize),
+        ],
+    );
+}
+
+fn dep_analysis_checkpoint(
+    checkpoint: &'static str,
+    target: &ConfiguredTargetLabel,
+    dep_analysis: &[(&ConfiguredTargetLabel, AnalysisResult)],
+    query_count: usize,
+) {
+    let mut retained_bytes = 0usize;
+    let mut profile_retained_bytes = 0usize;
+    let mut providers = 0usize;
+    let mut actions = 0usize;
+    let mut action_data = 0usize;
+    let mut transitive_sets = 0usize;
+    let mut declared_actions = 0usize;
+    let mut declared_artifacts = 0usize;
+    for (_, result) in dep_analysis {
+        retained_bytes = retained_bytes.saturating_add(result.retained_memory().unwrap_or(0));
+        profile_retained_bytes = profile_retained_bytes.saturating_add(
+            result
+                .profile_data
+                .as_ref()
+                .map(|p| p.total_retained_bytes())
+                .unwrap_or(0),
+        );
+        providers = providers.saturating_add(result.provider_count().unwrap_or(0));
+        let counts = result.counts();
+        actions = actions.saturating_add(counts.actions);
+        action_data = action_data.saturating_add(counts.action_data);
+        transitive_sets = transitive_sets.saturating_add(counts.transitive_sets);
+        declared_actions = declared_actions.saturating_add(result.num_declared_actions as usize);
+        declared_artifacts =
+            declared_artifacts.saturating_add(result.num_declared_artifacts as usize);
+    }
+    analysis_checkpoint(
+        checkpoint,
+        target,
+        [
+            ("active", ANALYSIS_ACTIVE.load(Ordering::Relaxed)),
+            ("completed", ANALYSIS_COMPLETED.load(Ordering::Relaxed)),
+            ("max_active", ANALYSIS_MAX_ACTIVE.load(Ordering::Relaxed)),
+            ("deps", dep_analysis.len()),
+            ("queries", query_count),
+            ("dep_retained_bytes", retained_bytes),
+            ("dep_profile_retained_bytes", profile_retained_bytes),
+            ("dep_providers", providers),
+            ("dep_actions", actions),
+            ("dep_action_data", action_data),
+            ("dep_transitive_sets", transitive_sets),
+            ("dep_declared_actions", declared_actions),
+            ("dep_declared_artifacts", declared_artifacts),
+        ],
+    );
+}
+
 #[derive(
     Clone,
     Dupe,
@@ -93,6 +241,95 @@ struct RuleAnalysisCalculationInstance;
 #[display("{}", _0)]
 pub struct AnalysisKey(pub ConfiguredTargetLabel);
 
+static ACTIVE_ANALYSIS_KEYS: LazyLock<Mutex<HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(HashSet::new()));
+
+struct AnalysisKeyActiveSetGuard {
+    key: String,
+}
+
+impl AnalysisKeyActiveSetGuard {
+    fn new(target: &ConfiguredTargetLabel) -> Self {
+        let key = target.to_string();
+        ACTIVE_ANALYSIS_KEYS
+            .lock()
+            .expect("ACTIVE_ANALYSIS_KEYS poisoned")
+            .insert(key.clone());
+        Self { key }
+    }
+}
+
+impl Drop for AnalysisKeyActiveSetGuard {
+    fn drop(&mut self) {
+        ACTIVE_ANALYSIS_KEYS
+            .lock()
+            .expect("ACTIVE_ANALYSIS_KEYS poisoned")
+            .remove(&self.key);
+    }
+}
+
+fn active_analysis_key_count() -> usize {
+    ACTIVE_ANALYSIS_KEYS
+        .lock()
+        .expect("ACTIVE_ANALYSIS_KEYS poisoned")
+        .len()
+}
+
+fn analysis_dep_checkpoint(
+    checkpoint: &'static str,
+    target: &ConfiguredTargetLabel,
+    dep_label: Option<&ConfiguredTargetLabel>,
+    batch_index: usize,
+    dep_index: usize,
+    total_deps: usize,
+    started: Instant,
+) {
+    if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
+    kuro_util::memory_checkpoint::checkpoint(
+        checkpoint,
+        [
+            ("active", ANALYSIS_ACTIVE.load(Ordering::Relaxed)),
+            ("active_keys", active_analysis_key_count()),
+            ("completed", ANALYSIS_COMPLETED.load(Ordering::Relaxed)),
+            ("max_active", ANALYSIS_MAX_ACTIVE.load(Ordering::Relaxed)),
+            ("batch_index", batch_index),
+            ("dep_index", dep_index),
+            ("deps", total_deps),
+            ("elapsed_ms", elapsed_ms),
+            (
+                "dep_label_len",
+                dep_label.map(|label| label.to_string().len()).unwrap_or(0),
+            ),
+        ],
+    );
+    match dep_label {
+        Some(dep_label) => tracing::warn!(
+            target: "kuro_memory",
+            checkpoint,
+            target_label = %target,
+            dep_label = %dep_label,
+            batch_index,
+            dep_index,
+            total_deps,
+            elapsed_ms,
+            "analysis dep checkpoint {checkpoint} target={target} dep={dep_label} index={dep_index}/{total_deps} elapsed_ms={elapsed_ms}"
+        ),
+        None => tracing::warn!(
+            target: "kuro_memory",
+            checkpoint,
+            target_label = %target,
+            batch_index,
+            dep_index,
+            total_deps,
+            elapsed_ms,
+            "analysis dep checkpoint {checkpoint} target={target} index={dep_index}/{total_deps} elapsed_ms={elapsed_ms}"
+        ),
+    }
+}
+
 pub(crate) fn init_rule_analysis_calculation() {
     RULE_ANALYSIS_CALCULATION.init(&RuleAnalysisCalculationInstance);
 }
@@ -105,6 +342,18 @@ impl Key for AnalysisKey {
         ctx: &mut DiceComputations,
         cancellation: &CancellationContext,
     ) -> Self::Value {
+        let (_active_guard, active, max_active) = AnalysisActiveGuard::new();
+        let _active_key_guard = AnalysisKeyActiveSetGuard::new(&self.0);
+        let completed = ANALYSIS_COMPLETED.load(Ordering::Relaxed);
+        analysis_checkpoint(
+            "analysis_key_start",
+            &self.0,
+            [
+                ("active", active),
+                ("completed", completed),
+                ("max_active", max_active),
+            ],
+        );
         let deferred_key = DeferredHolderKey::Base(BaseDeferredKey::TargetLabel(self.0.dupe()));
         ctx.analysis_started(&deferred_key)?;
         let res = get_analysis_result(ctx, &self.0, cancellation)
@@ -112,6 +361,26 @@ impl Key for AnalysisKey {
             .with_buck_error_context(|| format!("Error running analysis for `{}`", &self.0))?;
         if let MaybeCompatible::Compatible(v) = &res {
             ctx.analysis_complete(&deferred_key, &DeferredHolder::Analysis(v.dupe()))?;
+            let completed = ANALYSIS_COMPLETED.fetch_add(1, Ordering::SeqCst) + 1;
+            analysis_result_checkpoint(
+                "analysis_key_complete",
+                &self.0,
+                v,
+                ANALYSIS_ACTIVE.load(Ordering::Relaxed),
+                completed,
+                ANALYSIS_MAX_ACTIVE.load(Ordering::Relaxed),
+            );
+        } else {
+            let completed = ANALYSIS_COMPLETED.fetch_add(1, Ordering::SeqCst) + 1;
+            analysis_checkpoint(
+                "analysis_key_incompatible",
+                &self.0,
+                [
+                    ("active", ANALYSIS_ACTIVE.load(Ordering::Relaxed)),
+                    ("completed", completed),
+                    ("max_active", ANALYSIS_MAX_ACTIVE.load(Ordering::Relaxed)),
+                ],
+            );
         }
         Ok(res)
     }
@@ -218,17 +487,81 @@ pub async fn get_dep_analysis<'v>(
     configured_node: ConfiguredTargetNodeRef<'v>,
     ctx: &mut DiceComputations<'_>,
 ) -> kuro_error::Result<Vec<(&'v ConfiguredTargetLabel, AnalysisResult)>> {
-    KeepGoing::try_compute_join_all(ctx, configured_node.deps(), |ctx, dep| {
-        async move {
-            let res = ctx
-                .get_analysis_result(dep.label())
-                .await
-                .and_then(|v| v.require_compatible());
-            res.map(|x| (dep.label(), x))
+    let started = Instant::now();
+    let labels = configured_node
+        .deps()
+        .map(|dep| dep.label())
+        .collect::<Vec<_>>();
+    let total_deps = labels.len();
+    let mut results = Vec::with_capacity(labels.len());
+    analysis_dep_checkpoint(
+        "analysis_deps_start",
+        configured_node.label(),
+        None,
+        0,
+        0,
+        total_deps,
+        started,
+    );
+    for (batch_index, start) in (0..total_deps).step_by(ANALYSIS_DEP_BATCH_SIZE).enumerate() {
+        let end = (start + ANALYSIS_DEP_BATCH_SIZE).min(total_deps);
+        analysis_dep_checkpoint(
+            "analysis_dep_batch_start",
+            configured_node.label(),
+            labels.get(start).copied(),
+            batch_index,
+            start,
+            total_deps,
+            started,
+        );
+        let batch_results = KeepGoing::try_compute_join_all(ctx, start..end, |ctx, index| {
+            let label = labels[index];
+            async move {
+                analysis_dep_checkpoint(
+                    "analysis_dep_request_start",
+                    configured_node.label(),
+                    Some(label),
+                    batch_index,
+                    index,
+                    total_deps,
+                    started,
+                );
+                let res = ctx
+                    .get_analysis_result(label)
+                    .await
+                    .and_then(|v| v.require_compatible());
+                analysis_dep_checkpoint(
+                    "analysis_dep_request_complete",
+                    configured_node.label(),
+                    Some(label),
+                    batch_index,
+                    index,
+                    total_deps,
+                    started,
+                );
+                res.map(|x| (label, x))
+            }
+            .boxed()
+        })
+        .await?;
+        results.extend(batch_results);
+        if labels.len() > ANALYSIS_DEP_BATCH_SIZE {
+            analysis_checkpoint(
+                "analysis_dep_batch_complete",
+                configured_node.label(),
+                [
+                    ("active", ANALYSIS_ACTIVE.load(Ordering::Relaxed)),
+                    ("completed", ANALYSIS_COMPLETED.load(Ordering::Relaxed)),
+                    ("max_active", ANALYSIS_MAX_ACTIVE.load(Ordering::Relaxed)),
+                    ("deps", labels.len()),
+                    ("batch_index", batch_index),
+                    ("batch_size", end - start),
+                    ("results", results.len()),
+                ],
+            );
         }
-        .boxed()
-    })
-    .await
+    }
+    Ok(results)
 }
 
 /// Check whether all `flag_values` entries in a `config_setting` target match their
@@ -612,11 +945,10 @@ fn resolve_bazel_config_value(key: &str, expected: &str) -> bool {
 /// merged into the dep's base provider collection during resolution.
 async fn compute_dep_aspects<'v>(
     configured_node: ConfiguredTargetNodeRef<'v>,
-    dep_analysis: &[(&'v ConfiguredTargetLabel, AnalysisResult)],
+    _dep_analysis: &[(&'v ConfiguredTargetLabel, AnalysisResult)],
     ctx: &mut DiceComputations<'_>,
 ) -> kuro_error::Result<HashMap<ConfiguredTargetLabel, FrozenProviderCollectionValue>> {
     use kuro_core::provider::label::ConfiguredProvidersLabel;
-    use kuro_node::aspect_type::StarlarkAspectType;
     use kuro_node::attrs::configured_traversal::ConfiguredAttrTraversal;
 
     let pkg = configured_node.label().pkg();
@@ -809,15 +1141,29 @@ async fn get_analysis_result_inner(
 
     let ((res, now), spans): ((kuro_error::Result<_>, _), _) = match configured_node.rule_type() {
         RuleType::Starlark(func) => {
-            let (dep_analysis, query_results) = ctx
-                .try_compute2(
-                    |ctx| get_dep_analysis(configured_node, ctx).boxed(),
-                    |ctx| resolve_queries(ctx, configured_node).boxed(),
-                )
-                .await?;
+            let dep_analysis = get_dep_analysis(configured_node, ctx).await?;
+            let query_results = resolve_queries(ctx, configured_node).await?;
+            dep_analysis_checkpoint(
+                "analysis_deps_ready",
+                target,
+                &dep_analysis,
+                query_results.len(),
+            );
 
             // Phase 8h: Compute aspect results for deps that have aspects on their attributes.
             let aspect_results = compute_dep_aspects(configured_node, &dep_analysis, ctx).await?;
+            analysis_checkpoint(
+                "analysis_aspects_ready",
+                target,
+                [
+                    ("active", ANALYSIS_ACTIVE.load(Ordering::Relaxed)),
+                    ("completed", ANALYSIS_COMPLETED.load(Ordering::Relaxed)),
+                    ("max_active", ANALYSIS_MAX_ACTIVE.load(Ordering::Relaxed)),
+                    ("deps", dep_analysis.len()),
+                    ("queries", query_results.len()),
+                    ("aspects", aspect_results.len()),
+                ],
+            );
 
             let now = TimeSpan::start_now();
             let (res, spans) = async_record_root_spans(async {
@@ -857,6 +1203,14 @@ async fn get_analysis_result_inner(
                         profile = Some(make_analysis_profile(&result)?);
                         declared_artifacts = Some(result.num_declared_artifacts);
                         declared_actions = Some(result.num_declared_actions);
+                        analysis_result_checkpoint(
+                            "analysis_evaluate_rule_result",
+                            target,
+                            &result,
+                            ANALYSIS_ACTIVE.load(Ordering::Relaxed),
+                            ANALYSIS_COMPLETED.load(Ordering::Relaxed),
+                            ANALYSIS_MAX_ACTIVE.load(Ordering::Relaxed),
+                        );
 
                         MaybeCompatible::Compatible(result)
                     };

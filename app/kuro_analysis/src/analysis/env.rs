@@ -8,10 +8,14 @@
  * above-listed licenses.
  */
 
+use std::cell::Cell;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::LazyLock;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 use dice::CancellationContext;
 use dice::DiceComputations;
@@ -24,6 +28,7 @@ use kuro_build_api::analysis::registry::AnalysisRegistry;
 use kuro_build_api::interpreter::rule_defs::cmd_args::value::FrozenCommandLineArg;
 use kuro_build_api::interpreter::rule_defs::context::AnalysisContext;
 use kuro_build_api::interpreter::rule_defs::context::ResolvedToolchains;
+use kuro_build_api::interpreter::rule_defs::context::synthetic_cc_toolchain_provider_collection;
 use kuro_build_api::interpreter::rule_defs::provider::FrozenBuiltinProviderLike;
 use kuro_build_api::interpreter::rule_defs::provider::ValueAsProviderLike;
 use kuro_build_api::interpreter::rule_defs::provider::builtin::default_info::DefaultInfoCallable;
@@ -75,6 +80,7 @@ use kuro_node::rule_type::RuleType;
 use kuro_node::rule_type::StarlarkRuleType;
 use starlark::environment::FrozenModule;
 use starlark::environment::Module;
+use starlark::eval::CallStackCheckpoint;
 use starlark::eval::Evaluator;
 use starlark::values::FrozenValue;
 use starlark::values::FrozenValueTyped;
@@ -462,6 +468,328 @@ struct AnalysisEnv<'a> {
     aspect_results: HashMap<ConfiguredTargetLabel, FrozenProviderCollectionValue>,
 }
 
+struct AnalysisStarlarkProgress {
+    target: String,
+    started: Instant,
+    call_count: Cell<usize>,
+    bytecode_check_count: Cell<usize>,
+    heartbeat_count: Cell<usize>,
+    last_heartbeat_ms: Cell<usize>,
+    interesting_samples: Cell<usize>,
+    sampled_functions: RefCell<HashMap<String, usize>>,
+}
+
+impl AnalysisStarlarkProgress {
+    fn new(label: &ConfiguredTargetLabel) -> Self {
+        Self {
+            target: label.to_string(),
+            started: Instant::now(),
+            call_count: Cell::new(0),
+            bytecode_check_count: Cell::new(0),
+            heartbeat_count: Cell::new(0),
+            last_heartbeat_ms: Cell::new(0),
+            interesting_samples: Cell::new(0),
+            sampled_functions: RefCell::new(HashMap::new()),
+        }
+    }
+
+    fn should_log_interesting(sample_count: usize) -> bool {
+        sample_count <= 32 || sample_count.is_power_of_two()
+    }
+
+    fn is_interesting_starlark_file(filename: &str) -> bool {
+        (filename.contains("rules_cc+0.2.17")
+            && (filename.ends_with("cc/private/link/create_linker_input.bzl")
+                || filename.ends_with("cc/private/link/create_library_to_link.bzl")
+                || filename.ends_with(
+                    "cc/private/link/create_linking_context_from_compilation_outputs.bzl",
+                )
+                || filename.ends_with("cc/private/cc_info.bzl")))
+            || (filename.contains("rules_rust+0.69.0")
+                && (filename.ends_with("rust/private/rust_allocator_libraries.bzl")
+                    || filename.ends_with("rust/private/cc/cc_utils.bzl")))
+    }
+
+    fn elapsed_ms(&self) -> usize {
+        self.started.elapsed().as_millis().min(usize::MAX as u128) as usize
+    }
+}
+
+impl<'e> CallStackCheckpoint<'e> for AnalysisStarlarkProgress {
+    fn on_call_stack_push<'v>(&self, eval: &Evaluator<'v, '_, 'e>) {
+        let call_count = self.call_count.get().saturating_add(1);
+        self.call_count.set(call_count);
+
+        let Some(location) = eval.call_stack_top_location() else {
+            return;
+        };
+        let filename = location.filename();
+        if !Self::is_interesting_starlark_file(filename) {
+            return;
+        }
+
+        let interesting_samples = self.interesting_samples.get().saturating_add(1);
+        self.interesting_samples.set(interesting_samples);
+        if !Self::should_log_interesting(interesting_samples) {
+            return;
+        }
+
+        let resolved = location.resolve_span();
+        let frame = eval.call_stack_top_frame();
+        let function = frame
+            .as_ref()
+            .map(|frame| frame.name.as_str())
+            .unwrap_or("<unknown>");
+        let key = format!("{}:{}:{function}", filename, resolved.begin.line + 1);
+        let function_sample_count = {
+            let mut sampled_functions = self.sampled_functions.borrow_mut();
+            let count = sampled_functions.entry(key).or_insert(0);
+            *count = count.saturating_add(1);
+            *count
+        };
+
+        kuro_util::memory_checkpoint::checkpoint(
+            "analysis_starlark_call_sample",
+            [
+                ("call_count", call_count),
+                ("interesting_samples", interesting_samples),
+                ("function_sample_count", function_sample_count),
+                ("stack_depth", eval.call_stack_count()),
+                ("line", resolved.begin.line + 1),
+                ("column", resolved.begin.column + 1),
+                ("filename_len", filename.len()),
+                ("elapsed_ms", self.elapsed_ms()),
+            ],
+        );
+        tracing::warn!(
+            target: "kuro_memory",
+            checkpoint = "analysis_starlark_call_sample",
+            target_label = %self.target,
+            starlark_file = filename,
+            function,
+            call_count,
+            interesting_samples,
+            function_sample_count,
+            line = resolved.begin.line + 1,
+            column = resolved.begin.column + 1,
+            "analysis starlark call sample target={} file={} function={} line={} call_count={}",
+            self.target,
+            filename,
+            function,
+            resolved.begin.line + 1,
+            call_count
+        );
+    }
+
+    fn on_infrequent_instr_check<'v>(&self, eval: &Evaluator<'v, '_, 'e>) {
+        let bytecode_check_count = self.bytecode_check_count.get().saturating_add(1);
+        self.bytecode_check_count.set(bytecode_check_count);
+
+        let elapsed_ms = self.elapsed_ms();
+        if elapsed_ms < 1_000 {
+            return;
+        }
+
+        let heartbeat_count = self.heartbeat_count.get();
+        let interval_ms = if heartbeat_count < 4 { 1_000 } else { 5_000 };
+        let last_heartbeat_ms = self.last_heartbeat_ms.get();
+        if elapsed_ms.saturating_sub(last_heartbeat_ms) < interval_ms {
+            return;
+        }
+        self.last_heartbeat_ms.set(elapsed_ms);
+        let heartbeat_count = heartbeat_count.saturating_add(1);
+        self.heartbeat_count.set(heartbeat_count);
+
+        let location = eval.call_stack_top_location();
+        let (filename, line, column) = if let Some(location) = location.as_ref() {
+            let resolved = location.resolve_span();
+            (
+                location.filename(),
+                resolved.begin.line + 1,
+                resolved.begin.column + 1,
+            )
+        } else {
+            ("<unknown>", 0, 0)
+        };
+        let frame = eval.call_stack_top_frame();
+        let function = frame
+            .as_ref()
+            .map(|frame| frame.name.as_str())
+            .unwrap_or("<unknown>");
+        let interesting_file = Self::is_interesting_starlark_file(filename) as usize;
+
+        kuro_util::memory_checkpoint::checkpoint(
+            "analysis_starlark_eval_heartbeat",
+            [
+                ("heartbeat_count", heartbeat_count),
+                ("bytecode_check_count", bytecode_check_count),
+                ("call_count", self.call_count.get()),
+                ("interesting_samples", self.interesting_samples.get()),
+                ("stack_depth", eval.call_stack_count()),
+                ("line", line),
+                ("column", column),
+                ("filename_len", filename.len()),
+                ("interesting_file", interesting_file),
+                ("elapsed_ms", elapsed_ms),
+            ],
+        );
+        tracing::warn!(
+            target: "kuro_memory",
+            checkpoint = "analysis_starlark_eval_heartbeat",
+            target_label = %self.target,
+            starlark_file = filename,
+            function,
+            heartbeat_count,
+            bytecode_check_count,
+            line,
+            column,
+            interesting_file,
+            "analysis starlark eval heartbeat target={} file={} function={} line={} bytecode_checks={}",
+            self.target,
+            filename,
+            function,
+            line,
+            bytecode_check_count
+        );
+    }
+}
+
+fn analysis_eval_phase_checkpoint(
+    checkpoint: &'static str,
+    label: &ConfiguredTargetLabel,
+    phase_id: usize,
+    phase: &'static str,
+    started: Instant,
+) {
+    if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
+    kuro_util::memory_checkpoint::checkpoint(
+        checkpoint,
+        [
+            ("phase_id", phase_id),
+            ("elapsed_ms", elapsed_ms),
+            ("target_len", label.to_string().len()),
+        ],
+    );
+    tracing::warn!(
+        target: "kuro_memory",
+        checkpoint,
+        target_label = %label,
+        phase,
+        phase_id,
+        elapsed_ms,
+        "analysis evaluate_rule phase target={} phase={} elapsed_ms={}",
+        label,
+        phase,
+        elapsed_ms
+    );
+}
+
+fn analysis_ctx_toolchain_provider_checkpoint(
+    label: &ConfiguredTargetLabel,
+    type_label: &str,
+    impl_label: &str,
+    configured: Option<&ConfiguredTargetLabel>,
+    index: usize,
+    total: usize,
+    mandatory: bool,
+    is_self_dependency: bool,
+    status_id: usize,
+    status: &'static str,
+    started: Instant,
+) {
+    if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
+    let configured_label = configured
+        .map(|configured| configured.to_string())
+        .unwrap_or_else(|| "<none>".to_owned());
+    let configured_len = configured
+        .map(|configured| configured.to_string().len())
+        .unwrap_or(0);
+    kuro_util::memory_checkpoint::checkpoint(
+        "analysis_ctx_toolchain_provider",
+        [
+            ("status_id", status_id),
+            ("elapsed_ms", elapsed_ms),
+            ("index", index),
+            ("total", total),
+            ("mandatory", mandatory as usize),
+            ("is_self_dependency", is_self_dependency as usize),
+            ("type_len", type_label.len()),
+            ("impl_len", impl_label.len()),
+            ("configured_len", configured_len),
+        ],
+    );
+    tracing::warn!(
+        target: "kuro_memory",
+        checkpoint = "analysis_ctx_toolchain_provider",
+        target_label = %label,
+        toolchain_type = type_label,
+        toolchain_impl = impl_label,
+        configured_toolchain = configured_label.as_str(),
+        index,
+        total,
+        mandatory,
+        is_self_dependency,
+        status,
+        elapsed_ms,
+        "analysis ctx toolchain provider target={} type={} impl={} configured={} status={} mandatory={} self={} index={}/{} elapsed_ms={}",
+        label,
+        type_label,
+        impl_label,
+        configured_label,
+        status,
+        mandatory,
+        is_self_dependency,
+        index,
+        total,
+        elapsed_ms
+    );
+}
+
+fn analysis_toolchain_resolution_checkpoint(
+    label: &ConfiguredTargetLabel,
+    step_id: usize,
+    step: &'static str,
+    started: Instant,
+    fields: impl IntoIterator<Item = (&'static str, usize)>,
+) {
+    if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
+    let mut checkpoint_fields = vec![
+        ("step_id", step_id),
+        ("elapsed_ms", elapsed_ms),
+        ("target_len", label.to_string().len()),
+    ];
+    checkpoint_fields.extend(fields);
+    kuro_util::memory_checkpoint::checkpoint(
+        "analysis_toolchain_resolution_substep",
+        checkpoint_fields,
+    );
+    tracing::warn!(
+        target: "kuro_memory",
+        checkpoint = "analysis_toolchain_resolution_substep",
+        target_label = %label,
+        step,
+        step_id,
+        elapsed_ms,
+        "analysis toolchain resolution substep target={} step={} elapsed_ms={}",
+        label,
+        step,
+        elapsed_ms
+    );
+}
+
+fn is_cpp_toolchain_type_label(label: &str) -> bool {
+    label.trim_start_matches('@') == "bazel_tools//tools/cpp:toolchain_type"
+}
+
 pub(crate) async fn run_analysis<'a>(
     dice: &'a mut DiceComputations<'_>,
     label: &ConfiguredTargetLabel,
@@ -501,16 +829,47 @@ pub fn get_deps_from_analysis_results(
 /// Flag to ensure registered toolchain packages are loaded only once per session.
 static TOOLCHAINS_LOADING_DONE: AtomicBool = AtomicBool::new(false);
 
+/// Serializes the initial eager registered-toolchain load. Multiple analysis
+/// keys can start concurrently before the done flag flips; only one should
+/// materialize and scan the eager toolchain packages.
+static EAGER_TOOLCHAIN_LOAD_LOCK: LazyLock<futures::lock::Mutex<()>> =
+    LazyLock::new(|| futures::lock::Mutex::new(()));
+
 /// Serializes deferred toolchain loading. Resolution can run concurrently for
 /// many configured targets; without this gate, several misses can all decide to
 /// drain the deferred pool before any one load has populated the global
 /// `DeclaredToolchainInfo` registry.
-static DEFERRED_TOOLCHAIN_LOAD_LOCK: std::sync::LazyLock<futures::lock::Mutex<()>> =
-    std::sync::LazyLock::new(|| futures::lock::Mutex::new(()));
+static DEFERRED_TOOLCHAIN_LOAD_LOCK: LazyLock<futures::lock::Mutex<()>> =
+    LazyLock::new(|| futures::lock::Mutex::new(()));
 
 /// Reset the eager loading flag (for fresh builds / daemon restart).
 pub fn reset_toolchain_loading() {
     TOOLCHAINS_LOADING_DONE.store(false, Ordering::SeqCst);
+}
+
+fn eager_toolchain_loading_checkpoint(
+    step_id: usize,
+    step: &'static str,
+    started: Instant,
+    fields: impl IntoIterator<Item = (&'static str, usize)>,
+) {
+    if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
+    let mut checkpoint_fields = vec![("step_id", step_id), ("elapsed_ms", elapsed_ms)];
+    checkpoint_fields.extend(fields);
+    kuro_util::memory_checkpoint::checkpoint("analysis_eager_toolchain_loading", checkpoint_fields);
+    tracing::warn!(
+        target: "kuro_memory",
+        checkpoint = "analysis_eager_toolchain_loading",
+        step,
+        step_id,
+        elapsed_ms,
+        "analysis eager toolchain loading step={} elapsed_ms={}",
+        step,
+        elapsed_ms
+    );
 }
 
 /// Eagerly load all registered toolchain packages via DICE.
@@ -525,10 +884,21 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         return;
     }
 
+    let started = Instant::now();
+    eager_toolchain_loading_checkpoint(1, "lock_wait_start", started, []);
+    let _guard = EAGER_TOOLCHAIN_LOAD_LOCK.lock().await;
+    eager_toolchain_loading_checkpoint(2, "lock_acquired", started, []);
+
+    if TOOLCHAINS_LOADING_DONE.load(Ordering::SeqCst) {
+        eager_toolchain_loading_checkpoint(3, "already_loaded_after_lock", started, []);
+        return;
+    }
+
     let registered = kuro_bzlmod::get_registered_toolchains();
     if registered.is_empty() {
         TOOLCHAINS_LOADING_DONE.store(true, Ordering::SeqCst);
         set_deferred_toolchains(Vec::new());
+        eager_toolchain_loading_checkpoint(4, "no_registered_toolchains", started, []);
         return;
     }
 
@@ -548,6 +918,15 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         })
         .collect();
     set_deferred_toolchains(deferred_pool);
+    eager_toolchain_loading_checkpoint(
+        5,
+        "registry_split",
+        started,
+        [
+            ("eager_count", eager_registered.len()),
+            ("deferred_count", deferred.len()),
+        ],
+    );
 
     tracing::debug!(
         "Eagerly loading {} root toolchain package(s); {} non-root deferred",
@@ -560,6 +939,7 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         Err(e) => {
             tracing::debug!("Failed to get cell resolver for toolchain loading: {}", e);
             TOOLCHAINS_LOADING_DONE.store(true, Ordering::SeqCst);
+            eager_toolchain_loading_checkpoint(6, "cell_resolver_failed", started, []);
             return;
         }
     };
@@ -629,7 +1009,22 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
         to_load.push((tc_label_str.clone(), package_label));
     }
 
+    eager_toolchain_loading_checkpoint(
+        7,
+        "load_packages_start",
+        started,
+        [
+            ("to_load_count", to_load.len()),
+            ("skipped_count", skipped_count),
+        ],
+    );
     load_and_register_toolchain_packages(dice, to_load).await;
+    eager_toolchain_loading_checkpoint(
+        8,
+        "load_packages_complete",
+        started,
+        [("skipped_count", skipped_count)],
+    );
 
     if skipped_count > 0 {
         tracing::debug!(
@@ -639,6 +1034,7 @@ pub async fn ensure_registered_toolchains_loaded(dice: &mut DiceComputations<'_>
     }
 
     TOOLCHAINS_LOADING_DONE.store(true, Ordering::SeqCst);
+    eager_toolchain_loading_checkpoint(9, "done", started, []);
 }
 
 /// Load a list of `(label_str, package_label)` toolchain packages in
@@ -1195,6 +1591,7 @@ async fn run_analysis_with_env_underlying(
 ) -> kuro_error::Result<AnalysisResult> {
     BuckStarlarkModule::with_profiling_async(|env| async move {
         let print = EventDispatcherPrintHandler(get_dispatcher());
+        let evaluate_rule_started = Instant::now();
 
         let validations_from_deps = analysis_env
             .deps
@@ -1207,6 +1604,13 @@ async fn run_analysis_with_env_underlying(
             })
             .collect::<SmallMap<_, _>>();
 
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            1,
+            "attr_eval_start",
+            evaluate_rule_started,
+        );
         // Plan 16.6: attr_eval sub-span — attribute coercion + plugin resolution.
         let (attributes, plugins) = dispatch_span_simple::<
             _,
@@ -1248,6 +1652,13 @@ async fn run_analysis_with_env_underlying(
             },
             kuro_data::AnalysisStageEnd {},
         )?;
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            2,
+            "attr_eval_complete",
+            evaluate_rule_started,
+        );
 
         // Plan 16.6: configure sub-span — toolchain resolution + exec-group
         // resolution + recursive DICE analysis of toolchain impl targets. Uses
@@ -1294,11 +1705,25 @@ async fn run_analysis_with_env_underlying(
         // they were dispatched from.
         let needs_candidate_list =
             !analysis_env.rule_spec.toolchain_types().is_empty() || !exec_group_defs.is_empty();
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            3,
+            "execution_platforms_start",
+            evaluate_rule_started,
+        );
         let registered_exec_platforms = if needs_candidate_list {
             dice.get_execution_platforms().await?
         } else {
             None
         };
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            4,
+            "execution_platforms_complete",
+            evaluate_rule_started,
+        );
         let (candidate_constraints, candidate_by_label): (
             Vec<crate::analysis::toolchain_resolution::PlatformConstraints>,
             HashMap<String, ExecutionPlatform>,
@@ -1323,6 +1748,13 @@ async fn run_analysis_with_env_underlying(
         // calculation.rs::get_analysis_result_inner() which covers all rule types.
         // The resolution reads from the DeclaredToolchainInfo registry which is
         // populated by eager loading above and by toolchain() target analysis.
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            5,
+            "toolchain_resolution_start",
+            evaluate_rule_started,
+        );
         let (toolchain_resolution_result, exec_group_resolution_results) =
             resolve_toolchain_types(
                 dice,
@@ -1332,6 +1764,13 @@ async fn run_analysis_with_env_underlying(
                 &candidate_constraints,
             )
             .await?;
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            6,
+            "toolchain_resolution_complete",
+            evaluate_rule_started,
+        );
 
         // Plan 24 Phase 8: turn each named group's resolved exec_platform
         // label into a full `ExecutionPlatformResolution` (carrying the
@@ -1370,6 +1809,13 @@ async fn run_analysis_with_env_underlying(
             .filter_map(|(label, mandatory)| if mandatory { Some(label) } else { None })
             .collect();
 
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            7,
+            "ctx_toolchain_provider_analysis_start",
+            evaluate_rule_started,
+        );
         let resolved_toolchains_for_ctx = if let Some(result) = &toolchain_resolution_result {
             let any_resolved = result.resolved_toolchains.values().any(|v| v.is_some());
             if any_resolved {
@@ -1378,8 +1824,11 @@ async fn run_analysis_with_env_underlying(
                     String,
                     Option<FrozenProviderCollectionValue>,
                 >::new();
+                let toolchain_count = result.resolved_toolchains.len();
 
-                for (type_label, resolved) in &result.resolved_toolchains {
+                for (toolchain_index, (type_label, resolved)) in
+                    result.resolved_toolchains.iter().enumerate()
+                {
                     if let Some(tc) = resolved {
                         tracing::debug!(
                             "  {} → impl='{}', analyzing...",
@@ -1397,70 +1846,170 @@ async fn run_analysis_with_env_underlying(
                             match parse_impl_label_to_target_label(&tc.toolchain_impl) {
                                 Some(target_label) => {
                                     let configured = target_label.configure(target_cfg.dupe());
-                                    let analysis_result =
-                                        dice.get_analysis_result(&configured).await;
-                                    match analysis_result {
-                                        Ok(kuro_core::configuration::compatibility::MaybeCompatible::Compatible(analysis)) => {
-                                            match analysis.providers() {
-                                                Ok(providers) => Some(providers.to_owned()),
-                                                Err(e) => {
-                                                    if is_mandatory {
-                                                        return Err(e).with_buck_error_context(|| {
-                                                            format!(
-                                                                "Failed to extract providers from \
-                                                                 mandatory toolchain impl '{}' for \
-                                                                 toolchain type '{}'",
-                                                                tc.toolchain_impl, type_label
-                                                            )
-                                                        });
+                                    let is_self_dependency = configured.eq(node.label());
+                                    analysis_ctx_toolchain_provider_checkpoint(
+                                        &analysis_env.label,
+                                        type_label,
+                                        &tc.toolchain_impl,
+                                        Some(&configured),
+                                        toolchain_index,
+                                        toolchain_count,
+                                        is_mandatory,
+                                        is_self_dependency,
+                                        1,
+                                        "analysis_start",
+                                        evaluate_rule_started,
+                                    );
+                                    let use_synthetic_cc_toolchain =
+                                        is_cpp_toolchain_type_label(type_label);
+                                    if use_synthetic_cc_toolchain {
+                                        analysis_ctx_toolchain_provider_checkpoint(
+                                            &analysis_env.label,
+                                            type_label,
+                                            &tc.toolchain_impl,
+                                            Some(&configured),
+                                            toolchain_index,
+                                            toolchain_count,
+                                            is_mandatory,
+                                            is_self_dependency,
+                                            8,
+                                            "cc_toolchain_synthetic",
+                                            evaluate_rule_started,
+                                        );
+                                        Some(synthetic_cc_toolchain_provider_collection(
+                                            &tc.toolchain_impl,
+                                        ))
+                                    } else {
+                                        let analysis_result =
+                                            dice.get_analysis_result(&configured).await;
+                                        match analysis_result {
+                                            Ok(kuro_core::configuration::compatibility::MaybeCompatible::Compatible(analysis)) => {
+                                                analysis_ctx_toolchain_provider_checkpoint(
+                                                    &analysis_env.label,
+                                                    type_label,
+                                                    &tc.toolchain_impl,
+                                                    Some(&configured),
+                                                    toolchain_index,
+                                                    toolchain_count,
+                                                    is_mandatory,
+                                                    is_self_dependency,
+                                                    2,
+                                                    "analysis_compatible",
+                                                    evaluate_rule_started,
+                                                );
+                                                match analysis.providers() {
+                                                    Ok(providers) => Some(providers.to_owned()),
+                                                    Err(e) => {
+                                                        analysis_ctx_toolchain_provider_checkpoint(
+                                                            &analysis_env.label,
+                                                            type_label,
+                                                            &tc.toolchain_impl,
+                                                            Some(&configured),
+                                                            toolchain_index,
+                                                            toolchain_count,
+                                                            is_mandatory,
+                                                            is_self_dependency,
+                                                            4,
+                                                            "provider_extract_error",
+                                                            evaluate_rule_started,
+                                                        );
+                                                        if is_mandatory {
+                                                            return Err(e).with_buck_error_context(|| {
+                                                                format!(
+                                                                    "Failed to extract providers from \
+                                                                     mandatory toolchain impl '{}' for \
+                                                                     toolchain type '{}'",
+                                                                    tc.toolchain_impl, type_label
+                                                                )
+                                                            });
+                                                        }
+                                                        tracing::debug!(
+                                                            "  {} → providers extraction failed (optional): {}",
+                                                            type_label,
+                                                            e
+                                                        );
+                                                        None
                                                     }
-                                                    tracing::debug!(
-                                                        "  {} → providers extraction failed (optional): {}",
-                                                        type_label,
-                                                        e
-                                                    );
-                                                    None
                                                 }
                                             }
-                                        }
-                                        Ok(_) => {
-                                            if is_mandatory {
-                                                return Err(kuro_error::kuro_error!(
-                                                    kuro_error::ErrorTag::Input,
-                                                    "Mandatory toolchain impl '{}' for type '{}' \
-                                                     is incompatible with target configuration",
+                                            Ok(_) => {
+                                                analysis_ctx_toolchain_provider_checkpoint(
+                                                    &analysis_env.label,
+                                                    type_label,
+                                                    &tc.toolchain_impl,
+                                                    Some(&configured),
+                                                    toolchain_index,
+                                                    toolchain_count,
+                                                    is_mandatory,
+                                                    is_self_dependency,
+                                                    3,
+                                                    "analysis_incompatible",
+                                                    evaluate_rule_started,
+                                                );
+                                                if is_mandatory {
+                                                    return Err(kuro_error::kuro_error!(
+                                                        kuro_error::ErrorTag::Input,
+                                                        "Mandatory toolchain impl '{}' for type '{}' \
+                                                         is incompatible with target configuration",
+                                                        tc.toolchain_impl,
+                                                        type_label
+                                                    ));
+                                                }
+                                                tracing::debug!(
+                                                    "  {} → impl '{}' incompatible (optional)",
+                                                    type_label,
+                                                    tc.toolchain_impl
+                                                );
+                                                None
+                                            }
+                                            Err(e) => {
+                                                analysis_ctx_toolchain_provider_checkpoint(
+                                                    &analysis_env.label,
+                                                    type_label,
+                                                    &tc.toolchain_impl,
+                                                    Some(&configured),
+                                                    toolchain_index,
+                                                    toolchain_count,
+                                                    is_mandatory,
+                                                    is_self_dependency,
+                                                    5,
+                                                    "analysis_error",
+                                                    evaluate_rule_started,
+                                                );
+                                                if is_mandatory {
+                                                    return Err(e).with_buck_error_context(|| {
+                                                        format!(
+                                                            "Failed to analyze mandatory toolchain \
+                                                             impl '{}' for toolchain type '{}'",
+                                                            tc.toolchain_impl, type_label
+                                                        )
+                                                    });
+                                                }
+                                                tracing::debug!(
+                                                    "  {} → analysis of impl '{}' failed (optional): {:#}",
+                                                    type_label,
                                                     tc.toolchain_impl,
-                                                    type_label
-                                                ));
+                                                    e
+                                                );
+                                                None
                                             }
-                                            tracing::debug!(
-                                                "  {} → impl '{}' incompatible (optional)",
-                                                type_label,
-                                                tc.toolchain_impl
-                                            );
-                                            None
-                                        }
-                                        Err(e) => {
-                                            if is_mandatory {
-                                                return Err(e).with_buck_error_context(|| {
-                                                    format!(
-                                                        "Failed to analyze mandatory toolchain \
-                                                         impl '{}' for toolchain type '{}'",
-                                                        tc.toolchain_impl, type_label
-                                                    )
-                                                });
-                                            }
-                                            tracing::debug!(
-                                                "  {} → analysis of impl '{}' failed (optional): {:#}",
-                                                type_label,
-                                                tc.toolchain_impl,
-                                                e
-                                            );
-                                            None
                                         }
                                     }
                                 }
                                 None => {
+                                    analysis_ctx_toolchain_provider_checkpoint(
+                                        &analysis_env.label,
+                                        type_label,
+                                        &tc.toolchain_impl,
+                                        None,
+                                        toolchain_index,
+                                        toolchain_count,
+                                        is_mandatory,
+                                        false,
+                                        6,
+                                        "parse_error",
+                                        evaluate_rule_started,
+                                    );
                                     if is_mandatory {
                                         return Err(kuro_error::kuro_error!(
                                             kuro_error::ErrorTag::Input,
@@ -1481,6 +2030,19 @@ async fn run_analysis_with_env_underlying(
 
                         toolchain_providers.insert(type_label.clone(), provider_value);
                     } else {
+                        analysis_ctx_toolchain_provider_checkpoint(
+                            &analysis_env.label,
+                            type_label,
+                            "<none>",
+                            None,
+                            toolchain_index,
+                            toolchain_count,
+                            mandatory_types.contains(type_label),
+                            false,
+                            7,
+                            "unresolved_optional",
+                            evaluate_rule_started,
+                        );
                         toolchain_providers.insert(type_label.clone(), None);
                     }
                 }
@@ -1495,22 +2057,62 @@ async fn run_analysis_with_env_underlying(
         } else {
             None
         };
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            8,
+            "ctx_toolchain_provider_analysis_complete",
+            evaluate_rule_started,
+        );
 
         configure_span.end(kuro_data::AnalysisStageEnd {});
 
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            9,
+            "starlark_provider_start",
+            evaluate_rule_started,
+        );
         let eval_kind = StarlarkEvalKind::Analysis(node.label().dupe());
         let eval_provider = StarlarkEvaluatorProvider::new(dice, eval_kind).await?;
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            10,
+            "starlark_provider_complete",
+            evaluate_rule_started,
+        );
         let mut reentrant_eval =
             eval_provider.make_reentrant_evaluator(&env, analysis_env.cancellation.into())?;
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            11,
+            "reentrant_evaluator_ready",
+            evaluate_rule_started,
+        );
 
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            12,
+            "rule_impl_evaluator_start",
+            evaluate_rule_started,
+        );
         let (ctx, list_res) = reentrant_eval.with_evaluator(|mut eval| {
             eval.set_print_handler(&print);
             eval.set_soft_error_handler(&KuroStarlarkSoftErrorHandler);
+            if kuro_util::memory_checkpoint::enabled() {
+                eval.set_call_stack_checkpoint(Box::new(AnalysisStarlarkProgress::new(
+                    &analysis_env.label,
+                )));
+            }
 
             let ctx = AnalysisContext::prepare(
                 eval.heap(),
                 Some(attributes),
-                Some(analysis_env.label),
+                Some(analysis_env.label.dupe()),
                 Some(plugins.into()),
                 registry,
                 dice.global_data().get_digest_config(),
@@ -1561,6 +2163,13 @@ async fn run_analysis_with_env_underlying(
             // Plan 16.6: run_impl sub-span — the rule's Starlark impl
             // invocation itself, excluding toolchain resolution and attr
             // coercion. This is what "rule took too long" actually measures.
+            analysis_eval_phase_checkpoint(
+                "analysis_evaluate_rule_phase",
+                &analysis_env.label,
+                13,
+                "rule_impl_invoke_start",
+                evaluate_rule_started,
+            );
             let list_res = dispatch_span_simple::<
                 _,
                 kuro_data::AnalysisStageEnd,
@@ -1573,6 +2182,13 @@ async fn run_analysis_with_env_underlying(
                 || analysis_env.rule_spec.invoke(&mut eval, ctx),
                 kuro_data::AnalysisStageEnd {},
             )?;
+            analysis_eval_phase_checkpoint(
+                "analysis_evaluate_rule_phase",
+                &analysis_env.label,
+                14,
+                "rule_impl_invoke_complete",
+                evaluate_rule_started,
+            );
 
             // Bazel convention: when a rule declares outputs via `attr.output`
             // / `attr.output_list` and the impl does not return DefaultInfo
@@ -1589,13 +2205,41 @@ async fn run_analysis_with_env_underlying(
                 list_res,
                 &analysis_env.rule_spec.output_attr_names(),
             )?;
+            analysis_eval_phase_checkpoint(
+                "analysis_evaluate_rule_phase",
+                &analysis_env.label,
+                15,
+                "provider_value_ready",
+                evaluate_rule_started,
+            );
 
             Ok((ctx, list_res))
         })?;
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            16,
+            "rule_impl_evaluator_complete",
+            evaluate_rule_started,
+        );
 
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            20,
+            "promises_start",
+            evaluate_rule_started,
+        );
         ctx.actions
             .run_promises(&mut RunAnonPromisesAccessorPair(&mut reentrant_eval, dice))
             .await?;
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            21,
+            "promises_complete",
+            evaluate_rule_started,
+        );
 
         // Pull the ctx object back out, and steal ctx.action's state back
         let analysis_registry = ctx.take_state();
@@ -1629,6 +2273,13 @@ async fn run_analysis_with_env_underlying(
             list_res
         };
 
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            30,
+            "provider_collection_start",
+            evaluate_rule_started,
+        );
         // TODO: Convert the ValueError from `try_from_value` better than just printing its Debug
         // Use try_from_value_subtarget to auto-inject DefaultInfo when missing (Bazel compat:
         // build setting rules like error_format return only custom providers without DefaultInfo)
@@ -1659,7 +2310,21 @@ async fn run_analysis_with_env_underlying(
                 .analysis_value_storage
                 .set_result_value(provider_collection)?;
         }
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            31,
+            "provider_collection_complete",
+            evaluate_rule_started,
+        );
 
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            40,
+            "freeze_start",
+            evaluate_rule_started,
+        );
         let finished_eval = reentrant_eval.finish_evaluation();
 
         let declared_actions = analysis_registry.num_declared_actions();
@@ -1667,6 +2332,13 @@ async fn run_analysis_with_env_underlying(
         let registry_finalizer = analysis_registry.finalize(&env)?;
         let (token, frozen_env, profile_data) = finished_eval.freeze_and_finish(env)?;
         let recorded_values = registry_finalizer(&frozen_env)?;
+        analysis_eval_phase_checkpoint(
+            "analysis_evaluate_rule_phase",
+            &analysis_env.label,
+            41,
+            "freeze_complete",
+            evaluate_rule_started,
+        );
 
         let validations = transitive_validations(
             validations_from_deps,
@@ -1707,9 +2379,11 @@ async fn resolve_toolchain_types(
         crate::analysis::toolchain_resolution::ToolchainResolutionResult,
     >,
 )> {
+    let resolution_started = Instant::now();
+    let target_label = node.label();
     tracing::debug!(
         "Toolchain types for '{}': {:?} (count={}), exec_groups: {}",
-        node.label(),
+        target_label,
         toolchain_types,
         toolchain_types.len(),
         exec_group_defs.len()
@@ -1750,12 +2424,67 @@ async fn resolve_toolchain_types(
             all_type_labels.push(t.clone());
         }
     }
-    for label in &all_type_labels {
+    let unique_type_count = all_type_labels
+        .iter()
+        .collect::<std::collections::HashSet<_>>()
+        .len();
+    analysis_toolchain_resolution_checkpoint(
+        target_label,
+        1,
+        "canonicalize_type_labels_start",
+        resolution_started,
+        [
+            ("default_type_count", toolchain_types.len()),
+            ("exec_group_count", exec_group_defs.len()),
+            ("all_type_count", all_type_labels.len()),
+            ("unique_type_count", unique_type_count),
+        ],
+    );
+    for (index, label) in all_type_labels.iter().enumerate() {
         if !alias_cache.contains_key(label) {
+            analysis_toolchain_resolution_checkpoint(
+                target_label,
+                2,
+                "canonicalize_type_label_start",
+                resolution_started,
+                [
+                    ("index", index),
+                    ("total", all_type_labels.len()),
+                    ("label_len", label.len()),
+                    ("alias_cache_size", alias_cache.len()),
+                ],
+            );
             let canonical = canonicalize_toolchain_type_label(dice, label, &mut alias_cache).await;
+            let canonical_len = canonical.len();
+            let changed = (canonical != *label) as usize;
             alias_cache.insert(label.clone(), canonical);
+            analysis_toolchain_resolution_checkpoint(
+                target_label,
+                3,
+                "canonicalize_type_label_complete",
+                resolution_started,
+                [
+                    ("index", index),
+                    ("total", all_type_labels.len()),
+                    ("label_len", label.len()),
+                    ("canonical_len", canonical_len),
+                    ("changed", changed),
+                    ("alias_cache_size", alias_cache.len()),
+                ],
+            );
         }
     }
+    analysis_toolchain_resolution_checkpoint(
+        target_label,
+        4,
+        "canonicalize_type_labels_complete",
+        resolution_started,
+        [
+            ("all_type_count", all_type_labels.len()),
+            ("unique_type_count", unique_type_count),
+            ("alias_cache_size", alias_cache.len()),
+        ],
+    );
     let resolve_alias = |label: &str| -> String {
         alias_cache
             .get(label)
@@ -1811,27 +2540,124 @@ async fn resolve_toolchain_types(
     // Plan 13 Phase 3: collect every required toolchain type label across
     // all groups. If the first resolve pass fails (Err) or leaves a
     // mandatory type unresolved, lazy-load the deferred pool filtered by
-    // those types and retry once.
+    // those types and retry once. Optional misses are intentionally not
+    // retry drivers: Bazel preserves `mandatory = False` requirements as
+    // unresolved optional entries rather than making them block analysis.
     let all_required_type_labels: Vec<String> = requests
         .iter()
         .flat_map(|r| r.required_types.iter().map(|t| t.type_label.clone()))
         .collect();
 
+    analysis_toolchain_resolution_checkpoint(
+        target_label,
+        5,
+        "first_resolve_start",
+        resolution_started,
+        [
+            ("request_count", requests.len()),
+            ("required_type_count", all_required_type_labels.len()),
+            ("candidate_count", candidates.len()),
+        ],
+    );
     let first = resolve_toolchains_multi_group(&requests, &target, &candidates);
-    let mandatory_unresolved = match &first {
-        Err(_) => true,
-        Ok(multi) => multi.groups.values().any(|g| {
-            g.resolved_toolchains
-                .iter()
-                .any(|(_, resolved)| resolved.is_none())
-        }),
-    };
+    let (
+        first_error,
+        first_group_count,
+        first_resolved_count,
+        first_unresolved_mandatory,
+        first_unresolved_optional,
+        first_missing_group_count,
+    ) = summarize_toolchain_resolution_result(&first, &requests);
+    analysis_toolchain_resolution_checkpoint(
+        target_label,
+        6,
+        "first_resolve_complete",
+        resolution_started,
+        [
+            ("error", first_error),
+            ("group_count", first_group_count),
+            ("resolved_count", first_resolved_count),
+            ("unresolved_mandatory", first_unresolved_mandatory),
+            ("unresolved_optional", first_unresolved_optional),
+            ("missing_group_count", first_missing_group_count),
+        ],
+    );
+    let mandatory_unresolved = needs_deferred_toolchain_retry(&first, &requests);
+    analysis_toolchain_resolution_checkpoint(
+        target_label,
+        7,
+        "deferred_retry_decision",
+        resolution_started,
+        [
+            ("retry", mandatory_unresolved as usize),
+            ("required_type_count", all_required_type_labels.len()),
+            ("unresolved_mandatory", first_unresolved_mandatory),
+            ("unresolved_optional", first_unresolved_optional),
+            ("first_error", first_error),
+        ],
+    );
     let resolved_result = if mandatory_unresolved && !all_required_type_labels.is_empty() {
         // Retry even when this call did not perform the load itself. Another
         // concurrent analysis may have populated the global declared-toolchain
         // registry while this call waited on the deferred-load gate.
-        ensure_deferred_toolchains_loaded(dice, &all_required_type_labels).await;
-        resolve_toolchains_multi_group(&requests, &target, &candidates)
+        analysis_toolchain_resolution_checkpoint(
+            target_label,
+            8,
+            "ensure_deferred_toolchains_loaded_start",
+            resolution_started,
+            [
+                ("required_type_count", all_required_type_labels.len()),
+                ("candidate_count", candidates.len()),
+            ],
+        );
+        let loaded = ensure_deferred_toolchains_loaded(dice, &all_required_type_labels).await;
+        analysis_toolchain_resolution_checkpoint(
+            target_label,
+            9,
+            "ensure_deferred_toolchains_loaded_complete",
+            resolution_started,
+            [
+                ("loaded", loaded as usize),
+                ("required_type_count", all_required_type_labels.len()),
+                ("candidate_count", candidates.len()),
+            ],
+        );
+        analysis_toolchain_resolution_checkpoint(
+            target_label,
+            10,
+            "retry_resolve_start",
+            resolution_started,
+            [
+                ("loaded", loaded as usize),
+                ("request_count", requests.len()),
+                ("required_type_count", all_required_type_labels.len()),
+                ("candidate_count", candidates.len()),
+            ],
+        );
+        let retry = resolve_toolchains_multi_group(&requests, &target, &candidates);
+        let (
+            retry_error,
+            retry_group_count,
+            retry_resolved_count,
+            retry_unresolved_mandatory,
+            retry_unresolved_optional,
+            retry_missing_group_count,
+        ) = summarize_toolchain_resolution_result(&retry, &requests);
+        analysis_toolchain_resolution_checkpoint(
+            target_label,
+            11,
+            "retry_resolve_complete",
+            resolution_started,
+            [
+                ("error", retry_error),
+                ("group_count", retry_group_count),
+                ("resolved_count", retry_resolved_count),
+                ("unresolved_mandatory", retry_unresolved_mandatory),
+                ("unresolved_optional", retry_unresolved_optional),
+                ("missing_group_count", retry_missing_group_count),
+            ],
+        );
+        retry
     } else {
         first
     };
@@ -1874,6 +2700,94 @@ async fn resolve_toolchain_types(
             e
         )),
     }
+}
+
+fn needs_deferred_toolchain_retry(
+    first: &Result<crate::analysis::toolchain_resolution::MultiGroupResolutionResult, String>,
+    requests: &[crate::analysis::toolchain_resolution::ExecGroupResolutionRequest],
+) -> bool {
+    let multi = match first {
+        Ok(multi) => multi,
+        Err(_) => return true,
+    };
+
+    requests.iter().any(|request| {
+        let Some(result) = multi.groups.get(&request.group_name) else {
+            return true;
+        };
+        request.required_types.iter().any(|required| {
+            required.mandatory
+                && result
+                    .resolved_toolchains
+                    .get(&required.type_label)
+                    .map(|resolved| resolved.is_none())
+                    .unwrap_or(true)
+        })
+    })
+}
+
+fn summarize_toolchain_resolution_result(
+    result: &Result<crate::analysis::toolchain_resolution::MultiGroupResolutionResult, String>,
+    requests: &[crate::analysis::toolchain_resolution::ExecGroupResolutionRequest],
+) -> (usize, usize, usize, usize, usize, usize) {
+    let required_count: usize = requests.iter().map(|r| r.required_types.len()).sum();
+    let optional_count = requests
+        .iter()
+        .flat_map(|r| &r.required_types)
+        .filter(|t| !t.mandatory)
+        .count();
+    let mandatory_count = required_count - optional_count;
+
+    let multi = match result {
+        Ok(multi) => multi,
+        Err(_) => return (1, 0, 0, mandatory_count, optional_count, requests.len()),
+    };
+
+    let resolved_count = multi
+        .groups
+        .values()
+        .flat_map(|group| group.resolved_toolchains.values())
+        .filter(|resolved| resolved.is_some())
+        .count();
+    let mut unresolved_mandatory = 0;
+    let mut unresolved_optional = 0;
+    let mut missing_group_count = 0;
+    for request in requests {
+        let Some(group) = multi.groups.get(&request.group_name) else {
+            missing_group_count += 1;
+            for required in &request.required_types {
+                if required.mandatory {
+                    unresolved_mandatory += 1;
+                } else {
+                    unresolved_optional += 1;
+                }
+            }
+            continue;
+        };
+        for required in &request.required_types {
+            let unresolved = group
+                .resolved_toolchains
+                .get(&required.type_label)
+                .map(|resolved| resolved.is_none())
+                .unwrap_or(true);
+            if unresolved {
+                if required.mandatory {
+                    unresolved_mandatory += 1;
+                } else {
+                    unresolved_optional += 1;
+                }
+            }
+        }
+    }
+
+    (
+        0,
+        multi.groups.len(),
+        resolved_count,
+        unresolved_mandatory,
+        unresolved_optional,
+        missing_group_count,
+    )
 }
 
 pub fn transitive_validations(
@@ -2105,7 +3019,30 @@ pub fn get_user_defined_rule_spec(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
+    use crate::analysis::toolchain_resolution::ExecGroupResolutionRequest;
+    use crate::analysis::toolchain_resolution::MultiGroupResolutionResult;
+    use crate::analysis::toolchain_resolution::RequiredToolchainType;
+    use crate::analysis::toolchain_resolution::ResolvedToolchain;
+    use crate::analysis::toolchain_resolution::ToolchainResolutionResult;
+
+    fn required_toolchain(label: &str, mandatory: bool) -> RequiredToolchainType {
+        RequiredToolchainType {
+            type_label: label.to_owned(),
+            canonical_type_label: label.to_owned(),
+            mandatory,
+        }
+    }
+
+    fn resolved_toolchain(label: &str) -> ResolvedToolchain {
+        ResolvedToolchain {
+            toolchain_target: format!("{label}_target"),
+            toolchain_impl: format!("{label}_impl"),
+            toolchain_type: label.to_owned(),
+        }
+    }
 
     #[test]
     fn test_parse_registered_toolchain_label() {
@@ -2210,5 +3147,60 @@ mod tests {
             is_root: false,
         };
         assert!(should_eager_load_registered_toolchain(&bundled_transitive));
+    }
+
+    #[test]
+    fn test_deferred_retry_ignores_optional_miss() {
+        let requests = vec![ExecGroupResolutionRequest {
+            group_name: "default".to_owned(),
+            required_types: vec![
+                required_toolchain("@rules_rust//rust:toolchain_type", true),
+                required_toolchain("@bazel_tools//tools/cpp:toolchain_type", false),
+            ],
+            exec_constraints: Vec::new(),
+        }];
+        let mut resolved_toolchains = HashMap::new();
+        resolved_toolchains.insert(
+            "@rules_rust//rust:toolchain_type".to_owned(),
+            Some(resolved_toolchain("@rules_rust//rust:toolchain_type")),
+        );
+        resolved_toolchains.insert("@bazel_tools//tools/cpp:toolchain_type".to_owned(), None);
+        let mut groups = HashMap::new();
+        groups.insert(
+            "default".to_owned(),
+            ToolchainResolutionResult {
+                exec_platform: "@local_config_platform//:host".to_owned(),
+                resolved_toolchains,
+            },
+        );
+
+        assert!(!needs_deferred_toolchain_retry(
+            &Ok(MultiGroupResolutionResult { groups }),
+            &requests
+        ));
+    }
+
+    #[test]
+    fn test_deferred_retry_keeps_mandatory_miss() {
+        let requests = vec![ExecGroupResolutionRequest {
+            group_name: "default".to_owned(),
+            required_types: vec![required_toolchain("@rules_rust//rust:toolchain_type", true)],
+            exec_constraints: Vec::new(),
+        }];
+        let mut resolved_toolchains = HashMap::new();
+        resolved_toolchains.insert("@rules_rust//rust:toolchain_type".to_owned(), None);
+        let mut groups = HashMap::new();
+        groups.insert(
+            "default".to_owned(),
+            ToolchainResolutionResult {
+                exec_platform: "@local_config_platform//:host".to_owned(),
+                resolved_toolchains,
+            },
+        );
+
+        assert!(needs_deferred_toolchain_retry(
+            &Ok(MultiGroupResolutionResult { groups }),
+            &requests
+        ));
     }
 }
