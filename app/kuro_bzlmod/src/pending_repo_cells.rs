@@ -23,10 +23,12 @@
 //!
 //! ## Naming Convention
 //!
-//! - **Canonical name**: `_main+{extension_name}+{internal_name}`
-//!   - Example: `rules_python+pip+numpy` (Bazel 9.0 uses `+` separator)
+//! - **Canonical name**: `_main+{extension_name}+{internal_name}` for root-owned
+//!   extensions, or `{module}++{extension_name}+{internal_name}` for non-root
+//!   module-owned extensions.
+//!   - Example: `rules_python++pip+numpy` (Bazel 9.0 uses `+` separator)
 //! - **Apparent name**: From `use_repo()` - maps to canonical
-//!   - Example: `use_repo(pip, "numpy")` -> `@numpy` resolves to `@@rules_python+pip+numpy`
+//!   - Example: `use_repo(pip, "numpy")` -> `@numpy` resolves to `@@rules_python++pip+numpy`
 //!
 //! ## Integration
 //!
@@ -51,7 +53,7 @@ use crate::types::UseRepo;
 /// be materialized lazily when first accessed.
 #[derive(Debug, Clone)]
 pub struct PendingRepoCell {
-    /// Canonical repository name (e.g., "rules_python+pip+numpy").
+    /// Canonical repository name (e.g., "rules_python++pip+numpy").
     pub canonical_name: String,
     /// Extension that generated this repo (e.g., "@@rules_python//pip:pip.bzl%pip").
     pub extension_id: String,
@@ -70,7 +72,7 @@ pub struct PendingRepoCell {
 pub struct RepoAlias {
     /// The apparent name (e.g., "numpy" from `use_repo(pip, "numpy")`).
     pub apparent_name: String,
-    /// The canonical name this resolves to (e.g., "rules_python+pip+numpy").
+    /// The canonical name this resolves to (e.g., "rules_python++pip+numpy").
     pub canonical_name: String,
 }
 
@@ -190,7 +192,7 @@ pub fn pre_compute_extension_repo_cells(
             // mis-attribute every transitive dep's relative `use_extension`
             // to the root module (e.g. `rules_java`'s toolchains extension
             // showing up as `_main+toolchains+...` instead of
-            // `rules_java+toolchains+...`).
+            // `rules_java++toolchains+...`).
             let extracted_owner = extract_owning_module(&ext_id, root_module_name);
             let owner_module = if is_root && extracted_owner == module_name {
                 "_main"
@@ -788,8 +790,8 @@ pub fn build_extension_cells(
 /// to the canonical cell names.
 ///
 /// # Example
-/// `use_repo(pip, "numpy")` creates alias `numpy` -> `rules_python+pip+numpy`
-/// `use_repo(pip, myname = "numpy")` creates alias `myname` -> `rules_python+pip+numpy`
+/// `use_repo(pip, "numpy")` creates alias `numpy` -> `rules_python++pip+numpy`
+/// `use_repo(pip, myname = "numpy")` creates alias `myname` -> `rules_python++pip+numpy`
 ///
 /// # Arguments
 /// * `extension_result` - The extension result with canonical name mappings
@@ -941,7 +943,8 @@ pub fn extract_use_repos_for_extension<'a>(
 
 /// Check if a cell name looks like an extension-generated canonical name.
 ///
-/// Extension repos have canonical names like `module+extension+repo` (Bazel 9.0 `+` separator).
+/// Extension repos have canonical names like `_main+extension+repo` or
+/// `module++extension+repo` (Bazel 9.0 `+` separator).
 /// Also accepts legacy `~` separator for backwards compatibility.
 pub fn is_extension_repo_canonical_name(name: &str) -> bool {
     // Bazel 9.0 uses + separator: <module>+<extension>+<repo>
@@ -960,9 +963,13 @@ pub fn is_extension_repo_canonical_name(name: &str) -> bool {
 /// `Some((prefix, extension_name, internal_name))` if valid, `None` otherwise.
 ///
 /// # Example
-/// `rules_python+pip+numpy` -> `Some(("rules_python", "pip", "numpy"))`
+/// `rules_python++pip+numpy` -> `Some(("rules_python+", "pip", "numpy"))`
 pub fn parse_canonical_name(canonical: &str) -> Option<(&str, &str, &str)> {
     // Try + separator first (Bazel 9.0), then ~ for backwards compat
+    if let Some((owner, rest)) = canonical.split_once("++") {
+        let (extension, internal) = rest.split_once('+')?;
+        return Some((&canonical[..owner.len() + 1], extension, internal));
+    }
     let parts: Vec<_> = canonical.splitn(3, '+').collect();
     if parts.len() == 3 {
         return Some((parts[0], parts[1], parts[2]));
@@ -1033,12 +1040,12 @@ mod tests {
             .iter()
             .map(|c| c.canonical_name.as_str())
             .collect();
-        assert!(cell_names.contains(&"rules_python+pip+numpy"));
-        assert!(cell_names.contains(&"rules_python+pip+requests"));
+        assert!(cell_names.contains(&"rules_python++pip+numpy"));
+        assert!(cell_names.contains(&"rules_python++pip+requests"));
 
         // Check paths
         for cell in &defs.cells {
-            assert!(cell.path.starts_with("bazel-external/rules_python+pip+"));
+            assert!(cell.path.starts_with("bazel-external/rules_python++pip+"));
         }
 
         // Check extension IDs
@@ -1255,7 +1262,7 @@ mod tests {
 
         let aliases = build_use_repo_aliases(&result, &use_repos).unwrap();
 
-        // Should create aliases numpy -> rules_python+pip+numpy, etc.
+        // Should create aliases numpy -> rules_python++pip+numpy, etc.
         assert_eq!(aliases.len(), 2);
 
         let alias_map: HashMap<_, _> = aliases
@@ -1263,10 +1270,10 @@ mod tests {
             .map(|a| (a.apparent_name.as_str(), a.canonical_name.as_str()))
             .collect();
 
-        assert_eq!(alias_map.get("numpy"), Some(&"rules_python+pip+numpy"));
+        assert_eq!(alias_map.get("numpy"), Some(&"rules_python++pip+numpy"));
         assert_eq!(
             alias_map.get("requests"),
-            Some(&"rules_python+pip+requests")
+            Some(&"rules_python++pip+requests")
         );
     }
 
@@ -1281,7 +1288,7 @@ mod tests {
 
         assert_eq!(aliases.len(), 1);
         assert_eq!(aliases[0].apparent_name, "np");
-        assert_eq!(aliases[0].canonical_name, "rules_python+pip+numpy");
+        assert_eq!(aliases[0].canonical_name, "rules_python++pip+numpy");
     }
 
     #[test]
@@ -1315,10 +1322,10 @@ mod tests {
 
     #[test]
     fn test_is_extension_repo_canonical_name() {
-        assert!(is_extension_repo_canonical_name("rules_python+pip+numpy"));
+        assert!(is_extension_repo_canonical_name("rules_python++pip+numpy"));
         assert!(is_extension_repo_canonical_name("_main+go_deps+gazelle"));
         assert!(is_extension_repo_canonical_name(
-            "bazel_features+version_extension+bazel_features_version"
+            "bazel_features++version_extension+bazel_features_version"
         ));
         assert!(!is_extension_repo_canonical_name("rules_cc"));
         assert!(!is_extension_repo_canonical_name("_main"));
@@ -1327,17 +1334,17 @@ mod tests {
     #[test]
     fn test_parse_canonical_name() {
         assert_eq!(
-            parse_canonical_name("rules_python+pip+numpy"),
-            Some(("rules_python", "pip", "numpy"))
+            parse_canonical_name("rules_python++pip+numpy"),
+            Some(("rules_python+", "pip", "numpy"))
         );
         assert_eq!(
             parse_canonical_name("_main+go_deps+com_github_foo_bar"),
             Some(("_main", "go_deps", "com_github_foo_bar"))
         );
         assert_eq!(
-            parse_canonical_name("bazel_features+version_extension+bazel_features_version"),
+            parse_canonical_name("bazel_features++version_extension+bazel_features_version"),
             Some((
-                "bazel_features",
+                "bazel_features+",
                 "version_extension",
                 "bazel_features_version"
             ))
@@ -1402,11 +1409,11 @@ mod tests {
             .iter()
             .find(|c| c.internal_name == "numpy")
             .unwrap();
-        assert_eq!(numpy_cell.canonical_name, "rules_python+pip+numpy");
+        assert_eq!(numpy_cell.canonical_name, "rules_python++pip+numpy");
         assert_eq!(numpy_cell.extension_id, "@@rules_python//pip:pip.bzl%pip");
         assert_eq!(numpy_cell.internal_name, "numpy");
         assert!(numpy_cell.spec_hash.starts_with("sha256-"));
-        assert_eq!(numpy_cell.path, "bazel-external/rules_python+pip+numpy");
+        assert_eq!(numpy_cell.path, "bazel-external/rules_python++pip+numpy");
 
         // Verify repo_spec_json is valid JSON and can be deserialized
         let deserialized: RepoSpec = serde_json::from_str(&numpy_cell.repo_spec_json).unwrap();

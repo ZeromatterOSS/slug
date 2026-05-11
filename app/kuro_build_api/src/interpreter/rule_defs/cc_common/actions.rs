@@ -215,6 +215,95 @@ fn push_clang_resource_include(args: &mut Vec<String>) {
     }
 }
 
+fn copy_dir_contents(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    if !src.is_dir() {
+        return Ok(());
+    }
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir_contents(&src_path, &dst_path)?;
+        } else if src_path.is_file() {
+            if let Some(parent) = dst_path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            std::fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
+}
+
+fn write_musl_alltypes_header(
+    musl: &std::path::Path,
+    out: &std::path::Path,
+) -> std::io::Result<()> {
+    let sed = musl.join("tools").join("mkalltypes.sed");
+    let arch = musl
+        .join("arch")
+        .join("x86_64")
+        .join("bits")
+        .join("alltypes.h.in");
+    let generic = musl.join("include").join("alltypes.h.in");
+    let output = std::process::Command::new("sed")
+        .arg("-f")
+        .arg(sed)
+        .arg(arch)
+        .arg(generic)
+        .output()?;
+    if !output.status.success() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "failed to generate musl alltypes.h",
+        ));
+    }
+    std::fs::write(out, output.stdout)
+}
+
+fn write_musl_syscall_header(musl: &std::path::Path, out: &std::path::Path) -> std::io::Result<()> {
+    let input = musl
+        .join("arch")
+        .join("x86_64")
+        .join("bits")
+        .join("syscall.h.in");
+    let source = std::fs::read_to_string(input)?;
+    let mut generated = source.clone();
+    for line in source.lines() {
+        if line.contains("__NR_") {
+            generated.push_str(&line.replace("__NR_", "SYS_"));
+            generated.push('\n');
+        }
+    }
+    std::fs::write(out, generated)
+}
+
+fn ensure_musl_generated_include_dir(musl: &std::path::Path) -> Option<std::path::PathBuf> {
+    let out = musl.join("generated").join("x86_64").join("includes");
+    let bits = out.join("bits");
+    let alltypes = bits.join("alltypes.h");
+    let syscall = bits.join("syscall.h");
+    if alltypes.is_file() && syscall.is_file() {
+        return Some(out);
+    }
+
+    let result = (|| -> std::io::Result<()> {
+        copy_dir_contents(&musl.join("include"), &out)?;
+        copy_dir_contents(&musl.join("arch").join("generic"), &out)?;
+        copy_dir_contents(&musl.join("arch").join("x86_64"), &out)?;
+        std::fs::create_dir_all(&bits)?;
+        write_musl_alltypes_header(musl, &alltypes)?;
+        write_musl_syscall_header(musl, &syscall)?;
+        Ok(())
+    })();
+
+    match result {
+        Ok(()) => Some(out),
+        Err(_) => None,
+    }
+}
+
 fn llvm_musl_compile_default_args() -> Vec<String> {
     let mut args = [
         "-target",
@@ -250,9 +339,13 @@ fn llvm_musl_compile_default_args() -> Vec<String> {
     if let Some(musl) = first_external_dir(&external, |name| {
         name == "llvm+musl+musl_libc" || name == "llvm++musl+musl_libc"
     }) {
-        push_existing_isystem(&mut args, musl.join("include"));
-        push_existing_isystem(&mut args, musl.join("arch").join("x86_64"));
-        push_existing_isystem(&mut args, musl.join("src").join("include"));
+        if let Some(include_dir) = ensure_musl_generated_include_dir(&musl) {
+            push_existing_isystem(&mut args, include_dir);
+        } else {
+            push_existing_isystem(&mut args, musl.join("include"));
+            push_existing_isystem(&mut args, musl.join("arch").join("x86_64"));
+            push_existing_isystem(&mut args, musl.join("src").join("include"));
+        }
     }
 
     if let Some(compiler_rt) = first_external_dir(&external, |name| {
@@ -3680,7 +3773,6 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 args.push(heap.alloc_str(&flag).to_value());
             }
         }
-
         // Compilation-mode-based flags. Mode comes from the feature
         // configuration (Plan 19.6) so an exec-cfg compile sees the exec
         // platform's opt default from `platform(exec_properties=...)`, and
@@ -4783,14 +4875,17 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             );
         }
 
-        if let Ok(Some(target_system_name)) = cc_toolchain.get_attr("target_gnu_system_name", heap)
-        {
+        let direct_target_system_name = cc_toolchain
+            .get_attr("target_gnu_system_name", heap)
+            .ok()
+            .flatten();
+        let direct_target_libc = cc_toolchain.get_attr("libc", heap).ok().flatten();
+        if let Some(target_system_name) = direct_target_system_name {
             insert_if_set(&mut map, heap, "target_system_name", target_system_name);
         }
-        if let Ok(Some(target_libc)) = cc_toolchain.get_attr("libc", heap) {
+        if let Some(target_libc) = direct_target_libc {
             insert_if_set(&mut map, heap, "target_libc", target_libc);
         }
-
         // Merge variables_extension dict into the variables
         if !variables_extension.is_none() {
             if let Some(dict_ref) = DictRef::from_value(variables_extension) {

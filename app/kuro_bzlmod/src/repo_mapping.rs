@@ -502,7 +502,7 @@ mod tests {
                 .canonicalize_label("@coreutils_toolchains//:all")
                 .unwrap()
                 .to_storage_string(),
-            "@bazel_lib+toolchains+coreutils_toolchains//:all"
+            "@bazel_lib++toolchains+coreutils_toolchains//:all"
         );
     }
 
@@ -648,14 +648,15 @@ mod tests {
             "ext",
             None,
             |repo| {
-                (repo == "launcher").then(|| CanonicalRepoName::new("rules_python+python+launcher"))
+                (repo == "launcher")
+                    .then(|| CanonicalRepoName::new("rules_python++python+launcher"))
             },
         )
         .unwrap();
 
         assert_eq!(
             label.to_unambiguous_string(),
-            "@@rules_python+python+launcher//:launcher"
+            "@@rules_python++python+launcher//:launcher"
         );
     }
 

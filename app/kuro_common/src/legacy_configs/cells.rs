@@ -1097,6 +1097,13 @@ impl BuckConfigBasedCells {
                 cell.path.clone(),
                 setup.clone(),
             );
+            if cell.internal_name != cell.canonical_name {
+                kuro_core::cells::register_dynamic_extension_cell_with_setup(
+                    cell.internal_name.clone(),
+                    cell.path.clone(),
+                    setup.clone(),
+                );
+            }
             if !cell.repo_spec_json.is_empty() {
                 match serde_json::from_str::<kuro_bzlmod::RepoSpec>(&cell.repo_spec_json) {
                     Ok(repo_spec) => {

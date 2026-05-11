@@ -668,8 +668,9 @@ fn sanitize_extension_id_for_path(extension_id: &str) -> String {
 ///
 /// Format: `{owning_module}+{extension_unique_name}+{internal_name}`
 /// where `owning_module` is `_main` for extensions defined in the root module
-/// (Bazel 9 convention; see `extract_owning_module`) and the declared module
-/// name otherwise. The separator is `+`.
+/// (Bazel 9 convention; see `extract_owning_module`) and the canonical module
+/// repo name otherwise. The separator is `+`, so non-root module extensions can
+/// have Bazel's `rules_rs++crate+repo` shape.
 ///
 /// `root_module_name` is the value of `module(name=…)` in the root MODULE.bazel
 /// — required so the root module's declared name (e.g., `llvm-project-overlay`)
@@ -695,7 +696,8 @@ pub fn build_canonical_names(
 ///
 /// Bazel's canonical naming convention prefixes the *root* module's extension
 /// repos with the literal string `_main`, regardless of the name the root
-/// module declares in MODULE.bazel. Non-root modules use their declared name.
+/// module declares in MODULE.bazel. Non-root modules use their canonical module
+/// repo name, including Bazel 9's trailing `+`.
 /// `root_module_name` is the value of `module(name=…)` in the root MODULE.bazel
 /// (e.g., `llvm-project-overlay`); pass `""` if the build has no root module.
 ///
@@ -707,8 +709,8 @@ pub fn build_canonical_names(
 /// "package not found" once the repo rule tries to read its own files.
 ///
 /// Extension ID formats:
-/// - `@bazel_features//private:extensions.bzl%version_extension` → `bazel_features`
-/// - `@@rules_cc//cc:extensions.bzl%cc_configure` → `rules_cc`
+/// - `@bazel_features//private:extensions.bzl%version_extension` → `bazel_features+`
+/// - `@@rules_cc+//cc:extensions.bzl%cc_configure` → `rules_cc+`
 /// - `//path:file.bzl%ext` → `_main` (root module, no repo prefix)
 /// - `@<root_module_name>//path:file.bzl%ext` → `_main` (root module via its declared name)
 ///
@@ -722,16 +724,15 @@ pub fn extract_owning_module(extension_id: &str, root_module_name: &str) -> Stri
     // The module segment may appear in two shapes:
     //   - kuro internal:        `@<apparent>//...`        → module = "<apparent>"
     //   - bazel 9 canonical:    `@@<repo>+//...`          → module = "<repo>+"
-    // Strip the bazel-canonical trailing `+` so both shapes converge on the
-    // same owning-module name (otherwise format!"{}+{}+{}" produces
-    // `<repo>++<ext>+<repo>` for the canonical form).
+    // Bazel 9 includes the trailing `+` in canonical module repository names,
+    // and extension-generated repositories preserve it before adding their own
+    // `+<extension>+<repo>` suffix.
     let stripped = bzl_part
         .strip_prefix("@@")
         .or_else(|| bzl_part.strip_prefix('@'))
         .unwrap_or(bzl_part);
     if let Some(pos) = stripped.find("//") {
         let module = &stripped[..pos];
-        let module = module.strip_suffix('+').unwrap_or(module);
         if !module.is_empty() {
             // Map the root module's declared name back to Bazel's canonical
             // `_main` placeholder so callers all agree on one canonical
@@ -740,7 +741,10 @@ pub fn extract_owning_module(extension_id: &str, root_module_name: &str) -> Stri
             if !root_module_name.is_empty() && module == root_module_name {
                 return "_main".to_owned();
             }
-            return module.to_owned();
+            if module.ends_with('+') {
+                return module.to_owned();
+            }
+            return format!("{module}+");
         }
     }
 
@@ -912,11 +916,11 @@ mod tests {
 
         assert_eq!(
             result.canonical_name("foo"),
-            Some("module+my_extension+foo")
+            Some("module++my_extension+foo")
         );
         assert_eq!(
             result.canonical_name("bar"),
-            Some("module+my_extension+bar")
+            Some("module++my_extension+bar")
         );
         assert_eq!(result.canonical_name("baz"), None);
     }
@@ -934,11 +938,11 @@ mod tests {
         );
 
         assert_eq!(
-            result.internal_name_from_canonical("rules_python+pip+numpy"),
+            result.internal_name_from_canonical("rules_python++pip+numpy"),
             Some("numpy")
         );
         assert_eq!(
-            result.internal_name_from_canonical("rules_python+pip+pandas"),
+            result.internal_name_from_canonical("rules_python++pip+pandas"),
             None
         );
     }
@@ -972,11 +976,11 @@ mod tests {
 
         assert_eq!(
             names.get("numpy"),
-            Some(&"rules_python+pip+numpy".to_owned())
+            Some(&"rules_python++pip+numpy".to_owned())
         );
         assert_eq!(
             names.get("pandas"),
-            Some(&"rules_python+pip+pandas".to_owned())
+            Some(&"rules_python++pip+pandas".to_owned())
         );
     }
 
