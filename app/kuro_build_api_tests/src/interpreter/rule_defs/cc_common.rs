@@ -97,6 +97,27 @@ fn cc_common_create_linker_input_is_depset_eligible() -> kuro_error::Result<()> 
 }
 
 #[test]
+fn cc_common_compile_variables_carry_toolchain_target_identity() -> kuro_error::Result<()> {
+    let mut positive = tester()?;
+    positive.run_starlark_bzl_test(indoc!(
+        r#"
+        def test():
+            cc_toolchain = struct(
+                target_gnu_system_name = "x86_64-linux-musl",
+                libc = "musl",
+            )
+            variables = cc_common.create_compile_variables(
+                feature_configuration = None,
+                cc_toolchain = cc_toolchain,
+            )
+            assert_eq("x86_64-linux-musl", variables.target_system_name)
+            assert_eq("musl", variables.target_libc)
+        "#
+    ))?;
+    Ok(())
+}
+
+#[test]
 fn cc_info_values_are_depset_eligible_inside_rust_dep_variant_shape() -> kuro_error::Result<()> {
     let mut positive_tester = tester()?;
     positive_tester.run_starlark_bzl_test(indoc!(

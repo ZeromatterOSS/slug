@@ -46,6 +46,7 @@ use starlark::eval::Evaluator;
 use starlark::typing::Ty;
 use starlark::values::AllocValue;
 use starlark::values::FrozenHeap;
+use starlark::values::FrozenValue;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::OwnedFrozenValueTyped;
@@ -1925,6 +1926,75 @@ struct CcToolchainInfoNativeShim {
     target_platform: String,
 }
 
+/// Adds target-platform identity to real `CcToolchainInfo` values when Kuro has
+/// resolved the toolchain but the provider's rule-based metadata is incomplete.
+///
+/// rules_rust derives build-script `CFLAGS` from `cc_toolchain.libc` and
+/// `cc_toolchain.target_gnu_system_name`; without the musl identity it compiles
+/// C deps such as aws-lc-sys against host/glibc headers while later linking a
+/// musl binary.
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct CcToolchainInfoTargetPlatformOverlay {
+    inner: FrozenValue,
+    target_platform: String,
+}
+
+impl CcToolchainInfoTargetPlatformOverlay {
+    fn is_musl_target(&self) -> bool {
+        self.target_platform.contains("musl")
+    }
+}
+
+impl std::fmt::Display for CcToolchainInfoTargetPlatformOverlay {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.inner.to_value())
+    }
+}
+
+starlark::starlark_simple_value!(CcToolchainInfoTargetPlatformOverlay);
+
+#[starlark::values::starlark_value(type = "CcToolchainInfo")]
+impl<'v> StarlarkValue<'v> for CcToolchainInfoTargetPlatformOverlay {
+    fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
+        matches!(attribute, "target_gnu_system_name" | "libc")
+            || self.inner.to_value().has_attr(attribute, heap)
+    }
+
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        if self.is_musl_target() {
+            match attribute {
+                "target_gnu_system_name" => {
+                    return Some(heap.alloc_str("x86_64-linux-musl").to_value());
+                }
+                "libc" => return Some(heap.alloc_str("musl").to_value()),
+                _ => {}
+            }
+        }
+        self.inner
+            .to_value()
+            .get_attr(attribute, heap)
+            .ok()
+            .flatten()
+    }
+
+    fn dir_attr(&self) -> Vec<String> {
+        let mut attrs = self.inner.to_value().dir_attr();
+        for attr in ["target_gnu_system_name", "libc"] {
+            if !attrs.iter().any(|existing| existing == attr) {
+                attrs.push(attr.to_owned());
+            }
+        }
+        attrs
+    }
+
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        "CcToolchainInfoTargetPlatformOverlay".hash(hasher);
+        self.inner.to_value().write_hash(hasher)?;
+        self.target_platform.hash(hasher);
+        Ok(())
+    }
+}
+
 fn host_llvm_toolchain_bin(tool: &str) -> Option<String> {
     let root = kuro_core::cells::get_dynamic_project_root()?;
     let os = match std::env::consts::OS {
@@ -2273,7 +2343,10 @@ impl<'v> StarlarkValue<'v> for ResolvedToolchains {
                     .provider_collection()
                     .get_provider_raw(cc_toolchain_info_id)
                 {
-                    let cc = cc_fv.to_value();
+                    let cc = heap.alloc(CcToolchainInfoTargetPlatformOverlay {
+                        inner: *cc_fv,
+                        target_platform: self.target_platform.clone(),
+                    });
                     let cc_provider_in_toolchain = heap.alloc(true);
                     let fields = heap.alloc(AllocDict([
                         ("cc", cc),
@@ -2361,10 +2434,14 @@ fn alloc_cc_toolchain_info_shim<'v>(
     toolchain_label: &str,
     target_platform: &str,
 ) -> Value<'v> {
-    let cc = heap.alloc(CcToolchainInfoNativeShim {
-        toolchain_label: toolchain_label.to_owned(),
-        target_platform: target_platform.to_owned(),
-    });
+    let providers = cc_toolchain_native_shim_provider_collection(toolchain_label, target_platform);
+    let cc_toolchain_info_id =
+        crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider::provider_id();
+    let cc = providers
+        .provider_collection()
+        .get_provider_raw(cc_toolchain_info_id)
+        .expect("native C++ toolchain shim provider collection includes CcToolchainInfo")
+        .to_value();
     let cc_provider_in_toolchain = heap.alloc(true);
     let fields = heap.alloc(AllocDict([
         ("cc", cc),

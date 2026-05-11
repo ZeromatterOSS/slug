@@ -3031,6 +3031,19 @@ Kuro checkpoint RSS was ~815 MiB. The smoke wrapper killed the
 `kurod[zeromatter]` daemon after timeout, and no `kurod[...]` process
 remained.
 
+2026-05-11 follow-up: after Plan 57 module-extension fact reuse, the SDK
+smoke reached action execution and failed linking `//zm_cli:zm` for the
+linux-musl transition with `ld.lld: error: undefined symbol:
+__isoc23_sscanf` from `aws-lc-sys` C objects. A Bazel 9 parity probe in the
+same `../reactor-repo-kuro` checkout succeeds for `bazel build --config=linux
+//zm_cli:zm`, and its `aws-lc-sys` build-script log shows musl-targeted
+`CC`/`CXX` plus `CFLAGS`/`CXXFLAGS` containing `-target x86_64-linux-musl`,
+`-nostdlibinc`, musl/kernel/compiler-rt include paths, and LLVM resource
+headers. Kuro's generated `_bs.env` for the same crate was empty, so this is a
+Plan 15 `cc_common.create_compile_variables` /
+`get_memory_inefficient_command_line` toolchain-environment parity gap, not a
+module-extension or lockfile issue.
+
 ## Dependencies and ordering
 
 ```
