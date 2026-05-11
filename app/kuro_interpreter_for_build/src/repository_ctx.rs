@@ -41,6 +41,7 @@
 
 use std::collections::HashMap;
 use std::io::Cursor;
+use std::io::ErrorKind;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -724,6 +725,7 @@ pub(crate) fn resolve_label_to_path(label_str: &str, workspace_root: &Path) -> S
 
 fn resolve_label_to_filesystem_path(label_str: &str, workspace_root: &Path) -> PathBuf {
     let path = LabelFilesystemResolver::new(workspace_root)
+        .with_project_root(Some(workspace_root))
         .with_root_label_resolution(RootLabelResolution::ProjectAbsolute)
         .resolve_label_string(label_str)
         .unwrap_or_else(|| PathBuf::from(label_str));
@@ -751,6 +753,45 @@ pub(crate) fn ensure_label_path_materialized(path: &Path) {
             canonical,
             e
         );
+    }
+}
+
+fn apply_unified_patch(patch_path: &Path, strip: i32, working_dir: &Path) -> Result<(), String> {
+    match Command::new("patch")
+        .args(["-p", &strip.to_string(), "-i"])
+        .arg(patch_path)
+        .current_dir(working_dir)
+        .output()
+    {
+        Ok(output) if output.status.success() => return Ok(()),
+        Ok(output) => {
+            return Err(format!(
+                "Patch failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        Err(e) if e.kind() != ErrorKind::NotFound => {
+            return Err(format!("Failed to execute patch: {e}"));
+        }
+        Err(_) => {}
+    }
+
+    let strip_arg = format!("-p{strip}");
+    let output = Command::new("git")
+        .args(["apply", "--unsafe-paths", "--whitespace=nowarn", &strip_arg])
+        .arg(patch_path)
+        .current_dir(working_dir)
+        .output()
+        .map_err(|e| format!("Failed to execute patch fallback via git apply: {e}"))?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Patch failed via git apply: {}{}",
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
+        ))
     }
 }
 
@@ -1631,7 +1672,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
                 } else if v.get_type() == "Label" {
                     // Label: resolve to filesystem path via cell paths
                     let label_str = v.to_str();
-                    let path = resolve_label_to_filesystem_path(&label_str, &this.working_dir);
+                    let path = resolve_label_to_filesystem_path(&label_str, &this.workspace_root);
                     ensure_label_path_materialized(&path);
                     path.to_string_lossy().to_string()
                 } else {
@@ -1721,7 +1762,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             // string form (which would stringify as
             // `@@cell//templates:foo.bzl` and be a dangling link).
             let label_str = format!("{target}");
-            let path = resolve_label_to_filesystem_path(&label_str, &this.working_dir);
+            let path = resolve_label_to_filesystem_path(&label_str, &this.workspace_root);
             ensure_label_path_materialized(&path);
             path.to_string_lossy().to_string()
         } else {
@@ -1870,7 +1911,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             // form ("@@cell//templates:foo.tpl") as if it were the
             // template body, corrupting every generated file.
             let label_str = format!("{template}");
-            let template_path = resolve_label_to_filesystem_path(&label_str, &this.working_dir);
+            let template_path = resolve_label_to_filesystem_path(&label_str, &this.workspace_root);
             ensure_label_path_materialized(&template_path);
             std::fs::read_to_string(&template_path).map_err(|e| {
                 starlark::Error::from(kuro_error::kuro_error!(
@@ -1955,7 +1996,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         let _ = watch;
         let file_path = if let Some(s) = path.unpack_str() {
             if is_bazel_label_string(s) {
-                let path = resolve_label_to_filesystem_path(s, &this.working_dir);
+                let path = resolve_label_to_filesystem_path(s, &this.workspace_root);
                 ensure_label_path_materialized(&path);
                 path
             } else {
@@ -1965,7 +2006,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             repo_path.absolute_path()
         } else if path.get_type() == "Label" {
             let label_str = path.to_str();
-            let path = resolve_label_to_filesystem_path(&label_str, &this.working_dir);
+            let path = resolve_label_to_filesystem_path(&label_str, &this.workspace_root);
             ensure_label_path_materialized(&path);
             path
         } else {
@@ -2044,12 +2085,12 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             repo_path.absolute_path().to_path_buf()
         } else if patch_file.get_type() == "Label" {
             let path =
-                resolve_label_to_filesystem_path(&format!("{patch_file}"), &this.working_dir);
+                resolve_label_to_filesystem_path(&format!("{patch_file}"), &this.workspace_root);
             ensure_label_path_materialized(&path);
             path
         } else if let Some(s) = patch_file.unpack_str() {
             if is_bazel_label_string(s) {
-                let path = resolve_label_to_filesystem_path(s, &this.working_dir);
+                let path = resolve_label_to_filesystem_path(s, &this.workspace_root);
                 ensure_label_path_materialized(&path);
                 path
             } else {
@@ -2058,7 +2099,7 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
         } else {
             let repr = patch_file.to_repr();
             if is_bazel_label_string(&repr) {
-                let path = resolve_label_to_filesystem_path(&repr, &this.working_dir);
+                let path = resolve_label_to_filesystem_path(&repr, &this.workspace_root);
                 ensure_label_path_materialized(&path);
                 path
             } else {
@@ -2066,29 +2107,13 @@ fn repository_ctx_methods(builder: &mut MethodsBuilder) {
             }
         };
 
-        // Apply patch using the patch command
-        let output = Command::new("patch")
-            .args(["-p", &strip.to_string(), "-i"])
-            .arg(&patch_path)
-            .current_dir(this.working_dir.as_ref())
-            .output()
-            .map_err(|e| {
-                starlark::Error::from(kuro_error::kuro_error!(
-                    kuro_error::ErrorTag::Input,
-                    "Failed to execute patch: {}",
-                    e
-                ))
-            })?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(kuro_error::kuro_error!(
+        apply_unified_patch(&patch_path, strip, this.working_dir.as_ref()).map_err(|e| {
+            starlark::Error::from(kuro_error::kuro_error!(
                 kuro_error::ErrorTag::Input,
-                "Patch failed: {}",
-                stderr
-            )
-            .into());
-        }
+                "{}",
+                e
+            ))
+        })?;
 
         Ok(Value::new_none())
     }
@@ -2513,5 +2538,41 @@ mod tests {
         let path = temp_dir.path().join("repo").join(".");
 
         assert_eq!(normalize_path_lexically(path), temp_dir.path().join("repo"));
+    }
+
+    #[test]
+    fn test_resolve_root_label_to_filesystem_path_uses_workspace_root() {
+        let temp_dir = TempDir::new().unwrap();
+        let workspace_root = temp_dir.path();
+
+        assert_eq!(
+            resolve_label_to_filesystem_path("@@//:root.patch", workspace_root),
+            workspace_root.join("root.patch")
+        );
+        assert_eq!(
+            resolve_label_to_filesystem_path("//pkg:file.patch", workspace_root),
+            workspace_root.join("pkg/file.patch")
+        );
+    }
+
+    #[test]
+    fn test_apply_unified_patch_without_git_repo() {
+        let temp_dir = TempDir::new().unwrap();
+        let source_dir = temp_dir.path().join("source");
+        std::fs::create_dir(&source_dir).unwrap();
+        std::fs::write(source_dir.join("file.txt"), "old\n").unwrap();
+        let patch = temp_dir.path().join("change.patch");
+        std::fs::write(
+            &patch,
+            "--- a/file.txt\n+++ b/file.txt\n@@ -1 +1 @@\n-old\n+new\n",
+        )
+        .unwrap();
+
+        apply_unified_patch(&patch, 1, &source_dir).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(source_dir.join("file.txt")).unwrap(),
+            "new\n"
+        );
     }
 }

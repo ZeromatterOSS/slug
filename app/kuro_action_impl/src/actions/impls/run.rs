@@ -856,6 +856,7 @@ impl RunAction {
         let mut cli_env = cli_env?;
         for value in cli_env.values_mut() {
             rewrite_rendered_path(value, &path_rewrites);
+            unescape_bazel_pwd_placeholder(value);
         }
 
         Ok((
@@ -1434,13 +1435,20 @@ fn rendered_action_path_rewrites(
     fs: &ExecutorFs<'_>,
 ) -> kuro_error::Result<Vec<(String, String)>> {
     let mut rewrites = IndexMap::new();
+    let mut single_output_resolved = None;
     for output in outputs {
         let artifact: Artifact = output.dupe().into();
         let output_path = output.get_path();
         let resolved = cli_ctx
             .resolve_project_path(fs.fs().resolve_build(output_path, None)?)?
             .into_string();
+        if outputs.as_slice().len() == 1 {
+            single_output_resolved = Some(resolved.clone());
+        }
         add_rendered_path_rewrite(&mut rewrites, &artifact, resolved);
+    }
+    if let Some(resolved) = single_output_resolved {
+        rewrites.entry("$@".to_owned()).or_insert(resolved);
     }
 
     let own_outputs: std::collections::HashSet<&BuildArtifact> = outputs.iter().collect();
@@ -1507,6 +1515,7 @@ fn parent_path(path: &str) -> Option<String> {
 fn rewrite_rendered_paths(values: &mut [String], rewrites: &[(String, String)]) {
     for value in values {
         rewrite_rendered_path(value, rewrites);
+        unescape_bazel_pwd_placeholder(value);
     }
 }
 
@@ -1550,6 +1559,12 @@ fn rewrite_rendered_path(value: &mut String, rewrites: &[(String, String)]) {
         if contains_path_fragment(value, from) {
             *value = replace_path_fragment(value, from, to);
         }
+    }
+}
+
+fn unescape_bazel_pwd_placeholder(value: &mut String) {
+    if value.contains("$${pwd}") {
+        *value = value.replace("$${pwd}", "${pwd}");
     }
 }
 

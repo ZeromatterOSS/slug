@@ -11,6 +11,8 @@
 use std::borrow::Cow;
 use std::fmt;
 use std::hash::Hash;
+use std::sync::OnceLock;
+use std::sync::RwLock;
 
 use either::Either;
 use gazebo::cell::ARef;
@@ -34,6 +36,28 @@ pub struct ArtifactPath<'a> {
     /// The number of components at the prefix of that path that are internal details to the rule,
     /// not returned by `.short_path`.
     pub hidden_components_count: usize,
+}
+
+fn artifact_path_buck_out_root_cell() -> &'static RwLock<ProjectRelativePathBuf> {
+    static BUCK_OUT_ROOT: OnceLock<RwLock<ProjectRelativePathBuf>> = OnceLock::new();
+    BUCK_OUT_ROOT.get_or_init(|| {
+        RwLock::new(ProjectRelativePathBuf::unchecked_new(
+            "buck-out/v2".to_owned(),
+        ))
+    })
+}
+
+pub fn set_artifact_path_buck_out_root(root: ProjectRelativePathBuf) {
+    *artifact_path_buck_out_root_cell()
+        .write()
+        .expect("artifact path buck-out root lock poisoned") = root;
+}
+
+pub fn get_artifact_path_buck_out_root() -> ProjectRelativePathBuf {
+    artifact_path_buck_out_root_cell()
+        .read()
+        .expect("artifact path buck-out root lock poisoned")
+        .to_buf()
 }
 
 impl ArtifactPath<'_> {
@@ -261,6 +285,8 @@ impl ArtifactPath<'_> {
                     _ => None,
                 };
                 if let Some(target) = target_opt {
+                    let buck_out_root = get_artifact_path_buck_out_root();
+                    let buck_out_root = buck_out_root.as_str();
                     let cfg_hash = target.cfg().output_hash().as_str();
                     let cell_name = target.pkg().cell_name().as_str();
                     let cell_relative_path = target.pkg().cell_relative_path().as_str();
@@ -282,7 +308,10 @@ impl ArtifactPath<'_> {
                         kuro_core::fs::buck_out_path::BuckOutPathKind::Shareable
                     ) {
                         let joined = artifact_path.join(self.projected_path);
-                        format!("buck-out/v2/gen/{}/{}/{}", cell_name, cfg_hash, joined)
+                        format!(
+                            "{}/gen/{}/{}/{}",
+                            buck_out_root, cell_name, cfg_hash, joined
+                        )
                     } else if matches!(
                         resolution,
                         kuro_core::fs::buck_out_path::BuckOutPathKind::BazelOutput
@@ -291,31 +320,40 @@ impl ArtifactPath<'_> {
                         let is_root = kuro_core::cells::is_root_cell_name(cell_name);
                         match (is_root, cell_relative_path.is_empty()) {
                             (true, true) => {
-                                format!("buck-out/v2/gen/{}/{}/{}", cell_name, cfg_hash, joined)
+                                format!(
+                                    "{}/gen/{}/{}/{}",
+                                    buck_out_root, cell_name, cfg_hash, joined
+                                )
                             }
                             (true, false) => {
                                 format!(
-                                    "buck-out/v2/gen/{}/{}/{}/{}",
-                                    cell_name, cfg_hash, cell_relative_path, joined
+                                    "{}/gen/{}/{}/{}/{}",
+                                    buck_out_root, cell_name, cfg_hash, cell_relative_path, joined
                                 )
                             }
                             (false, true) => {
                                 format!(
-                                    "buck-out/v2/gen/{}/{}/external/{}/{}",
-                                    cell_name, cfg_hash, cell_name, joined
+                                    "{}/gen/{}/{}/external/{}/{}",
+                                    buck_out_root, cell_name, cfg_hash, cell_name, joined
                                 )
                             }
                             (false, false) => {
                                 format!(
-                                    "buck-out/v2/gen/{}/{}/external/{}/{}/{}",
-                                    cell_name, cfg_hash, cell_name, cell_relative_path, joined
+                                    "{}/gen/{}/{}/external/{}/{}/{}",
+                                    buck_out_root,
+                                    cell_name,
+                                    cfg_hash,
+                                    cell_name,
+                                    cell_relative_path,
+                                    joined
                                 )
                             }
                         }
                     } else if cell_relative_path.is_empty() {
-                        // Path format: buck-out/v2/gen/<cell>/<cfg_hash>/__<target>__/<artifact_path>
+                        // Path format: <buck-out>/gen/<cell>/<cfg_hash>/__<target>__/<artifact_path>
                         format!(
-                            "buck-out/v2/gen/{}/{}/__{}__/{}",
+                            "{}/gen/{}/{}/__{}__/{}",
+                            buck_out_root,
                             cell_name,
                             cfg_hash,
                             escaped_target_name,
@@ -323,7 +361,8 @@ impl ArtifactPath<'_> {
                         )
                     } else {
                         format!(
-                            "buck-out/v2/gen/{}/{}/{}/__{}__/{}",
+                            "{}/gen/{}/{}/{}/__{}__/{}",
+                            buck_out_root,
                             cell_name,
                             cfg_hash,
                             cell_relative_path,
@@ -385,15 +424,17 @@ impl ArtifactPath<'_> {
                     _ => None,
                 };
                 if let Some(target) = target_opt {
+                    let buck_out_root = get_artifact_path_buck_out_root();
+                    let buck_out_root = buck_out_root.as_str();
                     let cfg_hash = target.cfg().output_hash().as_str();
                     let cell_name = target.pkg().cell_name().as_str();
                     let is_root = kuro_core::cells::is_root_cell_name(cell_name);
                     let root_path = if is_root {
-                        format!("buck-out/v2/gen/{}/{}", cell_name, cfg_hash)
+                        format!("{}/gen/{}/{}", buck_out_root, cell_name, cfg_hash)
                     } else {
                         format!(
-                            "buck-out/v2/gen/{}/{}/external/{}",
-                            cell_name, cfg_hash, cell_name
+                            "{}/gen/{}/{}/external/{}",
+                            buck_out_root, cell_name, cfg_hash, cell_name
                         )
                     };
                     let root_path_buf = ForwardRelativePathBuf::unchecked_new(root_path);

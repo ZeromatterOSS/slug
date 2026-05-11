@@ -63,13 +63,9 @@ impl SetBuildContextData for DiceTransactionUpdater {
         &mut self,
         path: Option<ProjectRelativePathBuf>,
     ) -> kuro_error::Result<()> {
-        Ok(self.changed_to(vec![(
-            BuildDataKey,
-            Arc::new(BuildData {
-                buck_out_path: path.unwrap_or_else(|| {
-                    ProjectRelativePathBuf::unchecked_new("buck-out/v2".to_owned())
-                }),
-            }),
-        )])?)
+        let buck_out_path =
+            path.unwrap_or_else(|| ProjectRelativePathBuf::unchecked_new("buck-out/v2".to_owned()));
+        kuro_execute::path::artifact_path::set_artifact_path_buck_out_root(buck_out_path.to_buf());
+        Ok(self.changed_to(vec![(BuildDataKey, Arc::new(BuildData { buck_out_path }))])?)
     }
 }

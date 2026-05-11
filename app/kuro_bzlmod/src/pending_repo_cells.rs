@@ -34,7 +34,10 @@
 //! in kuro_common during cell resolver construction.
 
 use crate::extension_execution_dice::ModuleExtensionResult;
+use crate::extension_execution_dice::compute_bzl_transitive_digest;
 use crate::extension_execution_dice::extract_extension_name;
+use crate::extensions::AggregatedExtension;
+use crate::extensions::compute_extension_input_hash;
 use crate::repo_spec::RepoSpec;
 use crate::repository_invocations::AttrValue;
 use crate::types::ExtensionUsage;
@@ -389,6 +392,7 @@ fn canonicalize_repo_rule_source(rule_source: &str, module_name: &str, is_root: 
 /// Returns the cells to append (deduped against `existing`).
 pub fn pre_compute_extension_repo_cells_from_lockfile(
     lockfile: &crate::lockfile::Lockfile,
+    current_extensions: &std::collections::HashMap<String, AggregatedExtension>,
     root_module_name: &str,
     existing: &mut [PendingRepoCell],
     project_root: &std::path::Path,
@@ -409,10 +413,24 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
             continue;
         }
 
-        let Some(ext_data) = lockfile.get_extension_data(ext_id) else {
+        let Some((current_ext_id, current_extension)) =
+            current_extension_for_lockfile_id(current_extensions, ext_id)
+        else {
+            tracing::debug!(
+                "Skipping lockfile spoke pre-seed for '{}': extension is not used by the current module graph",
+                ext_id
+            );
             continue;
         };
-        let Some(general) = ext_data.general.as_ref() else {
+        let bzl_transitive_digest = compute_bzl_transitive_digest(current_ext_id);
+        let usages_digest = compute_extension_input_hash(current_extension);
+        let Some(cached_specs) =
+            lockfile.get_extension_cache(current_ext_id, &bzl_transitive_digest, &usages_digest)
+        else {
+            tracing::debug!(
+                "Skipping lockfile spoke pre-seed for '{}': cached extension data is stale",
+                ext_id
+            );
             continue;
         };
 
@@ -420,17 +438,12 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
             crate::extension_execution_dice::extract_owning_module(ext_id, root_module_name);
         let ext_name = crate::extension_execution_dice::extract_extension_name(ext_id);
 
-        let canonicalized_specs: Vec<_> = general
-            .generated_repo_specs
-            .iter()
+        let canonicalized_specs: Vec<_> = cached_specs
+            .into_iter()
             .map(|(repo_name, lock_spec)| {
                 (
-                    repo_name.clone(),
-                    canonicalize_lockfile_repo_spec_labels(
-                        lock_spec.to_repo_spec(),
-                        ext_id,
-                        root_module_name,
-                    ),
+                    repo_name,
+                    canonicalize_lockfile_repo_spec_labels(lock_spec, ext_id, root_module_name),
                 )
             })
             .collect();
@@ -520,6 +533,23 @@ pub fn pre_compute_extension_repo_cells_from_lockfile(
     );
 
     new_cells
+}
+
+fn current_extension_for_lockfile_id<'a>(
+    current_extensions: &'a std::collections::HashMap<String, AggregatedExtension>,
+    lockfile_ext_id: &'a str,
+) -> Option<(&'a str, &'a AggregatedExtension)> {
+    if let Some(extension) = current_extensions.get(lockfile_ext_id) {
+        return Some((lockfile_ext_id, extension));
+    }
+
+    let lockfile_canonical = crate::lockfile::lockfile_canonical_extension_id(lockfile_ext_id);
+    current_extensions
+        .iter()
+        .find(|(current_id, _)| {
+            crate::lockfile::lockfile_canonical_extension_id(current_id) == lockfile_canonical
+        })
+        .map(|(current_id, extension)| (current_id.as_str(), extension))
 }
 
 fn first_invalid_empty_target_label(specs: &[(String, RepoSpec)]) -> Option<(&str, &str, &str)> {
@@ -1127,6 +1157,13 @@ mod tests {
     #[test]
     fn lockfile_preseed_skips_invalid_empty_target_label_specs() {
         let mut lockfile = crate::lockfile::Lockfile::new();
+        let mut current_extensions = HashMap::new();
+        let extension = AggregatedExtension::new("@@rules_rs//rs:extensions.bzl", "crate");
+        let extension_id = extension.extension_id.clone();
+        let bzl_digest = compute_bzl_transitive_digest(&extension_id);
+        let usages_digest = compute_extension_input_hash(&extension);
+        current_extensions.insert(extension_id.clone(), extension);
+
         let mut specs = fxhash::FxHashMap::default();
         specs.insert(
             "crates__zstd-sys-2.0.16-zstd.1.5.7".to_owned(),
@@ -1136,12 +1173,7 @@ mod tests {
                     AttrValue::StringList(vec!["@@zstd//:".to_owned()]),
                 ),
         );
-        lockfile.set_extension_cache(
-            "@@rules_rs//rs:extensions.bzl%crate".to_owned(),
-            "bzl-digest".to_owned(),
-            "usages-digest".to_owned(),
-            &specs,
-        );
+        lockfile.set_extension_cache(extension_id, bzl_digest, usages_digest, &specs);
 
         let temp = std::env::temp_dir().join(format!(
             "kuro-lockfile-invalid-preseed-{}",
@@ -1153,6 +1185,48 @@ mod tests {
 
         let cells = pre_compute_extension_repo_cells_from_lockfile(
             &lockfile,
+            &current_extensions,
+            "_main",
+            &mut existing,
+            &temp,
+        );
+
+        assert!(cells.is_empty());
+        assert!(existing.is_empty());
+        let _ = std::fs::remove_dir_all(&temp);
+    }
+
+    #[test]
+    fn lockfile_preseed_skips_stale_extension_cache() {
+        let mut lockfile = crate::lockfile::Lockfile::new();
+        let mut current_extensions = HashMap::new();
+        let current_extension = AggregatedExtension::new("@@rules_rs//rs:extensions.bzl", "crate");
+        let extension_id = current_extension.extension_id.clone();
+        current_extensions.insert(extension_id.clone(), current_extension);
+
+        let mut specs = fxhash::FxHashMap::default();
+        specs.insert(
+            "crates__aho-corasick-1.1.3".to_owned(),
+            RepoSpec::new("rules_rs//rs/private/crate_repository.bzl%crate_repository".to_owned()),
+        );
+        lockfile.set_extension_cache(
+            extension_id,
+            "old-bzl-digest".to_owned(),
+            "old-usages-digest".to_owned(),
+            &specs,
+        );
+
+        let temp = std::env::temp_dir().join(format!(
+            "kuro-lockfile-stale-preseed-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&temp);
+        std::fs::create_dir_all(&temp).unwrap();
+        let mut existing = Vec::new();
+
+        let cells = pre_compute_extension_repo_cells_from_lockfile(
+            &lockfile,
+            &current_extensions,
             "_main",
             &mut existing,
             &temp,

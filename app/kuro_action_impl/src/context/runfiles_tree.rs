@@ -28,6 +28,7 @@
 
 use dupe::Dupe;
 use indexmap::indexset;
+use kuro_artifact::artifact::artifact_type::BaseArtifactKind;
 use kuro_build_api::interpreter::rule_defs::artifact::associated::AssociatedArtifacts;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact::StarlarkArtifact;
 use kuro_build_api::interpreter::rule_defs::artifact::starlark_artifact_like::StarlarkInputArtifactLike;
@@ -75,10 +76,7 @@ fn synthesize_runfiles_tree<'v>(
         })?;
 
     // Key into which every runfile is laid out. Bazel places runfiles at
-    // `<exe>.runfiles/<workspace>/<short_path>`. Kuro's `short_path` for
-    // declare_file(..., sibling=) drops the package prefix — self-consistent
-    // because rules_python's generated stub is computed from the same short_path
-    // (see §15.5.23 scope note).
+    // `<exe>.runfiles/<workspace>/<short_path>`.
     let mut srcs: Vec<(String, Value<'v>)> = Vec::new();
     let workspace_prefix: String = if workspace_name.is_empty() {
         String::new()
@@ -156,14 +154,14 @@ fn synthesize_runfiles_tree<'v>(
 
     // Declare the tree directory as a sibling of the executable:
     // <exe_dir>/<exe_filename>.runfiles.
-    let (exe_prefix, exe_filename) = exe_parent_and_filename(exe_artifact)?;
+    let (exe_prefix, exe_filename, exe_path_kind) = exe_parent_filename_and_kind(exe_artifact)?;
     let tree_filename = format!("{exe_filename}.runfiles");
     let tree_artifact_obj = actions.state()?.declare_output(
         exe_prefix.as_deref(),
         &tree_filename,
         OutputType::Directory,
         loc.dupe(),
-        BuckOutPathKind::Configuration,
+        exe_path_kind,
         heap,
     )?;
 
@@ -227,46 +225,31 @@ fn runfile_key(workspace_prefix: &str, short_path: &str) -> String {
     }
 }
 
-fn exe_parent_and_filename<'v>(
+fn exe_parent_filename_and_kind<'v>(
     exe: &'v dyn StarlarkInputArtifactLike<'v>,
-) -> kuro_error::Result<(Option<String>, String)> {
-    // Snapshot the short path into owned pieces while the callback borrows it.
+) -> kuro_error::Result<(Option<String>, String, BuckOutPathKind)> {
+    let artifact = exe.get_bound_artifact()?;
+    let path_kind = match artifact.as_parts().0 {
+        BaseArtifactKind::Build(build) => build.get_path().path_resolution_method(),
+        BaseArtifactKind::Source(_) => BuckOutPathKind::BazelOutput,
+    };
+
+    // Snapshot the rule-local path into owned pieces while the callback borrows it.
     // The runfiles tree is declared in *this* rule's artifact namespace, so we
-    // need a forward-relative path. Bazel-form short_path for an external-repo
-    // executable starts with `../<repo>/...`, which is not a valid
-    // forward-relative path component. Strip the leading `../<repo>` so the
-    // tree lands as a sibling of the exe within the rule's namespace.
+    // need the artifact fragment without Bazel's package or external-repo
+    // `File.short_path` prefix. For BazelOutput artifacts the path resolver
+    // supplies the package prefix; including it here places the tree one
+    // package level too deep.
     let pieces = std::cell::RefCell::new((None::<String>, String::new()));
-    exe.with_short_path(&|path| {
+    artifact.get_path().with_rule_local_short_path(|path| {
         let mut slot = pieces.borrow_mut();
-        let parent_str = path.parent().map(|p| p.as_str().to_owned());
-        let cleaned_parent = parent_str.and_then(|s| {
-            // External-repo Bazel short_path: strip `../<repo>` (and optional
-            // package suffix) so the tree declaration uses a valid
-            // forward-relative path within this rule's namespace. If the
-            // exe sits at the package root of an external repo, the parent
-            // collapses to `None`.
-            let cleaned = if let Some(rest) = s.strip_prefix("../") {
-                match rest.split_once('/') {
-                    Some((_, after)) => after.to_owned(),
-                    None => String::new(),
-                }
-            } else {
-                s
-            };
-            if cleaned.is_empty() {
-                None
-            } else {
-                Some(cleaned)
-            }
-        });
-        slot.0 = cleaned_parent;
+        slot.0 = path.parent().map(|p| p.as_str().to_owned());
         slot.1 = path
             .file_name()
             .map(|f| f.as_str().to_owned())
             .unwrap_or_default();
         starlark::values::StringValue::default()
-    })?;
+    });
     let (prefix, filename) = pieces.into_inner();
     if filename.is_empty() {
         return Err(kuro_error::kuro_error!(
@@ -274,7 +257,7 @@ fn exe_parent_and_filename<'v>(
             "DefaultInfo(executable=...): artifact has no file name"
         ));
     }
-    Ok((prefix, filename))
+    Ok((prefix, filename, path_kind))
 }
 
 fn artifact_short_path_string<'v>(

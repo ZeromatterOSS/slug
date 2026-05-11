@@ -138,6 +138,10 @@ static DEPSET_CREATE_COUNT: AtomicUsize = AtomicUsize::new(0);
 static DEPSET_CREATE_MAX_DIRECT: AtomicUsize = AtomicUsize::new(0);
 static DEPSET_CREATE_MAX_TRANSITIVE: AtomicUsize = AtomicUsize::new(0);
 static DEPSET_CREATE_MAX_DEPTH: AtomicUsize = AtomicUsize::new(0);
+static DEPSET_TO_LIST_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+const DEPSET_CHECKPOINT_LARGE_LEN: usize = 256;
+const DEPSET_TO_LIST_CHECKPOINT_LARGE_LEN: usize = 1024;
 
 #[derive(Clone, Copy, Debug)]
 pub struct DepsetSummary {
@@ -183,7 +187,11 @@ fn depset_create_checkpoint(
     let max_direct = update_max_usize(&DEPSET_CREATE_MAX_DIRECT, deduped_direct_len);
     let max_transitive = update_max_usize(&DEPSET_CREATE_MAX_TRANSITIVE, transitive_len);
     let max_depth = update_max_usize(&DEPSET_CREATE_MAX_DEPTH, depth as usize);
-    if direct_len + transitive_len < 16 && depth < 16 && !create_count.is_power_of_two() {
+    if deduped_direct_len < DEPSET_CHECKPOINT_LARGE_LEN
+        && transitive_len < DEPSET_CHECKPOINT_LARGE_LEN
+        && depth < 16
+        && !create_count.is_power_of_two()
+    {
         return;
     }
     kuro_util::memory_checkpoint::checkpoint(
@@ -321,21 +329,9 @@ impl<V: ValueLifetimeless> DepsetGen<V> {
     }
 }
 
-fn write_depset_gen_hash<'v, V: ValueLike<'v>>(
-    depset: &DepsetGen<V>,
-    hasher: &mut StarlarkHasher,
-) -> starlark::Result<()> {
+fn write_depset_identity_hash<T>(depset: &T, hasher: &mut StarlarkHasher) {
     "depset".hash(hasher);
-    depset.order.hash(hasher);
-    depset.direct.len().hash(hasher);
-    for value in &depset.direct {
-        value.to_value().write_hash(hasher)?;
-    }
-    depset.transitive.len().hash(hasher);
-    for child in &depset.transitive {
-        child.to_value().write_hash(hasher)?;
-    }
-    Ok(())
+    (depset as *const T as usize).hash(hasher);
 }
 
 impl Depset {
@@ -438,16 +434,26 @@ impl Display for Depset {
 fn dedupe_values_preserving_order<'v>(
     elements: Vec<Value<'v>>,
 ) -> starlark::Result<Vec<Value<'v>>> {
-    let mut deduped: Vec<Value<'v>> = Vec::with_capacity(elements.len());
+    let mut seen = HashSet::with_capacity(elements.len());
+    let mut deduped = Vec::with_capacity(elements.len());
     for value in elements {
-        let mut is_dup = false;
-        for existing in &deduped {
-            if existing.equals(value)? {
-                is_dup = true;
-                break;
-            }
+        if seen.insert(value.get_hashed()?) {
+            deduped.push(value);
         }
-        if !is_dup {
+    }
+    Ok(deduped)
+}
+
+fn dedupe_direct_values_preserving_order<'v>(
+    elements: Vec<Value<'v>>,
+) -> starlark::Result<Vec<Value<'v>>> {
+    let mut seen = HashSet::with_capacity(elements.len());
+    let mut deduped = Vec::with_capacity(elements.len());
+    for value in elements {
+        let hashed = value
+            .get_hashed()
+            .map_err(|_| kuro_error::Error::from(DepsetError::MutableElement))?;
+        if seen.insert(hashed) {
             deduped.push(value);
         }
     }
@@ -457,16 +463,14 @@ fn dedupe_values_preserving_order<'v>(
 fn dedupe_frozen_values_preserving_order(
     elements: Vec<FrozenValue>,
 ) -> starlark::Result<Vec<FrozenValue>> {
-    let mut deduped: Vec<FrozenValue> = Vec::with_capacity(elements.len());
+    let mut seen = HashSet::with_capacity(elements.len());
+    let mut deduped = Vec::with_capacity(elements.len());
     for value in elements {
-        let mut is_dup = false;
-        for existing in &deduped {
-            if existing.to_value().equals(value.to_value())? {
-                is_dup = true;
-                break;
-            }
-        }
-        if !is_dup {
+        if seen.insert(
+            value
+                .get_hashed()
+                .map_err(|_| kuro_error::Error::from(DepsetError::MutableElement))?,
+        ) {
             deduped.push(value);
         }
     }
@@ -480,14 +484,27 @@ fn depset_to_list_checkpoint(
     collected_len: usize,
     deduped_len: usize,
 ) {
+    if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    let list_count = DEPSET_TO_LIST_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
+    let duplicate_len = collected_len.saturating_sub(deduped_len);
+    if direct_len + transitive_len < DEPSET_CHECKPOINT_LARGE_LEN
+        && collected_len < DEPSET_TO_LIST_CHECKPOINT_LARGE_LEN
+        && duplicate_len == 0
+        && !list_count.is_power_of_two()
+    {
+        return;
+    }
     kuro_util::memory_checkpoint::checkpoint(
         checkpoint,
         [
+            ("list_count", list_count),
             ("direct_len", direct_len),
             ("transitive_len", transitive_len),
             ("collected_len", collected_len),
             ("deduped_len", deduped_len),
-            ("duplicate_len", collected_len.saturating_sub(deduped_len)),
+            ("duplicate_len", duplicate_len),
         ],
     );
 }
@@ -512,7 +529,8 @@ impl<'v> StarlarkValue<'v> for Depset {
     }
 
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
-        write_depset_gen_hash(&self.inner, hasher)
+        write_depset_identity_hash(self, hasher);
+        Ok(())
     }
 }
 
@@ -543,7 +561,8 @@ where
     }
 
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
-        write_depset_gen_hash(self, hasher)
+        write_depset_identity_hash(self, hasher);
+        Ok(())
     }
 }
 
@@ -855,11 +874,9 @@ fn generic_live_depset_methods(builder: &mut MethodsBuilder) {
             (0, 0)
         };
         let elements = depset_to_list_raw(this)?;
-        // Bazel depsets deduplicate elements: depset(["a", "a"]).to_list() == ["a"]
-        // Dedup by value equality (preserving insertion order) using
-        // Value::equals, which short-circuits on ptr_eq. Using the Display
-        // string would wrongly collapse distinct values whose representations
-        // happen to coincide (e.g. artifacts at different configurations).
+        // Bazel depsets deduplicate elements: depset(["a", "a"]).to_list() == ["a"].
+        // Depset elements are validated as hashable on creation, so use the cached
+        // Starlark hash and equality instead of the previous O(n^2) linear scan.
         let collected_len = elements.len();
         let deduped = dedupe_values_preserving_order(elements)?;
         depset_to_list_checkpoint(
@@ -1007,7 +1024,7 @@ fn make_live_depset_from_values<'v>(
 ) -> starlark::Result<LiveDepsetGen<Value<'v>>> {
     let direct_len = direct.len();
     let transitive_len = transitive.len();
-    let direct = dedupe_values_preserving_order(direct)?;
+    let direct = dedupe_direct_values_preserving_order(direct)?;
     let effective_order = validate_depset_order(order, &transitive)?;
     let (element_type, is_empty, depth) = validate_depset_elements(&direct, &transitive)?;
     depset_create_checkpoint(

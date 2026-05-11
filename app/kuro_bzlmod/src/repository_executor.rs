@@ -23,6 +23,7 @@
 //! - `new_local_repository` - Create a repository from a local directory with custom BUILD
 
 use std::io::Cursor;
+use std::io::ErrorKind;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
@@ -254,24 +255,11 @@ fn apply_patches(
                 invocation.name
             );
 
-            let mut cmd = Command::new("patch");
-            for arg in patch_args {
-                cmd.arg(arg);
-            }
             let resolved_patch_path = resolve_build_file_label(patch_path, working_dir);
-            cmd.arg("-i").arg(&resolved_patch_path);
-            cmd.current_dir(working_dir);
-
-            let output = cmd
-                .output()
-                .map_err(|e| RepositoryExecutionError::ExecutionFailed {
-                    name: invocation.name.clone(),
-                    reason: format!("Failed to run patch command for '{}': {}", patch_path, e),
-                })?;
-
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                tracing::warn!("Patch '{}' failed (non-fatal): {}", patch_path, stderr);
+            if let Err(e) =
+                apply_patch_file(Path::new(&resolved_patch_path), patch_args, working_dir)
+            {
+                tracing::warn!("Patch '{}' failed (non-fatal): {}", patch_path, e);
             }
         }
     }
@@ -302,6 +290,65 @@ fn apply_patches(
     }
 
     Ok(())
+}
+
+fn apply_patch_file(
+    patch_path: &Path,
+    patch_args: &[String],
+    working_dir: &Path,
+) -> Result<(), String> {
+    let mut cmd = Command::new("patch");
+    for arg in patch_args {
+        cmd.arg(arg);
+    }
+    match cmd
+        .arg("-i")
+        .arg(patch_path)
+        .current_dir(working_dir)
+        .output()
+    {
+        Ok(output) if output.status.success() => return Ok(()),
+        Ok(output) => {
+            return Err(String::from_utf8_lossy(&output.stderr).into_owned());
+        }
+        Err(e) if e.kind() != ErrorKind::NotFound => {
+            return Err(format!("Failed to run patch command: {e}"));
+        }
+        Err(_) => {}
+    }
+
+    let strip_arg = git_apply_strip_arg(patch_args);
+    let output = Command::new("git")
+        .args(["apply", "--unsafe-paths", "--whitespace=nowarn", &strip_arg])
+        .arg(patch_path)
+        .current_dir(working_dir)
+        .output()
+        .map_err(|e| format!("Failed to run patch fallback via git apply: {e}"))?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stderr),
+            String::from_utf8_lossy(&output.stdout)
+        ))
+    }
+}
+
+fn git_apply_strip_arg(patch_args: &[String]) -> String {
+    let mut iter = patch_args.iter();
+    while let Some(arg) = iter.next() {
+        if let Some(strip) = arg.strip_prefix("-p") {
+            if !strip.is_empty() {
+                return format!("-p{strip}");
+            }
+            if let Some(strip) = iter.next() {
+                return format!("-p{strip}");
+            }
+        }
+    }
+    "-p1".to_owned()
 }
 
 /// Execute http_file repository rule.

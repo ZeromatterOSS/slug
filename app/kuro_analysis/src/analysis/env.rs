@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::LazyLock;
 use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
 
@@ -104,6 +105,9 @@ use crate::analysis::plugins::plugins_to_starlark_value;
 use crate::attrs::resolve::ctx::AnalysisQueryResult;
 use crate::attrs::resolve::ctx::AttrResolutionContext;
 use crate::attrs::resolve::node_to_attrs_struct::node_to_attrs_struct;
+
+static ANALYSIS_ENV_VERBOSE_CHECKPOINT_COUNT: AtomicUsize = AtomicUsize::new(0);
+const ANALYSIS_ENV_VERBOSE_CHECKPOINT_INTERVAL: usize = 1024;
 
 /// For Bazel test rules (`rule(test=True)`) that return `DefaultInfo(executable=...)`
 /// without an explicit `ExternalRunnerTestInfo`, auto-inject a synthetic
@@ -494,7 +498,7 @@ impl AnalysisStarlarkProgress {
     }
 
     fn should_log_interesting(sample_count: usize) -> bool {
-        sample_count <= 32 || sample_count.is_power_of_two()
+        sample_count.is_power_of_two()
     }
 
     fn is_interesting_starlark_file(filename: &str) -> bool {
@@ -507,7 +511,10 @@ impl AnalysisStarlarkProgress {
                 || filename.ends_with("cc/private/cc_info.bzl")))
             || (filename.contains("rules_rust+0.69.0")
                 && (filename.ends_with("rust/private/rust_allocator_libraries.bzl")
-                    || filename.ends_with("rust/private/cc/cc_utils.bzl")))
+                    || filename.ends_with("rust/private/cc/cc_utils.bzl")
+                    || filename.ends_with("rust/private/rust.bzl")
+                    || filename.ends_with("rust/private/rustc.bzl")
+                    || filename.ends_with("rust/private/utils.bzl")))
     }
 
     fn elapsed_ms(&self) -> usize {
@@ -528,12 +535,6 @@ impl<'e> CallStackCheckpoint<'e> for AnalysisStarlarkProgress {
             return;
         }
 
-        let interesting_samples = self.interesting_samples.get().saturating_add(1);
-        self.interesting_samples.set(interesting_samples);
-        if !Self::should_log_interesting(interesting_samples) {
-            return;
-        }
-
         let resolved = location.resolve_span();
         let frame = eval.call_stack_top_frame();
         let function = frame
@@ -541,12 +542,17 @@ impl<'e> CallStackCheckpoint<'e> for AnalysisStarlarkProgress {
             .map(|frame| frame.name.as_str())
             .unwrap_or("<unknown>");
         let key = format!("{}:{}:{function}", filename, resolved.begin.line + 1);
+        let interesting_samples = self.interesting_samples.get().saturating_add(1);
+        self.interesting_samples.set(interesting_samples);
         let function_sample_count = {
             let mut sampled_functions = self.sampled_functions.borrow_mut();
             let count = sampled_functions.entry(key).or_insert(0);
             *count = count.saturating_add(1);
             *count
         };
+        if !Self::should_log_interesting(interesting_samples) {
+            return;
+        }
 
         kuro_util::memory_checkpoint::checkpoint(
             "analysis_starlark_call_sample",
@@ -654,6 +660,20 @@ impl<'e> CallStackCheckpoint<'e> for AnalysisStarlarkProgress {
     }
 }
 
+fn should_emit_analysis_env_verbose_checkpoint(checkpoint: &'static str) -> bool {
+    let high_volume = matches!(
+        checkpoint,
+        "analysis_evaluate_rule_phase"
+            | "analysis_toolchain_resolution_substep"
+            | "analysis_ctx_toolchain_provider"
+    );
+    if !high_volume {
+        return true;
+    }
+    let count = ANALYSIS_ENV_VERBOSE_CHECKPOINT_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+    count.is_power_of_two() || count % ANALYSIS_ENV_VERBOSE_CHECKPOINT_INTERVAL == 0
+}
+
 fn analysis_eval_phase_checkpoint(
     checkpoint: &'static str,
     label: &ConfiguredTargetLabel,
@@ -662,6 +682,9 @@ fn analysis_eval_phase_checkpoint(
     started: Instant,
 ) {
     if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    if !should_emit_analysis_env_verbose_checkpoint(checkpoint) {
         return;
     }
     let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
@@ -701,6 +724,9 @@ fn analysis_ctx_toolchain_provider_checkpoint(
     started: Instant,
 ) {
     if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    if !should_emit_analysis_env_verbose_checkpoint("analysis_ctx_toolchain_provider") {
         return;
     }
     let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
@@ -759,6 +785,9 @@ fn analysis_toolchain_resolution_checkpoint(
     fields: impl IntoIterator<Item = (&'static str, usize)>,
 ) {
     if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    if !should_emit_analysis_env_verbose_checkpoint("analysis_toolchain_resolution_substep") {
         return;
     }
     let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
@@ -2527,10 +2556,10 @@ async fn resolve_toolchain_types(
 
     // Plan 24 Phase 8: pass the registered candidate platforms (sourced from
     // `compute_execution_platforms` at the call site) so per-group resolution
-    // sees the same list as default-group resolution does. `target_platform`
-    // stays as host — `target_compatible_with` filtering of toolchains is
-    // unchanged by Plan 24.
-    let target = PlatformConstraints::host_platform();
+    // sees the same list as default-group resolution does. Check
+    // `target_compatible_with` against the configured target platform, whose
+    // constraints may include user/toolchain constraints beyond OS and CPU.
+    let target = PlatformConstraints::from_configuration_data(node.label().cfg());
     let candidates: Vec<PlatformConstraints> = if candidate_platforms.is_empty() {
         vec![target.clone()]
     } else {

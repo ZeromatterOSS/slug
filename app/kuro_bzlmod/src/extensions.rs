@@ -63,9 +63,11 @@ use std::path::PathBuf;
 use allocative::Allocative;
 use serde::Deserialize;
 use serde::Serialize;
+use sha2::Digest;
 
 use crate::types::ExtensionTag;
 use crate::types::ExtensionUsage;
+use crate::types::TagValue;
 
 /// Aggregated extension data from all modules.
 ///
@@ -307,9 +309,11 @@ pub fn compute_extension_input_hash(extension: &AggregatedExtension) -> String {
         if let Some(tags) = extension.tags_by_module.get(module_name) {
             for tag in tags {
                 hasher.update(tag.tag_name.as_bytes());
-                for (key, _value) in &tag.kwargs {
+                let mut kwargs: Vec<_> = tag.kwargs.iter().collect();
+                kwargs.sort_by(|(left, _), (right, _)| left.cmp(right));
+                for (key, value) in kwargs {
                     hasher.update(key.as_bytes());
-                    // Note: We'd need to serialize TagValue for a complete hash
+                    hash_tag_value(value, &mut hasher);
                 }
             }
         }
@@ -320,6 +324,47 @@ pub fn compute_extension_input_hash(extension: &AggregatedExtension) -> String {
         "sha256-{}",
         base64::Engine::encode(&base64::engine::general_purpose::STANDARD, hash)
     )
+}
+
+fn hash_tag_value(value: &TagValue, hasher: &mut sha2::Sha256) {
+    match value {
+        TagValue::String(s) => {
+            hasher.update(b"string:");
+            hasher.update(s.as_bytes());
+        }
+        TagValue::Label(s) => {
+            hasher.update(b"label:");
+            hasher.update(s.as_bytes());
+        }
+        TagValue::Int(i) => {
+            hasher.update(b"int:");
+            hasher.update(i.to_le_bytes());
+        }
+        TagValue::Bool(b) => {
+            hasher.update(b"bool:");
+            hasher.update([u8::from(*b)]);
+        }
+        TagValue::List(items) => {
+            hasher.update(b"list:");
+            hasher.update(items.len().to_le_bytes());
+            for item in items {
+                hash_tag_value(item, hasher);
+            }
+        }
+        TagValue::Dict(entries) => {
+            hasher.update(b"dict:");
+            hasher.update(entries.len().to_le_bytes());
+            let mut entries: Vec<_> = entries.iter().collect();
+            entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+            for (key, value) in entries {
+                hasher.update(key.as_bytes());
+                hash_tag_value(value, hasher);
+            }
+        }
+        TagValue::None => {
+            hasher.update(b"none");
+        }
+    }
 }
 
 #[cfg(test)]
@@ -397,5 +442,33 @@ mod tests {
 
         let hash = compute_extension_input_hash(&agg);
         assert!(hash.starts_with("sha256-"));
+    }
+
+    #[test]
+    fn test_compute_extension_input_hash_includes_kwarg_values() {
+        let mut first = AggregatedExtension::new("@rules_rs//:toolchains.bzl", "toolchains");
+        first.add_module_tags(
+            "root",
+            vec![
+                ExtensionTag::new("toolchain".to_owned())
+                    .with_kwarg("version".to_owned(), TagValue::String("1.94.1".to_owned()))
+                    .with_kwarg("edition".to_owned(), TagValue::String("2021".to_owned())),
+            ],
+        );
+
+        let mut second = AggregatedExtension::new("@rules_rs//:toolchains.bzl", "toolchains");
+        second.add_module_tags(
+            "root",
+            vec![
+                ExtensionTag::new("toolchain".to_owned())
+                    .with_kwarg("version".to_owned(), TagValue::String("1.95.0".to_owned()))
+                    .with_kwarg("edition".to_owned(), TagValue::String("2024".to_owned())),
+            ],
+        );
+
+        assert_ne!(
+            compute_extension_input_hash(&first),
+            compute_extension_input_hash(&second)
+        );
     }
 }

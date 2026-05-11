@@ -109,6 +109,27 @@ fn depset_orders_match_bazel_9_1_0_probe() -> kuro_error::Result<()> {
 }
 
 #[test]
+fn depset_to_list_dedupes_hashable_values_preserving_order() -> kuro_error::Result<()> {
+    let mut tester = depset_tester();
+    tester.run_starlark_bzl_test(indoc!(
+        r#"
+        frozen_dedup = depset([("z", 3), ("z", 3)])
+
+        def test():
+            assert_eq(
+                [("x", 1), ("y", 2)],
+                depset([("x", 1), ("y", 2), ("x", 1), ("y", 2)]).to_list(),
+            )
+            assert_eq(
+                [("y", 2), ("x", 1)],
+                depset([("x", 1)], transitive = [depset([("y", 2), ("x", 1), ("y", 2)])]).to_list(),
+            )
+            assert_eq([("z", 3)], frozen_dedup.to_list())
+        "#
+    ))
+}
+
+#[test]
 fn depset_validation_matches_bazel_9_1_0_probe() {
     let mut tester = depset_tester();
     tester.run_starlark_bzl_test_expecting_error(

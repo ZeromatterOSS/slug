@@ -873,6 +873,17 @@ impl BuckConfigBasedCells {
         } else {
             &parsed.module.name
         };
+        let mut module_extensions: std::collections::HashMap<
+            String,
+            Vec<kuro_bzlmod::types::ExtensionUsage>,
+        > = std::collections::HashMap::new();
+        for (module_name, parsed_mod) in &parsed_modules {
+            if !parsed_mod.extension_usages.is_empty() {
+                module_extensions.insert(module_name.clone(), parsed_mod.extension_usages.clone());
+            }
+        }
+        let aggregated =
+            kuro_bzlmod::aggregate_extensions_with_root(&module_extensions, Some(root_module_name));
         let (mut pre_computed_cells, pre_computed_aliases) =
             kuro_bzlmod::pre_compute_extension_repo_cells(&parsed_modules, root_module_name)?;
 
@@ -887,6 +898,7 @@ impl BuckConfigBasedCells {
         if let Some(lockfile) = kuro_bzlmod::cached_lockfile(project_root.root().as_path()) {
             let extra = kuro_bzlmod::pre_compute_extension_repo_cells_from_lockfile(
                 &lockfile,
+                &aggregated,
                 root_module_name,
                 &mut pre_computed_cells,
                 project_root.root().as_path(),
@@ -921,17 +933,6 @@ impl BuckConfigBasedCells {
 
         // Aggregate extension usages from all modules and store globally.
         // This data is needed by DICE when extension repos are lazily executed.
-        let mut module_extensions: std::collections::HashMap<
-            String,
-            Vec<kuro_bzlmod::types::ExtensionUsage>,
-        > = std::collections::HashMap::new();
-        for (module_name, parsed_mod) in &parsed_modules {
-            if !parsed_mod.extension_usages.is_empty() {
-                module_extensions.insert(module_name.clone(), parsed_mod.extension_usages.clone());
-            }
-        }
-        let aggregated =
-            kuro_bzlmod::aggregate_extensions_with_root(&module_extensions, Some(root_module_name));
         kuro_bzlmod::set_extension_aggregations(
             aggregated,
             root_module_name.to_owned(),

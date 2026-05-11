@@ -10,7 +10,216 @@
 
 ## Status: IN PROGRESS
 
-## Current Status 2026-05-09
+## Current Status 2026-05-10
+
+Follow-up smoke after sampled depset/cc checkpoints used isolation
+`sdk-parity-20260510-sampled-checkpoints-1` and log
+`/tmp/sdk-parity-20260510-sampled-checkpoints-1.log`. The depset/cc sampling
+fix worked initially: the log stayed around 2.5 MiB through configured target
+setup instead of hundreds of MiB. The run then paused in repository download
+rather than analysis CPU. A gdb capture at
+`/tmp/sdk-parity-20260510-sampled-checkpoints-1.gdb.txt` showed one worker in
+`module_ctx.download -> repository_ctx::download_url -> Command::output`,
+waiting on `curl -fsSL --max-time 300 https://index.crates.io/re/gi/region`.
+After that bounded curl wait cleared, Kuro resumed Rust crate analysis.
+
+The same smoke then exposed the next measurement artifact: the expanded
+`analysis_starlark_call_sample` instrumentation flooded the log during Rust
+crate analysis, growing it to about 541 MiB around
+`crates__rand_distr-0.5.1//:rand_distr`. This was logging overhead, not a new
+semantic Bazel mismatch. An intermediate sampler changed this to powers-of-two
+sample counts plus first sightings of distinct call sites, but that still
+needed another retry before drawing performance conclusions from the slice.
+
+Fresh retry `sdk-parity-20260510-sampled-checkpoints-2` confirmed the first
+distinct call-site clause was still too broad for `rules_rust`; after a bounded
+crate-index curl wait cleared, the log grew to about 737 MiB around
+`crates__actix-http-3.12.0//:actix-http`. The daemon was making analysis
+progress and using CPU, so this again classified as instrumentation overhead.
+The call sampler is now stricter: only powers-of-two interesting Starlark call
+counts are logged per target.
+
+Fresh retry `sdk-parity-20260510-sampled-checkpoints-3` reached the SDK
+analysis tail quickly after another bounded crate-index curl wait
+(`https://index.crates.io/fi/le/file-id`). It was making progress at
+`completed=13044`, `active=371`, with daemon RSS around 720 MiB, and no
+semantic Bazel-parity error was visible. The Starlark sampler was no longer
+the dominant source, but general configured/analysis checkpoints still produced
+about 504 MiB of log in roughly six minutes. The current slice now samples
+high-volume configured-node, configured-gather, analysis-dependency,
+analysis-phase, and toolchain-resolution checkpoints by powers of two plus
+every 1024th event.
+
+Fresh retry `sdk-parity-20260510-sampled-checkpoints-4` ran for the full
+1200s timeout and emitted
+`memory_smoke_summary elapsed_s=1202 peak_rss_kib=879768 final_rss_kib=704568`.
+No terminal semantic Bazel-parity error was visible in
+`/tmp/sdk-parity-20260510-sampled-checkpoints-4.log`; the only matched errors
+were non-fatal toolchain/repository probing warnings. The run still showed
+bounded memory, but the analysis tail remained slow: progress reached
+`completed=13101`, `active=314`, with user-facing waits around
+`zeromatter//lib/viz_tool:viz_tool` and other Rust rules. Log volume fell to
+about 134 MiB, but the dominant remaining instrumentation stream was
+`analysis_dep_request_start`/`analysis_dep_request_complete` with more than
+230k checkpoint lines. The current slice adds those dep-request checkpoints to
+the high-volume sampler before the next SDK smoke.
+
+Fresh retry `sdk-parity-20260510-sampled-checkpoints-5` verified that the
+dep-request sampling fix works. It ran for the full 1200s timeout and emitted
+`memory_smoke_summary elapsed_s=1204 peak_rss_kib=898424 final_rss_kib=733548`.
+The log stayed about 19 MiB; `analysis_dep_request_*` checkpoints dropped to
+hundreds of lines instead of hundreds of thousands. No terminal semantic
+Bazel-parity error was visible. The build still timed out in the same
+slow-tail shape: daemon CPU stayed high, RSS stayed bounded, Starlark eval
+heartbeats continued from `rules_rust`/`rules_cc`, and progress reached
+`completed=13104`, `active=314`. The oldest active keys were still root SDK
+aggregators waiting on leaves, while the visible leaf frontier moved through
+`aws-smithy-http-client`, `resources`, `configs`, and `viz_tool`.
+
+Current hypothesis: this does not look like a classic circular dependency or a
+globally parked DICE future. The active root keys are old because they wait on
+leaf analysis, and the daemon remains CPU-bound with Starlark heartbeats. The
+frontier looks more like a small remaining Rust/`CcInfo` Starlark analysis tail
+with expensive per-target rule implementation work, possibly multiplied across
+multiple configurations. To test the DICE angle directly, the next useful
+instrumentation should add per-active-key phase/current-child tracking or take
+a gdb/task snapshot during the tail, looking for duplicate/non-converging
+analysis keys rather than a whole-daemon hang.
+
+Follow-up SDK smoke with active-analysis snapshots:
+
+```sh
+env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep "kurod\\[zeromatter\\].*sdk-parity-20260510-active-snapshot-1" \
+    -- \
+    timeout 1200s \
+      /var/mnt/dev/kuro/target/debug/kuro \
+        --isolation-dir sdk-parity-20260510-active-snapshot-1 \
+        build //sdk:sdk_contents \
+  > /tmp/sdk-parity-20260510-active-snapshot-1.log 2>&1
+```
+
+The run was intentionally stopped after about 8.5 minutes with status `143`
+because it had already produced the needed evidence and was still making slow
+progress. No semantic Bazel-parity error was visible. RSS stayed bounded:
+daemon RSS was about 708 MiB and sampled total RSS about 870 MiB near stop.
+The active snapshot worked. It showed the oldest active key was consistently
+the root `zeromatter//sdk:sdk_contents`, followed by SDK wrapper/aggregation
+targets such as `sdk_with_configs`, `sdk_staged`, `zeromatter_ffi`, and CLI
+targets. Those are long-lived because they wait on the leaf tail, not because
+they are stuck in their own rule implementation. The visible leaf tail was
+still Rust analysis, including waits such as
+`crates__aws-sigv4-1.4.2//:aws-sigv4` and samples in
+`rules_rust+0.69.0/rust/private/rustc.bzl`.
+
+This smoke also exposed a measurement artifact: `KURO_MEMORY_CHECKPOINTS=1`
+was producing hundreds of thousands of per-depset log lines. At stop,
+`depset_create_live create_count` had exceeded `250k`, with many repeated
+small shapes such as `transitive_len=16/17`, and `depset_to_list_*` checkpoints
+were emitted for every Starlark `depset.to_list()`. The per-event tracing I/O
+distorts the performance smoke. The current slice samples `depset_create_live`,
+`depset_to_list_live`/`depset_to_list_frozen`, and `cc_internal_freeze` by
+powers of two plus genuinely large payload shapes, preserving diagnostic maxes
+while avoiding log-volume backpressure.
+
+Loop iteration follow-up on `/tmp/sdk-parity-20260510-rust-sampler-1.log`:
+classification remains Plan 51 slow-tail/performance, not a Plan 15 semantic
+parity failure. The run timed out after steady progress with
+`analysis_key_complete active=310 completed=13108 max_active=3682` and no
+terminal Bazel-mismatch error. The final visible wait was
+`zeromatter//lib/viz_tool:viz_tool` with 15 other analysis actions, while the
+offline reconstructed active set still contained 309 analysis keys.
+
+The expanded Starlark sampler narrowed the hot slow-tail to repeated
+rules_rust per-crate analysis. Top sampled locations were
+`rules_rust+0.69.0/rust/private/utils.bzl:386` (crate-name invalid-character
+scan), `utils.bzl:227` (output-hash computation), `utils.bzl:529` (dependency
+filtering), and `rust.bzl:146-155` (common Rust library setup). This suggests
+many expensive Rust rule analyses rather than one stuck target. Add a gated
+active-analysis snapshot so the next long smoke logs the oldest active analysis
+keys directly instead of requiring post-run reconstruction from
+`analysis_key_start`/`analysis_key_complete` pairs.
+
+Latest bounded SDK parity smoke after expanding the Rust Starlark sampler:
+
+```sh
+env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep "kurod\\[zeromatter\\].*sdk-parity-20260510-rust-sampler-1" \
+    -- \
+    timeout 1200s \
+      /var/mnt/dev/kuro/target/debug/kuro \
+        --isolation-dir sdk-parity-20260510-rust-sampler-1 \
+        build //sdk:sdk_contents \
+  > /tmp/sdk-parity-20260510-rust-sampler-1.log 2>&1
+```
+
+Result: timeout status `124` after 1201s, with no semantic analysis error
+visible in `/tmp/sdk-parity-20260510-rust-sampler-1.log`.
+`memory_smoke_summary elapsed_s=1201 peak_rss_kib=902552 final_rss_kib=726096`;
+the largest daemon sample was about 737 MiB RSS. Memory remains bounded below
+1 GiB, so this is a performance/slow-tail frontier rather than an unbounded-RSS
+blocker.
+
+The expanded sampler in `app/kuro_analysis/src/analysis/env.rs` worked: the log
+now includes `analysis_starlark_call_sample` events for
+`rules_rust+0.69.0/rust/private/rust.bzl`,
+`rules_rust+0.69.0/rust/private/rustc.bzl`, and
+`rules_rust+0.69.0/rust/private/utils.bzl`. The build continued making
+analysis progress through the full timeout. It completed the previous
+`tonic`/`arrow`/`aws-smithy-http-client` frontier, reached
+`completed=13106` / `active=312` before timeout, then continued into targets
+such as `crates__http-cache-0.19.0//:http-cache`. The last visible user-facing
+waits were around `zeromatter//lib/viz_tool:viz_tool` while Rust rule evaluation
+was still active.
+
+Current handoff: keep Plan 51 active for the SDK slow-tail/performance
+investigation, and do not classify this as a Plan 15 semantic parity blocker
+unless a later smoke returns a concrete Bazel mismatch. Plan 17/31 performance
+work is likely the next relevant track if repeated long smokes keep showing
+bounded memory plus steady analysis progress.
+
+## Previous Status 2026-05-10
+
+Earlier bounded SDK parity smoke after the provider/`ctx.attr` parity slice:
+
+```sh
+timeout 900s env KURO_MEMORY_CHECKPOINTS=1 \
+  /var/mnt/dev/kuro/scripts/memory_smoke.sh \
+    --interval 5 \
+    --include-pgrep "kurod\\[zeromatter\\].*sdk-parity-20260510-003745" \
+    -- \
+    /var/mnt/dev/kuro/target/debug/kuro \
+      --isolation-dir sdk-parity-20260510-003745 \
+      build //sdk:sdk_contents \
+  > /tmp/sdk-parity-20260510-003745.log 2>&1
+```
+
+Result: outer timeout status `124` after 900s, with no semantic analysis error
+visible in `/tmp/sdk-parity-20260510-003745.log`. Because the outer timeout
+killed the wrapper, `memory_smoke_summary` was not emitted. Sampled process RSS
+peaked around `858236` KiB and `kurod` reached about 699 MiB, so this is still
+not an unbounded-RSS conclusion. The build continued making analysis progress:
+it passed the prior `aws-sigv4` and `arrow` frontiers, completed roughly 13k
+analysis keys, and was still evaluating a few hundred Rust external targets
+near timeout, including `crates__tonic-prost-0.14.5//:tonic-prost`,
+`crates__aws-smithy-runtime-1.10.3//:aws-smithy-runtime`, and
+`crates__aws-smithy-http-client-1.1.12//:aws-smithy-http-client`.
+
+The hottest Starlark locations in the smoke included
+`rules_cc+0.2.17/cc/private/cc_info.bzl` and
+`rules_rust+0.69.0/rust/private/rustc.bzl` / `rust/private/rust.bzl`, but the
+existing call sampler only treated two `rules_rust` helper files as
+interesting. The next smoke should use the expanded sampler in
+`app/kuro_analysis/src/analysis/env.rs` so long-running Rust rule evaluation
+emits useful `analysis_starlark_call_sample` events. Keep Plan 51 active for
+this performance/frontier investigation unless the next run returns a concrete
+Bazel parity error.
+
+## Previous Status 2026-05-09
 
 Latest bounded smoke after the Plan 44/BazelOutput declared-path slice:
 

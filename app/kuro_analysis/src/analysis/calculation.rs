@@ -9,7 +9,6 @@
  */
 
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::LazyLock;
 use std::sync::Mutex;
@@ -89,8 +88,15 @@ struct RuleAnalysisCalculationInstance;
 static ANALYSIS_ACTIVE: AtomicUsize = AtomicUsize::new(0);
 static ANALYSIS_MAX_ACTIVE: AtomicUsize = AtomicUsize::new(0);
 static ANALYSIS_COMPLETED: AtomicUsize = AtomicUsize::new(0);
+static ANALYSIS_ACTIVE_SNAPSHOT_LAST_COMPLETED: AtomicUsize = AtomicUsize::new(0);
+static ANALYSIS_VERBOSE_CHECKPOINT_COUNT: AtomicUsize = AtomicUsize::new(0);
 
 const ANALYSIS_DEP_BATCH_SIZE: usize = 128;
+const ANALYSIS_ACTIVE_SNAPSHOT_MIN_ACTIVE: usize = 128;
+const ANALYSIS_ACTIVE_SNAPSHOT_INTERVAL: usize = 64;
+const ANALYSIS_ACTIVE_SNAPSHOT_SLOW_TAIL_INTERVAL: usize = 16;
+const ANALYSIS_ACTIVE_SNAPSHOT_LIMIT: usize = 12;
+const ANALYSIS_VERBOSE_CHECKPOINT_INTERVAL: usize = 1024;
 
 struct AnalysisActiveGuard;
 
@@ -127,6 +133,9 @@ fn analysis_checkpoint(
     if !kuro_util::memory_checkpoint::enabled() {
         return;
     }
+    if !should_emit_analysis_verbose_checkpoint(checkpoint) {
+        return;
+    }
     kuro_util::memory_checkpoint::checkpoint(checkpoint, fields.clone());
     tracing::warn!(
         target: "kuro_memory",
@@ -134,6 +143,27 @@ fn analysis_checkpoint(
         target_label = %target,
         "analysis checkpoint {checkpoint} target={target}"
     );
+}
+
+fn should_emit_analysis_verbose_checkpoint(checkpoint: &'static str) -> bool {
+    let high_volume = matches!(
+        checkpoint,
+        "analysis_key_start"
+            | "analysis_key_complete"
+            | "analysis_deps_start"
+            | "analysis_deps_ready"
+            | "analysis_aspects_ready"
+            | "analysis_dep_batch_start"
+            | "analysis_dep_batch_complete"
+            | "analysis_dep_request_start"
+            | "analysis_dep_request_complete"
+            | "analysis_evaluate_rule_result"
+    );
+    if !high_volume {
+        return true;
+    }
+    let count = ANALYSIS_VERBOSE_CHECKPOINT_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+    count.is_power_of_two() || count % ANALYSIS_VERBOSE_CHECKPOINT_INTERVAL == 0
 }
 
 fn analysis_result_checkpoint(
@@ -241,8 +271,14 @@ fn dep_analysis_checkpoint(
 #[display("{}", _0)]
 pub struct AnalysisKey(pub ConfiguredTargetLabel);
 
-static ACTIVE_ANALYSIS_KEYS: LazyLock<Mutex<HashSet<String>>> =
-    LazyLock::new(|| Mutex::new(HashSet::new()));
+struct AnalysisActiveState {
+    started: Instant,
+    phase: &'static str,
+    current_dep: Option<String>,
+}
+
+static ACTIVE_ANALYSIS_KEYS: LazyLock<Mutex<HashMap<String, AnalysisActiveState>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 struct AnalysisKeyActiveSetGuard {
     key: String,
@@ -254,7 +290,14 @@ impl AnalysisKeyActiveSetGuard {
         ACTIVE_ANALYSIS_KEYS
             .lock()
             .expect("ACTIVE_ANALYSIS_KEYS poisoned")
-            .insert(key.clone());
+            .insert(
+                key.clone(),
+                AnalysisActiveState {
+                    started: Instant::now(),
+                    phase: "analysis_key_start",
+                    current_dep: None,
+                },
+            );
         Self { key }
     }
 }
@@ -275,6 +318,104 @@ fn active_analysis_key_count() -> usize {
         .len()
 }
 
+fn set_active_analysis_phase(
+    target: &ConfiguredTargetLabel,
+    phase: &'static str,
+    current_dep: Option<&ConfiguredTargetLabel>,
+) {
+    if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    if let Some(state) = ACTIVE_ANALYSIS_KEYS
+        .lock()
+        .expect("ACTIVE_ANALYSIS_KEYS poisoned")
+        .get_mut(&target.to_string())
+    {
+        state.phase = phase;
+        state.current_dep = current_dep.map(|dep| dep.to_string());
+    }
+}
+
+fn maybe_analysis_active_snapshot(checkpoint: &'static str, completed: usize) {
+    if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    let active = ANALYSIS_ACTIVE.load(Ordering::Relaxed);
+    let interval = if active >= ANALYSIS_ACTIVE_SNAPSHOT_MIN_ACTIVE {
+        ANALYSIS_ACTIVE_SNAPSHOT_SLOW_TAIL_INTERVAL
+    } else {
+        ANALYSIS_ACTIVE_SNAPSHOT_INTERVAL
+    };
+    if completed == 0 || completed % interval != 0 {
+        return;
+    }
+    let mut last_completed = ANALYSIS_ACTIVE_SNAPSHOT_LAST_COMPLETED.load(Ordering::Relaxed);
+    loop {
+        if completed <= last_completed {
+            return;
+        }
+        match ANALYSIS_ACTIVE_SNAPSHOT_LAST_COMPLETED.compare_exchange(
+            last_completed,
+            completed,
+            Ordering::SeqCst,
+            Ordering::Relaxed,
+        ) {
+            Ok(_) => break,
+            Err(next) => last_completed = next,
+        }
+    }
+
+    let now = Instant::now();
+    let mut oldest = ACTIVE_ANALYSIS_KEYS
+        .lock()
+        .expect("ACTIVE_ANALYSIS_KEYS poisoned")
+        .iter()
+        .map(|(key, state)| {
+            let elapsed_ms = now
+                .duration_since(state.started)
+                .as_millis()
+                .min(usize::MAX as u128) as usize;
+            let phase = match &state.current_dep {
+                Some(dep) => format!("{} dep={}", state.phase, dep),
+                None => state.phase.to_owned(),
+            };
+            (elapsed_ms, key.clone(), phase)
+        })
+        .collect::<Vec<_>>();
+    oldest.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+    let active_keys = oldest.len();
+    let oldest_elapsed_ms = oldest
+        .first()
+        .map(|(elapsed_ms, _, _)| *elapsed_ms)
+        .unwrap_or(0);
+    let oldest_targets = oldest
+        .into_iter()
+        .take(ANALYSIS_ACTIVE_SNAPSHOT_LIMIT)
+        .map(|(elapsed_ms, key, phase)| format!("{elapsed_ms}ms:{key} phase={phase}"))
+        .collect::<Vec<_>>()
+        .join(" | ");
+
+    kuro_util::memory_checkpoint::checkpoint(
+        checkpoint,
+        [
+            ("active", active),
+            ("active_keys", active_keys),
+            ("completed", completed),
+            ("oldest_elapsed_ms", oldest_elapsed_ms),
+        ],
+    );
+    tracing::warn!(
+        target: "kuro_memory",
+        checkpoint,
+        active,
+        active_keys,
+        completed,
+        oldest_elapsed_ms,
+        oldest_targets = %oldest_targets,
+        "analysis active snapshot {checkpoint} active={active} active_keys={active_keys} completed={completed} oldest_elapsed_ms={oldest_elapsed_ms}"
+    );
+}
+
 fn analysis_dep_checkpoint(
     checkpoint: &'static str,
     target: &ConfiguredTargetLabel,
@@ -285,6 +426,10 @@ fn analysis_dep_checkpoint(
     started: Instant,
 ) {
     if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    set_active_analysis_phase(target, checkpoint, dep_label);
+    if !should_emit_analysis_verbose_checkpoint(checkpoint) {
         return;
     }
     let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
@@ -370,6 +515,7 @@ impl Key for AnalysisKey {
                 completed,
                 ANALYSIS_MAX_ACTIVE.load(Ordering::Relaxed),
             );
+            maybe_analysis_active_snapshot("analysis_active_snapshot_complete", completed);
         } else {
             let completed = ANALYSIS_COMPLETED.fetch_add(1, Ordering::SeqCst) + 1;
             analysis_checkpoint(
@@ -381,6 +527,7 @@ impl Key for AnalysisKey {
                     ("max_active", ANALYSIS_MAX_ACTIVE.load(Ordering::Relaxed)),
                 ],
             );
+            maybe_analysis_active_snapshot("analysis_active_snapshot_incompatible", completed);
         }
         Ok(res)
     }

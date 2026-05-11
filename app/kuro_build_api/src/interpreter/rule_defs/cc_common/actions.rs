@@ -15,6 +15,8 @@
 use std::fmt;
 use std::fmt::Display;
 use std::hash::Hash;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 use allocative::Allocative;
 use starlark::coerce::Coerce;
@@ -82,6 +84,10 @@ use crate::interpreter::rule_defs::depset::is_depset_value;
 // ============================================================================
 // CcCommonInternal - Internal API returned by internal_DO_NOT_USE()
 // ============================================================================
+
+static CC_INTERNAL_FREEZE_COUNT: AtomicUsize = AtomicUsize::new(0);
+
+const CC_INTERNAL_FREEZE_CHECKPOINT_LARGE_LEN: usize = 256;
 
 /// Helper: insert `(key, val)` into `map`, keyed by a freshly allocated
 /// Starlark string, iff `val` isn't `None`. Used by `create_compile_variables`
@@ -1175,18 +1181,26 @@ fn cc_common_internal_methods(builder: &mut MethodsBuilder) {
                     .map(|iter| iter.count())
                     .unwrap_or(0)
             };
-            cc_common_checkpoint(
-                "cc_internal_freeze",
-                [
-                    ("is_depset", is_depset_value(value) as usize),
-                    ("depset_direct", direct),
-                    ("depset_transitive", transitive),
-                    ("depset_depth", depth),
-                    ("depset_empty", is_empty),
-                    ("iterable_len", iterable_len),
-                    ("is_none", value.is_none() as usize),
-                ],
-            );
+            let freeze_count = CC_INTERNAL_FREEZE_COUNT.fetch_add(1, Ordering::SeqCst) + 1;
+            if direct + transitive >= CC_INTERNAL_FREEZE_CHECKPOINT_LARGE_LEN
+                || depth >= 16
+                || iterable_len >= CC_INTERNAL_FREEZE_CHECKPOINT_LARGE_LEN
+                || freeze_count.is_power_of_two()
+            {
+                cc_common_checkpoint(
+                    "cc_internal_freeze",
+                    [
+                        ("freeze_count", freeze_count),
+                        ("is_depset", is_depset_value(value) as usize),
+                        ("depset_direct", direct),
+                        ("depset_transitive", transitive),
+                        ("depset_depth", depth),
+                        ("depset_empty", is_empty),
+                        ("iterable_len", iterable_len),
+                        ("is_none", value.is_none() as usize),
+                    ],
+                );
+            }
         }
         cc_internal_freeze_value(value, eval.heap())
     }

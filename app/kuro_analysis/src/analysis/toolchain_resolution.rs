@@ -26,6 +26,7 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+use kuro_core::configuration::data::ConfigurationData;
 use kuro_core::execution_types::execution::ExecutionPlatform;
 
 use super::native_rule_analysis::get_declared_toolchains;
@@ -130,6 +131,32 @@ impl PlatformConstraints {
             for (_key, value) in &data.constraints {
                 constraint_values.insert(value.0.target().to_string());
             }
+        }
+        PlatformConstraints {
+            label,
+            constraint_values,
+        }
+    }
+
+    /// Build constraint set from a configured target's target platform.
+    ///
+    /// Toolchain `target_compatible_with` must be checked against the target
+    /// configuration, not a synthetic host platform. ZeroMatter-style platforms
+    /// carry additional constraints such as LLVM libc ABI values; dropping
+    /// those constraints makes Kuro reject the user-registered toolchain and
+    /// fall through to lower-priority transitive registrations.
+    pub fn from_configuration_data(cfg: &ConfigurationData) -> Self {
+        let label = cfg
+            .label()
+            .map(str::to_owned)
+            .unwrap_or_else(|_| cfg.full_name().to_owned());
+        let mut constraint_values = HashSet::new();
+        if let Ok(data) = cfg.data() {
+            for (_key, value) in &data.constraints {
+                constraint_values.insert(value.0.target().to_string());
+            }
+        } else {
+            constraint_values = Self::host_platform().constraint_values;
         }
         PlatformConstraints {
             label,
@@ -433,6 +460,12 @@ pub fn resolve_toolchains_multi_group(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
+    use kuro_core::configuration::constraints::ConstraintKey;
+    use kuro_core::configuration::constraints::ConstraintValue;
+    use kuro_core::configuration::data::ConfigurationDataData;
+
     use super::*;
 
     #[test]
@@ -531,6 +564,37 @@ mod tests {
         assert!(canonical_platform.satisfies(&[
             "@platforms//os:linux".to_owned(),
             "@platforms//cpu:x86_64".to_owned(),
+        ]));
+    }
+
+    #[test]
+    fn test_platform_constraints_from_configuration_data_preserve_extra_constraints() {
+        let cfg = ConfigurationData::from_platform(
+            "zeromatter//bazel/platforms:linux-gnu-host".to_owned(),
+            ConfigurationDataData::new(BTreeMap::from([
+                (
+                    ConstraintKey::testing_new("platforms//os:os"),
+                    ConstraintValue::testing_new("platforms//os:linux", None),
+                ),
+                (
+                    ConstraintKey::testing_new("platforms//cpu:cpu"),
+                    ConstraintValue::testing_new("platforms//cpu:x86_64", None),
+                ),
+                (
+                    ConstraintKey::testing_new("llvm//constraints/libc:constraint"),
+                    ConstraintValue::testing_new("llvm+0.7.0//constraints/libc:gnu.2.28", None),
+                ),
+            ])),
+        )
+        .unwrap();
+
+        let platform = PlatformConstraints::from_configuration_data(&cfg);
+
+        assert_eq!(platform.label, "zeromatter//bazel/platforms:linux-gnu-host");
+        assert!(platform.satisfies(&[
+            "platforms//os:linux".to_owned(),
+            "platforms//cpu:x86_64".to_owned(),
+            "llvm//constraints/libc:gnu.2.28".to_owned(),
         ]));
     }
 

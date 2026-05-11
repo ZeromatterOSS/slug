@@ -92,6 +92,8 @@ use crate::execution::resolve_execution_platform;
 static CONFIGURED_NODE_ACTIVE: AtomicUsize = AtomicUsize::new(0);
 static CONFIGURED_NODE_MAX_ACTIVE: AtomicUsize = AtomicUsize::new(0);
 static CONFIGURED_NODE_COMPLETED: AtomicUsize = AtomicUsize::new(0);
+static CONFIGURED_VERBOSE_CHECKPOINT_COUNT: AtomicUsize = AtomicUsize::new(0);
+const CONFIGURED_VERBOSE_CHECKPOINT_INTERVAL: usize = 1024;
 
 struct ConfiguredNodeActiveGuard;
 
@@ -129,6 +131,9 @@ fn configured_checkpoint(
     if !kuro_util::memory_checkpoint::enabled() {
         return;
     }
+    if !should_emit_configured_verbose_checkpoint(checkpoint) {
+        return;
+    }
     let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
     let mut checkpoint_fields = vec![
         ("active", CONFIGURED_NODE_ACTIVE.load(Ordering::Relaxed)),
@@ -154,6 +159,38 @@ fn configured_checkpoint(
     );
 }
 
+fn should_emit_configured_verbose_checkpoint(checkpoint: &'static str) -> bool {
+    let high_volume = matches!(
+        checkpoint,
+        "configured_node_key_start"
+            | "configured_node_key_complete"
+            | "configured_node_no_transition_start"
+            | "configured_node_matched_cfg_ready"
+            | "configured_node_platform_cfgs_ready"
+            | "configured_node_transition_attrs_ready"
+            | "configured_node_gather_deps_ready"
+            | "configured_node_plugin_deps_checked"
+            | "configured_node_exec_platform_ready"
+            | "configured_node_toolchain_exec_deps_ready"
+            | "configured_node_no_transition_complete"
+            | "configured_gather_start"
+            | "configured_gather_attrs_traversed"
+            | "configured_gather_aspect_keys"
+            | "configured_gather_aspects_complete"
+            | "configured_gather_normal_deps_start"
+            | "configured_gather_normal_deps_complete"
+            | "configured_gather_plugins_complete"
+            | "configured_gather_complete"
+            | "configured_gather_dep_request_start"
+            | "configured_gather_dep_request_complete"
+    );
+    if !high_volume {
+        return true;
+    }
+    let count = CONFIGURED_VERBOSE_CHECKPOINT_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+    count.is_power_of_two() || count % CONFIGURED_VERBOSE_CHECKPOINT_INTERVAL == 0
+}
+
 fn gather_checkpoint(
     checkpoint: &'static str,
     target_label: &TargetConfiguredTargetLabel,
@@ -161,6 +198,9 @@ fn gather_checkpoint(
     fields: impl IntoIterator<Item = (&'static str, usize)> + Clone,
 ) {
     if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    if !should_emit_configured_verbose_checkpoint(checkpoint) {
         return;
     }
     let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;
@@ -197,6 +237,9 @@ fn gather_dep_checkpoint(
     started: Instant,
 ) {
     if !kuro_util::memory_checkpoint::enabled() {
+        return;
+    }
+    if !should_emit_configured_verbose_checkpoint(checkpoint) {
         return;
     }
     let elapsed_ms = started.elapsed().as_millis().min(usize::MAX as u128) as usize;

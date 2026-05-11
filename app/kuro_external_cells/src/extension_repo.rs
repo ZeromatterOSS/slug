@@ -153,11 +153,6 @@ fn complete_marker_matches(marker: &str, spec_hash: &str) -> bool {
     let marker = marker.trim();
     if spec_hash.is_empty() {
         is_complete_marker(marker)
-    } else if marker == "complete" {
-        // Legacy materializations predate spec-hashed complete markers. Treat
-        // them as current unless a narrower stale-output check below proves
-        // otherwise.
-        true
     } else {
         marker == complete_marker(spec_hash)
     }
@@ -840,6 +835,16 @@ pub(crate) async fn get_file_ops_delegate(
         // Execute via DICE to materialize the repository
         match ctx.compute(&key).await {
             Ok(Ok(repo_result)) => {
+                if !setup.spec_hash.is_empty() {
+                    if let Err(e) = std::fs::write(&marker_path, complete_marker(&setup.spec_hash))
+                    {
+                        tracing::warn!(
+                            "Failed to write spec-hashed completion marker for '{}': {}",
+                            setup.canonical_name,
+                            e
+                        );
+                    }
+                }
                 tracing::info!(
                     "Successfully materialized extension repo '{}' at {:?}",
                     setup.canonical_name,
@@ -1145,7 +1150,7 @@ mod tests {
             "complete:sha256-new\n",
             "sha256-new"
         ));
-        assert!(complete_marker_matches("complete", "sha256-new"));
+        assert!(!complete_marker_matches("complete", "sha256-new"));
         assert!(!complete_marker_matches(
             "complete:sha256-old",
             "sha256-new"

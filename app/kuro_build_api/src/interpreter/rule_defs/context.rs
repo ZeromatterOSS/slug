@@ -265,8 +265,8 @@ impl<'v> AnalysisContext<'v> {
 
     /// The workspace name (repository) that owns the current rule target.
     ///
-    /// Matches the Bazel-visible `ctx.workspace_name` attribute: the cell name of the
-    /// target's package, or an empty string for the root cell. Used by
+    /// Matches the Bazel-visible `ctx.workspace_name` attribute: `_main` for
+    /// the root module, otherwise the cell name of the target's package. Used by
     /// `DefaultInfo(executable=..., default_runfiles=...)` to key the runfiles
     /// symlink tree under `<exe>.runfiles/<workspace_name>/...`.
     pub fn workspace_name_str(&self) -> &str {
@@ -274,7 +274,7 @@ impl<'v> AnalysisContext<'v> {
             Some(label) => {
                 let cell = label.label().target().pkg().cell_name().as_str();
                 if kuro_core::cells::is_root_cell_name(cell) {
-                    ""
+                    "_main"
                 } else {
                     cell
                 }
@@ -858,8 +858,9 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
     /// Returns a root object representing the output tree for binaries.
     /// Access the path via `ctx.bin_dir.path`.
     ///
-    /// In Kuro, derives the path from the target's cell name and configuration hash:
-    /// `buck-out/v2/gen/<cell>/<cfg_hash>`
+    /// In Kuro, derives the path from the active buck-out root, target's cell
+    /// name, and configuration hash:
+    /// `<buck-out>/gen/<cell>/<cfg_hash>`
     #[starlark(attribute)]
     fn bin_dir<'v>(this: RefAnalysisContext<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
         let path = bin_dir_path_from_label(this.0.label);
@@ -1239,6 +1240,7 @@ pub fn collect_location_pool_for_ctx<'v>(
     use crate::interpreter::rule_defs::artifact::starlark_declared_artifact::StarlarkDeclaredArtifact;
     use crate::interpreter::rule_defs::provider::dependency::Dependency;
     use crate::interpreter::rule_defs::provider::dependency::FrozenDependency;
+    use crate::interpreter::rule_defs::provider::dependency::SourceFileTarget;
 
     let collect_output_paths = |pc: starlark::values::FrozenValueTyped<
         '_,
@@ -1316,6 +1318,27 @@ pub fn collect_location_pool_for_ctx<'v>(
             let label_str = dep.label().label().unconfigured().to_string();
             let paths = collect_output_paths(dep.provider_collection());
             entries.push((label_str, paths));
+        } else if let Some(source) = v.downcast_ref::<SourceFileTarget>() {
+            let artifact_value = source.artifact_value(heap);
+            if let Some(art) = artifact_value.downcast_ref::<StarlarkArtifact>() {
+                if let Ok(bound) = art.get_bound_starlark_artifact() {
+                    let path = bound
+                        .artifact()
+                        .get_path()
+                        .with_full_path(|p| p.as_str().to_owned());
+                    let short = bound
+                        .artifact()
+                        .get_path()
+                        .with_short_path(|p| p.as_str().to_owned());
+                    entries.push((
+                        source.label().unconfigured().to_string(),
+                        vec![path.clone()],
+                    ));
+                    if !short.is_empty() {
+                        entries.push((short, vec![path]));
+                    }
+                }
+            }
         }
     };
 
@@ -1437,8 +1460,8 @@ pub fn lookup_output_path_for_ctx<'v>(
 
 /// Derives the output directory path from a configured target label.
 ///
-/// In Kuro, the output path is `buck-out/v2/gen/<cell>/<cfg_hash>`.
-/// Falls back to `buck-out/v2/gen` if no label is available.
+/// In Kuro, the output path is `<buck-out>/gen/<cell>/<cfg_hash>`.
+/// Falls back to `<buck-out>/gen` if no label is available.
 pub fn bin_dir_path_from_label(
     label: Option<
         starlark::values::ValueTyped<
@@ -1447,13 +1470,15 @@ pub fn bin_dir_path_from_label(
         >,
     >,
 ) -> String {
+    let buck_out_root = kuro_execute::path::artifact_path::get_artifact_path_buck_out_root();
+    let buck_out_root = buck_out_root.as_str();
     if let Some(label) = label {
         let target = label.label().target();
         let cell_name = target.pkg().cell_name().as_str();
         let cfg_hash = label.label().cfg().output_hash().as_str();
-        format!("buck-out/v2/gen/{}/{}", cell_name, cfg_hash)
+        format!("{}/gen/{}/{}", buck_out_root, cell_name, cfg_hash)
     } else {
-        "buck-out/v2/gen".to_owned()
+        format!("{}/gen", buck_out_root)
     }
 }
 
@@ -1898,6 +1923,40 @@ struct CcToolchainInfoNativeShim {
     toolchain_label: String,
 }
 
+fn host_llvm_toolchain_bin(tool: &str) -> Option<String> {
+    let root = kuro_core::cells::get_dynamic_project_root()?;
+    let os = match std::env::consts::OS {
+        "linux" => "linux",
+        "macos" => "darwin",
+        _ => return None,
+    };
+    let arch = match std::env::consts::ARCH {
+        "x86_64" => "amd64",
+        "aarch64" => "arm64",
+        _ => return None,
+    };
+    let suffix = format!("-{os}-{arch}");
+    let external = root.join("bazel-external");
+    let mut candidates = Vec::new();
+    for entry in std::fs::read_dir(&external).ok()?.flatten() {
+        let file_name = entry.file_name();
+        let Some(name) = file_name.to_str() else {
+            continue;
+        };
+        let is_llvm_toolchain = name.starts_with("llvm-toolchain-minimal-")
+            || name.starts_with("llvm+http_archive+llvm-toolchain-minimal-");
+        if !is_llvm_toolchain || !name.ends_with(&suffix) {
+            continue;
+        }
+        let path = entry.path().join("bin").join(tool);
+        if path.is_file() {
+            candidates.push(path.to_string_lossy().into_owned());
+        }
+    }
+    candidates.sort();
+    candidates.into_iter().next()
+}
+
 impl std::fmt::Display for CcToolchainInfoNativeShim {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "CcToolchainInfo({})", self.toolchain_label)
@@ -2010,7 +2069,16 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
         match attribute {
             "compiler" => Some(heap.alloc_str("clang").to_value()),
             "compiler_executable" | "preprocessor_executable" => {
-                Some(heap.alloc_str("clang").to_value())
+                let compiler = host_llvm_toolchain_bin("clang").unwrap_or_else(|| {
+                    if cfg!(target_os = "windows") {
+                        "cl.exe".to_owned()
+                    } else if cfg!(target_os = "macos") {
+                        "/usr/bin/clang".to_owned()
+                    } else {
+                        "/usr/bin/gcc".to_owned()
+                    }
+                });
+                Some(heap.alloc_str(&compiler).to_value())
             }
             "nm_executable" => Some(heap.alloc_str("nm").to_value()),
             "objdump_executable" => Some(heap.alloc_str("objdump").to_value()),
