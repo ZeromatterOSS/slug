@@ -307,14 +307,10 @@ pub fn compute_extension_input_hash(extension: &AggregatedExtension) -> String {
     for module_name in module_names {
         hasher.update(module_name.as_bytes());
         if let Some(tags) = extension.tags_by_module.get(module_name) {
+            let mut tags: Vec<_> = tags.iter().collect();
+            tags.sort_by_key(|tag| canonical_tag_hash_input(tag));
             for tag in tags {
-                hasher.update(tag.tag_name.as_bytes());
-                let mut kwargs: Vec<_> = tag.kwargs.iter().collect();
-                kwargs.sort_by(|(left, _), (right, _)| left.cmp(right));
-                for (key, value) in kwargs {
-                    hasher.update(key.as_bytes());
-                    hash_tag_value(value, &mut hasher);
-                }
+                hash_extension_tag(tag, &mut hasher);
             }
         }
     }
@@ -326,43 +322,72 @@ pub fn compute_extension_input_hash(extension: &AggregatedExtension) -> String {
     )
 }
 
-fn hash_tag_value(value: &TagValue, hasher: &mut sha2::Sha256) {
+fn canonical_tag_hash_input(tag: &ExtensionTag) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    append_extension_tag_hash_input(tag, &mut bytes);
+    bytes
+}
+
+fn hash_extension_tag(tag: &ExtensionTag, hasher: &mut sha2::Sha256) {
+    hasher.update(canonical_tag_hash_input(tag));
+}
+
+fn append_extension_tag_hash_input(tag: &ExtensionTag, bytes: &mut Vec<u8>) {
+    bytes.extend_from_slice(b"tag:");
+    bytes.extend_from_slice(tag.tag_name.as_bytes());
+    bytes.extend_from_slice(b"\0");
+
+    let mut kwargs: Vec<_> = tag.kwargs.iter().collect();
+    kwargs.sort_by(|(left, _), (right, _)| left.cmp(right));
+    for (key, value) in kwargs {
+        bytes.extend_from_slice(b"kw:");
+        bytes.extend_from_slice(key.as_bytes());
+        bytes.extend_from_slice(b"=");
+        append_tag_value_hash_input(value, bytes);
+        bytes.extend_from_slice(b"\0");
+    }
+}
+
+fn append_tag_value_hash_input(value: &TagValue, bytes: &mut Vec<u8>) {
     match value {
         TagValue::String(s) => {
-            hasher.update(b"string:");
-            hasher.update(s.as_bytes());
+            bytes.extend_from_slice(b"string:");
+            bytes.extend_from_slice(s.as_bytes());
         }
         TagValue::Label(s) => {
-            hasher.update(b"label:");
-            hasher.update(s.as_bytes());
+            bytes.extend_from_slice(b"label:");
+            bytes.extend_from_slice(s.as_bytes());
         }
         TagValue::Int(i) => {
-            hasher.update(b"int:");
-            hasher.update(i.to_le_bytes());
+            bytes.extend_from_slice(b"int:");
+            bytes.extend_from_slice(&i.to_le_bytes());
         }
         TagValue::Bool(b) => {
-            hasher.update(b"bool:");
-            hasher.update([u8::from(*b)]);
+            bytes.extend_from_slice(b"bool:");
+            bytes.push(u8::from(*b));
         }
         TagValue::List(items) => {
-            hasher.update(b"list:");
-            hasher.update(items.len().to_le_bytes());
+            bytes.extend_from_slice(b"list:");
+            bytes.extend_from_slice(&items.len().to_le_bytes());
             for item in items {
-                hash_tag_value(item, hasher);
+                append_tag_value_hash_input(item, bytes);
+                bytes.extend_from_slice(b"\0");
             }
         }
         TagValue::Dict(entries) => {
-            hasher.update(b"dict:");
-            hasher.update(entries.len().to_le_bytes());
+            bytes.extend_from_slice(b"dict:");
+            bytes.extend_from_slice(&entries.len().to_le_bytes());
             let mut entries: Vec<_> = entries.iter().collect();
             entries.sort_by(|(left, _), (right, _)| left.cmp(right));
             for (key, value) in entries {
-                hasher.update(key.as_bytes());
-                hash_tag_value(value, hasher);
+                bytes.extend_from_slice(key.as_bytes());
+                bytes.extend_from_slice(b"=");
+                append_tag_value_hash_input(value, bytes);
+                bytes.extend_from_slice(b"\0");
             }
         }
         TagValue::None => {
-            hasher.update(b"none");
+            bytes.extend_from_slice(b"none");
         }
     }
 }
@@ -467,6 +492,25 @@ mod tests {
         );
 
         assert_ne!(
+            compute_extension_input_hash(&first),
+            compute_extension_input_hash(&second)
+        );
+    }
+
+    #[test]
+    fn test_compute_extension_input_hash_sorts_tags_by_content() {
+        let tag_a = ExtensionTag::new("crate".to_owned())
+            .with_kwarg("name".to_owned(), TagValue::String("a".to_owned()));
+        let tag_b = ExtensionTag::new("crate".to_owned())
+            .with_kwarg("name".to_owned(), TagValue::String("b".to_owned()));
+
+        let mut first = AggregatedExtension::new("@rules_rs//:crates.bzl", "crates");
+        first.add_module_tags("root", vec![tag_a.clone(), tag_b.clone()]);
+
+        let mut second = AggregatedExtension::new("@rules_rs//:crates.bzl", "crates");
+        second.add_module_tags("root", vec![tag_b, tag_a]);
+
+        assert_eq!(
             compute_extension_input_hash(&first),
             compute_extension_input_hash(&second)
         );

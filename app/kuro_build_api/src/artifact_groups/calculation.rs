@@ -489,6 +489,12 @@ async fn path_artifact_value(
             // the link without telling us, so prefer reading the file
             // through.
             let abs_target = external_symlink.to_path_buf();
+            if let Ok(metadata) = std::fs::metadata(&abs_target) {
+                if metadata.is_dir() {
+                    return dir_artifact_value(ctx, cell_path).await;
+                }
+            }
+
             let target_path = match kuro_fs::paths::abs_path::AbsPath::new(&abs_target) {
                 Ok(p) => p.to_owned(),
                 Err(_) => {

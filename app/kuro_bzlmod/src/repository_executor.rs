@@ -377,10 +377,20 @@ fn execute_http_file(
 
     // Download the file
     let mut last_error = None;
-    let mut data = None;
+    let mut data = read_cached_repository_download(sha256.as_deref(), integrity.as_deref());
     for url in &urls {
+        if data.is_some() {
+            break;
+        }
         match download_url(url) {
             Ok(d) => {
+                if let Some(expected) = sha256.as_deref() {
+                    verify_sha256(&d, expected)?;
+                }
+                if let Some(expected) = integrity.as_deref() {
+                    verify_integrity(&d, expected)?;
+                }
+                write_cached_repository_download(sha256.as_deref(), integrity.as_deref(), &d);
                 data = Some(d);
                 break;
             }
@@ -470,10 +480,20 @@ fn execute_http_jar(
 
     // Download the jar
     let mut last_error = None;
-    let mut data = None;
+    let mut data = read_cached_repository_download(sha256.as_deref(), integrity.as_deref());
     for url in &urls {
+        if data.is_some() {
+            break;
+        }
         match download_url(url) {
             Ok(d) => {
+                if let Some(expected) = sha256.as_deref() {
+                    verify_sha256(&d, expected)?;
+                }
+                if let Some(expected) = integrity.as_deref() {
+                    verify_integrity(&d, expected)?;
+                }
+                write_cached_repository_download(sha256.as_deref(), integrity.as_deref(), &d);
                 data = Some(d);
                 break;
             }
@@ -660,6 +680,11 @@ fn download_and_extract(
     integrity: Option<&str>,
     strip_prefix: Option<&str>,
 ) -> kuro_error::Result<()> {
+    if let Some(data) = read_cached_repository_download(sha256, integrity) {
+        extract_archive(&data, dest_dir, strip_prefix)?;
+        return Ok(());
+    }
+
     tracing::info!("Downloading from {}", url);
 
     // Download using curl or wget
@@ -672,11 +697,54 @@ fn download_and_extract(
     if let Some(expected) = integrity {
         verify_integrity(&data, expected)?;
     }
+    write_cached_repository_download(sha256, integrity, &data);
 
     // Extract
     extract_archive(&data, dest_dir, strip_prefix)?;
 
     Ok(())
+}
+
+fn repository_download_cache_key(sha256: Option<&str>, integrity: Option<&str>) -> Option<String> {
+    if let Some(integrity) = integrity.filter(|s| !s.is_empty()) {
+        Some(integrity.to_owned())
+    } else {
+        sha256
+            .filter(|s| !s.is_empty())
+            .map(|sha256| format!("sha256-hex-{sha256}"))
+    }
+}
+
+fn read_cached_repository_download(
+    sha256: Option<&str>,
+    integrity: Option<&str>,
+) -> Option<Vec<u8>> {
+    let key = repository_download_cache_key(sha256, integrity)?;
+    let cache = crate::cache::ModuleCache::new().ok()?;
+    let data = cache.read_download(&key).ok()??;
+    if let Some(expected) = sha256.filter(|s| !s.is_empty()) {
+        if verify_sha256(&data, expected).is_err() {
+            tracing::warn!("Ignoring repository download cache entry with mismatched sha256");
+            return None;
+        }
+    }
+    if let Some(expected) = integrity.filter(|s| !s.is_empty()) {
+        if verify_integrity(&data, expected).is_err() {
+            tracing::warn!("Ignoring repository download cache entry with mismatched integrity");
+            return None;
+        }
+    }
+    Some(data)
+}
+
+fn write_cached_repository_download(sha256: Option<&str>, integrity: Option<&str>, data: &[u8]) {
+    let Some(key) = repository_download_cache_key(sha256, integrity) else {
+        return;
+    };
+    match crate::cache::ModuleCache::new().and_then(|cache| cache.write_download(&key, data)) {
+        Ok(_) => {}
+        Err(e) => tracing::debug!("Failed to write repository download cache entry: {}", e),
+    }
 }
 
 /// Download a URL using curl or wget.

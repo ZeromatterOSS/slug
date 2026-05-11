@@ -404,6 +404,12 @@ impl FileOpsDelegate for ExtensionRepoFileOpsDelegate {
         if metadata.is_dir() {
             Ok(Some(RawPathMetadata::Directory))
         } else if metadata.is_symlink() {
+            if let Ok(target_metadata) = tokio::fs::metadata(&abs_path).await {
+                if target_metadata.is_dir() {
+                    return Ok(Some(RawPathMetadata::Directory));
+                }
+            }
+
             // Read symlink target
             let target = tokio::fs::read_link(&abs_path).await.map_err(|e| {
                 kuro_error::kuro_error!(

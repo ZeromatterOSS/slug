@@ -633,6 +633,7 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         Ok(heap.alloc(ResolvedToolchains {
             toolchains: std::collections::HashMap::new(),
             exec_platform: String::new(),
+            target_platform: String::new(),
         }))
     }
 
@@ -1921,6 +1922,7 @@ impl<'v> StarlarkValue<'v> for CcInfoNativeShim {
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct CcToolchainInfoNativeShim {
     toolchain_label: String,
+    target_platform: String,
 }
 
 fn host_llvm_toolchain_bin(tool: &str) -> Option<String> {
@@ -1964,6 +1966,24 @@ impl std::fmt::Display for CcToolchainInfoNativeShim {
 }
 
 starlark::starlark_simple_value!(CcToolchainInfoNativeShim);
+
+impl CcToolchainInfoNativeShim {
+    fn is_musl_target(&self) -> bool {
+        self.toolchain_label.contains("musl") || self.target_platform.contains("musl")
+    }
+
+    fn target_system_name(&self) -> &'static str {
+        if self.is_musl_target() {
+            "x86_64-linux-musl"
+        } else {
+            "x86_64-unknown-linux-gnu"
+        }
+    }
+
+    fn target_libc(&self) -> &'static str {
+        if self.is_musl_target() { "musl" } else { "gnu" }
+    }
+}
 
 #[starlark::starlark_module]
 fn cc_toolchain_native_shim_methods(builder: &mut MethodsBuilder) {
@@ -2089,7 +2109,9 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
             "objcopy_executable" => Some(heap.alloc_str("objcopy").to_value()),
             "generate_modmap" => Some(Value::new_none()),
             "cpu" => Some(heap.alloc_str(&host_target_cpu()).to_value()),
-            "libc" | "target_gnu_system_name" | "toolchain_id" => Some(empty_string()),
+            "target_gnu_system_name" => Some(heap.alloc_str(self.target_system_name()).to_value()),
+            "libc" => Some(heap.alloc_str(self.target_libc()).to_value()),
+            "toolchain_id" => Some(empty_string()),
             "dynamic_runtime_solib_dir" => Some(heap.alloc_str("_solib").to_value()),
             "built_in_include_directories" => Some(empty_list()),
             "all_files"
@@ -2113,9 +2135,14 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
             | "_if_so_builder"
             | "_allowlist_for_layering_check"
             | "_aggregate_ddi" => Some(Value::new_none()),
-            "_tool_paths" | "_additional_make_variables" | "_build_variables_dict" => {
-                Some(empty_dict())
-            }
+            "_tool_paths" | "_additional_make_variables" => Some(empty_dict()),
+            "_build_variables_dict" => Some(heap.alloc(AllocDict([
+                (
+                    "target_system_name",
+                    heap.alloc_str(self.target_system_name()).to_value(),
+                ),
+                ("target_libc", heap.alloc_str(self.target_libc()).to_value()),
+            ]))),
             "_solib_dir" => Some(heap.alloc_str("_solib").to_value()),
             "_fdo_context" => Some(heap.alloc(AllocStruct::EMPTY)),
             "_legacy_cc_flags_make_variable"
@@ -2145,16 +2172,19 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
         "CcToolchainInfoNativeShim".hash(hasher);
         self.toolchain_label.hash(hasher);
+        self.target_platform.hash(hasher);
         Ok(())
     }
 }
 
 pub fn cc_toolchain_native_shim_provider_collection(
     toolchain_label: &str,
+    target_platform: &str,
 ) -> FrozenProviderCollectionValue {
     let heap = FrozenHeap::new();
     let cc = heap.alloc(CcToolchainInfoNativeShim {
         toolchain_label: toolchain_label.to_owned(),
+        target_platform: target_platform.to_owned(),
     });
     let cc_provider_in_toolchain = heap.alloc(true);
     let fields = heap.alloc(AllocDict([
@@ -2187,6 +2217,8 @@ pub struct ResolvedToolchains {
     pub toolchains: std::collections::HashMap<String, Option<FrozenProviderCollectionValue>>,
     /// The selected execution platform label.
     pub exec_platform: String,
+    /// The target platform/configuration this toolchain set was resolved for.
+    pub target_platform: String,
 }
 
 impl std::fmt::Display for ResolvedToolchains {
@@ -2231,6 +2263,31 @@ impl<'v> StarlarkValue<'v> for ResolvedToolchains {
                 .find(|(k, _)| normalize_toolchain_type_label(k) == normalized)
                 .map(|(_, v)| v)
         });
+
+        if is_cpp_toolchain_type_label_for_lookup(&normalized) {
+            if let Some(Some(providers)) = entry {
+                let cc_toolchain_info_id =
+                    crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider::provider_id(
+                    );
+                if let Some(cc_fv) = providers
+                    .provider_collection()
+                    .get_provider_raw(cc_toolchain_info_id)
+                {
+                    let cc = cc_fv.to_value();
+                    let cc_provider_in_toolchain = heap.alloc(true);
+                    let fields = heap.alloc(AllocDict([
+                        ("cc", cc),
+                        ("cc_provider_in_toolchain", cc_provider_in_toolchain),
+                    ]));
+                    return Ok(heap.alloc(ToolchainInfoInstanceGen::new(fields)));
+                }
+            }
+            return Ok(alloc_cc_toolchain_info_shim(
+                heap,
+                &key,
+                &self.target_platform,
+            ));
+        }
 
         match entry {
             Some(Some(providers)) => {
@@ -2278,6 +2335,42 @@ fn normalize_toolchain_type_label(label: &str) -> String {
     };
     let repo = normalize_bzlmod_module_repo_name(repo);
     format!("{repo}//{rest}")
+}
+
+fn is_cpp_toolchain_type_label_for_lookup(label: &str) -> bool {
+    let label = label.trim_start_matches('@');
+    if label.contains("tools/cpp:toolchain_type") {
+        return true;
+    }
+    let Some((repo, package)) = label.split_once("//") else {
+        return false;
+    };
+    (package == "tools/cpp:toolchain_type"
+        && (repo == "bazel_tools" || repo.starts_with("bazel_tools+")))
+        || package == "cc:toolchain_type"
+            && (repo == "rules_cc"
+                || repo.strip_prefix("rules_cc+").is_some_and(|rest| {
+                    rest.split('+')
+                        .next()
+                        .is_some_and(|version| version.contains('.'))
+                }))
+}
+
+fn alloc_cc_toolchain_info_shim<'v>(
+    heap: Heap<'v>,
+    toolchain_label: &str,
+    target_platform: &str,
+) -> Value<'v> {
+    let cc = heap.alloc(CcToolchainInfoNativeShim {
+        toolchain_label: toolchain_label.to_owned(),
+        target_platform: target_platform.to_owned(),
+    });
+    let cc_provider_in_toolchain = heap.alloc(true);
+    let fields = heap.alloc(AllocDict([
+        ("cc", cc),
+        ("cc_provider_in_toolchain", cc_provider_in_toolchain),
+    ]));
+    heap.alloc(ToolchainInfoInstanceGen::new(fields))
 }
 
 fn normalize_bzlmod_module_repo_name(repo: &str) -> &str {
@@ -3347,6 +3440,7 @@ impl<'v> StarlarkValue<'v> for ResolvedExecGroups {
                     toolchains: ResolvedToolchains {
                         toolchains: std::collections::HashMap::new(),
                         exec_platform: String::new(),
+                        target_platform: String::new(),
                     },
                 }));
             }
@@ -3357,6 +3451,7 @@ impl<'v> StarlarkValue<'v> for ResolvedExecGroups {
                 toolchains: ResolvedToolchains {
                     toolchains: toolchains.clone(),
                     exec_platform: String::new(),
+                    target_platform: String::new(),
                 },
             }))
         } else {
@@ -3367,6 +3462,7 @@ impl<'v> StarlarkValue<'v> for ResolvedExecGroups {
                 toolchains: ResolvedToolchains {
                     toolchains: std::collections::HashMap::new(),
                     exec_platform: String::new(),
+                    target_platform: String::new(),
                 },
             }))
         }
@@ -3408,6 +3504,7 @@ impl<'v> StarlarkValue<'v> for ResolvedExecGroupContext {
             "toolchains" => Some(heap.alloc(ResolvedToolchains {
                 toolchains: self.toolchains.toolchains.clone(),
                 exec_platform: self.toolchains.exec_platform.clone(),
+                target_platform: self.toolchains.target_platform.clone(),
             })),
             "exec_compatible_with" => {
                 use starlark::values::list::AllocList;

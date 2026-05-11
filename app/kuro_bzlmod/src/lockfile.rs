@@ -45,6 +45,8 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 
 use indexmap::IndexMap;
 use kuro_error::BuckErrorContext;
@@ -59,6 +61,8 @@ use crate::repository_invocations::AttrValue;
 /// Current lockfile format version.
 /// This matches Bazel 9.0's lockfile version (26).
 pub const LOCKFILE_VERSION: u32 = 26;
+
+static LOCKFILE_WRITE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Errors that can occur during lockfile operations.
 #[derive(Debug, kuro_error::Error)]
@@ -440,8 +444,14 @@ impl Lockfile {
         let content = serde_json::to_string_pretty(self)
             .map_err(|e| LockfileError::WriteError(format!("JSON serialization failed: {}", e)))?;
 
-        // Write atomically by writing to a temp file first
-        let temp_path = path.with_extension("lock.tmp");
+        // Write atomically by writing to a temp file first. Use a unique
+        // filename because multiple extension computations may update the
+        // lockfile concurrently.
+        let temp_path = path.with_extension(format!(
+            "lock.tmp.{}.{}",
+            std::process::id(),
+            LOCKFILE_WRITE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
 
         let mut file = fs::File::create(&temp_path)
             .map_err(|e| LockfileError::WriteError(format!("{}: {}", temp_path.display(), e)))?;
@@ -453,8 +463,14 @@ impl Lockfile {
             .map_err(|e| LockfileError::WriteError(format!("sync failed: {}", e)))?;
 
         // Rename temp file to final path
-        fs::rename(&temp_path, path)
-            .map_err(|e| LockfileError::WriteError(format!("rename failed: {}", e)))?;
+        fs::rename(&temp_path, path).map_err(|e| {
+            LockfileError::WriteError(format!(
+                "rename {} -> {} failed: {}",
+                temp_path.display(),
+                path.display(),
+                e
+            ))
+        })?;
 
         Ok(())
     }
@@ -495,38 +511,53 @@ impl Lockfile {
         //   - bazel 9 canonical:    "@@<canonical>+//pkg:file.bzl%name"
         //   - bazel legacy/relative: "//pkg:file.bzl%name"
         // Also handle ":" prefix used by some older serialization paths.
-        let canonical_form = lockfile_canonical_extension_id(extension_id);
-        let ext_data = self
-            .module_extensions
-            .get(extension_id)
-            .or_else(|| self.module_extensions.get(&canonical_form))
-            .or_else(|| {
-                // Try adding // prefix: ":file.bzl%name" -> "//:file.bzl%name"
-                if extension_id.starts_with(':') {
-                    self.module_extensions.get(&format!("//{}", extension_id))
-                } else {
-                    None
-                }
-            })
-            .or_else(|| {
-                // Try stripping // prefix: "//:file.bzl%name" -> ":file.bzl%name"
-                extension_id
-                    .strip_prefix("//")
-                    .and_then(|stripped| self.module_extensions.get(stripped))
-            })?;
-
-        // Validate that the cached data matches our current inputs. Mismatched
-        // digests mean the extension's `.bzl` code or its tag inputs have
-        // changed since the cache was written, so the cached repo specs are
-        // stale and must not be returned. Returning stale specs would silently
-        // skip extension re-execution and produce wrong builds.
-        if !ext_data.is_valid(bzl_transitive_digest, usages_digest) {
-            tracing::debug!(
-                "Extension cache miss for '{}': digest mismatch (will re-execute)",
-                extension_id
-            );
-            return None;
+        let mut candidate_keys = vec![
+            extension_id.to_owned(),
+            lockfile_canonical_extension_id(extension_id),
+        ];
+        if extension_id.starts_with(':') {
+            candidate_keys.push(format!("//{}", extension_id));
         }
+        if let Some(stripped) = extension_id.strip_prefix("//") {
+            candidate_keys.push(stripped.to_owned());
+        }
+        candidate_keys.sort();
+        candidate_keys.dedup();
+
+        let mut saw_candidate = false;
+        let mut selected = None;
+        for candidate_key in &candidate_keys {
+            let Some(ext_data) = self.module_extensions.get(candidate_key) else {
+                continue;
+            };
+            saw_candidate = true;
+
+            // Validate that the cached data matches our current inputs.
+            // Mismatched digests mean this particular spelling is stale, but a
+            // lockfile can contain both legacy and canonical spellings. Keep
+            // searching so a stale duplicate does not mask a valid entry.
+            if !ext_data.is_valid(bzl_transitive_digest, usages_digest) {
+                tracing::debug!(
+                    "Extension cache candidate '{}' for '{}' has digest mismatch",
+                    candidate_key,
+                    extension_id
+                );
+                continue;
+            }
+
+            selected = Some((candidate_key.as_str(), ext_data));
+            break;
+        }
+
+        let Some((selected_key, ext_data)) = selected else {
+            if saw_candidate {
+                tracing::debug!(
+                    "Extension cache miss for '{}': all candidate digests mismatched",
+                    extension_id
+                );
+            }
+            return None;
+        };
 
         // Convert lockfile specs back to RepoSpecs
         let repo_specs = ext_data.get_repo_specs()?;
@@ -561,8 +592,9 @@ impl Lockfile {
         }
 
         tracing::debug!(
-            "Extension cache hit for '{}': {} repo specs",
+            "Extension cache hit for '{}' via '{}': {} repo specs",
             extension_id,
+            selected_key,
             repo_specs.len()
         );
 

@@ -145,6 +145,18 @@ fn host_llvm_toolchain_bin(tool: &str) -> Option<String> {
     candidates.into_iter().next()
 }
 
+fn has_host_llvm_toolchain() -> bool {
+    host_llvm_toolchain_bin("clang++").is_some()
+}
+
+fn is_musl_cc_toolchain_target(
+    target_system_name: Option<&str>,
+    target_libc: Option<&str>,
+) -> bool {
+    target_system_name.is_some_and(|s| s.contains("musl"))
+        || target_libc.is_some_and(|s| s.contains("musl"))
+}
+
 fn depset_values<'v>(value: Value<'v>, heap: Heap<'v>) -> starlark::Result<Vec<Value<'v>>> {
     if value.is_none() {
         Ok(Vec::new())
@@ -3385,6 +3397,14 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
         // --- Link/Archive actions ---
         if is_link {
             let output_path = get_var("output_execpath").and_then(|v| get_str_val(v));
+            let target_system_name = get_var("target_system_name").and_then(|v| get_str_val(v));
+            let target_libc = get_var("target_libc").and_then(|v| get_str_val(v));
+            let use_llvm_linux_link_defaults = !msvc
+                && has_host_llvm_toolchain()
+                && is_musl_cc_toolchain_target(
+                    target_system_name.as_deref(),
+                    target_libc.as_deref(),
+                );
 
             if is_static_lib {
                 if msvc {
@@ -3427,6 +3447,26 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                     if let Some(ref path) = output_path {
                         args.push(heap.alloc_str("-o").to_value());
                         args.push(heap.alloc_str(path).to_value());
+                    }
+                    if use_llvm_linux_link_defaults {
+                        for arg in [
+                            "-target",
+                            "x86_64-linux-musl",
+                            "-static",
+                            "-fuse-ld=lld",
+                            "-rtlib=compiler-rt",
+                            "-nostdlib++",
+                            "--unwindlib=none",
+                            "-Wl,-no-as-needed",
+                            "-Wl,-z,relro,-z,now",
+                            "-Wl,--push-state",
+                            "-Wl,--as-needed",
+                            "-lpthread",
+                            "-ldl",
+                            "-Wl,--pop-state",
+                        ] {
+                            args.push(heap.alloc_str(arg).to_value());
+                        }
                     }
                 }
             }
@@ -4661,7 +4701,6 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
     ) -> starlark::Result<Value<'v>> {
         let _ = (
             feature_configuration,
-            cc_toolchain,
             is_using_linker,
             is_static_linking_mode,
         );
@@ -4699,6 +4738,14 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             library_search_directories,
         );
         insert_if_set(&mut map, heap, "linker_param_file", param_file);
+
+        if let Ok(Some(target_system_name)) = cc_toolchain.get_attr("target_gnu_system_name", heap)
+        {
+            insert_if_set(&mut map, heap, "target_system_name", target_system_name);
+        }
+        if let Ok(Some(target_libc)) = cc_toolchain.get_attr("libc", heap) {
+            insert_if_set(&mut map, heap, "target_libc", target_libc);
+        }
 
         if is_linking_dynamic_library {
             map.insert_hashed(

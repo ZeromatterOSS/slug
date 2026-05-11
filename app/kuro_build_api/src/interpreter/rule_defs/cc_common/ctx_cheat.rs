@@ -111,6 +111,7 @@ impl<'v> StarlarkValue<'v> for CtxCheatStub {
                 crate::interpreter::rule_defs::context::ResolvedToolchains {
                     toolchains: std::collections::HashMap::new(),
                     exec_platform: String::new(),
+                    target_platform: String::new(),
                 },
             )),
             _ => None,
@@ -217,6 +218,7 @@ impl<'v> StarlarkValue<'v> for CtxCheatWithActions<'v> {
                 crate::interpreter::rule_defs::context::ResolvedToolchains {
                     toolchains: std::collections::HashMap::new(),
                     exec_platform: String::new(),
+                    target_platform: String::new(),
                 },
             )),
             _ => None,

@@ -145,8 +145,16 @@ impl IoProvider for FsIoProvider {
                 let file_name = file_name
                     .to_str()
                     .ok_or_else(|| FsIoError::NotUtf8(file_name.clone()))?;
+                let file_type = match fs_util::metadata(e.path()) {
+                    Ok(metadata) if metadata.is_dir() => {
+                        crate::file_ops::metadata::FileType::Directory
+                    }
+                    Ok(metadata) if metadata.is_file() => crate::file_ops::metadata::FileType::File,
+                    Ok(_) => e.file_type()?.into(),
+                    Err(_) => e.file_type()?.into(),
+                };
                 entries.push(RawDirEntry {
-                    file_type: e.file_type()?.into(),
+                    file_type,
                     file_name: CompactString::from(file_name),
                 });
             }

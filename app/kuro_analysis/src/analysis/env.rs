@@ -817,20 +817,21 @@ fn analysis_toolchain_resolution_checkpoint(
 
 fn is_cpp_toolchain_type_label(label: &str) -> bool {
     let label = label.trim_start_matches('@');
-    if label == "bazel_tools//tools/cpp:toolchain_type" {
+    if label.contains("tools/cpp:toolchain_type") {
         return true;
     }
-
     let Some((repo, package)) = label.split_once("//") else {
         return false;
     };
-    package == "cc:toolchain_type"
-        && (repo == "rules_cc"
-            || repo.strip_prefix("rules_cc+").is_some_and(|rest| {
-                rest.split('+')
-                    .next()
-                    .is_some_and(|version| version.contains('.'))
-            }))
+    (package == "tools/cpp:toolchain_type"
+        && (repo == "bazel_tools" || repo.starts_with("bazel_tools+")))
+        || package == "cc:toolchain_type"
+            && (repo == "rules_cc"
+                || repo.strip_prefix("rules_cc+").is_some_and(|rest| {
+                    rest.split('+')
+                        .next()
+                        .is_some_and(|version| version.contains('.'))
+                }))
 }
 
 pub(crate) async fn run_analysis<'a>(
@@ -1921,6 +1922,7 @@ async fn run_analysis_with_env_underlying(
                                         );
                                         Some(cc_toolchain_native_shim_provider_collection(
                                             &tc.toolchain_impl,
+                                            target_cfg.short_name(),
                                         ))
                                     } else {
                                         let analysis_result =
@@ -2093,6 +2095,7 @@ async fn run_analysis_with_env_underlying(
                 Some(ResolvedToolchains {
                     toolchains: toolchain_providers,
                     exec_platform: result.exec_platform.clone(),
+                    target_platform: target_cfg.short_name().to_owned(),
                 })
             } else {
                 None

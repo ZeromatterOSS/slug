@@ -127,14 +127,6 @@ impl FileOpsDelegate for BzlmodFileOpsDelegate {
                 e
             )
         })? {
-            let file_type = entry.file_type().await.map_err(|e| {
-                kuro_error::kuro_error!(
-                    kuro_error::ErrorTag::Environment,
-                    "Failed to get file type: {}",
-                    e
-                )
-            })?;
-
             let file_name = entry.file_name().into_string().map_err(|_| {
                 kuro_error::kuro_error!(
                     kuro_error::ErrorTag::Environment,
@@ -143,15 +135,32 @@ impl FileOpsDelegate for BzlmodFileOpsDelegate {
                 )
             })?;
 
+            let entry_path = entry.path();
+            let resolved = tokio::fs::metadata(&entry_path).await;
+            let file_type = match resolved {
+                Ok(md) if md.is_dir() => FileType::Directory,
+                Ok(_) => FileType::File,
+                Err(_) => {
+                    let st = entry.file_type().await.map_err(|e| {
+                        kuro_error::kuro_error!(
+                            kuro_error::ErrorTag::Environment,
+                            "Failed to get file type: {}",
+                            e
+                        )
+                    })?;
+                    if st.is_dir() {
+                        FileType::Directory
+                    } else if st.is_symlink() {
+                        FileType::Symlink
+                    } else {
+                        FileType::File
+                    }
+                }
+            };
+
             entries.push(RawDirEntry {
                 file_name: CompactString::from(file_name),
-                file_type: if file_type.is_dir() {
-                    FileType::Directory
-                } else if file_type.is_symlink() {
-                    FileType::Symlink
-                } else {
-                    FileType::File
-                },
+                file_type,
             });
         }
 
@@ -184,6 +193,12 @@ impl FileOpsDelegate for BzlmodFileOpsDelegate {
         if metadata.is_dir() {
             Ok(Some(RawPathMetadata::Directory))
         } else if metadata.is_symlink() {
+            if let Ok(target_metadata) = tokio::fs::metadata(&abs_path).await {
+                if target_metadata.is_dir() {
+                    return Ok(Some(RawPathMetadata::Directory));
+                }
+            }
+
             // Read symlink target
             let target = tokio::fs::read_link(&abs_path).await.map_err(|e| {
                 kuro_error::kuro_error!(

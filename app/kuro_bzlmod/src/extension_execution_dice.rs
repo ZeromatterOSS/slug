@@ -64,6 +64,7 @@ struct ExtensionAggregationData {
 }
 
 static EXTENSION_AGGREGATIONS: Mutex<Option<ExtensionAggregationData>> = Mutex::new(None);
+static LOCKFILE_EXTENSION_UPDATE_LOCK: Mutex<()> = Mutex::new(());
 
 fn extension_ids_summary<'a>(extension_ids: impl Iterator<Item = &'a String>) -> String {
     let mut shown = Vec::new();
@@ -792,6 +793,10 @@ fn update_lockfile_extension_cache(
     usages_digest: &str,
     generated_repo_specs: &FxHashMap<String, RepoSpec>,
 ) -> kuro_error::Result<()> {
+    let _guard = LOCKFILE_EXTENSION_UPDATE_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
     // Read existing lockfile or create new one
     let mut lockfile = if lock_path.exists() {
         match Lockfile::read(lock_path) {

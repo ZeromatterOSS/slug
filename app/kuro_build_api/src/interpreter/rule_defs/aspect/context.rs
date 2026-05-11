@@ -258,6 +258,7 @@ fn aspect_context_methods(builder: &mut MethodsBuilder) {
         Ok(heap.alloc(ResolvedToolchains {
             toolchains: std::collections::HashMap::new(),
             exec_platform: String::new(),
+            target_platform: String::new(),
         }))
     }
 

@@ -857,6 +857,41 @@ pub(crate) fn download_url(url: &str) -> Result<Vec<u8>, String> {
     }
 }
 
+fn repository_download_cache_key(sha256: &str, integrity: &str) -> Option<String> {
+    if !integrity.is_empty() {
+        Some(integrity.to_owned())
+    } else if !sha256.is_empty() {
+        Some(format!("sha256-hex-{sha256}"))
+    } else {
+        None
+    }
+}
+
+fn read_cached_repository_download(sha256: &str, integrity: &str) -> Option<Vec<u8>> {
+    let key = repository_download_cache_key(sha256, integrity)?;
+    let cache = kuro_bzlmod::ModuleCache::new().ok()?;
+    let data = cache.read_download(&key).ok()??;
+    if !sha256.is_empty() && verify_sha256(&data, sha256).is_err() {
+        tracing::warn!("Ignoring repository download cache entry with mismatched sha256");
+        return None;
+    }
+    if !integrity.is_empty() && verify_integrity(&data, integrity).is_err() {
+        tracing::warn!("Ignoring repository download cache entry with mismatched integrity");
+        return None;
+    }
+    Some(data)
+}
+
+fn write_cached_repository_download(sha256: &str, integrity: &str, data: &[u8]) {
+    let Some(key) = repository_download_cache_key(sha256, integrity) else {
+        return;
+    };
+    match kuro_bzlmod::ModuleCache::new().and_then(|cache| cache.write_download(&key, data)) {
+        Ok(_) => {}
+        Err(e) => tracing::debug!("Failed to write repository download cache entry: {}", e),
+    }
+}
+
 /// Verify SHA256 hash of data.
 pub(crate) fn verify_sha256(data: &[u8], expected: &str) -> Result<(), String> {
     let hash = Sha256::digest(data);
@@ -941,6 +976,34 @@ pub(crate) fn perform_download_to_path(
     integrity: &str,
     executable: bool,
 ) -> kuro_error::Result<DownloadInfo> {
+    if let Some(data) = read_cached_repository_download(sha256, integrity) {
+        if let Some(parent) = output_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| {
+                kuro_error::kuro_error!(
+                    kuro_error::ErrorTag::Input,
+                    "Failed to create directory: {}",
+                    e
+                )
+            })?;
+        }
+        std::fs::write(output_path, &data).map_err(|e| {
+            kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "Failed to write file: {}", e)
+        })?;
+        #[cfg(unix)]
+        if executable {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(output_path)
+                .map_err(|e| kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", e))?
+                .permissions();
+            perms.set_mode(perms.mode() | 0o111);
+            std::fs::set_permissions(output_path, perms)
+                .map_err(|e| kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", e))?;
+        }
+        #[cfg(not(unix))]
+        let _ = executable;
+        return Ok(DownloadInfo::new(true, &data));
+    }
+
     let mut last_error: Option<String> = None;
     for url in urls {
         match download_url(url) {
@@ -955,6 +1018,7 @@ pub(crate) fn perform_download_to_path(
                         kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", e)
                     })?;
                 }
+                write_cached_repository_download(sha256, integrity, &data);
 
                 if let Some(parent) = output_path.parent() {
                     std::fs::create_dir_all(parent).map_err(|e| {
@@ -1013,6 +1077,19 @@ pub(crate) fn perform_download_and_extract_to_dir(
     integrity: &str,
     strip_prefix: Option<&str>,
 ) -> kuro_error::Result<DownloadInfo> {
+    if let Some(data) = read_cached_repository_download(sha256, integrity) {
+        std::fs::create_dir_all(output_dir).map_err(|e| {
+            kuro_error::kuro_error!(
+                kuro_error::ErrorTag::Input,
+                "Failed to create directory: {}",
+                e
+            )
+        })?;
+        extract_archive(&data, output_dir, strip_prefix)
+            .map_err(|e| kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", e))?;
+        return Ok(DownloadInfo::new(true, &data));
+    }
+
     let mut last_error: Option<String> = None;
     for url in urls {
         match download_url(url) {
@@ -1027,6 +1104,7 @@ pub(crate) fn perform_download_and_extract_to_dir(
                         kuro_error::kuro_error!(kuro_error::ErrorTag::Input, "{}", e)
                     })?;
                 }
+                write_cached_repository_download(sha256, integrity, &data);
 
                 std::fs::create_dir_all(output_dir).map_err(|e| {
                     kuro_error::kuro_error!(
