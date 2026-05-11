@@ -282,6 +282,25 @@ pub struct CommonBuildOptions {
 }
 
 impl CommonBuildOptions {
+    pub fn to_proto_with_host_platform(
+        &self,
+        host_platform: Option<&str>,
+    ) -> kuro_cli_proto::CommonBuildOptions {
+        let mut opts = self.to_proto();
+        if let Some(host_platform) = host_platform {
+            if !host_platform.is_empty()
+                && !opts
+                    .extra_execution_platforms
+                    .iter()
+                    .any(|platform| platform == host_platform)
+            {
+                opts.extra_execution_platforms
+                    .insert(0, host_platform.to_owned());
+            }
+        }
+        opts
+    }
+
     fn build_report(&self) -> (bool, String) {
         match &self.build_report {
             None => (false, "".to_owned()),

@@ -816,7 +816,21 @@ fn analysis_toolchain_resolution_checkpoint(
 }
 
 fn is_cpp_toolchain_type_label(label: &str) -> bool {
-    label.trim_start_matches('@') == "bazel_tools//tools/cpp:toolchain_type"
+    let label = label.trim_start_matches('@');
+    if label == "bazel_tools//tools/cpp:toolchain_type" {
+        return true;
+    }
+
+    let Some((repo, package)) = label.split_once("//") else {
+        return false;
+    };
+    package == "cc:toolchain_type"
+        && (repo == "rules_cc"
+            || repo.strip_prefix("rules_cc+").is_some_and(|rest| {
+                rest.split('+')
+                    .next()
+                    .is_some_and(|version| version.contains('.'))
+            }))
 }
 
 pub(crate) async fn run_analysis<'a>(

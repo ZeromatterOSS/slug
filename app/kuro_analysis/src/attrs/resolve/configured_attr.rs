@@ -426,20 +426,35 @@ fn configured_attr_to_value<'v>(
                 heap.alloc(AllocList(specs.iter().map(|s| s.to_string())))
             }
         },
-        ConfiguredAttr::ExplicitConfiguredDep(d) => heap.alloc(
-            StarlarkConfiguredProvidersLabel::new(d.as_ref().label.dupe()),
-        ),
-        ConfiguredAttr::TransitionDep(t) => {
-            heap.alloc(StarlarkConfiguredProvidersLabel::new(t.dep.dupe()))
-        }
+        ConfiguredAttr::ExplicitConfiguredDep(d) => match pkg {
+            PackageLabelOption::TransitionAttr => heap.alloc(StarlarkTargetLabel::new(
+                d.as_ref().label.target().unconfigured().dupe(),
+            )),
+            PackageLabelOption::PackageLabel(_) => heap.alloc(
+                StarlarkConfiguredProvidersLabel::new(d.as_ref().label.dupe()),
+            ),
+        },
+        ConfiguredAttr::TransitionDep(t) => match pkg {
+            PackageLabelOption::TransitionAttr => heap.alloc(StarlarkTargetLabel::new(
+                t.dep.target().unconfigured().dupe(),
+            )),
+            PackageLabelOption::PackageLabel(_) => {
+                heap.alloc(StarlarkConfiguredProvidersLabel::new(t.dep.dupe()))
+            }
+        },
         ConfiguredAttr::SplitTransitionDep(t) => {
             let mut map = SmallMap::with_capacity(t.deps.len());
 
             for (trans, p) in t.deps.iter() {
-                map.insert_hashed(
-                    heap.alloc(trans).get_hashed()?,
-                    heap.alloc(StarlarkConfiguredProvidersLabel::new(p.dupe())),
-                );
+                let label = match pkg {
+                    PackageLabelOption::TransitionAttr => {
+                        heap.alloc(StarlarkTargetLabel::new(p.target().unconfigured().dupe()))
+                    }
+                    PackageLabelOption::PackageLabel(_) => {
+                        heap.alloc(StarlarkConfiguredProvidersLabel::new(p.dupe()))
+                    }
+                };
+                map.insert_hashed(heap.alloc(trans).get_hashed()?, label);
             }
 
             heap.alloc(Dict::new(map))
@@ -449,11 +464,30 @@ fn configured_attr_to_value<'v>(
             heap.alloc(StarlarkTargetLabel::new(c.target().dupe()))
         }
         ConfiguredAttr::PluginDep(d, _) => heap.alloc(StarlarkTargetLabel::new(d.dupe())),
-        ConfiguredAttr::Dep(d) => heap.alloc(StarlarkConfiguredProvidersLabel::new(d.label.dupe())),
-        ConfiguredAttr::SourceLabel(s) => {
-            heap.alloc(StarlarkConfiguredProvidersLabel::new(s.dupe()))
-        }
-        ConfiguredAttr::Label(l) => heap.alloc(StarlarkConfiguredProvidersLabel::new(l.dupe())),
+        ConfiguredAttr::Dep(d) => match pkg {
+            PackageLabelOption::TransitionAttr => heap.alloc(StarlarkTargetLabel::new(
+                d.label.target().unconfigured().dupe(),
+            )),
+            PackageLabelOption::PackageLabel(_) => {
+                heap.alloc(StarlarkConfiguredProvidersLabel::new(d.label.dupe()))
+            }
+        },
+        ConfiguredAttr::SourceLabel(s) => match pkg {
+            PackageLabelOption::TransitionAttr => {
+                heap.alloc(StarlarkTargetLabel::new(s.target().unconfigured().dupe()))
+            }
+            PackageLabelOption::PackageLabel(_) => {
+                heap.alloc(StarlarkConfiguredProvidersLabel::new(s.dupe()))
+            }
+        },
+        ConfiguredAttr::Label(l) => match pkg {
+            PackageLabelOption::TransitionAttr => {
+                heap.alloc(StarlarkTargetLabel::new(l.target().unconfigured().dupe()))
+            }
+            PackageLabelOption::PackageLabel(_) => {
+                heap.alloc(StarlarkConfiguredProvidersLabel::new(l.dupe()))
+            }
+        },
         ConfiguredAttr::Arg(arg) => heap.alloc(arg.to_string()),
         ConfiguredAttr::Query(query) => heap.alloc(&query.query.query),
         ConfiguredAttr::SourceFile(f) => match pkg {

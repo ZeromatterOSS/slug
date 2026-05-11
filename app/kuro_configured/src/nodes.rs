@@ -31,7 +31,10 @@ use kuro_build_api::transition::TRANSITION_ATTRS_PROVIDER;
 use kuro_build_api::transition::TRANSITION_CALCULATION;
 use kuro_build_signals::node_key::BuildSignalsNodeKey;
 use kuro_build_signals::node_key::BuildSignalsNodeKeyImpl;
+use kuro_common::dice::cells::HasCellResolver;
 use kuro_common::dice::cycles::CycleGuard;
+use kuro_core::configuration::build_setting::BuildSettingLabel;
+use kuro_core::configuration::build_setting::BuildSettingValue;
 use kuro_core::configuration::compatibility::IncompatiblePlatformReason;
 use kuro_core::configuration::compatibility::IncompatiblePlatformReasonCause;
 use kuro_core::configuration::compatibility::MaybeCompatible;
@@ -85,6 +88,7 @@ use starlark_map::small_set::SmallSet;
 
 use crate::configuration::compute_platform_cfgs;
 use crate::configuration::get_matched_cfg_keys_for_node;
+use crate::configuration::get_platform_configuration;
 use crate::cycle::ConfiguredGraphCycleDescriptor;
 use crate::execution::find_execution_platform_by_configuration;
 use crate::execution::resolve_execution_platform;
@@ -1215,7 +1219,6 @@ async fn compute_configured_target_node_no_transition(
         [("platform_cfgs", platform_cfgs.len())],
     );
 
-    let mut resolved_transitions = OrderedMap::new();
     let attrs = resolve_transition_attrs(
         target_node.transition_deps().map(|(_, tr)| tr.as_ref()),
         &target_node,
@@ -1234,13 +1237,10 @@ async fn compute_configured_target_node_no_transition(
             ("attrs", attrs.len()),
         ],
     );
-    for (_dep, tr) in target_node.transition_deps() {
-        let resolved_cfg = TRANSITION_CALCULATION
-            .get()?
-            .apply_transition(ctx, &attrs, target_cfg, tr)
+    let resolved_transitions =
+        resolve_transition_deps(ctx, target_node.as_ref(), target_cfg, &attrs)
+            .boxed()
             .await?;
-        resolved_transitions.insert(tr.dupe(), resolved_cfg);
-    }
 
     // We need to collect deps and to ensure that all attrs can be successfully
     // configured so that we don't need to support propagate configuration errors on attr access.
@@ -1530,9 +1530,9 @@ async fn compute_configured_forward_target_node(
             transition_id,
         )
         .await?;
-    let target_label_after_transition = target_label_before_transition
-        .unconfigured()
-        .configure(cfg.single()?.dupe());
+    let cfg = normalize_platforms_transition_cfg(ctx, cfg.single()?).await?;
+    let target_label_after_transition =
+        target_label_before_transition.unconfigured().configure(cfg);
 
     if &target_label_after_transition == target_label_before_transition {
         // Transitioned to identical configured target, no need to create a forward node.
@@ -1582,6 +1582,88 @@ async fn compute_configured_forward_target_node(
 
         Ok(configured_target_node)
     }
+}
+
+/// Bazel-style platform transitions write `//command_line_option:platforms`.
+/// That option changes the configured target's platform, not just a string
+/// build setting. Rebase the transition result onto the selected platform's
+/// constraints while preserving the transition's build settings.
+async fn normalize_platforms_transition_cfg(
+    ctx: &mut DiceComputations<'_>,
+    cfg: &ConfigurationData,
+) -> kuro_error::Result<ConfigurationData> {
+    if !cfg.is_bound() {
+        return Ok(cfg.dupe());
+    }
+
+    let platforms_label = BuildSettingLabel::from_bazel_label("//command_line_option:platforms")?;
+    let Some(BuildSettingValue::String(platform)) = cfg.get_build_setting(&platforms_label)? else {
+        return Ok(cfg.dupe());
+    };
+    if platform.is_empty() {
+        return Ok(cfg.dupe());
+    }
+
+    let cell_resolver = ctx.get_cell_resolver().await?;
+    let root_cell = cell_resolver.root_cell();
+    let alias_resolver = ctx.get_cell_alias_resolver(root_cell).await?;
+    let platform_label = TargetLabel::parse(platform, root_cell, &cell_resolver, &alias_resolver)
+        .with_buck_error_context(|| {
+        format!("Parsing transitioned --platforms value `{platform}`")
+    })?;
+
+    let mut out = get_platform_configuration(ctx, &platform_label)
+        .await
+        .with_buck_error_context(|| {
+            format!("Resolving transitioned platform `{platform_label}`")
+        })?;
+    for (label, value) in &cfg.data()?.build_settings {
+        out = out.with_build_setting(label.dupe(), value.clone())?;
+    }
+    Ok(out)
+}
+
+async fn resolve_transition_deps(
+    ctx: &mut DiceComputations<'_>,
+    target_node: TargetNodeRef<'_>,
+    target_cfg: &ConfigurationData,
+    attrs: &OrderedMap<&str, Arc<ConfiguredAttr>>,
+) -> kuro_error::Result<OrderedMap<Arc<TransitionId>, Arc<TransitionApplied>>> {
+    let mut resolved_transitions = OrderedMap::new();
+    for (_dep, tr) in target_node.transition_deps() {
+        let resolved_cfg = TRANSITION_CALCULATION
+            .get()?
+            .apply_transition(ctx, attrs, target_cfg, tr)
+            .await?;
+        let resolved_cfg = normalize_platforms_transition_applied(ctx, resolved_cfg.as_ref())
+            .boxed()
+            .await?;
+        resolved_transitions.insert(tr.dupe(), resolved_cfg);
+    }
+    Ok(resolved_transitions)
+}
+
+async fn normalize_platforms_transition_applied(
+    ctx: &mut DiceComputations<'_>,
+    cfg: &TransitionApplied,
+) -> kuro_error::Result<Arc<TransitionApplied>> {
+    Ok(match cfg {
+        TransitionApplied::Single(cfg) => Arc::new(TransitionApplied::Single(
+            normalize_platforms_transition_cfg(ctx, cfg).await?,
+        )),
+        TransitionApplied::Split(split) => {
+            let mut normalized = OrderedMap::new();
+            for (key, cfg) in split.iter() {
+                normalized.insert(
+                    key.clone(),
+                    normalize_platforms_transition_cfg(ctx, cfg).await?,
+                );
+            }
+            Arc::new(TransitionApplied::Split(
+                starlark_map::sorted_map::SortedMap::from(normalized),
+            ))
+        }
+    })
 }
 
 #[derive(Clone, Dupe, Display, Debug, Eq, Hash, PartialEq, Allocative)]
@@ -1806,7 +1888,7 @@ async fn get_dep_only_incompatible_custom_soft_error(
 
         async fn compute(
             &self,
-            mut ctx: &mut DiceComputations,
+            ctx: &mut DiceComputations,
             _cancellation: &CancellationContext,
         ) -> Self::Value {
             let _ = ctx;
