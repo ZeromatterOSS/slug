@@ -65,6 +65,21 @@ impl PartialEq for BaseDeferredKeyBxl {
     }
 }
 
+fn bazel_output_cell_name(cell_name: &str) -> String {
+    if crate::cells::is_root_cell_name(cell_name) {
+        cell_name.to_owned()
+    } else {
+        crate::cells::canonical_dynamic_extension_cell_name(cell_name)
+            .unwrap_or_else(|| cell_name.to_owned())
+    }
+}
+
+fn has_bazel_external_prefix(path: &ForwardRelativePath, cell_name: &str) -> bool {
+    path.as_str()
+        .strip_prefix("external/")
+        .is_some_and(|rest| rest == cell_name || rest.starts_with(&format!("{cell_name}/")))
+}
+
 #[derive(Debug, kuro_error::Error)]
 #[kuro(tag = Tier0)]
 pub enum PathResolutionError {
@@ -170,12 +185,14 @@ impl BaseDeferredKey {
                 // produced by `bin_dir + <pkg>/<include_dir>` (matches
                 // `bazel-bin/external/<repo>/<pkg>/...`).
                 if matches!(path_resolution_method, BuckOutPathKind::Shareable) {
+                    let output_cell_name =
+                        bazel_output_cell_name(target.pkg().cell_name().as_str());
                     let shareable_path = [
                         base.as_str(),
                         "/",
                         prefix.as_str(),
                         "/",
-                        target.pkg().cell_name().as_str(),
+                        output_cell_name.as_str(),
                         "/",
                         target.cfg().output_hash().as_str(),
                         "/",
@@ -188,13 +205,29 @@ impl BaseDeferredKey {
                 if matches!(path_resolution_method, BuckOutPathKind::BazelOutput) {
                     let cell_name_str = target.pkg().cell_name().as_str();
                     let is_root = crate::cells::is_root_cell_name(cell_name_str);
-                    let bazel_path = if is_root {
+                    let output_cell_name = bazel_output_cell_name(cell_name_str);
+                    let path_has_external_prefix =
+                        has_bazel_external_prefix(path, &output_cell_name);
+                    let bazel_path = if path_has_external_prefix {
                         [
                             base.as_str(),
                             "/",
                             prefix.as_str(),
                             "/",
-                            cell_name_str,
+                            output_cell_name.as_str(),
+                            "/",
+                            target.cfg().output_hash().as_str(),
+                            "/",
+                            path.as_str(),
+                        ]
+                        .concat()
+                    } else if is_root {
+                        [
+                            base.as_str(),
+                            "/",
+                            prefix.as_str(),
+                            "/",
+                            output_cell_name.as_str(),
                             "/",
                             target.cfg().output_hash().as_str(),
                             "/",
@@ -213,11 +246,11 @@ impl BaseDeferredKey {
                             "/",
                             prefix.as_str(),
                             "/",
-                            cell_name_str,
+                            output_cell_name.as_str(),
                             "/",
                             target.cfg().output_hash().as_str(),
                             "/external/",
-                            cell_name_str,
+                            output_cell_name.as_str(),
                             "/",
                             cell_relative_path,
                             if cell_relative_path.is_empty() {
@@ -305,12 +338,13 @@ impl BaseDeferredKey {
                     path_identifier.concat()
                 };
 
+                let output_cell_name = bazel_output_cell_name(target.pkg().cell_name().as_str());
                 let hashed_path = [
                     base.as_str(),
                     "/",
                     prefix.as_str(),
                     "/",
-                    target.pkg().cell_name().as_str(),
+                    output_cell_name.as_str(),
                     "/",
                     path_or_hash.as_str(),
                     path.as_str(),
@@ -334,12 +368,14 @@ impl BaseDeferredKey {
     pub fn make_unhashed_path(&self) -> Option<ForwardRelativePathBuf> {
         match self {
             BaseDeferredKey::TargetLabel(target) => Some(
-                ForwardRelativePath::new(target.pkg().cell_name().as_str())
-                    .unwrap()
-                    .join(target.pkg().cell_relative_path()),
+                ForwardRelativePath::new(&bazel_output_cell_name(
+                    target.pkg().cell_name().as_str(),
+                ))
+                .unwrap()
+                .join(target.pkg().cell_relative_path()),
             ),
             BaseDeferredKey::Aspect(d) => d.configured_label().map(|label| {
-                ForwardRelativePath::new(label.pkg().cell_name().as_str())
+                ForwardRelativePath::new(&bazel_output_cell_name(label.pkg().cell_name().as_str()))
                     .unwrap()
                     .join(label.pkg().cell_relative_path())
             }),
