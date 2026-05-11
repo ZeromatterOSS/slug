@@ -111,6 +111,40 @@ fn compilation_mode_from_features(feature_configuration: Value<'_>) -> String {
     crate::interpreter::rule_defs::build_config::get_compilation_mode()
 }
 
+fn host_llvm_toolchain_bin(tool: &str) -> Option<String> {
+    let root = kuro_core::cells::get_dynamic_project_root()?;
+    let os = match std::env::consts::OS {
+        "linux" => "linux",
+        "macos" => "darwin",
+        _ => return None,
+    };
+    let arch = match std::env::consts::ARCH {
+        "x86_64" => "amd64",
+        "aarch64" => "arm64",
+        _ => return None,
+    };
+    let suffix = format!("-{os}-{arch}");
+    let external = root.join("bazel-external");
+    let mut candidates = Vec::new();
+    for entry in std::fs::read_dir(&external).ok()?.flatten() {
+        let file_name = entry.file_name();
+        let Some(name) = file_name.to_str() else {
+            continue;
+        };
+        let is_llvm_toolchain = name.starts_with("llvm-toolchain-minimal-")
+            || name.starts_with("llvm+http_archive+llvm-toolchain-minimal-");
+        if !is_llvm_toolchain || !name.ends_with(&suffix) {
+            continue;
+        }
+        let path = entry.path().join("bin").join(tool);
+        if path.is_file() {
+            candidates.push(path.to_string_lossy().into_owned());
+        }
+    }
+    candidates.sort();
+    candidates.into_iter().next()
+}
+
 fn depset_values<'v>(value: Value<'v>, heap: Heap<'v>) -> starlark::Result<Vec<Value<'v>>> {
     if value.is_none() {
         Ok(Vec::new())
@@ -3178,58 +3212,68 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             "windows" => {
                 let msvc = get_msvc_tool_paths();
                 if name.contains("compile") {
-                    msvc.as_ref().map(|t| t.cl.as_str()).unwrap_or("cl.exe")
+                    msvc.as_ref()
+                        .map(|t| t.cl.clone())
+                        .unwrap_or_else(|| "cl.exe".to_owned())
                 } else if name.contains("link") && name.contains("static-library") {
-                    msvc.as_ref().map(|t| t.lib.as_str()).unwrap_or("lib.exe")
+                    msvc.as_ref()
+                        .map(|t| t.lib.clone())
+                        .unwrap_or_else(|| "lib.exe".to_owned())
                 } else if name.contains("link") {
                     // executable or dynamic library linking → use link.exe
-                    msvc.as_ref().map(|t| t.link.as_str()).unwrap_or("link.exe")
+                    msvc.as_ref()
+                        .map(|t| t.link.clone())
+                        .unwrap_or_else(|| "link.exe".to_owned())
                 } else if name == "strip" || name == "objcopy" {
-                    ""
+                    String::new()
                 } else {
-                    msvc.as_ref().map(|t| t.cl.as_str()).unwrap_or("cl.exe")
+                    msvc.as_ref()
+                        .map(|t| t.cl.clone())
+                        .unwrap_or_else(|| "cl.exe".to_owned())
                 }
             }
             "macos" => {
                 if name.contains("compile") {
                     if name.starts_with("c-") || name.starts_with("c_") {
-                        "/usr/bin/clang"
+                        "/usr/bin/clang".to_owned()
                     } else {
-                        "/usr/bin/clang++"
+                        "/usr/bin/clang++".to_owned()
                     }
                 } else if name.contains("link") && name.contains("static-library") {
-                    "/usr/bin/ar"
+                    "/usr/bin/ar".to_owned()
                 } else if name.contains("link") {
-                    "/usr/bin/clang++"
+                    "/usr/bin/clang++".to_owned()
                 } else if name == "strip" {
-                    "/usr/bin/strip"
+                    "/usr/bin/strip".to_owned()
                 } else if name == "objcopy" {
-                    "/usr/bin/objcopy"
+                    "/usr/bin/objcopy".to_owned()
                 } else {
-                    "/usr/bin/clang"
+                    "/usr/bin/clang".to_owned()
                 }
             }
             _ => {
                 if name.contains("compile") {
                     if name.starts_with("c-") || name.starts_with("c_") {
-                        "/usr/bin/gcc"
+                        host_llvm_toolchain_bin("clang")
+                            .unwrap_or_else(|| "/usr/bin/gcc".to_owned())
                     } else {
-                        "/usr/bin/g++"
+                        host_llvm_toolchain_bin("clang++")
+                            .unwrap_or_else(|| "/usr/bin/g++".to_owned())
                     }
                 } else if name.contains("link") && name.contains("static-library") {
-                    "/usr/bin/ar"
+                    "/usr/bin/ar".to_owned()
                 } else if name.contains("link") {
-                    "/usr/bin/g++"
+                    host_llvm_toolchain_bin("clang++").unwrap_or_else(|| "/usr/bin/g++".to_owned())
                 } else if name == "strip" {
-                    "/usr/bin/strip"
+                    "/usr/bin/strip".to_owned()
                 } else if name == "objcopy" {
-                    "/usr/bin/objcopy"
+                    "/usr/bin/objcopy".to_owned()
                 } else {
-                    "/usr/bin/gcc"
+                    host_llvm_toolchain_bin("clang").unwrap_or_else(|| "/usr/bin/gcc".to_owned())
                 }
             }
         };
-        Ok(tool.to_owned())
+        Ok(tool)
     }
 
     /// Gets execution requirements for a given action.
