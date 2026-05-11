@@ -110,6 +110,9 @@ daemon sessions alive when handing off.
 - Do not mask Bazel failures. If Bazel 9 fails, Kuro should fail in the same
   shape.
 - Do not fix SDK blockers with one-off target or label workarounds.
+- Do not optimize for the smallest patch that advances the current smoke.
+  Optimize for the narrowest systemic fix that covers the whole demonstrated
+  bug class.
 - Do not weaken depset mutable-value validation.
 - Preserve TransitiveSet streaming, projection, reduction, and action-input
   behavior.
@@ -119,6 +122,56 @@ daemon sessions alive when handing off.
 - Prefer `Native`, `Intrinsic`, or `NativeShim` terminology. Do not introduce
   new `Synthetic` or `Stub` terminology for valid provider/API facades.
 - Use Bazel source or focused Bazel 9 probes for parity decisions.
+
+## Systemic-Fix Bias
+
+For SDK parity work, "smallest systemic fix" means minimal blast radius inside
+the abstraction that owns the missing Bazel semantic. It does not mean the
+quickest local patch, the first change that gets the current target farther, or
+the smallest diff against the latest smoke failure.
+
+Before editing code for a new failure, write down the class boundary in the
+active plan or subplan:
+
+- What Bazel semantic is missing or wrong?
+- Which Kuro subsystem owns that semantic?
+- What other targets, rules, features, or toolchains would fail for the same
+  reason?
+- What would count as a one-off workaround for this failure?
+
+Do not implement a patch if its correctness depends on a specific SDK target,
+label, repository name, artifact filename, isolation directory, configuration
+hash, or observed output path, unless Bazel itself has that exact intrinsic
+boundary.
+
+Classify the intended patch before file edits:
+
+1. Systemic parity fix: implements a Bazel semantic at its owning abstraction.
+2. Test/instrumentation: proves or localizes a parity class.
+3. Temporary diagnostic code: must not be committed.
+
+If the intended patch is only a symptom fix, stop and create or update the
+relevant plan instead. Examples of symptom fixes include adding SDK-specific
+labels, hardcoding toolchain outputs, chmodding a final output tree to match one
+target, adding path remaps for one binary, or special-casing one repository's
+generated paths.
+
+If a failure reveals a missing abstraction or incomplete model, create or update
+a numbered subplan before implementation. The implementation should then follow
+that subplan. Do not continue with an ad hoc code change simply because the
+current failure has an obvious local workaround.
+
+The following are not acceptable parity fixes unless explicitly approved by the
+user as temporary diagnostics:
+
+- Hardcoding missing LLVM, rules_rust, or rules_rs linker flags because one SDK
+  binary needs them.
+- Adding `--remap-path-prefix` entries for one observed output hash or target.
+- Chmodding `//sdk:sdk_contents` outputs after the fact to match Bazel modes.
+- Special-casing `rules_rs`, `rules_rust`, `llvm`, `zeromatter`, or generated
+  canonical repository names outside the abstraction that owns those semantics.
+- Treating a successful build as sufficient progress when the produced command
+  line is known to differ from Bazel in a structured way.
 
 ## Per-Blocker Operating Loop
 
@@ -135,13 +188,14 @@ For every new SDK failure or stall:
    - memory/profiling behavior: Plan 51.
 3. Update or create the relevant plan before implementing.
 4. If it is a bug class, search for other instances of the same class.
-5. Implement a systemic fix in the plan scope.
-6. Add focused Bazel 9 parity tests or source-cited assertions.
-7. Run focused verification, then broader verification appropriate to the
+5. Identify the owning abstraction and explicitly reject symptom-only patches.
+6. Implement the narrowest systemic fix in the plan scope.
+7. Add focused Bazel 9 parity tests or source-cited assertions.
+8. Run focused verification, then broader verification appropriate to the
    blast radius.
-8. Rerun the SDK smoke from `/var/mnt/dev/zeromatter`.
-9. Commit each clean completed slice with a clear message.
-10. Continue the loop.
+9. Rerun the SDK smoke from `/var/mnt/dev/zeromatter`.
+10. Commit each clean completed slice with a clear message.
+11. Continue the loop.
 
 ## Recommended SDK Smoke
 
