@@ -157,6 +157,130 @@ fn is_musl_cc_toolchain_target(
         || target_libc.is_some_and(|s| s.contains("musl"))
 }
 
+fn first_external_dir(
+    external: &std::path::Path,
+    matches: impl Fn(&str) -> bool,
+) -> Option<std::path::PathBuf> {
+    let mut candidates = Vec::new();
+    for entry in std::fs::read_dir(external).ok()?.flatten() {
+        let file_name = entry.file_name();
+        let Some(name) = file_name.to_str() else {
+            continue;
+        };
+        if matches(name) {
+            let path = entry.path();
+            if path.is_dir() {
+                candidates.push(path);
+            }
+        }
+    }
+    candidates.sort();
+    candidates.into_iter().next()
+}
+
+fn push_existing_isystem(args: &mut Vec<String>, path: std::path::PathBuf) {
+    if path.is_dir() {
+        args.push("-isystem".to_owned());
+        args.push(path.to_string_lossy().into_owned());
+    }
+}
+
+fn push_clang_resource_include(args: &mut Vec<String>) {
+    let Some(clang) = host_llvm_toolchain_bin("clang") else {
+        return;
+    };
+    let clang = std::path::PathBuf::from(clang);
+    let Some(toolchain_root) = clang.parent().and_then(|bin| bin.parent()) else {
+        return;
+    };
+    let clang_lib = toolchain_root.join("lib").join("clang");
+    let mut candidates = Vec::new();
+    for entry in std::fs::read_dir(&clang_lib)
+        .ok()
+        .into_iter()
+        .flatten()
+        .flatten()
+    {
+        let include = entry.path().join("include");
+        if include.is_dir() {
+            candidates.push(include);
+        }
+    }
+    candidates.sort();
+    if let Some(include) = candidates.into_iter().last() {
+        args.push("-Xclang".to_owned());
+        args.push("-internal-isystem".to_owned());
+        args.push("-Xclang".to_owned());
+        args.push(include.to_string_lossy().into_owned());
+    }
+}
+
+fn llvm_musl_compile_default_args() -> Vec<String> {
+    let mut args = [
+        "-target",
+        "x86_64-linux-musl",
+        "-no-canonical-prefixes",
+        "-Wno-builtin-macro-redefined",
+        "-D__DATE__=\"redacted\"",
+        "-D__TIMESTAMP__=\"redacted\"",
+        "-D__TIME__=\"redacted\"",
+        "-ffile-compilation-dir=.",
+        "-Xclang",
+        "-fno-cxx-modules",
+        "-Wno-module-import-in-extern-c",
+        "-Werror=incomplete-umbrella",
+        "-nostdlibinc",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect::<Vec<_>>();
+
+    let Some(root) = kuro_core::cells::get_dynamic_project_root() else {
+        return args;
+    };
+    let external = root.join("bazel-external");
+
+    if let Some(kernel_headers) = first_external_dir(&external, |name| {
+        name.starts_with("llvm+kernel_headers+linux_kernel_headers_x86")
+            || name.starts_with("llvm++kernel_headers+linux_kernel_headers_x86")
+    }) {
+        push_existing_isystem(&mut args, kernel_headers.join("include"));
+    }
+
+    if let Some(musl) = first_external_dir(&external, |name| {
+        name == "llvm+musl+musl_libc" || name == "llvm++musl+musl_libc"
+    }) {
+        push_existing_isystem(&mut args, musl.join("include"));
+        push_existing_isystem(&mut args, musl.join("arch").join("x86_64"));
+        push_existing_isystem(&mut args, musl.join("src").join("include"));
+    }
+
+    if let Some(compiler_rt) = first_external_dir(&external, |name| {
+        name == "llvm+llvm_source+compiler-rt" || name == "llvm++llvm_source+compiler-rt"
+    }) {
+        push_existing_isystem(&mut args, compiler_rt.join("include"));
+    }
+
+    push_clang_resource_include(&mut args);
+
+    args.extend(
+        [
+            "-fstack-protector",
+            "-Wall",
+            "-Wthread-safety",
+            "-Wself-assign",
+            "-Wunused-but-set-parameter",
+            "-Wno-free-nonheap-object",
+            "-fcolor-diagnostics",
+            "-fno-omit-frame-pointer",
+        ]
+        .into_iter()
+        .map(str::to_owned),
+    );
+
+    args
+}
+
 fn depset_values<'v>(value: Value<'v>, heap: Heap<'v>) -> starlark::Result<Vec<Value<'v>>> {
     if value.is_none() {
         Ok(Vec::new())
@@ -3393,12 +3517,12 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             }
             None
         };
+        let target_system_name = get_var("target_system_name").and_then(|v| get_str_val(v));
+        let target_libc = get_var("target_libc").and_then(|v| get_str_val(v));
 
         // --- Link/Archive actions ---
         if is_link {
             let output_path = get_var("output_execpath").and_then(|v| get_str_val(v));
-            let target_system_name = get_var("target_system_name").and_then(|v| get_str_val(v));
-            let target_libc = get_var("target_libc").and_then(|v| get_str_val(v));
             let use_llvm_linux_link_defaults = !msvc
                 && has_host_llvm_toolchain()
                 && is_musl_cc_toolchain_target(
@@ -3544,6 +3668,16 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
             }
             if is_compile && has_source {
                 args.push(heap.alloc_str("-c").to_value());
+            }
+        }
+
+        if is_compile
+            && !msvc
+            && has_host_llvm_toolchain()
+            && is_musl_cc_toolchain_target(target_system_name.as_deref(), target_libc.as_deref())
+        {
+            for flag in llvm_musl_compile_default_args() {
+                args.push(heap.alloc_str(&flag).to_value());
             }
         }
 
@@ -4647,6 +4781,14 @@ fn cc_common_module_methods(builder: &mut MethodsBuilder) {
                 heap.alloc_str("pic").to_value().get_hashed().unwrap(),
                 Value::new_bool(true),
             );
+        }
+
+        if let Ok(Some(target_system_name)) = cc_toolchain.get_attr("target_gnu_system_name", heap)
+        {
+            insert_if_set(&mut map, heap, "target_system_name", target_system_name);
+        }
+        if let Ok(Some(target_libc)) = cc_toolchain.get_attr("libc", heap) {
+            insert_if_set(&mut map, heap, "target_libc", target_libc);
         }
 
         // Merge variables_extension dict into the variables
