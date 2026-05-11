@@ -1,6 +1,6 @@
 # Tips and tricks for hacking on Kuro
 
-You might have been lead here by reading [CONTRIBUTING.md](/CONTRIBUTING.md). If
+You might have been led here by reading [CONTRIBUTING.md](/CONTRIBUTING.md). If
 not, please read that as well! That will give you the high level overview; this
 document is all about the needed elbow grease you'll have to apply.
 
@@ -14,7 +14,7 @@ You can either build `kuro` from a clone of the Kuro repo (this will cause
 rustup/cargo to install the right nightly version of `rustc`):
 
 ```sh
-git clone https://github.com/facebook/kuro.git
+git clone https://github.com/ZeromatterOSS/kuro.git
 cd kuro/
 cargo install --path=app/kuro
 ```
@@ -23,7 +23,7 @@ Or, alternatively, install it directly from GitHub:
 
 ```sh
 rustup install nightly-2025-08-01
-cargo +nightly-2025-08-01 install --git https://github.com/facebook/kuro.git kuro
+cargo +nightly-2025-08-01 install --git https://github.com/ZeromatterOSS/kuro.git kuro
 ```
 
 ### Side note: using [Nix] to compile the source
@@ -37,7 +37,7 @@ the Kuro source code includes a `flake.nix` file, which can be used to compile
 Kuro itself via `cargo`:
 
 ```sh
-git clone https://github.com/facebook/kuro.git
+git clone https://github.com/ZeromatterOSS/kuro.git
 cd kuro/
 nix develop . # add 'rustc' and 'cargo' to $PATH
 cargo build --release --bin=kuro
@@ -104,7 +104,7 @@ It's possible to run kuro's test suite with `cargo test`.
 canonical lint configuration is in `lint_levels.bzl` rather than `Cargo.toml`,
 so it's recommended to use `test.py` instead.
 
-[clippy-bug]: https://github.com/facebook/kuro/issues/943
+[clippy-bug]: https://github.com/ZeromatterOSS/kuro/issues/943
 
 To run the build, tests, rustdoc, and lints in the same way as kuro's OSS CI,
 run:
@@ -117,12 +117,8 @@ Various checks can be run individually with `--lint-only`, `--test-only` and
 similar; see `python3 test.py --help` for details.
 
 N.B. This command will not run Starlark lints since the Starlark linter is
-[disabled due to Git gremlins][Git gremlins] that may be fixable with enough
-effort. FIXME: It may be possible to use Sapling on OSS Kuro to get a working
-Starlark linter, but the instructions to do so would need to be written.
-
-[Git gremlins]:
-  https://github.com/facebook/kuro/commit/54f986c0329f4f60e9057d7e86f3d361f1b5e1bf
+disabled in this repository. FIXME: It may be possible to use Sapling to get a
+working Starlark linter, but the instructions to do so would need to be written.
 
 ## Coding conventions
 
@@ -156,15 +152,14 @@ have written. Some rules:
 - Error messages should start with an upper case letter. Error messages should
   not end with a period.
 
-## Open-source differences
+## Buck2 heritage
 
-Most code is shared as-is between open source and the internal Meta version of
-Kuro. However, there are some exceptions:
+Kuro is derived from Buck2, originally developed by Meta Platforms, Inc. A
+substantial amount of code, documentation, and architecture still reflects that
+heritage. Preserve accurate Buck2 and Meta attribution when editing inherited
+material.
 
-- The open-source remote execution client is different, because our internal one
-  works with custom servers/infrastructure that is not publicly available.
-- There are places controlled with `is_open_source()` which change configuration
-  between the internal and open source versions.
-- Some places use `@oss-enable` or `@oss-disable` to comment/uncomment lines of
-  code. The internal code is visible, but the comment markers are moved during
-  export/import of code.
+Kuro is now a separate Zeromatter Inc project with primary authorship by Walter
+Gray. It is provided for educational and research purposes and is in large part
+an exercise in experimenting with agentic programming on a substantial systems
+codebase. Pull requests may or may not be reviewed.

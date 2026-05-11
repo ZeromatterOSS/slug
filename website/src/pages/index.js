@@ -46,7 +46,7 @@ function HomepageHeader() {
             <Link
               className="button button--secondary button--lg"
               to="/docs/about/why">
-              Why Buck2?
+              Why Kuro?
             </Link>
             <Link
               className="button button--secondary button--lg"
@@ -64,8 +64,8 @@ export default function Home() {
   const {siteConfig} = useDocusaurusContext();
   return (
     <Layout
-      title="Buck2 build system website"
-      description="Buck2 is an open-source large-scale build system from Meta. The successor to Buck.">
+      title="Kuro build system website"
+      description="Kuro is a Bazel-compatible build tool developed by Zeromatter Inc, derived from Buck2 by Meta.">
       <HomepageHeader />
       <main>
         <HomepageFeatures />

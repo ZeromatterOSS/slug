@@ -42,4 +42,4 @@ ln -sf $(kuro bxl comp_db.bxl:gen -- --targets ...) $(git rev-parse --show-tople
 
 Providing better ergonomics for BXL scripts (such as enabling something like
 `kuro comp_db`) is being discussed
-[here](https://github.com/facebook/kuro/issues/86).
+[here](https://github.com/ZeromatterOSS/kuro/issues/86).

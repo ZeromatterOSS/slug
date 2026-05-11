@@ -8,26 +8,28 @@ of what Kuro is and the key reasons you might consider using it.
 
 ## What is Kuro?
 
-Kuro is a build system developed and used by Meta. Think of a build system as a
-tool that automates the process of creating executable binary from source code.
-This includes compiling code, linking libraries, and packaging everything
-together.
+Kuro is a Bazel-compatible build tool developed by Zeromatter Inc, with primary
+authorship by Walter Gray. It is provided for educational and research purposes
+and is in large part an exercise in experimenting with agentic programming on a
+substantial systems codebase.
+
+Kuro is derived from Buck2, originally developed by Meta Platforms, Inc. It keeps
+credit and attribution for Buck2 and Meta while evolving as a separate project
+targeting Bazel 9 compatibility.
 
 Here are a few key things to know about Kuro:
 
-- **Supports Many Languages**: Kuro can build projects written in a variety of
-  programming languages, including C++, Rust, Python, Go, OCaml, Erlang, and
-  more.
-- **Designed for Large Monorepos**
+- **Bazel 9 compatibility**: Kuro aims to run standard Bazel 9 BUILD files and
+  bzlmod modules.
+- **Designed for Large Monorepos**: Kuro inherits Buck2's focus on large,
+  incremental builds.
 - **Open Source**: You can find its source code and contribute at
-  [https://github.com/facebook/kuro](https://github.com/facebook/kuro).
-- **Fast**: 2x as fast as Buck1 🚀
-- **Correctness**: Buck enforces hermeticity to ensure builds are correct by
-  default.
+  [https://github.com/ZeromatterOSS/kuro](https://github.com/ZeromatterOSS/kuro).
+- **Fast internals**: Kuro builds on Buck2's Rust internals, including DICE.
+- **Correctness**: Kuro aims to preserve Bazel-compatible hermeticity and
+  dependency semantics.
 - **Extensible**: Allows developers to easily extend and customize their build
-  process. Kuro runs on various operating systems including Windows, Linux, and
-  macOS, and can build for these platforms as well as for Android, iOS, and
-  others.
+  process through Starlark.
 
 ## Why Use Kuro? Key Advantages
 

@@ -6,7 +6,7 @@ does not support persistent workers for builds that use remote execution. This
 demo is part of a patch-set that adds support for remote persistent workers to
 Kuro, see [#776].
 
-[#776]: https://github.com/facebook/kuro/issues/776
+[#776]: https://github.com/ZeromatterOSS/kuro/issues/776
 
 ## Requirements
 

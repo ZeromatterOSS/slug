@@ -84,7 +84,7 @@ controlling the Python used when building other languages.
 Toolchains for custom languages (and more generally, any custom process/build)
 can also easily be written as rules with `is_toolchain_rule = True` which return
 any provider struct (conventionally named `*ToolchainInfo`). The
-[prelude's toolchains](https://github.com/facebook/kuro/tree/main/prelude/toolchains),
+[prelude's toolchains](https://github.com/ZeromatterOSS/kuro/tree/main/prelude/toolchains),
 including `system_cxx_toolchain` referenced earlier, can serve as examples.
 
 There is no technical difference between toolchains defined in the prelude
@@ -135,7 +135,7 @@ Doing is typically as follows:
 
 - Download the tools, e.g. using the
   [`http_archive`](../../prelude/rules/core/http_archive) rule (see the
-  [Zig-based C++ toolchain in the prelude](https://github.com/facebook/kuro/tree/main/prelude/toolchains/cxx/zig)
+  [Zig-based C++ toolchain in the prelude](https://github.com/ZeromatterOSS/kuro/tree/main/prelude/toolchains/cxx/zig)
   as an example).
 - Expose those tools as [`RunInfo`](../../api/build/RunInfo/) providers in rules
   that are referenced as [exec deps](configurations_by_example.md#exec-deps) in

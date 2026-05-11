@@ -3,7 +3,14 @@ id: why
 title: Why Kuro
 ---
 
-Kuro is a build system from Meta. This page answers the questions:
+Kuro is a Bazel-compatible build tool from Zeromatter Inc, with primary
+authorship by Walter Gray. It is derived from Buck2, originally developed by Meta
+Platforms, Inc., and preserves attribution to Buck2 and Meta for inherited code,
+documentation, and architecture.
+
+Kuro is provided for educational and research purposes and is in large part an
+exercise in experimenting with agentic programming on a substantial systems
+codebase. This page answers the questions:
 [why does Kuro exist](#why-does-kuro-exist),
 [what's different about Kuro](#whats-different-about-kuro), and
 [why use Kuro](#why-use-kuro).
@@ -96,7 +103,7 @@ expressiveness (most of these are also different from Bazel).
   providing a reduction in the size of the dependency graph.
 - **Kuro is not phased** - there are no target graph/action graph phases, just
   a series of dependencies in a
-  [single graph on DICE](https://github.com/facebook/kuro/blob/main/dice/dice/docs/index.md)
+  [single graph on DICE](https://github.com/ZeromatterOSS/kuro/blob/main/dice/dice/docs/index.md)
   that result in whatever the user requested. That means that Kuro can
   sometimes parallelise different phases and track changes very precisely.
 - **Kuro can integrate with the virtual filesystem
@@ -120,24 +127,17 @@ For a comprehensive list of benefits, see
 
 ## Why use Kuro?
 
-It would be delightful if you tried out Kuro! But it is early-stage software,
-so users may run into unexpected issues. If you encounter an issue, please
-report it via [Github issues](https://github.com/facebook/kuro/issues).
+Kuro is early-stage software, so users may run into unexpected issues. If you
+encounter an issue, you may report it via
+[Github issues](https://github.com/ZeromatterOSS/kuro/issues), but issue and pull
+request review is not guaranteed.
 
-Kuro is being used internally within Meta and is available as open-source
-from 2023.
+Kuro is available as open source for educational and research use.
 
-There are several differences between the internal and open-source versions:
-
-- Meta uses an internal version of remote execution with builds always hooked up
-  to remote execution. The open-source binding, which uses Kuro without remote
-  execution, may be less polished.
-- There are some configuration differences between the open source and internal
-  versions. For example, file changes default to `inotify` in open-source, and
-  to Watchman internally.
-- The prelude (containing all the rules) is the same for open-source as
-  internal, but toolchains are not open-sourced. The required custom toolchains
-  may not work as well.
+Kuro inherits a substantial amount of Buck2 documentation. Some pages still
+describe Buck2-era concepts or Meta-internal workflows. Those references should
+be treated as inherited context unless a page explicitly describes current Kuro
+behavior.
 
 There are also some things that aren't quite yet finished:
 

@@ -33,7 +33,7 @@ queried with `kuro aquery`.
 A single input or output of an [action](#action). These are files that
 participate as inputs or outputs of a build and can be source files or build
 outputs. For more information, see the
-[Artifact API](https://kuro.build/docs/api/build/Artifact/).
+[Artifact API](../api/build/Artifact/).
 
 ## Attribute
 
@@ -167,7 +167,7 @@ via a `load()` statement.
 
 When you create a Kuro project using `kuro init --git`, it will contain the
 same prelude used internally at Meta by Kuro users. It is viewable at
-https://github.com/facebook/kuro/tree/main/prelude.
+https://github.com/ZeromatterOSS/kuro/tree/main/prelude.
 
 ## Project
 
@@ -182,7 +182,7 @@ are executed from the project root.
 Data returned from a [rule](#rule) function. It's the only way that information
 from this rule is available to other rules that depend on it (see
 [dependency](#dependency)). For more information, see
-[Providers](https://kuro.build/docs/rule_authors/writing_rules/#providers).
+[Providers](../rule_authors/writing_rules.md#providers).
 
 ## Platform
 

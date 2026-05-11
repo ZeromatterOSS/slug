@@ -39,20 +39,22 @@ def setup_gen_dir(path: Path) -> None:
         """
 This directory contains generated files.
 
-Re-generate by running `fbcode/buck2/website/gen_docs.py`.
+Re-generate by running `website/gen_docs.py`.
 """
     )
 
 
-def buck_command(args: argparse.Namespace) -> str:
-    if args.buck2:
+def kuro_command(args: argparse.Namespace) -> str:
+    if args.kuro:
+        return args.kuro
+    elif args.buck2:
         return args.buck2
     elif args.prod:
-        return "buck2"
+        return "kuro"
     elif args.cargo:
-        return "cargo run --bin=buck2 --"
+        return "cargo run --bin=kuro --"
     else:
-        return "./buck2.py"
+        return "./kuro.py"
 
 
 def copy_starlark_docs() -> None:
@@ -89,7 +91,7 @@ def generate_prelude_rules_docs(buck: str) -> None:
             shutil.copyfile(orig, dest)
 
         index_file_content = (
-            "# Rules\n\nThese rules are available as standard in Buck2.\n"
+            "# Rules\n\nThese rules are available as standard in Kuro.\n"
         )
 
         os.makedirs(base_dir, exist_ok=True)
@@ -190,7 +192,7 @@ def generate_help_docs_index_page(buck: str, subcommands: List[str]) -> str:
     titile = """\
 ---
 id: index
-title: buck2 commands
+title: kuro commands
 ---
 """
     common_options_section = """\
@@ -203,7 +205,7 @@ For common options available across multiple commands, see [Common Options](./co
         "|---------------|------------------------------|",
     ]
     for sub in subcommands:
-        full_cmd = f"`buck2 {sub}`"
+        full_cmd = f"`kuro {sub}`"
         cmd_with_link = f"[{full_cmd}](./{sub})"
         short_help = generate_subcommand_short_help(buck, [sub])
         # Escape any pipe characters in the help text
@@ -261,7 +263,7 @@ def main() -> None:
         "--prod",
         action="store_true",
         default=False,
-        help="Whether to use the production `buck2` binary",
+        help="Whether to use the production `kuro` binary",
     )
     parser.add_argument(
         "--cargo",
@@ -270,22 +272,27 @@ def main() -> None:
         help="Whether to use a `cargo` built binary.",
     )
     parser.add_argument(
+        "--kuro",
+        nargs="?",
+        help="Whether to use the provided kuro binary.",
+    )
+    parser.add_argument(
         "--buck2",
         nargs="?",
-        help="Whether to use provided binary.",
+        help=argparse.SUPPRESS,
     )
     args = parser.parse_args()
 
-    # Change to buck2 directory
-    buck2_dir = Path(__file__).absolute().parent.parent
-    os.chdir(str(buck2_dir))
+    # Change to the Kuro repository root.
+    kuro_dir = Path(__file__).absolute().parent.parent
+    os.chdir(str(kuro_dir))
 
     # Clear the docs folder first so that if we change the names of any
     # objects, we'll remove old docs
     for x in Path("docs").rglob("*.generated.md"):
         os.remove(x)
 
-    buck = buck_command(args)
+    buck = kuro_command(args)
     copy_starlark_docs()
     generate_prelude_rules_docs(buck)
     generate_api_docs(buck)

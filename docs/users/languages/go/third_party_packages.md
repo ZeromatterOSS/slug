@@ -11,7 +11,7 @@ the following approach:
 
 - Use [`go.mod`](https://go.dev/doc/modules/gomod-ref) for dependency resolution
 - Use
-  [`gobuckify`](https://github.com/facebook/kuro/tree/main/prelude/go/tools/gobuckify)
+  [`gobuckify`](https://github.com/ZeromatterOSS/kuro/tree/main/prelude/go/tools/gobuckify)
   to generate `BUCK` files for your dependencies
 
 ## How `gobuckify` works
@@ -45,7 +45,7 @@ $ kuro run prelude//go/tools/gobuckify:gobuckify -- ./path/to/go-mod-dir
 ```
 
 See a complete example in
-[examples/toolchains/go_toolchain](https://github.com/facebook/kuro/blob/main/examples/toolchains/go_toolchain).
+[examples/toolchains/go_toolchain](https://github.com/ZeromatterOSS/kuro/blob/main/examples/toolchains/go_toolchain).
 
 ## The `gobuckify.json` file
 

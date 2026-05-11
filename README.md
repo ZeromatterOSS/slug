@@ -2,7 +2,7 @@
 
 # Kuro
 
-**Bazel, powered by Buck2 and Rust**
+**Bazel-compatible builds, powered by Buck2 and Rust**
 
 ![Status] ![License]
 
@@ -43,6 +43,9 @@ your builds &mdash; with less overhead.
 
 Kuro is in **alpha**. It is under active development and not yet suitable for
 production use. APIs, CLI flags, and behaviors may change without notice.
+The project is provided for educational and research purposes, and is in large
+part an exercise in experimenting with agentic programming on a substantial
+systems codebase.
 
 ### What works today
 
@@ -82,7 +85,7 @@ Kuro is currently build-from-source only. You'll need a recent Rust nightly
 toolchain.
 
 ```bash
-git clone https://github.com/ZeroMatter/kuro.git
+git clone https://github.com/ZeromatterOSS/kuro.git
 cd kuro
 cargo build --release
 ```
@@ -103,10 +106,9 @@ kuro run //:my_binary
 
 ## Credits
 
-Kuro is built by Walter Gray
+Kuro is developed by Zeromatter Inc, with primary authorship by Walter Gray
 ([walter-zeromatter](https://github.com/walter-zeromatter) /
-[yeswalrus](https://github.com/yeswalrus)) at
-[ZeroMatter](https://zeromatter.com).
+[yeswalrus](https://github.com/yeswalrus)).
 
 Kuro is a fork of [Buck2](https://github.com/facebook/buck2) by Meta Platforms,
 Inc. The DICE incremental computation engine, starlark-rust interpreter,

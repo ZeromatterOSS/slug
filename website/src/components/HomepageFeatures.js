@@ -18,9 +18,9 @@ const FeatureList = [
     title: 'Fast',
     description: (
       <>
-        Buck2 is faster than Buck.
-        If you've got nothing to do, Buck2 is significantly faster.
-        If you've got lots to do, Buck2 will start doing it faster and be much closer to the critical path.
+        Kuro targets Bazel 9 compatibility while reusing Buck2's fast Rust
+        internals. It is experimental software for exploring build-system design
+        and agentic programming.
       </>
     ),
   },
@@ -29,9 +29,9 @@ const FeatureList = [
     title: 'Reliable',
     description: (
       <>
-        Buck2 rules are hermetic by default. Missing dependencies are errors.
-        These restrictions apply to both the user-written <code>BUCK</code> files and the language rules.
-        Buck2 gives the right result more reliably.
+        Kuro aims to preserve Bazel-compatible hermeticity and dependency
+        semantics. Missing dependencies should be surfaced as errors rather than
+        hidden by local machine state.
       </>
     ),
   },
@@ -40,8 +40,9 @@ const FeatureList = [
     title: 'Extensible',
     description: (
       <>
-        All rules are written in Starlark, with nothing in the core of Buck2 knowing anything about languages.
-        That means that Buck2 users can define their own rules as first-class citizens.
+        Kuro builds on Starlark, DICE, Superconsole, and remote execution
+        architecture inherited from Buck2 while evolving as a separate
+        Zeromatter Inc project.
       </>
     ),
   },

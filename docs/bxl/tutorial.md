@@ -26,7 +26,7 @@ This tutorial has 4 parts:
 
 For all following tutorial, we assume you are in [`examples/bxl_tutorial`](
 <FbInternalOnly>https://www.internalfb.com/code/fbsource/fbcode/kuro/examples/bxl_tutorial/</FbInternalOnly>
-<OssOnly>https://github.com/facebook/kuro/tree/main/examples/bxl_tutorial</OssOnly>
+<OssOnly>https://github.com/ZeromatterOSS/kuro/tree/main/examples/bxl_tutorial</OssOnly>
 ) folder.
 
 This folder contains a kuro [project](../../concepts/glossary/#project) with
@@ -220,7 +220,7 @@ target.
 
 You can find the complete code for this tutorial in [`part1.bxl`](
 <FbInternalOnly>https://www.internalfb.com/code/fbsource/fbcode/kuro/examples/bxl_tutorial/part1.bxl</FbInternalOnly>
-<OssOnly>https://github.com/facebook/kuro/blob/main/examples/bxl_tutorial/part1.bxl</OssOnly>
+<OssOnly>https://github.com/ZeromatterOSS/kuro/blob/main/examples/bxl_tutorial/part1.bxl</OssOnly>
 ).
 
 ## Part 2
@@ -284,7 +284,7 @@ You'll see output like this:
 
 You can find the complete code for this tutorial in [`part2.bxl`](
 <FbInternalOnly>https://www.internalfb.com/code/fbsource/fbcode/kuro/examples/bxl_tutorial/part2.bxl</FbInternalOnly>
-<OssOnly>https://github.com/facebook/kuro/blob/main/examples/bxl_tutorial/part2.bxl</OssOnly>
+<OssOnly>https://github.com/ZeromatterOSS/kuro/blob/main/examples/bxl_tutorial/part2.bxl</OssOnly>
 ).
 
 ## Part 3
@@ -346,7 +346,7 @@ Now we can confirm these index files are available on our disk.
 
 You can find the complete code for this tutorial in [`part3.bxl`](
 <FbInternalOnly>https://www.internalfb.com/code/fbsource/fbcode/kuro/examples/bxl_tutorial/part3.bxl</FbInternalOnly>
-<OssOnly>https://github.com/facebook/kuro/blob/main/examples/bxl_tutorial/part3.bxl</OssOnly>
+<OssOnly>https://github.com/ZeromatterOSS/kuro/blob/main/examples/bxl_tutorial/part3.bxl</OssOnly>
 ).
 
 ## Conclusion

@@ -5,9 +5,15 @@ title: Introduction
 
 import { FbInternalOnly } from 'docusaurus-plugin-internaldocs-fb/internal';
 
-Welcome to Kuro, a large scale, fast, reliable, and extensible build tool
-developed and used by Meta. Kuro supports a variety of languages on many
-platforms.
+Welcome to Kuro, a Bazel-compatible build tool developed by Zeromatter Inc, with
+primary authorship by Walter Gray. Kuro is provided for educational and research
+purposes and is in large part an exercise in experimenting with agentic
+programming on a substantial systems codebase.
+
+Kuro is derived from [Buck2](https://github.com/facebook/buck2), originally
+developed by Meta Platforms, Inc. Kuro preserves attribution to Buck2 and Meta
+for inherited code, documentation, and architecture while evolving as a separate
+project targeting Bazel 9 compatibility.
 
 Kuro's core is written in [Rust](https://www.rust-lang.org/).
 [Starlark](https://github.com/bazelbuild/starlark), which is a deterministic,
@@ -22,8 +28,8 @@ matter how many times an operation is performed, it yields the same result) and
 hermeticity (code is sealed off from the world), giving the right results,
 reliably.
 
-Kuro multi-language support includes C++, Python, Java, Kotlin, Go, Rust,
-Erlang, OCaml, and more.
+Kuro's compatibility work currently focuses on Bazel 9 BUILD files, bzlmod, and
+the Bazel rules ecosystem.
 
 The following sub-sections contain a list of links to key points in the Kuro
 Documentation website that explain the advantages of using Kuro for you and
@@ -70,7 +76,7 @@ your team.
 
 ### For people integrating with Kuro
 
-- [Extending Buck via BXL](./bxl) - powerful Starlark scripts for introspection
+- [Extending Kuro via BXL](./bxl) - powerful Starlark scripts for introspection
   of Kuro's graphs.
 - [Kuro change detector](https://github.com/facebookincubator/kuro-change-detector) -
   tools for building a CI that only builds/tests what has changed in diff/PR.
@@ -85,10 +91,10 @@ your team.
   per-project basis. Enables a project or team to do seamless upgrades of their
   build system tooling.
 
-### External articles about Kuro
+### External articles about Buck2 and inherited components
 
-- [Introducing Kuro](https://engineering.fb.com/2023/04/06/open-source/kuro-open-source-large-scale-build-system/) -
-  our initial introduction when we open sourced Kuro.
+- [Introducing Buck2](https://engineering.fb.com/2023/04/06/open-source/kuro-open-source-large-scale-build-system/) -
+  Meta's initial introduction when Buck2 was open sourced.
 - [Reddit AMA](https://old.reddit.com/r/rust/comments/136qs44/hello_rrust_we_are_meta_engineers_who_created_the/)
   where the Kuro team answered a number of questions.
 - [Using buck to build Rust projects](https://steveklabnik.com/writing/using-buck-to-build-rust-projects) -
@@ -130,8 +136,8 @@ your team.
   [Nix](https://nixos.org) together in a harmonious way.
 
 Feel free to
-[send a PR](https://github.com/facebook/kuro/edit/main/docs/index.md) adding
-your project.
+[send a PR](https://github.com/ZeromatterOSS/kuro/edit/main/docs/index.md) adding
+your project. Pull requests may or may not be reviewed.
 
 <FbInternalOnly>
 

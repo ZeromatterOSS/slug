@@ -26,7 +26,7 @@ The built-in Kuro rules are stored in the `prelude` folder in the kuro repo.
 To add a rule for a language, say `pascal`:
 
 1. Look at
-   [prelude/decls](https://github.com/facebook/kuro/blob/main/prelude/decls/)
+   [prelude/decls](https://github.com/ZeromatterOSS/kuro/blob/main/prelude/decls/)
    to see the attributes that are supported in Buck1 and are mirrored into
    Kuro. If `pascal` was an existing rule, you would see what attributes it
    takes (often it will be `pascal_library` and `pascal_binary`).
@@ -249,7 +249,7 @@ are used instead of shell scripts as they have better cross-platform
 compatibility and fewer hidden corners (especially in error paths).
 
 As an example of a Python helper, see
-[make_comp_db.py](https://github.com/facebook/kuro/blob/main/prelude/cxx/tools/make_comp_db.py).
+[make_comp_db.py](https://github.com/ZeromatterOSS/kuro/blob/main/prelude/cxx/tools/make_comp_db.py).
 
 A further advantage of using Python is that these commands can be tested in
 isolation, outside of Kuro.

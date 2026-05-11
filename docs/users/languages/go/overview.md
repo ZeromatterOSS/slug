@@ -13,7 +13,7 @@ concepts.
 ## Just need an example?
 
 Check out the
-**[examples/toolchains/go_toolchain](https://github.com/facebook/kuro/tree/main/examples/toolchains/go_toolchain)**
+**[examples/toolchains/go_toolchain](https://github.com/ZeromatterOSS/kuro/tree/main/examples/toolchains/go_toolchain)**
 project for an example of a Go project using Kuro. This example supports
 hermetic toolchains, third-party dependency management, cross-compilation, and
 multiple execution platforms.
@@ -85,7 +85,7 @@ modifiers.
 
 For example, to build for linux/amd64, the following commands are equivalent
 (assuming your project confugured similary to
-[this example](https://github.com/facebook/kuro/tree/main/examples/toolchains/go_toolchain)):
+[this example](https://github.com/ZeromatterOSS/kuro/tree/main/examples/toolchains/go_toolchain)):
 
 ```sh
 $ GOOS=linux GOARCH=amd64 go build example.com/foo/bar

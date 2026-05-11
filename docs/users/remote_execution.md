@@ -12,7 +12,7 @@ Kuro projects have been successfully tested for remote execution against
 [BuildBarn](https://github.com/buildbarn/bb-remote-execution) and
 [BuildBuddy](https://www.buildbuddy.io). Sample project configurations for those
 providers are available under
-[examples/remote_execution](https://github.com/facebook/kuro/tree/main/examples/remote_execution).
+[examples/remote_execution](https://github.com/ZeromatterOSS/kuro/tree/main/examples/remote_execution).
 
 ## RE configuration in `.buckconfig`
 
@@ -51,16 +51,16 @@ digest_algorithms = BLAKE3
 ## RE platform configuration
 
 Next, your build will need an
-[execution platform](https://kuro.build/docs/concepts/glossary/#execution-platform)
+[execution platform](../concepts/glossary.md#execution-platform)
 that specifies how and where actions should be executed. For a sample platform
 definition that sets up an execution platform to utilize RE, take a look at the
-[EngFlow example](https://github.com/facebook/kuro/blob/main/examples/remote_execution/engflow/platforms/defs.bzl),
-[BuildBarn example](https://github.com/facebook/kuro/blob/main/examples/remote_execution/buildbarn/platforms/defs.bzl),
+[EngFlow example](https://github.com/ZeromatterOSS/kuro/blob/main/examples/remote_execution/engflow/platforms/defs.bzl),
+[BuildBarn example](https://github.com/ZeromatterOSS/kuro/blob/main/examples/remote_execution/buildbarn/platforms/defs.bzl),
 or the
-[BuildBuddy example](https://github.com/facebook/kuro/blob/main/examples/remote_execution/buildbuddy/platforms/defs.bzl).
+[BuildBuddy example](https://github.com/ZeromatterOSS/kuro/blob/main/examples/remote_execution/buildbuddy/platforms/defs.bzl).
 
 To enable remote execution, configure the following fields in
-[CommandExecutorConfig](https://kuro.build/docs/api/build/globals/#commandexecutorconfig)
+[CommandExecutorConfig](../api/build/globals.md#commandexecutorconfig)
 as follows:
 
 - `remote_enabled` - set to `True`.

@@ -166,5 +166,5 @@ memory.
 If you still can not figure out how to reduce Starlark memory footprint of your
 build files, <FbInternalOnly>please post in
 [Kuro Users](https://fb.workplace.com/groups/kurousers)</FbInternalOnly><OssOnly>raise
-[an issue](https://github.com/facebook/kuro/issues) in our Github
+[an issue](https://github.com/ZeromatterOSS/kuro/issues) in our Github
 project</OssOnly>.

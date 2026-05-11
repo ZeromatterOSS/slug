@@ -9,7 +9,7 @@
  */
 
 import { themes } from 'prism-react-renderer';
-import { fbContent, isInternal } from 'docusaurus-plugin-internaldocs-fb/internal';
+import { fbContent } from 'docusaurus-plugin-internaldocs-fb/internal';
 import type { ThemeConfig as ClassicPresetConfig, Options as ClassicPresetOptions } from '@docusaurus/preset-classic';
 import type { DocusaurusConfig } from '@docusaurus/types';
 
@@ -34,7 +34,7 @@ const presetOptions: ClassicPresetOptions = ({
     customCss: require.resolve('./src/css/custom.css'),
   },
   internSearch: true,
-  staticDocsProject: 'buck2',
+  staticDocsProject: 'kuro',
 });
 
 const themeConfig: ClassicPresetConfig = ({
@@ -44,9 +44,9 @@ const themeConfig: ClassicPresetConfig = ({
     },
   },
   navbar: {
-    title: 'Buck2',
+    title: 'Kuro',
     logo: {
-      alt: 'Buck2 Logo',
+      alt: 'Kuro Logo',
       src: 'img/logo.svg',
     },
     items: [
@@ -70,14 +70,11 @@ const themeConfig: ClassicPresetConfig = ({
       },
       {
         href: fbContent({
-          internal: 'https://www.internalfb.com/code/buck2',
-          external: 'https://github.com/facebook/buck2',
+          internal: 'https://github.com/ZeromatterOSS/kuro',
+          external: 'https://github.com/ZeromatterOSS/kuro',
         }),
         // @ts-ignore : The type signature for `fbContent` incorrectly claims it might return a `[]`
-        label: fbContent({
-          internal: 'CodeHub',
-          external: 'GitHub',
-        }),
+        label: 'GitHub',
         position: 'right',
       },
     ],
@@ -96,19 +93,10 @@ const themeConfig: ClassicPresetConfig = ({
       },
       {
         title: 'Community',
-        items: isInternal() ? [
-          {
-            label: 'User group',
-            href: 'https://fb.workplace.com/groups/buck2users',
-          },
-          {
-            label: 'Announcement group',
-            href: 'https://fb.workplace.com/groups/buck2prototyping',
-          },
-        ] : [
+        items: [
           {
             label: 'GitHub issues',
-            href: 'https://github.com/facebook/buck2/issues',
+            href: 'https://github.com/ZeromatterOSS/kuro/issues',
           },
         ],
       },
@@ -118,22 +106,22 @@ const themeConfig: ClassicPresetConfig = ({
           {
             label: 'Code',
             href: fbContent({
-              internal: 'https://www.internalfb.com/code/fbsource/fbcode/buck2/',
-              external: 'https://github.com/facebook/buck2',
+              internal: 'https://github.com/ZeromatterOSS/kuro',
+              external: 'https://github.com/ZeromatterOSS/kuro',
             }),
           },
           {
-            label: 'Terms of Use',
-            href: 'https://opensource.fb.com/legal/terms',
+            label: 'Zeromatter',
+            href: 'https://zeromatter.com',
           },
           {
-            label: 'Privacy Policy',
-            href: 'https://opensource.fb.com/legal/privacy',
+            label: 'Buck2 upstream',
+            href: 'https://github.com/facebook/buck2',
           },
         ],
       },
     ],
-    copyright: `Copyright © ${new Date().getFullYear()} Meta Platforms, Inc. Built with Docusaurus.`,
+    copyright: `Copyright © ${new Date().getFullYear()} Zeromatter Inc. Portions derived from Buck2 by Meta Platforms, Inc. Built with Docusaurus.`,
   },
   prism: {
     additionalLanguages: ['bash', 'powershell', 'cpp', 'ini', 'mermaid'],
@@ -145,21 +133,23 @@ const themeConfig: ClassicPresetConfig = ({
     external: {
       appId: '9RT0EWXQO8',
       apiKey: 'cf8a08e681e1e1d8a73a08d3f13948c7',
-      indexName: 'buck2',
+      indexName: 'kuro',
     }
   }),
 });
 
 const config: DocusaurusConfig = ({
-  title: 'Buck2',
-  url: 'https://buck2.build',
+  title: 'Kuro',
+  // Kuro does not currently have a public docs website. This local URL avoids
+  // advertising a nonexistent domain in generated metadata.
+  url: 'http://localhost',
   baseUrl: '/',
   onBrokenLinks: 'throw',
   trailingSlash: true,
   onBrokenMarkdownLinks: 'warn',
   favicon: 'img/logo.png',
-  organizationName: 'facebook',
-  projectName: 'buck2',
+  organizationName: 'ZeromatterOSS',
+  projectName: 'kuro',
 
   presets: [
     [

@@ -65,7 +65,7 @@ creating unhashed output symlinks, and since you need a span to get any console
 feedback, the console says nothing is happening.
 
 **An easy fix**: In this particular instance, Thomas spotted
-[an easy optimization](https://github.com/facebook/kuro/commit/d677e41253b73a31aafa1255a532c38992482efd)
+[an easy optimization](https://github.com/ZeromatterOSS/kuro/commit/d677e41253b73a31aafa1255a532c38992482efd)
 which resolved the issue. But, of course, that’s not always possible. If the
 easy fix hadn't been available, we’d be at a dead end, so what do we do next?
 

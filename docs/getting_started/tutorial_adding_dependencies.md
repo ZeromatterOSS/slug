@@ -271,7 +271,7 @@ or just understanding the flow. To help with this, let's say we've prepared a
 simple, shared logging library for you. <FbInternalOnly> The library is
 `fbcode//kuro/docs/kuro_lab/logging_lib:logging_lib`. </FbInternalOnly>
 <OssOnly> You can find it at
-https://github.com/facebook/kuro/tree/main/docs/kuro_lab/logging_lib and copy
+https://github.com/ZeromatterOSS/kuro/tree/main/docs/kuro_lab/logging_lib and copy
 the folder into `kuro_lab` folder. </OssOnly>
 
 Our first step is to make our existing greeter_lib use this new logging_lib.
