@@ -27,7 +27,6 @@
 //! The late binding pattern allows `ModuleExtensionExecutionKey::compute()` in
 //! `kuro_bzlmod` to call into `kuro_interpreter_for_build` without a direct dependency.
 
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -36,6 +35,24 @@ use kuro_util::late_binding::LateBinding;
 
 use crate::extensions::AggregatedExtension;
 use crate::repo_spec::RepoSpec;
+
+/// Metadata returned by `module_ctx.extension_metadata(...)`.
+///
+/// Bazel keeps `facts` as a top-level lockfile field and deliberately does not
+/// use fact contents as an extension invalidation input.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModuleExtensionMetadata {
+    /// JSON-like facts made available to future executions as `module_ctx.facts`.
+    pub facts: serde_json::Value,
+}
+
+impl Default for ModuleExtensionMetadata {
+    fn default() -> Self {
+        Self {
+            facts: serde_json::Value::Object(serde_json::Map::new()),
+        }
+    }
+}
 
 /// Result of extension execution.
 ///
@@ -49,6 +66,9 @@ pub struct ExtensionExecutionOutput {
     /// `FxHashMap` so that iteration order is stable across invocations
     /// (Plan 21.2 — fixes CellResolver churn).
     pub generated_repo_specs: fxhash::FxHashMap<String, RepoSpec>,
+
+    /// Metadata returned by the extension implementation.
+    pub metadata: ModuleExtensionMetadata,
 }
 
 /// Trait for module extension execution.
@@ -86,6 +106,7 @@ pub trait ModuleExtensionExecutorImpl: Send + Sync + 'static {
         aggregated: &AggregatedExtension,
         root_module_name: &str,
         working_dir: &PathBuf,
+        prior_facts: serde_json::Value,
     ) -> kuro_error::Result<ExtensionExecutionOutput>;
 }
 
@@ -118,6 +139,7 @@ mod tests {
 
         let output = ExtensionExecutionOutput {
             generated_repo_specs: specs,
+            metadata: ModuleExtensionMetadata::default(),
         };
 
         assert_eq!(output.generated_repo_specs.len(), 1);

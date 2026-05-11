@@ -601,6 +601,45 @@ impl Lockfile {
         Some(result)
     }
 
+    fn extension_candidate_keys(extension_id: &str) -> Vec<String> {
+        let mut candidate_keys = vec![
+            extension_id.to_owned(),
+            lockfile_canonical_extension_id(extension_id),
+        ];
+        if extension_id.starts_with(':') {
+            candidate_keys.push(format!("//{}", extension_id));
+        }
+        if let Some(stripped) = extension_id.strip_prefix("//") {
+            candidate_keys.push(stripped.to_owned());
+        }
+        candidate_keys.sort();
+        candidate_keys.dedup();
+        candidate_keys
+    }
+
+    /// Return top-level facts for an extension, accepting the same extension-id
+    /// spellings as module extension cache lookup.
+    pub fn get_extension_facts(&self, extension_id: &str) -> Option<serde_json::Value> {
+        for candidate_key in Self::extension_candidate_keys(extension_id) {
+            if let Some(facts) = self.facts.get(&candidate_key) {
+                return Some(facts.clone());
+            }
+        }
+        None
+    }
+
+    /// Store top-level facts for an extension.
+    pub fn set_extension_facts(&mut self, extension_id: String, facts: serde_json::Value) {
+        match &facts {
+            serde_json::Value::Object(map) if map.is_empty() => {
+                self.facts.shift_remove(&extension_id);
+            }
+            _ => {
+                self.facts.insert(extension_id, facts);
+            }
+        }
+    }
+
     /// Store a module extension result in the lockfile cache.
     ///
     /// This caches the generated repo specs along with the digests needed
@@ -827,7 +866,18 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("MODULE.bazel.lock");
 
-        let lockfile = Lockfile::new();
+        let mut lockfile = Lockfile::new();
+        lockfile.set_extension_facts(
+            "@@rules_rs+//rs:extensions.bzl%crate".to_owned(),
+            serde_json::json!({
+                "serde_1.0.0": {
+                    "checksum": "abc123",
+                    "downloads": [1, 2],
+                    "usable": true,
+                    "missing": null
+                }
+            }),
+        );
         lockfile.write(&path).unwrap();
 
         let loaded = Lockfile::read(&path).unwrap();
@@ -836,8 +886,18 @@ mod tests {
         assert!(loaded.module_file_hash.is_empty());
         assert!(loaded.module_dep_graph.is_empty());
         assert!(loaded.repository_rules.is_empty());
-        // New fields should be present
-        assert!(loaded.facts.is_empty());
+        // New fields should be present and facts should round-trip.
+        assert_eq!(
+            loaded.get_extension_facts("@@rules_rs+//rs:extensions.bzl%crate"),
+            Some(serde_json::json!({
+                "serde_1.0.0": {
+                    "checksum": "abc123",
+                    "downloads": [1, 2],
+                    "usable": true,
+                    "missing": null
+                }
+            }))
+        );
     }
 
     #[test]
@@ -1113,6 +1173,25 @@ mod tests {
             numpy_spec.repo_rule_id,
             "@@rules_python//pip:pip.bzl%pip_install"
         );
+    }
+
+    #[test]
+    fn test_extension_facts_canonical_lookup() {
+        let mut lockfile = Lockfile::new();
+        lockfile.set_extension_facts(
+            "@@rules_rs+//rs:extensions.bzl%crate".to_owned(),
+            serde_json::json!({"serde_1.0.0": "cached"}),
+        );
+
+        assert_eq!(
+            lockfile.get_extension_facts("@rules_rs//rs:extensions.bzl%crate"),
+            Some(serde_json::json!({"serde_1.0.0": "cached"}))
+        );
+        assert_eq!(
+            lockfile.get_extension_facts("@@rules_rs+//rs:extensions.bzl%crate"),
+            Some(serde_json::json!({"serde_1.0.0": "cached"}))
+        );
+        assert_eq!(lockfile.get_extension_facts("@@other+//:ext.bzl%ext"), None);
     }
 
     #[test]

@@ -431,12 +431,16 @@ impl Key for ModuleExtensionExecutionKey {
         // later when we have better access to the Starlark module dependency graph.
         let bzl_transitive_digest = compute_bzl_transitive_digest(&self.extension_id);
         let usages_digest = self.input_hash.to_string();
+        let mut prior_facts = serde_json::Value::Object(serde_json::Map::new());
 
         // 1. Check lockfile cache (if project_root is set). Lockfile parse
         //    is shared with `cached_lockfile` callers (e.g. startup spoke
         //    seeding) so zeromatter-sized lockfiles only get parsed once.
         if let Some(project_root) = &self.project_root {
             if let Some(lockfile) = crate::lockfile::cached_lockfile(project_root) {
+                prior_facts = lockfile
+                    .get_extension_facts(&self.extension_id)
+                    .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::new()));
                 if let Some(cached_specs) = lockfile.get_extension_cache(
                     &self.extension_id,
                     &bzl_transitive_digest,
@@ -494,7 +498,13 @@ impl Key for ModuleExtensionExecutionKey {
         let execution_result = match MODULE_EXTENSION_EXECUTOR_IMPL.get() {
             Ok(executor) => {
                 executor
-                    .execute_extension(ctx, &self.aggregated, &self.root_module_name, &temp_dir)
+                    .execute_extension(
+                        ctx,
+                        &self.aggregated,
+                        &self.root_module_name,
+                        &temp_dir,
+                        prior_facts,
+                    )
                     .await
             }
             Err(e) => {
@@ -525,6 +535,7 @@ impl Key for ModuleExtensionExecutionKey {
                 // Return empty result in stub mode
                 Ok(crate::module_extension_executor::ExtensionExecutionOutput {
                     generated_repo_specs: FxHashMap::default(),
+                    metadata: Default::default(),
                 })
             }
         };
@@ -560,7 +571,12 @@ impl Key for ModuleExtensionExecutionKey {
         // 8. Update lockfile cache (if project_root is set and we have real specs)
         // Don't cache empty results — they likely indicate a failed extension execution
         // (graceful fallback), and caching them would poison future builds.
-        if !output.generated_repo_specs.is_empty() {
+        if !output.generated_repo_specs.is_empty()
+            || !matches!(
+                &output.metadata.facts,
+                serde_json::Value::Object(map) if map.is_empty()
+            )
+        {
             if let Some(project_root) = &self.project_root {
                 let lock_path = lockfile_path(project_root);
                 match update_lockfile_extension_cache(
@@ -569,6 +585,7 @@ impl Key for ModuleExtensionExecutionKey {
                     &bzl_transitive_digest,
                     &usages_digest,
                     &output.generated_repo_specs,
+                    &output.metadata.facts,
                 ) {
                     Ok(()) => {
                         tracing::debug!(
@@ -792,6 +809,7 @@ fn update_lockfile_extension_cache(
     bzl_transitive_digest: &str,
     usages_digest: &str,
     generated_repo_specs: &FxHashMap<String, RepoSpec>,
+    facts: &serde_json::Value,
 ) -> kuro_error::Result<()> {
     let _guard = LOCKFILE_EXTENSION_UPDATE_LOCK
         .lock()
@@ -823,11 +841,12 @@ fn update_lockfile_extension_cache(
     // round-trips cleanly with `bazel mod`.
     let lockfile_key = crate::lockfile::lockfile_canonical_extension_id(extension_id);
     lockfile.set_extension_cache(
-        lockfile_key,
+        lockfile_key.clone(),
         bzl_transitive_digest.to_owned(),
         usages_digest.to_owned(),
         generated_repo_specs,
     );
+    lockfile.set_extension_facts(lockfile_key, facts.clone());
 
     // Write back
     lockfile.write(lock_path)?;
@@ -1141,6 +1160,7 @@ mod tests {
             "bzl-digest-123",
             "usages-digest-456",
             &specs,
+            &serde_json::json!({"numpy_1.24.0": {"checksum": "abc"}}),
         )
         .unwrap();
 
@@ -1157,6 +1177,10 @@ mod tests {
         let cached_specs = cached.unwrap();
         assert_eq!(cached_specs.len(), 1);
         assert!(cached_specs.contains_key("numpy"));
+        assert_eq!(
+            lockfile.get_extension_facts("@@rules_python//pip:pip.bzl%pip"),
+            Some(serde_json::json!({"numpy_1.24.0": {"checksum": "abc"}}))
+        );
     }
 
     #[test]
@@ -1176,8 +1200,15 @@ mod tests {
 
         // Update with extension cache
         let specs = FxHashMap::default();
-        update_lockfile_extension_cache(&lock_path, "@@ext//ext.bzl%ext", "bzl", "usages", &specs)
-            .unwrap();
+        update_lockfile_extension_cache(
+            &lock_path,
+            "@@ext//ext.bzl%ext",
+            "bzl",
+            "usages",
+            &specs,
+            &serde_json::json!({"resource": "stored"}),
+        )
+        .unwrap();
 
         // Verify existing data is preserved
         let lockfile = Lockfile::read(&lock_path).unwrap();
@@ -1187,6 +1218,10 @@ mod tests {
                 .contains_key("https://bcr.bazel.build/test")
         );
         assert!(lockfile.has_extension_cache());
+        assert_eq!(
+            lockfile.get_extension_facts("@@ext//ext.bzl%ext"),
+            Some(serde_json::json!({"resource": "stored"}))
+        );
     }
 
     #[test]

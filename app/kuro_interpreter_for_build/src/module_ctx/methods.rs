@@ -24,6 +24,8 @@ use starlark::values::ValueLike;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 
 use crate::module_ctx::context::ModuleContext;
+use crate::module_ctx::metadata::StarlarkModuleExtensionMetadata;
+use crate::module_ctx::metadata::validate_facts_value;
 use crate::repository_ctx::DownloadInfo;
 use crate::repository_ctx::DownloadToken;
 use crate::repository_ctx::ExecutionResult;
@@ -599,13 +601,25 @@ pub(super) fn module_ctx_methods(builder: &mut MethodsBuilder) {
         Ok(Value::new_none())
     }
 
-    /// Report an extension's metadata for IDE integration.
-    /// STUB: Returns None. Accepts arbitrary kwargs for forward compatibility.
+    /// Report an extension's metadata for lockfile storage.
     fn extension_metadata<'v>(
         this: &ModuleContext,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        _root_module_direct_deps: Value<'v>,
+        #[starlark(require = named, default = starlark::values::none::NoneType)]
+        _root_module_direct_dev_deps: Value<'v>,
+        #[starlark(require = named, default = false)] _reproducible: bool,
+        #[starlark(require = named, default = starlark::values::none::NoneType)] facts: Value<'v>,
         #[starlark(kwargs)] _kwargs: Value<'v>,
+        eval: &mut starlark::eval::Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        Ok(Value::new_none())
+        let _ = this;
+        let metadata = kuro_bzlmod::module_extension_executor::ModuleExtensionMetadata {
+            facts: validate_facts_value(facts)?,
+        };
+        Ok(eval
+            .heap()
+            .alloc(StarlarkModuleExtensionMetadata::new(metadata)))
     }
 
     /// Check if a path is a directory.

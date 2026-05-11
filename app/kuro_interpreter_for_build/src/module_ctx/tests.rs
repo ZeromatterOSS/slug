@@ -31,6 +31,57 @@ fn test_module_context_empty() {
 }
 
 #[test]
+fn test_module_context_exposes_facts_attr() {
+    use starlark::environment::Module;
+    use starlark::values::StarlarkValue;
+
+    let module = Module::new();
+    let heap = module.heap();
+    let ctx = ModuleContext::empty().with_facts(serde_json::json!({"resource": "stored"}));
+
+    assert!(ctx.has_attr("facts", heap));
+    let facts = ctx.get_attr("facts", heap).unwrap();
+    assert!(facts.is_in(heap.alloc("resource")).unwrap());
+    assert_eq!(
+        facts.at(heap.alloc("resource"), heap).unwrap().unpack_str(),
+        Some("stored")
+    );
+}
+
+#[test]
+fn test_module_context_extension_metadata_returns_facts() {
+    use starlark::environment::Globals;
+    use starlark::environment::Module;
+    use starlark::eval::Evaluator;
+    use starlark::syntax::AstModule;
+    use starlark::syntax::Dialect;
+    use starlark::values::ValueLike;
+
+    use crate::module_ctx::StarlarkModuleExtensionMetadata;
+
+    let module = Module::new();
+    let heap = module.heap();
+    module.set("mctx", heap.alloc(ModuleContext::empty()));
+
+    let ast = AstModule::parse(
+        "metadata.star",
+        "mctx.extension_metadata(facts = {'resource': {'checksum': 'abc'}})".to_owned(),
+        &Dialect::Standard,
+    )
+    .unwrap();
+    let mut eval = Evaluator::new(&module);
+    let result = eval.eval_module(ast, &Globals::standard()).unwrap();
+    let metadata = result
+        .downcast_ref::<StarlarkModuleExtensionMetadata>()
+        .unwrap();
+
+    assert_eq!(
+        metadata.metadata().facts,
+        serde_json::json!({"resource": {"checksum": "abc"}})
+    );
+}
+
+#[test]
 fn test_module_context_with_temp_working_dir() {
     let temp_dir = TempDir::new().unwrap();
     let temp_path = temp_dir.path().to_path_buf();

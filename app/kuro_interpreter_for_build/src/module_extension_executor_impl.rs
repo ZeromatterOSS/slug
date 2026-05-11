@@ -65,8 +65,10 @@ use kuro_interpreter::paths::module::StarlarkModulePath;
 use starlark::environment::Module;
 use starlark::eval::Evaluator;
 use starlark::values::OwnedFrozenValueTyped;
+use starlark::values::ValueLike;
 
 use crate::extension_execution::build_module_context;
+use crate::module_ctx::StarlarkModuleExtensionMetadata;
 use crate::module_extension::FrozenStarlarkModuleExtension;
 
 /// Errors during extension execution.
@@ -205,7 +207,7 @@ impl ConcreteModuleExtensionExecutor {
         ctx: &mut DiceComputations<'_>,
         aggregated: &AggregatedExtension,
         mut module_ctx: crate::module_ctx::ModuleContext,
-    ) -> kuro_error::Result<fxhash::FxHashMap<String, kuro_bzlmod::RepoSpec>> {
+    ) -> kuro_error::Result<ExtensionExecutionOutput> {
         // 1. Get the cell resolver to parse the bzl path
         let cell_resolver = ctx.get_cell_resolver().await?;
 
@@ -316,15 +318,24 @@ impl ConcreteModuleExtensionExecutor {
 
                 match invoke_result {
                     Ok(return_value) => {
-                        // Extension implementations should return None
-                        if !return_value.is_none() {
-                            tracing::warn!(
-                                "Extension '{}' returned non-None value: {}",
-                                aggregated.extension_name,
-                                return_value.get_type()
-                            );
+                        if return_value.is_none() {
+                            return Ok::<
+                                kuro_bzlmod::module_extension_executor::ModuleExtensionMetadata,
+                                kuro_error::Error,
+                            >(Default::default());
                         }
-                        Ok::<(), kuro_error::Error>(())
+
+                        let Some(metadata) =
+                            return_value.downcast_ref::<StarlarkModuleExtensionMetadata>()
+                        else {
+                            return Err(ExtensionExecutionError::ImplementationError(format!(
+                                "module extension implementation must return None or module_ctx.extension_metadata(...), got {}",
+                                return_value.get_type()
+                            ))
+                            .into());
+                        };
+
+                        Ok(metadata.metadata().clone())
                     }
                     Err(e) => {
                         tracing::error!(
@@ -339,9 +350,12 @@ impl ConcreteModuleExtensionExecutor {
         });
 
         // Check for execution errors
-        result?;
+        let metadata = result?;
 
-        Ok(specs)
+        Ok(ExtensionExecutionOutput {
+            generated_repo_specs: specs,
+            metadata,
+        })
     }
 }
 
@@ -353,6 +367,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         aggregated: &AggregatedExtension,
         root_module_name: &str,
         working_dir: &PathBuf,
+        prior_facts: serde_json::Value,
     ) -> kuro_error::Result<ExtensionExecutionOutput> {
         tracing::debug!(
             "Executing extension '{}' (kuro_interpreter_for_build)",
@@ -378,7 +393,8 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         // Build the module_ctx from aggregated extension data
         let module_ctx = build_module_context(aggregated, root_module_name)
             .with_temp_working_dir(working_dir.clone())
-            .with_label_resolution(project_root.clone(), cell_paths);
+            .with_label_resolution(project_root.clone(), cell_paths)
+            .with_facts(prior_facts);
 
         tracing::debug!(
             "Built module_ctx with {} module(s), working_dir: {:?}",
@@ -416,8 +432,8 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
         // to the extension. So we also print a user-visible stderr line
         // with the extension id and underlying error; analysis errors
         // downstream can be correlated to the extension they came from.
-        let specs = match self.try_execute_starlark(ctx, aggregated, module_ctx).await {
-            Ok(specs) => specs,
+        let output = match self.try_execute_starlark(ctx, aggregated, module_ctx).await {
+            Ok(output) => output,
             Err(e) => {
                 eprintln!(
                     "warning: module extension '{}' failed; any repo it was \
@@ -431,9 +447,13 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
                     aggregated.extension_id,
                     e
                 );
-                fxhash::FxHashMap::default()
+                ExtensionExecutionOutput {
+                    generated_repo_specs: fxhash::FxHashMap::default(),
+                    metadata: Default::default(),
+                }
             }
         };
+        let specs = output.generated_repo_specs.clone();
 
         tracing::info!(
             "Extension '{}' captured {} repository spec(s)",
@@ -525,9 +545,7 @@ impl ModuleExtensionExecutorImpl for ConcreteModuleExtensionExecutor {
             }
         }
 
-        Ok(ExtensionExecutionOutput {
-            generated_repo_specs: specs,
-        })
+        Ok(output)
     }
 }
 
