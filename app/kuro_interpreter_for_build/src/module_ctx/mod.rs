@@ -50,6 +50,7 @@
 //! ```
 
 mod context;
+mod metadata;
 mod methods;
 mod module;
 mod os;
@@ -64,6 +65,10 @@ use starlark::values::starlark_value_as_type::StarlarkValueAsType;
 
 pub use crate::module_ctx::context::ModuleContext;
 pub use crate::module_ctx::context::SerializedModule;
+pub use crate::module_ctx::metadata::FactsValue;
+pub use crate::module_ctx::metadata::StarlarkModuleExtensionMetadata;
+pub use crate::module_ctx::metadata::empty_facts;
+pub use crate::module_ctx::metadata::validate_facts_value;
 pub use crate::module_ctx::module::BazelModule;
 pub use crate::module_ctx::os::RepositoryOs;
 pub use crate::module_ctx::tags::BazelModuleTags;

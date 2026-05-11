@@ -1078,7 +1078,12 @@ mod tests {
     #[test]
     fn test_canonicalize_repo_rule_invocation_name_matches_bazel_root_shape() {
         assert_eq!(
-            canonicalize_repo_rule_invocation_name("zeromatter", true, "//:repo.bzl%rr", "launcher"),
+            canonicalize_repo_rule_invocation_name(
+                "zeromatter",
+                true,
+                "//:repo.bzl%rr",
+                "launcher"
+            ),
             "+rr+launcher",
         );
     }

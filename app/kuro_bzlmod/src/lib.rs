@@ -78,6 +78,7 @@ pub use lockfile::lockfile_path;
 pub use module_extension_executor::ExtensionExecutionOutput;
 pub use module_extension_executor::MODULE_EXTENSION_EXECUTOR_IMPL;
 pub use module_extension_executor::ModuleExtensionExecutorImpl;
+pub use module_extension_executor::ModuleExtensionMetadata;
 pub use parser::parse_module_bazel;
 pub use pending_repo_cells::ExtensionCellDefinitions;
 pub use pending_repo_cells::PendingRepoCell;

@@ -32,6 +32,8 @@ use starlark::values::starlark_value;
 
 use crate::label_filesystem::LabelFilesystemResolver;
 use crate::label_filesystem::RootLabelResolution;
+use crate::module_ctx::metadata::FactsValue;
+use crate::module_ctx::metadata::empty_facts;
 use crate::module_ctx::methods::module_ctx_methods;
 use crate::module_ctx::module::BazelModule;
 use crate::module_ctx::os::RepositoryOs;
@@ -89,6 +91,9 @@ pub struct ModuleContext {
     /// Built from CellResolver before entering Starlark eval.
     #[allocative(skip)]
     cell_paths: HashMap<String, PathBuf>,
+    /// Facts returned by a previous execution of this extension.
+    #[allocative(skip)]
+    facts: serde_json::Value,
 }
 
 starlark_simple_value!(ModuleContext);
@@ -112,6 +117,7 @@ impl ModuleContext {
             delete_on_close: true,
             project_root: None,
             cell_paths: HashMap::new(),
+            facts: empty_facts(),
         }
     }
 
@@ -127,6 +133,7 @@ impl ModuleContext {
             delete_on_close: true,
             project_root: None,
             cell_paths: HashMap::new(),
+            facts: empty_facts(),
         }
     }
 
@@ -139,6 +146,7 @@ impl ModuleContext {
             delete_on_close: true,
             project_root: None,
             cell_paths: HashMap::new(),
+            facts: empty_facts(),
         }
     }
 
@@ -176,6 +184,15 @@ impl ModuleContext {
     ) -> Self {
         self.project_root = Some(project_root);
         self.cell_paths = cell_paths;
+        self
+    }
+
+    /// Set facts from a previous execution of this extension.
+    pub fn with_facts(mut self, facts: serde_json::Value) -> Self {
+        self.facts = match facts {
+            serde_json::Value::Object(_) => facts,
+            _ => empty_facts(),
+        };
         self
     }
 
@@ -270,6 +287,7 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
                 | "is_isolated"
                 | "root_module_direct_deps"
                 | "root_module_direct_dev_deps"
+                | "facts"
         )
     }
 
@@ -300,6 +318,7 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
             "root_module_direct_deps" => Some(Value::new_none()),
             // Root module's direct dev bazel_dep labels
             "root_module_direct_dev_deps" => Some(Value::new_none()),
+            "facts" => Some(heap.alloc(FactsValue::new(self.facts.clone()))),
             _ => None,
         }
     }
@@ -312,6 +331,7 @@ impl<'v> StarlarkValue<'v> for ModuleContext {
             "is_isolated".to_owned(),
             "root_module_direct_deps".to_owned(),
             "root_module_direct_dev_deps".to_owned(),
+            "facts".to_owned(),
         ]
     }
 
