@@ -18,15 +18,15 @@
 Kuro is a Bazel-compatible build tool that uses
 [Buck2](https://github.com/facebook/buck2)'s high-performance Rust internals to
 run standard [Bazel](https://github.com/bazelbuild/bazel) 9.0 BUILD files and
-bzlmod modules &mdash; faster.
+bzlmod modules.
 
 Named after the [Costasiella kuroshimae](https://en.wikipedia.org/wiki/Costasiella_kuroshimae)
-(the "leaf sheep" sea slug) &mdash; The slug is one of the only known photosynthetic animals, effectively a plant-animal hybrid.
+(the "leaf sheep" sea slug) &mdash. This slug is able to absorb and make use of the chloroplasts
+in the algae it eats via kleptoplasty, which seemed apt given the goal of absorbing bazel into buck2's codebase.
 
 ## Why Kuro?
 
-Kuro targets teams who want Bazel ecosystem compatibility without Bazel's
-performance overhead. Under the hood, it leverages:
+Kuro aims to be a drop-in replacement for bazel, making use of buck2's internals. Under the hood, it leverages:
 
 - **DICE** &mdash; Buck2's deterministic incremental computation engine for fast,
   correct rebuilds
@@ -76,7 +76,6 @@ systems codebase.
 
 - **Bazel versions before 9.0** &mdash; no WORKSPACE file support
 - **Android / iOS rules** &mdash; not a current priority
-- **Java rules** &mdash; not yet implemented
 - **macOS** &mdash; not yet tested
 
 ## Installing
