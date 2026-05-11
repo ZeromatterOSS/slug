@@ -60,6 +60,14 @@ pub fn get_artifact_path_buck_out_root() -> ProjectRelativePathBuf {
         .to_buf()
 }
 
+fn canonical_external_cell_name(cell_name: &str) -> String {
+    if cell_name.starts_with("crates__") {
+        return format!("rules_rs++crate+{cell_name}");
+    }
+    kuro_core::cells::canonical_dynamic_extension_cell_name(cell_name)
+        .unwrap_or_else(|| cell_name.to_owned())
+}
+
 impl ArtifactPath<'_> {
     pub fn with_filename<F, T>(&self, f: F) -> kuro_error::Result<T>
     where
@@ -189,6 +197,7 @@ impl ArtifactPath<'_> {
                     None => ForwardRelativePath::empty(),
                 };
                 let cell_name = source.package().cell_name();
+                let external_cell_name = canonical_external_cell_name(cell_name.as_str());
                 let pkg_path: &ForwardRelativePath = source.package().cell_relative_path().as_ref();
                 let cell_rel = if pkg_path.is_empty() {
                     in_pkg.as_str().to_owned()
@@ -201,8 +210,7 @@ impl ArtifactPath<'_> {
                 } else {
                     let with_prefix = ForwardRelativePathBuf::unchecked_new(format!(
                         "../{}/{}",
-                        cell_name.as_str(),
-                        cell_rel
+                        external_cell_name, cell_rel
                     ));
                     f(with_prefix.as_ref())
                 }
@@ -386,6 +394,7 @@ impl ArtifactPath<'_> {
                 // For external repos (non-root cells), prefix with "external/<cell>"
                 // to match Bazel's execution-time path convention.
                 let cell_name = buck.package().cell_name().as_str();
+                let external_cell_name = canonical_external_cell_name(cell_name);
                 let cell_relative = buck
                     .package()
                     .cell_relative_path()
@@ -394,7 +403,7 @@ impl ArtifactPath<'_> {
                 let path = cell_relative.join_cow(self.projected_path);
 
                 if !kuro_core::cells::is_root_cell_name(cell_name) {
-                    let full_path = format!("external/{}/{}", cell_name, path);
+                    let full_path = format!("external/{}/{}", external_cell_name, path);
                     let full_path_buf = ForwardRelativePathBuf::unchecked_new(full_path);
                     f(&full_path_buf)
                 } else {

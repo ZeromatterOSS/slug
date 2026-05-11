@@ -168,7 +168,9 @@ fn configured_label_methods(builder: &mut MethodsBuilder) {
         if kuro_core::cells::is_root_cell_name(cell) {
             Ok(heap.alloc_str_intern(""))
         } else {
-            Ok(heap.alloc_str_intern(cell))
+            let canonical = kuro_core::cells::canonical_dynamic_extension_cell_name(cell)
+                .unwrap_or_else(|| cell.to_owned());
+            Ok(heap.alloc_str_intern(&canonical))
         }
     }
 
@@ -185,7 +187,9 @@ fn configured_label_methods(builder: &mut MethodsBuilder) {
         if kuro_core::cells::is_root_cell_name(cell) {
             Ok(heap.alloc_str_intern(""))
         } else {
-            Ok(heap.alloc_str_intern(cell))
+            let canonical = kuro_core::cells::canonical_dynamic_extension_cell_name(cell)
+                .unwrap_or_else(|| cell.to_owned());
+            Ok(heap.alloc_str_intern(&canonical))
         }
     }
 

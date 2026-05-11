@@ -242,6 +242,48 @@ pub fn resolve_dynamic_extension_cell_alias(apparent_name: &str) -> Option<Strin
         .and_then(|aliases| aliases.get(apparent_name).cloned())
 }
 
+/// Resolve an apparent or internal extension repo name to the canonical Bazel
+/// repo name used under `external/`.
+pub fn canonical_dynamic_extension_cell_name(name: &str) -> Option<String> {
+    if name.starts_with("crates__") {
+        return Some(format!("rules_rs++crate+{name}"));
+    }
+    if let Some(canonical) = resolve_dynamic_extension_cell_alias(name) {
+        return Some(canonical);
+    }
+    let cells = DYNAMIC_EXTENSION_CELLS.lock().ok()?;
+    if cells.contains_key(name) {
+        return Some(name.to_owned());
+    }
+    let suffix = format!("+{name}");
+    if let Some(canonical) = cells
+        .keys()
+        .filter(|canonical| canonical.ends_with(&suffix))
+        .min()
+        .cloned()
+    {
+        return Some(canonical);
+    }
+
+    let bazel_ext_dir = DYNAMIC_PROJECT_ROOT
+        .get()
+        .map(|root| root.join("bazel-external"))
+        .unwrap_or_else(|| std::path::PathBuf::from("bazel-external"));
+    let mut candidates = Vec::new();
+    for entry in std::fs::read_dir(bazel_ext_dir).ok()?.flatten() {
+        if !entry.path().is_dir() {
+            continue;
+        }
+        let dir_name = entry.file_name();
+        let dir_name = dir_name.to_string_lossy();
+        if dir_name.ends_with(&suffix) {
+            candidates.push(dir_name.into_owned());
+        }
+    }
+    candidates.sort();
+    candidates.into_iter().next()
+}
+
 /// Plan 36: register a dynamic extension spoke cell with its
 /// `ExtensionRepoCellSetup` so that `get_or_create_dynamic_cell`
 /// wires `ExternalCellOrigin::ExtensionRepo` onto the synthesized

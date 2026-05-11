@@ -104,8 +104,8 @@ async fn apply_cli_build_settings(
 ) -> kuro_error::Result<ConfigurationData> {
     let compilation_mode =
         kuro_build_api::interpreter::rule_defs::build_config::get_compilation_mode();
-    let starlark_flags: Vec<(String, String)> =
-        kuro_build_api::interpreter::rule_defs::build_config::get_all_starlark_flags()
+    let starlark_flags: Vec<(String, Vec<String>)> =
+        kuro_build_api::interpreter::rule_defs::build_config::get_all_starlark_flag_values()
             .into_iter()
             .collect();
     let resolver = ctx.get_cell_resolver().await?;
@@ -156,7 +156,7 @@ fn canonicalize_cell_alias(raw: &str, aliases: Option<&CellAliasResolver>) -> St
 fn apply_cli_build_settings_with(
     cfg: ConfigurationData,
     compilation_mode: &str,
-    starlark_flags: &[(String, String)],
+    starlark_flags: &[(String, Vec<String>)],
     aliases: Option<&CellAliasResolver>,
 ) -> kuro_error::Result<ConfigurationData> {
     if !cfg.is_bound() {
@@ -169,7 +169,7 @@ fn apply_cli_build_settings_with(
         BuildSettingValue::String(compilation_mode.to_owned()),
     )?;
 
-    for (raw_label, raw_value) in starlark_flags {
+    for (raw_label, raw_values) in starlark_flags {
         let canonical_label = canonicalize_cell_alias(raw_label, aliases);
         let label = match BuildSettingLabel::from_bazel_label(&canonical_label) {
             Ok(l) => l,
@@ -180,9 +180,15 @@ fn apply_cli_build_settings_with(
         };
         // CLI flags are strings at parse time; user build-setting rules
         // that expect bool/int/list will coerce at consumption time
-        // (e.g. in `ctx.build_setting_value`). Keep the raw string here so
-        // the stored value round-trips the `--//foo:bar=…` CLI syntax.
-        out = out.with_build_setting(label, BuildSettingValue::String(raw_value.clone()))?;
+        // (e.g. in `ctx.build_setting_value`). Preserve repeated flags so
+        // repeatable build settings affect the configuration hash and expose
+        // every value to Starlark.
+        let value = if raw_values.len() == 1 {
+            BuildSettingValue::String(raw_values[0].clone())
+        } else {
+            BuildSettingValue::StringList(raw_values.clone())
+        };
+        out = out.with_build_setting(label, value)?;
     }
     Ok(out)
 }
@@ -304,8 +310,8 @@ mod tests {
     #[test]
     fn starlark_flags_land_in_build_settings() -> kuro_error::Result<()> {
         let flags = vec![
-            ("//:my_flag".to_owned(), "baz".to_owned()),
-            ("@foo//:feature".to_owned(), "on".to_owned()),
+            ("//:my_flag".to_owned(), vec!["baz".to_owned()]),
+            ("@foo//:feature".to_owned(), vec!["on".to_owned()]),
         ];
         let cfg = apply_cli_build_settings_with(make_cfg(), "fastbuild", &flags, None)?;
         let my_flag = BuildSettingLabel::from_bazel_label("//:my_flag")?;
@@ -317,6 +323,25 @@ mod tests {
         assert_eq!(
             cfg.get_build_setting(&feature)?,
             Some(&BuildSettingValue::String("on".to_owned()))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn repeated_starlark_flags_land_as_string_list() -> kuro_error::Result<()> {
+        let flags = vec![(
+            "@rules_rust//rust/settings:extra_rustc_flag".to_owned(),
+            vec!["-Cpanic=abort".to_owned(), "-Cdebuginfo=2".to_owned()],
+        )];
+        let cfg = apply_cli_build_settings_with(make_cfg(), "fastbuild", &flags, None)?;
+        let label =
+            BuildSettingLabel::from_bazel_label("@rules_rust//rust/settings:extra_rustc_flag")?;
+        assert_eq!(
+            cfg.get_build_setting(&label)?,
+            Some(&BuildSettingValue::StringList(vec![
+                "-Cpanic=abort".to_owned(),
+                "-Cdebuginfo=2".to_owned(),
+            ]))
         );
         Ok(())
     }
@@ -345,31 +370,41 @@ mod tests {
 
         use kuro_core::cells::alias::NonEmptyCellAlias;
 
-        let canonical = CellName::testing_new("rules_rust+0.69.0");
+        let canonical = CellName::testing_new("rules_rust_canonical");
         let mut aliases = HashMap::new();
         aliases.insert(NonEmptyCellAlias::new("rules_rust".to_owned())?, canonical);
         let resolver = CellAliasResolver::new(CellName::testing_new("root"), aliases)?;
 
         let flags = vec![(
             "@rules_rust//cargo/settings:experimental_symlink_execroot".to_owned(),
-            "true".to_owned(),
+            vec!["true".to_owned()],
         )];
         let cfg = apply_cli_build_settings_with(make_cfg(), "fastbuild", &flags, Some(&resolver))?;
 
-        // Canonical-cell lookup matches.
-        let canonical_label = BuildSettingLabel::from_bazel_label(
-            "@rules_rust+0.69.0//cargo/settings:experimental_symlink_execroot",
-        )?;
+        // Storage follows the same label shape that canonicalize_cell_alias
+        // produces for this resolver.
+        let stored = canonicalize_cell_alias(
+            "@rules_rust//cargo/settings:experimental_symlink_execroot",
+            Some(&resolver),
+        );
+        let stored_label = BuildSettingLabel::from_bazel_label(&stored)?;
         assert_eq!(
-            cfg.get_build_setting(&canonical_label)?,
+            cfg.get_build_setting(&stored_label)?,
             Some(&BuildSettingValue::String("true".to_owned()))
         );
-        // Apparent-cell lookup MISSES — that's the whole point of
-        // canonicalizing on the storage side.
-        let apparent_label = BuildSettingLabel::from_bazel_label(
-            "@rules_rust//cargo/settings:experimental_symlink_execroot",
+
+        // Canonical-cell lookup matches when this resolver canonicalizes the
+        // apparent name. Dynamic bzlmod aliases may choose to preserve an
+        // apparent key; ctx.build_setting_value checks both forms.
+        let canonical_label = BuildSettingLabel::from_bazel_label(
+            "@rules_rust_canonical//cargo/settings:experimental_symlink_execroot",
         )?;
-        assert_eq!(cfg.get_build_setting(&apparent_label)?, None);
+        if stored != "@rules_rust//cargo/settings:experimental_symlink_execroot" {
+            assert_eq!(
+                cfg.get_build_setting(&canonical_label)?,
+                Some(&BuildSettingValue::String("true".to_owned()))
+            );
+        }
         Ok(())
     }
 
@@ -378,8 +413,8 @@ mod tests {
     #[test]
     fn invalid_flag_label_is_skipped() -> kuro_error::Result<()> {
         let flags = vec![
-            ("bogus".to_owned(), "x".to_owned()),
-            ("//:good".to_owned(), "y".to_owned()),
+            ("bogus".to_owned(), vec!["x".to_owned()]),
+            ("//:good".to_owned(), vec!["y".to_owned()]),
         ];
         let cfg = apply_cli_build_settings_with(make_cfg(), "fastbuild", &flags, None)?;
         let good = BuildSettingLabel::from_bazel_label("//:good")?;

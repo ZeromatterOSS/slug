@@ -68,9 +68,10 @@ struct BuildConfig {
     /// --experimental_cc_implementation_deps flag.
     experimental_cc_implementation_deps: bool,
     /// Starlark build flags from --//pkg:target=value on the command line.
-    /// Keys are fully-qualified target labels (e.g., "//pkg:my_bool_flag"),
-    /// values are the string representation of the flag value.
-    starlark_flags: Option<HashMap<String, String>>,
+    /// Keys are fully-qualified target labels (e.g., "//pkg:my_bool_flag").
+    /// Values preserve repeated flags in command-line order; Bazel's repeatable
+    /// build settings expose all values, while scalar settings use the last one.
+    starlark_flags: Option<HashMap<String, Vec<String>>>,
 }
 
 /// Set the compilation mode for the current build.
@@ -365,7 +366,7 @@ pub fn get_experimental_cc_implementation_deps() -> bool {
 /// Each entry should be in "//pkg:target=value" format (with or without leading --).
 pub fn set_starlark_flags(flags: &[String]) {
     if let Ok(mut config) = BUILD_CONFIG.write() {
-        let mut map = HashMap::new();
+        let mut map: HashMap<String, Vec<String>> = HashMap::new();
         for entry in flags {
             // Strip leading -- if present
             let entry = entry.strip_prefix("--").unwrap_or(entry);
@@ -376,7 +377,7 @@ pub fn set_starlark_flags(flags: &[String]) {
                 } else {
                     format!("//{}", label)
                 };
-                map.insert(label, value.to_owned());
+                map.entry(label).or_default().push(value.to_owned());
             }
         }
         config.starlark_flags = if map.is_empty() { None } else { Some(map) };
@@ -392,13 +393,23 @@ pub fn set_starlark_flag(label: &str, value: &str) {
         } else {
             format!("//{}", label)
         };
-        flags.insert(label, value.to_owned());
+        flags.insert(label, vec![value.to_owned()]);
     }
 }
 
 /// Get the value of a Starlark build flag, or None if not set.
-/// The label should be in "//pkg:target" format.
+/// The label should be in "//pkg:target" format. For repeated flags, returns
+/// the last value, matching Bazel scalar build-setting semantics.
 pub fn get_starlark_flag(label: &str) -> Option<String> {
+    BUILD_CONFIG.read().ok().and_then(|c| {
+        c.starlark_flags
+            .as_ref()
+            .and_then(|f| f.get(label).and_then(|values| values.last().cloned()))
+    })
+}
+
+/// Get all values for a repeated Starlark build flag, or None if not set.
+pub fn get_starlark_flag_values(label: &str) -> Option<Vec<String>> {
     BUILD_CONFIG.read().ok().and_then(|c| {
         c.starlark_flags
             .as_ref()
@@ -406,8 +417,27 @@ pub fn get_starlark_flag(label: &str) -> Option<String> {
     })
 }
 
-/// Get all Starlark build flags as a map.
+/// Get all Starlark build flags as a scalar map, using the last value for
+/// repeated flags.
 pub fn get_all_starlark_flags() -> HashMap<String, String> {
+    BUILD_CONFIG
+        .read()
+        .ok()
+        .and_then(|c| {
+            c.starlark_flags.as_ref().map(|flags| {
+                flags
+                    .iter()
+                    .filter_map(|(label, values)| {
+                        values.last().map(|value| (label.clone(), value.clone()))
+                    })
+                    .collect()
+            })
+        })
+        .unwrap_or_default()
+}
+
+/// Get all Starlark build flags with repeated values preserved.
+pub fn get_all_starlark_flag_values() -> HashMap<String, Vec<String>> {
     BUILD_CONFIG
         .read()
         .ok()

@@ -9,7 +9,6 @@
  */
 
 use allocative::Allocative;
-use dupe::Dupe;
 
 use crate::cells::CellResolver;
 use crate::cells::cell_path::CellPathRef;
@@ -76,7 +75,8 @@ impl ArtifactFs {
     ) -> kuro_error::Result<ProjectRelativePathBuf> {
         let cell_resolver = self.cell_resolver();
         let cell_name = source_artifact_path.package().cell_name();
-        if cell_resolver.get(cell_name)?.external().is_some() {
+        let cell = cell_resolver.get(cell_name)?;
+        if cell.external().is_some() {
             // Bazel convention: source files in non-root cells live at
             // `external/<cell>/<rel>` in the action sandbox. rules_cc's
             // `init_cc_compilation_context` emits `-Iexternal/<cell>/include`
@@ -96,9 +96,42 @@ impl ArtifactFs {
             // because the worker only has whatever path we uploaded.
             // Switch to the `external/<cell>/<rel>` form everywhere
             // (matching `ArtifactPath::with_path`).
+            let external_cell_name =
+                crate::cells::canonical_dynamic_extension_cell_name(cell_name.as_str())
+                    .or_else(|| {
+                        cell.path()
+                            .as_project_relative_path()
+                            .as_str()
+                            .strip_prefix("bazel-external/")
+                            .and_then(|path| path.split('/').next())
+                            .filter(|name| name.contains('+'))
+                            .map(str::to_owned)
+                    })
+                    .or_else(|| {
+                        let suffix = format!("+{}", cell_name.as_str());
+                        let bazel_external = self
+                            .project_filesystem
+                            .root()
+                            .as_path()
+                            .join("bazel-external");
+                        let mut candidates = Vec::new();
+                        for entry in std::fs::read_dir(bazel_external).ok()?.flatten() {
+                            if !entry.path().is_dir() {
+                                continue;
+                            }
+                            let dir_name = entry.file_name();
+                            let dir_name = dir_name.to_string_lossy();
+                            if dir_name.ends_with(&suffix) {
+                                candidates.push(dir_name.into_owned());
+                            }
+                        }
+                        candidates.sort();
+                        candidates.into_iter().next()
+                    })
+                    .unwrap_or_else(|| cell_name.as_str().to_owned());
             let cell_path = source_artifact_path.to_cell_path();
             let rel = cell_path.path().as_str();
-            let combined = format!("external/{}/{}", cell_name.as_str(), rel);
+            let combined = format!("external/{external_cell_name}/{rel}");
             Ok(ProjectRelativePathBuf::unchecked_new(combined))
         } else {
             Ok(cell_resolver

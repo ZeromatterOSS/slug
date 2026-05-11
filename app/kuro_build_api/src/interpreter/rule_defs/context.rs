@@ -75,6 +75,7 @@ use crate::interpreter::rule_defs::artifact::methods::ArtifactRoot;
 use crate::interpreter::rule_defs::bazel_label::BazelLabel;
 use crate::interpreter::rule_defs::cc_common::CcToolchainFeatures;
 use crate::interpreter::rule_defs::cc_common::CcToolchainInfoProvider;
+use crate::interpreter::rule_defs::cc_common::CcToolchainVariablesGen;
 use crate::interpreter::rule_defs::depset::Depset;
 use crate::interpreter::rule_defs::fragments::ConfigurationFragments;
 use crate::interpreter::rule_defs::fragments::CppFragment;
@@ -549,7 +550,9 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             if kuro_core::cells::is_root_cell_name(cell) {
                 Ok(heap.alloc_str("").to_value())
             } else {
-                Ok(heap.alloc_str(cell).to_value())
+                let canonical = kuro_core::cells::canonical_dynamic_extension_cell_name(cell)
+                    .unwrap_or_else(|| cell.to_owned());
+                Ok(heap.alloc_str(&canonical).to_value())
             }
         } else {
             Ok(heap.alloc_str("").to_value())
@@ -844,11 +847,13 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
         if let Some(label) = this.0.label {
             let cell_name = label.label().target().pkg().cell_name().as_str();
             // In Bazel with bzlmod, the root module is known as "_main".
-            // External modules use their apparent name (cell name).
+            // Extension repos use their canonical repo name.
             if kuro_core::cells::is_root_cell_name(cell_name) {
                 Ok(heap.alloc_str("_main").to_value())
             } else {
-                Ok(heap.alloc_str(cell_name).to_value())
+                let canonical = kuro_core::cells::canonical_dynamic_extension_cell_name(cell_name)
+                    .unwrap_or_else(|| cell_name.to_owned());
+                Ok(heap.alloc_str(&canonical).to_value())
             }
         } else {
             Ok(heap.alloc_str("").to_value())
@@ -981,6 +986,16 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
             } else {
                 format!("@{}//{}:{}", cell, pkg_path, target_name)
             };
+            let apparent_cell = normalize_bzlmod_module_repo_name(cell);
+            let apparent_cell_qualified = if apparent_cell != cell {
+                Some(if pkg_path.is_empty() {
+                    format!("@{}//:{}", apparent_cell, target_name)
+                } else {
+                    format!("@{}//{}:{}", apparent_cell, pkg_path, target_name)
+                })
+            } else {
+                None
+            };
             let cell_relative = if pkg_path.is_empty() {
                 format!("//:{}", target_name)
             } else {
@@ -995,6 +1010,12 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
                 .ok()
                 .and_then(|l| cfg.get_build_setting(&l).ok().flatten())
                 .or_else(|| {
+                    apparent_cell_qualified
+                        .as_deref()
+                        .and_then(|label| BuildSettingLabel::from_bazel_label(label).ok())
+                        .and_then(|l| cfg.get_build_setting(&l).ok().flatten())
+                })
+                .or_else(|| {
                     BuildSettingLabel::from_bazel_label(&cell_relative)
                         .ok()
                         .and_then(|l| cfg.get_build_setting(&l).ok().flatten())
@@ -1003,19 +1024,35 @@ fn analysis_context_methods(builder: &mut MethodsBuilder) {
 
             // Fallback: the process-global starlark_flags store, used by
             // any path that wrote there (e.g. transition mirror-writes).
+            let flag_label_candidates = || {
+                std::iter::once(cell_qualified.as_str())
+                    .chain(apparent_cell_qualified.as_deref())
+                    .chain(std::iter::once(cell_relative.as_str()))
+            };
+            let cli_value_to_starlark = |cli_value: &str| match cli_value {
+                "True" | "true" | "1" => heap.alloc(true).to_value(),
+                "False" | "false" | "0" => heap.alloc(false).to_value(),
+                s => heap.alloc_str(s).to_value(),
+            };
             let final_value = cfg_value.or_else(|| {
-                let cli_value =
-                    crate::interpreter::rule_defs::build_config::get_starlark_flag(&cell_qualified)
-                        .or_else(|| {
-                            crate::interpreter::rule_defs::build_config::get_starlark_flag(
-                                &cell_relative,
-                            )
-                        });
-                cli_value.map(|cli_value| match cli_value.as_str() {
-                    "True" | "true" | "1" => heap.alloc(true).to_value(),
-                    "False" | "false" | "0" => heap.alloc(false).to_value(),
-                    s => heap.alloc_str(s).to_value(),
-                })
+                if allows_multiple {
+                    use starlark::values::list::AllocList;
+                    flag_label_candidates()
+                        .find_map(
+                            crate::interpreter::rule_defs::build_config::get_starlark_flag_values,
+                        )
+                        .map(|values| {
+                            let values = values
+                                .iter()
+                                .map(|value| cli_value_to_starlark(value))
+                                .collect::<Vec<_>>();
+                            heap.alloc(AllocList(values)).to_value()
+                        })
+                } else {
+                    flag_label_candidates()
+                        .find_map(crate::interpreter::rule_defs::build_config::get_starlark_flag)
+                        .map(|cli_value| cli_value_to_starlark(&cli_value))
+                }
             });
 
             if let Some(value) = final_value {
@@ -1926,6 +1963,72 @@ struct CcToolchainInfoNativeShim {
     target_platform: String,
 }
 
+const CC_TOOLCHAIN_NATIVE_SHIM_ATTRS: &[&str] = &[
+    "compiler",
+    "compiler_executable",
+    "preprocessor_executable",
+    "nm_executable",
+    "objdump_executable",
+    "ar_executable",
+    "strip_executable",
+    "ld_executable",
+    "gcov_executable",
+    "objcopy_executable",
+    "generate_modmap",
+    "cpu",
+    "libc",
+    "target_gnu_system_name",
+    "toolchain_id",
+    "dynamic_runtime_solib_dir",
+    "built_in_include_directories",
+    "all_files",
+    "sysroot",
+    "_as_files",
+    "_ar_files",
+    "_strip_files",
+    "_tool_paths",
+    "_solib_dir",
+    "_linker_files",
+    "_coverage_files",
+    "_fdo_context",
+    "_compiler_files",
+    "_dwp_files",
+    "_builtin_include_files",
+    "_legacy_cc_flags_make_variable",
+    "_additional_make_variables",
+    "_all_files_including_libc",
+    "_abi",
+    "_abi_glibc_version",
+    "_crosstool_top_path",
+    "_build_info_files",
+    "_build_variables_dict",
+    "_build_variables",
+    "_supports_header_parsing",
+    "_supports_param_files",
+    "_toolchain_features",
+    "_toolchain_label",
+    "_cpp_configuration",
+    "_link_dynamic_library_tool",
+    "_grep_includes",
+    "_if_so_builder",
+    "_is_tool_configuration",
+    "_is_sibling_repository_layout",
+    "_stamp_binaries",
+    "_static_runtime_lib_depset",
+    "_dynamic_runtime_lib_depset",
+    "_compiler_files_without_includes",
+    "_allowlist_for_layering_check",
+    "_cc_info",
+    "_objcopy_files",
+    "_aggregate_ddi",
+    "_extra_allowlisted_feature_layering_check_macros",
+    "_force_layering_check_features",
+];
+
+fn cc_toolchain_native_shim_has_attr(attribute: &str) -> bool {
+    CC_TOOLCHAIN_NATIVE_SHIM_ATTRS.contains(&attribute)
+}
+
 /// Adds target-platform identity to real `CcToolchainInfo` values when Kuro has
 /// resolved the toolchain but the provider's rule-based metadata is incomplete.
 ///
@@ -1953,10 +2056,78 @@ impl std::fmt::Display for CcToolchainInfoTargetPlatformOverlay {
 
 starlark::starlark_simple_value!(CcToolchainInfoTargetPlatformOverlay);
 
+#[starlark::starlark_module]
+fn cc_toolchain_target_platform_overlay_methods(builder: &mut MethodsBuilder) {
+    fn needs_pic_for_dynamic_libraries<'v>(
+        #[starlark(this)] this: &CcToolchainInfoTargetPlatformOverlay,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<bool> {
+        let heap = eval.heap();
+        if let Ok(Some(method)) = this
+            .inner
+            .to_value()
+            .get_attr("needs_pic_for_dynamic_libraries", heap)
+        {
+            if let Ok(result) = eval.eval_function(
+                method,
+                &[],
+                &[("feature_configuration", feature_configuration)],
+            ) {
+                if let Some(value) = result.unpack_bool() {
+                    return Ok(value);
+                }
+            }
+        }
+        Ok(true)
+    }
+
+    fn static_runtime_lib<'v>(
+        #[starlark(this)] this: &CcToolchainInfoTargetPlatformOverlay,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
+        if let Ok(Some(method)) = this.inner.to_value().get_attr("static_runtime_lib", heap) {
+            if let Ok(result) = eval.eval_function(
+                method,
+                &[],
+                &[("feature_configuration", feature_configuration)],
+            ) {
+                return Ok(result);
+            }
+        }
+        Ok(heap.alloc(Depset::empty()))
+    }
+
+    fn dynamic_runtime_lib<'v>(
+        #[starlark(this)] this: &CcToolchainInfoTargetPlatformOverlay,
+        #[starlark(require = named)] feature_configuration: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> starlark::Result<Value<'v>> {
+        let heap = eval.heap();
+        if let Ok(Some(method)) = this.inner.to_value().get_attr("dynamic_runtime_lib", heap) {
+            if let Ok(result) = eval.eval_function(
+                method,
+                &[],
+                &[("feature_configuration", feature_configuration)],
+            ) {
+                return Ok(result);
+            }
+        }
+        Ok(heap.alloc(Depset::empty()))
+    }
+}
+
 #[starlark::values::starlark_value(type = "CcToolchainInfo")]
 impl<'v> StarlarkValue<'v> for CcToolchainInfoTargetPlatformOverlay {
+    fn to_bool(&self) -> bool {
+        true
+    }
+
     fn has_attr(&self, attribute: &str, heap: Heap<'v>) -> bool {
         matches!(attribute, "target_gnu_system_name" | "libc")
+            || cc_toolchain_native_shim_has_attr(attribute)
             || self.inner.to_value().has_attr(attribute, heap)
     }
 
@@ -1975,16 +2146,28 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoTargetPlatformOverlay {
             .get_attr(attribute, heap)
             .ok()
             .flatten()
+            .or_else(|| {
+                let shim = CcToolchainInfoNativeShim {
+                    toolchain_label: "@bazel_tools//tools/cpp:current_cc_toolchain".to_owned(),
+                    target_platform: self.target_platform.clone(),
+                };
+                shim.get_attr(attribute, heap)
+            })
     }
 
     fn dir_attr(&self) -> Vec<String> {
         let mut attrs = self.inner.to_value().dir_attr();
-        for attr in ["target_gnu_system_name", "libc"] {
+        for attr in CC_TOOLCHAIN_NATIVE_SHIM_ATTRS.iter().copied() {
             if !attrs.iter().any(|existing| existing == attr) {
                 attrs.push(attr.to_owned());
             }
         }
         attrs
+    }
+
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(cc_toolchain_target_platform_overlay_methods)
     }
 
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
@@ -2053,6 +2236,26 @@ impl CcToolchainInfoNativeShim {
     fn target_libc(&self) -> &'static str {
         if self.is_musl_target() { "musl" } else { "gnu" }
     }
+
+    fn build_variables<'v>(&self, heap: Heap<'v>) -> Value<'v> {
+        let vars = heap.alloc(Dict::new(SmallMap::from_iter([
+            (
+                heap.alloc_str("target_system_name")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
+                heap.alloc_str(self.target_system_name()).to_value(),
+            ),
+            (
+                heap.alloc_str("target_libc")
+                    .to_value()
+                    .get_hashed()
+                    .unwrap(),
+                heap.alloc_str(self.target_libc()).to_value(),
+            ),
+        ])));
+        heap.alloc(CcToolchainVariablesGen { vars })
+    }
 }
 
 #[starlark::starlark_module]
@@ -2086,69 +2289,12 @@ fn cc_toolchain_native_shim_methods(builder: &mut MethodsBuilder) {
 
 #[starlark::values::starlark_value(type = "CcToolchainInfo")]
 impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
+    fn to_bool(&self) -> bool {
+        true
+    }
+
     fn has_attr(&self, attribute: &str, _heap: Heap<'v>) -> bool {
-        matches!(
-            attribute,
-            "compiler"
-                | "compiler_executable"
-                | "preprocessor_executable"
-                | "nm_executable"
-                | "objdump_executable"
-                | "ar_executable"
-                | "strip_executable"
-                | "ld_executable"
-                | "gcov_executable"
-                | "objcopy_executable"
-                | "generate_modmap"
-                | "cpu"
-                | "libc"
-                | "target_gnu_system_name"
-                | "toolchain_id"
-                | "dynamic_runtime_solib_dir"
-                | "built_in_include_directories"
-                | "all_files"
-                | "sysroot"
-                | "_as_files"
-                | "_ar_files"
-                | "_strip_files"
-                | "_tool_paths"
-                | "_solib_dir"
-                | "_linker_files"
-                | "_coverage_files"
-                | "_fdo_context"
-                | "_compiler_files"
-                | "_dwp_files"
-                | "_builtin_include_files"
-                | "_legacy_cc_flags_make_variable"
-                | "_additional_make_variables"
-                | "_all_files_including_libc"
-                | "_abi"
-                | "_abi_glibc_version"
-                | "_crosstool_top_path"
-                | "_build_info_files"
-                | "_build_variables_dict"
-                | "_build_variables"
-                | "_supports_header_parsing"
-                | "_supports_param_files"
-                | "_toolchain_features"
-                | "_toolchain_label"
-                | "_cpp_configuration"
-                | "_link_dynamic_library_tool"
-                | "_grep_includes"
-                | "_if_so_builder"
-                | "_is_tool_configuration"
-                | "_is_sibling_repository_layout"
-                | "_stamp_binaries"
-                | "_static_runtime_lib_depset"
-                | "_dynamic_runtime_lib_depset"
-                | "_compiler_files_without_includes"
-                | "_allowlist_for_layering_check"
-                | "_cc_info"
-                | "_objcopy_files"
-                | "_aggregate_ddi"
-                | "_extra_allowlisted_feature_layering_check_macros"
-                | "_force_layering_check_features"
-        )
+        cc_toolchain_native_shim_has_attr(attribute)
     }
 
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
@@ -2219,7 +2365,7 @@ impl<'v> StarlarkValue<'v> for CcToolchainInfoNativeShim {
             | "_abi"
             | "_abi_glibc_version"
             | "_crosstool_top_path" => Some(empty_string()),
-            "_build_variables" => Some(empty_depset()),
+            "_build_variables" => Some(self.build_variables(heap)),
             "_supports_header_parsing" | "_supports_param_files" => Some(Value::new_bool(true)),
             "_toolchain_features" => Some(heap.alloc(CcToolchainFeatures::empty())),
             "_toolchain_label" => Some(heap.alloc_str(&self.toolchain_label).to_value()),
