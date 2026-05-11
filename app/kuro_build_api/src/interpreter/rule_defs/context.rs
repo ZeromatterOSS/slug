@@ -1514,8 +1514,14 @@ pub fn bin_dir_path_from_label(
     if let Some(label) = label {
         let target = label.label().target();
         let cell_name = target.pkg().cell_name().as_str();
+        let output_cell_name = if kuro_core::cells::is_root_cell_name(cell_name) {
+            cell_name.to_owned()
+        } else {
+            kuro_core::cells::canonical_dynamic_extension_cell_name(cell_name)
+                .unwrap_or_else(|| cell_name.to_owned())
+        };
         let cfg_hash = label.label().cfg().output_hash().as_str();
-        format!("{}/gen/{}/{}", buck_out_root, cell_name, cfg_hash)
+        format!("{}/gen/{}/{}", buck_out_root, output_cell_name, cfg_hash)
     } else {
         format!("{}/gen", buck_out_root)
     }
@@ -1550,7 +1556,9 @@ pub fn workspace_root_from_label(
     if kuro_core::cells::is_root_cell_name(cell_name) {
         String::new()
     } else {
-        format!("external/{}", cell_name)
+        let output_cell_name = kuro_core::cells::canonical_dynamic_extension_cell_name(cell_name)
+            .unwrap_or_else(|| cell_name.to_owned());
+        format!("external/{}", output_cell_name)
     }
 }
 

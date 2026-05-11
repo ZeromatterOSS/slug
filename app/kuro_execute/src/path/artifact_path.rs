@@ -68,6 +68,12 @@ fn canonical_external_cell_name(cell_name: &str) -> String {
         .unwrap_or_else(|| cell_name.to_owned())
 }
 
+fn has_bazel_external_prefix(path: &ForwardRelativePath, cell_name: &str) -> bool {
+    path.as_str()
+        .strip_prefix("external/")
+        .is_some_and(|rest| rest == cell_name || rest.starts_with(&format!("{cell_name}/")))
+}
+
 impl ArtifactPath<'_> {
     pub fn with_filename<F, T>(&self, f: F) -> kuro_error::Result<T>
     where
@@ -158,6 +164,7 @@ impl ArtifactPath<'_> {
                 match cfg_label {
                     Some(label) => {
                         let cell_name = label.pkg().cell_name();
+                        let external_cell_name = canonical_external_cell_name(cell_name.as_str());
                         let pkg_rel = label.pkg().cell_relative_path().as_str();
                         let rule_local_str = rule_local.as_str();
                         let prefixed = match (
@@ -168,15 +175,15 @@ impl ArtifactPath<'_> {
                             (true, true, _) => rule_local_str.to_owned(),
                             (true, false, true) => pkg_rel.to_owned(),
                             (true, false, false) => format!("{}/{}", pkg_rel, rule_local_str),
-                            (false, true, true) => format!("../{}", cell_name.as_str()),
+                            (false, true, true) => format!("../{}", external_cell_name),
                             (false, true, false) => {
-                                format!("../{}/{}", cell_name.as_str(), rule_local_str)
+                                format!("../{}/{}", external_cell_name, rule_local_str)
                             }
                             (false, false, true) => {
-                                format!("../{}/{}", cell_name.as_str(), pkg_rel)
+                                format!("../{}/{}", external_cell_name, pkg_rel)
                             }
                             (false, false, false) => {
-                                format!("../{}/{}/{}", cell_name.as_str(), pkg_rel, rule_local_str)
+                                format!("../{}/{}/{}", external_cell_name, pkg_rel, rule_local_str)
                             }
                         };
                         let buf = ForwardRelativePathBuf::unchecked_new(prefixed);
@@ -297,6 +304,7 @@ impl ArtifactPath<'_> {
                     let buck_out_root = buck_out_root.as_str();
                     let cfg_hash = target.cfg().output_hash().as_str();
                     let cell_name = target.pkg().cell_name().as_str();
+                    let external_cell_name = canonical_external_cell_name(cell_name);
                     let cell_relative_path = target.pkg().cell_relative_path().as_str();
                     let target_name = target.name().as_str();
                     let artifact_path = buck_out.path();
@@ -318,7 +326,7 @@ impl ArtifactPath<'_> {
                         let joined = artifact_path.join(self.projected_path);
                         format!(
                             "{}/gen/{}/{}/{}",
-                            buck_out_root, cell_name, cfg_hash, joined
+                            buck_out_root, external_cell_name, cfg_hash, joined
                         )
                     } else if matches!(
                         resolution,
@@ -326,35 +334,52 @@ impl ArtifactPath<'_> {
                     ) {
                         let joined = artifact_path.join(self.projected_path);
                         let is_root = kuro_core::cells::is_root_cell_name(cell_name);
-                        match (is_root, cell_relative_path.is_empty()) {
-                            (true, true) => {
-                                format!(
-                                    "{}/gen/{}/{}/{}",
-                                    buck_out_root, cell_name, cfg_hash, joined
-                                )
-                            }
-                            (true, false) => {
-                                format!(
-                                    "{}/gen/{}/{}/{}/{}",
-                                    buck_out_root, cell_name, cfg_hash, cell_relative_path, joined
-                                )
-                            }
-                            (false, true) => {
-                                format!(
-                                    "{}/gen/{}/{}/external/{}/{}",
-                                    buck_out_root, cell_name, cfg_hash, cell_name, joined
-                                )
-                            }
-                            (false, false) => {
-                                format!(
-                                    "{}/gen/{}/{}/external/{}/{}/{}",
-                                    buck_out_root,
-                                    cell_name,
-                                    cfg_hash,
-                                    cell_name,
-                                    cell_relative_path,
-                                    joined
-                                )
+                        let has_external_prefix =
+                            has_bazel_external_prefix(&joined, &external_cell_name);
+                        if has_external_prefix {
+                            format!(
+                                "{}/gen/{}/{}/{}",
+                                buck_out_root, external_cell_name, cfg_hash, joined
+                            )
+                        } else {
+                            match (is_root, cell_relative_path.is_empty()) {
+                                (true, true) => {
+                                    format!(
+                                        "{}/gen/{}/{}/{}",
+                                        buck_out_root, external_cell_name, cfg_hash, joined
+                                    )
+                                }
+                                (true, false) => {
+                                    format!(
+                                        "{}/gen/{}/{}/{}/{}",
+                                        buck_out_root,
+                                        external_cell_name,
+                                        cfg_hash,
+                                        cell_relative_path,
+                                        joined
+                                    )
+                                }
+                                (false, true) => {
+                                    format!(
+                                        "{}/gen/{}/{}/external/{}/{}",
+                                        buck_out_root,
+                                        external_cell_name,
+                                        cfg_hash,
+                                        external_cell_name,
+                                        joined
+                                    )
+                                }
+                                (false, false) => {
+                                    format!(
+                                        "{}/gen/{}/{}/external/{}/{}/{}",
+                                        buck_out_root,
+                                        external_cell_name,
+                                        cfg_hash,
+                                        external_cell_name,
+                                        cell_relative_path,
+                                        joined
+                                    )
+                                }
                             }
                         }
                     } else if cell_relative_path.is_empty() {
@@ -362,7 +387,7 @@ impl ArtifactPath<'_> {
                         format!(
                             "{}/gen/{}/{}/__{}__/{}",
                             buck_out_root,
-                            cell_name,
+                            external_cell_name,
                             cfg_hash,
                             escaped_target_name,
                             artifact_path.join(self.projected_path)
@@ -371,7 +396,7 @@ impl ArtifactPath<'_> {
                         format!(
                             "{}/gen/{}/{}/{}/__{}__/{}",
                             buck_out_root,
-                            cell_name,
+                            external_cell_name,
                             cfg_hash,
                             cell_relative_path,
                             escaped_target_name,
@@ -437,13 +462,14 @@ impl ArtifactPath<'_> {
                     let buck_out_root = buck_out_root.as_str();
                     let cfg_hash = target.cfg().output_hash().as_str();
                     let cell_name = target.pkg().cell_name().as_str();
+                    let external_cell_name = canonical_external_cell_name(cell_name);
                     let is_root = kuro_core::cells::is_root_cell_name(cell_name);
                     let root_path = if is_root {
-                        format!("{}/gen/{}/{}", buck_out_root, cell_name, cfg_hash)
+                        format!("{}/gen/{}/{}", buck_out_root, external_cell_name, cfg_hash)
                     } else {
                         format!(
                             "{}/gen/{}/{}/external/{}",
-                            buck_out_root, cell_name, cfg_hash, cell_name
+                            buck_out_root, external_cell_name, cfg_hash, external_cell_name
                         )
                     };
                     let root_path_buf = ForwardRelativePathBuf::unchecked_new(root_path);
