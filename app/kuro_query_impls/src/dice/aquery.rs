@@ -173,6 +173,7 @@ async fn convert_inputs<'c, 'a, Iter: IntoIterator<Item = &'a ArtifactGroup>>(
             ResolvedArtifactGroup::Depset(depset) => {
                 stack.extend(depset_to_artifact_group_inputs(depset.depset.to_value())?);
             }
+            ResolvedArtifactGroup::TargetDefaultOutputs(_) => {}
         }
     }
 

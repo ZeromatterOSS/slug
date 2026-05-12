@@ -97,6 +97,7 @@ pub(crate) async fn visit_artifact_path_without_associated_deduped(
             ResolvedArtifactGroup::Depset(depset) => {
                 todo.extend(depset_to_artifact_group_inputs(depset.depset.to_value())?);
             }
+            ResolvedArtifactGroup::TargetDefaultOutputs(_) => {}
         }
     }
 

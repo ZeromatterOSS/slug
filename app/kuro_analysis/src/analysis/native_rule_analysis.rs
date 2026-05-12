@@ -86,6 +86,10 @@ pub struct DeclaredToolchainInfo {
     pub toolchain_type: String,
     /// The toolchain implementation target label
     pub toolchain_impl: String,
+    /// For rule-based C++ toolchains, the generated cc_toolchain_config target.
+    pub cc_toolchain_config: Option<String>,
+    /// For rule-based C++ toolchains, the configured module map target, if any.
+    pub cc_toolchain_module_map: Option<String>,
     /// Constraint values the execution platform must satisfy
     pub exec_compatible_with: Vec<String>,
     /// Constraint values the target platform must satisfy
@@ -1191,6 +1195,8 @@ fn analyze_toolchain(
         let info = DeclaredToolchainInfo {
             toolchain_type: toolchain_type_label.clone(),
             toolchain_impl: toolchain_impl_label.clone(),
+            cc_toolchain_config: None,
+            cc_toolchain_module_map: None,
             exec_compatible_with: exec_compat,
             target_compatible_with: target_compat,
         };

@@ -320,6 +320,60 @@ fn append_map_each_result<'v>(result: &mut Vec<Value<'v>>, mapped: Value<'v>) {
     }
 }
 
+fn eval_map_each<'v>(
+    eval: &mut Evaluator<'v, '_, '_>,
+    map_each: Value<'v>,
+    item: Value<'v>,
+) -> starlark::Result<Value<'v>> {
+    match eval.eval_function(map_each, &[item], &[]) {
+        Ok(mapped) => Ok(mapped),
+        Err(err)
+            if err
+                .to_string()
+                .contains("Missing parameter `tree_expander`") =>
+        {
+            let tree_expander = eval.heap().alloc(ArgsTreeExpander).to_value();
+            eval.eval_function(map_each, &[item, tree_expander], &[])
+        }
+        Err(err) => Err(err),
+    }
+}
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct ArgsTreeExpander;
+
+impl Display for ArgsTreeExpander {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "<tree_expander>")
+    }
+}
+
+starlark_simple_value!(ArgsTreeExpander);
+
+#[starlark_value(type = "tree_expander")]
+impl<'v> StarlarkValue<'v> for ArgsTreeExpander {
+    fn get_methods() -> Option<&'static Methods> {
+        static RES: MethodsStatic = MethodsStatic::new();
+        RES.methods(args_tree_expander_methods)
+    }
+}
+
+#[starlark_module]
+fn args_tree_expander_methods(builder: &mut MethodsBuilder) {
+    /// Expands a tree artifact to its children.
+    ///
+    /// Kuro does not have analysis-time tree contents, so this conservative shim
+    /// returns an empty expansion. Non-tree artifacts are never expanded by
+    /// Bazel's module-map callback path.
+    fn expand<'v>(
+        this: &ArgsTreeExpander,
+        artifact: Value<'v>,
+    ) -> starlark::Result<Vec<Value<'v>>> {
+        let _ = (this, artifact);
+        Ok(Vec::new())
+    }
+}
+
 /// Fields of `cmd_args`. Abstract mutable and frozen versions.
 trait Fields<'v> {
     fn items(&self) -> &[CommandLineArg<'v>];
@@ -1250,7 +1304,7 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
         let mapped_items: Vec<Value<'v>> = if has_map_each {
             let mut result = Vec::new();
             for item in &items {
-                let mapped = eval.eval_function(map_each, &[*item], &[])?;
+                let mapped = eval_map_each(eval, map_each, *item)?;
                 append_map_each_result(&mut result, mapped);
             }
             result
@@ -1392,7 +1446,7 @@ fn cmd_args_methods(builder: &mut MethodsBuilder) {
         let mapped_items: Vec<Value<'v>> = if !map_each.is_none() {
             let mut result = Vec::new();
             for item in &raw_items {
-                let mapped = eval.eval_function(map_each, &[*item], &[])?;
+                let mapped = eval_map_each(eval, map_each, *item)?;
                 append_map_each_result(&mut result, mapped);
             }
             result

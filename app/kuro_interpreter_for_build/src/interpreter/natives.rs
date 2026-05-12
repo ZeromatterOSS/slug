@@ -263,6 +263,23 @@ fn canonical_repo_name_for_label_context(
     apparent_repo_name.to_owned()
 }
 
+fn scoped_canonical_repo_name_for_label_context(
+    eval: &Evaluator<'_, '_, '_>,
+    file_cell: &str,
+    apparent_repo_name: &str,
+) -> String {
+    if let Some(canonical_name) =
+        kuro_core::cells::resolve_scoped_bzlmod_repo_alias_for_current_cell(
+            file_cell,
+            apparent_repo_name,
+        )
+    {
+        return canonical_name;
+    }
+
+    canonical_repo_name_for_label_context(eval, apparent_repo_name)
+}
+
 /// Register Bazel-specific module-level globals.
 ///
 /// These are functions that can be called at the top level of .bzl files.
@@ -341,7 +358,7 @@ pub(crate) fn register_bzl_module_globals(globals: &mut GlobalsBuilder) {
             None,
             |apparent_repo| {
                 Some(kuro_bzlmod::CanonicalRepoName::new(
-                    canonical_repo_name_for_label_context(eval, apparent_repo),
+                    scoped_canonical_repo_name_for_label_context(eval, &file_cell, apparent_repo),
                 ))
             },
         )

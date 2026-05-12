@@ -24,6 +24,7 @@ use dupe::Dupe;
 use gazebo::variants::UnpackVariants;
 use kuro_artifact::artifact::artifact_type::Artifact;
 use kuro_core::configuration::data::ConfigurationData;
+use kuro_core::target::configured_target_label::ConfiguredTargetLabel;
 use starlark::values::FrozenValue;
 use starlark::values::ValueIdentity;
 use static_assertions::assert_eq_size;
@@ -122,6 +123,7 @@ pub enum ArtifactGroup {
     TransitiveSetProjection(Arc<TransitiveSetProjectionWrapper>),
     Depset(Arc<DepsetArtifactGroup>),
     Promise(Arc<PromiseArtifactWrapper>),
+    TargetDefaultOutputs(Arc<ConfiguredTargetLabel>),
 }
 
 assert_eq_size!(ArtifactGroup, [usize; 2]);
@@ -150,6 +152,9 @@ impl ArtifactGroup {
                     ResolvedArtifactGroup::Artifact(artifact)
                 }
             },
+            ArtifactGroup::TargetDefaultOutputs(label) => {
+                ResolvedArtifactGroup::TargetDefaultOutputs(label.as_ref())
+            }
         })
     }
 
@@ -159,6 +164,7 @@ impl ArtifactGroup {
             ArtifactGroup::TransitiveSetProjection(a) => a.has_content_based_path,
             ArtifactGroup::Depset(a) => a.has_content_based_path,
             ArtifactGroup::Promise(p) => p.has_content_based_path,
+            ArtifactGroup::TargetDefaultOutputs(_) => false,
         }
     }
 
@@ -185,6 +191,7 @@ impl ArtifactGroup {
                 .unwrap_or(false);
             }
             ArtifactGroup::Promise(p) => p.has_content_based_path,
+            ArtifactGroup::TargetDefaultOutputs(_) => false,
         };
 
         if is_artifact_group_eligible_for_dedupe {
@@ -201,6 +208,9 @@ impl ArtifactGroup {
                 // We have to assume that anonymous targets are not eligible for dedupe unless they are content-based,
                 // since they have a hash based on their inputs, which will very likely be different across configurations.
                 ArtifactGroup::Promise(_) => return false,
+                ArtifactGroup::TargetDefaultOutputs(label) => {
+                    return label.cfg() != target_platform;
+                }
             };
 
             artifact_group_owner
@@ -221,6 +231,7 @@ pub enum ResolvedArtifactGroup<'a> {
     Artifact(Artifact),
     TransitiveSetProjection(&'a TransitiveSetProjectionKey),
     Depset(&'a DepsetArtifactGroup),
+    TargetDefaultOutputs(&'a ConfiguredTargetLabel),
 }
 
 pub enum ResolvedArtifactGroupBuildSignalsKey {

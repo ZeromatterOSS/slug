@@ -32,6 +32,169 @@ use crate::interpreter::rule_defs::cc_common::host::is_windows_host;
 // FeatureConfiguration - C++ feature configuration
 // ============================================================================
 
+#[derive(Debug, Allocative, Clone)]
+pub struct CcWithFeatureSet {
+    pub(crate) features: Vec<String>,
+    pub(crate) not_features: Vec<String>,
+}
+
+impl CcWithFeatureSet {
+    pub fn new(features: Vec<String>, not_features: Vec<String>) -> Self {
+        Self {
+            features,
+            not_features,
+        }
+    }
+}
+
+#[derive(Debug, Allocative, Clone)]
+pub(crate) struct CcEnvEntry {
+    pub(crate) key: String,
+    pub(crate) value: String,
+    pub(crate) expand_if_available: Option<String>,
+}
+
+#[derive(Debug, Allocative, Clone)]
+pub(crate) struct CcEnvSet {
+    pub(crate) actions: Vec<String>,
+    pub(crate) env_entries: Vec<CcEnvEntry>,
+    pub(crate) with_features: Vec<CcWithFeatureSet>,
+}
+
+impl CcEnvSet {
+    pub(crate) fn applies_to_action(&self, action_name: &str) -> bool {
+        self.actions.iter().any(|action| action == action_name)
+    }
+
+    pub(crate) fn with_features_match(&self, feature_configuration: &FeatureConfiguration) -> bool {
+        self.with_features.is_empty()
+            || self.with_features.iter().any(|with_features| {
+                with_features
+                    .features
+                    .iter()
+                    .all(|feature| feature_configuration.is_feature_enabled(feature))
+                    && with_features
+                        .not_features
+                        .iter()
+                        .all(|feature| !feature_configuration.is_feature_enabled(feature))
+            })
+    }
+}
+
+#[derive(Debug, Allocative, Clone)]
+pub(crate) struct CcFeatureEnvSets {
+    pub(crate) feature_name: String,
+    pub(crate) env_sets: Vec<CcEnvSet>,
+}
+
+#[derive(Debug, Allocative, Clone)]
+pub struct CcExpandIfEqual {
+    pub(crate) variable: String,
+    pub(crate) value: String,
+}
+
+impl CcExpandIfEqual {
+    pub fn new(variable: String, value: String) -> Self {
+        Self { variable, value }
+    }
+}
+
+#[derive(Debug, Allocative, Clone)]
+pub struct CcFlagGroup {
+    pub(crate) flags: Vec<String>,
+    pub(crate) flag_groups: Vec<CcFlagGroup>,
+    pub(crate) iterate_over: Option<String>,
+    pub(crate) expand_if_available: Option<String>,
+    pub(crate) expand_if_not_available: Option<String>,
+    pub(crate) expand_if_true: Option<String>,
+    pub(crate) expand_if_false: Option<String>,
+    pub(crate) expand_if_equal: Option<CcExpandIfEqual>,
+}
+
+impl CcFlagGroup {
+    pub fn new(
+        flags: Vec<String>,
+        flag_groups: Vec<CcFlagGroup>,
+        iterate_over: Option<String>,
+        expand_if_available: Option<String>,
+        expand_if_not_available: Option<String>,
+        expand_if_true: Option<String>,
+        expand_if_false: Option<String>,
+        expand_if_equal: Option<CcExpandIfEqual>,
+    ) -> Self {
+        Self {
+            flags,
+            flag_groups,
+            iterate_over,
+            expand_if_available,
+            expand_if_not_available,
+            expand_if_true,
+            expand_if_false,
+            expand_if_equal,
+        }
+    }
+}
+
+#[derive(Debug, Allocative, Clone)]
+pub struct CcFlagSet {
+    pub(crate) actions: Vec<String>,
+    pub(crate) flag_groups: Vec<CcFlagGroup>,
+    pub(crate) with_features: Vec<CcWithFeatureSet>,
+}
+
+impl CcFlagSet {
+    pub fn new(
+        actions: Vec<String>,
+        flag_groups: Vec<CcFlagGroup>,
+        with_features: Vec<CcWithFeatureSet>,
+    ) -> Self {
+        Self {
+            actions,
+            flag_groups,
+            with_features,
+        }
+    }
+
+    pub fn into_flag_groups(self) -> Vec<CcFlagGroup> {
+        self.flag_groups
+    }
+}
+
+impl CcFlagSet {
+    pub(crate) fn applies_to_action(&self, action_name: &str) -> bool {
+        self.actions.is_empty() || self.actions.iter().any(|action| action == action_name)
+    }
+
+    pub(crate) fn with_features_match(&self, feature_configuration: &FeatureConfiguration) -> bool {
+        self.with_features.is_empty()
+            || self.with_features.iter().any(|with_features| {
+                with_features
+                    .features
+                    .iter()
+                    .all(|feature| feature_configuration.is_feature_enabled(feature))
+                    && with_features
+                        .not_features
+                        .iter()
+                        .all(|feature| !feature_configuration.is_feature_enabled(feature))
+            })
+    }
+}
+
+#[derive(Debug, Allocative, Clone)]
+pub struct CcFeatureFlagSets {
+    pub(crate) feature_name: String,
+    pub(crate) flag_sets: Vec<CcFlagSet>,
+}
+
+impl CcFeatureFlagSets {
+    pub fn new(feature_name: String, flag_sets: Vec<CcFlagSet>) -> Self {
+        Self {
+            feature_name,
+            flag_sets,
+        }
+    }
+}
+
 /// FeatureConfiguration holds the enabled features for C++ compilation.
 ///
 /// This is created by cc_common.configure_features() and used to control
@@ -44,6 +207,12 @@ use crate::interpreter::rule_defs::cc_common::host::is_windows_host;
 pub struct FeatureConfiguration {
     /// Set of enabled feature names
     pub(crate) enabled_features: Vec<String>,
+    /// Action-config-declared flag sets, expanded before feature flag sets.
+    pub(crate) action_config_flag_sets: Vec<CcFlagSet>,
+    /// Feature-declared flag sets active for this configuration.
+    pub(crate) feature_flag_sets: Vec<CcFlagSet>,
+    /// Feature-declared environment sets active for this configuration.
+    pub(crate) env_sets: Vec<CcEnvSet>,
 }
 
 /// Default features that are typically enabled by CC toolchains.
@@ -109,6 +278,9 @@ impl Default for FeatureConfiguration {
                 .into_iter()
                 .map(|s| s.to_owned())
                 .collect(),
+            action_config_flag_sets: Vec::new(),
+            feature_flag_sets: Vec::new(),
+            env_sets: Vec::new(),
         }
     }
 }
@@ -133,6 +305,9 @@ impl FeatureConfiguration {
 
         Self {
             enabled_features: enabled,
+            action_config_flag_sets: Vec::new(),
+            feature_flag_sets: Vec::new(),
+            env_sets: Vec::new(),
         }
     }
 
@@ -199,6 +374,12 @@ pub struct CcToolchainFeatures {
     pub(crate) feature_names: Vec<String>,
     /// Names of features that are enabled by default
     pub(crate) default_enabled_features: Vec<String>,
+    /// Feature-declared environment sets, keyed by owning feature name.
+    pub(crate) feature_env_sets: Vec<CcFeatureEnvSets>,
+    /// Action-config-declared flag sets in legacy toolchain order.
+    pub(crate) action_config_flag_sets: Vec<CcFlagSet>,
+    /// Feature-declared flag sets, keyed by owning feature name.
+    pub(crate) feature_flag_sets: Vec<CcFeatureFlagSets>,
     /// Names of action configs declared in the toolchain config
     pub(crate) action_config_names: Vec<String>,
     /// The tools directory path (reserved for future use in tool path resolution)
@@ -211,8 +392,30 @@ impl CcToolchainFeatures {
         Self {
             feature_names: Vec::new(),
             default_enabled_features: Vec::new(),
+            feature_env_sets: Vec::new(),
+            action_config_flag_sets: Vec::new(),
+            feature_flag_sets: Vec::new(),
             action_config_names: Vec::new(),
             tools_directory: String::new(),
+        }
+    }
+
+    pub fn new(
+        feature_names: Vec<String>,
+        default_enabled_features: Vec<String>,
+        action_config_flag_sets: Vec<CcFlagSet>,
+        feature_flag_sets: Vec<CcFeatureFlagSets>,
+        action_config_names: Vec<String>,
+        tools_directory: String,
+    ) -> Self {
+        Self {
+            feature_names,
+            default_enabled_features,
+            feature_env_sets: Vec::new(),
+            action_config_flag_sets,
+            feature_flag_sets,
+            action_config_names,
+            tools_directory,
         }
     }
 }
@@ -225,6 +428,89 @@ impl Display for CcToolchainFeatures {
             self.feature_names.len(),
             self.action_config_names.len()
         )
+    }
+}
+
+impl CcToolchainFeatures {
+    pub(crate) fn configure(
+        &self,
+        requested_features: Vec<String>,
+        unsupported_features: Vec<String>,
+    ) -> FeatureConfiguration {
+        let mut enabled: Vec<String> = default_cc_features()
+            .into_iter()
+            .map(|s| s.to_owned())
+            .collect();
+
+        for f in &self.default_enabled_features {
+            if !enabled.iter().any(|e| e == f) {
+                enabled.push(f.clone());
+            }
+        }
+
+        for f in &requested_features {
+            if !enabled.iter().any(|e| e == f) {
+                enabled.push(f.clone());
+            }
+        }
+
+        enabled.retain(|f| !unsupported_features.contains(f));
+
+        let env_sets = self
+            .feature_env_sets
+            .iter()
+            .filter(|feature| enabled.iter().any(|name| name == &feature.feature_name))
+            .flat_map(|feature| feature.env_sets.clone())
+            .collect();
+        let feature_flag_sets = self
+            .feature_flag_sets
+            .iter()
+            .filter(|feature| enabled.iter().any(|name| name == &feature.feature_name))
+            .flat_map(|feature| feature.flag_sets.clone())
+            .collect();
+
+        FeatureConfiguration {
+            enabled_features: enabled,
+            action_config_flag_sets: self.action_config_flag_sets.clone(),
+            feature_flag_sets,
+            env_sets,
+        }
+    }
+
+    pub(crate) fn configure_requested_features(
+        &self,
+        requested_features: Vec<String>,
+    ) -> FeatureConfiguration {
+        let mut enabled: Vec<String> = default_cc_features()
+            .into_iter()
+            .map(|s| s.to_owned())
+            .collect();
+
+        for f in &requested_features {
+            if !enabled.iter().any(|e| e == f) {
+                enabled.push(f.clone());
+            }
+        }
+
+        let env_sets = self
+            .feature_env_sets
+            .iter()
+            .filter(|feature| enabled.iter().any(|name| name == &feature.feature_name))
+            .flat_map(|feature| feature.env_sets.clone())
+            .collect();
+        let feature_flag_sets = self
+            .feature_flag_sets
+            .iter()
+            .filter(|feature| enabled.iter().any(|name| name == &feature.feature_name))
+            .flat_map(|feature| feature.flag_sets.clone())
+            .collect();
+
+        FeatureConfiguration {
+            enabled_features: enabled,
+            action_config_flag_sets: self.action_config_flag_sets.clone(),
+            feature_flag_sets,
+            env_sets,
+        }
     }
 }
 
@@ -259,29 +545,7 @@ fn cc_toolchain_features_methods(builder: &mut MethodsBuilder) {
             }
         }
 
-        // Start with the default platform features
-        let mut enabled: Vec<String> = default_cc_features()
-            .into_iter()
-            .map(|s| s.to_owned())
-            .collect();
-
-        // Add features that are enabled by default in the toolchain config
-        for f in &this.default_enabled_features {
-            if !enabled.iter().any(|e| e == f) {
-                enabled.push(f.clone());
-            }
-        }
-
-        // Add all requested features
-        for f in &requested {
-            if !enabled.iter().any(|e| e == f) {
-                enabled.push(f.clone());
-            }
-        }
-
-        Ok(FeatureConfiguration {
-            enabled_features: enabled,
-        })
+        Ok(this.configure_requested_features(requested))
     }
 
     /// Returns the list of default feature and action_config names.

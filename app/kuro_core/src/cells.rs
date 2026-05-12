@@ -136,6 +136,10 @@ static DYNAMIC_EXTENSION_CELL_ALIASES: std::sync::LazyLock<
     std::sync::Mutex<std::collections::HashMap<String, String>>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
+static SCOPED_BZLMOD_REPO_ALIASES: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<(String, String), String>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
 static BZLMOD_APPARENT_ALIAS_CACHE: std::sync::LazyLock<
     std::sync::Mutex<std::collections::HashMap<String, Option<String>>>,
 > = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
@@ -240,6 +244,64 @@ pub fn resolve_dynamic_extension_cell_alias(apparent_name: &str) -> Option<Strin
         .lock()
         .ok()
         .and_then(|aliases| aliases.get(apparent_name).cloned())
+}
+
+pub fn register_scoped_bzlmod_repo_alias(
+    owner_module: String,
+    apparent_name: String,
+    canonical_name: String,
+) {
+    if let Ok(mut aliases) = SCOPED_BZLMOD_REPO_ALIASES.lock() {
+        aliases.insert((owner_module, apparent_name), canonical_name);
+    }
+}
+
+pub fn resolve_scoped_bzlmod_repo_alias(owner_module: &str, apparent_name: &str) -> Option<String> {
+    SCOPED_BZLMOD_REPO_ALIASES.lock().ok().and_then(|aliases| {
+        aliases
+            .get(&(owner_module.to_owned(), apparent_name.to_owned()))
+            .cloned()
+    })
+}
+
+/// Resolve an apparent repo name using the Bzlmod `use_repo` imports of the
+/// module that owns the current extension-generated repo.
+///
+/// Bazel scopes apparent repo names. A generated repo like
+/// `llvm+llvm_source+compiler-rt` resolving `@llvm-project` should use the
+/// `llvm` module's imports, not a process-global apparent-name alias.
+pub fn resolve_scoped_bzlmod_repo_alias_for_current_cell(
+    current_cell: &str,
+    apparent_name: &str,
+) -> Option<String> {
+    if apparent_name.is_empty() {
+        return None;
+    }
+
+    let aliases = SCOPED_BZLMOD_REPO_ALIASES.lock().ok()?;
+    let lookup = |owner_module: &str| {
+        aliases
+            .get(&(owner_module.to_owned(), apparent_name.to_owned()))
+            .cloned()
+    };
+
+    if let Some((owner, _rest)) = current_cell.split_once("++") {
+        let owner_module = &current_cell[..owner.len() + 1];
+        return lookup(owner_module);
+    }
+
+    let mut parts = current_cell.splitn(3, '+');
+    let owner_module = parts.next()?;
+    parts.next()?;
+    parts.next()?;
+
+    lookup(owner_module).or_else(|| {
+        if owner_module.ends_with('+') {
+            None
+        } else {
+            lookup(&format!("{owner_module}+"))
+        }
+    })
 }
 
 /// Resolve an apparent or internal extension repo name to the canonical Bazel
@@ -750,6 +812,13 @@ impl CellAliasResolver {
         }
         if alias == self.current.as_str() {
             return Ok(self.current);
+        }
+        if let Some(canonical_name) =
+            resolve_scoped_bzlmod_repo_alias_for_current_cell(self.current.as_str(), alias)
+        {
+            if let Ok(cell_name) = CellName::unchecked_new(&canonical_name) {
+                return Ok(cell_name);
+            }
         }
         if let Some(name) = self.aliases.get(alias).duped() {
             return Ok(name);
@@ -1498,6 +1567,49 @@ mod tests {
         assert!(!err.contains("alias_099"));
 
         Ok(())
+    }
+
+    #[test]
+    fn cell_alias_resolver_prefers_scoped_bzlmod_repo_alias() -> kuro_error::Result<()> {
+        let apparent = "scoped_alias_test_project";
+        let wanted = "owner++toolchain+scoped_alias_test_project";
+        let global_wrong = "owner+other_extension+scoped_alias_test_project";
+
+        register_scoped_bzlmod_repo_alias(
+            "owner+".to_owned(),
+            apparent.to_owned(),
+            wanted.to_owned(),
+        );
+
+        let mut aliases = HashMap::new();
+        aliases.insert(
+            NonEmptyCellAlias::new(apparent.to_owned())?,
+            CellName::testing_new(global_wrong),
+        );
+        let resolver =
+            CellAliasResolver::new(CellName::testing_new("owner+source+generated"), aliases)?;
+
+        assert_eq!(CellName::testing_new(wanted), resolver.resolve(apparent)?);
+        Ok(())
+    }
+
+    #[test]
+    fn scoped_bzlmod_repo_alias_resolves_double_plus_owner() {
+        let apparent = "scoped_alias_test_double_plus_project";
+        let wanted = "double_owner++toolchain+scoped_alias_test_double_plus_project";
+        register_scoped_bzlmod_repo_alias(
+            "double_owner+".to_owned(),
+            apparent.to_owned(),
+            wanted.to_owned(),
+        );
+
+        assert_eq!(
+            Some(wanted.to_owned()),
+            resolve_scoped_bzlmod_repo_alias_for_current_cell(
+                "double_owner++source+generated",
+                apparent
+            )
+        );
     }
 
     #[test]

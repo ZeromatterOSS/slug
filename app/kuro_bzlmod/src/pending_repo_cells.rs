@@ -347,7 +347,7 @@ fn canonicalize_repo_rule_invocation_name(
     if is_root {
         format!("+{}+{}", rule_name, repo_name)
     } else {
-        format!("{}+{}+{}", module_name, rule_name, repo_name)
+        format!("{}++{}+{}", module_name, rule_name, repo_name)
     }
 }
 
@@ -1096,6 +1096,19 @@ mod tests {
     }
 
     #[test]
+    fn test_canonicalize_repo_rule_invocation_name_matches_bazel_non_root_shape() {
+        assert_eq!(
+            canonicalize_repo_rule_invocation_name(
+                "llvm",
+                false,
+                "//extensions:llvm.bzl%llvm",
+                "llvm-project"
+            ),
+            "llvm++llvm+llvm-project",
+        );
+    }
+
+    #[test]
     fn test_precompute_use_repo_rule_uses_canonical_name_and_apparent_alias() {
         let mut module = parsed_module("ape");
         let mut attrs = indexmap::IndexMap::new();
@@ -1117,12 +1130,12 @@ mod tests {
         assert_eq!(cells.len(), 1);
         assert_eq!(
             cells[0].canonical_name,
-            "ape+toolchain_local_select+launcher"
+            "ape++toolchain_local_select+launcher"
         );
         assert_eq!(cells[0].internal_name, "launcher");
         assert_eq!(
             cells[0].path,
-            "bazel-external/ape+toolchain_local_select+launcher"
+            "bazel-external/ape++toolchain_local_select+launcher"
         );
         let repo_spec: RepoSpec = serde_json::from_str(&cells[0].repo_spec_json).unwrap();
         assert_eq!(
@@ -1139,7 +1152,7 @@ mod tests {
         assert_eq!(aliases[0].apparent_name, "launcher");
         assert_eq!(
             aliases[0].canonical_name,
-            "ape+toolchain_local_select+launcher"
+            "ape++toolchain_local_select+launcher"
         );
     }
 
